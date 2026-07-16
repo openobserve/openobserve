@@ -116,7 +116,7 @@
               v-if="!inputQuery && queryEditorPlaceholderFlag"
               class="query-editor-placeholder-overlay absolute top-0 left-0 right-0 bottom-0 flex items-start p-[0.1875rem_0.5rem_0_2.15rem] pointer-events-none z-1 select-none"
             >
-              <span class="query-editor-placeholder-typewriter [font-family:monospace] text-[var(--text-base)] [line-height:1.3125rem] text-text-placeholder whitespace-nowrap overflow-hidden text-ellipsis">{{ queryEditorPlaceholder }}</span>
+              <span class="query-editor-placeholder-typewriter [font-family:monospace] text-[var(--text-sm)] [line-height:1.3125rem] text-text-placeholder whitespace-nowrap overflow-hidden text-ellipsis">{{ queryEditorPlaceholder }}</span>
             </div>
             <div
               class="text-status-error-text p-1 invalid-sql-error min-h-5.5"

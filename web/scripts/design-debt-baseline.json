@@ -2,7 +2,6 @@
   "totals": {
     "themeTernary": 151,
     "darkMechanism": 310,
-    "arbTextSize": 302,
     "rawPalette": 57,
     "arbPx": 174,
     "arbRadius": 25,
@@ -14,15 +13,13 @@
     "tsHex": 471,
     "inlineHexBind": 6,
     "bareRounded": 10,
-    "hexClass": 40
+    "hexClass": 40,
+    "arbTextSize": 3
   },
   "files": {
     "App.vue": {
       "themeTernary": 1,
       "darkMechanism": 1
-    },
-    "components/about/FeatureComparisonTable.vue": {
-      "arbTextSize": 3
     },
     "components/actionScripts/EditScript.vue": {
       "rawPalette": 5
@@ -41,7 +38,6 @@
       "styleBlockHex": 2
     },
     "components/ai-assistant/welcome/WelcomeGreeting.vue": {
-      "arbTextSize": 3,
       "unscopedStyle": 1,
       "arbPx": 3
     },
@@ -55,14 +51,10 @@
       "arbPx": 1,
       "stylePxUnit": 23
     },
-    "components/alerts/AddTemplate.vue": {
-      "arbTextSize": 1
-    },
     "components/alerts/AlertHistory.vue": {
       "unscopedStyle": 1
     },
     "components/alerts/AlertHistoryTimeline.vue": {
-      "arbTextSize": 2,
       "arbPx": 1,
       "styleBlockHex": 2,
       "stylePxUnit": 12
@@ -73,9 +65,6 @@
     "components/alerts/AlertList.vue": {
       "unscopedStyle": 1,
       "stylePxUnit": 1
-    },
-    "components/alerts/AlertsContainer.vue": {
-      "arbTextSize": 1
     },
     "components/alerts/AlertSettingsHelpDrawer.vue": {
       "stylePxUnit": 2
@@ -89,15 +78,10 @@
       "darkMechanism": 1
     },
     "components/alerts/DestinationPreview.vue": {
-      "arbTextSize": 9,
       "unscopedStyle": 1,
       "stylePxUnit": 1
     },
-    "components/alerts/DestinationTestResult.vue": {
-      "arbTextSize": 4
-    },
     "components/alerts/FilterGroup.vue": {
-      "arbTextSize": 1,
       "stylePxUnit": 3
     },
     "components/alerts/HorizontalStepper.vue": {
@@ -115,7 +99,6 @@
     "components/alerts/IncidentDetailDrawer.vue": {
       "rawPalette": 10,
       "themeTernary": 15,
-      "arbTextSize": 10,
       "unscopedStyle": 1,
       "darkMechanism": 18,
       "styleBlockHex": 2,
@@ -144,7 +127,6 @@
     },
     "components/alerts/QueryEditorDialog.vue": {
       "themeTernary": 1,
-      "arbTextSize": 3,
       "unscopedStyle": 1,
       "arbPx": 12,
       "arbZ": 2,
@@ -209,11 +191,7 @@
     "components/common/AppDialog.vue": {
       "unscopedStyle": 1
     },
-    "components/common/AppPageHeader.vue": {
-      "arbTextSize": 1
-    },
     "components/common/BaseImport.vue": {
-      "arbTextSize": 1,
       "unscopedStyle": 1
     },
     "components/common/empty-states/EmptyState.vue": {
@@ -224,16 +202,13 @@
       "stylePxUnit": 1
     },
     "components/common/FieldListPagination.vue": {
-      "arbTextSize": 8,
       "unscopedStyle": 1
     },
     "components/common/FieldTypeBadge.vue": {
-      "arbRadius": 1,
-      "arbTextSize": 1
+      "arbRadius": 1
     },
     "components/common/FieldValuesPanel.vue": {
-      "arbRadius": 1,
-      "arbTextSize": 2
+      "arbRadius": 1
     },
     "components/common/JsonEditor.vue": {
       "themeTernary": 1,
@@ -244,9 +219,6 @@
       "unscopedStyle": 1,
       "arbPx": 1,
       "arbZ": 1
-    },
-    "components/common/SectionRail.vue": {
-      "arbTextSize": 1
     },
     "components/common/sidebar/FolderList.vue": {
       "unscopedStyle": 1
@@ -337,9 +309,6 @@
     "components/dashboards/addPanel/dynamicFunction/SelectFunction.vue": {
       "unscopedStyle": 1
     },
-    "components/dashboards/addPanel/PanelSidebar.vue": {
-      "arbTextSize": 2
-    },
     "components/dashboards/addPanel/ShowLegendsPopup.vue": {
       "inlineHexStyle": 1,
       "inlineHexBind": 1,
@@ -354,7 +323,6 @@
       "stylePxUnit": 1
     },
     "components/dashboards/OverrideConfigPopup.vue": {
-      "arbTextSize": 1,
       "arbPx": 3,
       "stylePxUnit": 4
     },
@@ -378,7 +346,6 @@
       "stylePxUnit": 11
     },
     "components/dashboards/QueryInspector.vue": {
-      "arbTextSize": 1,
       "unscopedStyle": 1,
       "stylePxUnit": 4
     },
@@ -401,19 +368,16 @@
       "darkMechanism": 1
     },
     "components/DateTime.vue": {
-      "arbTextSize": 2,
       "unscopedStyle": 1,
       "stylePxUnit": 1
     },
     "components/DateTimePicker.vue": {
-      "arbTextSize": 1,
       "unscopedStyle": 1,
       "arbPx": 2,
       "stylePxUnit": 1
     },
     "components/EnterpriseUpgradeDialog.vue": {
       "arbRadius": 2,
-      "arbTextSize": 2,
       "unscopedStyle": 1,
       "arbZ": 1,
       "stylePxUnit": 2
@@ -444,9 +408,6 @@
       "arbZ": 1,
       "stylePxUnit": 4
     },
-    "components/functions/StreamRouting.vue": {
-      "arbTextSize": 1
-    },
     "components/functions/TestFunction.vue": {
       "unscopedStyle": 1,
       "stylePxUnit": 4
@@ -472,9 +433,6 @@
       "unscopedStyle": 1,
       "stylePxUnit": 4
     },
-    "components/ingestion/ai/AIIntegrationDetail.vue": {
-      "arbTextSize": 1
-    },
     "components/ingestion/ai/content/AIIntegrationCard.vue": {
       "stylePxUnit": 2
     },
@@ -488,17 +446,8 @@
       "unscopedStyle": 1,
       "stylePxUnit": 3
     },
-    "components/ingestion/recommended/AWSQuickSetup.vue": {
-      "arbTextSize": 8
-    },
-    "components/ingestion/recommended/AzureConfig.vue": {
-      "arbTextSize": 2
-    },
     "components/ingestion/recommended/AzureQuickSetup.vue": {
       "unscopedStyle": 1
-    },
-    "components/ingestion/recommended/GCPConfig.vue": {
-      "arbTextSize": 1
     },
     "components/ingestion/setupCard/content/aerospike.ts": {
       "tsHex": 1
@@ -547,9 +496,6 @@
       "themeTernary": 1,
       "darkMechanism": 1
     },
-    "components/login/GetStarted.vue": {
-      "arbTextSize": 2
-    },
     "components/logs/LogsHighLighting.vue": {
       "themeTernary": 1,
       "unscopedStyle": 1,
@@ -565,18 +511,13 @@
     },
     "components/logstream/schema.vue": {
       "themeTernary": 1,
-      "arbTextSize": 2,
       "unscopedStyle": 1,
       "darkMechanism": 1,
       "stylePxUnit": 4
     },
-    "components/MenuLink.vue": {
-      "arbTextSize": 2
-    },
     "components/O2AIChat.vue": {
       "hexClass": 8,
       "themeTernary": 14,
-      "arbTextSize": 1,
       "unscopedStyle": 1,
       "arbZ": 2,
       "darkMechanism": 42,
@@ -605,7 +546,6 @@
     },
     "components/pipeline/NodeForm/ScheduledPipeline.vue": {
       "themeTernary": 1,
-      "arbTextSize": 4,
       "unscopedStyle": 1,
       "darkMechanism": 1
     },
@@ -614,7 +554,6 @@
       "arbPx": 3
     },
     "components/pipeline/NodeSidebar.vue": {
-      "arbTextSize": 1,
       "unscopedStyle": 1,
       "styleBlockHex": 5,
       "stylePxUnit": 15
@@ -645,9 +584,6 @@
     "components/queries/SummaryList.vue": {
       "unscopedStyle": 1
     },
-    "components/query-plan/QueryPlanNode.vue": {
-      "arbTextSize": 1
-    },
     "components/QueryPlanDialog.vue": {
       "unscopedStyle": 1,
       "stylePxUnit": 1
@@ -663,9 +599,6 @@
       "styleBlockHex": 4,
       "stylePxUnit": 17
     },
-    "components/rum/common/performance/MetricCard.vue": {
-      "arbTextSize": 2
-    },
     "components/rum/ErrorsList.vue": {
       "unscopedStyle": 1,
       "styleBlockHex": 2,
@@ -674,16 +607,11 @@
     "components/rum/errorTracking/view/ErrorEvents.vue": {
       "stylePxUnit": 1
     },
-    "components/rum/errorTracking/view/ErrorHeader.vue": {
-      "arbTextSize": 1
-    },
     "components/rum/errorTracking/view/PrettyStackTrace.vue": {
-      "arbTextSize": 1,
       "unscopedStyle": 1
     },
     "components/rum/EventDetailDrawerContent.vue": {
       "themeTernary": 1,
-      "arbTextSize": 10,
       "unscopedStyle": 1,
       "darkMechanism": 1
     },
@@ -732,7 +660,6 @@
     },
     "components/settings/ModelPricingEditor.vue": {
       "arbRadius": 3,
-      "arbTextSize": 1,
       "unscopedStyle": 2,
       "arbPx": 3
     },
@@ -750,7 +677,6 @@
       "inlineHexStyle": 1,
       "inlineHexBind": 1,
       "themeTernary": 6,
-      "arbTextSize": 3,
       "arbZ": 1,
       "darkMechanism": 7
     },
@@ -767,22 +693,16 @@
       "stylePxUnit": 1
     },
     "components/settings/ServiceIdentitySetup.vue": {
-      "arbTextSize": 7,
       "unscopedStyle": 1,
       "styleBlockHex": 2
     },
     "components/settings/TestModelMatchDialog.vue": {
-      "arbTextSize": 3,
       "unscopedStyle": 2,
       "arbPx": 4,
       "stylePxUnit": 1
     },
-    "components/shared/grid/NoOrganizationSelected.vue": {
-      "arbTextSize": 1
-    },
     "components/shared/HomeViewSkeleton.vue": {
       "arbRadius": 1,
-      "arbTextSize": 3,
       "unscopedStyle": 1,
       "stylePxUnit": 3
     },
@@ -805,13 +725,11 @@
       "darkMechanism": 2
     },
     "components/traces/FlameGraphView.vue": {
-      "inlineHexStyle": 5,
-      "arbTextSize": 2
+      "inlineHexStyle": 5
     },
     "components/WebinarBanner.vue": {
       "rawPalette": 1,
       "hexClass": 5,
-      "arbTextSize": 1,
       "unscopedStyle": 1,
       "arbZ": 1
     },
@@ -846,19 +764,14 @@
       "tsHex": 8
     },
     "enterprise/components/billings/BillingGroup.vue": {
-      "arbTextSize": 14,
+      "arbTextSize": 1,
       "arbPx": 2
     },
-    "enterprise/components/billings/enterprisePlan.vue": {
-      "arbTextSize": 3
-    },
     "enterprise/components/billings/plans.vue": {
-      "arbTextSize": 2,
       "arbPx": 3
     },
     "enterprise/components/billings/proPlan.vue": {
-      "inlineHexStyle": 1,
-      "arbTextSize": 3
+      "inlineHexStyle": 1
     },
     "enterprise/components/billings/usage.vue": {
       "arbRadius": 3
@@ -867,7 +780,6 @@
       "tsHex": 4
     },
     "enterprise/components/billings/UsageMemberList.vue": {
-      "arbTextSize": 2,
       "unscopedStyle": 1,
       "arbPx": 2,
       "stylePxUnit": 1
@@ -876,7 +788,6 @@
       "stylePxUnit": 5
     },
     "enterprise/components/onlineEvals/forms/EvalJobDetail.vue": {
-      "arbTextSize": 3,
       "unscopedStyle": 1,
       "styleBlockHex": 12,
       "stylePxUnit": 3
@@ -898,7 +809,6 @@
       "styleBlockHex": 5
     },
     "enterprise/components/onlineEvals/forms/ScoreConfigDialog.vue": {
-      "arbTextSize": 4,
       "unscopedStyle": 1,
       "arbPx": 3,
       "styleBlockHex": 16,
@@ -910,11 +820,9 @@
       "styleBlockHex": 1
     },
     "enterprise/components/onlineEvals/forms/ScorerDetail.vue": {
-      "arbTextSize": 3,
       "styleBlockHex": 11
     },
     "enterprise/components/onlineEvals/forms/ScorerFormPage.vue": {
-      "arbTextSize": 3,
       "unscopedStyle": 1,
       "arbPx": 2,
       "stylePxUnit": 2
@@ -932,13 +840,9 @@
       "stylePxUnit": 5
     },
     "enterprise/components/onlineEvals/quality/QualityDetailPanel.vue": {
-      "arbTextSize": 2,
       "unscopedStyle": 1,
       "styleBlockHex": 1,
       "stylePxUnit": 6
-    },
-    "enterprise/components/onlineEvals/quality/QualityKpiCard.vue": {
-      "arbTextSize": 5
     },
     "enterprise/components/onlineEvals/quality/QualityKpiSkeleton.vue": {
       "unscopedStyle": 1,
@@ -955,14 +859,12 @@
       "darkMechanism": 3
     },
     "lib/core/Badge/OBadge.vue": {
-      "bareRounded": 1,
-      "arbTextSize": 1
+      "bareRounded": 1
     },
     "lib/core/Badge/OTag.vue": {
       "bareRounded": 1
     },
     "lib/core/Button/OButton.vue": {
-      "arbTextSize": 1,
       "arbPx": 1
     },
     "lib/core/Code/OCodeBlock.vue": {
@@ -1071,7 +973,6 @@
     },
     "lib/core/Navbar/ONavGroup.vue": {
       "themeTernary": 1,
-      "arbTextSize": 1,
       "darkMechanism": 2,
       "stylePxUnit": 1
     },
@@ -1089,9 +990,6 @@
       "unscopedStyle": 1,
       "styleBlockHex": 1,
       "stylePxUnit": 1
-    },
-    "lib/core/Table/sub-components/OTableColumnToggle.vue": {
-      "arbTextSize": 1
     },
     "lib/core/Table/sub-components/OTableHeader.vue": {
       "bareRounded": 2
@@ -1116,18 +1014,12 @@
     "lib/forms/Color/OColor.vue": {
       "arbZ": 1
     },
-    "lib/forms/Combobox/OCombobox.vue": {
-      "arbTextSize": 1
-    },
     "lib/forms/DateTime/OFormDateTimeRange.vue": {
       "rawPalette": 1
     },
     "lib/forms/DateTimeRange/ODateRangeCalendar.vue": {
       "unscopedStyle": 1,
       "stylePxUnit": 1
-    },
-    "lib/forms/File/OFile.vue": {
-      "arbTextSize": 1
     },
     "lib/forms/Input/OInput.vue": {
       "arbRadius": 2
@@ -1136,7 +1028,6 @@
       "unscopedStyle": 1
     },
     "lib/forms/Select/OSelect.vue": {
-      "arbTextSize": 3,
       "arbZ": 2
     },
     "lib/forms/Slider/OSlider.vue": {
@@ -1144,9 +1035,6 @@
     },
     "lib/forms/Time/OTime.vue": {
       "unscopedStyle": 1
-    },
-    "lib/lists/FieldList/OFieldLabel.vue": {
-      "arbTextSize": 1
     },
     "lib/lists/FieldList/OFieldList.vue": {
       "arbRadius": 3,
@@ -1162,9 +1050,6 @@
     },
     "lib/overlay/Tooltip/OTooltip.vue": {
       "arbZ": 1
-    },
-    "lib/vue-shortcut-manager/ShortcutCheatsheet.vue": {
-      "arbTextSize": 4
     },
     "plugins/correlation/CorrelatedLogsTable.vue": {
       "themeTernary": 1,
@@ -1204,7 +1089,6 @@
       "darkMechanism": 5
     },
     "plugins/logs/patterns/PatternCard.vue": {
-      "arbTextSize": 1,
       "unscopedStyle": 1
     },
     "plugins/logs/patterns/PatternDetailsDialog.vue": {
@@ -1217,7 +1101,6 @@
       "stylePxUnit": 1
     },
     "plugins/logs/patterns/WildcardValuePopover.vue": {
-      "arbTextSize": 1,
       "unscopedStyle": 1,
       "stylePxUnit": 2
     },
@@ -1230,7 +1113,6 @@
     },
     "plugins/logs/SearchJobInspector.vue": {
       "themeTernary": 2,
-      "arbTextSize": 4,
       "darkMechanism": 2
     },
     "plugins/logs/SearchResult.vue": {
@@ -1253,12 +1135,6 @@
       "themeTernary": 3,
       "darkMechanism": 4
     },
-    "plugins/metrics/explorer/FunctionConfigDialog.vue": {
-      "arbTextSize": 1
-    },
-    "plugins/metrics/explorer/MetricCard.vue": {
-      "arbTextSize": 1
-    },
     "plugins/metrics/MetricLegends.vue": {
       "themeTernary": 1,
       "unscopedStyle": 1,
@@ -1279,7 +1155,6 @@
     "plugins/pipelines/CustomNode.vue": {
       "inlineHexStyle": 1,
       "arbRadius": 1,
-      "arbTextSize": 1,
       "unscopedStyle": 1,
       "arbPx": 13,
       "arbZ": 7,
@@ -1295,7 +1170,6 @@
       "stylePxUnit": 1
     },
     "plugins/traces/components/TraceErrorTab.vue": {
-      "arbTextSize": 9,
       "unscopedStyle": 1,
       "darkMechanism": 14,
       "styleBlockHex": 28,
@@ -1305,20 +1179,13 @@
       "inlineHexStyle": 1,
       "inlineHexBind": 1
     },
-    "plugins/traces/components/TraceServiceCell.vue": {
-      "arbTextSize": 1
-    },
     "plugins/traces/components/TracesSearchResultList.vue": {
       "unscopedStyle": 1
     },
     "plugins/traces/config/llmInsightsPanels.ts": {
       "tsHex": 7
     },
-    "plugins/traces/DbSpanDetails.vue": {
-      "arbTextSize": 1
-    },
     "plugins/traces/Index.vue": {
-      "arbTextSize": 3,
       "unscopedStyle": 1,
       "styleBlockHex": 2,
       "stylePxUnit": 7
@@ -1332,12 +1199,6 @@
       "styleBlockHex": 3,
       "stylePxUnit": 23
     },
-    "plugins/traces/LLMErrorTable.vue": {
-      "arbTextSize": 2
-    },
-    "plugins/traces/LLMInsightsDashboard.vue": {
-      "arbTextSize": 3
-    },
     "plugins/traces/LLMInsightsSkeleton.vue": {
       "themeTernary": 6,
       "unscopedStyle": 1,
@@ -1345,14 +1206,12 @@
       "styleBlockHex": 7
     },
     "plugins/traces/LLMSchemaPanel.vue": {
-      "arbTextSize": 2,
       "stylePxUnit": 2
     },
     "plugins/traces/llmTrendPanel.utils.ts": {
       "tsHex": 8
     },
     "plugins/traces/metrics/TracesAnalysisDashboard.vue": {
-      "arbTextSize": 10,
       "unscopedStyle": 1,
       "darkMechanism": 6,
       "styleBlockHex": 6,
@@ -1370,13 +1229,11 @@
       "arbZ": 1
     },
     "plugins/traces/ServiceGraph.vue": {
-      "arbTextSize": 3,
       "unscopedStyle": 1,
       "stylePxUnit": 4
     },
     "plugins/traces/ServiceGraphNodeSidePanel.vue": {
       "hexClass": 1,
-      "arbTextSize": 1,
       "unscopedStyle": 1,
       "darkMechanism": 8,
       "styleBlockHex": 22,
@@ -1384,11 +1241,9 @@
     },
     "plugins/traces/ServicesCatalog.vue": {
       "bareRounded": 1,
-      "arbTextSize": 10,
       "unscopedStyle": 1
     },
     "plugins/traces/SessionDetails.vue": {
-      "arbTextSize": 36,
       "arbPx": 2,
       "arbZ": 1,
       "styleBlockHex": 1,
@@ -1396,7 +1251,6 @@
     },
     "plugins/traces/SessionRibbon.vue": {
       "arbRadius": 2,
-      "arbTextSize": 4,
       "arbPx": 5
     },
     "plugins/traces/SpanBlock.vue": {
@@ -1417,7 +1271,6 @@
       "hexClass": 17,
       "themeTernary": 1,
       "arbRadius": 1,
-      "arbTextSize": 19,
       "unscopedStyle": 1,
       "arbPx": 6,
       "arbZ": 1,
@@ -1426,7 +1279,6 @@
       "stylePxUnit": 9
     },
     "plugins/traces/TraceDAG.vue": {
-      "arbTextSize": 1,
       "unscopedStyle": 1,
       "darkMechanism": 1,
       "styleBlockHex": 1
@@ -1440,19 +1292,16 @@
     },
     "plugins/traces/TraceDetailsSidebar.vue": {
       "inlineHexStyle": 1,
-      "arbTextSize": 2,
       "unscopedStyle": 3,
       "darkMechanism": 28,
       "styleBlockHex": 61,
       "stylePxUnit": 71
     },
     "plugins/traces/TraceTree.vue": {
-      "arbTextSize": 1,
       "unscopedStyle": 1,
       "styleBlockHex": 2
     },
     "plugins/traces/TurnPreviewCard.vue": {
-      "arbTextSize": 3,
       "arbPx": 3
     },
     "stores/index.ts": {
@@ -1601,9 +1450,6 @@
     "views/Dashboards/ViewDashboard.vue": {
       "unscopedStyle": 1,
       "styleBlockHex": 1
-    },
-    "views/EmptyStateDemo.vue": {
-      "arbTextSize": 1
     },
     "views/Error404.vue": {
       "arbTextSize": 1

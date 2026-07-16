@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Deployment Mode Toggle -->
       <div class="mb-6">
-        <div class="mb-3 font-semibold text-[0.9rem]" :class="stepLabelClass">Deployment mode</div>
+        <div class="mb-3 font-semibold text-sm" :class="stepLabelClass">Deployment mode</div>
         <OToggleGroup
           v-model="deploymentMode"
           data-test="aws-deployment-mode-toggle"
@@ -74,7 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :name="showServices ? 'expand-less' : 'expand-more'" size="sm"
               color="primary"
             />
-            <div class="font-semibold text-[0.9rem]" :class="stepLabelClass">Select services to monitor</div>
+            <div class="font-semibold text-sm" :class="stepLabelClass">Select services to monitor</div>
             <OTag type="countChip" value="accent">
               {{ enabledServices.length }} /
               {{ QUICK_SETUP_SERVICES.length }} selected
@@ -115,7 +115,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Single Region: region picker -->
       <div v-if="deploymentMode === 'single'" class="mb-6">
-        <div class="mb-3 font-semibold text-[0.9rem]" :class="stepLabelClass">Deployment region</div>
+        <div class="mb-3 font-semibold text-sm" :class="stepLabelClass">Deployment region</div>
         <OSelect
           v-model="selectedRegion"
           :options="AWS_REGIONS"
@@ -129,7 +129,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- StackSets: admin + target regions -->
       <template v-else>
         <div class="mb-6">
-          <div class="mb-3 font-semibold text-[0.9rem]" :class="stepLabelClass">
+          <div class="mb-3 font-semibold text-sm" :class="stepLabelClass">
             Admin region
             <span class="font-normal text-xs text-text-secondary"
               >(where the StackSet is managed)</span
@@ -156,7 +156,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :name="showTargetRegions ? 'expand-less' : 'expand-more'" size="sm"
                 color="primary"
               />
-              <div class="font-semibold text-[0.9rem]" :class="stepLabelClass">
+              <div class="font-semibold text-sm" :class="stepLabelClass">
                 Target regions
                 <span class="font-normal text-xs text-text-secondary"
                   >(where stacks will be deployed)</span
@@ -209,7 +209,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <div class="mb-6">
-          <div class="mb-3 font-semibold text-[0.9rem]" :class="stepLabelClass">Deployment model</div>
+          <div class="mb-3 font-semibold text-sm" :class="stepLabelClass">Deployment model</div>
           <OToggleGroup
             v-model="stackSetModel"
             data-test="aws-stackset-model-toggle"
@@ -296,7 +296,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OSeparator class="mb-4" />
           <div class="rounded-lg p-4" :class="paramHelperClass">
             <div class="flex items-center justify-between mb-3">
-              <div class="font-semibold text-[0.9rem]" :class="stepLabelClass">
+              <div class="font-semibold text-sm" :class="stepLabelClass">
                 Parameters to enter in the AWS wizard
               </div>
               <OButton
@@ -315,7 +315,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div
                 v-for="param in stackSetParams"
                 :key="param.key"
-                class="flex items-center gap-3 py-1.5 px-2.5 rounded-sm text-[0.8rem] font-mono"
+                class="flex items-center gap-3 py-1.5 px-2.5 rounded-sm text-compact font-mono"
                 :class="paramRowClass"
               >
                 <div class="min-w-60 font-semibold shrink-0" :class="paramKeyClass">{{ param.key }}</div>

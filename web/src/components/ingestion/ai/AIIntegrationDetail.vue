@@ -94,7 +94,7 @@ const richContent = computed(() =>
       :content="cardContent"
       :doc-url="docURL"
     />
-    <div v-else class="text-[16px]">
+    <div v-else class="text-base">
       <CopyContent :content="aiContent" />
       <div class="font-bold pt-6 pb-2">
         Click

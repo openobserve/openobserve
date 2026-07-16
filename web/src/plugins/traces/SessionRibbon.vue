@@ -27,10 +27,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Header: title + subtitle (left) · metric toggle (right) -->
     <div class="flex items-baseline justify-between gap-[0.5rem] mb-[0.75rem]">
       <div>
-        <div class="text-[0.85rem] font-semibold text-text-heading">
+        <div class="text-sm font-semibold text-text-heading">
           {{ t('traces.sessionDetail.ribbon.title') }}
         </div>
-        <div class="text-[0.7rem] leading-normal text-text-secondary mt-[0.1rem]">
+        <div class="text-2xs leading-normal text-text-secondary mt-[0.1rem]">
           {{ t('traces.sessionDetail.ribbon.subtitle') }}
         </div>
       </div>
@@ -55,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- chart region: y-axis labels + bars, sharing the grown height -->
       <div class="flex gap-[0.5rem] flex-1 min-h-0">
         <div
-          class="flex flex-col justify-between items-end h-full w-[2.75rem] flex-shrink-0 text-[0.6rem] text-text-muted tabular-nums"
+          class="flex flex-col justify-between items-end h-full w-[2.75rem] flex-shrink-0 text-3xs text-text-muted tabular-nums"
         >
           <span>{{ maxLabel }}</span>
           <span>{{ midLabel }}</span>
@@ -96,7 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span
               v-for="bar in detailBars"
               :key="bar.index"
-              class="flex-1 min-w-0 text-center text-[0.6rem] text-text-muted tabular-nums"
+              class="flex-1 min-w-0 text-center text-3xs text-text-muted tabular-nums"
             >
               {{ detailLabeled.has(bar.index + 1) ? bar.index + 1 : "" }}
             </span>

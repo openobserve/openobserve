@@ -72,6 +72,25 @@ read it once, it is the backbone of everything below.
    rem-based scale. This applies **inside class arbitrary values too** (`w-[320px]`,
    `text-[13px]`, `gap-[6px]` are all banned — convert to `rem`). The only allowed
    `px` is a `1px` hairline border/divider.
+   - **Font size — never `text-[..px/rem]`; pick the type-scale utility by role:**
+
+     | Utility | px | Use for |
+     |---|---|---|
+     | `text-3xs` | 10 | chart axis micro-labels, dense table sub-text (charts only) |
+     | `text-2xs` | 11 | tiny labels, chips, badge text |
+     | `text-xs` | 12 | captions, metadata, timestamps |
+     | `text-compact` | 13 | dense body / data tables |
+     | `text-sm` | 14 | **default body text** (start here) |
+     | `text-base` | 16 | comfortable body, form inputs |
+     | `text-lg` | 18 | card / panel titles |
+     | `text-xl` | 20 | section headings |
+     | `text-2xl` | 24 | page / modal titles |
+     | `text-3xl` | 30 | hero numbers / large display |
+     | `text-4xl` | 36 | display |
+
+     Default to `text-sm` for body. Go smaller only for genuinely dense/secondary UI,
+     larger only for titles. If a design needs a size not on the scale, snap to the
+     nearest step — do **not** reintroduce an arbitrary `text-[..]`.
 4. **No `<style scoped>` and no inline `style=""`** — style with **bare** Tailwind
    utilities (no `tw:` prefix — it was removed; no Quasar `q-*` utilities — not
    available). Form-field spacing is `class="flex flex-col gap-5"` on `<OForm>`;

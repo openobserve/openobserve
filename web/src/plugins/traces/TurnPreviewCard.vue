@@ -38,10 +38,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <!-- Header: Turn N · time · status -->
           <div class="flex items-center gap-2 mb-2">
-            <span class="text-[12.5px] font-bold">
+            <span class="text-compact font-bold">
               {{ t('traces.sessionDetail.turnLabel') }} {{ index + 1 }}
             </span>
-            <span class="text-[10px] text-text-muted">{{ timeLabel }}</span>
+            <span class="text-3xs text-text-muted">{{ timeLabel }}</span>
             <OBadge
               size="sm"
               class="ml-auto"
@@ -54,7 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- User message preview -->
           <div class="mb-[9px] leading-[1.5]">
             <span
-              class="block text-[9.5px] font-bold uppercase tracking-[0.05em] text-text-muted mb-0.5"
+              class="block text-3xs font-bold uppercase tracking-[0.05em] text-text-muted mb-0.5"
             >
               {{ t('traces.sessionDetail.roles.user') }}
             </span>

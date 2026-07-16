@@ -4,7 +4,7 @@
         <div class="flex items-start justify-between w-full ">
 
           <div
-            class="text-[16px] flex items-start"
+            class="text-base flex items-start"
 
           >
           <OIcon

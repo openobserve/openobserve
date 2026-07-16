@@ -41,7 +41,7 @@
             <span class="text-xs font-semibold uppercase tracking-wider text-text-secondary">
               {{ p.label }}
             </span>
-            <code class="text-[0.7rem] text-text-disabled">preset="{{ p.preset }}"</code>
+            <code class="text-2xs text-text-disabled">preset="{{ p.preset }}"</code>
           </div>
           <div class="rounded-xl border border-border-default h-110 overflow-hidden">
             <OEmptyState

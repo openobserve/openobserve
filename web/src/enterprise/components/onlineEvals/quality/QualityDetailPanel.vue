@@ -33,11 +33,11 @@
           class="kpi-card rounded-lg flex flex-col px-[0.875rem] pt-[0.625rem] pb-[0.625rem] gap-[0.25rem] bg-surface-base border border-border-default transition-shadow duration-200"
           :data-test="`quality-detail-kpi-${kpi.id}`"
         >
-          <div class="text-[0.7rem] font-semibold text-text-secondary">
+          <div class="text-2xs font-semibold text-text-secondary">
             {{ kpiTitle(kpi) }}
           </div>
           <div class="flex items-baseline gap-[0.2rem]">
-            <span class="text-[1.4rem] font-bold leading-none text-text-secondary">
+            <span class="text-2xl font-bold leading-none text-text-secondary">
               {{ formatKpi(kpi) }}
             </span>
           </div>

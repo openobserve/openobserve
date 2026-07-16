@@ -188,8 +188,8 @@
                 :checked="formValues.healthyDirection === 'gte'"
                 @change="form.setFieldValue('healthyDirection', 'gte')"
               />
-              <span class="sc-ht-sym sc-mono text-[17px] font-bold text-(--color-text-primary) text-center">≥</span>
-              <span class="sc-ht-op text-[12.5px] text-(--color-text-primary)">{{ t("onlineEvals.scoreConfig.gteLabel") }}</span>
+              <span class="sc-ht-sym sc-mono text-lg font-bold text-(--color-text-primary) text-center">≥</span>
+              <span class="sc-ht-op text-compact text-(--color-text-primary)">{{ t("onlineEvals.scoreConfig.gteLabel") }}</span>
               <OFormInput
                 name="healthyGteValue"
                 type="number"
@@ -211,8 +211,8 @@
                 :checked="formValues.healthyDirection === 'lte'"
                 @change="form.setFieldValue('healthyDirection', 'lte')"
               />
-              <span class="sc-ht-sym sc-mono text-[17px] font-bold text-(--color-text-primary) text-center">≤</span>
-              <span class="sc-ht-op text-[12.5px] text-(--color-text-primary)">{{ t("onlineEvals.scoreConfig.lteLabel") }}</span>
+              <span class="sc-ht-sym sc-mono text-lg font-bold text-(--color-text-primary) text-center">≤</span>
+              <span class="sc-ht-op text-compact text-(--color-text-primary)">{{ t("onlineEvals.scoreConfig.lteLabel") }}</span>
               <OFormInput
                 name="healthyLteValue"
                 type="number"

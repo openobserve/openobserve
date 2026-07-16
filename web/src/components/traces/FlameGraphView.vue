@@ -43,7 +43,7 @@
           <span
             v-for="(tick, index) in timelineTicks"
             :key="'lbl-' + index"
-            class="absolute text-[10px] text-text-secondary leading-none whitespace-nowrap"
+            class="absolute text-3xs text-text-secondary leading-none whitespace-nowrap"
             style="top: 50%; padding-left: 3px"
             :style="{ left: tick.left, transform: tick.transform }"
             >{{ tick.label }}</span
@@ -70,7 +70,7 @@
             :style="{ left: cursorX + 'px' }"
           >
             <div
-              class="text-[10px] text-white px-1.5 py-0.5 rounded-sm whitespace-nowrap font-medium"
+              class="text-3xs text-white px-1.5 py-0.5 rounded-sm whitespace-nowrap font-medium"
               style="background: rgba(30, 30, 30, 0.9); line-height: 1.4"
             >
               {{ cursorTimeLabel }}

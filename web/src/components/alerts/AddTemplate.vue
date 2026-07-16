@@ -163,7 +163,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="add-template-sample-template-text"
                 class="bg-black/[0.07] px-2 rounded-sm"
               >
-                <pre class="text-[10px] my-0">
+                <pre class="text-3xs my-0">
                     {{ template.body }}
                   </pre
                 >

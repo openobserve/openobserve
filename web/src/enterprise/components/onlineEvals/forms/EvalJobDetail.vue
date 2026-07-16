@@ -56,19 +56,19 @@
           class="rounded-lg flex flex-col px-[0.875rem] pt-[0.625rem] pb-[0.625rem] gap-[0.25rem] bg-surface-base border border-border-default transition-shadow duration-200 hover:shadow-[0_0.0625rem_0.375rem_rgba(0,0,0,0.08)]"
         >
           <div
-            class="kpi-label text-[0.7rem] leading-normal font-semibold mb-[0.25rem] text-text-secondary"
+            class="kpi-label text-2xs leading-normal font-semibold mb-[0.25rem] text-text-secondary"
           >
             {{ card.label }}
           </div>
           <div class="flex items-baseline gap-[0.2rem]">
             <span
-              class="text-[1.4rem] font-bold leading-none text-text-secondary"
+              class="text-2xl font-bold leading-none text-text-secondary"
             >
               {{ card.value }}
             </span>
             <span
               v-if="card.unit"
-              class="text-[0.8rem] font-semibold text-text-secondary"
+              class="text-compact font-semibold text-text-secondary"
             >
               {{ card.unit }}
             </span>

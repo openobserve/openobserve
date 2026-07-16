@@ -146,7 +146,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <div
                   v-if="(spans as any[])[virtualRow.index].hasChildSpans"
-                  class="span-count-box min-w-5 h-5 py-0 px-1 rounded-full border flex items-center justify-center text-[0.7rem] font-semibold mr-1 transition-colors duration-200 cursor-pointer border-card-glass-border! relative"
+                  class="span-count-box min-w-5 h-5 py-0 px-1 rounded-full border flex items-center justify-center text-2xs font-semibold mr-1 transition-colors duration-200 cursor-pointer border-card-glass-border! relative"
                   :style="{
                     color: (spans as any[])[virtualRow.index].style.color,
                   }"

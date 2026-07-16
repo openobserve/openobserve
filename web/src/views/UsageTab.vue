@@ -1117,7 +1117,7 @@ watch(orgId, (newVal, oldVal) => {
 }
 
 .view-arrow-icon {
-  font-size: var(--text-md);
+  font-size: var(--text-base);
   transition:
     transform 0.4s ease-in-out,
     opacity 0.4s ease-in-out;

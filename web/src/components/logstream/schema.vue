@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <div class="flex items-center gap-1.5">
           <span
-            class="text-[10px] font-medium px-1.5 py-0.5 rounded-sm text-text-secondary bg-surface-subtle"
+            class="text-3xs font-medium px-1.5 py-0.5 rounded-sm text-text-secondary bg-surface-subtle"
           >
             UTC
           </span>
@@ -452,7 +452,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             :options="indexTypeOptionsForRow(row)"
                             label-key="label"
                             value-key="value"
-                            class="min-h-6! max-h-6! h-6! text-[0.813rem]"
+                            class="min-h-6! max-h-6! h-6! text-compact"
                             multiple
                             clearable
                             size="sm"

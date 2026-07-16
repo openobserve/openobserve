@@ -162,7 +162,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         v-if="(localTab === 'sql' ? !localSqlQuery : !localPromqlQuery) && queryEditorPlaceholderFlag"
                         class="absolute top-0 left-0 right-0 bottom-0 flex items-start [padding:0.1875rem_0.5rem_0_2.15rem] pointer-events-none z-[1] select-none"
                       >
-                        <span class="font-mono text-[var(--text-base)] [line-height:1.3125rem] text-text-placeholder whitespace-nowrap overflow-hidden text-ellipsis">{{ fullEditorPlaceholder }}</span>
+                        <span class="font-mono text-[var(--text-sm)] [line-height:1.3125rem] text-text-placeholder whitespace-nowrap overflow-hidden text-ellipsis">{{ fullEditorPlaceholder }}</span>
                       </div>
                     </div>
                   </div>
@@ -295,7 +295,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       v-if="!vrlFunctionContent && functionEditorPlaceholderFlag"
                       class="absolute top-0 left-0 right-0 bottom-0 flex items-start [padding:0.1875rem_0.5rem_0_2.15rem] pointer-events-none z-[1] select-none"
                     >
-                      <span class="font-mono text-[var(--text-base)] [line-height:1.3125rem] text-text-placeholder whitespace-nowrap overflow-hidden text-ellipsis">{{ vrlPlaceholder }}</span>
+                      <span class="font-mono text-[var(--text-sm)] [line-height:1.3125rem] text-text-placeholder whitespace-nowrap overflow-hidden text-ellipsis">{{ vrlPlaceholder }}</span>
                     </div>
                   </div>
                 </div>
@@ -319,7 +319,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <span class="text-xs font-semibold">Query Result</span>
                     <span
                       v-if="multiTimeRange && multiTimeRange.length > 0"
-                      class="text-[10px] font-bold py-px px-[7px] rounded-sm tracking-[0.04em] bg-status-info-bg border border-banner-info-border text-text-link"
+                      class="text-3xs font-bold py-px px-[7px] rounded-sm tracking-[0.04em] bg-status-info-bg border border-banner-info-border text-text-link"
                     >results across all time windows</span>
                   </div>
                 </div>
@@ -372,13 +372,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div class="w-[3px] h-3.5 rounded-sm shrink-0 bg-(--q-secondary)" />
                     <span class="text-xs font-semibold">Combined Output</span>
                     <span
-                      class="text-[10px] font-bold py-px px-[7px] rounded-sm tracking-[0.04em] bg-badge-purple-soft-bg border border-badge-purple-ol-border text-badge-purple-ol-text"
+                      class="text-3xs font-bold py-px px-[7px] rounded-sm tracking-[0.04em] bg-badge-purple-soft-bg border border-badge-purple-ol-border text-badge-purple-ol-text"
                     >SQL + VRL</span>
                   </div>
                   <!-- Running indicator -->
                   <div v-if="runFnQueryLoading" class="flex items-center gap-1">
                     <span class="w-1.5 h-1.5 rounded-full bg-status-positive [animation:pulse_1.5s_ease-in-out_infinite]" />
-                    <span class="text-[10px] font-semibold text-status-positive">Running</span>
+                    <span class="text-3xs font-semibold text-status-positive">Running</span>
                   </div>
                 </div>
 

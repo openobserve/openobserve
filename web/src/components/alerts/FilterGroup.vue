@@ -6,7 +6,7 @@
         <span class="font-medium text-xs flex-shrink-0 leading-[1.3] text-text-body">
           Preview:
         </span>
-        <span class="text-[10px] font-mono leading-[1.3] min-w-0 break-words text-text-secondary">
+        <span class="text-3xs font-mono leading-[1.3] min-w-0 break-words text-text-secondary">
           {{ previewString }}
         </span>
       </div>

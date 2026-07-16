@@ -1489,7 +1489,7 @@ body {
   overflow: hidden;
   color: var(--color-text-body);
   font-family: var(--font-sans);
-  font-size: var(--text-sm);
+  font-size: var(--text-compact);
   font-weight: var(--font-normal);
   line-height: var(--leading-base);
 }
@@ -1529,21 +1529,21 @@ h3 {
 }
 
 h4 {
-  font-size: var(--text-md);
+  font-size: var(--text-base);
   font-weight: var(--font-medium);
   line-height: var(--leading-md);
   letter-spacing: var(--tracking-normal);
 }
 
 h5 {
-  font-size: var(--text-base);
+  font-size: var(--text-sm);
   font-weight: var(--font-medium);
   line-height: var(--leading-base);
   letter-spacing: var(--tracking-normal);
 }
 
 h6 {
-  font-size: var(--text-sm);
+  font-size: var(--text-compact);
   font-weight: var(--font-medium);
   line-height: var(--leading-sm);
   letter-spacing: var(--tracking-normal);
@@ -1551,7 +1551,7 @@ h6 {
 
 p {
   color: var(--color-text-body);
-  font-size: var(--text-base);
+  font-size: var(--text-sm);
   line-height: var(--leading-base);
   margin: 0;
 }
@@ -1572,7 +1572,7 @@ small {
 }
 
 label:not(.o-input-label) {
-  font-size: var(--text-sm);
+  font-size: var(--text-compact);
   color: var(--color-text-label);
   font-weight: var(--font-normal);
 }
@@ -1581,7 +1581,7 @@ label:not(.o-input-label) {
 @layer base {
   code {
     font-family: var(--font-mono);
-    font-size: var(--text-sm);
+    font-size: var(--text-compact);
     color: var(--color-text-code);
     font-feature-settings: "tnum";
     letter-spacing: -0.2px;
@@ -1592,7 +1592,7 @@ label:not(.o-input-label) {
   samp,
   .log-line {
     font-family: var(--font-mono);
-    font-size: var(--text-sm);
+    font-size: var(--text-compact);
     line-height: 1.6;
   }
 }
@@ -1799,7 +1799,7 @@ body.body--dark .ai-icon-button:hover {
 }
 
 .o-input-label {
-  font-size: var(--text-sm);
+  font-size: var(--text-compact);
   font-weight: 500;
   line-height: 1.25;
   color: #262626;
@@ -4368,6 +4368,7 @@ button.date-time-button {
   --color-log-table-row-hover: var(--color-log-table-row-hover);
   --color-table-actions-bg: var(--color-table-actions-bg);
   /* Type-scale utilities (§3.J) — text-2xs (11px) / text-compact (13px) */
+  --text-3xs: var(--text-3xs);
   --text-2xs: var(--text-2xs);
   --text-compact: var(--text-compact);
   /* Domain tokens (§3.K.4) */

@@ -280,7 +280,7 @@ const wrapperClasses = computed(() => [
           <span class="truncate" :title="`${file.name} (${formatSize(file.size)})`">
             {{ file.name }}
           </span>
-          <span class="text-[0.65rem] opacity-70 shrink-0">
+          <span class="text-3xs opacity-70 shrink-0">
             {{ formatSize(file.size) }}
           </span>
           <button

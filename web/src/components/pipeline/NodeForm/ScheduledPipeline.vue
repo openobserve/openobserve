@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="scheduled-pipeline-field-list-collapsed-bar"
           @click="collapseFieldList"
         >
-          <OIcon name="expand-all" size="sm" class="rotate-90 mt-2.5 text-[20px]" />
+          <OIcon name="expand-all" size="sm" class="rotate-90 mt-2.5 text-xl" />
           <div class="[writing-mode:vertical-rl] [text-orientation:mixed] font-bold text-xs">{{ t("pipeline.buildQuery") }}</div>
         </div>
 
@@ -172,8 +172,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                       :key="p.key"
                                       class="flex items-center justify-between py-[0.15rem] pl-[0.5rem]"
                                     >
-                                      <span class="text-[0.7rem] w-[2rem] shrink-0">{{ p.label }}</span>
-                                      <span class="text-[0.7rem] flex-1 text-right pr-[0.25rem]">
+                                      <span class="text-2xs w-[2rem] shrink-0">{{ p.label }}</span>
+                                      <span class="text-2xs flex-1 text-right pr-[0.25rem]">
                                         {{ formatTimeWithSuffix(durationPercentiles[p.key]) }}
                                       </span>
                                       <div class="flex w-[2.7rem]">
@@ -199,7 +199,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                       </div>
                                     </div>
                                   </template>
-                                  <div v-else class="pl-2 py-1 text-[0.7rem] text-text-secondary">
+                                  <div v-else class="pl-2 py-1 text-2xs text-text-secondary">
                                     {{ durationPercentileErrMsg || "No values found" }}
                                   </div>
                                 </template>
@@ -827,7 +827,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       v-if="!query && queryEditorPlaceholderFlag && expandState.query"
                       class="query-editor-placeholder-overlay absolute inset-0 flex items-start pt-0.75 pl-[2.15rem] pr-2 pointer-events-none z-1 select-none"
                     >
-                      <span class="query-editor-placeholder-typewriter [font-family:monospace] text-[var(--text-base)] [line-height:1.3125rem] text-text-placeholder whitespace-nowrap overflow-hidden text-ellipsis">{{ editorPlaceholder }}</span>
+                      <span class="query-editor-placeholder-typewriter [font-family:monospace] text-[var(--text-sm)] [line-height:1.3125rem] text-text-placeholder whitespace-nowrap overflow-hidden text-ellipsis">{{ editorPlaceholder }}</span>
                     </div>
                   </div>
 

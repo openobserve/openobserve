@@ -44,7 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :class="{ 'border-2 border-accent pt-7 max-[1024px]:pt-5': buildType === ed.id }"
       >
         <!-- Your Plan badge (floats above the card top border) -->
-        <div v-if="buildType === ed.id" data-test="feature-comparison-table-your-plan-badge" class="absolute top-[-14px] left-1/2 -translate-x-1/2 inline-flex items-center py-1 px-[0.875rem] rounded-full text-[0.625rem] font-bold uppercase tracking-[0.08em] whitespace-nowrap bg-accent text-button-primary-foreground">
+        <div v-if="buildType === ed.id" data-test="feature-comparison-table-your-plan-badge" class="absolute top-[-14px] left-1/2 -translate-x-1/2 inline-flex items-center py-1 px-[0.875rem] rounded-full text-3xs font-bold uppercase tracking-[0.08em] whitespace-nowrap bg-accent text-button-primary-foreground">
           <OIcon name="arrow-upward" size="sm" class="mr-1" />
           Your Plan
         </div>
@@ -53,13 +53,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="mb-5">
           <div class="text-base font-bold text-text-heading m-0 mb-[0.125rem]">{{ ed.shortName }}</div>
           <div class="text-compact text-text-muted m-0 mb-[0.875rem]">{{ ed.hosting }}</div>
-          <div class="text-[1.75rem] font-bold text-accent m-0 mb-1 tracking-[-0.03em] leading-[1.1]">{{ ed.price }}</div>
+          <div class="text-3xl font-bold text-accent m-0 mb-1 tracking-[-0.03em] leading-[1.1]">{{ ed.price }}</div>
           <div class="text-compact text-text-muted m-0 leading-[1.4]">{{ ed.priceSub }}</div>
         </div>
 
         <!-- All Five Pillars chips ────────────────────────────────────── -->
         <div class="bg-[color-mix(in_srgb,var(--color-accent)_5%,var(--color-card-glass-bg))] border border-[color-mix(in_srgb,var(--color-accent)_15%,transparent)] rounded-lg p-3 mb-4">
-          <div class="text-[0.5625rem] font-bold uppercase tracking-[0.12em] text-text-label m-0 mb-2">ALL FIVE PILLARS</div>
+          <div class="text-3xs font-bold uppercase tracking-[0.12em] text-text-label m-0 mb-2">ALL FIVE PILLARS</div>
           <div class="flex flex-wrap gap-1.5 mb-1.5">
             <span v-for="pillarId in PILLAR_IDS" :key="pillarId" data-test="feature-comparison-table-pillar-chip" class="inline-flex items-center py-[0.1875rem] px-2 rounded-sm text-2xs font-medium bg-[color-mix(in_srgb,var(--color-accent)_10%,var(--color-card-glass-bg))] text-accent border border-[color-mix(in_srgb,var(--color-accent)_20%,transparent)] mr-[0.375rem] mb-[0.375rem]">
               {{ t(`about.feature_${pillarId}`) }}

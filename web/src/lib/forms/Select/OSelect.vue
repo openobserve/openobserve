@@ -1085,7 +1085,7 @@ const fieldWidthClass = computed(() => {
             <!-- Inside label: in-flow with whitespace-nowrap so it drives the trigger's auto-width -->
             <span
               v-if="label && labelPosition === 'inside'"
-              class="text-[0.625rem] leading-none whitespace-nowrap text-start text-select-placeholder select-none pointer-events-none ps-3 pe-7"
+              class="text-3xs leading-none whitespace-nowrap text-start text-select-placeholder select-none pointer-events-none ps-3 pe-7"
               >{{ label }}<span v-if="required" aria-hidden="true">&nbsp;*</span></span
             >
 
@@ -1485,7 +1485,7 @@ const fieldWidthClass = computed(() => {
                                   filteredOptions[vRow.index].badgeTitle ? 'cursor-help' : undefined,
                                   filteredOptions[vRow.index].badgeStyle
                                     ? 'inline-flex items-center justify-center leading-none ml-auto min-w-[1.125rem] h-[1.125rem] px-1 text-xs font-semibold border-current'
-                                    : 'text-[10px] font-medium px-1 py-px leading-tight',
+                                    : 'text-3xs font-medium px-1 py-px leading-tight',
                                 ]"
                                 :title="filteredOptions[vRow.index].badgeTitle"
                                 :style="
@@ -1629,7 +1629,7 @@ const fieldWidthClass = computed(() => {
           <!-- Inside label: in-flow with whitespace-nowrap so it drives the trigger's auto-width -->
           <span
             v-if="label && labelPosition === 'inside'"
-            class="text-[0.625rem] leading-none whitespace-nowrap text-start text-select-placeholder select-none pointer-events-none ps-3 pe-7"
+            class="text-3xs leading-none whitespace-nowrap text-start text-select-placeholder select-none pointer-events-none ps-3 pe-7"
             >{{ label }}<span v-if="required" aria-hidden="true">&nbsp;*</span></span
           >
 

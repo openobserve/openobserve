@@ -51,7 +51,7 @@ export default {
           <template #content>
             <div class="px-2.5 py-1.5">
               <div class="font-medium text-2xs mb-0.5 capitalize">{{ node.label }}</div>
-              <div class="text-[10px] leading-[1.3] capitalize">{{ node.tooltip }}</div>
+              <div class="text-3xs leading-[1.3] capitalize">{{ node.tooltip }}</div>
             </div>
           </template>
         </OTooltip>

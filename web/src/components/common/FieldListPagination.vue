@@ -41,8 +41,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
         >
           <template v-if="opt.slot === 'user_defined_slot'">
-            <OIcon name="person" size="xs" class="text-[10px]!"></OIcon>
-            <OIcon name="schema" size="xs" class="text-[10px]!"></OIcon>
+            <OIcon name="person" size="xs" class="text-3xs!"></OIcon>
+            <OIcon name="schema" size="xs" class="text-3xs!"></OIcon>
             <OTooltip
               :data-test="`${dataTestPrefix}-fields-list-user-defined-fields-warning-tooltip`"
               :content="t('search.userDefinedSchemaLabel')"
@@ -52,7 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </template>
           <template v-else-if="opt.slot === 'all_fields_slot'">
-            <OIcon name="schema" size="xs" class="text-[10px]!"></OIcon>
+            <OIcon name="schema" size="xs" class="text-3xs!"></OIcon>
             <OTooltip
               :data-test="`${dataTestPrefix}-fields-list-all-fields-warning-tooltip`"
               max-width="18.75rem"
@@ -69,8 +69,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template
             v-else-if="opt.slot === 'interesting_fields_slot' && showQuickMode"
           >
-            <OIcon name="info-outline" size="xs" class="text-[10px]!" />
-            <OIcon name="schema" size="xs" class="text-[10px]!"></OIcon>
+            <OIcon name="info-outline" size="xs" class="text-3xs!" />
+            <OIcon name="schema" size="xs" class="text-3xs!"></OIcon>
             <OTooltip
               :content="t('search.showOnlyInterestingFields')"
               max-width="18.75rem"
@@ -99,7 +99,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data-test="opt.slot === 'all_fields_slot' ? `${dataTestPrefix}-all-fields-btn` : `${dataTestPrefix}-interesting-fields-btn`"
         >
           <template v-if="opt.slot === 'all_fields_slot'">
-            <OIcon name="schema" size="xs" class="text-[10px]!"></OIcon>
+            <OIcon name="schema" size="xs" class="text-3xs!"></OIcon>
             <OTooltip
               :data-test="`${dataTestPrefix}-fields-list-all-fields-warning-tooltip`"
               max-width="18.75rem"
@@ -116,8 +116,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template
             v-else-if="opt.slot === 'interesting_fields_slot' && showQuickMode"
           >
-            <OIcon name="info-outline" size="xs" class="text-[10px]!" />
-            <OIcon name="schema" size="xs" class="text-[10px]!"></OIcon>
+            <OIcon name="info-outline" size="xs" class="text-3xs!" />
+            <OIcon name="schema" size="xs" class="text-3xs!"></OIcon>
             <OTooltip
               :content="t('search.showOnlyInterestingFields')"
               max-width="18.75rem"

@@ -467,7 +467,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- The footer pads itself now that the frame is flush, mirroring how the
          panel bar pads itself. -->
-    <div class="flex items-center justify-between gap-2 text-[10px] px-2 py-1">
+    <div class="flex items-center justify-between gap-2 text-3xs px-2 py-1">
       <!-- The function actually in effect, so a ⚙ override is visible on the
            card rather than silently identical to the default. -->
       <span class="opacity-70 text-text-secondary truncate">{{

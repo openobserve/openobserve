@@ -62,7 +62,7 @@
                 <div class="text-left text-text-secondary! text-xs font-semibold">
                   {{ level.label }}
                 </div>
-                <div class="text-left text-[0.625rem] opacity-55">{{ level.range }}</div>
+                <div class="text-left text-3xs opacity-55">{{ level.range }}</div>
               </div>
             </div>
           </div>
@@ -142,7 +142,7 @@
             class="p-2 flex flex-col gap-2 min-w-52"
             data-test="service-graph-collapse-mode"
           >
-            <div class="text-[0.625rem] font-bold uppercase opacity-60">
+            <div class="text-3xs font-bold uppercase opacity-60">
               {{ t("traces.serviceGraph.layout") }}
             </div>
             <OToggleGroup
@@ -161,7 +161,7 @@
                 {{ t(`traces.serviceGraph.mode.${m}`) }}
               </OToggleGroupItem>
             </OToggleGroup>
-            <div class="text-[0.625rem] font-bold uppercase opacity-60 mt-1">
+            <div class="text-3xs font-bold uppercase opacity-60 mt-1">
               {{ t("traces.serviceGraph.types") }}
             </div>
             <!-- Each row: type name + live count, with a checkbox to show/hide.

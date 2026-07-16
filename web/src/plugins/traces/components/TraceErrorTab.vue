@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div class="flex-col items-center gap-1">
       <div
-        class="text-text-primary! text-[0.85rem] tracking-[0.03rem] pl-[0.5rem] w-full pb-[0.125rem]"
+        class="text-text-primary! text-sm tracking-[0.03rem] pl-[0.5rem] w-full pb-[0.125rem]"
       >
         {{ spanStatusCode ? "HTTP Status Code" : "gRPC Status Code" }}
       </div>
@@ -39,10 +39,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="spanStatusCode || spanGrpcStatusCode"
           :code="spanStatusCode"
           :grpc-code="spanGrpcStatusCode"
-          class="text-[0.9rem]! flex! items-center"
+          class="text-sm! flex! items-center"
         />
         <span
-          class="text-[0.9rem] font-semibold"
+          class="text-sm font-semibold"
           :style="{ color: 'var(--color-status-error-text)' }"
           data-test="trace-details-sidebar-error-summary-title"
         >
@@ -60,13 +60,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div class="flex-col items-center gap-1">
       <div
-        class="text-text-primary! text-[0.65rem] tracking-[0.03rem] pl-[0.5rem] w-full pb-[0.125rem]"
+        class="text-text-primary! text-3xs tracking-[0.03rem] pl-[0.5rem] w-full pb-[0.125rem]"
       >
         DB Response Status Code
       </div>
       <div class="flex items-center pl-[0.5rem]">
         <span
-          class="text-[0.9rem] font-semibold"
+          class="text-sm font-semibold"
           :style="{ color: 'var(--color-status-error-text)' }"
           data-test="trace-details-sidebar-db-response-status-code-value"
         >
@@ -84,13 +84,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div class="flex-col items-center gap-1">
       <div
-        class="text-text-primary! text-[0.65rem] tracking-[0.03rem] pl-[0.5rem] w-full pb-[0.125rem]"
+        class="text-text-primary! text-3xs tracking-[0.03rem] pl-[0.5rem] w-full pb-[0.125rem]"
       >
         Process Exit Code
       </div>
       <div class="flex items-center pl-[0.5rem]">
         <span
-          class="text-[0.9rem] font-semibold"
+          class="text-sm font-semibold"
           :style="{ color: 'var(--color-status-error-text)' }"
           data-test="trace-details-sidebar-process-exit-code-value"
         >
@@ -115,7 +115,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="text-status-error-text"
       />
       <span
-        class="text-[1rem] font-semibold"
+        class="text-base font-semibold"
         :style="{ color: 'var(--color-status-error-text)' }"
         data-test="trace-details-sidebar-error-summary-title"
       >
@@ -135,7 +135,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <!-- Exceptions Table -->
   <template v-if="hasExceptionEvents.length">
     <div
-      class="text-[0.9rem] pt-[0.325rem]! font-semibold pb-[0.325rem] text-text-secondary!"
+      class="text-sm pt-[0.325rem]! font-semibold pb-[0.325rem] text-text-secondary!"
     >
       {{ t("traces.exceptionsWithCount", { count: hasExceptionEvents.length }) }}
     </div>

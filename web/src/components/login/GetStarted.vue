@@ -20,7 +20,7 @@
     <!-- Top Section: Logo and Heading -->
     <div class="flex flex-col items-center mb-4">
       <img class="h-16" src="@/assets/images/common/o2_logo.svg" alt="Get Started Banner" />
-      <div class="text-[24px] md:text-[32px] font-semibold text-center text-text-heading">
+      <div class="text-2xl md:text-3xl font-semibold text-center text-text-heading">
         One last thing before we begin
       </div>
     </div>

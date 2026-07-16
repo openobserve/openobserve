@@ -72,7 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Anomaly badge with explanation tooltip -->
       <span
         v-if="pattern.is_anomaly"
-        class="text-badge-error-ol-text font-bold text-[0.7rem] cursor-help"
+        class="text-badge-error-ol-text font-bold text-2xs cursor-help"
         :data-test="`pattern-card-${index}-anomaly-badge`"
       >
         ⚠️ {{ t("search.anomalyLabel") }}

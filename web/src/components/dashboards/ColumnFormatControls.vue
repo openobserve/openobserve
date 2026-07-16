@@ -120,7 +120,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div
         v-if="!col.conditions.length"
-        class="text-[length:var(--text-sm)] text-text-secondary mb-1.5"
+        class="text-[length:var(--text-compact)] text-text-secondary mb-1.5"
       >
         {{ t("dashboard.conditionNoRules") }}
       </div>

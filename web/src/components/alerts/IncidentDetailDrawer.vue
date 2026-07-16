@@ -845,7 +845,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div class="space-y-2">
                       <!-- Alert Name -->
                       <div class="flex flex-col gap-0.5">
-                        <span :class="'text-text-secondary'" class="text-[10px] uppercase tracking-wide">
+                        <span :class="'text-text-secondary'" class="text-3xs uppercase tracking-wide">
                           Alert Name
                         </span>
                         <span :class="'text-text-primary'" class="text-sm font-medium">
@@ -856,7 +856,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <!-- Stream Type & Name -->
                       <div class="grid grid-cols-2 gap-2">
                         <div class="flex flex-col gap-0.5">
-                          <span :class="'text-text-secondary'" class="text-[10px] uppercase tracking-wide">
+                          <span :class="'text-text-secondary'" class="text-3xs uppercase tracking-wide">
                             Stream Type
                           </span>
                           <OTag
@@ -866,7 +866,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           />
                         </div>
                         <div class="flex flex-col gap-0.5">
-                          <span :class="'text-text-secondary'" class="text-[10px] uppercase tracking-wide">
+                          <span :class="'text-text-secondary'" class="text-3xs uppercase tracking-wide">
                             Stream Name
                           </span>
                           <span :class="'text-text-primary'" class="text-sm font-medium truncate">
@@ -878,7 +878,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <!-- Threshold & Period -->
                       <div class="grid grid-cols-2 gap-2">
                         <div class="flex flex-col gap-0.5">
-                          <span :class="'text-text-secondary'" class="text-[10px] uppercase tracking-wide">
+                          <span :class="'text-text-secondary'" class="text-3xs uppercase tracking-wide">
                             Threshold
                           </span>
                           <span :class="'text-text-primary'" class="text-sm font-medium">
@@ -886,7 +886,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           </span>
                         </div>
                         <div class="flex flex-col gap-0.5">
-                          <span :class="'text-text-secondary'" class="text-[10px] uppercase tracking-wide">
+                          <span :class="'text-text-secondary'" class="text-3xs uppercase tracking-wide">
                             Period
                           </span>
                           <span :class="'text-text-primary'" class="text-sm font-medium">
@@ -898,7 +898,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <!-- Frequency & Silence -->
                       <div class="grid grid-cols-2 gap-2">
                         <div class="flex flex-col gap-0.5">
-                          <span :class="'text-text-secondary'" class="text-[10px] uppercase tracking-wide">
+                          <span :class="'text-text-secondary'" class="text-3xs uppercase tracking-wide">
                             Frequency
                           </span>
                           <span :class="'text-text-primary'" class="text-sm font-medium">
@@ -906,7 +906,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           </span>
                         </div>
                         <div class="flex flex-col gap-0.5">
-                          <span :class="'text-text-secondary'" class="text-[10px] uppercase tracking-wide">
+                          <span :class="'text-text-secondary'" class="text-3xs uppercase tracking-wide">
                             Silence
                           </span>
                           <span :class="'text-text-primary'" class="text-sm font-medium">
@@ -926,17 +926,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div class="p-2.5 overflow-y-auto flex-1">
                       <!-- SQL Query -->
                       <div v-if="alerts[selectedAlertIndex]?.query_condition?.sql">
-                        <pre :class="['text-[0.8rem] overflow-x-auto whitespace-pre-wrap break-words', 'text-text-body']">{{ alerts[selectedAlertIndex]?.query_condition?.sql }}</pre>
+                        <pre :class="['text-compact overflow-x-auto whitespace-pre-wrap break-words', 'text-text-body']">{{ alerts[selectedAlertIndex]?.query_condition?.sql }}</pre>
                       </div>
 
                       <!-- PromQL Query -->
                       <div v-else-if="alerts[selectedAlertIndex]?.query_condition?.promql">
-                        <pre :class="['text-[0.8rem] overflow-x-auto whitespace-pre-wrap break-words', 'text-text-body']">{{ alerts[selectedAlertIndex]?.query_condition?.promql }}</pre>
+                        <pre :class="['text-compact overflow-x-auto whitespace-pre-wrap break-words', 'text-text-body']">{{ alerts[selectedAlertIndex]?.query_condition?.promql }}</pre>
                       </div>
 
                       <!-- Custom Conditions -->
                       <div v-else-if="alerts[selectedAlertIndex]?.query_condition?.conditions">
-                        <pre :class="['text-[0.8rem] overflow-x-auto whitespace-pre-wrap break-words', 'text-text-body']">if {{ formatCustomConditions(alerts[selectedAlertIndex]?.query_condition?.conditions) }}</pre>
+                        <pre :class="['text-compact overflow-x-auto whitespace-pre-wrap break-words', 'text-text-body']">if {{ formatCustomConditions(alerts[selectedAlertIndex]?.query_condition?.conditions) }}</pre>
                       </div>
 
                       <!-- No conditions -->

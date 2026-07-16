@@ -29,20 +29,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <!-- Baseline Chip -->
         <div
-          class="time-range-chip baseline-chip flex items-center gap-1 px-2 py-[0.375rem] rounded-sm text-[0.85rem]"
+          class="time-range-chip baseline-chip flex items-center gap-1 px-2 py-[0.375rem] rounded-sm text-sm"
           :style="{ '--chip-color': chipColors.baseline }"
         >
           <span class="uppercase tracking-wide opacity-70"
             >Baseline:</span
           >
-          <span class="whitespace-nowrap text-[0.7rem]">{{
+          <span class="whitespace-nowrap text-2xs">{{
             formatSmartTimestamp(
               baselineTimeRange.startTime,
               baselineTimeRange.endTime,
             ).start
           }}</span>
-          <span class="opacity-60 text-[0.65rem]">→</span>
-          <span class="whitespace-nowrap text-[0.7rem]">{{
+          <span class="opacity-60 text-3xs">→</span>
+          <span class="whitespace-nowrap text-2xs">{{
             formatSmartTimestamp(
               baselineTimeRange.startTime,
               baselineTimeRange.endTime,
@@ -53,20 +53,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Selected Chip -->
         <div
           v-if="hasSelectedTimeRange"
-          class="time-range-chip selected-chip flex items-center gap-1 px-2 py-[0.375rem] rounded-sm text-[0.85rem]"
+          class="time-range-chip selected-chip flex items-center gap-1 px-2 py-[0.375rem] rounded-sm text-sm"
           :style="{ '--chip-color': chipColors.selected }"
         >
           <span class="uppercase tracking-wide opacity-70"
             >Selected:</span
           >
-          <span class="whitespace-nowrap text-[0.7rem]">{{
+          <span class="whitespace-nowrap text-2xs">{{
             formatSmartTimestamp(
               selectedTimeRangeDisplay.startTime,
               selectedTimeRangeDisplay.endTime,
             ).start
           }}</span>
-          <span class="opacity-70 text-[0.65rem]">→</span>
-          <span class="whitespace-nowrap text-[0.7rem]">{{
+          <span class="opacity-70 text-3xs">→</span>
+          <span class="whitespace-nowrap text-2xs">{{
             formatSmartTimestamp(
               selectedTimeRangeDisplay.startTime,
               selectedTimeRangeDisplay.endTime,
@@ -77,7 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Additional filter info -->
         <span
           v-if="filterMetadata"
-          class="opacity-60 text-[0.65rem] ml-1"
+          class="opacity-60 text-3xs ml-1"
         >
           {{ filterMetadata }}
         </span>
@@ -125,7 +125,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="dimension-selector-collapsed-bar"
           @click="toggleDimensionSelector"
         >
-          <OIcon name="expand-all" size="sm" class="field-list-collapsed-icon rotate-90 mt-2.5 text-[20px]" />
+          <OIcon name="expand-all" size="sm" class="field-list-collapsed-icon rotate-90 mt-2.5 text-xl" />
           <div class="field-list-collapsed-title [writing-mode:vertical-rl] [text-orientation:mixed] font-bold text-xs">Dimensions</div>
         </div>
 

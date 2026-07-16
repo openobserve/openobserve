@@ -42,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <template v-for="group in visibleGroups" :key="group.label">
           <div
-            class="px-2 py-1 text-[0.72rem] font-semibold text-text-secondary"
+            class="px-2 py-1 text-xs font-semibold text-text-secondary"
           >
             {{ group.label }}
           </div>

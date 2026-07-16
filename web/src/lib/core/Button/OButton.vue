@@ -244,7 +244,7 @@ const sizeClasses: Record<NonNullable<ButtonProps["size"]>, string> = {
   md: "h-10 ps-4 pe-4 text-sm gap-2 rounded-lg",
   lg: "h-12 ps-6 pe-6 text-base gap-3 rounded-lg",
   icon: "size-6 p-0 rounded-md gap-x-0",
-  "icon-xs": "h-7.5 px-2 text-[18px] rounded-md gap-x-0",
+  "icon-xs": "h-7.5 px-2 text-lg rounded-md gap-x-0",
   // 24px round circle — for small inline add/action icon buttons (e.g. + Joins, + Filters)
   "icon-xs-circle": "size-6 p-0 rounded-full gap-x-0",
   // 28px square — matches xs chip height for paired close/remove buttons

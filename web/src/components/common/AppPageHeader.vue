@@ -102,7 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <div class="flex flex-col justify-center min-w-0 shrink-0">
         <h1
-          class="text-[1.0625rem]! font-semibold! leading-[1.45]! tracking-[-0.02em]! text-text-primary truncate min-h-6"
+          class="text-lg! font-semibold! leading-[1.45]! tracking-[-0.02em]! text-text-primary truncate min-h-6"
           :title="title"
           :data-test="titleDataTest"
         >

@@ -170,7 +170,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <!-- Actual error case -->
                       <div
                         data-test="traces-search-error-message"
-                        class="text-[1.3rem] pt-4"
+                        class="text-xl pt-4"
                       >
                         {{ t("traces.errorRetrievingTraces") }}
                         <OButton
@@ -187,7 +187,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </div>
                       <!-- Collapsible error detail — shown below results when toggled -->
                       <div class="text-center">
-                        <div class="my-none text-[1rem]! px-[2rem]!">
+                        <div class="my-none text-base! px-[2rem]!">
                           <span v-if="disableMoreErrorDetails">
                             <SanitizedHtmlRenderer
                               data-test="traces-search-detail-error-message"
@@ -232,7 +232,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       !searchObj.loading
                     "
                     data-test="traces-search-error-text"
-                    class="text-center py-10 text-[20px] card-container h-full"
+                    class="text-center py-10 text-xl card-container h-full"
                   >
                     <SanitizedHtmlRenderer
                       data-test="traces-search-detail-error-message"

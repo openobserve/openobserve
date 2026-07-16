@@ -70,7 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div
               v-for="chip in filterChips"
               :key="chip.key"
-              class="inline-flex items-center gap-1 rounded-sm border border-border-default px-2 py-[0.325rem] text-[0.7rem] leading-none text-text-primary"
+              class="inline-flex items-center gap-1 rounded-sm border border-border-default px-2 py-[0.325rem] text-2xs leading-none text-text-primary"
               :data-test="`service-graph-filter-chip-${chip.key}`"
               :class="
                 chip.type === 'duration'

@@ -545,7 +545,7 @@ function getIcon(data, ioType) {
             pipelineObj.currentSelectedPipeline?.last_error?.node_errors?.[id]
               ?.error_count
           "
-          class="absolute top-[-6px] right-[-6px] bg-status-negative text-button-destructive-foreground text-[9px] font-bold min-w-3.5 h-3.5 rounded-[7px] flex items-center justify-center px-[3px] border-[1.5px] border-solid border-white shadow-[0_1px_3px_rgba(0,0,0,0.4)]"
+          class="absolute top-[-6px] right-[-6px] bg-status-negative text-button-destructive-foreground text-3xs font-bold min-w-3.5 h-3.5 rounded-[7px] flex items-center justify-center px-[3px] border-[1.5px] border-solid border-white shadow-[0_1px_3px_rgba(0,0,0,0.4)]"
         >
           {{
             pipelineObj.currentSelectedPipeline.last_error.node_errors[id]

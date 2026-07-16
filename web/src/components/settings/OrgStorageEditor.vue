@@ -64,7 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="flex items-start gap-2.5 px-3 py-2.5 mb-3 rounded-lg border bg-banner-warning-bg border-banner-warning-border"
             >
               <OIcon name="warning" size="sm" class="flex-shrink-0 mt-px" />
-              <div class="text-[0.82rem] leading-[1.55] text-text-primary">
+              <div class="text-compact leading-[1.55] text-text-primary">
                 This action is <strong>irreversible</strong>. Once set, you cannot switch to a different storage provider or delete this configuration. To use a different provider, you must create a new organization.
               </div>
             </div>
@@ -73,7 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="flex items-start gap-2.5 px-3 py-2.5 mb-3 rounded-lg border bg-banner-info-bg border-banner-info-border"
             >
               <OIcon name="info" size="sm" class="flex-shrink-0 mt-px" />
-              <div class="text-[0.82rem] leading-[1.55] text-text-primary">
+              <div class="text-compact leading-[1.55] text-text-primary">
                 Once configured, only credential fields can be updated. All other fields will be locked.
               </div>
             </div>
@@ -258,7 +258,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="flex items-start gap-2.5 px-3 py-2.5 mb-3 rounded-lg border bg-banner-info-bg border-banner-info-border"
                 >
                   <OIcon name="info" size="sm" class="flex-shrink-0 mt-px" />
-                  <div class="text-[0.82rem] leading-[1.55] text-text-primary">
+                  <div class="text-compact leading-[1.55] text-text-primary">
                     <template v-if="isCloud">
                       {{ t("storage_settings.awsStsCloudInfo") }}
                     </template>

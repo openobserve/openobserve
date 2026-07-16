@@ -7,7 +7,7 @@
       <!-- Label + a metric icon in a soft corner tile — same KPI-card pattern
            as LLM Insights / Session Detail so every card reads the same. -->
       <div class="flex items-center justify-between gap-2 mb-[0.25rem]">
-        <div class="kpi-label text-[0.7rem] font-semibold leading-normal text-text-secondary min-w-0 truncate">
+        <div class="kpi-label text-2xs font-semibold leading-normal text-text-secondary min-w-0 truncate">
           {{ t(`onlineEvals.quality.kpis.${kpi.id}.title`) }}
         </div>
         <span
@@ -18,19 +18,19 @@
       </div>
       <div class="flex items-baseline gap-[0.2rem]">
         <template v-if="kpi.value != null">
-          <span class="text-[1.4rem] font-bold leading-none text-text-secondary">
+          <span class="text-2xl font-bold leading-none text-text-secondary">
             {{ bigNumber }}
           </span>
           <span
             v-if="unitLabel"
-            class="text-[0.8rem] font-semibold text-text-secondary "
+            class="text-compact font-semibold text-text-secondary "
           >
             {{ unitLabel }}
           </span>
         </template>
         <span
           v-else
-          class="text-[0.95rem] font-medium leading-none text-text-muted"
+          class="text-base font-medium leading-none text-text-muted"
         >
           {{ t("onlineEvals.quality.kpis.noData") }}
         </span>
@@ -42,7 +42,7 @@
            short history) rather than zero. -->
       <div
         v-if="kpi.value != null"
-        class="text-[0.65rem] font-medium flex items-center gap-[0.25rem]"
+        class="text-3xs font-medium flex items-center gap-[0.25rem]"
         :class="{
           'text-status-success-text': (delta != null ? trendSentiment : 'neutral') === 'good',
           'text-error-600': (delta != null ? trendSentiment : 'neutral') === 'bad',

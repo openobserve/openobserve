@@ -361,7 +361,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @select.prevent="searchObj.meta.showTransformEditor = !searchObj.meta.showTransformEditor"
             >
               <template #icon-left>
-                <span class="inline-flex items-center justify-center w-7 h-7 rounded-md bg-section-header-bg text-text-secondary shrink-0 [font-family:var(--font-mono,monospace)] text-[var(--text-sm)] italic [font-weight:var(--font-bold)] text-accent">fx</span>
+                <span class="inline-flex items-center justify-center w-7 h-7 rounded-md bg-section-header-bg text-text-secondary shrink-0 [font-family:var(--font-mono,monospace)] text-[var(--text-compact)] italic [font-weight:var(--font-bold)] text-accent">fx</span>
               </template>
               {{ t('search.functionEditorLabel') }}
               <template #icon-right>
@@ -525,7 +525,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :aria-disabled="isDownloadDisabled || undefined"
               @mouseenter="!isDownloadDisabled && (showDownloadSubmenu = true)"
               @mouseleave="showDownloadSubmenu = false"
-              class="relative flex items-center gap-2 py-[0.375rem] px-3 text-[var(--text-base)] [line-height:1.2] cursor-pointer select-none hover:bg-interactive-hover-bg search-download-item"
+              class="relative flex items-center gap-2 py-[0.375rem] px-3 text-[var(--text-sm)] [line-height:1.2] cursor-pointer select-none hover:bg-interactive-hover-bg search-download-item"
               :class="{ 'cursor-not-allowed! text-text-muted hover:bg-transparent!': isDownloadDisabled }"
             >
               <span class="inline-flex items-center justify-center w-7 h-7 rounded-md bg-section-header-bg text-text-secondary shrink-0">
@@ -542,7 +542,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <button
                   type="button"
                   data-test="search-download-csv-btn"
-                  class="flex items-center gap-[0.625rem] w-full py-[0.375rem] px-3 text-[var(--text-base)] [line-height:1.2] text-left bg-transparent border-0 cursor-pointer text-text-body hover:bg-interactive-hover-bg"
+                  class="flex items-center gap-[0.625rem] w-full py-[0.375rem] px-3 text-[var(--text-sm)] [line-height:1.2] text-left bg-transparent border-0 cursor-pointer text-text-body hover:bg-interactive-hover-bg"
                   @click="downloadLogs(searchObj.data.queryResults.hits, 'csv'); showDownloadSubmenu = false"
                 >
                   <OIcon name="grid-on" size="sm" />
@@ -551,7 +551,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <button
                   type="button"
                   data-test="search-download-json-btn"
-                  class="flex items-center gap-[0.625rem] w-full py-[0.375rem] px-3 text-[var(--text-base)] [line-height:1.2] text-left bg-transparent border-0 cursor-pointer text-text-body hover:bg-interactive-hover-bg"
+                  class="flex items-center gap-[0.625rem] w-full py-[0.375rem] px-3 text-[var(--text-sm)] [line-height:1.2] text-left bg-transparent border-0 cursor-pointer text-text-body hover:bg-interactive-hover-bg"
                   @click="downloadLogs(searchObj.data.queryResults.hits, 'json'); showDownloadSubmenu = false"
                 >
                   <OIcon name="data-object" size="sm" />

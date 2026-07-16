@@ -29,10 +29,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
 
-      <div class="text-[1.2rem] font-bold tracking-[-0.2px] mb-2.5">
+      <div class="text-xl font-bold tracking-[-0.2px] mb-2.5">
         {{ t("billing.billingGroup.plansManagedTitle") }}
       </div>
-      <div class="text-[0.88rem] leading-[1.65] opacity-65 max-w-110 mb-6">
+      <div class="text-sm leading-[1.65] opacity-65 max-w-110 mb-6">
         {{
           t("billing.billingGroup.plansManagedDescription", {
             name: membership?.payer_org_name,

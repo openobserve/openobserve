@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="flex items-center w-full"
               >
                 <div
-                  class="px-1.5 py-0.5 rounded-sm text-[10px] font-semibold uppercase mr-1.5"
+                  class="px-1.5 py-0.5 rounded-sm text-3xs font-semibold uppercase mr-1.5"
                   :class="getEventTypeClass(event.type)"
                 >
                   {{ event.type }}
@@ -172,7 +172,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <div class="flex-1 break-words">
                   <span
-                    class="px-1 py-0.5 rounded-sm text-[10px]"
+                    class="px-1 py-0.5 rounded-sm text-3xs"
                     :class="
                       rawEvent.error_handling === 'unhandled'
                         ? 'text-status-error-text border border-solid border-status-negative'
@@ -194,7 +194,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <div class="flex-1 break-words">
                   <code
-                    class="font-mono text-[10px] px-1 py-0.5 bg-surface-accent rounded-sm"
+                    class="font-mono text-3xs px-1 py-0.5 bg-surface-accent rounded-sm"
                   >
                     {{ formatId(rawEvent.error_id) }}
                   </code>
@@ -251,7 +251,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <div class="flex-1 break-words">
                   <code
-                    class="font-mono text-[10px] px-1 py-0.5 bg-surface-accent rounded-sm"
+                    class="font-mono text-3xs px-1 py-0.5 bg-surface-accent rounded-sm"
                   >
                     {{ formatId(rawEvent.view_id) }}
                   </code>
@@ -294,7 +294,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <!-- Event Type Badge -->
                   <div class="flex items-center mb-0.5">
                     <div
-                      class="px-1 py-0.5 rounded-sm text-[10px] font-semibold uppercase mr-1.5"
+                      class="px-1 py-0.5 rounded-sm text-3xs font-semibold uppercase mr-1.5"
                       :class="getEventTypeClass(item.type)"
                     >
                       {{ item.type }}
@@ -303,7 +303,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <!-- Resource -->
                     <template v-if="item.type === 'resource'">
                       <span
-                        class="mr-1 font-bold text-[10px] text-button-primary"
+                        class="mr-1 font-bold text-3xs text-button-primary"
                       >
                         {{ item.resource_method || "GET" }}
                       </span>
@@ -352,7 +352,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
 
                   <!-- Event Details Row -->
-                  <div class="flex items-center text-text-caption text-[10px]">
+                  <div class="flex items-center text-text-caption text-3xs">
                     <OIcon name="schedule" size="xs" class="mr-1" />
                     <span class="mr-2">{{
                       formatTimestamp(item.date)
@@ -412,7 +412,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <div class="flex items-center mb-1">
                 <span
-                  class="px-1.5 py-0.5 rounded-sm text-[10px] font-bold mr-2 bg-badge-blue-soft-bg text-badge-blue-soft-text"
+                  class="px-1.5 py-0.5 rounded-sm text-3xs font-bold mr-2 bg-badge-blue-soft-bg text-badge-blue-soft-text"
                 >
                   {{ resource.resource_method || "GET" }}
                 </span>
@@ -421,7 +421,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </span>
               </div>
               <div
-                class="flex items-center gap-x-3 text-[10px] text-text-caption"
+                class="flex items-center gap-x-3 text-3xs text-text-caption"
               >
                 <div class="flex items-center">
                   <OIcon name="access-time" size="xs" class="mr-1" />
@@ -484,7 +484,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
         </div>
         <div
-          class="p-2 rounded-sm overflow-x-auto font-mono text-[10px]"
+          class="p-2 rounded-sm overflow-x-auto font-mono text-3xs"
           data-test="raw-event-json"
         >
           <div>

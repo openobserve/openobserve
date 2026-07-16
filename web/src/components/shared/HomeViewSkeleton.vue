@@ -36,7 +36,7 @@
             </div>
 
             <!-- Bottom Section (40%) -->
-            <div class="data-to-display flex items-end text-[28px] font-semibold leading-8">
+            <div class="data-to-display flex items-end text-3xl font-semibold leading-8">
               <SkeletonBox variant="title" width="80px" height="32px" />
             </div>
           </div>
@@ -62,7 +62,7 @@
                 <SkeletonBox variant="button" width="40px" height="40px" />
               </div>
             </div>
-            <div class="data-to-display flex items-end text-[28px] font-semibold leading-8">
+            <div class="data-to-display flex items-end text-3xl font-semibold leading-8">
               <SkeletonBox variant="title" width="60px" height="32px" />
             </div>
           </div>
@@ -82,7 +82,7 @@
                 <SkeletonBox variant="button" width="40px" height="40px" />
               </div>
             </div>
-            <div class="data-to-display flex items-end text-[28px] font-semibold leading-8">
+            <div class="data-to-display flex items-end text-3xl font-semibold leading-8">
               <SkeletonBox variant="title" width="60px" height="32px" />
             </div>
           </div>

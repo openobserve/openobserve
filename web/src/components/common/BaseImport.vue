@@ -302,7 +302,7 @@ export default defineComponent({
     },
     titleClass: {
       type: String,
-      default: "font-[600] text-[20px]",
+      default: "font-[600] text-xl",
     },
     contentWrapperClass: {
       type: String,

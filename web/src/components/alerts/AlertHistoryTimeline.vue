@@ -91,7 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ normalizeStatus(seg.status) }}
             </div>
             <div class="opacity-60 mt-0.5">{{ seg.startLabel }}</div>
-            <div v-if="seg.count > 1" class="opacity-50 text-[10px]">{{ seg.count }} evaluations</div>
+            <div v-if="seg.count > 1" class="opacity-50 text-3xs">{{ seg.count }} evaluations</div>
           </div>
         </div>
       </template>
@@ -103,7 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <span
         v-for="(tick, i) in tickLabels"
         :key="i"
-        class="absolute top-0 text-[10px] tabular-nums whitespace-nowrap translate-x-[-50%]"
+        class="absolute top-0 text-3xs tabular-nums whitespace-nowrap translate-x-[-50%]"
         :style="{ left: tick.leftPct + '%', color: 'var(--color-text-caption)' }"
       >
         {{ tick.label }}

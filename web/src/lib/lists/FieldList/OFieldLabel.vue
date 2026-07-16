@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OTooltip :content="field.label ?? field.name" :disabled="!isTruncated" side="right">
       <span
         ref="labelRef"
-        class="truncate flex-1 min-w-0 leading-relaxed text-[0.82rem] text-field-list-label-text"
+        class="truncate flex-1 min-w-0 leading-relaxed text-compact text-field-list-label-text"
       >
         {{ field.label ?? field.name }}
       </span>

@@ -1,7 +1,7 @@
 <template>
   <div data-test="add-stream-routing-section" class="bg-surface-base h-full">
     <div class="py-2 px-3 flex justify-between items-center">
-      <div class="text-[18px]">Stream Routing</div>
+      <div class="text-lg">Stream Routing</div>
       <OIcon
         data-test="stream-routing-close-dialog-btn"
         name="cancel"

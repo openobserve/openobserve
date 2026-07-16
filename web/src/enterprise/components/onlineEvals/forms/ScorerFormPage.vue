@@ -244,7 +244,7 @@
             <div class="flex justify-between items-baseline gap-3">
               <div class="flex flex-col gap-0.5">
                 <strong class="text-xs font-semibold">{{ t("onlineEvals.scorer.extraFieldsLabel") }}</strong>
-                <span class="text-[10px] font-semibold text-(--color-text-muted) uppercase tracking-[0.04em]">
+                <span class="text-3xs font-semibold text-(--color-text-muted) uppercase tracking-[0.04em]">
                   {{ t("onlineEvals.scorer.extraFieldsOptional") }}
                 </span>
                 <small class="block text-2xs text-(--color-text-secondary)">{{ t("onlineEvals.scorer.extraFieldsHint") }}</small>
@@ -256,7 +256,7 @@
               class="flex flex-col gap-1.5 border border-(--color-border) rounded-md p-[8px_10px] bg-(--color-card-bg-solid)"
               data-test="scorer-form-extra-fields"
             >
-              <div class="grid grid-cols-[minmax(120px,1fr)_110px_minmax(140px,2fr)_28px] gap-2 items-center text-[10px] font-semibold uppercase tracking-[0.04em]">
+              <div class="grid grid-cols-[minmax(120px,1fr)_110px_minmax(140px,2fr)_28px] gap-2 items-center text-3xs font-semibold uppercase tracking-[0.04em]">
                 <span>{{ t("onlineEvals.scorer.extraFields.colName") }}</span>
                 <span>{{ t("onlineEvals.scorer.extraFields.colType") }}</span>
                 <span>{{ t("onlineEvals.scorer.extraFields.colDescription") }}</span>
@@ -518,7 +518,7 @@
               class="flex flex-col gap-1.5 border border-(--color-border) rounded-md p-[8px_10px] bg-(--color-card-bg-solid)"
               data-test="scorer-form-remote-headers"
             >
-              <div class="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_28px] gap-1.5 items-center text-[10px] font-semibold uppercase tracking-[0.04em]">
+              <div class="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_28px] gap-1.5 items-center text-3xs font-semibold uppercase tracking-[0.04em]">
                 <span>{{ t("onlineEvals.scorer.remoteHeaders.colName") }}</span>
                 <span>{{ t("onlineEvals.scorer.remoteHeaders.colValue") }}</span>
                 <span aria-hidden="true" />

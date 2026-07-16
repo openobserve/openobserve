@@ -68,7 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="webinar-home-content relative z-[1] flex items-center justify-between flex-wrap gap-3 p-4 pr-[1.375rem]">
       <div class="webinar-home-left flex flex-col gap-[0.3rem]">
         <!-- Live badge -->
-        <div class="webinar-home-badge inline-flex items-center gap-[0.375rem] text-[0.7rem] font-bold uppercase tracking-[0.06em] text-[var(--q-secondary)]">
+        <div class="webinar-home-badge inline-flex items-center gap-[0.375rem] text-2xs font-bold uppercase tracking-[0.06em] text-[var(--q-secondary)]">
           <span class="webinar-home-badge-dot w-[0.5rem] h-[0.5rem] rounded-full bg-(--q-secondary) shrink-0 [animation:badge-pulse_1.8s_ease-in-out_infinite]" />
           {{ webinarData.tag }}
         </div>

@@ -140,7 +140,7 @@ const message = computed(() => {
 // darkest palette step for text, so currentColor stays readable.
 .insight-action-btn {
   color: currentColor;
-  font-size: var(--text-sm);
+  font-size: var(--text-compact);
   font-weight: var(--font-medium);
   text-decoration: underline;
   text-underline-offset: 0.1875rem;

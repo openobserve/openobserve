@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div
                 v-if="currentOrgToShow.secondary"
-                class="member-id text-[0.72rem] opacity-60 truncate max-w-full normal-case"
+                class="member-id text-xs opacity-60 truncate max-w-full normal-case"
                 :title="currentOrgToShow.secondary"
               >
                 {{ currentOrgToShow.secondary }}
@@ -85,7 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="member-name font-semibold truncate max-w-full normal-case" :title="opt.title">
                 {{ opt.primary }}
               </div>
-              <div v-if="opt.secondary" class="member-id text-[0.72rem] opacity-60 truncate max-w-full normal-case" :title="opt.secondary">
+              <div v-if="opt.secondary" class="member-id text-xs opacity-60 truncate max-w-full normal-case" :title="opt.secondary">
                 {{ opt.secondary }}
               </div>
             </div>

@@ -39,19 +39,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="text-sm font-semibold leading-5 opacity-85 whitespace-nowrap">
               {{ t("billing.billingGroup.statTotal") }}
             </div>
-            <div class="text-[24px] font-semibold leading-[1.2] mt-1.5">{{ totalCount }}</div>
+            <div class="text-2xl font-semibold leading-[1.2] mt-1.5">{{ totalCount }}</div>
           </div>
           <div class="feature-card flex-1">
             <div class="text-sm font-semibold leading-5 opacity-85 whitespace-nowrap">
               {{ t("billing.billingGroup.statActive") }}
             </div>
-            <div class="text-[24px] font-semibold leading-[1.2] mt-1.5 text-status-positive">{{ activeCount }}</div>
+            <div class="text-2xl font-semibold leading-[1.2] mt-1.5 text-status-positive">{{ activeCount }}</div>
           </div>
           <div class="feature-card flex-1">
             <div class="text-sm font-semibold leading-5 opacity-85 whitespace-nowrap">
               {{ t("billing.billingGroup.statPending") }}
             </div>
-            <div class="text-[24px] font-semibold leading-[1.2] mt-1.5 text-status-warning-text">
+            <div class="text-2xl font-semibold leading-[1.2] mt-1.5 text-status-warning-text">
               {{ pendingCount }}
             </div>
           </div>
@@ -119,7 +119,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="flex items-center justify-between gap-14 py-12 px-10 flex-wrap">
           <!-- Left: headline + CTA -->
           <div class="flex-1 min-w-70 max-w-120">
-            <div class="inline-flex items-center gap-1.5 text-[0.72rem] font-semibold tracking-[0.4px] text-primary-600 bg-[color-mix(in_srgb,var(--color-primary-600)_10%,transparent)] border border-[color-mix(in_srgb,var(--color-primary-600)_25%,transparent)] py-1 px-2.5 rounded-full mb-5">
+            <div class="inline-flex items-center gap-1.5 text-xs font-semibold tracking-[0.4px] text-primary-600 bg-[color-mix(in_srgb,var(--color-primary-600)_10%,transparent)] border border-[color-mix(in_srgb,var(--color-primary-600)_25%,transparent)] py-1 px-2.5 rounded-full mb-5">
               <OIcon name="verified" size="xs" />
               {{ t("billing.billingGroup.statusActive") }}
             </div>
@@ -139,7 +139,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </OTooltip>
               </span>
             </div>
-            <div class="text-[0.95rem] leading-[1.7] opacity-70 mb-8 max-w-105">
+            <div class="text-base leading-[1.7] opacity-70 mb-8 max-w-105">
               {{ t("billing.billingGroup.childHeroSub") }}
             </div>
             <OButton
@@ -162,10 +162,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OIcon name="person-add" />
               </div>
               <div class="flex-1 min-w-0">
-                <div class="text-[0.78rem] font-semibold opacity-60 mb-1">
+                <div class="text-xs font-semibold opacity-60 mb-1">
                   {{ t("billing.billingGroup.invitedBy") }}
                 </div>
-                <div class="text-[0.95rem] font-semibold truncate">
+                <div class="text-base font-semibold truncate">
                   {{ membership?.created_by }}
                 </div>
               </div>
@@ -175,10 +175,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OIcon name="how-to-reg" />
               </div>
               <div class="flex-1 min-w-0">
-                <div class="text-[0.78rem] font-semibold opacity-60 mb-1">
+                <div class="text-xs font-semibold opacity-60 mb-1">
                   {{ t("billing.billingGroup.acceptedBy") }}
                 </div>
-                <div class="text-[0.95rem] font-semibold truncate">
+                <div class="text-base font-semibold truncate">
                   {{
                     membership?.accepted_by ||
                     t("billing.billingGroup.addedOnCreation")
@@ -191,10 +191,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OIcon name="schedule" />
               </div>
               <div class="flex-1 min-w-0">
-                <div class="text-[0.78rem] font-semibold opacity-60 mb-1">
+                <div class="text-xs font-semibold opacity-60 mb-1">
                   {{ t("billing.billingGroup.memberSince") }}
                 </div>
-                <div class="text-[0.95rem] font-semibold">
+                <div class="text-base font-semibold">
                   {{ formatDate(membership?.created_at) }}
                 </div>
               </div>
@@ -269,14 +269,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
 
-          <div class="text-[1.2rem] font-bold tracking-[-0.2px] mb-2.5">
+          <div class="text-xl font-bold tracking-[-0.2px] mb-2.5">
             {{
               allowedForBillingGroup
                 ? t("billing.billingGroup.emptyTitle")
                 : t("billing.billingGroup.notEnabledTitle")
             }}
           </div>
-          <div class="text-[0.88rem] leading-[1.65] opacity-65 max-w-105 mb-6">
+          <div class="text-sm leading-[1.65] opacity-65 max-w-105 mb-6">
             {{
               allowedForBillingGroup
                 ? t("billing.billingGroup.inviteTabPrompt")

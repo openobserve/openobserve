@@ -153,7 +153,7 @@
 
               <!-- Priority flow -->
               <div class="py-3 px-3.5 border border-card-glass-border rounded-lg bg-[rgba(0,0,0,0.015)] dark:bg-[rgba(255,255,255,0.02)]">
-                <div class="text-[10px] font-semibold opacity-40 mb-2">
+                <div class="text-3xs font-semibold opacity-40 mb-2">
                   {{ t("modelPricing.matchPriority") }}
                 </div>
                 <div class="flex items-center gap-1.5 flex-wrap">
@@ -214,8 +214,8 @@
 
                 <div class="text-xs" v-if="pricingRows.length > 0">
                   <div class="grid gap-2 py-[7px] px-3.5 border-b border-card-glass-border bg-[rgba(0,0,0,0.015)] dark:bg-[rgba(255,255,255,0.02)] [grid-template-columns:1.5fr_1fr]">
-                    <span class="text-[10px] font-semibold opacity-40">{{ t("modelPricing.usageType") }}</span>
-                    <span class="text-[10px] font-semibold opacity-40 text-right">{{
+                    <span class="text-3xs font-semibold opacity-40">{{ t("modelPricing.usageType") }}</span>
+                    <span class="text-3xs font-semibold opacity-40 text-right">{{
                       t("modelPricing.pricePerMTokens")
                     }}</span>
                   </div>

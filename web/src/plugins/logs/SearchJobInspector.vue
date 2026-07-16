@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </svg>
           <div class="flex items-center gap-1.5">
             <span
-              class="text-[10px] font-small px-1.5 py-0.5 rounded-sm text-text-secondary bg-surface-subtle"
+              class="text-3xs font-small px-1.5 py-0.5 rounded-sm text-text-secondary bg-surface-subtle"
             >
               {{ store.state.timezone || 'UTC' }}
             </span>
@@ -77,7 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   {{ hasNoData ? 'NA' : (profileData?.data_records || 0).toLocaleString() }}
                 </div>
                 <div
-                  class="text-[10px] text-text-caption"
+                  class="text-3xs text-text-caption"
                 >
                   Returned from query
                 </div>
@@ -110,7 +110,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   {{ hasNoData ? 'NA' : (profileData?.scan_records || 0).toLocaleString() }}
                 </div>
                 <div
-                  class="text-[10px] text-text-caption"
+                  class="text-3xs text-text-caption"
                 >
                   Scanned events for this query
                 </div>
@@ -146,7 +146,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   {{ hasNoData ? 'NA' : formatDuration(profileData?.time_taken || profileData?.total_duration) }}
                 </div>
                 <div
-                  class="text-[10px]"
+                  class="text-3xs"
                   :class="hasNoData ? 'text-text-caption' : getResponseTimeLabel(profileData?.time_taken || profileData?.total_duration).colorClass"
                 >
                   {{ hasNoData ? 'No data' : getResponseTimeLabel(profileData?.time_taken || profileData?.total_duration).text }}

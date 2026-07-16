@@ -91,13 +91,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Body -->
     <div
       v-if="!props.spans || props.spans.length === 0"
-      class="flex-1 flex items-center justify-center text-text-muted text-[0.85rem]"
+      class="flex-1 flex items-center justify-center text-text-muted text-sm"
     >
       No spans loaded for this trace.
     </div>
     <div
       v-else-if="turns.length === 0"
-      class="flex-1 flex items-center justify-center text-text-muted text-[0.85rem]"
+      class="flex-1 flex items-center justify-center text-text-muted text-sm"
     >
       No LLM turns detected. The trace doesn't contain spans with
       <code>gen_ai.operation.name = chat</code>.
@@ -112,18 +112,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="thread-system__head flex items-center gap-[0.625rem] py-2 px-3 cursor-pointer transition-all duration-[120ms]"
           @click="showSystemFull = !showSystemFull"
         >
-          <span class="thread-system__badge inline-flex items-center py-[0.15rem] px-2 bg-[rgba(139,92,246,0.1)] text-[#8b5cf6] rounded-sm text-[0.7rem] font-semibold tracking-[0.02rem] shrink-0">
+          <span class="thread-system__badge inline-flex items-center py-[0.15rem] px-2 bg-[rgba(139,92,246,0.1)] text-[#8b5cf6] rounded-sm text-2xs font-semibold tracking-[0.02rem] shrink-0">
             <OIcon name="settings" size="xs" class="mr-1" />
             System
           </span>
           <span
             v-if="!showSystemFull"
-            class="thread-system__preview flex-1 min-w-0 text-[0.8rem] text-text-secondary truncate"
+            class="thread-system__preview flex-1 min-w-0 text-compact text-text-secondary truncate"
           >
             {{ truncate(head.systemPrompt, 160) }}
           </span>
           <span v-else class="flex-1" />
-          <span class="thread-system__toggle inline-flex items-center gap-[0.15rem] text-(--q-primary) text-[0.72rem] font-medium shrink-0">
+          <span class="thread-system__toggle inline-flex items-center gap-[0.15rem] text-(--q-primary) text-xs font-medium shrink-0">
             <OIcon
               :name="showSystemFull ? 'expand-less' : 'expand-more'"
               size="sm"
@@ -132,7 +132,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div
           v-if="showSystemFull"
-          class="thread-system__content py-3 px-[0.875rem] border-t border-border-default bg-(--color-surface-base,var(--color-surface-base)) text-[0.82rem] leading-[1.55] text-text-secondary whitespace-pre-wrap break-words max-h-90 overflow-auto"
+          class="thread-system__content py-3 px-[0.875rem] border-t border-border-default bg-(--color-surface-base,var(--color-surface-base)) text-compact leading-[1.55] text-text-secondary whitespace-pre-wrap break-words max-h-90 overflow-auto"
         >
           {{ head.systemPrompt }}
         </div>
@@ -143,7 +143,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              same session — these are answered in earlier traces. -->
         <div
           v-if="group.historicalUserCount > 0"
-          class="thread-prior flex items-center gap-[0.5rem] px-[0.75rem] py-[0.4rem] mb-[0.5rem] rounded-sm border border-dashed border-border-default text-[0.72rem] text-text-muted"
+          class="thread-prior flex items-center gap-[0.5rem] px-[0.75rem] py-[0.4rem] mb-[0.5rem] rounded-sm border border-dashed border-border-default text-xs text-text-muted"
         >
           <span>↶</span>
           <span>
@@ -156,10 +156,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- This group's user query. -->
         <div
           v-if="group.userQuery"
-          class="thread-bubble thread-bubble--user thread-user-row flex items-start gap-[0.625rem] mb-4 ml-auto max-w-[40%] w-fit py-[0.625rem] px-[0.875rem] rounded-lg text-[0.85rem] leading-normal whitespace-pre-wrap break-words bg-[linear-gradient(135deg,#f8f9ff_0%,#e8edff_100%)] border border-[#e0e6ff] text-[#2c3e50] shadow-[0_1px_2px_rgba(0,0,0,0.06)]"
+          class="thread-bubble thread-bubble--user thread-user-row flex items-start gap-[0.625rem] mb-4 ml-auto max-w-[40%] w-fit py-[0.625rem] px-[0.875rem] rounded-lg text-sm leading-normal whitespace-pre-wrap break-words bg-[linear-gradient(135deg,#f8f9ff_0%,#e8edff_100%)] border border-[#e0e6ff] text-[#2c3e50] shadow-[0_1px_2px_rgba(0,0,0,0.06)]"
         >
           <div
-            class="thread-user-avatar w-6 h-6 rounded-full bg-[image:var(--color-gradient-ai)] text-white inline-flex items-center justify-content-center text-[0.7rem] font-bold shrink-0 cursor-default"
+            class="thread-user-avatar w-6 h-6 rounded-full bg-[image:var(--color-gradient-ai)] text-white inline-flex items-center justify-content-center text-2xs font-bold shrink-0 cursor-default"
             :title="group.userId || 'User'"
           >
             <OIcon name="person" size="sm" />
@@ -189,7 +189,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             v-for="(u, uIdx) in turn.followupUsers"
             :key="`u-${uIdx}`"
-            class="thread-bubble thread-bubble--user thread-bubble--user-followup py-[0.625rem] px-[0.875rem] rounded-lg text-[0.85rem] leading-normal whitespace-pre-wrap break-words max-w-[min(640px,75%)] bg-[linear-gradient(135deg,#f8f9ff_0%,#e8edff_100%)] border border-[#e0e6ff] text-[#2c3e50] shadow-[0_1px_2px_rgba(0,0,0,0.06)]"
+            class="thread-bubble thread-bubble--user thread-bubble--user-followup py-[0.625rem] px-[0.875rem] rounded-lg text-sm leading-normal whitespace-pre-wrap break-words max-w-[min(640px,75%)] bg-[linear-gradient(135deg,#f8f9ff_0%,#e8edff_100%)] border border-[#e0e6ff] text-[#2c3e50] shadow-[0_1px_2px_rgba(0,0,0,0.06)]"
           >
             {{ u.content }}
           </div>
@@ -208,42 +208,42 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             v-for="(msg, mIdx) in turn.assistant"
             :key="`a-${mIdx}`"
-            class="thread-bubble thread-bubble--assistant markdown-body self-start bg-white border border-[#e5e7eb] text-[#2c3e50] max-w-full shadow-[0_1px_2px_rgba(0,0,0,0.06)] py-[0.625rem] px-[0.875rem] rounded-lg text-[0.85rem] leading-normal break-words"
+            class="thread-bubble thread-bubble--assistant markdown-body self-start bg-white border border-[#e5e7eb] text-[#2c3e50] max-w-full shadow-[0_1px_2px_rgba(0,0,0,0.06)] py-[0.625rem] px-[0.875rem] rounded-lg text-sm leading-normal break-words"
             v-html="renderMarkdown(msg.content)"
           />
 
 
           <!-- Footer. -->
-          <div class="thread-turn__footer flex items-center flex-wrap gap-[0.35rem] mt-2 pt-2 border-t border-dashed border-border-default text-[0.72rem] text-text-secondary">
-            <span class="thread-metric inline-flex items-center gap-1 py-[0.18rem] px-2 rounded-md bg-(--color-surface-base,rgba(0,0,0,0.03)) border border-border-default text-text-secondary text-[0.7rem] leading-none whitespace-nowrap shrink-0" :title="`Started at ${formatTime(turn.span.start_time)}`">
+          <div class="thread-turn__footer flex items-center flex-wrap gap-[0.35rem] mt-2 pt-2 border-t border-dashed border-border-default text-xs text-text-secondary">
+            <span class="thread-metric inline-flex items-center gap-1 py-[0.18rem] px-2 rounded-md bg-(--color-surface-base,rgba(0,0,0,0.03)) border border-border-default text-text-secondary text-2xs leading-none whitespace-nowrap shrink-0" :title="`Started at ${formatTime(turn.span.start_time)}`">
               <OIcon name="schedule" size="xs" />
               {{ formatTime(turn.span.start_time) }}
             </span>
-            <span class="thread-metric thread-metric--model inline-flex items-center gap-1 py-[0.18rem] px-2 rounded-md text-[#8b5cf6] bg-[rgba(139,92,246,0.06)] border border-[rgba(139,92,246,0.2)] font-medium max-w-50 overflow-hidden text-ellipsis text-[0.7rem] leading-none whitespace-nowrap shrink-0" :title="getModel(turn.span)">
+            <span class="thread-metric thread-metric--model inline-flex items-center gap-1 py-[0.18rem] px-2 rounded-md text-[#8b5cf6] bg-[rgba(139,92,246,0.06)] border border-[rgba(139,92,246,0.2)] font-medium max-w-50 overflow-hidden text-ellipsis text-2xs leading-none whitespace-nowrap shrink-0" :title="getModel(turn.span)">
               <OIcon name="bolt" size="xs" />
               {{ getModel(turn.span) || "unknown" }}
             </span>
-            <span class="thread-metric inline-flex items-center gap-1 py-[0.18rem] px-2 rounded-md bg-(--color-surface-base,rgba(0,0,0,0.03)) border border-border-default text-text-secondary text-[0.7rem] leading-none whitespace-nowrap shrink-0" title="Duration">
+            <span class="thread-metric inline-flex items-center gap-1 py-[0.18rem] px-2 rounded-md bg-(--color-surface-base,rgba(0,0,0,0.03)) border border-border-default text-text-secondary text-2xs leading-none whitespace-nowrap shrink-0" title="Duration">
               <OIcon name="timer" size="xs" />
               {{ formatDuration(turn.span.duration) }}
             </span>
-            <span class="thread-metric inline-flex items-center gap-1 py-[0.18rem] px-2 rounded-md bg-(--color-surface-base,rgba(0,0,0,0.03)) border border-border-default text-text-secondary text-[0.7rem] leading-none whitespace-nowrap shrink-0" title="Tokens">
+            <span class="thread-metric inline-flex items-center gap-1 py-[0.18rem] px-2 rounded-md bg-(--color-surface-base,rgba(0,0,0,0.03)) border border-border-default text-text-secondary text-2xs leading-none whitespace-nowrap shrink-0" title="Tokens">
               <OIcon name="data-usage" size="xs" />
               {{ formatNumber(getTokens(turn.span)) }} tokens
             </span>
-            <span class="thread-metric inline-flex items-center gap-1 py-[0.18rem] px-2 rounded-md bg-(--color-surface-base,rgba(0,0,0,0.03)) border border-border-default text-text-secondary text-[0.7rem] leading-none whitespace-nowrap shrink-0" title="Cost">
+            <span class="thread-metric inline-flex items-center gap-1 py-[0.18rem] px-2 rounded-md bg-(--color-surface-base,rgba(0,0,0,0.03)) border border-border-default text-text-secondary text-2xs leading-none whitespace-nowrap shrink-0" title="Cost">
               <OIcon name="payments" size="xs" />
               {{ formatCost(getCost(turn.span)) }}
             </span>
             <span
               v-if="turn.span.span_status === 'ERROR'"
-              class="thread-metric thread-metric--error inline-flex items-center gap-1 py-[0.18rem] px-2 rounded-md text-[#dc2626] bg-[rgba(220,38,38,0.08)] border border-[rgba(220,38,38,0.25)] font-medium text-[0.7rem] leading-none whitespace-nowrap shrink-0"
+              class="thread-metric thread-metric--error inline-flex items-center gap-1 py-[0.18rem] px-2 rounded-md text-[#dc2626] bg-[rgba(220,38,38,0.08)] border border-[rgba(220,38,38,0.25)] font-medium text-2xs leading-none whitespace-nowrap shrink-0"
             >
               <OIcon name="error-outline" size="xs" />
               Error
             </span>
             <button
-              class="thread-turn__view-span ml-auto inline-flex items-center gap-[0.2rem] py-[0.2rem] px-[0.55rem] rounded-md text-(--q-primary) text-[0.72rem] font-medium bg-transparent border border-transparent cursor-pointer transition-all duration-[120ms] shrink-0"
+              class="thread-turn__view-span ml-auto inline-flex items-center gap-[0.2rem] py-[0.2rem] px-[0.55rem] rounded-md text-(--q-primary) text-xs font-medium bg-transparent border border-transparent cursor-pointer transition-all duration-[120ms] shrink-0"
               @click="emit('span-selected', turn.span.span_id)"
             >
               View span

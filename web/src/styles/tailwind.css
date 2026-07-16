@@ -15,21 +15,13 @@
 @source "../**/*.{vue,js,ts}";
 
 /*
- * Font-size parity with the pre-prefix-removal build.
+ * text-sm / text-base line-height pin.
  *
- * On main (`@import "tailwindcss" prefix(tw)`) Tailwind namespaced its theme
- * variables, so the `tw:text-sm` / `tw:text-base` utilities read Tailwind's
- * built-in scale (`--tw-text-sm` = 0.875rem/14px, `--tw-text-base` = 1rem/16px)
- * — independent of the O2 design tokens `--text-sm` (0.8125rem/13px) and
- * `--text-base` (0.875rem/14px), which drive element-level rules (body, p,
- * headings, label).
- *
- * Dropping the prefix collapsed both into the single `--text-*` variable, so the
- * ~780 `text-sm` / `text-base` utility usages inherited the smaller O2 tokens and
- * every label/header/button shrank ~1px. Re-pin ONLY the two utilities to
- * Tailwind's defaults so utility-driven text matches main pixel-for-pixel, while
- * the semantic element rules keep the O2 token sizes (unchanged from main).
- * `var(--tw-leading, …)` is preserved so `leading-*` overrides still win.
+ * The `--text-sm` (14px) and `--text-base` (16px) tokens now match Tailwind's
+ * conventional scale, so the font-SIZE here is redundant-but-explicit. This block
+ * is retained to lock the paired line-heights (`var(--tw-leading, …)`) for the
+ * ~780 utility usages so `leading-*` overrides still win. (Element rules use the
+ * same tokens via var(--text-*), so element and utility text now agree pixel-for-pixel.)
  */
 @layer utilities {
   .text-sm {
@@ -74,7 +66,7 @@
  */
 .query-editor-placeholder-overlay .query-editor-placeholder-typewriter {
   font-family: monospace;
-  font-size: var(--text-base);
+  font-size: var(--text-sm);
   line-height: 1.3125rem;
   color: var(--color-text-placeholder);
   white-space: nowrap;

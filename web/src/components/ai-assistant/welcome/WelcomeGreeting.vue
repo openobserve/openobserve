@@ -31,14 +31,14 @@ const logoSrc = computed(() =>
       </div>
 
       <div class="welcome-hero__heading-block flex items-center">
-        <div class="welcome-hero__title m-0 text-[32px] font-bold tracking-[-0.01em] leading-[1.15] text-typography-body flex items-center gap-2">
+        <div class="welcome-hero__title m-0 text-3xl font-bold tracking-[-0.01em] leading-[1.15] text-typography-body flex items-center gap-2">
           {{ greeting }}
-          <span class="welcome-hero__wave text-[26px] leading-none inline-block [animation:wave_2.4s_ease-in-out_0.4s_2] [transform-origin:70%_70%]" aria-hidden="true">👋</span>
+          <span class="welcome-hero__wave text-2xl leading-none inline-block [animation:wave_2.4s_ease-in-out_0.4s_2] [transform-origin:70%_70%]" aria-hidden="true">👋</span>
         </div>
       </div>
     </div>
 
-    <div class="welcome-hero__tagline mt-1 text-[13.5px] leading-[1.6] text-typography-meta max-w-[38rem] m-0">
+    <div class="welcome-hero__tagline mt-1 text-sm leading-[1.6] text-typography-meta max-w-[38rem] m-0">
       {{ t("aiAssistant.welcome.taglineLead") }}
       <span class="welcome-hero__highlight font-semibold bg-[image:var(--color-gradient-brand-ribbon)] [background-clip:text] [-webkit-background-clip:text] text-transparent">{{
         t("aiAssistant.welcome.taglineHighlight")

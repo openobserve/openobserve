@@ -552,7 +552,7 @@ class="h-5! text-xs!">
                         </OIcon>
                       </OButton>
                     </span>
-                    <span class="text-[0.85rem]!">{{
+                    <span class="text-sm!">{{
                       $t("traces.applyAndSearch")
                     }}</span>
                   </li>
@@ -609,7 +609,7 @@ class="h-5! text-xs!">
                             </OIcon>
                           </OButton>
                         </span>
-                        <span class="text-[0.85rem]!">{{
+                        <span class="text-sm!">{{
                           $t("traces.applyAndSearch")
                         }}</span>
                       </li>

@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="m-3 mt-1">
     <CopyContent :content="content" />
-    <div class="text-[16px]">
+    <div class="text-base">
       <div class="font-bold pt-6 pb-2">
         Check further documentation at:
       </div>

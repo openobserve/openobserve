@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OIcon name="workspace-premium" size="xl" />
             </div>
 
-            <div data-test="enterprise-upgrade-hero-title" class="text-[32px] font-bold mb-4 leading-[1.2] text-center text-white">{{ dialogConfig.heroTitle }}</div>
+            <div data-test="enterprise-upgrade-hero-title" class="text-3xl font-bold mb-4 leading-[1.2] text-center text-white">{{ dialogConfig.heroTitle }}</div>
 
             <div class="mb-6 text-sm leading-[1.6] opacity-[0.95] text-center text-white">
               {{ dialogConfig.offerText }}
@@ -133,7 +133,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Right Panel - Features List -->
         <div class="flex-1 flex flex-col overflow-hidden bg-surface-base" :class="[{ 'max-w-full': dialogConfig.isCloudLayout }]">
           <div class="pt-4 pb-3 px-8 sticky top-0 z-10 border-b text-center bg-surface-base border-border-default">
-            <div data-test="enterprise-upgrade-features-title" class="text-[18px] font-bold mb-1 [letter-spacing:-0.3px] text-text-heading">{{ dialogConfig.featuresTitle }}</div>
+            <div data-test="enterprise-upgrade-features-title" class="text-lg font-bold mb-1 [letter-spacing:-0.3px] text-text-heading">{{ dialogConfig.featuresTitle }}</div>
             <div class="text-xs font-medium text-text-secondary">{{ dialogConfig.featuresSubtitle }}</div>
           </div>
 

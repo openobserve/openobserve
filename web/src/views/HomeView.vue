@@ -396,7 +396,7 @@ export default defineComponent({
   border-radius: var(--radius-sm);
   cursor: pointer;
   opacity: 0.6;
-  font-size: var(--text-base);
+  font-size: var(--text-sm);
   color: var(--color-text-secondary);
   transition: all 0.2s ease;
 }

@@ -506,18 +506,21 @@
   --font-sans: 'Geist', -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif;
   --font-mono: 'Geist Mono', 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
 
-  /* --- Font size scale --- */
-  --text-2xs:  0.6875rem; /* 11px — captions, micro-labels (§3.J) */
-  --text-xs:   0.75rem;   /* 12px */
-  --text-compact: 0.8125rem; /* 13px — dense data UIs (§3.J) */
-  --text-sm:   0.8125rem; /* 13px */
-  --text-base: 0.875rem; /* 14px */
-  --text-md:   1rem;      /* 16px */
-  --text-lg:   1.125rem;  /* 18px */
-  --text-xl:   1.25rem;   /* 20px */
-  --text-2xl:  1.5rem;    /* 24px */
-  --text-3xl:  1.875rem;  /* 30px */
-  --text-4xl:  2.25rem;   /* 36px */
+  /* --- Font size scale — SINGLE source of truth ---
+     Values match Tailwind's conventional scale, so token-driven element rules and
+     the text-* utilities agree pixel-for-pixel. Role guidance ("when to use which")
+     lives here and in the ui-architect skill. Do NOT use raw text-[..px]. */
+  --text-3xs:  0.625rem;  /* 10px — chart axis micro-labels, dense table sub-text */
+  --text-2xs:  0.6875rem; /* 11px — tiny labels, chips, badge text */
+  --text-xs:   0.75rem;   /* 12px — captions, metadata, timestamps */
+  --text-compact: 0.8125rem; /* 13px — dense body / data tables */
+  --text-sm:   0.875rem;  /* 14px — DEFAULT body text */
+  --text-base: 1rem;      /* 16px — comfortable body, form inputs */
+  --text-lg:   1.125rem;  /* 18px — card / panel titles */
+  --text-xl:   1.25rem;   /* 20px — section headings */
+  --text-2xl:  1.5rem;    /* 24px — page / modal titles */
+  --text-3xl:  1.875rem;  /* 30px — hero numbers / large display */
+  --text-4xl:  2.25rem;   /* 36px — display */
 
   /* --- Line-height scale --- */
   --leading-xs:    1rem;      /* 16px */

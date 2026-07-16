@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Expand/collapse icon for nodes with children -->
       <span
         v-if="node.children.length > 0"
-        class="expand-icon cursor-pointer select-none text-(--q-primary) text-[10px] w-4 inline-block text-center hover:opacity-70"
+        class="expand-icon cursor-pointer select-none text-(--q-primary) text-3xs w-4 inline-block text-center hover:opacity-70"
         data-test="query-plan-node-expand-icon"
         @click="toggleChildrenExpanded"
       >

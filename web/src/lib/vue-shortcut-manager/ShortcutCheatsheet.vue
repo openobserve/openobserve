@@ -124,7 +124,7 @@
             <template v-for="sec in m.sections" :key="sec.title">
               <div
                 v-if="m.sections.length > 1"
-                class="text-[10px] font-semibold uppercase tracking-wider text-accent pt-2 pb-1 px-1"
+                class="text-3xs font-semibold uppercase tracking-wider text-accent pt-2 pb-1 px-1"
                 data-test="shortcut-cheatsheet-category"
               >
                 {{ sec.title }}
@@ -149,7 +149,7 @@
                     >
                       <span
                         v-if="part === 'then'"
-                        class="text-[10px] text-text-secondary mx-0.5"
+                        class="text-3xs text-text-secondary mx-0.5"
                         >then</span
                       >
                       <kbd
@@ -197,7 +197,7 @@
             <template v-for="sec in m.sections" :key="sec.title">
               <div
                 v-if="m.sections.length > 1"
-                class="text-[10px] font-semibold uppercase tracking-wider text-accent pt-2 pb-1 px-1"
+                class="text-3xs font-semibold uppercase tracking-wider text-accent pt-2 pb-1 px-1"
                 data-test="shortcut-cheatsheet-category"
               >
                 {{ sec.title }}
@@ -222,7 +222,7 @@
                     >
                       <span
                         v-if="part === 'then'"
-                        class="text-[10px] text-text-secondary mx-0.5"
+                        class="text-3xs text-text-secondary mx-0.5"
                         >then</span
                       >
                       <kbd

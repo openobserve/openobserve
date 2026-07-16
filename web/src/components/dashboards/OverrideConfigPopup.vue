@@ -138,7 +138,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="flex flex-col gap-2 min-w-0 overflow-y-auto p-3 border-l border-[rgba(128,128,128,0.18)]"
         >
           <div
-            class="flex items-center gap-[5px] text-[10px] font-bold tracking-[0.06em] uppercase text-text-secondary"
+            class="flex items-center gap-[5px] text-3xs font-bold tracking-[0.06em] uppercase text-text-secondary"
           >
             <OIcon name="visibility" size="xs" />
             <span>{{ t("dashboard.inlinePreview") }}</span>

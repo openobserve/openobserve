@@ -122,7 +122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @update:start-date="data.selectedDate.absolute.date.from = $event"
               @update:end-date="data.selectedDate.absolute.date.to = $event"
             />
-            <div class="pr-6 pl-6 text-[0.625rem] text-text-secondary">{{ t("common.datetimeMessage") }}</div>
+            <div class="pr-6 pl-6 text-3xs text-text-secondary">{{ t("common.datetimeMessage") }}</div>
             <OSeparator class="my-2" />
 
             <table class="px-3 startEndTime w-[calc(100%-0.8rem)] mx-[0.4rem] mt-2 mb-[0.3rem]">

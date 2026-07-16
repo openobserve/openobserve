@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <span class="date-time-label font-semibold flex-1 text-left">{{ triggerLabel }}</span>
           <template #icon-right
-            ><OIcon name="arrow-drop-down" size="sm" class="date-time-arrow transition-transform duration-250 ml-auto text-[18px]!"
+            ><OIcon name="arrow-drop-down" size="sm" class="date-time-arrow transition-transform duration-250 ml-auto text-lg!"
           /></template>
         </OButton>
       </template>
@@ -180,7 +180,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @update:end-date="selectedDate.to = $event"
                 />
               </div>
-              <div class="pr-6 pl-6 text-[0.625rem]">{{ t("common.datetimeMessage") }}</div>
+              <div class="pr-6 pl-6 text-3xs">{{ t("common.datetimeMessage") }}</div>
               <OSeparator v-if="!disableRelative" class="my-2" />
 
               <table v-if="!hideRelativeTime" class="px-3 w-[calc(100%-0.8rem)] mx-[0.4rem] mt-2 mb-[0.3rem] startEndTime">

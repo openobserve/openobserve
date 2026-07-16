@@ -196,7 +196,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template v-else>
             <div class="flex flex-col gap-[0.25rem]">
               <div class="flex items-center justify-between gap-2 mb-[0.25rem]">
-                <div class="text-[0.7rem] leading-normal font-semibold text-text-secondary min-w-0 truncate">
+                <div class="text-2xs leading-normal font-semibold text-text-secondary min-w-0 truncate">
                   {{ card.label }}
                 </div>
                 <span
@@ -206,12 +206,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </span>
               </div>
               <div class="flex items-baseline gap-[0.2rem]">
-                <span class="text-[1.4rem] font-bold leading-none text-text-secondary">
+                <span class="text-2xl font-bold leading-none text-text-secondary">
                   {{ card.value }}
                 </span>
                 <span
                   v-if="card.unit"
-                  class="text-[0.8rem] font-semibold text-text-secondary"
+                  class="text-compact font-semibold text-text-secondary"
                 >
                   {{ card.unit }}
                 </span>

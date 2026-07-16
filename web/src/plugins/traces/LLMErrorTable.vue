@@ -39,13 +39,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <div>
         <div
-          class="text-[0.85rem] font-semibold text-text-heading"
+          class="text-sm font-semibold text-text-heading"
         >
           {{ displayTitle }}
         </div>
         <div
           v-if="displaySubtitle"
-          class="text-[0.7rem] leading-normal mt-[0.1rem]"
+          class="text-2xs leading-normal mt-[0.1rem]"
         >
           {{ displaySubtitle }}
         </div>

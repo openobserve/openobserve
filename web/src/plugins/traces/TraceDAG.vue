@@ -67,7 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               type="spanStatus"
               :value="data.span_status"
               label="ERR"
-              class="text-[10px] h-3.5 mt-0.5 px-1"
+              class="text-3xs h-3.5 mt-0.5 px-1"
             />
           </div>
           <Handle v-if="data.hasOutgoing" type="source" :position="Position.Bottom"

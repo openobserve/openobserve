@@ -275,7 +275,7 @@
                     class="text-sm font-[600] ml-7.5 text-center"
                     >O2 Assistant</span
                   >
-                  <span class="o2-ai-beta-text ml-2 relative text-[var(--q-primary)] text-[8px] px-1 rounded-lg text-center border border-[var(--q-primary)] uppercase font-semibold [letter-spacing:0.5px] w-8.5">BETA</span>
+                  <span class="o2-ai-beta-text ml-2 relative text-[var(--q-primary)] text-3xs px-1 rounded-lg text-center border border-[var(--q-primary)] uppercase font-semibold [letter-spacing:0.5px] w-8.5">BETA</span>
                 </div>
               </div>
             </div>

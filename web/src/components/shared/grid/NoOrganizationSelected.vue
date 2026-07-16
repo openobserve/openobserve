@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         style="width: 200px; height: 200px; margin-top: 20vh"
         alt=""
       />
-      <div data-test="no-organization-selected-title" class="m-0 text-[18px] font-semibold">{{ t("ticket.noOrganizationSelected") }}</div>
+      <div data-test="no-organization-selected-title" class="m-0 text-lg font-semibold">{{ t("ticket.noOrganizationSelected") }}</div>
       <div data-test="no-organization-selected-message" class="m-0 text-sm font-normal leading-5 text-text-secondary">{{ t("ticket.selectOrganizationForQuota") }}</div>
     </div>
   </template>

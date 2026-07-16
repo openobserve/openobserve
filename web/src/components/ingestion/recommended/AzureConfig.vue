@@ -47,7 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           align-items: start;
         "
       >
-        <div class="w-7 h-7 rounded-full flex items-center justify-center font-bold text-[0.85rem] shrink-0 bg-accent text-text-inverse">1</div>
+        <div class="w-7 h-7 rounded-full flex items-center justify-center font-bold text-sm shrink-0 bg-accent text-text-inverse">1</div>
         <div>
           <div class="font-semibold mb-1 text-text-heading">
             Deploy ARM Template
@@ -83,7 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           align-items: start;
         "
       >
-        <div class="w-7 h-7 rounded-full flex items-center justify-center font-bold text-[0.85rem] shrink-0 bg-accent text-text-inverse">2</div>
+        <div class="w-7 h-7 rounded-full flex items-center justify-center font-bold text-sm shrink-0 bg-accent text-text-inverse">2</div>
         <div>
           <div class="font-semibold mb-1 text-text-heading">
             Configure Diagnostic Settings

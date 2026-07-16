@@ -143,7 +143,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :sub-title="t('modelPricing.patternExamplesDesc')"
         >
           <div class="examples-table border border-card-glass-border rounded-lg overflow-hidden">
-            <div class="grid grid-cols-[180px_1fr_auto] gap-3 py-1.5 px-3 bg-[rgba(0,0,0,0.03)] border-b border-card-glass-border text-[10px] font-bold uppercase tracking-[0.06em] opacity-45 dark:bg-[rgba(255,255,255,0.05)]">
+            <div class="grid grid-cols-[180px_1fr_auto] gap-3 py-1.5 px-3 bg-[rgba(0,0,0,0.03)] border-b border-card-glass-border text-3xs font-bold uppercase tracking-[0.06em] opacity-45 dark:bg-[rgba(255,255,255,0.05)]">
               <span>{{ t("modelPricing.patternExamplesModelCol") }}</span>
               <span>{{ t("modelPricing.patternExamplesPatternCol") }}</span>
             </div>

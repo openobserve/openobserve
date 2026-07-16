@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <div
           v-if="badge && badge > 0"
-          class="menu-badge absolute -top-1 -right-2 min-w-4 h-4 px-1 bg-[image:var(--color-gradient-notification)] border-2 border-[var(--color-grey-900)] rounded-full text-[9px] font-bold text-text-inverse flex items-center justify-center leading-none shadow-[0_4px_8px_rgba(239,68,68,0.5)] animate-pulse z-1"
+          class="menu-badge absolute -top-1 -right-2 min-w-4 h-4 px-1 bg-[image:var(--color-gradient-notification)] border-2 border-[var(--color-grey-900)] rounded-full text-3xs font-bold text-text-inverse flex items-center justify-center leading-none shadow-[0_4px_8px_rgba(239,68,68,0.5)] animate-pulse z-1"
           aria-live="polite"
           :aria-label="`${badge} notifications`"
         >
@@ -48,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       <div
-        class="nav-menu-item-label text-[0.71875rem] tracking-[0.01em] transition-colors duration-250 w-full text-center leading-tight line-clamp-2 wrap-normal break-normal [hyphens:none]"
+        class="nav-menu-item-label text-xs tracking-[0.01em] transition-colors duration-250 w-full text-center leading-tight line-clamp-2 wrap-normal break-normal [hyphens:none]"
         :class="isActive
           ? activeLabelClass
           : 'font-medium text-tabs-inactive-text group-hover:text-primary-600'"

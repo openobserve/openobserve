@@ -42,7 +42,7 @@
               {{ query.tabName || ('Query ' + (index + 1)) }}
             </span>
             <span
-              class="bg-theme-body-bg-primary border border-card-glass-border text-text-secondary text-[10px] font-bold px-2 py-0.5 rounded-md"
+              class="bg-theme-body-bg-primary border border-card-glass-border text-text-secondary text-3xs font-bold px-2 py-0.5 rounded-md"
             >
               {{ getQueryTypeDisplay(query.queryType) }}
             </span>

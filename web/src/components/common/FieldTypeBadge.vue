@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <span
     v-if="info"
     data-test="common-field-type-badge"
-    class="inline-flex items-center justify-center w-4 h-4 rounded-[0.2rem] text-[0.6rem] font-bold mr-[0.3rem] shrink-0 align-middle"
+    class="inline-flex items-center justify-center w-4 h-4 rounded-[0.2rem] text-3xs font-bold mr-[0.3rem] shrink-0 align-middle"
     :style="{ backgroundColor: info.color, color: info.textColor }"
     :title="dataType"
   >{{ info.label }}</span>

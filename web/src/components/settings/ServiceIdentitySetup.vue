@@ -155,7 +155,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="flex flex-wrap items-center justify-between gap-2"
                 >
                   <div
-                    class="flex flex-wrap items-center gap-3 text-[10px]"
+                    class="flex flex-wrap items-center gap-3 text-3xs"
                     :class="
                       'text-text-secondary'
                     "
@@ -318,7 +318,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :class="{ 'pt-2 border-t': envIdx > 0 }"
                 >
                   <span
-                    class="text-[10px] font-bold"
+                    class="text-3xs font-bold"
                     :class="
                       'text-text-secondary'
                     "
@@ -864,7 +864,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Stream type legend -->
           <div class="flex items-center gap-3 mt-2 ml-1">
             <div
-              class="flex items-center gap-1 text-[10px]"
+              class="flex items-center gap-1 text-3xs"
               :class="
                 'text-text-secondary'
               "
@@ -875,7 +875,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span>Found in Logs</span>
             </div>
             <div
-              class="flex items-center gap-1 text-[10px]"
+              class="flex items-center gap-1 text-3xs"
               :class="
                 'text-text-secondary'
               "
@@ -886,7 +886,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span>Found in Traces</span>
             </div>
             <div
-              class="flex items-center gap-1 text-[10px]"
+              class="flex items-center gap-1 text-3xs"
               :class="
                 'text-text-secondary'
               "
@@ -959,7 +959,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                Cannot be expressed cleanly with title + sub-title props alone. -->
           <template #header>
             <div class="flex-1 min-w-0">
-              <div class="text-[16px] flex items-center">
+              <div class="text-base flex items-center">
                 {{ insightData.subtitle }}
                 <span
                   :class="[
@@ -1305,7 +1305,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     <div
                       v-if="typeIdx > 0"
-                      class="px-4 py-1 text-[10px] font-bold uppercase text-text-label sticky top-0 z-10 border-b border-t bg-surface-subtle"
+                      class="px-4 py-1 text-3xs font-bold uppercase text-text-label sticky top-0 z-10 border-b border-t bg-surface-subtle"
                     >
                       {{ typeName }}
                     </div>

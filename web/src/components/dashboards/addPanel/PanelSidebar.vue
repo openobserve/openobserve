@@ -26,10 +26,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="panel-sidebar-header-collapsed"
       @click="toggleSidebar"
     >
-      <!-- <div class="mt-2.5 text-[20px]">+</div> -->
+      <!-- <div class="mt-2.5 text-xl">+</div> -->
       <OIcon
         name="expand-all" size="sm"
-        class="mt-2.5 text-[20px] rotate-90"
+        class="mt-2.5 text-xl rotate-90"
         data-test="dashboard-sidebar"
       />
       <div

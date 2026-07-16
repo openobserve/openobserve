@@ -120,7 +120,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="services-catalog-status-legend"
       >
         <span
-          class="text-[0.7rem] font-bold text-text-primary whitespace-nowrap"
+          class="text-2xs font-bold text-text-primary whitespace-nowrap"
         >
           {{ t("traces.servicesCatalog.legend.title") }}
         </span>
@@ -131,11 +131,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <span class="sc-legend-dot sc-legend-dot--healthy" />
             <span
-              class="text-[0.7rem] font-semibold text-text-secondary"
+              class="text-2xs font-semibold text-text-secondary"
               >{{ t("traces.servicesCatalog.status.healthy") }}</span
             >
             <span
-              class="text-[0.65rem] opacity-55 text-text-primary"
+              class="text-3xs opacity-55 text-text-primary"
               >&lt;&nbsp;1%</span
             >
           </div>
@@ -145,11 +145,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <span class="sc-legend-dot sc-legend-dot--degraded" />
             <span
-              class="text-[0.7rem] font-semibold text-text-secondary"
+              class="text-2xs font-semibold text-text-secondary"
               >{{ t("traces.servicesCatalog.status.degraded") }}</span
             >
             <span
-              class="text-[0.65rem] opacity-55 text-text-primary"
+              class="text-3xs opacity-55 text-text-primary"
               >1&nbsp;–&nbsp;5%</span
             >
           </div>
@@ -159,11 +159,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <span class="sc-legend-dot sc-legend-dot--warning" />
             <span
-              class="text-[0.7rem] font-semibold text-text-secondary"
+              class="text-2xs font-semibold text-text-secondary"
               >{{ t("traces.servicesCatalog.status.warning") }}</span
             >
             <span
-              class="text-[0.65rem] opacity-55 text-text-primary"
+              class="text-3xs opacity-55 text-text-primary"
               >5&nbsp;–&nbsp;10%</span
             >
           </div>
@@ -173,11 +173,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <span class="sc-legend-dot sc-legend-dot--critical" />
             <span
-              class="text-[0.7rem] font-semibold text-text-secondary"
+              class="text-2xs font-semibold text-text-secondary"
               >{{ t("traces.servicesCatalog.status.critical") }}</span
             >
             <span
-              class="text-[0.65rem] opacity-55 text-text-primary"
+              class="text-3xs opacity-55 text-text-primary"
               >&gt;&nbsp;10%</span
             >
           </div>
@@ -257,7 +257,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                        plain total to its left. Hover explains it. -->
                   <span
                     v-if="categoryUnhealthyCounts[cat] > 0"
-                    class="inline-flex items-center justify-center min-w-[1.05rem] h-[1.05rem] px-[0.25rem] rounded-full text-[0.65rem] font-semibold leading-none text-white"
+                    class="inline-flex items-center justify-center min-w-[1.05rem] h-[1.05rem] px-[0.25rem] rounded-full text-3xs font-semibold leading-none text-white"
                     :style="{ backgroundColor: tabStatusColorVar(cat) }"
                     :data-test="`services-catalog-type-unhealthy-${cat}`"
                   >

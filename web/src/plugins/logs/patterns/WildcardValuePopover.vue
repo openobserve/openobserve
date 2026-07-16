@@ -88,7 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <!-- Percentage -->
         <div
-          class="wcp__row-pct text-[0.625rem] text-text-caption [font-variant-numeric:tabular-nums]"
+          class="wcp__row-pct text-3xs text-text-caption [font-variant-numeric:tabular-nums]"
         >
           {{ totalOccurrences > 0 ? ((item.count / totalOccurrences) * 100).toFixed(1) + '%' : '' }}
         </div>

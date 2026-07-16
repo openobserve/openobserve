@@ -45,7 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="flex items-center mb-2 text-status-error-text"
       >
         <OIcon name="warning" size="sm" class="mr-2" />
-        <span class="text-[0.938rem] leading-[1.375rem] text-text-body"
+        <span class="text-base leading-[1.375rem] text-text-body"
           >Failed to load pricing details. Please refresh the page.</span
         >
       </div>
@@ -61,9 +61,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="md"
             class="mr-2 text-status-positive check-icon"
           />
-          <div class="text-[0.938rem] leading-[1.375rem] text-text-body" :class="{ 'ml-6': !feature.is_parent }">{{ feature.name }}</div>
+          <div class="text-base leading-[1.375rem] text-text-body" :class="{ 'ml-6': !feature.is_parent }">{{ feature.name }}</div>
         </div>
-        <div class="text-[0.938rem] leading-[1.375rem] text-text-body font-bold">{{ feature.price }}</div>
+        <div class="text-base leading-[1.375rem] text-text-body font-bold">{{ feature.price }}</div>
       </div>
     </div>
 

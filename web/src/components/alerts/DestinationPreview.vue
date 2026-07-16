@@ -30,7 +30,7 @@ limitations under the License.
             </div>
             <div class="slack-content flex-1">
               <div class="slack-header flex items-center gap-2 mb-2">
-                <strong data-test="slack-bot-name" class="bot-name text-[var(--color-brand-slack-link)] text-[0.9rem]">OpenObserve Bot</strong>
+                <strong data-test="slack-bot-name" class="bot-name text-[var(--color-brand-slack-link)] text-sm">OpenObserve Bot</strong>
                 <span class="slack-timestamp text-[var(--color-brand-slack-meta)] text-xs">{{ getCurrentTime() }}</span>
               </div>
               <div data-test="slack-message-body" class="slack-body">
@@ -68,7 +68,7 @@ limitations under the License.
         <div v-if="type === 'msteams'" data-test="msteams-preview" class="teams-card max-w-150 mx-auto bg-white border border-[var(--color-brand-msg-border-2)] rounded-lg overflow-hidden shadow-[0_2px_8px_rgba(0,0,0,0.1)]">
           <div data-test="msteams-card-content" class="teams-card-content">
             <div class="teams-header bg-[var(--color-brand-teams-hover)] text-white p-4">
-              <div class="teams-title text-[1.125rem] font-bold mb-1">🚨 Alert: High CPU Usage</div>
+              <div class="teams-title text-lg font-bold mb-1">🚨 Alert: High CPU Usage</div>
               <div class="teams-subtitle text-sm opacity-90">OpenObserve Alert Notification</div>
             </div>
             <div class="teams-facts p-4 grid gap-2">
@@ -117,10 +117,10 @@ limitations under the License.
           </div>
           <div data-test="email-body" class="email-body p-6">
             <div class="email-alert-header">
-              <div class="text-[var(--color-brand-msg-error)] text-center mb-4 text-[1.5rem] font-bold">🚨 Alert Notification</div>
+              <div class="text-[var(--color-brand-msg-error)] text-center mb-4 text-2xl font-bold">🚨 Alert Notification</div>
             </div>
             <div class="email-alert-info bg-[var(--color-brand-msg-bg)] border-l-4 border-[var(--color-brand-msg-error)] p-4 my-4">
-              <div class="text-[var(--color-brand-msg-error)] m-0 mb-2 text-[1.125rem] font-bold">High CPU Usage</div>
+              <div class="text-[var(--color-brand-msg-error)] m-0 mb-2 text-lg font-bold">High CPU Usage</div>
               <p class="m-0 text-[var(--color-brand-msg-meta)]">An alert has been triggered in your OpenObserve monitoring system.</p>
             </div>
             <div class="email-details my-4">
@@ -156,11 +156,11 @@ limitations under the License.
         <!-- PagerDuty Preview -->
         <div v-if="type === 'pagerduty'" data-test="pagerduty-preview" class="pagerduty-incident max-w-150 mx-auto bg-white border border-[var(--color-brand-msg-divider)] rounded-lg overflow-hidden shadow-[0_2px_8px_rgba(0,0,0,0.1)]">
           <div class="pagerduty-header bg-[var(--color-brand-slack-green)] text-white p-4 flex justify-between items-center">
-            <div class="pagerduty-title font-bold text-[1.125rem]">PagerDuty Incident</div>
+            <div class="pagerduty-title font-bold text-lg">PagerDuty Incident</div>
             <div class="pagerduty-status bg-[var(--color-brand-email-accent)] py-1 px-2 rounded-sm text-xs font-bold">Triggered</div>
           </div>
           <div class="pagerduty-content p-6">
-            <div class="m-0 mb-4 text-[var(--color-brand-msg-text-dark)] font-bold text-[1.17rem]">OpenObserve Alert: High CPU Usage</div>
+            <div class="m-0 mb-4 text-[var(--color-brand-msg-text-dark)] font-bold text-lg">OpenObserve Alert: High CPU Usage</div>
             <div class="pagerduty-details">
               <div class="pagerduty-field mb-2 text-[var(--color-brand-msg-text)]">
                 <strong>Source:</strong> openobserve
@@ -184,7 +184,7 @@ limitations under the License.
         <!-- ServiceNow Preview -->
         <div v-if="type === 'servicenow'" data-test="servicenow-preview" class="servicenow-incident max-w-150 mx-auto bg-white border border-[var(--color-brand-msg-divider)] rounded-lg overflow-hidden shadow-[0_2px_8px_rgba(0,0,0,0.1)]">
           <div class="servicenow-header bg-[var(--color-brand-slack-avatar)] text-white p-4 flex justify-between items-center">
-            <div class="servicenow-title font-bold text-[1.125rem]">ServiceNow Incident</div>
+            <div class="servicenow-title font-bold text-lg">ServiceNow Incident</div>
             <div class="servicenow-number [font-family:monospace] font-bold">INC0000123</div>
           </div>
           <div class="servicenow-content p-6">
@@ -216,11 +216,11 @@ limitations under the License.
         <!-- Opsgenie Preview -->
         <div v-if="type === 'opsgenie'" data-test="opsgenie-preview" class="opsgenie-alert max-w-150 mx-auto bg-white border border-[var(--color-brand-msg-divider)] rounded-lg overflow-hidden shadow-[0_2px_8px_rgba(0,0,0,0.1)]">
           <div class="opsgenie-header bg-[var(--color-brand-email-ink)] text-white p-4 flex justify-between items-center">
-            <div class="opsgenie-title font-bold text-[1.125rem]">Opsgenie Alert</div>
+            <div class="opsgenie-title font-bold text-lg">Opsgenie Alert</div>
             <div class="opsgenie-priority bg-[var(--color-brand-email-warning)] text-[var(--color-brand-email-ink)] py-1 px-2 rounded-sm font-bold">P3</div>
           </div>
           <div class="opsgenie-content p-6">
-            <div class="m-0 mb-4 text-[var(--color-brand-msg-text-dark)] font-bold text-[1.17rem]">OpenObserve Alert: High CPU Usage</div>
+            <div class="m-0 mb-4 text-[var(--color-brand-msg-text-dark)] font-bold text-lg">OpenObserve Alert: High CPU Usage</div>
             <div class="opsgenie-details">
               <div class="opsgenie-field mb-2 text-[var(--color-brand-msg-text)]">
                 <strong>Source:</strong> OpenObserve

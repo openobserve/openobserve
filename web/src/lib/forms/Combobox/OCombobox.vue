@@ -225,7 +225,7 @@ const hasInsideLabel = computed(
         <!-- Inside label -->
         <span
           v-if="hasInsideLabel"
-          class="absolute top-1 start-3 text-[10px] leading-none text-input-placeholder select-none pointer-events-none z-10"
+          class="absolute top-1 start-3 text-3xs leading-none text-input-placeholder select-none pointer-events-none z-10"
         >
           <slot name="label">{{ label }}</slot><span v-if="required" aria-hidden="true">&nbsp;*</span>
         </span>

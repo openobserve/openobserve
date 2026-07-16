@@ -41,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="flex items-center flex-nowrap my-1">
         <div
           data-test="error-header-error-type"
-          class="text-[22px] font-bold"
+          class="text-2xl font-bold"
         >{{ error.type }}</div>
       </div>
       <div class="text-base pt-1 flex items-center">

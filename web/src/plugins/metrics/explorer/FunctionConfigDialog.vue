@@ -96,7 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
 
         <div
-          class="truncate font-mono text-[10px] text-text-secondary"
+          class="truncate font-mono text-3xs text-text-secondary"
           :title="exprOf(variant)"
           :data-test="`metrics-fn-expr-${variant.id}`"
         >

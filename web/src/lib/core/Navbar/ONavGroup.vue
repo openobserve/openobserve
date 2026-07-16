@@ -418,7 +418,7 @@ function onChildMouseenter(event: MouseEvent) {
         <template v-for="(row, rowIndex) in flyoutRows" :key="row.key">
           <div
             v-if="row.kind === 'header'"
-            class="px-3 pb-1 text-[10.5px] font-medium text-tabs-inactive-text"
+            class="px-3 pb-1 text-2xs font-medium text-tabs-inactive-text"
             :class="rowIndex === 0 ? 'pt-2' : 'pt-4'"
           >
             {{ row.label }}

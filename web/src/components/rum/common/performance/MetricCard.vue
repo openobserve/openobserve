@@ -49,12 +49,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </span>
     </div>
 
-    <div v-if="description" class="mt-2 text-[10px] text-text-secondary">
+    <div v-if="description" class="mt-2 text-3xs text-text-secondary">
       {{ description }}
     </div>
 
     <div v-if="threshold" class="mt-2">
-      <div class="flex justify-between text-[10px] mb-1">
+      <div class="flex justify-between text-3xs mb-1">
         <span class="text-text-secondary">Threshold</span>
         <span class="font-medium">{{ threshold }}</span>
       </div>
