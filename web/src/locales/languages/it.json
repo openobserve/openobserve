@@ -4294,7 +4294,26 @@
       "logsWithCount": "Log ({count})",
       "tracesWithCount": "Trace ({count})",
       "metricsWithCount": "Metriche ({count})"
-    }
+    },
+    "dangerZone": "Zona pericolosa",
+    "deleteOrganization": "Elimina organizzazione",
+    "deleteOrganizationTitle": "Elimina questa organizzazione",
+    "deleteOrganizationDescription": "Pianifica l'eliminazione di {name}. Diventa immediatamente inaccessibile a tutti — anche a te — e viene cancellata definitivamente al termine del periodo di tolleranza. Per ripristinarla prima è necessario contattare l'assistenza.",
+    "deleteOrganizationScopeLoading": "Verifica del contenuto di questa organizzazione…",
+    "deleteOrganizationScope": "{dashboards} dashboard · {streams} stream · {size} di dati",
+    "deleteFactGracePeriod": "Periodo di tolleranza",
+    "deleteFactGracePeriodDetail": "L'assistenza può ripristinarla fino alla cancellazione",
+    "deleteFactEverything": "Elimina tutto",
+    "deleteFactEverythingDetail": "Tutti i dashboard, gli stream e i dati acquisiti",
+    "deleteFactMembers": "Coinvolge {n} membro | Coinvolge {n} membri",
+    "deleteFactMembersDetail": "Tutti gli accessi vengono revocati immediatamente",
+    "deleteFactOwner": "Solo amministratori",
+    "deleteFactOwnerDetail": "Richiede il ruolo di amministratore in questa organizzazione",
+    "deleteOrganizationConfirm": "Questa azione pianificherà l'eliminazione di \"{name}\" e di tutti i suoi stream, dashboard, avvisi, pipeline, utenti e impostazioni.",
+    "deleteOrganizationWarning": "L'organizzazione diventa immediatamente non disponibile e viene nascosta a tutti coloro che la utilizzano. L'acquisizione viene bloccata e gli avvisi, le pipeline e i report pianificati smettono di essere eseguiti, quindi non viene inviata alcuna notifica mentre è pianificata per l'eliminazione.",
+    "deleteOrganizationRecoverable": "Rimane in uno stato ripristinabile durante il periodo di tolleranza, ma non potrai ripristinarla da solo: perdi l'accesso a questa organizzazione non appena inizia l'eliminazione e solo l'assistenza OpenObserve può recuperarla. Dopo il periodo di tolleranza i dati vengono eliminati definitivamente e non possono essere recuperati da nessuno.",
+    "deleteOrganizationTypeToConfirm": "Per confermare, digita {name} qui sotto:",
+    "deleteOrganizationInitiated": "Organizzazione pianificata per l'eliminazione. Ora è nascosta; contatta l'assistenza per ripristinarla prima del termine del periodo di tolleranza."
   },
   "reports": {
     "header": "Report",
