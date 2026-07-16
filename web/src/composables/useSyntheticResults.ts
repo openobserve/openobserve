@@ -199,26 +199,25 @@ export function useSyntheticResults() {
     try {
       const interval = bucketInterval(endTime - startTime);
 
-      // Check the stream schema to conditionally include optional fields.
-      // "attempts" and the browser-only "device"/"engine" fields only exist
-      // once a record carrying them has been ingested — the search API
-      // rejects queries naming absent fields.
-      let hasAttemptsField = false;
-      let hasDeviceField = false;
-      let hasEngineField = false;
+      // Fetch the stream schema: it only contains fields some ingested row
+      // has carried (browser-only fields are absent on protocol-only
+      // deployments, `error` is absent until a run has failed, …) and the
+      // search API rejects queries naming absent fields. The runs query
+      // substitutes literals for missing columns; the KPI query gates its
+      // optional `attempts` clause.
+      let schemaFields = new Set<string>();
       try {
         const stream: any = await getStream(
           SYNTHETIC_RESULTS_STREAM, "logs", true,
         );
-        const fields = new Set(
+        schemaFields = new Set(
           ((stream?.schema ?? []) as { name: string }[]).map((f) => f.name),
         );
-        hasAttemptsField = fields.has("attempts");
-        hasDeviceField = fields.has("device");
-        hasEngineField = fields.has("engine");
       } catch {
-        // Schema not available — omit the optional fields, which is safe.
+        // Schema not available — an empty set selects literals for every
+        // optional column, which cannot fail.
       }
+      const hasAttemptsField = schemaFields.has("attempts");
 
       // Group 1: KPI + last-run — both feed KPI cards. Resolves
       // independently so the KPI section renders as soon as these
@@ -252,10 +251,7 @@ export function useSyntheticResults() {
       // Group 3: Runs list — feeds timeline, breakdown cards, table,
       // steps tab, and errors tab. Typically the slowest query.
       const runsPromise = executeQuery(
-        buildRunsSql(monitorId, 500, {
-          hasDevice: hasDeviceField,
-          hasEngine: hasEngineField,
-        }), startTime, endTime, "logs",
+        buildRunsSql(monitorId, 500, schemaFields), startTime, endTime, "logs",
       ).then((runsRows) => {
         runs.value = runsRows.map(mapRun);
       }).catch((e: unknown) => {

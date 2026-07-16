@@ -70,23 +70,30 @@ describe("syntheticResultsSchema query builders", () => {
   });
 
   it("should apply the requested limit on the runs query", () => {
-    const sql = buildRunsSql("mon-1", 50, { hasDevice: true, hasEngine: true });
+    const sql = buildRunsSql("mon-1", 50, null);
     expect(sql).toContain("LIMIT 50");
     expect(sql).toContain(`${SYNTHETIC_FIELDS.location} as location`);
     expect(sql).toContain(`${SYNTHETIC_FIELDS.device} as device`);
     expect(sql).toContain(`${SYNTHETIC_FIELDS.error} as error`);
   });
 
-  it("should select '' literals for device/engine when absent from the stream schema", () => {
-    // Protocol-only deployments have no browser fields — naming them
-    // would make the search API reject the whole query.
-    const sql = buildRunsSql("mon-1", 50);
+  it("should select typed literals for columns absent from the stream schema", () => {
+    // The schema only contains fields some ingested row has carried
+    // (device/engine are browser-only, error appears after a first failure);
+    // naming an absent field makes the search API reject the whole query.
+    const sql = buildRunsSql("mon-1", 50, new Set(["_timestamp", "status", "response_time_ms", "location"]));
+    expect(sql).toContain(`${SYNTHETIC_FIELDS.timestamp} as ts`);
+    expect(sql).toContain("status as status");
+    expect(sql).toContain(`${SYNTHETIC_FIELDS.location} as location`);
     expect(sql).toContain("'' as device");
     expect(sql).toContain("'' as engine");
-    expect(sql).not.toContain(`${SYNTHETIC_FIELDS.device} as device`);
-    const sqlWithDevice = buildRunsSql("mon-1", 50, { hasDevice: true });
-    expect(sqlWithDevice).toContain(`${SYNTHETIC_FIELDS.device} as device`);
-    expect(sqlWithDevice).toContain("'' as engine");
+    expect(sql).toContain("'' as error");
+    expect(sql).toContain("0 as scheduled_ts");
+    expect(sql).not.toContain(`${SYNTHETIC_FIELDS.error} as error`);
+    // Empty set (schema unavailable) — every optional column is a literal.
+    const minimal = buildRunsSql("mon-1", 50, new Set());
+    expect(minimal).toContain("0 as ts");
+    expect(minimal).toContain("'' as status");
   });
 
   it("should target the configured stream name", () => {

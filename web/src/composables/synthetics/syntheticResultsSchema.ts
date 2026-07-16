@@ -461,19 +461,41 @@ ORDER BY ts`;
 }
 
 /** Most-recent runs for the Runs table. */
+/** Columns the runs query selects, with a typed literal fallback for when the
+ * field is absent from the stream schema. The schema only contains fields some
+ * ingested row has carried: browser-only fields (`device`/`engine`) are missing
+ * on protocol-only deployments, `error` is missing until a run has failed, etc.
+ * The search API rejects any query naming an absent field, so each column is
+ * selected as a literal instead when missing — the row shape stays constant. */
+const RUNS_COLUMNS: { field: string; alias: string; fallback: string }[] = [
+  { field: F.timestamp, alias: "ts", fallback: "0" },
+  { field: "scheduled_ts", alias: "scheduled_ts", fallback: "0" },
+  { field: F.status, alias: "status", fallback: "''" },
+  { field: F.duration, alias: "duration", fallback: "0" },
+  { field: F.location, alias: "location", fallback: "''" },
+  { field: F.device, alias: "device", fallback: "''" },
+  { field: F.engine, alias: "engine", fallback: "''" },
+  { field: "trigger_type", alias: "trigger_type", fallback: "''" },
+  { field: F.error, alias: "error", fallback: "''" },
+  { field: "job_id", alias: "job_id", fallback: "''" },
+  { field: "run_id", alias: "run_id", fallback: "''" },
+  { field: F.executionId, alias: "execution_id", fallback: "''" },
+];
+
 export function buildRunsSql(
   monitorId: string,
   limit: number,
-  /** Which optional fields exist in the stream schema. `device`/`engine` are
-   * browser-only — on a deployment that has ingested only protocol results
-   * they're absent, and the search API rejects any query naming them. Absent
-   * fields are selected as '' literals so the row shape stays constant. */
-  flags: { hasDevice?: boolean; hasEngine?: boolean } = {},
+  /** Field names present in the stream schema. Columns not in the set are
+   * selected as typed literals. Pass null to select all fields by name
+   * (only safe when the schema is known to be complete). */
+  schemaFields: Set<string> | null = new Set(),
 ): string {
   const id = escapeSqlLiteral(monitorId);
-  const device = flags.hasDevice ? F.device : "''";
-  const engine = flags.hasEngine ? F.engine : "''";
-  return `SELECT ${F.timestamp} as ts, scheduled_ts, ${F.status} as status, ${F.duration} as duration, ${F.location} as location, ${device} as device, ${engine} as engine, trigger_type, ${F.error} as error, job_id, run_id, execution_id
+  const select = RUNS_COLUMNS.map(({ field, alias, fallback }) => {
+    const expr = schemaFields === null || schemaFields.has(field) ? field : fallback;
+    return `${expr} as ${alias}`;
+  }).join(", ");
+  return `SELECT ${select}
 FROM ${TABLE}
 WHERE ${F.monitorId} = '${id}'
 ORDER BY ${F.timestamp} DESC
