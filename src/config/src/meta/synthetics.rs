@@ -168,6 +168,14 @@ pub struct Synthetic {
     /// When set, the scheduler uses this as the initial next_run_at instead of firing immediately.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub start: Option<i64>,
+    /// Encrypted config-embedded secret values, keyed by concrete JSON pointer
+    /// into `config` (e.g. "/headers/0/value", "/auth/secret"). Extracted at
+    /// write time so the `config` column never stores secret material — even
+    /// ciphertext lives only in the dedicated `secrets` column. Rehydrated
+    /// into `config` on the edit read and at probe resolve. Never serialized
+    /// to API clients.
+    #[serde(skip)]
+    pub config_secrets: std::collections::BTreeMap<String, String>,
 
     // ── Scheduler fields (managed by server, not sent by client on create) ──
     /// Pre-computed next fire time (microseconds). 0 = fire on first tick.
@@ -272,6 +280,55 @@ pub fn for_each_string_at_path<E>(
         .filter(|s| !s.is_empty())
         .collect();
     walk(value, &segments, f)
+}
+
+/// Removes every non-empty string at `path` (wildcards allowed) from `value`,
+/// returning `(concrete_pointer, taken_value)` pairs — e.g. walking
+/// `/headers/*/value` yields `("/headers/0/value", "Basic …")`. The slots are
+/// left as empty strings so `config` keeps its shape but carries no secret
+/// material. Rehydrate with `value.pointer_mut(ptr)`.
+pub fn take_strings_at_path(value: &mut serde_json::Value, path: &str) -> Vec<(String, String)> {
+    fn walk(
+        value: &mut serde_json::Value,
+        segments: &[&str],
+        pointer: &mut String,
+        out: &mut Vec<(String, String)>,
+    ) {
+        let Some((head, rest)) = segments.split_first() else {
+            if let serde_json::Value::String(s) = value
+                && !s.is_empty()
+            {
+                out.push((pointer.clone(), std::mem::take(s)));
+            }
+            return;
+        };
+        if *head == "*" {
+            if let serde_json::Value::Array(items) = value {
+                for (i, item) in items.iter_mut().enumerate() {
+                    let len = pointer.len();
+                    pointer.push('/');
+                    pointer.push_str(&i.to_string());
+                    walk(item, rest, pointer, out);
+                    pointer.truncate(len);
+                }
+            }
+        } else if let Some(child) = value.get_mut(*head) {
+            let len = pointer.len();
+            pointer.push('/');
+            pointer.push_str(head);
+            walk(child, rest, pointer, out);
+            pointer.truncate(len);
+        }
+    }
+    let segments: Vec<&str> = path
+        .trim_start_matches('/')
+        .split('/')
+        .filter(|s| !s.is_empty())
+        .collect();
+    let mut out = Vec::new();
+    let mut pointer = String::new();
+    walk(value, &segments, &mut pointer, &mut out);
+    out
 }
 
 // ── SyntheticStatus ─────────────────────────────────────────────────────────────
@@ -1309,6 +1366,40 @@ mod tests {
         })
         .unwrap();
         assert_eq!(v["auth"]["secret"], 42);
+    }
+
+    #[test]
+    fn test_take_strings_at_path() {
+        let mut v = serde_json::json!({
+            "headers": [
+                {"name": "Authorization", "value": "Basic abc"},
+                {"name": "X-Empty", "value": ""},
+                {"name": "X-Api-Key", "value": "k123"},
+            ],
+            "auth": {"secret": "hunter2"}
+        });
+        let taken = take_strings_at_path(&mut v, "/headers/*/value");
+        assert_eq!(
+            taken,
+            vec![
+                ("/headers/0/value".to_string(), "Basic abc".to_string()),
+                ("/headers/2/value".to_string(), "k123".to_string()),
+            ]
+        );
+        // Slots blanked, shape intact, names untouched.
+        assert_eq!(v["headers"][0]["value"], "");
+        assert_eq!(v["headers"][2]["value"], "");
+        assert_eq!(v["headers"][0]["name"], "Authorization");
+        // Non-matching path untouched.
+        assert_eq!(v["auth"]["secret"], "hunter2");
+        let taken2 = take_strings_at_path(&mut v, "/auth/secret");
+        assert_eq!(
+            taken2,
+            vec![("/auth/secret".to_string(), "hunter2".to_string())]
+        );
+        // Rehydrate via pointer round-trips.
+        *v.pointer_mut("/headers/0/value").unwrap() = serde_json::json!("Basic abc");
+        assert_eq!(v["headers"][0]["value"], "Basic abc");
     }
 
     #[test]

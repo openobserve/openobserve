@@ -58,6 +58,7 @@ impl TryFrom<synthetics_monitors::Model> for Synthetic {
         let auth = stored.auth;
         let cookies = stored.cookies;
         let variables = stored.variables;
+        let config_secrets = stored.config;
 
         let last_check_status = SyntheticStatus::from_db(m.last_check_status);
 
@@ -85,6 +86,7 @@ impl TryFrom<synthetics_monitors::Model> for Synthetic {
             auth,
             cookies,
             variables,
+            config_secrets,
             start: settings.start,
             next_run_at: m.next_run_at,
             last_triggered_at: m.last_triggered_at,
@@ -452,7 +454,7 @@ fn pack_settings(monitor: &Synthetic) -> Result<serde_json::Value, errors::Error
 }
 
 /// Internal serde shape for the `secrets` column.
-/// All three fields default to empty so missing keys deserialize cleanly.
+/// All fields default to empty so missing keys deserialize cleanly.
 #[derive(Serialize, Deserialize, Default)]
 struct StoredSecrets {
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -461,6 +463,11 @@ struct StoredSecrets {
     cookies: Vec<SyntheticCookie>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     variables: Vec<SyntheticVariable>,
+    /// Encrypted config-embedded secrets keyed by JSON pointer into `config`
+    /// (e.g. "/headers/0/value") — extracted so the config column stores no
+    /// secret material at all.
+    #[serde(default, skip_serializing_if = "std::collections::BTreeMap::is_empty")]
+    config: std::collections::BTreeMap<String, String>,
 }
 
 fn pack_secrets(monitor: &Synthetic) -> Result<String, errors::Error> {
@@ -468,6 +475,7 @@ fn pack_secrets(monitor: &Synthetic) -> Result<String, errors::Error> {
         auth: monitor.auth.clone(),
         cookies: monitor.cookies.clone(),
         variables: monitor.variables.clone(),
+        config: monitor.config_secrets.clone(),
     })
     .map_err(|e| errors::Error::Message(format!("secrets serialize failed: {e}")))
 }
