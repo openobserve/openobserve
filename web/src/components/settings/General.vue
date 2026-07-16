@@ -380,40 +380,66 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       id="dangerZone"
       v-if="canDeleteOrg"
       data-test="general-settings-danger-zone"
-      class="tw:mt-8"
+      class="mt-8 overflow-hidden rounded-lg border border-(--color-banner-error-soft-border)"
     >
       <!-- Red-accented header signals this section is destructive. -->
-      <div class="tw:flex tw:items-center tw:gap-2 tw:mb-2">
-        <OIcon name="warning" size="sm" class="tw:text-error" />
-        <span class="tw:text-base tw:font-bold tw:leading-6 tw:text-error">
+      <div
+        class="flex items-center gap-2 border-b border-(--color-banner-error-soft-border) bg-(--color-banner-error-soft-bg) px-5 py-3"
+      >
+        <OIcon name="warning" size="sm" class="text-(--color-banner-error-soft-text)" />
+        <span class="text-base font-bold text-(--color-banner-error-soft-text)">
           {{ t("settings.dangerZone") }}
         </span>
       </div>
 
-      <!-- Bordered, tinted card. Title + description share one row (same layout as
-           the settings rows above), then the destructive action on the next line,
-           left-aligned to match the Save button. -->
-      <div
-        class="tw:rounded-lg tw:border tw:border-error/50 tw:bg-error/[0.06] tw:px-5 tw:py-4"
-      >
-        <div class="tw:grid tw:grid-cols-3 tw:gap-4 tw:items-start">
-          <span class="individual-setting-title tw:text-sm tw:font-medium tw:leading-5 tw:col-span-1">
-            {{ t("settings.deleteOrganization") }}
+      <!-- Action row: what the action does, and the control that does it. The org
+           name is interpolated so the sentence names the thing being destroyed. -->
+      <div class="flex items-start justify-between gap-6 bg-surface-base px-5 py-4">
+        <div class="flex flex-col gap-1">
+          <span class="text-sm font-semibold text-text-primary">
+            {{ t("settings.deleteOrganizationTitle") }}
           </span>
-          <span class="individual-setting-description tw:text-[13px] tw:opacity-70 tw:col-span-2">
-            {{ t("settings.deleteOrganizationDescription") }}
-          </span>
+          <i18n-t
+            keypath="settings.deleteOrganizationDescription"
+            tag="p"
+            class="max-w-3xl text-sm text-text-secondary"
+          >
+            <template #name>
+              <span class="font-semibold text-text-primary">{{ deleteOrgName }}</span>
+            </template>
+          </i18n-t>
         </div>
         <OButton
           data-test="general-settings-delete-org-btn"
-          variant="destructive"
+          variant="outline-destructive"
           size="sm-action"
-          class="tw:mt-4"
+          icon-left="delete"
+          class="shrink-0"
           :loading="deleting"
-          @click="confirmDeleteOrg = true"
+          @click="openDeleteOrgDialog"
         >
           {{ t("settings.deleteOrganization") }}
         </OButton>
+      </div>
+
+      <!-- Consequence strip: the four things worth knowing before deciding —
+           reversibility, blast radius, who is affected, and who may do it. -->
+      <div
+        data-test="general-settings-delete-org-facts"
+        class="grid grid-cols-4 divide-x divide-border-default border-t border-border-default bg-surface-base"
+      >
+        <div
+          v-for="fact in deleteOrgFacts"
+          :key="fact.key"
+          :data-test="`general-settings-delete-org-fact-${fact.key}`"
+          class="flex flex-col gap-1 px-5 py-4"
+        >
+          <div class="flex items-center gap-2">
+            <OIcon :name="fact.icon" size="sm" class="shrink-0 text-text-muted" />
+            <span class="text-sm font-semibold text-text-primary">{{ fact.title }}</span>
+          </div>
+          <span class="text-xs text-text-secondary">{{ fact.detail }}</span>
+        </div>
       </div>
     </div>
   </div>
@@ -459,9 +485,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @click:secondary="confirmDeleteOrg = false"
     @click:primary="deleteOrg"
   >
-    <div class="tw:space-y-3">
+    <div class="flex flex-col gap-3">
       <!-- What will happen -->
-      <p class="tw:text-sm tw:text-text-primary">
+      <p class="text-sm text-text-primary">
         {{
           t("settings.deleteOrganizationConfirm", {
             name: deleteOrgName,
@@ -469,28 +495,48 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         }}
       </p>
 
+      <!-- Blast radius in concrete numbers. Fetched only when this dialog opens
+           (see fetchOrgScope) and treated as contextual — if it fails to load the
+           delete flow still works, the user just decides without the counts. -->
+      <p
+        v-if="orgScopeLoading"
+        class="text-xs text-text-secondary"
+      >
+        {{ t("settings.deleteOrganizationScopeLoading") }}
+      </p>
+      <p
+        v-else-if="orgScope"
+        data-test="general-delete-org-scope"
+        class="text-xs font-semibold text-text-primary"
+      >
+        {{ orgScope }}
+      </p>
+
       <!-- Irreversible-action warning callout -->
       <div
-        class="tw:flex tw:items-start tw:gap-2 tw:rounded tw:border tw:border-error tw:bg-surface-secondary tw:px-3 tw:py-2"
+        class="flex items-start gap-2 rounded border border-(--color-banner-error-soft-border) bg-(--color-banner-error-soft-bg) px-3 py-2"
       >
-        <OIcon name="warning" size="sm" class="tw:text-error tw:mt-0.5 tw:shrink-0" />
-        <div class="tw:space-y-1">
-          <p class="tw:text-xs tw:text-text-secondary">
+        <OIcon
+          name="warning"
+          size="sm"
+          class="mt-0.5 shrink-0 text-(--color-banner-error-soft-text)"
+        />
+        <div class="flex flex-col gap-1">
+          <p class="text-xs text-(--color-banner-error-soft-text)">
             {{ t("settings.deleteOrganizationWarning") }}
           </p>
-          <p class="tw:text-xs tw:text-text-secondary">
+          <p class="text-xs text-(--color-banner-error-soft-text)">
             {{ t("settings.deleteOrganizationRecoverable") }}
           </p>
         </div>
       </div>
 
       <!-- Type-to-confirm gate -->
-      <div class="tw:space-y-1">
-        <label class="tw:text-xs tw:text-text-secondary tw:block">
-          <!-- eslint-disable-next-line @intlify/vue-i18n/no-raw-text -->
+      <div class="flex flex-col gap-1">
+        <label class="block text-xs text-text-secondary">
           <i18n-t keypath="settings.deleteOrganizationTypeToConfirm" tag="span">
             <template #name>
-              <span class="tw:font-semibold tw:text-text-primary">{{ deleteOrgName }}</span>
+              <span class="font-semibold text-text-primary">{{ deleteOrgName }}</span>
             </template>
           </i18n-t>
         </label>
@@ -523,6 +569,7 @@ import GroupHeader from "../common/GroupHeader.vue";
 import store from "@/test/unit/helpers/store";
 import { applyThemeColors } from "@/utils/theme";
 import { useLocalOrganization } from "@/utils/zincutils";
+import { formatSizeFromMB } from "@/utils/formatters";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -677,6 +724,12 @@ export default defineComponent({
     const currentUserRole = ref("");
     const confirmDeleteOrg = ref(false);
     const deleting = ref(false);
+    // Human members of this org, counted from the same list that resolves our role
+    // (service accounts excluded — they aren't people who lose access).
+    const memberCount = ref(0);
+    // Formatted "N dashboards · N streams · N GB data", loaded on dialog open.
+    const orgScope = ref("");
+    const orgScopeLoading = ref(false);
 
     // Type-to-confirm gate: the destructive action is only enabled once the user
     // types the exact org name. Guards against accidental clicks on an irreversible
@@ -700,6 +753,41 @@ export default defineComponent({
       return role === "root" || role === "admin";
     });
 
+    // The consequence strip under the Danger Zone header. Grace period is stated
+    // without a duration on purpose: the real value lives in the enterprise config
+    // (org_deletion_grace_period_days) and is not exposed to the frontend, so any
+    // number rendered here would be a guess.
+    const deleteOrgFacts = computed(() => [
+      {
+        key: "grace",
+        icon: "access-time",
+        title: t("settings.deleteFactGracePeriod"),
+        detail: t("settings.deleteFactGracePeriodDetail"),
+      },
+      {
+        key: "scope",
+        icon: "dashboard",
+        title: t("settings.deleteFactEverything"),
+        detail: t("settings.deleteFactEverythingDetail"),
+      },
+      {
+        key: "members",
+        icon: "group",
+        title: t(
+          "settings.deleteFactMembers",
+          { n: memberCount.value },
+          memberCount.value,
+        ),
+        detail: t("settings.deleteFactMembersDetail"),
+      },
+      {
+        key: "owner",
+        icon: "shield",
+        title: t("settings.deleteFactOwner"),
+        detail: t("settings.deleteFactOwnerDetail"),
+      },
+    ]);
+
     const fetchCurrentUserRole = async () => {
       const orgId = store.state.selectedOrganization?.identifier;
       if (!orgId || config.isCloud !== "true") return;
@@ -711,10 +799,43 @@ export default defineComponent({
           (m: any) => m.email?.toLowerCase() === me,
         );
         currentUserRole.value = mine?.role?.toLowerCase() || "";
+        memberCount.value = members.filter((m: any) => !m.is_system).length;
       } catch {
         // On error, leave role empty -> button stays hidden.
         currentUserRole.value = "";
+        memberCount.value = 0;
       }
+    };
+
+    // /summary is an expensive query (it lists every stream, runs a usage search
+    // over the triggers stream, and lists pipelines, alerts, functions and
+    // dashboards), so it is deferred to the moment the user actually opens the
+    // confirm dialog rather than run on every General Settings visit. Cached after
+    // the first successful load.
+    const fetchOrgScope = async () => {
+      const orgId = store.state.selectedOrganization?.identifier;
+      if (!orgId || orgScope.value || orgScopeLoading.value) return;
+      orgScopeLoading.value = true;
+      try {
+        const res = await organizations.get_organization_summary(orgId);
+        orgScope.value = t("settings.deleteOrganizationScope", {
+          dashboards: res.data?.total_dashboards ?? 0,
+          streams: res.data?.streams?.num_streams ?? 0,
+          size: formatSizeFromMB(
+            String(res.data?.streams?.total_storage_size ?? 0),
+          ),
+        });
+      } catch {
+        // Contextual only — the delete flow stays usable without the counts.
+        orgScope.value = "";
+      } finally {
+        orgScopeLoading.value = false;
+      }
+    };
+
+    const openDeleteOrgDialog = () => {
+      confirmDeleteOrg.value = true;
+      fetchOrgScope();
     };
 
     const deleteOrg = async () => {
@@ -1255,6 +1376,10 @@ export default defineComponent({
       deleteConfirmInput,
       deleteOrgName,
       deleteConfirmMatches,
+      deleteOrgFacts,
+      openDeleteOrgDialog,
+      orgScope,
+      orgScopeLoading,
     };
   },
 });

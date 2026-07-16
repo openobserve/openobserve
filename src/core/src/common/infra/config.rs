@@ -34,6 +34,7 @@ use dashmap::DashMap;
 use hashbrown::HashMap;
 use infra::table::short_urls::ShortUrlRecord;
 use parking_lot::RwLock;
+pub use search::enrichment::ENRICHMENT_TABLES;
 use vector_enrichment::TableRegistry;
 
 use crate::{
@@ -42,7 +43,7 @@ use crate::{
         organization::{OrgStatus, Organization, OrganizationSetting},
     },
     service::{
-        db::scheduler as db_scheduler, enrichment::StreamTable, enrichment_table::geoip::Geoip,
+        db::scheduler as db_scheduler, enrichment_table::geoip::Geoip,
         pipeline::batch_execution::ExecutablePipeline,
     },
 };
@@ -73,7 +74,6 @@ pub static REALTIME_ALERT_TRIGGERS: Lazy<RwAHashMap<String, db_scheduler::Trigge
     Lazy::new(Default::default);
 pub static ALERTS_TEMPLATES: Lazy<RwHashMap<String, Template>> = Lazy::new(Default::default);
 pub static DESTINATIONS: Lazy<RwHashMap<String, Destination>> = Lazy::new(Default::default);
-pub static ENRICHMENT_TABLES: Lazy<RwHashMap<String, StreamTable>> = Lazy::new(Default::default);
 pub static ENRICHMENT_REGISTRY: Lazy<Arc<TableRegistry>> =
     Lazy::new(|| Arc::new(TableRegistry::default()));
 

@@ -89,6 +89,7 @@ rand.workspace = true
 regex.workspace = true
 reqwest.workspace = true
 rust-embed-for-web.workspace = true
+web.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 snap.workspace = true

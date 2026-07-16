@@ -4275,7 +4275,26 @@
       "logsWithCount": "Logs ({count})",
       "tracesWithCount": "Traces ({count})",
       "metricsWithCount": "Métriques ({count})"
-    }
+    },
+    "dangerZone": "Zone de danger",
+    "deleteOrganization": "Supprimer l'organisation",
+    "deleteOrganizationTitle": "Supprimer cette organisation",
+    "deleteOrganizationDescription": "Programme la suppression de {name}. Elle devient immédiatement inaccessible à tous — y compris à vous — puis est définitivement effacée à la fin du délai de grâce. La restaurer avant nécessite de contacter le support.",
+    "deleteOrganizationScopeLoading": "Vérification du contenu de cette organisation…",
+    "deleteOrganizationScope": "{dashboards} tableaux de bord · {streams} flux · {size} de données",
+    "deleteFactGracePeriod": "Délai de grâce",
+    "deleteFactGracePeriodDetail": "Le support peut la restaurer jusqu'à l'effacement",
+    "deleteFactEverything": "Supprime tout",
+    "deleteFactEverythingDetail": "Tous les tableaux de bord, flux et données ingérées",
+    "deleteFactMembers": "Concerne {n} membre | Concerne {n} membres",
+    "deleteFactMembersDetail": "Tous les accès sont révoqués immédiatement",
+    "deleteFactOwner": "Administrateurs uniquement",
+    "deleteFactOwnerDetail": "Nécessite le rôle Administrateur dans cette organisation",
+    "deleteOrganizationConfirm": "Cette action programmera la suppression de « {name} » et de tous ses flux, tableaux de bord, alertes, pipelines, utilisateurs et paramètres.",
+    "deleteOrganizationWarning": "L'organisation devient immédiatement indisponible et est masquée pour toutes les personnes qui l'utilisent. L'ingestion est bloquée et les alertes, pipelines et rapports planifiés cessent de s'exécuter : aucune notification n'est envoyée tant que la suppression est programmée.",
+    "deleteOrganizationRecoverable": "Elle reste récupérable pendant le délai de grâce, mais vous ne pourrez pas la restaurer vous-même : vous perdez l'accès à cette organisation dès le début de la suppression, et seul le support OpenObserve peut la rétablir. Passé le délai de grâce, ses données sont définitivement supprimées et ne peuvent être récupérées par personne.",
+    "deleteOrganizationTypeToConfirm": "Pour confirmer, saisissez {name} ci-dessous :",
+    "deleteOrganizationInitiated": "Organisation programmée pour suppression. Elle est désormais masquée ; contactez le support pour la restaurer avant la fin du délai de grâce."
   },
   "reports": {
     "header": "Rapports",
@@ -4314,7 +4333,16 @@
     "dimensionWidth": "Largeur (px)",
     "dimensionHeight": "Hauteur (px)",
     "imagePreview": "Inclure une image d'aperçu du tableau de bord en ligne",
-    "customDimensions": "Dimensions personnalisées (avancées)"
+    "customDimensions": "Dimensions personnalisées (avancées)",
+    "validation": {
+      "resourceNameInvalid": "Les caractères tels que :, ?, /, # et les espaces ne sont pas autorisés.",
+      "invalidCron": "Expression cron non valide !",
+      "cronSixFields": "L'expression cron doit comporter exactement 6 champs : [Seconde] [Minute] [Heure] [Jour du mois] [Mois] [Jour de la semaine]",
+      "cronMinInterval": "La fréquence doit être supérieure à {seconds} secondes.",
+      "dateFormat": "Le format de la date est incorrect !",
+      "timeFormat": "Le format de l'heure est incorrect !",
+      "invalidEmails": "Ajoutez des adresses e-mail valides !"
+    }
   },
   "queries": {
     "runningQueries": "Exécution de requêtes",
@@ -4817,6 +4845,25 @@
     "providerTypeRequired": "Le type de fournisseur est obligatoire",
     "algorithmRequired": "L'algorithme est requis",
     "secretRequired": "Le secret est requis",
+    "nameRequired": "Le nom est obligatoire",
+    "nameMaxLength": "Le nom ne doit pas dépasser 50 caractères.",
+    "nameInvalidChars": "Seuls les caractères alphanumériques, les traits de soulignement et les tirets sont autorisés",
+    "nameInvalidResource": "Les caractères tels que :, ?, /, # et les espaces ne sont pas autorisés.",
+    "typeRequired": "Le type est obligatoire",
+    "baseURLRequired": "L'URL de base est obligatoire",
+    "baseURLInvalid": "Veuillez fournir une URL correcte.",
+    "baseURLHtmlNotAllowed": "Les balises HTML ne sont pas autorisées",
+    "accessIdRequired": "L'ID d'accès est obligatoire",
+    "accessIdInvalid": "L'ID d'accès doit être alphanumérique",
+    "authenticationTypeRequired": "Le type d'authentification est obligatoire",
+    "secretTypeRequired": "Le type de secret est obligatoire",
+    "accessKeyRequired": "La clé d'accès est obligatoire",
+    "ldapUsernameRequired": "Le nom d'utilisateur LDAP est obligatoire",
+    "ldapUsernameInvalid": "Le nom d'utilisateur ne peut contenir que des caractères alphanumériques, des points, des traits de soulignement et des tirets",
+    "ldapPasswordRequired": "Le mot de passe LDAP est obligatoire",
+    "staticSecretNameRequired": "Le nom du secret statique est obligatoire",
+    "dfcNameRequired": "Le nom DFC est obligatoire",
+    "dfcEncryptedDataRequired": "Les données cryptées DFC sont obligatoires",
     "storeType": "Type de magasin",
     "mechanismType": "Type de mécanisme",
     "actions": "Actions"
@@ -5606,7 +5653,11 @@
       "authEditNote": "Les identifiants ne peuvent pas être relus. Saisissez à nouveau la clé API uniquement si vous souhaitez la renouveler.",
       "cannotRename": "Ne peut pas être renommé après la création.",
       "availableModelsHelp": "Facultatif. Liste de modèles disponibles sur ce fournisseur, séparés par des virgules.",
-      "saveError": "Impossible d'enregistrer le fournisseur"
+      "saveError": "Impossible d'enregistrer le fournisseur",
+      "nameRequired": "Provider name is required",
+      "typeRequired": "Provider type is required",
+      "defaultModelRequired": "Default model is required",
+      "apiKeyRequired": "API key is required"
     },
     "scoreConfig": {
       "booleanValues": "true / false",
@@ -5723,6 +5774,12 @@
       "falseIsHealthyHint": "Les scores de true déclenchent des problèmes de qualité.",
       "thresholdEmptyHint": "Laisser ce champ vide signifie que cette dimension ne contribuera pas aux signaux d'état de qualité dans le produit. Les scores seront tout de même enregistrés mais ne déclencheront pas d'indicateurs de problème.",
       "saveError": "Impossible d'enregistrer la configuration du score",
+      "validation": {
+        "nameRequired": "Name is required",
+        "nameFormat": "Use lowercase letters, numbers, and underscores only",
+        "minRequired": "Min is required",
+        "maxRequired": "Max is required"
+      },
       "empty": {
         "title": "Aucune configuration de score pour l'instant",
         "description": "Les configurations de score définissent les dimensions que vos évaluateurs produisent — nom, type de données, plage de valeurs et seuil de santé. Créez-en une pour commencer à mettre en place l'évaluation en ligne.",
@@ -5956,6 +6013,20 @@
       },
       "requestBodyLabel": "Modèle de corps de demande",
       "saveError": "N'a pas réussi à sauver le buteur",
+      "validation": {
+        "nameRequired": "Scorer name is required",
+        "scoreConfigRequired": "A score config is required",
+        "providerRequired": "A provider is required",
+        "endpointRequired": "An endpoint URL is required",
+        "bearerTokenRequired": "Token is required",
+        "basicUsernameRequired": "Username is required",
+        "basicPasswordRequired": "Password is required",
+        "apiKeyHeaderRequired": "Header name is required",
+        "apiKeyTokenRequired": "Token is required",
+        "timeoutInvalid": "Timeout must be 0 or greater",
+        "retriesInvalid": "Retries must be 0 or greater",
+        "duplicateFieldName": "Field names must be unique"
+      },
       "versionsLoadError": "Impossible de charger les versions de configuration des scores",
       "testPanel": {
         "title": "Testez ce score",
@@ -6135,7 +6206,12 @@
       "selectAtLeastOne": "Sélectionnez au moins un buteur",
       "saveError": "Impossible d'enregistrer la tâche d'évaluation",
       "createdAndActivated": "Tâche d'évaluation créée et activée",
-      "createdButActivateFailed": "Tâche d'évaluation créée, mais l'activation a échoué"
+      "createdButActivateFailed": "Tâche d'évaluation créée, mais l'activation a échoué",
+      "validation": {
+        "nameRequired": "Job name is required",
+        "streamRequired": "A stream is required",
+        "samplingValueRequired": "A sampling value is required"
+      }
     }
   },
   "llmProviders": {

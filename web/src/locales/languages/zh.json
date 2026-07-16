@@ -4275,7 +4275,26 @@
       "logsWithCount": "日志（{count}）",
       "tracesWithCount": "追踪（{count}）",
       "metricsWithCount": "指标（{count}）"
-    }
+    },
+    "dangerZone": "危险区域",
+    "deleteOrganization": "删除组织",
+    "deleteOrganizationTitle": "删除此组织",
+    "deleteOrganizationDescription": "将 {name} 安排删除。所有人（包括您）将立即无法访问该组织，宽限期结束后将被永久清除。在此之前如需恢复，请联系支持团队。",
+    "deleteOrganizationScopeLoading": "正在检查该组织包含的内容…",
+    "deleteOrganizationScope": "{dashboards} 个仪表板 · {streams} 个数据流 · {size} 数据",
+    "deleteFactGracePeriod": "宽限期",
+    "deleteFactGracePeriodDetail": "在清除前支持团队可以恢复",
+    "deleteFactEverything": "删除所有内容",
+    "deleteFactEverythingDetail": "所有仪表板、数据流和已采集的数据",
+    "deleteFactMembers": "影响 {n} 位成员 | 影响 {n} 位成员",
+    "deleteFactMembersDetail": "立即撤销所有访问权限",
+    "deleteFactOwner": "仅限管理员",
+    "deleteFactOwnerDetail": "需要该组织的管理员角色",
+    "deleteOrganizationConfirm": "此操作会将“{name}”及其所有数据流、仪表板、告警、管道、用户和设置安排删除。",
+    "deleteOrganizationWarning": "该组织将立即不可用，并对所有使用它的人隐藏。数据采集将被阻止，计划的告警、管道和报表将停止运行，因此在安排删除期间不会发送任何通知。",
+    "deleteOrganizationRecoverable": "在宽限期内，该组织将保持可恢复状态，但您无法自行恢复——删除一开始，您就会失去对该组织的访问权限，只有 OpenObserve 支持团队才能将其恢复。宽限期结束后，其数据将被永久删除，任何人都无法恢复。",
+    "deleteOrganizationTypeToConfirm": "如需确认，请在下方输入 {name}：",
+    "deleteOrganizationInitiated": "组织已安排删除。现已隐藏；如需在宽限期结束前恢复，请联系支持团队。"
   },
   "reports": {
     "header": "报表",
@@ -4314,7 +4333,16 @@
     "dimensionWidth": "宽度 (px)",
     "dimensionHeight": "高度 (px)",
     "imagePreview": "包括内联仪表板预览图片",
-    "customDimensions": "自定义尺寸（高级）"
+    "customDimensions": "自定义尺寸（高级）",
+    "validation": {
+      "resourceNameInvalid": "不允许使用 :、?、/、# 等字符和空格。",
+      "invalidCron": "无效的 Cron 表达式！",
+      "cronSixFields": "Cron 表达式必须正好包含 6 个字段：[秒] [分钟] [小时] [日] [月] [星期]",
+      "cronMinInterval": "频率应大于 {seconds} 秒。",
+      "dateFormat": "日期格式不正确！",
+      "timeFormat": "时间格式不正确！",
+      "invalidEmails": "请添加有效的电子邮件！"
+    }
   },
   "queries": {
     "runningQueries": "运行查询",
@@ -4817,6 +4845,25 @@
     "providerTypeRequired": "提供商类型为必填项",
     "algorithmRequired": "算法是必需的",
     "secretRequired": "密钥为必填项",
+    "nameRequired": "名称为必填项",
+    "nameMaxLength": "名称不得超过50个字符。",
+    "nameInvalidChars": "仅允许使用字母数字字符、下划线和连字符",
+    "nameInvalidResource": "不允许使用 :、?、/、# 和空格等字符。",
+    "typeRequired": "类型为必填项",
+    "baseURLRequired": "基本网址为必填项",
+    "baseURLInvalid": "请提供正确的网址。",
+    "baseURLHtmlNotAllowed": "不允许使用HTML标签",
+    "accessIdRequired": "访问ID为必填项",
+    "accessIdInvalid": "访问ID应为字母数字",
+    "authenticationTypeRequired": "身份验证类型为必填项",
+    "secretTypeRequired": "密钥类型为必填项",
+    "accessKeyRequired": "访问密钥为必填项",
+    "ldapUsernameRequired": "LDAP 用户名为必填项",
+    "ldapUsernameInvalid": "用户名只能包含字母数字字符、点、下划线和连字符",
+    "ldapPasswordRequired": "LDAP 密码为必填项",
+    "staticSecretNameRequired": "静态密钥名称为必填项",
+    "dfcNameRequired": "DFC 名称为必填项",
+    "dfcEncryptedDataRequired": "DFC 加密数据为必填项",
     "storeType": "商店类型",
     "mechanismType": "机制类型",
     "actions": "操作"
@@ -5606,7 +5653,11 @@
       "authEditNote": "凭据无法回读。仅当您想轮换 API 密钥时才重新输入。",
       "cannotRename": "创建后无法重命名。",
       "availableModelsHelp": "可选。此提供商上可用模型的逗号分隔列表。",
-      "saveError": "无法保存提供商"
+      "saveError": "无法保存提供商",
+      "nameRequired": "Provider name is required",
+      "typeRequired": "Provider type is required",
+      "defaultModelRequired": "Default model is required",
+      "apiKeyRequired": "API key is required"
     },
     "scoreConfig": {
       "booleanValues": "true / false",
@@ -5723,6 +5774,12 @@
       "falseIsHealthyHint": "评分为 true 时触发质量问题。",
       "thresholdEmptyHint": "将此项留空意味着此维度不会影响整个产品的质量状态信号。评分仍会被记录，但不会触发问题指示器。",
       "saveError": "无法保存分数配置",
+      "validation": {
+        "nameRequired": "Name is required",
+        "nameFormat": "Use lowercase letters, numbers, and underscores only",
+        "minRequired": "Min is required",
+        "maxRequired": "Max is required"
+      },
       "empty": {
         "title": "尚无评分配置",
         "description": "评分配置定义了您的评分器产生的维度 — 名称、数据类型、值范围和健康阈值。创建一个以开始连接在线评估。",
@@ -5956,6 +6013,20 @@
       },
       "requestBodyLabel": "请求正文模板",
       "saveError": "无法保存评分器",
+      "validation": {
+        "nameRequired": "Scorer name is required",
+        "scoreConfigRequired": "A score config is required",
+        "providerRequired": "A provider is required",
+        "endpointRequired": "An endpoint URL is required",
+        "bearerTokenRequired": "Token is required",
+        "basicUsernameRequired": "Username is required",
+        "basicPasswordRequired": "Password is required",
+        "apiKeyHeaderRequired": "Header name is required",
+        "apiKeyTokenRequired": "Token is required",
+        "timeoutInvalid": "Timeout must be 0 or greater",
+        "retriesInvalid": "Retries must be 0 or greater",
+        "duplicateFieldName": "Field names must be unique"
+      },
       "versionsLoadError": "加载分数配置版本失败",
       "testPanel": {
         "title": "测试这个评分器",
@@ -6135,7 +6206,12 @@
       "selectAtLeastOne": "至少选择一名评分器",
       "saveError": "无法保存评测任务",
       "createdAndActivated": "评估作业已创建并激活",
-      "createdButActivateFailed": "评估作业已创建，但激活失败"
+      "createdButActivateFailed": "评估作业已创建，但激活失败",
+      "validation": {
+        "nameRequired": "Job name is required",
+        "streamRequired": "A stream is required",
+        "samplingValueRequired": "A sampling value is required"
+      }
     }
   },
   "llmProviders": {

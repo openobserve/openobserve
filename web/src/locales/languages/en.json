@@ -168,6 +168,12 @@
       "action": "Configure storage",
       "actionDesc": "Connect an S3, GCS, or Azure bucket"
     },
+    "noModelPricing": {
+      "title": "No model pricing definitions",
+      "description": "Add a custom pricing definition to track LLM token costs.",
+      "action": "New model",
+      "actionDesc": "Define custom per-token pricing for a model"
+    },
     "noPipelineHistory": {
       "title": "No pipeline history yet",
       "description": "Pipeline execution history will appear here once your pipelines run."
@@ -339,7 +345,8 @@
       "evalJobs": "evaluation jobs",
       "scoreConfigs": "score configs",
       "pipelineHistory": "pipeline history",
-      "regexPatterns": "regex patterns"
+      "regexPatterns": "regex patterns",
+      "modelPricing": "model pricing definitions"
     }
   },
   "common": {
@@ -4176,12 +4183,23 @@
     "organizationSettingsUpdated": "Organization settings updated",
     "dangerZone": "Danger Zone",
     "deleteOrganization": "Delete organization",
-    "deleteOrganizationDescription": "Schedule this organization for deletion. It becomes inaccessible right away and is permanently removed after a grace period.",
+    "deleteOrganizationTitle": "Delete this organization",
+    "deleteOrganizationDescription": "Schedules {name} for deletion. It becomes inaccessible to everyone — including you — immediately, then is permanently erased once the grace period ends. Restoring it before then requires contacting support.",
+    "deleteOrganizationScopeLoading": "Checking what this organization contains…",
+    "deleteOrganizationScope": "{dashboards} dashboards · {streams} streams · {size} data",
+    "deleteFactGracePeriod": "Grace period",
+    "deleteFactGracePeriodDetail": "Support can restore it until erasure",
+    "deleteFactEverything": "Deletes everything",
+    "deleteFactEverythingDetail": "All dashboards, streams and ingested data",
+    "deleteFactMembers": "Affects {n} member | Affects {n} members",
+    "deleteFactMembersDetail": "All access revoked immediately",
+    "deleteFactOwner": "Admins only",
+    "deleteFactOwnerDetail": "Requires the Admin role in this organization",
     "deleteOrganizationConfirm": "This will schedule \"{name}\" — and all of its streams, dashboards, alerts, pipelines, users, and settings — for deletion.",
     "deleteOrganizationWarning": "The organization becomes unavailable immediately and is hidden from everyone who uses it. Ingestion is blocked and scheduled alerts, pipelines, and reports stop running, so no notifications are sent while it is scheduled for deletion.",
-    "deleteOrganizationRecoverable": "It is kept in a recoverable state during the grace period. You can restore it until then — activity resumes on restore. After the grace period its data is permanently deleted and cannot be recovered.",
+    "deleteOrganizationRecoverable": "It is kept in a recoverable state during the grace period, but you will not be able to restore it yourself — you lose access to this organization as soon as deletion starts, and only OpenObserve support can bring it back. After the grace period its data is permanently deleted and cannot be recovered by anyone.",
     "deleteOrganizationTypeToConfirm": "To confirm, type {name} below:",
-    "deleteOrganizationInitiated": "Organization scheduled for deletion. It is now hidden and recoverable until the grace period ends.",
+    "deleteOrganizationInitiated": "Organization scheduled for deletion. It is now hidden; contact support to restore it before the grace period ends.",
     "somethingWentWrong": "Something went wrong",
     "logoUpdatedSuccessfully": "{mode} logo updated successfully.",
     "errorUploadingImage": "Error while uploading image.",
@@ -4439,7 +4457,16 @@
     "dimensionWidth": "Width (px)",
     "dimensionHeight": "Height (px)",
     "imagePreview": "Include inline dashboard preview image",
-    "customDimensions": "Custom Dimensions (Advanced)"
+    "customDimensions": "Custom Dimensions (Advanced)",
+    "validation": {
+      "resourceNameInvalid": "Characters like :, ?, /, #, and spaces are not allowed.",
+      "invalidCron": "Invalid cron expression!",
+      "cronSixFields": "Cron expression must have exactly 6 fields: [Second] [Minute] [Hour] [Day of Month] [Month] [Day of Week]",
+      "cronMinInterval": "Frequency should be greater than {seconds} seconds.",
+      "dateFormat": "Date format is incorrect!",
+      "timeFormat": "Time format is incorrect!",
+      "invalidEmails": "Add valid emails!"
+    }
   },
   "queries": {
     "runningQueries": "Running Queries",
@@ -4942,6 +4969,25 @@
     "providerTypeRequired": "Provider type is required",
     "algorithmRequired": "Algorithm is required",
     "secretRequired": "Secret is required",
+    "nameRequired": "Name is required",
+    "nameMaxLength": "Name must be 50 characters or less.",
+    "nameInvalidChars": "Only alphanumeric characters, underscores, and hyphens are allowed",
+    "nameInvalidResource": "Characters like :, ?, /, #, and spaces are not allowed.",
+    "typeRequired": "Type is required",
+    "baseURLRequired": "Base URL is required",
+    "baseURLInvalid": "Please provide correct URL.",
+    "baseURLHtmlNotAllowed": "HTML tags are not allowed",
+    "accessIdRequired": "Access ID is required",
+    "accessIdInvalid": "Access ID should be alphanumeric",
+    "authenticationTypeRequired": "Authentication type is required",
+    "secretTypeRequired": "Secret type is required",
+    "accessKeyRequired": "Access Key is required",
+    "ldapUsernameRequired": "LDAP Username is required",
+    "ldapUsernameInvalid": "Username can only contain alphanumeric characters, dots, underscores, and hyphens",
+    "ldapPasswordRequired": "LDAP Password is required",
+    "staticSecretNameRequired": "Static Secret Name is required",
+    "dfcNameRequired": "DFC Name is required",
+    "dfcEncryptedDataRequired": "DFC Encrypted Data is required",
     "storeType": "Store Type",
     "mechanismType": "Mechanism Type",
     "actions": "Actions"
@@ -5704,7 +5750,11 @@
       "authEditNote": "Credentials cannot be read back. Re-enter the API key only if you want to rotate it.",
       "cannotRename": "Cannot be renamed after creation.",
       "availableModelsHelp": "Optional. Comma-separated list of models available on this Provider.",
-      "saveError": "Failed to save provider"
+      "saveError": "Failed to save provider",
+      "nameRequired": "Provider name is required",
+      "typeRequired": "Provider type is required",
+      "defaultModelRequired": "Default model is required",
+      "apiKeyRequired": "API key is required"
     },
     "scoreConfig": {
       "booleanValues": "true / false",
@@ -5760,7 +5810,7 @@
         "type": "Type",
         "rangeValues": "Range / values",
         "healthy": "Healthy",
-        "activeVersion": "version",
+        "activeVersion": "Version",
         "usedBy": "Used by",
         "created": "Created",
         "actions": "Actions"
@@ -5821,6 +5871,12 @@
       "falseIsHealthyHint": "Scores of true trigger quality issues.",
       "thresholdEmptyHint": "Leaving this empty means this dimension won't contribute to quality status signals across the product. Scores will still be recorded but won't trigger issue indicators.",
       "saveError": "Failed to save score config",
+      "validation": {
+        "nameRequired": "Name is required",
+        "nameFormat": "Use lowercase letters, numbers, and underscores only",
+        "minRequired": "Min is required",
+        "maxRequired": "Max is required"
+      },
       "empty": {
         "title": "No Score Configs Yet",
         "description": "Score Configs define the dimensions your scorers produce — name, data type, value range, and healthy threshold. Create one to start wiring online evaluation.",
@@ -6054,6 +6110,20 @@
       },
       "requestBodyLabel": "Request body template",
       "saveError": "Failed to save scorer",
+      "validation": {
+        "nameRequired": "Scorer name is required",
+        "scoreConfigRequired": "A score config is required",
+        "providerRequired": "A provider is required",
+        "endpointRequired": "An endpoint URL is required",
+        "bearerTokenRequired": "Token is required",
+        "basicUsernameRequired": "Username is required",
+        "basicPasswordRequired": "Password is required",
+        "apiKeyHeaderRequired": "Header name is required",
+        "apiKeyTokenRequired": "Token is required",
+        "timeoutInvalid": "Timeout must be 0 or greater",
+        "retriesInvalid": "Retries must be 0 or greater",
+        "duplicateFieldName": "Field names must be unique"
+      },
       "versionsLoadError": "Failed to load score config versions",
       "testPanel": {
         "title": "Test this scorer",
@@ -6145,6 +6215,10 @@
       "newButton": "New job",
       "scorersCount": "{count} scorers",
       "scorerCount": "{count} scorer",
+      "deleteBulkButton": "Delete",
+      "deleteBulkTitle": "Delete eval jobs",
+      "deleteBulkConfirm": "Are you sure you want to delete {count} eval jobs? This action cannot be undone.",
+      "deletedBulk": "{count} eval jobs deleted",
       "columns": {
         "name": "Name",
         "status": "Status",
@@ -6233,7 +6307,12 @@
       "selectAtLeastOne": "Select at least one scorer",
       "saveError": "Failed to save eval job",
       "createdAndActivated": "Eval job created and activated",
-      "createdButActivateFailed": "Eval job created, but activation failed"
+      "createdButActivateFailed": "Eval job created, but activation failed",
+      "validation": {
+        "nameRequired": "Job name is required",
+        "streamRequired": "A stream is required",
+        "samplingValueRequired": "A sampling value is required"
+      }
     }
   },
   "llmProviders": {

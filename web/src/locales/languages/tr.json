@@ -4275,7 +4275,26 @@
       "logsWithCount": "Loglar ({count})",
       "tracesWithCount": "İzler ({count})",
       "metricsWithCount": "Metrikler ({count})"
-    }
+    },
+    "dangerZone": "Tehlikeli Bölge",
+    "deleteOrganization": "Kuruluşu sil",
+    "deleteOrganizationTitle": "Bu kuruluşu sil",
+    "deleteOrganizationDescription": "{name} kuruluşunu silinmek üzere zamanlar. Kuruluş herkes için — siz dahil — anında erişilemez hale gelir ve ek süre dolduğunda kalıcı olarak silinir. Bundan önce geri yüklemek için destek ekibiyle iletişime geçmeniz gerekir.",
+    "deleteOrganizationScopeLoading": "Bu kuruluşun içeriği denetleniyor…",
+    "deleteOrganizationScope": "{dashboards} pano · {streams} akış · {size} veri",
+    "deleteFactGracePeriod": "Ek süre",
+    "deleteFactGracePeriodDetail": "Silinene kadar destek ekibi geri yükleyebilir",
+    "deleteFactEverything": "Her şeyi siler",
+    "deleteFactEverythingDetail": "Tüm panolar, akışlar ve alınan veriler",
+    "deleteFactMembers": "{n} üyeyi etkiler | {n} üyeyi etkiler",
+    "deleteFactMembersDetail": "Tüm erişim anında iptal edilir",
+    "deleteFactOwner": "Yalnızca yöneticiler",
+    "deleteFactOwnerDetail": "Bu kuruluşta Yönetici rolü gerektirir",
+    "deleteOrganizationConfirm": "Bu işlem \"{name}\" kuruluşunu ve ona ait tüm akışları, panoları, uyarıları, işlem hatlarını, kullanıcıları ve ayarları silinmek üzere zamanlar.",
+    "deleteOrganizationWarning": "Kuruluş anında kullanılamaz hale gelir ve onu kullanan herkesten gizlenir. Veri alımı engellenir; zamanlanmış uyarılar, işlem hatları ve raporlar çalışmayı durdurur, bu nedenle silinmek üzere zamanlandığı sürece hiçbir bildirim gönderilmez.",
+    "deleteOrganizationRecoverable": "Ek süre boyunca geri yüklenebilir durumda tutulur, ancak onu kendiniz geri yükleyemezsiniz — silme başlar başlamaz bu kuruluşa erişiminizi kaybedersiniz ve yalnızca OpenObserve destek ekibi onu geri getirebilir. Ek süre dolduktan sonra verileri kalıcı olarak silinir ve hiç kimse tarafından kurtarılamaz.",
+    "deleteOrganizationTypeToConfirm": "Onaylamak için aşağıya {name} yazın:",
+    "deleteOrganizationInitiated": "Kuruluş silinmek üzere zamanlandı. Artık gizli; ek süre dolmadan geri yüklemek için destek ekibiyle iletişime geçin."
   },
   "reports": {
     "header": "Raporlar",
@@ -4314,7 +4333,16 @@
     "dimensionWidth": "Genişlik (piksel)",
     "dimensionHeight": "Yükseklik (piksel)",
     "imagePreview": "Satır içi gösterge paneli önizleme görüntüsünü ekleyin",
-    "customDimensions": "Özel Boyutlar (Gelişmiş)"
+    "customDimensions": "Özel Boyutlar (Gelişmiş)",
+    "validation": {
+      "resourceNameInvalid": ":, ?, /, # gibi karakterlere ve boşluklara izin verilmez.",
+      "invalidCron": "Geçersiz Cron ifadesi!",
+      "cronSixFields": "Cron ifadesi tam olarak 6 alana sahip olmalıdır: [Saniye] [Dakika] [Saat] [Ayın Günü] [Ay] [Haftanın Günü]",
+      "cronMinInterval": "Sıklık {seconds} saniyeden fazla olmalıdır.",
+      "dateFormat": "Tarih biçimi hatalı!",
+      "timeFormat": "Saat biçimi hatalı!",
+      "invalidEmails": "Geçerli e-postalar ekleyin!"
+    }
   },
   "queries": {
     "runningQueries": "Çalışan Sorgular",
@@ -4817,6 +4845,25 @@
     "providerTypeRequired": "Sağlayıcı tipi gereklidir",
     "algorithmRequired": "Algoritma gerekli",
     "secretRequired": "Sır gerekli",
+    "nameRequired": "İsim gereklidir",
+    "nameMaxLength": "İsim en fazla 50 karakter olmalıdır.",
+    "nameInvalidChars": "Yalnızca alfanümerik karakterler, alt çizgiler ve tireler kullanılabilir",
+    "nameInvalidResource": ":, ?, /, # ve boşluk gibi karakterlere izin verilmez.",
+    "typeRequired": "Tür gereklidir",
+    "baseURLRequired": "Temel URL gereklidir",
+    "baseURLInvalid": "Lütfen doğru bir URL girin.",
+    "baseURLHtmlNotAllowed": "HTML etiketlerine izin verilmez",
+    "accessIdRequired": "Erişim Kimliği gereklidir",
+    "accessIdInvalid": "Erişim Kimliği alfanümerik olmalıdır",
+    "authenticationTypeRequired": "Kimlik doğrulama türü gereklidir",
+    "secretTypeRequired": "Gizli türü gereklidir",
+    "accessKeyRequired": "Erişim Anahtarı gereklidir",
+    "ldapUsernameRequired": "LDAP Kullanıcı Adı gereklidir",
+    "ldapUsernameInvalid": "Kullanıcı adı yalnızca alfanümerik karakterler, noktalar, alt çizgiler ve tireler içerebilir",
+    "ldapPasswordRequired": "LDAP Şifresi gereklidir",
+    "staticSecretNameRequired": "Statik Gizli Adı gereklidir",
+    "dfcNameRequired": "DFC Adı gereklidir",
+    "dfcEncryptedDataRequired": "DFC Şifreli Verileri gereklidir",
     "storeType": "Mağaza Türü",
     "mechanismType": "Mekanizma Tipi",
     "actions": "Eylemler"
@@ -5606,7 +5653,11 @@
       "authEditNote": "Kimlik bilgileri geri okunamaz. API anahtarını yalnızca değiştirmek istiyorsanız yeniden girin.",
       "cannotRename": "Oluşturulduktan sonra yeniden adlandırılamaz.",
       "availableModelsHelp": "İsteğe bağlı. Bu Sağlayıcıda kullanılabilen modellerin virgülle ayrılmış listesi.",
-      "saveError": "Sağlayıcı kaydedilemedi"
+      "saveError": "Sağlayıcı kaydedilemedi",
+      "nameRequired": "Provider name is required",
+      "typeRequired": "Provider type is required",
+      "defaultModelRequired": "Default model is required",
+      "apiKeyRequired": "API key is required"
     },
     "scoreConfig": {
       "booleanValues": "true / false",
@@ -5723,6 +5774,12 @@
       "falseIsHealthyHint": "true puanları kalite sorunlarını tetikler.",
       "thresholdEmptyHint": "Bunu boş bırakmak, bu boyutun ürün genelindeki kalite durumu sinyallerine katkıda bulunmayacağı anlamına gelir. Puanlar yine de kaydedilir ancak sorun göstergelerini tetiklemez.",
       "saveError": "Puan yapılandırması kaydedilemedi",
+      "validation": {
+        "nameRequired": "Name is required",
+        "nameFormat": "Use lowercase letters, numbers, and underscores only",
+        "minRequired": "Min is required",
+        "maxRequired": "Max is required"
+      },
       "empty": {
         "title": "Henüz Puan Yapılandırması Yok",
         "description": "Puan Yapılandırmaları, puanlayıcılarınızın ürettiği boyutları tanımlar — ad, veri türü, değer aralığı ve sağlıklı eşik. Çevrimiçi değerlendirmeyi bağlamaya başlamak için bir tane oluşturun.",
@@ -5956,6 +6013,20 @@
       },
       "requestBodyLabel": "Gövde şablonu isteyin",
       "saveError": "Gol oyuncusu kurtarılamadı",
+      "validation": {
+        "nameRequired": "Scorer name is required",
+        "scoreConfigRequired": "A score config is required",
+        "providerRequired": "A provider is required",
+        "endpointRequired": "An endpoint URL is required",
+        "bearerTokenRequired": "Token is required",
+        "basicUsernameRequired": "Username is required",
+        "basicPasswordRequired": "Password is required",
+        "apiKeyHeaderRequired": "Header name is required",
+        "apiKeyTokenRequired": "Token is required",
+        "timeoutInvalid": "Timeout must be 0 or greater",
+        "retriesInvalid": "Retries must be 0 or greater",
+        "duplicateFieldName": "Field names must be unique"
+      },
       "versionsLoadError": "Puan yapılandırma sürümleri yüklenemedi",
       "testPanel": {
         "title": "Bu golcüyü test et",
@@ -6135,7 +6206,12 @@
       "selectAtLeastOne": "En az bir golcü seçin",
       "saveError": "Eval işi kaydedilemedi",
       "createdAndActivated": "Değerlendirme işi oluşturuldu ve etkinleştirildi",
-      "createdButActivateFailed": "Değerlendirme işi oluşturuldu ancak etkinleştirme başarısız oldu"
+      "createdButActivateFailed": "Değerlendirme işi oluşturuldu ancak etkinleştirme başarısız oldu",
+      "validation": {
+        "nameRequired": "Job name is required",
+        "streamRequired": "A stream is required",
+        "samplingValueRequired": "A sampling value is required"
+      }
     }
   },
   "llmProviders": {
