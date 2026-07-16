@@ -90,6 +90,15 @@
   }
 }
 
+/* Print MODE (store.state.printMode, dashboard print/report capture): body must
+   release its overflow so the full page height is capturable. Was
+   `.printMode body { … }` in MainLayout.vue — dead as written, because
+   `.printMode` sits on a div INSIDE body, so "body as descendant of .printMode"
+   matches nothing. `:has()` expresses the intended relationship. */
+body:has(.printMode) {
+  overflow: auto !important;
+}
+
 /* ── F4 — element typography / reset (from component.css, W1.b) ─────────────
    Verbatim move. The two @layer base sub-blocks keep their layer; the
    html/body/::placeholder rules stay unlayered exactly as they were —

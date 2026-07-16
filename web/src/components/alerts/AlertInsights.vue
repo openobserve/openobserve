@@ -53,7 +53,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OTabs
           v-model="currentTab"
           dense
-          class="alert-insights-tabs"
           align="left"
           data-test="alert-insights-tabs"
         >
@@ -727,9 +726,3 @@ onMounted(async () => {
   isLoading.value = false;
 });
 </script>
-
-<style>
-.alert-insights-tabs :deep(.o-tab__label) {
-  text-transform: none !important;
-}
-</style>

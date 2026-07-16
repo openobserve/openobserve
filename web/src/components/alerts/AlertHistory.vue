@@ -85,7 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
     </AppPageHeader>
     <div class="flex-1 min-h-0 px-2.5 pt-2">
-      <div class="alert-history-table card-container h-full">
+      <div class="card-container h-full">
         <OTable
           data-test="alert-history-table"
           :data="rows"
@@ -847,13 +847,3 @@ watch(
   },
 );
 </script>
-
-<style>
-.alert-history-table :deep(table) {
-  width: 100%;
-}
-
-.alert-history-table :deep(table) td {
-  vertical-align: middle;
-}
-</style>

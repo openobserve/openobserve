@@ -535,7 +535,7 @@ function getIcon(data, ioType) {
       <div
         v-if="hasNodeError"
         data-test="pipeline-node-error-badge"
-        class="absolute top-[-12px] right-[-12px] w-5 h-5 bg-status-negative border-2 border-white rounded-full flex items-center justify-center cursor-pointer z-[15] shadow-[0_2px_6px_rgba(239,68,68,0.5)] transition-all duration-200 error-badge"
+        class="absolute top-[-12px] right-[-12px] w-5 h-5 bg-status-negative border-2 border-white rounded-full flex items-center justify-center cursor-pointer z-[15] shadow-[0_2px_6px_rgba(239,68,68,0.5)] transition-all duration-200 hover:scale-[1.2] hover:shadow-[0_3px_10px_rgba(239,68,68,0.7)] hover:z-20"
         @click.stop="navigateToFunction(data.name)"
       >
         <OIcon name="error" size="sm" />
@@ -573,7 +573,7 @@ function getIcon(data, ioType) {
           variant="ghost"
           size="icon"
           @click.stop="deleteNode(id)"
-          class="min-w-5! w-5! h-5! p-0! rounded-sm! bg-[rgba(255,255,255,0.95)]! border! border-(--node-color)! text-(--node-color)! transition-all! duration-200! node-action-btn delete-btn"
+          class="min-w-5! w-5! h-5! p-0! rounded-sm! bg-[rgba(255,255,255,0.95)]! border! border-(--node-color)! text-(--node-color)! transition-all! duration-200! hover:bg-error-500! hover:border-error-500! hover:text-white! hover:scale-110! hover:shadow-[0_2px_8px_rgba(239,68,68,0.3)]!"
           :data-test="`pipeline-node-${io_type}-delete-btn`"
           @mouseenter="handleDeleteTooltipEnter"
           @mouseleave="handleDeleteTooltipLeave"
@@ -659,7 +659,7 @@ function getIcon(data, ioType) {
           variant="ghost"
           size="icon"
           @click.stop="deleteNode(id)"
-          class="min-w-5! w-5! h-5! p-0! rounded-sm! bg-[rgba(255,255,255,0.95)]! border! border-(--node-color)! text-(--node-color)! transition-all! duration-200! node-action-btn delete-btn"
+          class="min-w-5! w-5! h-5! p-0! rounded-sm! bg-[rgba(255,255,255,0.95)]! border! border-(--node-color)! text-(--node-color)! transition-all! duration-200! hover:bg-error-500! hover:border-error-500! hover:text-white! hover:scale-110! hover:shadow-[0_2px_8px_rgba(239,68,68,0.3)]!"
           :data-test="`pipeline-node-${io_type}-delete-btn`"
           @mouseenter="handleDeleteTooltipEnter"
           @mouseleave="handleDeleteTooltipLeave"
@@ -731,7 +731,7 @@ function getIcon(data, ioType) {
           variant="ghost"
           size="icon"
           @click.stop="deleteNode(id)"
-          class="min-w-5! w-5! h-5! p-0! rounded-sm! bg-[rgba(255,255,255,0.95)]! border! border-(--node-color)! text-(--node-color)! transition-all! duration-200! node-action-btn delete-btn"
+          class="min-w-5! w-5! h-5! p-0! rounded-sm! bg-[rgba(255,255,255,0.95)]! border! border-(--node-color)! text-(--node-color)! transition-all! duration-200! hover:bg-error-500! hover:border-error-500! hover:text-white! hover:scale-110! hover:shadow-[0_2px_8px_rgba(239,68,68,0.3)]!"
           :data-test="`pipeline-node-${io_type}-delete-btn`"
           @mouseenter="handleDeleteTooltipEnter"
           @mouseleave="handleDeleteTooltipLeave"
@@ -805,7 +805,7 @@ function getIcon(data, ioType) {
           variant="ghost"
           size="icon"
           @click.stop="deleteNode(id)"
-          class="min-w-5! w-5! h-5! p-0! rounded-sm! bg-[rgba(255,255,255,0.95)]! border! border-(--node-color)! text-(--node-color)! transition-all! duration-200! node-action-btn delete-btn"
+          class="min-w-5! w-5! h-5! p-0! rounded-sm! bg-[rgba(255,255,255,0.95)]! border! border-(--node-color)! text-(--node-color)! transition-all! duration-200! hover:bg-error-500! hover:border-error-500! hover:text-white! hover:scale-110! hover:shadow-[0_2px_8px_rgba(239,68,68,0.3)]!"
           :data-test="`pipeline-node-${io_type}-delete-btn`"
           @mouseenter="handleDeleteTooltipEnter"
           @mouseleave="handleDeleteTooltipLeave"
@@ -878,7 +878,7 @@ function getIcon(data, ioType) {
           variant="ghost"
           size="icon"
           @click.stop="deleteNode(id)"
-          class="min-w-5! w-5! h-5! p-0! rounded-sm! bg-[rgba(255,255,255,0.95)]! border! border-(--node-color)! text-(--node-color)! transition-all! duration-200! node-action-btn delete-btn"
+          class="min-w-5! w-5! h-5! p-0! rounded-sm! bg-[rgba(255,255,255,0.95)]! border! border-(--node-color)! text-(--node-color)! transition-all! duration-200! hover:bg-error-500! hover:border-error-500! hover:text-white! hover:scale-110! hover:shadow-[0_2px_8px_rgba(239,68,68,0.3)]!"
           :data-test="`pipeline-node-${io_type}-delete-btn`"
           @mouseenter="handleDeleteTooltipEnter"
           @mouseleave="handleDeleteTooltipLeave"
@@ -988,7 +988,7 @@ function getIcon(data, ioType) {
           variant="ghost"
           size="icon"
           @click.stop="deleteNode(id)"
-          class="min-w-5! w-5! h-5! p-0! rounded-sm! bg-[rgba(255,255,255,0.95)]! border! border-(--node-color)! text-(--node-color)! transition-all! duration-200! node-action-btn delete-btn"
+          class="min-w-5! w-5! h-5! p-0! rounded-sm! bg-[rgba(255,255,255,0.95)]! border! border-(--node-color)! text-(--node-color)! transition-all! duration-200! hover:bg-error-500! hover:border-error-500! hover:text-white! hover:scale-110! hover:shadow-[0_2px_8px_rgba(239,68,68,0.3)]!"
           :data-test="`pipeline-node-${io_type}-delete-btn`"
           @mouseenter="handleDeleteTooltipEnter"
           @mouseleave="handleDeleteTooltipLeave"
@@ -1026,7 +1026,8 @@ function getIcon(data, ioType) {
   />
 </template>
 
-<style>
+<style scoped>
+/* keep(lib-override:vue-flow): styles vue-flow Handle DOM (classes are built dynamically as `handle_${io_type}`, also targeted by PipelineView's tooltip preview) and the vue-flow-generated .vue-flow__node-custom wrapper; !important is required to beat vue-flow core CSS */
 .node_handle_custom {
   width: 16px !important;
   height: 16px !important;
@@ -1077,7 +1078,7 @@ function getIcon(data, ioType) {
   background: #f59e0b !important;
 }
 
-.vue-flow__node-custom {
+:global(.vue-flow__node-custom) {
   padding: 10px;
   border-radius: 3px;
   width: 150px;
@@ -1088,69 +1089,5 @@ function getIcon(data, ioType) {
   color: var(--vf-node-text);
   background-color: var(--vf-node-bg);
   border-color: var(--vf-node-color);
-}
-
-.node-action-btn:hover {
-  background: var(--node-color) !important;
-  color: white !important;
-  transform: scale(1.1) !important;
-}
-
-.delete-btn:hover {
-  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.3) !important;
-  background: #ef4444 !important;
-  border-color: #ef4444 !important;
-}
-
-.error-badge:hover {
-  transform: scale(1.2);
-  box-shadow: 0 3px 10px rgba(239, 68, 68, 0.7);
-  z-index: 20;
-}
-
-/* Pipeline error tooltip styling - increased specificity to override global theme styles */
-.dark .pipeline-error-tooltip,
-:root:not(.dark) .pipeline-error-tooltip,
-.pipeline-error-tooltip {
-  background-color: #ef4444 !important;
-  color: white !important;
-  font-size: 12px !important;
-  white-space: pre-wrap !important;
-  word-wrap: break-word !important;
-  line-height: 1.5 !important;
-  padding: 10px 14px !important;
-}
-
-.dark .pipeline-error-tooltip div,
-:root:not(.dark) .pipeline-error-tooltip div,
-.pipeline-error-tooltip div {
-  max-height: 300px;
-  overflow-y: auto;
-}
-
-.dark .pipeline-error-tooltip div::-webkit-scrollbar,
-:root:not(.dark) .pipeline-error-tooltip div::-webkit-scrollbar,
-.pipeline-error-tooltip div::-webkit-scrollbar {
-  width: 6px;
-}
-
-.dark .pipeline-error-tooltip div::-webkit-scrollbar-track,
-:root:not(.dark) .pipeline-error-tooltip div::-webkit-scrollbar-track,
-.pipeline-error-tooltip div::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 3px;
-}
-
-.dark .pipeline-error-tooltip div::-webkit-scrollbar-thumb,
-:root:not(.dark) .pipeline-error-tooltip div::-webkit-scrollbar-thumb,
-.pipeline-error-tooltip div::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.3);
-  border-radius: 3px;
-}
-
-.dark .pipeline-error-tooltip div::-webkit-scrollbar-thumb:hover,
-:root:not(.dark) .pipeline-error-tooltip div::-webkit-scrollbar-thumb:hover,
-.pipeline-error-tooltip div::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.5);
 }
 </style>

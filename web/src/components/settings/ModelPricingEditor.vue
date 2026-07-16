@@ -150,7 +150,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div
               v-for="ex in patternExamples"
               :key="ex.name"
-              class="examples-table-row grid grid-cols-[180px_1fr_auto] gap-3 items-center py-2 px-3 border-b border-card-glass-border text-xs"
+              class="grid grid-cols-[180px_1fr_auto] gap-3 items-center py-2 px-3 border-b border-card-glass-border text-xs last:border-b-0"
             >
               <span class="examples-model-name font-medium">{{ ex.name }}</span>
               <code class="font-mono text-2xs bg-[rgba(0,0,0,0.04)] py-px px-1.5 rounded-sm break-all dark:bg-[rgba(255,255,255,0.08)]">{{ ex.match_pattern }}</code>
@@ -1028,10 +1028,3 @@ onBeforeMount(async () => {
   }
 });
 </script>
-
-<style>
-/* :last-child pseudo selector — kept in <style> per project rules */
-.examples-table-row:last-child {
-  border-bottom: none;
-}
-</style>

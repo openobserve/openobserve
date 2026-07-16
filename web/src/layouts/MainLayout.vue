@@ -1316,9 +1316,3 @@ export default defineComponent({
 </script>
 
 
-<style>
-/* Print mode — hide header + sidebar, show body overflow */
-.printMode body {
-  overflow: auto !important;
-}
-</style>

@@ -58,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OTag
                     type="exampleChip"
                     value="dim"
-                    class="mx-1 my-1 example-chip"
+                    class="mx-1 my-1"
                     >k8s-cluster=prod</OTag
                   >
                 </template>
@@ -66,7 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OTag
                     type="exampleChip"
                     value="dim"
-                    class="mx-1 my-1 example-chip"
+                    class="mx-1 my-1"
                     >k8s-deployment=api-server</OTag
                   >
                 </template>
@@ -74,7 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OTag
                     type="exampleChip"
                     value="value"
-                    class="mx-1 my-1 example-chip"
+                    class="mx-1 my-1"
                     >prod/api-server</OTag
                   >
                 </template>
@@ -344,21 +344,3 @@ const loadConfig = async () => {
 // Load config on mount
 loadConfig();
 </script>
-
-<style>
-:deep(.section-header) {
-  font-weight: 600;
-}
-
-:deep(.tooltip-text) {
-  font-size: 0.75rem;
-}
-
-:deep(.example-chip) {
-  font-size: 13px;
-}
-
-:deep(.text-caption) {
-  color: var(--color-text-primary);
-}
-</style>

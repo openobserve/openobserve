@@ -67,7 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <ul
-            class="dashboard-list flex flex-col rounded-sm list-none p-0 m-0 max-h-[calc(100dvh-200px)] overflow-y-auto"
+            class="flex flex-col rounded-sm list-none p-0 m-0 max-h-[calc(100dvh-200px)] overflow-y-auto"
             :class="filteredDashboards.length > 0 ? 'border border-border' : ''"
           >
             <li
@@ -77,8 +77,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="flex items-center gap-2 px-3 py-1 cursor-pointer transition-colors duration-200 border-l-4"
               :class="[
                 isSelected(dashboard)
-                  ? 'selected-item bg-theme-tab-bg! border-primary'
-                  : 'border-transparent hover:bg-surface-subtle',
+                  ? 'bg-theme-tab-bg! border-primary'
+                  : 'border-transparent hover:bg-hover-gray',
               ]"
               data-test="add-dashboard-github-item"
             >
@@ -574,9 +574,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style>
-.dashboard-list li:hover:not(.selected-item) {
-  background-color: var(--color-hover-gray);
-}
-</style>

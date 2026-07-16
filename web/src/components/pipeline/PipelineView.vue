@@ -186,23 +186,23 @@ const queryImage = getImageURL("images/pipeline/input_query.png");
   });
   </script>
     
-  <style>
-  /* Node background colors — parent-context compound selectors, must stay in CSS */
-  .pipeline-view-tooltip .vue-flow__node-input .btn-fixed-width {
+  <style scoped>
+  /* keep(lib-override:vue-flow): read-only tooltip preview recolors vue-flow node/handle DOM rendered by child components (CustomNode / vue-flow wrappers) — parent-context compound selectors and ::before pseudo-elements, not expressible as utilities on this template */
+  .pipeline-view-tooltip :deep(.vue-flow__node-input .btn-fixed-width) {
     background-color: var(--color-status-info-bg) !important;
     border-color: var(--color-status-info-text) !important;
     color: var(--color-text-body) !important;
     padding: 8px 12px !important;
   }
 
-  .pipeline-view-tooltip .vue-flow__node-output .btn-fixed-width {
+  .pipeline-view-tooltip :deep(.vue-flow__node-output .btn-fixed-width) {
     background-color: var(--color-status-success-bg) !important;
     border-color: var(--color-status-positive) !important;
     color: var(--color-text-body) !important;
     padding: 8px 12px !important;
   }
 
-  .pipeline-view-tooltip .vue-flow__node-default .btn-fixed-width {
+  .pipeline-view-tooltip :deep(.vue-flow__node-default .btn-fixed-width) {
     background-color: var(--color-status-warning-bg) !important;
     border-color: var(--color-status-warning-text) !important;
     color: var(--color-text-body) !important;
@@ -210,32 +210,32 @@ const queryImage = getImageURL("images/pipeline/input_query.png");
   }
 
   /* Handle colors — ::before pseudo-elements, must stay in CSS */
-  .pipeline-view-tooltip .handle_input {
+  .pipeline-view-tooltip :deep(.handle_input) {
     background: var(--color-status-info-bg) !important;
   }
 
-  .pipeline-view-tooltip .handle_input::before {
+  .pipeline-view-tooltip :deep(.handle_input::before) {
     background: var(--color-status-info-text) !important;
   }
 
-  .pipeline-view-tooltip .handle_output {
+  .pipeline-view-tooltip :deep(.handle_output) {
     background: var(--color-status-success-bg) !important;
   }
 
-  .pipeline-view-tooltip .handle_output::before {
+  .pipeline-view-tooltip :deep(.handle_output::before) {
     background: var(--color-status-positive) !important;
   }
 
-  .pipeline-view-tooltip .handle_default {
+  .pipeline-view-tooltip :deep(.handle_default) {
     background: var(--color-status-warning-bg) !important;
   }
 
-  .pipeline-view-tooltip .handle_default::before {
+  .pipeline-view-tooltip :deep(.handle_default::before) {
     background: var(--color-status-warning-text) !important;
   }
 
   /* Hide action buttons in tooltip */
-  .pipeline-view-tooltip .node-action-buttons {
+  .pipeline-view-tooltip :deep(.node-action-buttons) {
     display: none !important;
   }
   </style>

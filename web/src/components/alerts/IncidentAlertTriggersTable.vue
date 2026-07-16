@@ -173,9 +173,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style>
-.o2-table tbody tr {
-  cursor: pointer;
-}
-</style>

@@ -1735,12 +1735,8 @@ export default defineComponent({
   },
 });
 </script>
-<style lang="scss" scoped>
-// When the panel is too short to comfortably fit the icon, hide it and show
-// just the centered "No Data" message. Kept as scoped CSS because this is a
-// container query targeting a deep descendant rendered by OEmptyState — it
-// cannot be expressed as an inline Tailwind utility. The container itself and
-// its min-height/padding overrides are applied inline on the OEmptyState above.
+<style scoped>
+/* keep(lib-override:o2-empty-state): container query hides OEmptyState's internally-rendered icon when the panel is too short — targets a deep descendant of the lib component, not expressible as a utility on this template */
 @container (max-height: 5rem) {
   .noData :deep(.o2-empty-state__inline-icon) {
     display: none;

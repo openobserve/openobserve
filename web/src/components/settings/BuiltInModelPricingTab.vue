@@ -105,7 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   (a.condition ? 1 : 0) - (b.condition ? 1 : 0),
               )"
               :key="idx"
-              class="tier-row py-px"
+              class="py-px not-first:border-t not-first:border-dashed not-first:border-border-default not-first:mt-0.5 not-first:pt-0.5"
               :class="{ 'tier-conditional': !!tier.condition }"
             >
               <div class="tier-name text-2xs font-semibold text-text-secondary mb-px" :class="tier.condition ? 'text-text-muted' : ''">
@@ -381,12 +381,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style>
-/* Tier pricing rows — sibling selector not convertible to  */
-.tier-row + .tier-row {
-  border-top: 1px dashed var(--color-border-default);
-  margin-top: 2px;
-  padding-top: 2px;
-}
-</style>

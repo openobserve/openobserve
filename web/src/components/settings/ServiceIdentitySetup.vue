@@ -193,7 +193,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                   <!-- Customize link -->
                   <a
-                    class="config-link-btn cursor-pointer inline-flex items-center gap-1 px-2 py-0.5 rounded-sm text-xs font-semibold no-underline border border-text-link text-text-link bg-badge-blue-soft-bg transition-[background]"
+                    class="config-link-btn cursor-pointer inline-flex items-center gap-1 px-2 py-0.5 rounded-sm text-xs font-semibold no-underline border border-text-link text-text-link bg-badge-blue-soft-bg transition-[background] hover:bg-[rgba(59,130,246,0.18)] dark:hover:bg-[rgba(96,165,250,0.22)]"
                     @click.prevent="emit('navigate-to-aliases', 'service')"
                   >
                     {{ t("settings.correlation.customizeFieldMappings") }}
@@ -584,7 +584,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 and recommendations. Fields not in this list will not influence
                 service discovery results. Cannot be empty.
                 <a
-                  class="config-link-btn cursor-pointer inline-block mx-1 px-2 py-0.5 rounded-sm text-xs font-semibold no-underline align-middle border border-text-link text-text-link bg-badge-blue-soft-bg transition-[background]"
+                  class="config-link-btn cursor-pointer inline-block mx-1 px-2 py-0.5 rounded-sm text-xs font-semibold no-underline align-middle border border-text-link text-text-link bg-badge-blue-soft-bg transition-[background] hover:bg-[rgba(59,130,246,0.18)] dark:hover:bg-[rgba(96,165,250,0.22)]"
                   @click.prevent="emit('navigate-to-aliases', 'service')"
                   >Go to Field Aliases</a
                 >
@@ -703,7 +703,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             We discovered these deployment patterns in your streams. Use them to
             configure service correlation.
             <a
-              class="config-link-btn cursor-pointer inline-block mx-1 px-2 py-0.5 rounded-sm text-xs font-semibold no-underline align-middle border border-text-link text-text-link bg-badge-blue-soft-bg transition-[background]"
+              class="config-link-btn cursor-pointer inline-block mx-1 px-2 py-0.5 rounded-sm text-xs font-semibold no-underline align-middle border border-text-link text-text-link bg-badge-blue-soft-bg transition-[background] hover:bg-[rgba(59,130,246,0.18)] dark:hover:bg-[rgba(96,165,250,0.22)]"
               @click.prevent="emit('navigate-to-services')"
               >Go to Services</a
             >
@@ -3531,13 +3531,3 @@ onMounted(() => {
   loadData();
 });
 </script>
-
-<style>
-.config-link-btn:hover {
-  background: rgba(59, 130, 246, 0.18);
-}
-
-.dark .config-link-btn:hover {
-  background: rgba(96, 165, 250, 0.22);
-}
-</style>

@@ -13,7 +13,7 @@ See the License for the specific language governing permissions and
 limitations under the License. -->
 
 <template>
-  <div data-test="prebuilt-destination-selector" class="destination-selector">
+  <div data-test="prebuilt-destination-selector">
     <!-- Destination Type Grid -->
     <div class="selector-grid grid gap-3 mb-4 [grid-template-columns:repeat(auto-fill,minmax(8.75rem,1fr))]">
       <div
@@ -48,7 +48,7 @@ limitations under the License. -->
           </div>
 
           <!-- Description -->
-          <div data-test="destination-type-description" class="card-description text-2xs text-text-secondary mt-1 mb-0 [line-height:1.2] grow text-center hidden">
+          <div data-test="destination-type-description" class="text-2xs text-text-secondary mt-1 mb-0 [line-height:1.2] grow text-center hidden min-[75rem]:block">
             {{ type.description }}
           </div>
         </div>
@@ -77,7 +77,7 @@ limitations under the License. -->
           <div data-test="destination-type-name" class="card-title text-compact font-medium mt-1 mb-0 text-text-primary [line-height:1.3] text-center">
             {{ t('alerts.customDestination') }}
           </div>
-          <div data-test="destination-type-description" class="card-description text-2xs text-text-secondary mt-1 mb-0 [line-height:1.2] grow text-center hidden">
+          <div data-test="destination-type-description" class="text-2xs text-text-secondary mt-1 mb-0 [line-height:1.2] grow text-center hidden min-[75rem]:block">
             {{ t('alerts.customDestinationDescription') }}
           </div>
         </div>
@@ -152,11 +152,3 @@ function getIconName(icon: string): string {
   return iconMap[icon] || icon;
 }
 </script>
-
-<style>
-@media (min-width: 75rem) {
-  .destination-selector .destination-card .card-description {
-    display: block;
-  }
-}
-</style>

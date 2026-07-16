@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <OIcon
             name="update"
-            :class="isAnimating ? '![animation:rotate_2s_linear_infinite] ![transform-origin:center_center] !inline-block' : ''"
+            :class="isAnimating ? '![animation:auto-refresh-rotate_2s_linear_infinite] ![transform-origin:center_center] !inline-block' : ''"
             size="sm"
           />
           <OTooltip :content="`${t('search.autoRefresh')}: ${selectedLabel}`" />
@@ -100,7 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               name="update"
               size="sm"
               :class="[
-                isAnimating ? '![animation:rotate_2s_linear_infinite] ![transform-origin:center_center] !inline-block' : '',
+                isAnimating ? '![animation:auto-refresh-rotate_2s_linear_infinite] ![transform-origin:center_center] !inline-block' : '',
                 isAnimating ? 'text-primary' : '',
                 'mr-0.5',
               ]"
@@ -383,7 +383,12 @@ export default defineComponent({
 </script>
 
 <style>
-@keyframes rotate {
+/* keep(keyframes): @keyframes cannot be expressed as Tailwind utilities; the name
+   must stay global because it is referenced from arbitrary `animation:` utilities
+   in the template (Vue rewrites keyframe names inside `scoped` blocks, which would
+   break that reference). Renamed from generic `rotate` to a component-prefixed name
+   to avoid app-wide keyframe collisions. */
+@keyframes auto-refresh-rotate {
   0% {
     transform: rotate(0deg);
   }

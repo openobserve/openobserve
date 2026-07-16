@@ -54,7 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @select="addField(opt.value)"
             >
               <span class="flex items-center gap-2">
-                <span :class="['cf-badge-base', badgeClass(opt.isNumeric)]">
+                <span class="shrink-0 text-[0.5625rem] font-bold tracking-[0.05em] uppercase py-0.5 px-1.25 rounded-sm" :class="badgeClass(opt.isNumeric)">
                   {{ opt.isNumeric ? t("dashboard.typeNumeric") : t("dashboard.typeText") }}
                 </span>
                 <span>{{ opt.label }}</span>
@@ -89,7 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @keydown.enter.prevent="selectedIdx = idx"
             @keydown.space.prevent="selectedIdx = idx"
           >
-            <span :class="['cf-badge-base', badgeClass(isNumericColumn(col))]">
+            <span class="shrink-0 text-[0.5625rem] font-bold tracking-[0.05em] uppercase py-0.5 px-1.25 rounded-sm" :class="badgeClass(isNumericColumn(col))">
               {{ isNumericColumn(col) ? t("dashboard.typeNumeric") : t("dashboard.typeText") }}
             </span>
             <span
@@ -144,7 +144,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span>{{ t("dashboard.inlinePreview") }}</span>
           </div>
           <div
-            class="cf-preview-table border border-[rgba(128,128,128,0.18)] rounded-md overflow-hidden"
+            class="border border-[rgba(128,128,128,0.18)] rounded-md overflow-hidden [&_[data-test=dashboard-table-cell-copy-btn]]:hidden!"
           >
             <TableRenderer
               v-if="selectedPreview"
@@ -200,7 +200,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @select="addField(opt.value)"
                 >
                   <span class="flex items-center gap-2">
-                    <span :class="['cf-badge-base', badgeClass(opt.isNumeric)]">
+                    <span class="shrink-0 text-[0.5625rem] font-bold tracking-[0.05em] uppercase py-0.5 px-1.25 rounded-sm" :class="badgeClass(opt.isNumeric)">
                       {{ opt.isNumeric ? t("dashboard.typeNumeric") : t("dashboard.typeText") }}
                     </span>
                     <span>{{ opt.label }}</span>
@@ -528,21 +528,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style lang="scss" scoped>
-// Shared field-type badge base (variant colour comes from badgeClass()).
-.cf-badge-base {
-  flex-shrink: 0;
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  padding: 2px 5px;
-  border-radius: 4px;
-}
-
-// :deep needed to reach the renderer's copy button inside the mini preview.
-.cf-preview-table :deep([data-test="dashboard-table-cell-copy-btn"]) {
-  display: none !important;
-}
-</style>

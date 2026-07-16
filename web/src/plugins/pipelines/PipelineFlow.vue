@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
    </div>
 
    <!-- Edge deletion help notification -->
-   <div v-if="showEdgeHelpNotification" class="edge-help-notification absolute top-5 left-1/2 -translate-x-1/2 z-[1000] bg-surface-base text-text-body py-2.5 px-4 rounded-lg text-sm shadow-[0_4px_20px_rgba(0,0,0,0.15)] border border-border-default flex items-center dark:shadow-[0_4px_20px_rgba(0,0,0,0.4)] [animation:slideDown_0.3s_ease-out]">
+   <div v-if="showEdgeHelpNotification" class="edge-help-notification absolute top-5 left-1/2 -translate-x-1/2 z-[1000] bg-surface-base text-text-body py-2.5 px-4 rounded-lg text-sm shadow-[0_4px_20px_rgba(0,0,0,0.15)] border border-border-default flex items-center dark:shadow-[0_4px_20px_rgba(0,0,0,0.4)]">
      <OIcon name="info" class="mr-1" size="sm" />
      Press Backspace/Delete to remove the edge
    </div>
@@ -227,8 +227,13 @@ function resetTransform() {
 };
 </script>
 
-<style>
-@keyframes slideDown {
+<style scoped>
+/* keep(keyframes): entry animation for the edge-deletion help toast; the animation reference must live in this scoped block (not a Tailwind utility) so Vue's scoped keyframe-name hashing resolves it */
+.edge-help-notification {
+  animation: pipeline-flow-slide-down 0.3s ease-out;
+}
+
+@keyframes pipeline-flow-slide-down {
   from {
     opacity: 0;
     transform: translateX(-50%) translateY(-10px);

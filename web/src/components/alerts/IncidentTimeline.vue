@@ -272,7 +272,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             type="textarea"
             placeholder="Write a comment..."
             :rows="3"
-            class="comment-input"
             @keydown.ctrl.enter.prevent="submitComment"
             @keydown.meta.enter.prevent="submitComment"
             data-test="incident-timeline-comment-input"
@@ -640,12 +639,3 @@ defineExpose({
   fetchEvents
 });
 </script>
-
-<style>
-.comment-input :deep(textarea) {
-  font-size: 14px;
-  line-height: 1.5;
-  padding-right: 50px !important;
-  resize: none;
-}
-</style>

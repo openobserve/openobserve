@@ -1,6 +1,7 @@
 # O2 Style Migration — Style Blocks → Tailwind & Token-Layer Class Evacuation
 
-> **Status: POLICY APPROVED 2026-07-16 (§3 ruling). P0 ✅ · PQ ✅ · PQ2 ✅ · W1.a ✅ (2026-07-16). W1.b–e / W2 not started.**
+> **Status: POLICY APPROVED 2026-07-16 (§3 ruling). P0 ✅ · PQ ✅ · PQ2 ✅ · W1 COMPLETE (a–e) ✅ · W2 in progress (2026-07-16).**
+> **The 4 token files now contain tokens only; `lint:token-purity` is zero-tolerance (baseline deleted).**
 > Execution log, findings that CORRECT this plan, and the remaining queue: **§10**.
 > ⚠ §1 counts and some §5/§9 claims are pre-execution estimates — several proved wrong; see §10.2.
 >
@@ -672,3 +673,49 @@ run in parallel from now).
 
 Remaining open design call: **D6 light code-bg** (`#ffffff` vs `#f6f8fa`) — blocks only the
 O2AIChat/OCodeBlock/TraceErrorTab syntax-theme PRs.
+
+---
+
+## 12. Execution log — W1.b–e complete (2026-07-16)
+
+**Token purity: 220 → 0. `component.css` 4,382 → 1,700 lines (tokens + @theme registrations only).
+`lint:token-purity` now runs in zero-tolerance mode (baseline file deleted — that IS the W1.e flip).**
+
+### 12.1 What went where
+
+| Family | Destination | Mode |
+|---|---|---|
+| F4 element typography/reset, F7 interaction affordances + destructive-icon chrome | `styles/base-elements.css` | verbatim (layer positions preserved) |
+| F3 `.o2-table*`, F5 app-shell helpers, F7 `.o-input-label*`, F6 AI buttons, F13 syntax guide, F17 misc, F8/F14/F10 + stragglers, navbar `[data-test]` dark token overrides | `styles/utilities.css` **unlayered-legacy section** | verbatim, file order preserved |
+| Dead rules — **51 total**: `.ai-floating-button*` ×4, `.ai-icon-button*` ×4, `.spitter-container`, `.syntax-guide-sub-title`, + **41 W1.d rules over 38 dead classes** (incl. `.logPage_bkcss`, `.badge-int64/-float64/-utf8/-bool`, `.tile-content-dark/-light`, `.schema-input-box*`, `.field-value-*`, `.load-more-*`, `.toolbar-toggle-*`) | **deleted** | full-corpus consumer check + dynamic-construction (R5) patterns first |
+| `.o-input-label` colors | new `--color-input-label-text(/-disabled)` tokens (exact old hex; dark #c4c4c4 kept as raw token value — no palette equivalent) | tokenised, dark twins collapsed |
+
+### 12.2 Why "unlayered legacy" instead of @utility / component extraction
+
+Moving a rule into the utilities layer flips who wins against co-occurring utilities (24 templates pair
+`card-container` with a `bg-*`; unlayered CSS beats layered). Scoping `.o2-table*` into OTable adds
+`[data-v]` specificity (risk R2). The legacy section in `utilities.css` imports after `dark.css` — which is
+token-only — so **the cascade is byte-identical** while the token layer is purified. Each helper then goes
+through the §3.1 ladder in W2 with per-surface visual checks. This trades one extra W2 step for zero
+visual risk in W1 — deliberate.
+
+### 12.3 Additional plan corrections
+
+1. **W1.d's "expect several dead classes" was a large understatement**: 38 of 119 remaining leading
+   class names (32%) had zero consumers — including the F10 flagship `.logPage_bkcss` itself.
+2. **§1.1's EmptyState consolidation premise is wrong**: the `.es-*` blocks are NOT copy-pasted
+   identical. Keyframe names are shared (`es-pulse` ×5, `es-twinkle` ×6…) but bodies DIFFER per
+   illustration, and 20 of 23 blocks were **unscoped** — the same global keyframe-collision bug as
+   `pulse` (§11.3.3), N times over: the last-loaded illustration hijacked the others' animations.
+   The right fix was not a wrapper component or shared stylesheet but **scoping all 20 blocks**
+   (done — W2.b.1): Vue rewrites scoped keyframe names per component, which ends the collisions with
+   zero markup changes. `es-static` gating is self-contained per illustration, so nothing else moved.
+3. §1.1 line drift: total style-block lines are now ~15,400 (the branch grew past the plan's 11,686).
+
+### 12.4 Verification
+
+`lint:token-purity` **zero-tolerance green** · `lint:tokens` green · stylelint 0 errors · type-check clean ·
+live probes in the running app for every family (F3 row heights, F4 body/h2/code typography, F5 card/border
+helpers, F6 AI gradient, F7 cursors + label colors light&dark, F13/F17 samples, F14 resizer, F10 sticky
+thead, shimmer keyframes, navbar dark override) — all value-identical; deleted dead classes verified
+unstyled · logs + EmptyState + alerts suites pass.

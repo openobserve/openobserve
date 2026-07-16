@@ -13,7 +13,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <div class="overview-tab flex flex-col gap-0 pt-[0.625rem] pr-[0.875rem] pb-[0.625rem] pl-[0.625rem] h-full overflow-y-auto text-text-heading">
+  <div class="flex flex-col gap-0 pt-[0.625rem] pr-[0.875rem] pb-[0.625rem] pl-[0.625rem] h-full overflow-y-auto text-text-heading">
     <!-- Header: refresh + time picker -->
     <div class="flex justify-end mb-4">
       <div class="flex items-center gap-2">
@@ -54,7 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           v-for="inc in incidents"
           :key="inc.id"
-          class="ov-alert-row ov-table-row flex items-center gap-3 py-[0.625rem] px-[0.875rem] bg-surface-base transition-[background] duration-150 hover:bg-table-row-hover-bg"
+          class="group flex items-center gap-3 py-[0.625rem] px-[0.875rem] bg-surface-base transition-[background] duration-150 hover:bg-table-row-hover-bg border-l-[0.1875em] border-b-[0.0625em] border-b-border-default last:border-b-0"
           :class="incidentRowClass(inc.severity)"
         >
           <span class="shrink-0 flex items-center" :class="incidentIconClass(inc.severity)">
@@ -84,7 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span class="text-xs text-text-muted">·</span>
             <span class="text-xs font-normal text-text-secondary">{{ inc.alert_count }} alerts</span>
           </div>
-          <span class="ov-investigate-hover shrink-0 whitespace-nowrap">
+          <span class="invisible group-hover:visible shrink-0 whitespace-nowrap">
             <OButton
               variant="ghost-primary"
               size="sm"
@@ -119,7 +119,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <path d="M15 18l-6-6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
           </svg>
         </button>
-        <div ref="svcGridRef" class="ov-service-grid flex flex-row gap-2 overflow-x-auto flex-1 [scrollbar-width:none]" @scroll="onSvcScroll">
+        <div ref="svcGridRef" class="flex flex-row gap-2 overflow-x-auto flex-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" @scroll="onSvcScroll">
         <div
           v-for="svc in services"
           :key="svc.id"
@@ -206,7 +206,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           v-for="item in anomalies"
           :key="item.id"
-          class="ov-alert-row flex items-center gap-3 py-[0.625rem] px-[0.875rem] rounded-md border border-[0.0625em] border-border-default bg-surface-base transition-[background] duration-150 hover:bg-table-row-hover-bg"
+          class="group flex items-center gap-3 py-[0.625rem] px-[0.875rem] rounded-md border border-[0.0625em] border-border-default bg-surface-base transition-[background] duration-150 hover:bg-table-row-hover-bg"
           :class="severityRowClass(item.severity)"
         >
           <span class="shrink-0 flex items-center" :class="severityIconClass(item.severity)">
@@ -221,7 +221,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span class="text-xs text-text-muted font-normal">{{ item.description }}</span>
             </div>
           </div>
-          <span class="ov-investigate-hover shrink-0 whitespace-nowrap">
+          <span class="invisible group-hover:visible shrink-0 whitespace-nowrap">
             <OButton
               variant="ghost-primary"
               size="sm"
@@ -247,7 +247,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           v-for="ev in recentEvents"
           :key="ev.id"
-          class="ov-event-row flex items-center gap-3 py-2 px-[0.875rem] border-b border-b-[0.0625em] border-b-border-default text-compact transition-[background] duration-150 hover:bg-table-row-hover-bg"
+          class="flex items-center gap-3 py-2 px-[0.875rem] border-b border-b-[0.0625em] border-b-border-default last:border-b-0 text-compact transition-[background] duration-150 hover:bg-table-row-hover-bg"
         >
           <OTag type="eventStatus" :value="ev.typeLabel" class="shrink-0" />
           <span class="font-medium text-text-heading whitespace-nowrap min-w-[7.5em] max-w-[12.5em] overflow-hidden text-ellipsis">{{ ev.service }}</span>
@@ -276,7 +276,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #description>{{ t('overview.allClearDesc') }}</template>
       <template #actions>
         <!-- View alerts -->
-        <button v-if="showAlertsCard" type="button" class="ov-action-card group relative flex items-center gap-3 flex-1 basis-56 min-w-0 max-w-72 min-h-16 py-[0.625rem] pr-[0.875rem] pl-3 rounded-xl border border-border-default bg-surface-base shadow-(--shadow-sm) text-left cursor-pointer transition-[color,background-color,border-color,box-shadow] duration-150 outline-none hover:shadow-(--shadow-md) hover:border-primary-400 hover:bg-tabs-hover-bg" data-test="overview-empty-alerts-card" @click="goToAlertList">
+        <button v-if="showAlertsCard" type="button" class="focus-visible:shadow-[0_0_0_0.125rem_color-mix(in_srgb,var(--color-primary-500)_40%,transparent)] group relative flex items-center gap-3 flex-1 basis-56 min-w-0 max-w-72 min-h-16 py-[0.625rem] pr-[0.875rem] pl-3 rounded-xl border border-border-default bg-surface-base shadow-(--shadow-sm) text-left cursor-pointer transition-[color,background-color,border-color,box-shadow] duration-150 outline-none hover:shadow-(--shadow-md) hover:border-primary-400 hover:bg-tabs-hover-bg" data-test="overview-empty-alerts-card" @click="goToAlertList">
           <span class="inline-flex items-center justify-center shrink-0 w-10 h-10 rounded-lg transition-[background-color,color] duration-150 bg-warning-50 text-warning-700 group-hover:bg-primary-600 group-hover:text-text-inverse">
             <OIcon name="notifications" size="md" />
           </span>
@@ -287,7 +287,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OIcon name="chevron-right" size="sm" class="shrink-0 text-text-disabled transition-[transform,color] duration-150 group-hover:translate-x-[0.125rem] group-hover:text-primary-600" />
         </button>
         <!-- Explore logs -->
-        <button v-if="showLogsCard" type="button" class="ov-action-card group relative flex items-center gap-3 flex-1 basis-56 min-w-0 max-w-72 min-h-16 py-[0.625rem] pr-[0.875rem] pl-3 rounded-xl border border-border-default bg-surface-base shadow-(--shadow-sm) text-left cursor-pointer transition-[color,background-color,border-color,box-shadow] duration-150 outline-none hover:shadow-(--shadow-md) hover:border-primary-400 hover:bg-tabs-hover-bg" data-test="overview-empty-logs-card" @click="goToLogs">
+        <button v-if="showLogsCard" type="button" class="focus-visible:shadow-[0_0_0_0.125rem_color-mix(in_srgb,var(--color-primary-500)_40%,transparent)] group relative flex items-center gap-3 flex-1 basis-56 min-w-0 max-w-72 min-h-16 py-[0.625rem] pr-[0.875rem] pl-3 rounded-xl border border-border-default bg-surface-base shadow-(--shadow-sm) text-left cursor-pointer transition-[color,background-color,border-color,box-shadow] duration-150 outline-none hover:shadow-(--shadow-md) hover:border-primary-400 hover:bg-tabs-hover-bg" data-test="overview-empty-logs-card" @click="goToLogs">
           <span class="inline-flex items-center justify-center shrink-0 w-10 h-10 rounded-lg transition-[background-color,color] duration-150 bg-status-info-bg text-status-info-text group-hover:bg-primary-600 group-hover:text-text-inverse">
             <OIcon name="search" size="md" />
           </span>
@@ -298,7 +298,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OIcon name="chevron-right" size="sm" class="shrink-0 text-text-disabled transition-[transform,color] duration-150 group-hover:translate-x-[0.125rem] group-hover:text-primary-600" />
         </button>
         <!-- Explore traces -->
-        <button v-if="showTracesCard" type="button" class="ov-action-card group relative flex items-center gap-3 flex-1 basis-56 min-w-0 max-w-72 min-h-16 py-[0.625rem] pr-[0.875rem] pl-3 rounded-xl border border-border-default bg-surface-base shadow-(--shadow-sm) text-left cursor-pointer transition-[color,background-color,border-color,box-shadow] duration-150 outline-none hover:shadow-(--shadow-md) hover:border-primary-400 hover:bg-tabs-hover-bg" data-test="overview-empty-traces-card" @click="goToTraces">
+        <button v-if="showTracesCard" type="button" class="focus-visible:shadow-[0_0_0_0.125rem_color-mix(in_srgb,var(--color-primary-500)_40%,transparent)] group relative flex items-center gap-3 flex-1 basis-56 min-w-0 max-w-72 min-h-16 py-[0.625rem] pr-[0.875rem] pl-3 rounded-xl border border-border-default bg-surface-base shadow-(--shadow-sm) text-left cursor-pointer transition-[color,background-color,border-color,box-shadow] duration-150 outline-none hover:shadow-(--shadow-md) hover:border-primary-400 hover:bg-tabs-hover-bg" data-test="overview-empty-traces-card" @click="goToTraces">
           <span class="inline-flex items-center justify-center shrink-0 w-10 h-10 rounded-lg transition-[background-color,color] duration-150 bg-status-info-bg text-status-info-text group-hover:bg-primary-600 group-hover:text-text-inverse">
             <OIcon name="account-tree" size="md" />
           </span>
@@ -903,45 +903,3 @@ watch(isIncidentsEnabled, (enabled) => {
   if (enabled && incidents.value.length === 0) loadIncidents();
 });
 </script>
-
-<style>
-/* Incidents table rows — !important overrides to beat the shared .ov-alert-row
-   base border/radius, plus :last-child border removal. Not cleanly inlineable. */
-.ov-table-row {
-  border-radius: 0 !important;
-  border-left-width: 0.1875em !important;
-  border-top: none !important;
-  border-right: none !important;
-  border-bottom: 0.0625em solid var(--color-border-default) !important;
-}
-.ov-table-row:last-child {
-  border-bottom: none !important;
-}
-
-/* Hover-only Investigate button — visible only when the parent row is hovered.
-   Descendant/combinator selector cannot be inlined. */
-.ov-investigate-hover {
-  visibility: hidden;
-}
-.ov-alert-row:hover .ov-investigate-hover {
-  visibility: visible;
-}
-
-/* Recent-events last row border removal — structural pseudo-class. */
-.ov-event-row:last-child {
-  border-bottom: none;
-}
-
-/* Empty-state action card focus ring — :focus-visible pseudo-class. */
-.ov-action-card:focus-visible {
-  box-shadow: 0 0 0 0.125rem color-mix(in srgb, var(--color-primary-500) 40%, transparent);
-}
-
-/* Hide the horizontal scrollbar on the services grid — pseudo-element. */
-.ov-service-grid::-webkit-scrollbar { display: none; }
-
-/* Overview scrollbar styling — pseudo-elements. */
-.overview-tab::-webkit-scrollbar { width: 0.375em; }
-.overview-tab::-webkit-scrollbar-track { background: transparent; }
-.overview-tab::-webkit-scrollbar-thumb { background: var(--color-border-default); border-radius: 0.1875em; }
-</style>

@@ -37,7 +37,7 @@
       <div class="grid grid-cols-3 max-[720px]:grid-cols-1 gap-3">
         <button
           type="button"
-          class="scorer-type-card relative flex flex-col items-start gap-2.5 min-h-45 py-4 px-4 pb-3.5 border border-(--color-dialog-header-border,var(--color-border-default)) rounded-lg bg-card-bg text-(--color-text-primary,currentColor) text-left cursor-pointer transition-[border-color,background,box-shadow] duration-[120ms]"
+          class="relative flex flex-col items-start gap-2.5 min-h-45 py-4 px-4 pb-3.5 border border-(--color-dialog-header-border,var(--color-border-default)) rounded-lg bg-card-bg text-(--color-text-primary,currentColor) text-left cursor-pointer transition-[border-color,background,box-shadow] duration-[120ms] hover:border-(--color-primary-600,#3F7994) hover:bg-[color-mix(in_srgb,var(--color-primary-600)_4%,var(--color-card-bg))] hover:shadow-[0_0_0_3px_color-mix(in_srgb,var(--color-primary-600)_12%,transparent)]"
           data-test="scorer-type-llm-judge"
           @click="$emit('select', 'llm_judge')"
         >
@@ -58,7 +58,7 @@
 
         <button
           type="button"
-          class="scorer-type-card relative flex flex-col items-start gap-2.5 min-h-45 py-4 px-4 pb-3.5 border border-(--color-dialog-header-border,var(--color-border-default)) rounded-lg bg-card-bg text-(--color-text-primary,currentColor) text-left cursor-pointer transition-[border-color,background,box-shadow] duration-[120ms]"
+          class="relative flex flex-col items-start gap-2.5 min-h-45 py-4 px-4 pb-3.5 border border-(--color-dialog-header-border,var(--color-border-default)) rounded-lg bg-card-bg text-(--color-text-primary,currentColor) text-left cursor-pointer transition-[border-color,background,box-shadow] duration-[120ms] hover:border-(--color-primary-600,#3F7994) hover:bg-[color-mix(in_srgb,var(--color-primary-600)_4%,var(--color-card-bg))] hover:shadow-[0_0_0_3px_color-mix(in_srgb,var(--color-primary-600)_12%,transparent)]"
           data-test="scorer-type-remote"
           @click="$emit('select', 'remote')"
         >
@@ -79,7 +79,7 @@
 
         <button
           type="button"
-          class="scorer-type-card scorer-type-card--disabled relative flex flex-col items-start gap-2.5 min-h-45 py-4 px-4 pb-3.5 border border-(--color-dialog-header-border,var(--color-border-default)) rounded-lg bg-card-bg text-(--color-text-primary,currentColor) text-left cursor-not-allowed opacity-60 transition-[border-color,background,box-shadow] duration-[120ms]"
+          class="relative flex flex-col items-start gap-2.5 min-h-45 py-4 px-4 pb-3.5 border border-(--color-dialog-header-border,var(--color-border-default)) rounded-lg bg-card-bg text-(--color-text-primary,currentColor) text-left cursor-not-allowed opacity-60 transition-[border-color,background,box-shadow] duration-[120ms]"
           data-test="scorer-type-code"
           disabled
         >
@@ -118,12 +118,10 @@ const { t } = useI18n();
 </script>
 
 <style>
-.scorer-type-card:hover:not(.scorer-type-card--disabled) {
-  border-color: var(--color-primary-600, #3F7994);
-  background: color-mix(in srgb, var(--color-primary-600) 4%, var(--color-card-bg));
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary-600) 12%, transparent);
-}
-
+/* keep(keyframes): not expressible as Tailwind utilities. Names are component-
+   prefixed and must stay global — they are referenced from arbitrary
+   `animate-[…]` utilities in the template, and Vue rewrites keyframe names
+   inside `scoped` blocks. */
 @keyframes scorer-type-scrim-in {
   from { opacity: 0; }
   to { opacity: 1; }

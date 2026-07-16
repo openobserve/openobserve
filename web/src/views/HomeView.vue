@@ -63,7 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <button
                 v-if="tab.id.startsWith('dash:')"
                 type="button"
-                class="home-tab-close ml-1"
+                class="ml-1 inline-flex items-center justify-center w-4 h-4 leading-none border-none bg-transparent rounded-sm cursor-pointer opacity-60 text-sm text-text-secondary transition-all duration-200 ease-[ease] hover:opacity-100 hover:bg-surface-subtle-hover hover:text-text-primary"
                 :data-test="`home-tab-close-${tab.id}`"
                 :aria-label="t('home.removeHomeDashboard')"
                 @mousedown.stop.prevent
@@ -383,29 +383,6 @@ export default defineComponent({
  */
 
 /* Home tab bar now uses the shared OTabs component (see template). */
-
-.home-tab-close {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 1rem;
-  height: 1rem;
-  line-height: 1;
-  border: none;
-  background: transparent;
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  opacity: 0.6;
-  font-size: var(--text-sm);
-  color: var(--color-text-secondary);
-  transition: all 0.2s ease;
-}
-
-.home-tab-close:hover {
-  opacity: 1;
-  background: var(--color-surface-subtle-hover);
-  color: var(--color-text-primary);
-}
 
 /* Chat fills remaining width and height */
 .home-ai-panel .chat-container {
