@@ -446,7 +446,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, computed, watch } from "vue";
+import { defineComponent, computed, watch, provide } from "vue";
 import OButton from '@/lib/core/Button/OButton.vue';
 import OToggleGroup from '@/lib/core/ToggleGroup/OToggleGroup.vue';
 import OToggleGroupItem from '@/lib/core/ToggleGroup/OToggleGroupItem.vue';
@@ -526,6 +526,10 @@ export default defineComponent({
   },
   setup(props, { emit }) {
     const alertForm = useAlertForm(props, emit);
+
+    // Share server SQL-validation squiggle ranges with the descendant query
+    // editors (QueryEditorDialog / QueryConfig) via inject.
+    provide("alertSqlErrorRanges", alertForm.sqlErrorRanges);
 
     const isAnomalyDetectionEnabled = computed(
       () => alertForm.store.state.zoConfig.anomaly_detection_enabled === true,

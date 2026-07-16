@@ -221,6 +221,10 @@ import AddSettingVariable from "../../../components/dashboards/settings/AddSetti
 import { useLoading } from "@/composables/useLoading";
 import { debounce, isEqual } from "lodash-es";
 import { provide, inject } from "vue";
+import {
+  rangesFromServerError,
+  type SqlErrorRange,
+} from "@/utils/query/sqlDiagnostics";
 import useNotifications from "@/composables/useNotifications";
 import config from "@/aws-exports";
 import useCancelQuery from "@/composables/dashboard/useCancelQuery";
@@ -276,6 +280,10 @@ export default defineComponent({
   },
   setup(props) {
     provide("dashboardPanelDataPageKey", "dashboard");
+
+    // Server-error highlight ranges shared with the descendant query editor.
+    const dashboardSqlErrorRanges = ref<SqlErrorRange[]>([]);
+    provide("dashboardSqlErrorRanges", dashboardSqlErrorRanges);
 
     // PanelEditor ref for accessing exposed methods/properties
     const panelEditorRef = ref<InstanceType<typeof PanelEditor> | null>(null);
@@ -1437,18 +1445,33 @@ export default defineComponent({
     const expandedSplitterHeight = ref(null);
 
     const handleChartApiError = (errorMsg: any) => {
-      if (typeof errorMsg === "string") {
-        errorMessage.value = errorMsg;
+      const errorText =
+        typeof errorMsg === "string" ? errorMsg : (errorMsg?.message ?? "");
+
+      if (errorText) {
+        errorMessage.value = errorText;
         const errorList = errorData.errors ?? [];
         errorList.splice(0);
-        errorList.push(errorMsg);
-      } else if (errorMsg?.message) {
-        errorMessage.value = errorMsg.message ?? "";
-        const errorList = errorData.errors ?? [];
-        errorList.splice(0);
-        errorList.push(errorMsg.message);
+        errorList.push(errorText);
       } else {
         errorMessage.value = "";
+      }
+
+      // Locate the offending token in the query and squiggle it in the editor
+      // (shares the central engine; message text carries the DataFusion detail).
+      if (!errorText) {
+        dashboardSqlErrorRanges.value = [];
+      } else {
+        const idx = dashboardPanelData.layout.currentQueryIndex;
+        const currentQuery = dashboardPanelData.data.queries?.[idx];
+        rangesFromServerError({
+          message: errorText,
+          sqlMode: dashboardPanelData.data.queryType === "sql",
+          query: currentQuery?.query,
+          streamName: currentQuery?.fields?.stream,
+        }).then((ranges) => {
+          dashboardSqlErrorRanges.value = ranges;
+        });
       }
     };
 

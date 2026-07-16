@@ -130,7 +130,12 @@ import {
   watch,
   type Ref,
   onActivated,
+  provide,
 } from "vue";
+import {
+  rangesFromServerError,
+  type SqlErrorRange,
+} from "@/utils/query/sqlDiagnostics";
 import { useI18n } from "vue-i18n";
 import { getTimezoneOffset, getUUID } from "@/utils/zincutils";
 import { useStore } from "vuex";
@@ -363,6 +368,11 @@ const form = useOForm<QueryForm>({
 // helper mutations below go through the form. Kept as `streamRoute` to preserve
 // the established read surface.
 const streamRoute = form.useStore((s: any) => s.values as StreamRoute);
+
+// Server-error highlight ranges for the SQL editor. Provided here (parent) and
+// injected by the descendant ScheduledPipeline where the editor + composable live.
+const sqlErrorRanges = ref<SqlErrorRange[]>([]);
+provide("pipelineSqlErrorRanges", sqlErrorRanges);
 
 const originalStreamRouting: Ref<StreamRoute> = ref(
   JSON.parse(JSON.stringify(getDefaultStreamRoute())),
@@ -626,6 +636,7 @@ const validateSqlQuery = async () => {
       .then((res: any) => {
         isValidSqlQuery.value = true;
         validatingSqlQuery.value = false;
+        sqlErrorRanges.value = [];
         resolve("");
       })
       .catch((err: any) => {
@@ -639,6 +650,19 @@ const validateSqlQuery = async () => {
             variant: "error",
             message: `${message}`,
           });
+
+          // Locate the offending token in the SQL and squiggle it in the editor.
+          rangesFromServerError({
+            code: err?.response?.data?.code,
+            message: err?.response?.data?.message,
+            errorDetail: err?.response?.data?.error_detail,
+            sqlMode: true,
+            query: streamRoute.value.query_condition.sql,
+            streamName: streamRoute.value.name as string,
+          }).then((ranges) => {
+            sqlErrorRanges.value = ranges;
+          });
+
           reject(message);
         } else {
           isValidSqlQuery.value = true;

@@ -1060,6 +1060,7 @@ import { useQueryPlaceholder } from "@/components/logs/useQueryPlaceholder";
 import { debounce } from "lodash-es";
 import useSqlSuggestions from "@/composables/useSuggestions";
 import { useSqlEditorDiagnostics } from "@/composables/useSqlEditorDiagnostics";
+import { type SqlErrorRange } from "@/utils/query/sqlDiagnostics";
 import { createPipelinesContextProvider } from "@/composables/contextProviders/pipelinesContextProvider";
 import { contextRegistry } from "@/composables/contextProviders";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
@@ -1273,11 +1274,19 @@ const functionEditorPlaceholderFlag = ref(true);
 const queryEditorPlaceholderFlag = ref(true);
 const pipelineEditorRef: any = ref(null);
 
+// Server-error highlight ranges, provided by the parent Query.vue where the
+// SQL validation runs. The composable forwards these to the editor.
+const sqlErrorRanges = inject<Ref<SqlErrorRange[]>>(
+  "pipelineSqlErrorRanges",
+  ref<SqlErrorRange[]>([]),
+);
+
 const { onFocus: _sqlOnFocus, onBlur: _sqlOnBlur, onQueryChange: _sqlOnQueryChange } =
   useSqlEditorDiagnostics({
     queryEditorRef: pipelineEditorRef,
     sqlMode: computed(() => tab.value === "sql"),
     query: computed(() => query.value ?? ""),
+    externalErrors: sqlErrorRanges,
   });
 const expandedLogs = ref<any[]>([]);
 const cursorPosition = ref(-1);

@@ -876,7 +876,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, computed, type PropType, defineAsyncComponent, nextTick, watch } from "vue";
+import { defineComponent, ref, computed, type PropType, defineAsyncComponent, nextTick, watch, inject, type Ref } from "vue";
+import { type SqlErrorRange } from "@/utils/query/sqlDiagnostics";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { b64EncodeUnicode, getUUID, convertMinutesToCron, getCronIntervalDifferenceInSeconds, isAboveMinRefreshInterval, describeCron, getImageURL } from "@/utils/zincutils";
@@ -1036,12 +1037,19 @@ export default defineComponent({
     const filtersSectionRef = ref<HTMLElement | null>(null);
     const inlineQueryEditorRef = ref<any>(null);
 
+    // Server SQL-validation squiggle ranges, provided by AddAlert.vue.
+    const alertSqlErrorRanges = inject<Ref<SqlErrorRange[]>>(
+      "alertSqlErrorRanges",
+      ref<SqlErrorRange[]>([]),
+    );
+
     const { onFocus: _sqlOnFocus, onBlur: _sqlOnBlur, onQueryChange: _sqlOnQueryChange } =
       useSqlEditorDiagnostics({
         queryEditorRef: inlineQueryEditorRef,
         sqlMode: computed(() => localTab.value === 'sql'),
         query: computed(() => localSqlQuery.value ?? ""),
         streamName: computed(() => props.streamName),
+        externalErrors: alertSqlErrorRanges,
       });
 
     const onQueryEditorFocus = () => {

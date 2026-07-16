@@ -277,6 +277,10 @@ import { useSqlEditorDiagnostics } from "@/composables/useSqlEditorDiagnostics";
 import { useQueryPlaceholder } from "@/components/logs/useQueryPlaceholder";
 import { debounce } from "lodash-es";
 import useQuery from "@/composables/useQuery";
+import {
+  rangesFromServerError,
+  type SqlErrorRange,
+} from "@/utils/query/sqlDiagnostics";
 import { b64EncodeUnicode, getImageURL } from "@/utils/zincutils";
 import searchService from "@/services/search";
 import { useStore } from "vuex";
@@ -339,11 +343,15 @@ const eventsErrorMsg = ref<string>("");
 
 const queryEditorRef = ref<InstanceType<typeof QueryEditor>>();
 
+// Server-error highlight ranges, forwarded to the SQL editor by the composable.
+const sqlErrorRanges = ref<SqlErrorRange[]>([]);
+
 const { onFocus: _sqlOnFocus, onBlur: _sqlOnBlur, onQueryChange: _sqlOnQueryChange } =
   useSqlEditorDiagnostics({
     queryEditorRef,
     sqlMode: computed(() => true),
     query: inputQuery,
+    externalErrors: sqlErrorRanges,
   });
 
 const onQueryEditorFocus = () => {
@@ -607,11 +615,24 @@ const getResults = async () => {
         2,
       );
       sqlQueryErrorMsg.value = "";
+      sqlErrorRanges.value = [];
     })
     .catch((err: any) => {
       sqlQueryErrorMsg.value = err.response?.data?.message
         ? err.response?.data?.message
         : "Invalid SQL Query";
+
+      // Locate the offending token in the SQL and squiggle it in the editor.
+      rangesFromServerError({
+        code: err.response?.data?.code,
+        message: err.response?.data?.message,
+        errorDetail: err.response?.data?.error_detail,
+        sqlMode: true,
+        query: inputQuery.value,
+        streamName: selectedStream.value?.name,
+      }).then((ranges) => {
+        sqlErrorRanges.value = ranges;
+      });
 
       // Show error only if it is not real time alert
       // This case happens when user enters invalid query and then switches to real time alert

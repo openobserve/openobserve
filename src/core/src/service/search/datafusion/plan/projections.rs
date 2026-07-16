@@ -27,9 +27,8 @@ use datafusion::{
 use hashbrown::HashSet;
 
 use crate::service::search::{
-    cache::cacher::handle_histogram,
-    cluster::flight::{SearchContextBuilder, register_table},
-    sql::Sql,
+    datafusion::context::{SearchContextBuilder, register_table},
+    sql::{Sql, histogram::handle_histogram},
 };
 
 /// Structure to store the result schema info

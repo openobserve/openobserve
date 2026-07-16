@@ -406,6 +406,7 @@ import {
   onBeforeUnmount,
   onActivated,
   computed,
+  toRef,
 } from "vue";
 import { useQueryPlaceholder } from "@/components/logs/useQueryPlaceholder";
 import { useI18n } from "vue-i18n";
@@ -511,6 +512,7 @@ export default defineComponent({
         sqlMode: computed(() => searchObj.meta.sqlMode),
         query: computed(() => searchObj.data.editorValue ?? ""),
         streamName: computed(() => searchObj.data.stream.selectedStream?.value),
+        externalErrors: toRef(searchObj.data, "sqlSyntaxErrorRanges"),
       });
 
     const onQueryEditorFocus = () => {

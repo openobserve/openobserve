@@ -1093,9 +1093,12 @@ export default defineComponent({
         const startLine = range.startLine;
         const endLine = range.endLine;
         const startCol = range.column ?? 1;
-        // Highlight to end-of-line so the squiggle is visible
+        // Prefer an explicit end column (wraps a single token — e.g. an unknown
+        // field name). Otherwise highlight to end-of-line so a syntax-error
+        // squiggle near the cursor stays visible.
         const lineContent = model?.getLineContent?.(endLine) ?? "";
-        const endCol = lineContent.length + 1 || startCol + 1;
+        const endCol =
+          range.endColumn ?? (lineContent.length + 1 || startCol + 1);
         return {
           severity: monaco.MarkerSeverity.Error,
           startLineNumber: startLine,

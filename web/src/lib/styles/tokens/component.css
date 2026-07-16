@@ -3872,12 +3872,14 @@ button.date-time-button {
   opacity: 1;
 }
 
-.container {
+/* Namespaced: a bare `.container` collides with Tailwind's built-in container
+   utility, which adds viewport-keyed max-width caps and clips wide tables. */
+.o2-scroll-container {
   overflow: auto;
   border-radius: 0.5rem;
 }
 
-.container.virtual-scroll-active {
+.o2-scroll-container.virtual-scroll-active {
   will-change: scroll-position;
 }
 

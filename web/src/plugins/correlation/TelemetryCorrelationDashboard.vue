@@ -2101,6 +2101,18 @@ const regenerateGroupDashboards = (config: MetricsCorrelationConfig) => {
   }
 };
 
+/**
+ * Drop every rendered metric chart (both the flat and per-group dashboards).
+ * Used when the selection empties out, so the "no metrics" empty state shows
+ * instead of the previous selection's charts.
+ */
+const clearMetricDashboards = () => {
+  dashboardData.value = null;
+  dashboardRenderKey.value++;
+  groupedDashboardData.value = {};
+  groupedDashboardRenderKey.value++;
+};
+
 // Select all metrics in a group (adds any that aren't already selected)
 const selectAllInGroup = (groupId: string) => {
   const groupStreams = groupedFilteredMetricStreams.value.byGroup[groupId];
@@ -2378,7 +2390,8 @@ const loadDashboard = async () => {
       dashboardRenderKey.value++;
       regenerateGroupDashboards(config);
     } else {
-      // console.log("[TelemetryCorrelationDashboard] No metric streams selected, skipping metrics dashboard");
+      // Nothing selected: clear rather than leave the previous charts standing.
+      clearMetricDashboards();
     }
 
     // Generate logs dashboard JSON
@@ -3225,6 +3238,15 @@ watch(
       // Check actual current state when timeout fires (not captured values)
       const currentStreams = selectedMetricStreams.value;
       const currentPanels = dashboardData.value?.tabs?.[0]?.panels || [];
+
+      // Every metric deselected: drop the charts so the empty state shows.
+      // The reload paths below are all gated on a non-empty selection, so
+      // without this the last-deselected metric's chart would linger.
+      if (currentStreams.length === 0) {
+        clearMetricDashboards();
+        suppressNextStreamReload = false;
+        return;
+      }
 
       // Get current panel stream names
       const currentPanelStreamNames = new Set(

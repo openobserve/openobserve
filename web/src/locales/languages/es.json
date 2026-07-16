@@ -4275,7 +4275,26 @@
       "logsWithCount": "Logs ({count})",
       "tracesWithCount": "Trazas ({count})",
       "metricsWithCount": "Métricas ({count})"
-    }
+    },
+    "dangerZone": "Zona de peligro",
+    "deleteOrganization": "Eliminar organización",
+    "deleteOrganizationTitle": "Eliminar esta organización",
+    "deleteOrganizationDescription": "Programa {name} para su eliminación. Dejará de ser accesible para todos —incluido usted— de inmediato y se borrará de forma permanente al finalizar el período de gracia. Para restaurarla antes es necesario contactar con soporte.",
+    "deleteOrganizationScopeLoading": "Comprobando el contenido de esta organización…",
+    "deleteOrganizationScope": "{dashboards} paneles · {streams} streams · {size} de datos",
+    "deleteFactGracePeriod": "Período de gracia",
+    "deleteFactGracePeriodDetail": "Soporte puede restaurarla hasta el borrado",
+    "deleteFactEverything": "Elimina todo",
+    "deleteFactEverythingDetail": "Todos los paneles, streams y datos ingeridos",
+    "deleteFactMembers": "Afecta a {n} miembro | Afecta a {n} miembros",
+    "deleteFactMembersDetail": "Se revoca todo el acceso de inmediato",
+    "deleteFactOwner": "Solo administradores",
+    "deleteFactOwnerDetail": "Requiere el rol de administrador en esta organización",
+    "deleteOrganizationConfirm": "Esto programará la eliminación de \"{name}\" y de todos sus streams, paneles, alertas, pipelines, usuarios y configuraciones.",
+    "deleteOrganizationWarning": "La organización deja de estar disponible de inmediato y se oculta a todas las personas que la usan. Se bloquea la ingesta y se detienen las alertas, pipelines e informes programados, por lo que no se envía ninguna notificación mientras esté programada para su eliminación.",
+    "deleteOrganizationRecoverable": "Se mantiene en estado recuperable durante el período de gracia, pero usted no podrá restaurarla: perderá el acceso a esta organización en cuanto comience la eliminación y solo el soporte de OpenObserve puede recuperarla. Tras el período de gracia, sus datos se eliminan de forma permanente y nadie puede recuperarlos.",
+    "deleteOrganizationTypeToConfirm": "Para confirmar, escriba {name} a continuación:",
+    "deleteOrganizationInitiated": "Organización programada para su eliminación. Ahora está oculta; contacte con soporte para restaurarla antes de que finalice el período de gracia."
   },
   "reports": {
     "header": "Informes",

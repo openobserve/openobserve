@@ -26,10 +26,9 @@ use datafusion::{
     logical_expr::{ColumnarValue, ScalarUDF, Volatility},
     prelude::create_udf,
 };
+use openobserve_vrl::{QUERY_FUNCTIONS, compile_vrl_function};
 use vector_enrichment::TableRegistry;
 use vrl::compiler::{TargetValueRef, VrlRuntime, runtime::Runtime};
-
-use crate::{common::infra::config::QUERY_FUNCTIONS, service::ingestion::compile_vrl_function};
 
 type FnType = Arc<dyn Fn(&[ColumnarValue]) -> Result<ColumnarValue> + Sync + Send>;
 
@@ -49,13 +48,11 @@ fn create_user_df(fn_name: &str, num_args: u8, pow_scalar: FnType) -> ScalarUDF 
 
 pub fn get_all_transform(org_id: &str) -> Result<Vec<ScalarUDF>> {
     let mut udf_list = Vec::new();
-    for transform in QUERY_FUNCTIONS.clone().iter() {
-        let key = transform.key();
-        // do not register ingest_time transforms
-        if key.contains(org_id) {
+    for transform in QUERY_FUNCTIONS.iter() {
+        if transform.key().contains(org_id) {
             udf_list.push(get_udf_vrl(
-                transform.name.to_owned(),
-                transform.function.to_owned().as_str(),
+                transform.name.clone(),
+                transform.function.as_str(),
                 &transform.params,
                 transform.num_args,
                 org_id,
@@ -67,12 +64,12 @@ pub fn get_all_transform(org_id: &str) -> Result<Vec<ScalarUDF>> {
 
 fn get_udf_vrl(
     fn_name: String,
-    func: &str,
+    source: &str,
     params: &str,
     num_args: u8,
     org_id: &str,
 ) -> Result<ScalarUDF> {
-    let local_func = func.trim().to_owned();
+    let local_func = source.trim().to_owned();
     let local_fn_params = params.to_owned();
     let local_org_id = org_id.to_owned();
 
@@ -81,7 +78,7 @@ fn get_udf_vrl(
         let len = args[0].len();
         let in_params = local_fn_params.split(',').collect::<Vec<&str>>();
         let mut res_data_vec = vec![];
-        let mut runtime = crate::common::utils::functions::init_vrl_runtime();
+        let mut runtime = Runtime::new(vrl::prelude::state::RuntimeState::default());
 
         for i in 0..len {
             let mut obj_str = String::from("");
@@ -95,10 +92,10 @@ fn get_udf_vrl(
             }
             obj_str.push_str(&format!(" \n {}", local_func));
             match compile_vrl_function(&obj_str, &local_org_id) {
-                Ok(res) => {
-                    let registry = res.config.get_custom::<TableRegistry>().unwrap();
+                Ok(result) => {
+                    let registry = result.config.get_custom::<TableRegistry>().unwrap();
                     registry.finish_load();
-                    let result = apply_vrl_fn(&mut runtime, res.program);
+                    let result = apply_vrl_fn(&mut runtime, result.program);
                     if result != json::Value::Null {
                         res_data_vec.insert(i, json::get_string_value(&result));
                     } else {
