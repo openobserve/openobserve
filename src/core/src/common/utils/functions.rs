@@ -42,11 +42,8 @@ pub fn init_vrl_runtime() -> vrl::compiler::runtime::Runtime {
     vrl::compiler::runtime::Runtime::new(vrl::prelude::state::RuntimeState::default())
 }
 
-pub fn get_vrl_compiler_config(org_id: &str) -> VRLCompilerConfig {
+pub fn get_enrichment_tables(org_id: &str) -> HashMap<String, Box<dyn Table + Send + Sync>> {
     let en_tables = ENRICHMENT_TABLES.clone();
-    let mut functions = vrl::stdlib::all();
-    functions.append(&mut vector_enrichment::vrl_functions());
-    let registry = TableRegistry::default();
     let mut tables: HashMap<String, Box<dyn Table + Send + Sync>> = HashMap::new();
 
     for table in en_tables.iter() {
@@ -82,7 +79,14 @@ pub fn get_vrl_compiler_config(org_id: &str) -> VRLCompilerConfig {
         }
     };
 
-    registry.load(tables);
+    tables
+}
+
+pub fn get_vrl_compiler_config(org_id: &str) -> VRLCompilerConfig {
+    let mut functions = vrl::stdlib::all();
+    functions.append(&mut vector_enrichment::vrl_functions());
+    let registry = TableRegistry::default();
+    registry.load(get_enrichment_tables(org_id));
     let mut config = vrl::compiler::CompileConfig::default();
     config.set_custom(registry);
     VRLCompilerConfig { config, functions }

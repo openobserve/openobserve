@@ -53,6 +53,7 @@ use crate::service::{
             optimizer::physical_optimizer::remote_scan::wrap_partial_reduce_for_aggregate,
         },
         inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
+        prepare_query_transforms,
         work_group::DeferredLock,
     },
 };
@@ -88,7 +89,7 @@ pub async fn search(
         .await?;
 
     // register udf
-    register_udf(&ctx, &req.org_id)?;
+    register_udf(&ctx, prepare_query_transforms(&req.org_id))?;
     datafusion_functions_json::register_all(&mut ctx)?;
 
     // Decode physical plan from bytes

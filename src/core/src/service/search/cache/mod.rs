@@ -568,7 +568,11 @@ pub async fn prepare_cache_response(
             } else {
                 sql.time_range
             };
-        cacher::handle_histogram(&mut origin_sql, q_time_range, req.query.histogram_interval);
+        crate::service::search::sql::histogram::handle_histogram(
+            &mut origin_sql,
+            q_time_range,
+            req.query.histogram_interval,
+        );
     }
 
     // calculate hash for the query with version (after normalizing histogram interval)
@@ -1223,9 +1227,13 @@ pub async fn apply_regex_to_response(
             }
         };
 
+    let query_context = crate::service::search::datafusion::context::QueryExecutionContext::new(
+        crate::service::search::prepare_query_transforms(org_id),
+    );
     let projections: std::collections::HashMap<String, Vec<ProjectionColumnMapping>> =
         crate::service::search::datafusion::plan::regex_projections::get_columns_from_projections(
             sql,
+            &query_context,
         )
         .await?;
     if projections.is_empty() {

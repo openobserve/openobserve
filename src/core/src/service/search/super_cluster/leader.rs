@@ -44,12 +44,15 @@ use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 use crate::service::search::{
     SEARCH_SERVER, SearchResult,
-    cluster::flight::{SearchContextBuilder, register_table},
-    datafusion::optimizer::{
-        context::{PhysicalOptimizerContext, RemoteScanContext, StreamingAggregationContext},
-        create_physical_plan,
+    datafusion::{
+        context::{QueryExecutionContext, SearchContextBuilder, register_table},
+        optimizer::{
+            context::{PhysicalOptimizerContext, RemoteScanContext, StreamingAggregationContext},
+            create_physical_plan,
+        },
     },
     inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
+    prepare_query_transforms,
     sql::Sql,
     utils::{AsyncDefer, ScanStatsVisitor, check_query_default_limit_exceeded},
 };
@@ -230,6 +233,7 @@ async fn run_datafusion(
 
     // construct physical plan
     let is_complete_cache_hit = Arc::new(Mutex::new(false));
+    let query_context = QueryExecutionContext::new(prepare_query_transforms(&req.org_id));
     let ctx = SearchContextBuilder::new()
         .target_partitions(cfg.limit.cpu_num)
         .add_context(PhysicalOptimizerContext::RemoteScan(RemoteScanContext {
@@ -242,7 +246,7 @@ async fn run_datafusion(
             StreamingAggregationContext::new(&req, is_complete_cache_hit.clone()).await?,
         ))
         .add_context(PhysicalOptimizerContext::AggregateTopk)
-        .build(&req, &sql)
+        .build(&req, &sql, &query_context)
         .await?;
 
     // register table

@@ -22,6 +22,10 @@ mod warm;
 
 use std::{ops::Bound, sync::Arc};
 
+use ::search::{
+    file_cache::{cache_files, calc_target_partitions},
+    types::QueryParams,
+};
 use arrow::{
     buffer::{BooleanBuffer, MutableBuffer},
     util::bit_util,
@@ -62,7 +66,6 @@ use self::{
     warm::WarmPlan,
 };
 use crate::service::search::{
-    grpc::{QueryParams, calc_target_partitions, storage::cache_files},
     index::IndexCondition,
     inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
 };

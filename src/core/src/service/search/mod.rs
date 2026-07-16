@@ -54,8 +54,12 @@ use {
 
 use super::self_reporting::report_request_usage_stats;
 use crate::{
-    common::utils::functions::{get_all_transform_keys, init_vrl_runtime},
+    common::{
+        infra::config::QUERY_FUNCTIONS,
+        utils::functions::{get_all_transform_keys, get_enrichment_tables, init_vrl_runtime},
+    },
     service::search::{
+        datafusion::udf::transform_udf::{EnrichmentTable, PreparedQueryTransform},
         inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
         partition::{
             cpu_cores::estimated_secs, generate_partitions, settings::calculate_partition_settings,
@@ -86,6 +90,35 @@ pub mod utils;
 pub mod work_group;
 
 pub use searcher::Searcher;
+
+pub fn prepare_query_transforms(org_id: &str) -> Vec<PreparedQueryTransform> {
+    let transforms = QUERY_FUNCTIONS
+        .clone()
+        .iter()
+        .filter(|transform| transform.key().contains(org_id))
+        .map(|transform| {
+            (
+                transform.name.clone(),
+                transform.function.clone(),
+                transform.params.clone(),
+                transform.num_args,
+            )
+        })
+        .collect::<Vec<_>>();
+    if transforms.is_empty() {
+        return Vec::new();
+    }
+
+    let enrichment_tables: Arc<Vec<EnrichmentTable>> =
+        Arc::new(get_enrichment_tables(org_id).into_iter().collect());
+
+    transforms
+        .into_iter()
+        .map(|(name, source, params, num_args)| {
+            PreparedQueryTransform::new(name, source, params, num_args, enrichment_tables.clone())
+        })
+        .collect()
+}
 
 /// The result of search in cluster
 /// data, scan_stats, wait_in_queue, is_partial, partial_err

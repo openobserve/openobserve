@@ -27,9 +27,8 @@ use datafusion::{
 use hashbrown::HashSet;
 
 use crate::service::search::{
-    cache::cacher::handle_histogram,
-    cluster::flight::{SearchContextBuilder, register_table},
-    sql::Sql,
+    datafusion::context::{QueryExecutionContext, SearchContextBuilder, register_table},
+    sql::{Sql, histogram::handle_histogram},
 };
 
 /// Structure to store the result schema info
@@ -546,6 +545,7 @@ pub async fn get_result_schema(
     mut sql: Sql,
     is_streaming: bool,
     use_cache: bool,
+    query_context: &QueryExecutionContext,
 ) -> Result<ResultSchemaExtractor, anyhow::Error> {
     if !is_streaming
         && use_cache
@@ -556,7 +556,7 @@ pub async fn get_result_schema(
 
     let sql_arc = Arc::new(sql.clone());
     let ctx = SearchContextBuilder::new()
-        .build(&Request::default(), &sql_arc)
+        .build(&Request::default(), &sql_arc, query_context)
         .await?;
     register_table(&ctx, &sql_arc).await?;
     let plan = ctx.state().create_logical_plan(&sql_arc.sql).await?;
@@ -599,6 +599,20 @@ mod tests {
     use proto::cluster_rpc::SearchQuery;
 
     use super::*;
+
+    async fn get_result_schema(
+        sql: Sql,
+        is_streaming: bool,
+        use_cache: bool,
+    ) -> Result<ResultSchemaExtractor, anyhow::Error> {
+        super::get_result_schema(
+            sql,
+            is_streaming,
+            use_cache,
+            &QueryExecutionContext::default(),
+        )
+        .await
+    }
 
     #[test]
     fn test_operator_to_string_comparison_ops() {

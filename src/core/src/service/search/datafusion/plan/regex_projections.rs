@@ -19,16 +19,17 @@ use config::{datafusion::request::Request, meta::projections::ProjectionColumnMa
 use datafusion::common::tree_node::TreeNode;
 
 use crate::service::search::{
-    cluster::flight::{SearchContextBuilder, register_table},
+    datafusion::context::{QueryExecutionContext, SearchContextBuilder, register_table},
     sql::Sql,
 };
 
 pub async fn get_columns_from_projections(
     sql: Sql,
+    query_context: &QueryExecutionContext,
 ) -> Result<HashMap<String, Vec<ProjectionColumnMapping>>, anyhow::Error> {
     let sql_arc = Arc::new(sql.clone());
     let ctx = SearchContextBuilder::new()
-        .build(&Request::default(), &sql_arc)
+        .build(&Request::default(), &sql_arc, query_context)
         .await?;
     register_table(&ctx, &sql_arc).await?;
     let plan = ctx.state().create_logical_plan(&sql_arc.sql).await?;
@@ -47,6 +48,12 @@ mod tests {
     use proto::cluster_rpc::SearchQuery;
 
     use super::*;
+
+    async fn get_columns_from_projections(
+        sql: Sql,
+    ) -> Result<HashMap<String, Vec<ProjectionColumnMapping>>, anyhow::Error> {
+        super::get_columns_from_projections(sql, &QueryExecutionContext::default()).await
+    }
 
     fn get_fields_default() -> Vec<Field> {
         vec![

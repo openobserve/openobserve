@@ -26,6 +26,8 @@ use infra::cache::{
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::search::cache::streaming_agg::STREAMING_AGGS_CACHE_DIR;
 
+#[cfg(test)]
+use crate::service::search::sql::histogram::handle_histogram;
 use crate::{
     common::meta::search::{
         CacheQueryRequest, CachedQueryResponse, QueryDelta, ResultCacheSelectionStrategy,
@@ -35,7 +37,7 @@ use crate::{
             MultiCachedQueryResponse,
             result_utils::{get_ts_value, has_non_timestamp_ordering, is_timestamp_field},
         },
-        sql::{RE_HISTOGRAM, Sql, visitor::histogram_interval::generate_histogram_interval},
+        sql::Sql,
     },
 };
 
@@ -905,46 +907,6 @@ pub async fn delete_cache(
         r.remove(&query_key);
     }
     Ok(true)
-}
-
-pub fn handle_histogram(
-    origin_sql: &mut String,
-    q_time_range: (i64, i64),
-    histogram_interval: i64,
-) {
-    let caps = if let Some(caps) = RE_HISTOGRAM.captures(origin_sql.as_str()) {
-        caps
-    } else {
-        return;
-    };
-
-    // 0th capture is the whole histogram(...) ,
-    // 1st capture is the comma-delimited list of args
-    // ideally there should be at least one arg, otherwise df with anyways complain,
-    // so we we return from here if capture[1] is None
-    let args = match caps.get(1) {
-        Some(v) => v
-            .as_str()
-            .split(',')
-            .map(|v| v.trim().trim_matches(|v| v == '\'' || v == '"'))
-            .collect::<Vec<&str>>(),
-        None => return,
-    };
-
-    let interval = if histogram_interval > 0 {
-        format!("{histogram_interval} second")
-    } else {
-        args.get(1)
-            .map_or_else(|| generate_histogram_interval(q_time_range), |v| *v)
-            .to_string()
-    };
-
-    let field = args.first().unwrap_or(&"_timestamp");
-
-    *origin_sql = origin_sql.replace(
-        caps.get(0).unwrap().as_str(),
-        &format!("histogram({field},'{interval}')"),
-    );
 }
 
 fn calculate_deltas_multi(

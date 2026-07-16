@@ -15,6 +15,7 @@
 
 use std::sync::Arc;
 
+use ::search::types::QueryParams;
 use config::meta::{inverted_index::IndexOptimizeMode, stream::FileKey};
 use datafusion::{
     arrow::datatypes::SchemaRef,
@@ -32,8 +33,7 @@ use datafusion::{
 use o2_enterprise::enterprise::search::datafusion::distributed_plan::metadata_count_exec::MetadataCountExec;
 
 use crate::service::search::{
-    datafusion::plan::tantivy_optimize_exec::TantivyOptimizeExec, grpc::QueryParams,
-    index::IndexCondition,
+    datafusion::plan::tantivy_optimize_exec::TantivyOptimizeExec, index::IndexCondition,
 };
 
 pub fn aggregate_optimize_rewrite(

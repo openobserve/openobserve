@@ -30,9 +30,7 @@ use config::{
     metrics,
     utils::{json, time::now_micros, took_watcher::TookWatcher},
 };
-use datafusion::{
-    common::TableReference, physical_plan::visit_execution_plan, prelude::SessionContext,
-};
+use datafusion::{common::TableReference, physical_plan::visit_execution_plan};
 use hashbrown::{HashMap, HashSet};
 use infra::{
     cluster,
@@ -56,18 +54,17 @@ use crate::service::{
     search::{
         SearchResult,
         datafusion::{
-            exec::{DataFusionContextBuilder, register_udf},
+            context::{QueryExecutionContext, SearchContextBuilder, register_table},
             optimizer::{
                 context::{
                     PhysicalOptimizerContext, RemoteScanContext, StreamingAggregationContext,
                 },
-                create_physical_plan, generate_analyzer_rules, generate_optimizer_rules,
-                generate_physical_optimizer_rules,
+                create_physical_plan,
             },
             plan_metrics::get_peak_memory_from_ctx,
-            table_provider::{catalog::StreamTypeProvider, empty_table::NewEmptyTable},
         },
         inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
+        prepare_query_transforms,
         sql::Sql,
         utils::{ScanStatsVisitor, check_query_default_limit_exceeded},
     },
@@ -387,6 +384,7 @@ pub async fn run_datafusion(
     let cfg = get_config();
 
     let is_complete_cache_hit = Arc::new(Mutex::new(false));
+    let query_context = QueryExecutionContext::new(prepare_query_transforms(&req.org_id));
     let ctx = SearchContextBuilder::new()
         .target_partitions(cfg.limit.cpu_num)
         .add_context(PhysicalOptimizerContext::RemoteScan(RemoteScanContext {
@@ -399,7 +397,7 @@ pub async fn run_datafusion(
             StreamingAggregationContext::new(&req, is_complete_cache_hit.clone()).await?,
         ))
         .add_context(PhysicalOptimizerContext::AggregateTopk)
-        .build(&req, &sql)
+        .build(&req, &sql, &query_context)
         .await?;
 
     log::info!(
@@ -662,93 +660,6 @@ pub async fn partition_file_by_hash(
         partitions[idx].push(fk.id);
     }
     partitions
-}
-
-pub struct SearchContextBuilder {
-    pub target_partitions: usize,
-    pub contexts: Vec<PhysicalOptimizerContext>,
-}
-
-impl Default for SearchContextBuilder {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl SearchContextBuilder {
-    pub fn new() -> Self {
-        Self {
-            target_partitions: 0,
-            contexts: vec![],
-        }
-    }
-
-    pub fn target_partitions(mut self, target_partitions: usize) -> Self {
-        self.target_partitions = target_partitions;
-        self
-    }
-
-    pub fn add_context(mut self, context: PhysicalOptimizerContext) -> Self {
-        self.contexts.push(context);
-        self
-    }
-
-    pub async fn build(self, req: &Request, sql: &Arc<Sql>) -> Result<SessionContext> {
-        let analyzer_rules = generate_analyzer_rules(sql);
-        let optimizer_rules = generate_optimizer_rules(sql);
-        let physical_optimizer_rules = generate_physical_optimizer_rules(req, sql, self.contexts);
-        let mut ctx = DataFusionContextBuilder::new()
-            .trace_id(&req.trace_id)
-            .work_group(req.work_group.clone())
-            .analyzer_rules(analyzer_rules)
-            .optimizer_rules(optimizer_rules)
-            .physical_optimizer_rules(physical_optimizer_rules)
-            .sorted_by_time(sql.sorted_by_time)
-            .build(self.target_partitions)
-            .await?;
-
-        // register udf
-        register_udf(&ctx, &req.org_id)?;
-        datafusion_functions_json::register_all(&mut ctx)?;
-
-        Ok(ctx)
-    }
-}
-
-pub async fn register_table(ctx: &SessionContext, sql: &Sql) -> Result<()> {
-    // register schema provider
-    let mut registed_schema = HashSet::new();
-    for (stream, _) in &sql.schemas {
-        let stream_type = stream.stream_type();
-        if !stream.has_stream_type() || registed_schema.contains(&stream_type) {
-            continue;
-        }
-        registed_schema.insert(stream_type.clone());
-        let schema_provider = StreamTypeProvider::create(&stream_type).await?;
-        let _ = ctx
-            .catalog("datafusion")
-            .unwrap()
-            .as_ref()
-            .register_schema(&stream_type, schema_provider);
-    }
-
-    // register table
-    for (stream, schema) in &sql.schemas {
-        let schema = schema
-            .schema()
-            .as_ref()
-            .clone()
-            .with_metadata(Default::default());
-        let stream_name = stream.to_quoted_string();
-        let table = Arc::new(
-            NewEmptyTable::new(&stream_name, Arc::new(schema))
-                .with_partitions(ctx.state().config().target_partitions())
-                .with_sorted_by_time(sql.sorted_by_time),
-        );
-        ctx.register_table(&stream_name, table)?;
-    }
-
-    Ok(())
 }
 
 #[tracing::instrument(name = "service:search:cluster:flight:get_file_id_lists", skip_all)]

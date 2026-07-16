@@ -23,6 +23,45 @@ use sqlparser::{
     parser::Parser,
 };
 
+use super::{RE_HISTOGRAM, visitor::histogram_interval::generate_histogram_interval};
+
+pub fn handle_histogram(
+    origin_sql: &mut String,
+    q_time_range: (i64, i64),
+    histogram_interval: i64,
+) {
+    let Some(captures) = RE_HISTOGRAM.captures(origin_sql.as_str()) else {
+        return;
+    };
+
+    let args = match captures.get(1) {
+        Some(args) => args
+            .as_str()
+            .split(',')
+            .map(|value| {
+                value
+                    .trim()
+                    .trim_matches(|value| value == '\'' || value == '"')
+            })
+            .collect::<Vec<_>>(),
+        None => return,
+    };
+
+    let interval = if histogram_interval > 0 {
+        format!("{histogram_interval} second")
+    } else {
+        args.get(1)
+            .map_or_else(|| generate_histogram_interval(q_time_range), |value| *value)
+            .to_string()
+    };
+    let field = args.first().unwrap_or(&"_timestamp");
+
+    *origin_sql = origin_sql.replace(
+        captures.get(0).unwrap().as_str(),
+        &format!("histogram({field},'{interval}')"),
+    );
+}
+
 /// Converts an original query to a histogram query
 /// Extracts WHERE clause and builds histogram query with provided stream name
 pub fn convert_to_histogram_query(

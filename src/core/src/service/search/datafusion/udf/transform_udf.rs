@@ -13,7 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::BTreeMap, sync::Arc};
+use std::{
+    collections::{BTreeMap, HashMap},
+    sync::Arc,
+};
 
 use config::utils::json;
 use datafusion::{
@@ -26,12 +29,38 @@ use datafusion::{
     logical_expr::{ColumnarValue, ScalarUDF, Volatility},
     prelude::create_udf,
 };
-use vector_enrichment::TableRegistry;
-use vrl::compiler::{TargetValueRef, VrlRuntime, runtime::Runtime};
-
-use crate::{common::infra::config::QUERY_FUNCTIONS, service::ingestion::compile_vrl_function};
+use vector_enrichment::{Table, TableRegistry};
+use vrl::compiler::{CompilationResult, TargetValueRef, VrlRuntime, runtime::Runtime};
 
 type FnType = Arc<dyn Fn(&[ColumnarValue]) -> Result<ColumnarValue> + Sync + Send>;
+pub type EnrichmentTable = (String, Box<dyn Table + Send + Sync>);
+
+#[derive(Clone)]
+pub struct PreparedQueryTransform {
+    name: String,
+    source: String,
+    params: String,
+    num_args: u8,
+    enrichment_tables: Arc<Vec<EnrichmentTable>>,
+}
+
+impl PreparedQueryTransform {
+    pub fn new(
+        name: String,
+        source: String,
+        params: String,
+        num_args: u8,
+        enrichment_tables: Arc<Vec<EnrichmentTable>>,
+    ) -> Self {
+        Self {
+            name,
+            source,
+            params,
+            num_args,
+            enrichment_tables,
+        }
+    }
+}
 
 fn create_user_df(fn_name: &str, num_args: u8, pow_scalar: FnType) -> ScalarUDF {
     let mut input_vec = vec![];
@@ -47,34 +76,14 @@ fn create_user_df(fn_name: &str, num_args: u8, pow_scalar: FnType) -> ScalarUDF 
     )
 }
 
-pub fn get_all_transform(org_id: &str) -> Result<Vec<ScalarUDF>> {
-    let mut udf_list = Vec::new();
-    for transform in QUERY_FUNCTIONS.clone().iter() {
-        let key = transform.key();
-        // do not register ingest_time transforms
-        if key.contains(org_id) {
-            udf_list.push(get_udf_vrl(
-                transform.name.to_owned(),
-                transform.function.to_owned().as_str(),
-                &transform.params,
-                transform.num_args,
-                org_id,
-            )?);
-        }
-    }
-    Ok(udf_list)
+pub fn get_all_transform(transforms: Vec<PreparedQueryTransform>) -> Result<Vec<ScalarUDF>> {
+    transforms.into_iter().map(get_udf_vrl).collect()
 }
 
-fn get_udf_vrl(
-    fn_name: String,
-    func: &str,
-    params: &str,
-    num_args: u8,
-    org_id: &str,
-) -> Result<ScalarUDF> {
-    let local_func = func.trim().to_owned();
-    let local_fn_params = params.to_owned();
-    let local_org_id = org_id.to_owned();
+fn get_udf_vrl(transform: PreparedQueryTransform) -> Result<ScalarUDF> {
+    let local_func = transform.source.trim().to_owned();
+    let local_fn_params = transform.params;
+    let enrichment_tables = transform.enrichment_tables;
 
     let vrl_calc = Arc::new(move |args: &[ColumnarValue]| {
         let args = ColumnarValue::values_to_arrays(args)?;
@@ -94,11 +103,10 @@ fn get_udf_vrl(
                 ));
             }
             obj_str.push_str(&format!(" \n {}", local_func));
-            match compile_vrl_function(&obj_str, &local_org_id) {
-                Ok(res) => {
-                    let registry = res.config.get_custom::<TableRegistry>().unwrap();
+            match compile_vrl_function(&obj_str, &enrichment_tables) {
+                Ok((program, registry)) => {
                     registry.finish_load();
-                    let result = apply_vrl_fn(&mut runtime, res.program);
+                    let result = apply_vrl_fn(&mut runtime, program);
                     if result != json::Value::Null {
                         res_data_vec.insert(i, json::get_string_value(&result));
                     } else {
@@ -115,7 +123,44 @@ fn get_udf_vrl(
         Ok(ColumnarValue::from(Arc::new(result) as ArrayRef))
     });
 
-    Ok(create_user_df(fn_name.as_str(), num_args, vrl_calc))
+    Ok(create_user_df(
+        transform.name.as_str(),
+        transform.num_args,
+        vrl_calc,
+    ))
+}
+
+fn compile_vrl_function(
+    source: &str,
+    enrichment_tables: &[EnrichmentTable],
+) -> Result<(vrl::compiler::Program, TableRegistry), std::io::Error> {
+    if source.contains("get_env_var") {
+        return Err(std::io::Error::other("get_env_var is not supported"));
+    }
+
+    let tables = enrichment_tables
+        .iter()
+        .map(|(name, table)| (name.clone(), table.clone()))
+        .collect::<HashMap<_, _>>();
+    let registry = TableRegistry::default();
+    registry.load(tables);
+
+    let mut functions = vrl::stdlib::all();
+    functions.append(&mut vector_enrichment::vrl_functions());
+    let mut config = vrl::compiler::CompileConfig::default();
+    config.set_custom(registry.clone());
+
+    match vrl::compiler::compile_with_external(
+        source,
+        &functions,
+        &vrl::prelude::state::ExternalEnv::default(),
+        config,
+    ) {
+        Ok(CompilationResult { program, .. }) => Ok((program, registry)),
+        Err(error) => Err(std::io::Error::other(
+            vrl::diagnostic::Formatter::new(source, error).to_string(),
+        )),
+    }
 }
 
 pub fn apply_vrl_fn(runtime: &mut Runtime, program: vrl::compiler::Program) -> json::Value {
@@ -179,13 +224,13 @@ mod tests {
         )
         .unwrap();
 
-        let vrl_udf = get_udf_vrl(
+        let vrl_udf = get_udf_vrl(PreparedQueryTransform::new(
             "vrltest".to_string(),
-            " . = parse_aws_vpc_flow_log!(.col1) \n .http_code=200 \n .",
-            "col1",
+            " . = parse_aws_vpc_flow_log!(.col1) \n .http_code=200 \n .".to_string(),
+            "col1".to_string(),
             1,
-            "org1",
-        )
+            Arc::new(Vec::new()),
+        ))
         .unwrap();
 
         // declare a new context. In spark API, this corresponds to a new spark

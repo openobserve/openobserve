@@ -7,12 +7,23 @@ publish = false
 
 [features]
 default = []
-enterprise = []
+enterprise = ["dep:hashbrown", "dep:o2_enterprise", "dep:parking_lot"]
+vectorscan = []
+vortex = []
 
 [dependencies]
 async-trait.workspace = true
+chrono.workspace = true
 config.workspace = true
+datafusion.workspace = true
+hashbrown = { workspace = true, optional = true }
+infra.workspace = true
+log.workspace = true
+o2_enterprise = { workspace = true, optional = true, default-features = false }
+parking_lot = { workspace = true, optional = true }
 serde.workspace = true
+tokio.workspace = true
+tracing.workspace = true
 utoipa.workspace = true
 vector-enrichment.workspace = true
 vrl.workspace = true
@@ -20,5 +31,4 @@ vrl.workspace = true
 [dev-dependencies]
 arrow.workspace = true
 arrow-schema.workspace = true
-o2_enterprise.workspace = true
 serde_json.workspace = true

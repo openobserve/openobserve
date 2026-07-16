@@ -15,6 +15,7 @@
 
 use std::str::FromStr;
 
+pub mod context;
 pub mod distributed_plan;
 pub mod exec;
 pub mod merge;
