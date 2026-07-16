@@ -66,7 +66,7 @@ use crate::{
 pub mod grpc;
 pub mod ingestion_service;
 
-pub use o2_vrl::compile_vrl_function;
+pub use openobserve_vrl::compile_vrl_function;
 
 pub type TriggerAlertData = Vec<(Alert, Vec<Map<String, Value>>)>;
 

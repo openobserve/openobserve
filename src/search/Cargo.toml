@@ -18,7 +18,7 @@ datafusion.workspace = true
 hashbrown = { workspace = true, optional = true }
 infra.workspace = true
 log.workspace = true
-o2_vrl.workspace = true
+openobserve-vrl.workspace = true
 o2_enterprise = { workspace = true, optional = true, default-features = false }
 parking_lot = { workspace = true, optional = true }
 serde.workspace = true

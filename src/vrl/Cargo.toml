@@ -1,5 +1,5 @@
 [package]
-name = "o2_vrl"
+name = "openobserve-vrl"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

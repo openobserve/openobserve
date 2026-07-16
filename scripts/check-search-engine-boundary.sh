@@ -10,7 +10,7 @@ cargo metadata --no-deps --format-version 1 \
   >/dev/null
 
 cargo metadata --no-deps --format-version 1 \
-  | jq -e '.packages[] | select(.name == "o2_vrl") | all(.dependencies[]; .name != "openobserve-core" and .name != "search")' \
+  | jq -e '.packages[] | select(.name == "openobserve-vrl") | all(.dependencies[]; .name != "openobserve-core" and .name != "search")' \
   >/dev/null
 
 candidate_paths=(
@@ -32,7 +32,7 @@ if rg "$deny_direct" "${candidate_paths[@]}" || \
   exit 1
 fi
 
-if rg 'SearchRuntime|CoreSearchRuntime|set_search_runtime|#\[path|include!' src; then
+if rg 'SearchRuntime|CoreSearchRuntime|set_search_runtime|QueryExecutionContext|PreparedQueryTransform|prepare_query_transforms|#\[path|include!' src; then
   echo 'temporary search bridge is forbidden' >&2
   exit 1
 fi
