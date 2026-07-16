@@ -138,7 +138,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :class="[
           'w-1/4 max-w-full min-w-[75px]',
           heightOffset ? 'ai-chat-with-offset' : '',
-          store.state.theme == 'dark' ? 'dark-mode-chat-container' : 'light-mode-chat-container',
         ]"
       >
         <O2AIChat

@@ -171,6 +171,7 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import OColor from "@/lib/forms/Color/OColor.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import { useStore } from "vuex";
+import { useTheme } from "@/composables/useTheme";
 import { applyThemeColors, switchThemeMode } from "@/utils/theme";
 import { applyThemeForMode, applyCurrentTheme } from "@/utils/themeManager";
 import {
@@ -186,6 +187,7 @@ import {
 import { toast } from "@/lib/feedback/Toast/useToast";
 
 const store = useStore();
+    const { isDark } = useTheme();
 const { isOpen } = usePredefinedThemes();
 const dialogOpen = ref(false);
 const activeTab = ref("light");
@@ -256,7 +258,7 @@ watch(isOpen, (val) => {
   dialogOpen.value = val;
   // When dialog opens, sync activeTab with current store theme
   if (val) {
-    activeTab.value = store.state.theme === "dark" ? "dark" : "light";
+    activeTab.value = isDark.value ? "dark" : "light";
   }
 });
 

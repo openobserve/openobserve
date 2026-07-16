@@ -262,11 +262,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           min-width: 75px;
           height: calc(100vh - 90px) !important;
         "
-        :class="
-          store.state.theme == 'dark'
-            ? 'dark-mode-chat-container'
-            : 'light-mode-chat-container'
-        "
       >
         <O2AIChat
           :aiChatInputContext="inputContext"

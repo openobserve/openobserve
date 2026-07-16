@@ -17,7 +17,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     class="correlated-logs-table flex flex-col h-full w-full"
-    :class="themeClass"
     data-test="correlated-logs-table"
   >
     <!-- Header with Inline Filters -->
@@ -510,9 +509,6 @@ watch(
 );
 
 // Computed
-const themeClass = computed(() =>
-  store.state.theme === "dark" ? "dark-theme" : "light-theme",
-);
 
 const matchedDimensions = computed(() => props.matchedDimensions);
 const additionalDimensions = computed(() => props.additionalDimensions || {});

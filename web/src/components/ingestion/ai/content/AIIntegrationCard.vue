@@ -17,7 +17,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed } from "vue";
 import { useStore } from "vuex";
-import { useTheme } from "@/composables/useTheme";
 import useIngestion from "@/composables/useIngestion";
 import { b64EncodeStandard } from "@/utils/zincutils";
 import OTag from "@/lib/core/Badge/OTag.vue";
@@ -35,7 +34,6 @@ const props = defineProps<{
 
 const store = useStore();
 const { endpoint } = useIngestion();
-const { isDark } = useTheme();
 
 // The {url}/{org}/{token} the snippets are substituted with. `token` is the
 // base64 of email:password (the same value used for ingest tokens), WITHOUT the
@@ -109,8 +107,7 @@ const renderedSections = computed(() =>
         <template v-for="(seg, j) in section.segments" :key="j">
           <div
             v-if="seg.type === 'html'"
-            class="o2-card-md prose prose-sm max-w-none min-w-0"
-            :class="{ 'prose-invert': isDark }"
+            class="o2-card-md prose prose-sm max-w-none min-w-0 dark:prose-invert"
             v-html="seg.html"
           ></div>
           <OCodeBlock v-else :code="seg.code" :lang="seg.lang" data-test="ai-md-code" />

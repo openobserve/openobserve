@@ -49,7 +49,6 @@
     <div
       v-if="store.state.isAiChatEnabled"
       class="ml-2 w-[25vw] h-full"
-      :class="store.state.theme == 'dark' ? 'dark-mode-chat-container' : 'light-mode-chat-container'"
     >
       <O2AIChat
         class="h-full"

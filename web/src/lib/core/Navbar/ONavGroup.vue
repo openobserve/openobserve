@@ -43,6 +43,7 @@ const openGroupKey = moduleRef<string | null>(null);
  */
 import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
 import { useStore } from "vuex";
+import { useTheme } from "@/composables/useTheme";
 import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -74,7 +75,7 @@ const isLinkMode = computed(() => !!props.parentItem);
 // `!` is REQUIRED: the flyout items are <router-link> (<a>) and the app's global
 // `a { color: var(--color-text-link) }` rule (app.scss, unlayered) otherwise wins
 // over the layered Tailwind color utility, tinting the link text/icon primary.
-const isDark = computed(() => store.state.theme === "dark");
+const { isDark } = useTheme();
 const flyoutTextClass = computed(() =>
   isDark.value ? "text-dropdown-item-text!" : "text-black!",
 );

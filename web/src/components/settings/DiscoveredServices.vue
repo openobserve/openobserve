@@ -17,7 +17,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     class="flex flex-col w-full h-full bg-card-glass-bg discovered-services"
-    :class="{ 'ds-dark': store.state.theme === 'dark' }"
   >
     <!-- Loading State -->
     <div v-if="loading" class="flex flex-1 items-center justify-center">

@@ -1,19 +1,19 @@
 {
   "totals": {
     "rawPalette": 53,
-    "arbPx": 174,
+    "arbPx": 173,
     "arbRadius": 25,
     "unscopedStyle": 204,
     "arbZ": 48,
     "styleBlockHex": 480,
     "stylePxUnit": 1015,
-    "darkMechanism": 51,
     "inlineHexStyle": 21,
-    "themeTernary": 24,
     "tsHex": 471,
     "inlineHexBind": 6,
     "bareRounded": 10,
     "hexClass": 32,
+    "themeTernary": 10,
+    "darkMechanism": 33,
     "arbTextSize": 3
   },
   "files": {
@@ -68,9 +68,6 @@
       "arbZ": 1,
       "styleBlockHex": 1
     },
-    "components/alerts/AlertWizardRightColumn.vue": {
-      "darkMechanism": 1
-    },
     "components/alerts/DestinationPreview.vue": {
       "unscopedStyle": 1,
       "stylePxUnit": 1
@@ -101,9 +98,7 @@
     },
     "components/alerts/IncidentServiceGraph.vue": {
       "inlineHexStyle": 5,
-      "themeTernary": 1,
       "unscopedStyle": 1,
-      "darkMechanism": 2,
       "styleBlockHex": 16,
       "stylePxUnit": 10
     },
@@ -116,11 +111,9 @@
       "arbZ": 2
     },
     "components/alerts/QueryEditorDialog.vue": {
-      "themeTernary": 1,
       "unscopedStyle": 1,
       "arbPx": 12,
-      "arbZ": 2,
-      "darkMechanism": 1
+      "arbZ": 2
     },
     "components/alerts/SemanticFieldGroupsConfig.vue": {
       "unscopedStyle": 1,
@@ -181,10 +174,6 @@
     },
     "components/common/FieldValuesPanel.vue": {
       "arbRadius": 1
-    },
-    "components/common/JsonEditor.vue": {
-      "themeTernary": 1,
-      "darkMechanism": 1
     },
     "components/common/LoadingProgress.vue": {
       "rawPalette": 2,
@@ -326,10 +315,6 @@
       "bareRounded": 1,
       "unscopedStyle": 1
     },
-    "components/DatabaseDeprecationBanner.vue": {
-      "themeTernary": 1,
-      "darkMechanism": 1
-    },
     "components/DateTime.vue": {
       "unscopedStyle": 1,
       "stylePxUnit": 1
@@ -349,15 +334,8 @@
       "unscopedStyle": 1
     },
     "components/functions/AddFunction.vue": {
-      "themeTernary": 1,
       "unscopedStyle": 1,
-      "arbPx": 1,
-      "darkMechanism": 1,
       "stylePxUnit": 1
-    },
-    "components/functions/EnrichmentSchema.vue": {
-      "themeTernary": 1,
-      "darkMechanism": 1
     },
     "components/functions/EnrichmentTableList.vue": {
       "unscopedStyle": 1
@@ -450,9 +428,7 @@
       "stylePxUnit": 86
     },
     "components/logs/LogsHighLighting.vue": {
-      "themeTernary": 1,
-      "unscopedStyle": 1,
-      "darkMechanism": 1
+      "unscopedStyle": 1
     },
     "components/logstream/AssociatedRegexPatterns.vue": {
       "unscopedStyle": 1,
@@ -463,9 +439,7 @@
       "stylePxUnit": 1
     },
     "components/logstream/schema.vue": {
-      "themeTernary": 1,
       "unscopedStyle": 1,
-      "darkMechanism": 1,
       "stylePxUnit": 4
     },
     "components/O2AIChat.vue": {
@@ -495,9 +469,7 @@
       "stylePxUnit": 2
     },
     "components/pipeline/NodeForm/ScheduledPipeline.vue": {
-      "themeTernary": 1,
-      "unscopedStyle": 1,
-      "darkMechanism": 1
+      "unscopedStyle": 1
     },
     "components/pipeline/NodeForm/Stream.vue": {
       "unscopedStyle": 1,
@@ -516,10 +488,6 @@
     "components/pipeline/PipelineView.vue": {
       "unscopedStyle": 1,
       "stylePxUnit": 6
-    },
-    "components/PredefinedThemes.vue": {
-      "themeTernary": 1,
-      "darkMechanism": 1
     },
     "components/promql/components/OperationsList.vue": {
       "rawPalette": 1,
@@ -577,19 +545,13 @@
       "stylePxUnit": 2
     },
     "components/settings/AddRegexPattern.vue": {
-      "themeTernary": 1,
       "unscopedStyle": 1,
       "arbPx": 6,
-      "darkMechanism": 1,
       "stylePxUnit": 1
     },
     "components/settings/BuiltInModelPricingTab.vue": {
       "unscopedStyle": 1,
       "stylePxUnit": 2
-    },
-    "components/settings/DiscoveredServices.vue": {
-      "themeTernary": 1,
-      "darkMechanism": 1
     },
     "components/settings/General.vue": {
       "themeTernary": 3,
@@ -661,8 +623,8 @@
       "stylePxUnit": 1
     },
     "components/ThemeSwitcher.vue": {
-      "themeTernary": 1,
-      "darkMechanism": 2
+      "themeTernary": 2,
+      "darkMechanism": 3
     },
     "components/traces/FlameGraphView.vue": {
       "inlineHexStyle": 5
@@ -903,8 +865,6 @@
       "stylePxUnit": 2
     },
     "lib/core/Navbar/ONavGroup.vue": {
-      "themeTernary": 1,
-      "darkMechanism": 2,
       "stylePxUnit": 1
     },
     "lib/core/Table/composables/useTableHighlight.ts": {
@@ -983,9 +943,7 @@
       "arbZ": 1
     },
     "plugins/correlation/CorrelatedLogsTable.vue": {
-      "themeTernary": 1,
       "unscopedStyle": 1,
-      "darkMechanism": 1,
       "stylePxUnit": 1
     },
     "plugins/correlation/DimensionFilterEditor.vue": {
@@ -1142,8 +1100,6 @@
       "inlineHexBind": 1
     },
     "plugins/traces/ThreadToolCalls.vue": {
-      "themeTernary": 1,
-      "darkMechanism": 2,
       "styleBlockHex": 32,
       "stylePxUnit": 11
     },

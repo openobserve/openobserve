@@ -90,11 +90,6 @@
           <div>
 
             <div
-              :class="
-                store.state.theme === 'dark'
-                  ? 'dark-theme-table'
-                  : 'light-theme-table'
-              "
               style="margin-bottom: 30px"
               class="mt-4"
             >

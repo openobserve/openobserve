@@ -28,7 +28,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     class="thread-view flex flex-col w-full h-full bg-surface-base"
-    :class="{ 'thread-view--dark': isDark }"
   >
     <!-- Summary toolbar — sidebar-style badge chips. Hidden in the Session
          Detail Pretty view (those metrics already show in the KPI cards). -->
@@ -288,7 +287,6 @@ const emit = defineEmits<{
 }>();
 
 import { useStore } from "vuex";
-import { useTheme } from "@/composables/useTheme";
 import {
   getModel,
   getCost,
@@ -306,7 +304,6 @@ import { renderMarkdown } from "./markdown";
 
 const store = useStore();
 
-const { isDark } = useTheme();
 
 interface ThreadHead {
   systemPrompt: string;

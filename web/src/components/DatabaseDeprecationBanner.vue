@@ -17,7 +17,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     class="feature-card mb-3"
-    :class="store.state.theme === 'dark' ? 'dark-stream-container' : 'light-stream-container'"
     v-if="showDeprecationWarning"
     role="region"
     aria-label="MySQL deprecation warning"

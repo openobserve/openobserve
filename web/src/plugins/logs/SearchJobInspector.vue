@@ -325,7 +325,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, ref, onMounted, computed, watch } from "vue";
 import { useRouter, useRoute } from "vue-router";
 import { useStore } from "vuex";
-import { useTheme } from "@/composables/useTheme";
 import searchService from "@/services/search";
 import { chartColor } from "@/utils/chartTheme";
 import NoData from "@/components/shared/grid/NoData.vue";
@@ -343,6 +342,7 @@ import { COL } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import { copyToClipboard } from "@/utils/clipboard";
+import { useTheme } from "@/composables/useTheme";
 
 interface ProfileEvent {
   timestamp: string;
@@ -600,6 +600,7 @@ export default defineComponent({
 
       if (ms < 50) {
         return {
+      isDark,
           text: "Ultra-fast response",
           colorClass: "text-status-positive"
         };
@@ -679,7 +680,6 @@ export default defineComponent({
     });
 
     return {
-      isDark,
       loading,
       errorMessage,
       profileData,

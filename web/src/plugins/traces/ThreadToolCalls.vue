@@ -29,7 +29,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div
     v-if="toolCalls.length > 0"
     class="thread-tools-thread"
-    :class="{ 'thread-tools-thread--dark': isDark }"
   >
     <!-- One-way reveal: clicking shows the calls and removes the pill. -->
     <button v-if="!shown" class="tt-toggle" @click="shown = true">
@@ -108,7 +107,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from "vue";
+import { ref } from "vue";
 import { useStore } from "vuex";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { getInputRaw, getOutputRaw } from "./threadView.utils";
@@ -120,7 +119,6 @@ defineProps<{
 const emit = defineEmits<{ (e: "span-selected", spanId: string): void }>();
 
 const store = useStore();
-const isDark = computed(() => store.state.theme === "dark");
 
 // One-way reveal for the whole group; per-tool rows expand independently.
 const shown = ref(false);

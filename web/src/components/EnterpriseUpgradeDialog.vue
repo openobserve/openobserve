@@ -157,7 +157,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               ]"
               @click="feature.link && openFeatureLink(feature.link)"
             >
-              <div class="shrink-0 w-7.5 h-7.5 rounded-lg flex items-center justify-center text-[var(--q-primary)]" :class="isDark ? 'bg-[color-mix(in_srgb,var(--color-theme-accent)_15%,transparent)]' : 'bg-[color-mix(in_srgb,var(--color-theme-accent)_10%,transparent)]'">
+              <div class="shrink-0 w-7.5 h-7.5 rounded-lg flex items-center justify-center text-[var(--q-primary)] bg-[color-mix(in_srgb,var(--color-theme-accent)_10%,transparent)] dark:bg-[color-mix(in_srgb,var(--color-theme-accent)_15%,transparent)]">
                 <OIcon :name="feature.icon" size="sm" />
               </div>
               <div class="flex-1 min-w-0">
@@ -188,7 +188,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               ]"
               @click="feature.link && openFeatureLink(feature.link)"
             >
-              <div class="shrink-0 w-7.5 h-7.5 rounded-lg flex items-center justify-center text-[var(--q-primary)]" :class="isDark ? 'bg-[color-mix(in_srgb,var(--color-theme-accent)_15%,transparent)]' : 'bg-[color-mix(in_srgb,var(--color-theme-accent)_10%,transparent)]'">
+              <div class="shrink-0 w-7.5 h-7.5 rounded-lg flex items-center justify-center text-[var(--q-primary)] bg-[color-mix(in_srgb,var(--color-theme-accent)_10%,transparent)] dark:bg-[color-mix(in_srgb,var(--color-theme-accent)_15%,transparent)]">
                 <OIcon :name="feature.icon" size="sm" />
               </div>
               <div class="flex-1 min-w-0">
@@ -222,7 +222,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               ]"
               @click="feature.link && openFeatureLink(feature.link)"
             >
-              <div class="shrink-0 w-7.5 h-7.5 rounded-lg flex items-center justify-center text-[var(--q-primary)]" :class="isDark ? 'bg-[color-mix(in_srgb,var(--color-theme-accent)_15%,transparent)]' : 'bg-[color-mix(in_srgb,var(--color-theme-accent)_10%,transparent)]'">
+              <div class="shrink-0 w-7.5 h-7.5 rounded-lg flex items-center justify-center text-[var(--q-primary)] bg-[color-mix(in_srgb,var(--color-theme-accent)_10%,transparent)] dark:bg-[color-mix(in_srgb,var(--color-theme-accent)_15%,transparent)]">
                 <OIcon :name="feature.icon" size="sm" />
               </div>
               <div class="flex-1 min-w-0">

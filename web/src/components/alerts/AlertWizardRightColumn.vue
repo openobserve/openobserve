@@ -33,7 +33,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="evaluationStatus && !isRealTime"
             class="alert-status-indicator group flex items-center gap-1.5 px-2 py-1 rounded-sm border-l-[0.1875rem] border-l-solid bg-status-success-bg border-l-status-positive"
             :class="{
-              'status-indicator-light': store.state.theme !== 'dark',
               'bg-surface-subtle border-l-border-strong': !evaluationStatus.wouldTrigger,
             }"
             data-test="alert-status-indicator"
@@ -46,8 +45,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span class="text-xs font-semibold tracking-wide uppercase flex-shrink-0 whitespace-nowrap">
               {{ evaluationStatus.wouldTrigger ? t('alerts.wouldTrigger') : t('alerts.wouldNotTrigger') }}
             </span>
-            <span class="text-xs flex-shrink-0 text-[rgba(255,255,255,0.3)] group-[.status-indicator-light]:text-[rgba(0,0,0,0.3)]">•</span>
-            <span class="text-xs text-[rgba(255,255,255,0.65)] group-[.status-indicator-light]:text-[rgba(0,0,0,0.6)]">
+            <span class="text-xs flex-shrink-0 text-[rgba(0,0,0,0.3)] dark:text-[rgba(255,255,255,0.3)]">•</span>
+            <span class="text-xs text-[rgba(0,0,0,0.6)] dark:text-[rgba(255,255,255,0.65)]">
               {{ evaluationStatus.reason }}
             </span>
           </div>

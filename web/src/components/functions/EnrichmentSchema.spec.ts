@@ -261,7 +261,9 @@ describe('EnrichmentSchema.vue Branch Coverage', () => {
       await nextTick();
       await nextTick();
 
-      const themeTable = wrapper.find('.light-theme-table');
+      // Theming is now global (`.dark` on <html>), not a per-element class, so
+      // the mapping table renders the same regardless of theme.
+      const themeTable = wrapper.find('[data-test="schema-log-stream-field-mapping-table"]');
       expect(themeTable.exists()).toBe(true);
     });
 
@@ -280,7 +282,9 @@ describe('EnrichmentSchema.vue Branch Coverage', () => {
       await nextTick();
       await nextTick();
 
-      const themeTable = wrapper.find('.dark-theme-table');
+      // Theming is now global (`.dark` on <html>), not a per-element class, so
+      // the mapping table renders the same regardless of theme.
+      const themeTable = wrapper.find('[data-test="schema-log-stream-field-mapping-table"]');
       expect(themeTable.exists()).toBe(true);
     });
   });

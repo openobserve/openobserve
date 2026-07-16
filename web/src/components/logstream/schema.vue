@@ -635,11 +635,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :show-global-filter="false"
                         :default-columns="false"
                         dense
-                        :class="
-                          store.state.theme == 'dark'
-                            ? 'o2-last-row-border-dark o2-schema-table-header-sticky-dark'
-                            : 'o2-last-row-border-light o2-schema-table-header-sticky-light'
-                        "
                         :style="{ height: '100%' }"
                       />
                     </div>
