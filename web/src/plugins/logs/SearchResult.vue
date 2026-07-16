@@ -2091,16 +2091,15 @@ export default defineComponent({
 
 
 <style lang="scss" scoped>
-/* keep(generated-content): pin-breakdown tooltip. Moved verbatim out of the
-   token layer (W1.a, F11) — SearchResult.vue is its only consumer. The rows are
-   built from data via v-for with per-row inline colours, and the whole tooltip is
+/* keep(generated-content): pin-breakdown tooltip. Moved out of the token layer
+   (W1.a, F11) — SearchResult.vue is its only consumer. The rows are built from
+   data via v-for with per-row inline colours, and the whole tooltip is
    <Teleport to="body">; Vue still stamps the scope id onto teleported nodes, so
-   `scoped` reaches it. Values are UNCHANGED from component.css on purpose: this
-   move is behaviour-neutral by design. The hex/rgba → --color-* tokenisation and
-   px → rem pass belong to W2.c, where the logs pin tooltip gets eyeballed in both
-   themes (plan §7.4) — the include/exclude actions map onto --color-status-info-*
-   / --color-status-error-*, which are already theme-aware and would collapse the
-   `:root:not(.dark) &` / `.dark &` twins. */
+   `scoped` reaches it. Tokenised in W2.c per the recorded mapping: surfaces/
+   borders/text use the theme-flipping tokens (the old `:root:not(.dark)` /
+   `.dark` twins collapsed), include/exclude actions use --color-status-info-* /
+   --color-status-error-* with color-mix tints. Flagged for the §7.4 eyeball pass:
+   include-action blue moved from material blue-700 to the app's status-info hue. */
 .oo-pin-backdrop {
   position: fixed;
   inset: 0;
@@ -2110,49 +2109,43 @@ export default defineComponent({
 .oo-pin-tooltip {
   position: fixed;
   z-index: 9999;
-  min-width: 200px;
+  min-width: 12.5rem;
   max-height: 20vh;
   overflow-y: auto;
   overflow-x: hidden;
   background: var(--color-surface-base);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 8px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
-  padding: 8px 0;
-  font-size: 12px;
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  padding: 0.5rem 0;
+  font-size: var(--text-xs);
+  color: var(--color-text-primary);
   outline: none;
 
-  :root:not(.dark) & {
-    background: #fff;
-    border-color: rgba(0, 0, 0, 0.12);
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
-    color: #222;
-  }
-
   &__time {
-    font-size: 11px;
+    font-size: var(--text-2xs);
     font-weight: 500;
     opacity: 0.65;
-    padding: 0 10px 4px;
+    padding: 0 0.625rem 0.25rem;
     margin-bottom: 0;
-    border-bottom: 1px solid rgba(128, 128, 128, 0.15);
+    border-bottom: 1px solid color-mix(in srgb, var(--color-grey-500) 15%, transparent);
   }
 
   &__row {
     display: flex;
     align-items: center;
-    gap: 6px;
-    padding: 1px 10px;
+    gap: 0.375rem;
+    padding: 1px 0.625rem;
     transition: background 0.1s;
 
     &:hover {
-      background: rgba(128, 128, 128, 0.12);
+      background: color-mix(in srgb, var(--color-grey-500) 12%, transparent);
     }
   }
 
   &__dot {
-    width: 8px;
-    height: 8px;
+    width: 0.5rem;
+    height: 0.5rem;
     border-radius: 50%;
     flex-shrink: 0;
   }
@@ -2164,55 +2157,45 @@ export default defineComponent({
 
   &__count {
     font-weight: 600;
-    min-width: 32px;
+    min-width: 2rem;
     text-align: right;
     transition: opacity 0.1s;
   }
 
   &__row-actions {
     display: flex;
-    gap: 3px;
+    gap: 0.1875rem;
     flex-shrink: 0;
-    margin-left: 4px;
+    margin-left: 0.25rem;
   }
 
   &__action {
-    width: 22px;
-    height: 22px;
+    width: 1.375rem;
+    height: 1.375rem;
     display: flex;
     align-items: center;
     justify-content: center;
-    border-radius: 4px;
+    border-radius: var(--radius-sm);
     cursor: pointer;
-    font-size: 13px;
+    font-size: var(--text-compact);
     font-weight: 700;
     line-height: 1;
 
     &--include {
-      background: rgba(25, 118, 210, 0.12);
-      color: #1976D2;
-
-      .dark & {
-        color: #64B5F6;
-        background: rgba(100, 181, 246, 0.15);
-      }
+      background: color-mix(in srgb, var(--color-status-info-text) 12%, transparent);
+      color: var(--color-status-info-text);
 
       &:hover {
-        background: rgba(25, 118, 210, 0.25);
+        background: color-mix(in srgb, var(--color-status-info-text) 25%, transparent);
       }
     }
 
     &--exclude {
-      background: rgba(198, 40, 40, 0.08);
-      color: #c62828;
-
-      .dark & {
-        color: #EF9A9A;
-        background: rgba(239, 154, 154, 0.12);
-      }
+      background: color-mix(in srgb, var(--color-status-error-text) 8%, transparent);
+      color: var(--color-status-error-text);
 
       &:hover {
-        background: rgba(198, 40, 40, 0.2);
+        background: color-mix(in srgb, var(--color-status-error-text) 20%, transparent);
       }
     }
   }

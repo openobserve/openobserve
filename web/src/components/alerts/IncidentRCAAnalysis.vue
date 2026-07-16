@@ -125,38 +125,39 @@ export default defineComponent({
    (formatRcaContent), so there is no template to hang Tailwind utilities on. This
    is ladder step 5 of O2_STYLE_MIGRATION_PLAN.md §3.1.
 
-   Moved verbatim out of the token layer (W1.a, F9). `:deep()` is required and
-   deliberate: v-html children never receive the scope id, so a plain scoped
-   selector would not match them. Values are UNCHANGED — the hex → --color-*
-   tokenisation of the private --rca-* vocabulary belongs to W2.c, where the
-   incident RCA report gets eyeballed in both themes (plan §7.4). */
+   Moved out of the token layer (W1.a, F9), tokenised in W2.c. `:deep()` is required
+   and deliberate: v-html children never receive the scope id, so a plain scoped
+   selector would not match them. The private --rca-* vocabulary now aliases global
+   tokens; entries whose token already flips in dark mode carry no dark override.
+   Judgment mappings (near-identical values, flagged for the §7.4 eyeball pass):
+   slate text → neutral text tokens; inline-code pink (rose-700) → status-error-text. */
 :deep(.rca-report-content) {
-  --rca-bg-primary: #eff6ff;
-  --rca-bg-secondary: #eff6ff;
-  --rca-bg-code: #f3f4f6;
-  --rca-bg-table-even: #eff6ff;
-  --rca-bg-table-hover: #dbeafe;
-  --rca-bg-section: rgba(37, 99, 235, 0.05);
-  --rca-bg-blockquote: #eff6ff;
+  --rca-bg-primary: var(--color-info-50);
+  --rca-bg-secondary: var(--color-info-50);
+  --rca-bg-code: var(--color-surface-subtle);
+  --rca-bg-table-even: var(--color-info-50);
+  --rca-bg-table-hover: var(--color-info-100);
+  --rca-bg-section: color-mix(in srgb, var(--color-blue-600) 5%, transparent);
+  --rca-bg-blockquote: var(--color-info-50);
 
-  --rca-text-primary: #1e293b;
-  --rca-text-secondary: #334155;
-  --rca-text-tertiary: #475569;
-  --rca-text-heading: #2563eb;
-  --rca-text-code: #be185d;
-  --rca-text-blockquote: #1e40af;
-  --rca-text-strong: #1e40af;
-  --rca-text-em: #475569;
-  --rca-text-list: #1f2937;
+  --rca-text-primary: var(--color-text-heading);
+  --rca-text-secondary: var(--color-text-body);
+  --rca-text-tertiary: var(--color-text-secondary);
+  --rca-text-heading: var(--color-blue-600);
+  --rca-text-code: var(--color-status-error-text);
+  --rca-text-blockquote: var(--color-blue-800);
+  --rca-text-strong: var(--color-blue-800);
+  --rca-text-em: var(--color-text-secondary);
+  --rca-text-list: var(--color-text-body);
 
-  --rca-border-primary: #cbd5e1;
-  --rca-border-secondary: #bfdbfe;
-  --rca-border-tertiary: #d1d5db;
-  --rca-border-table: #bfdbfe;
-  --rca-border-accent: #3b82f6;
+  --rca-border-primary: var(--color-border-strong);
+  --rca-border-secondary: var(--color-info-200);
+  --rca-border-tertiary: var(--color-border-default);
+  --rca-border-table: var(--color-info-200);
+  --rca-border-accent: var(--color-blue-500);
 
-  --rca-icon-color: #334155;
-  --rca-shadow: 0 2px 8px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.06);
+  --rca-icon-color: var(--color-text-body);
+  --rca-shadow: var(--shadow-md);
 
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
   line-height: 1.6;
@@ -164,32 +165,24 @@ export default defineComponent({
 }
 
 .dark :deep(.rca-report-content) {
-  --rca-bg-primary: #1f2937;
-  --rca-bg-secondary: #1e293b;
-  --rca-bg-code: #1f2937;
-  --rca-bg-table-even: #1a2332;
-  --rca-bg-table-hover: #2d3748;
-  --rca-bg-section: rgba(96, 165, 250, 0.08);
-  --rca-bg-blockquote: #1e3a5f;
+  /* Only the entries whose dark value differs from what the aliased token flips
+     to on its own: the info-blue washes go neutral/deep-blue, accents brighten. */
+  --rca-bg-primary: var(--color-surface-panel);
+  --rca-bg-secondary: var(--color-surface-subtle);
+  --rca-bg-table-even: color-mix(in srgb, var(--color-info-900) 35%, var(--color-surface-base));
+  --rca-bg-table-hover: color-mix(in srgb, var(--color-info-800) 30%, var(--color-surface-panel));
+  --rca-bg-section: color-mix(in srgb, var(--color-blue-400) 8%, transparent);
+  --rca-bg-blockquote: var(--color-info-900);
 
-  --rca-text-primary: #e5e7eb;
-  --rca-text-secondary: #cbd5e1;
-  --rca-text-tertiary: #94a3b8;
-  --rca-text-heading: #67a6ff;
-  --rca-text-code: #fda4af;
-  --rca-text-blockquote: #67a6ff;
-  --rca-text-strong: #639ced;
-  --rca-text-em: #cbd5e1;
-  --rca-text-list: #d1d5db;
+  --rca-text-heading: var(--color-blue-400);
+  --rca-text-blockquote: var(--color-blue-400);
+  --rca-text-strong: var(--color-blue-400);
 
-  --rca-border-primary: #4b5563;
-  --rca-border-secondary: #374151;
-  --rca-border-tertiary: #374151;
-  --rca-border-table: #334155;
-  --rca-border-accent: #60a5fa;
+  --rca-border-secondary: var(--color-border-default);
+  --rca-border-table: var(--color-border-default);
+  --rca-border-accent: var(--color-blue-400);
 
-  --rca-icon-color: #cbd5e1;
-  --rca-shadow: 0 2px 8px rgba(0, 0, 0, 0.4), 0 1px 2px rgba(0, 0, 0, 0.3);
+  --rca-shadow: var(--shadow-lg);
 }
 
 :deep(.rca-report-content) {
@@ -219,7 +212,7 @@ export default defineComponent({
       top: 50%;
       transform: translateY(-50%);
       color: var(--rca-icon-color);
-      font-size: 20px;
+      font-size: 1.25rem;
       line-height: 1;
     }
   }
@@ -260,7 +253,7 @@ export default defineComponent({
   }
 
   .rca-table-wrapper {
-    border-radius: 8px;
+    border-radius: var(--radius-lg);
     overflow: hidden;
     box-shadow: var(--rca-shadow);
   }
@@ -273,16 +266,16 @@ export default defineComponent({
 
     thead {
       background: linear-gradient(to bottom, var(--rca-bg-secondary) 0%, var(--rca-bg-secondary) 100%);
-      border-bottom: 2px solid var(--rca-border-primary);
+      border-bottom: 0.125rem solid var(--rca-border-primary);
     }
 
     th {
-      padding: 8px 12px;
+      padding: 0.5rem 0.75rem;
       color: var(--rca-text-primary);
       font-weight: 700;
       text-transform: uppercase;
-      font-size: 10px;
-      letter-spacing: 0.8px;
+      font-size: var(--text-3xs);
+      letter-spacing: 0.08em;
       text-align: left;
       border-right: 1px solid var(--rca-border-secondary);
 
@@ -292,11 +285,11 @@ export default defineComponent({
     }
 
     td {
-      padding: 8px 12px;
+      padding: 0.5rem 0.75rem;
       border-bottom: 1px solid var(--rca-border-table);
       border-right: 1px solid var(--rca-border-table);
       color: var(--rca-text-secondary);
-      font-size: 13px;
+      font-size: var(--text-compact);
       line-height: 1.6;
       vertical-align: top;
 
@@ -323,7 +316,7 @@ export default defineComponent({
       color: var(--rca-text-tertiary);
       white-space: nowrap;
       background-color: var(--rca-bg-secondary);
-      min-width: 160px;
+      min-width: 10rem;
     }
 
     tbody tr:hover td:first-child,

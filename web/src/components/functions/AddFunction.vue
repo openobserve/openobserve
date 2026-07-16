@@ -136,7 +136,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         v-if="store.state.isAiChatEnabled && !isAddFunctionComponent"
         :class="[
-          'w-1/4 max-w-full min-w-[75px]',
+          'w-1/4 max-w-full min-w-19',
           heightOffset ? 'ai-chat-with-offset' : '',
         ]"
       >

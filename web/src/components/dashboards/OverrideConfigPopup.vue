@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -54,7 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @select="addField(opt.value)"
             >
               <span class="flex items-center gap-2">
-                <span class="shrink-0 text-[0.5625rem] font-bold tracking-[0.05em] uppercase py-0.5 px-1.25 rounded-sm" :class="badgeClass(opt.isNumeric)">
+                <span class="shrink-0 text-3xs font-bold tracking-[0.05em] uppercase py-0.5 px-1.25 rounded-sm" :class="badgeClass(opt.isNumeric)">
                   {{ opt.isNumeric ? t("dashboard.typeNumeric") : t("dashboard.typeText") }}
                 </span>
                 <span>{{ opt.label }}</span>
@@ -89,7 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @keydown.enter.prevent="selectedIdx = idx"
             @keydown.space.prevent="selectedIdx = idx"
           >
-            <span class="shrink-0 text-[0.5625rem] font-bold tracking-[0.05em] uppercase py-0.5 px-1.25 rounded-sm" :class="badgeClass(isNumericColumn(col))">
+            <span class="shrink-0 text-3xs font-bold tracking-[0.05em] uppercase py-0.5 px-1.25 rounded-sm" :class="badgeClass(isNumericColumn(col))">
               {{ isNumericColumn(col) ? t("dashboard.typeNumeric") : t("dashboard.typeText") }}
             </span>
             <span
@@ -200,7 +200,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @select="addField(opt.value)"
                 >
                   <span class="flex items-center gap-2">
-                    <span class="shrink-0 text-[0.5625rem] font-bold tracking-[0.05em] uppercase py-0.5 px-1.25 rounded-sm" :class="badgeClass(opt.isNumeric)">
+                    <span class="shrink-0 text-3xs font-bold tracking-[0.05em] uppercase py-0.5 px-1.25 rounded-sm" :class="badgeClass(opt.isNumeric)">
                       {{ opt.isNumeric ? t("dashboard.typeNumeric") : t("dashboard.typeText") }}
                     </span>
                     <span>{{ opt.label }}</span>

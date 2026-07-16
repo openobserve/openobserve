@@ -318,7 +318,7 @@ export default defineComponent({
 </script>
 
 <style>
-/* Remove border-radius from the shared scroll container (logs uses rounded corners) */
+/* Remove border-radius from the shared scroll container (logs keeps its corner radius) */
 .table-wrapper .o2-scroll-container {
   border-radius: 0;
 }

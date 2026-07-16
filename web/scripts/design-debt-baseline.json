@@ -3,10 +3,10 @@
     "rawPalette": 53,
     "arbPx": 173,
     "arbRadius": 25,
-    "unscopedStyle": 204,
+    "unscopedStyle": 162,
     "arbZ": 48,
-    "styleBlockHex": 480,
-    "stylePxUnit": 1015,
+    "styleBlockHex": 469,
+    "stylePxUnit": 977,
     "inlineHexStyle": 21,
     "tsHex": 471,
     "inlineHexBind": 6,
@@ -45,16 +45,10 @@
       "arbPx": 1,
       "stylePxUnit": 23
     },
-    "components/alerts/AlertHistory.vue": {
-      "unscopedStyle": 1
-    },
     "components/alerts/AlertHistoryTimeline.vue": {
       "arbPx": 1,
       "styleBlockHex": 2,
       "stylePxUnit": 12
-    },
-    "components/alerts/AlertInsights.vue": {
-      "unscopedStyle": 1
     },
     "components/alerts/AlertList.vue": {
       "unscopedStyle": 1,
@@ -84,9 +78,6 @@
       "unscopedStyle": 1,
       "stylePxUnit": 4
     },
-    "components/alerts/IncidentAlertTriggersTable.vue": {
-      "unscopedStyle": 1
-    },
     "components/alerts/IncidentDetailDrawer.vue": {
       "rawPalette": 10,
       "unscopedStyle": 1,
@@ -102,12 +93,7 @@
       "styleBlockHex": 16,
       "stylePxUnit": 10
     },
-    "components/alerts/IncidentTimeline.vue": {
-      "unscopedStyle": 1,
-      "stylePxUnit": 2
-    },
     "components/alerts/PrebuiltDestinationSelector.vue": {
-      "unscopedStyle": 1,
       "arbZ": 2
     },
     "components/alerts/QueryEditorDialog.vue": {
@@ -194,9 +180,6 @@
       "arbPx": 2,
       "arbZ": 1
     },
-    "components/dashboards/AddDashboardFromGitHub.vue": {
-      "unscopedStyle": 1
-    },
     "components/dashboards/addPanel/ColorPaletteDropDown.vue": {
       "arbRadius": 1,
       "unscopedStyle": 1
@@ -205,9 +188,6 @@
       "unscopedStyle": 1,
       "arbPx": 2,
       "stylePxUnit": 1
-    },
-    "components/dashboards/addPanel/CustomChartEditor.vue": {
-      "unscopedStyle": 1
     },
     "components/dashboards/addPanel/customChartExamples/customChartTemplates/bar3dDataset.ts": {
       "tsHex": 13
@@ -246,12 +226,10 @@
       "tsHex": 1
     },
     "components/dashboards/addPanel/CustomHTMLEditor.vue": {
-      "rawPalette": 1,
-      "unscopedStyle": 1
+      "rawPalette": 1
     },
     "components/dashboards/addPanel/CustomMarkdownEditor.vue": {
-      "rawPalette": 1,
-      "unscopedStyle": 1
+      "rawPalette": 1
     },
     "components/dashboards/addPanel/DashboardGeoMapsQueryBuilder.vue": {
       "arbPx": 6
@@ -282,8 +260,7 @@
       "stylePxUnit": 1
     },
     "components/dashboards/OverrideConfigPopup.vue": {
-      "arbPx": 3,
-      "stylePxUnit": 4
+      "arbPx": 3
     },
     "components/dashboards/PanelEditor/PanelEditor.vue": {
       "rawPalette": 1,
@@ -486,7 +463,6 @@
       "stylePxUnit": 31
     },
     "components/pipeline/PipelineView.vue": {
-      "unscopedStyle": 1,
       "stylePxUnit": 6
     },
     "components/promql/components/OperationsList.vue": {
@@ -529,9 +505,6 @@
     "components/rum/EventDetailDrawerContent.vue": {
       "unscopedStyle": 1
     },
-    "components/rum/PlayerEventsSidebar.vue": {
-      "unscopedStyle": 1
-    },
     "components/rum/PlayerTracesTab.vue": {
       "unscopedStyle": 1,
       "stylePxUnit": 1
@@ -549,10 +522,6 @@
       "arbPx": 6,
       "stylePxUnit": 1
     },
-    "components/settings/BuiltInModelPricingTab.vue": {
-      "unscopedStyle": 1,
-      "stylePxUnit": 2
-    },
     "components/settings/General.vue": {
       "themeTernary": 3,
       "unscopedStyle": 1,
@@ -566,7 +535,6 @@
     },
     "components/settings/ModelPricingEditor.vue": {
       "arbRadius": 3,
-      "unscopedStyle": 2,
       "arbPx": 3
     },
     "components/settings/ModelPricingList.vue": {
@@ -589,14 +557,6 @@
       "arbPx": 7,
       "styleBlockHex": 1,
       "stylePxUnit": 2
-    },
-    "components/settings/ServiceIdentityConfig.vue": {
-      "unscopedStyle": 1,
-      "stylePxUnit": 1
-    },
-    "components/settings/ServiceIdentitySetup.vue": {
-      "unscopedStyle": 1,
-      "styleBlockHex": 2
     },
     "components/settings/TestModelMatchDialog.vue": {
       "unscopedStyle": 2,
@@ -680,9 +640,6 @@
       "arbPx": 2,
       "stylePxUnit": 1
     },
-    "enterprise/components/EvalTemplateEditor.vue": {
-      "stylePxUnit": 5
-    },
     "enterprise/components/onlineEvals/forms/EvalJobDetail.vue": {
       "unscopedStyle": 1,
       "styleBlockHex": 12,
@@ -724,9 +681,7 @@
       "stylePxUnit": 2
     },
     "enterprise/components/onlineEvals/forms/ScorerTypeDialog.vue": {
-      "unscopedStyle": 1,
-      "styleBlockHex": 1,
-      "stylePxUnit": 1
+      "unscopedStyle": 1
     },
     "enterprise/components/onlineEvals/quality/QualityConfigSidebar.vue": {
       "hexClass": 3,
@@ -749,8 +704,7 @@
       "stylePxUnit": 1
     },
     "layouts/MainLayout.vue": {
-      "bareRounded": 1,
-      "unscopedStyle": 1
+      "bareRounded": 1
     },
     "lib/core/Badge/OBadge.vue": {
       "bareRounded": 1
@@ -778,82 +732,54 @@
       "unscopedStyle": 1
     },
     "lib/core/EmptyState/illustrations/EmptyAlert.vue": {
-      "unscopedStyle": 1,
       "stylePxUnit": 2
     },
     "lib/core/EmptyState/illustrations/EmptyAllClear.vue": {
-      "unscopedStyle": 1,
       "stylePxUnit": 4
     },
     "lib/core/EmptyState/illustrations/EmptyBoard.vue": {
-      "unscopedStyle": 1,
       "stylePxUnit": 1
     },
-    "lib/core/EmptyState/illustrations/EmptyBox.vue": {
-      "unscopedStyle": 1
-    },
     "lib/core/EmptyState/illustrations/EmptyBrokenPanel.vue": {
-      "unscopedStyle": 1,
       "stylePxUnit": 3
     },
     "lib/core/EmptyState/illustrations/EmptyBuilder.vue": {
-      "unscopedStyle": 1,
       "stylePxUnit": 12
     },
-    "lib/core/EmptyState/illustrations/EmptyCheck.vue": {
-      "unscopedStyle": 1
-    },
     "lib/core/EmptyState/illustrations/EmptyConnect.vue": {
-      "unscopedStyle": 1,
       "stylePxUnit": 15
     },
     "lib/core/EmptyState/illustrations/EmptyError.vue": {
-      "unscopedStyle": 1,
       "stylePxUnit": 8
     },
     "lib/core/EmptyState/illustrations/EmptyExplorer.vue": {
-      "unscopedStyle": 1,
       "stylePxUnit": 7
     },
     "lib/core/EmptyState/illustrations/EmptyFunction.vue": {
-      "unscopedStyle": 1,
       "stylePxUnit": 5
     },
     "lib/core/EmptyState/illustrations/EmptyHistory.vue": {
-      "unscopedStyle": 1,
       "stylePxUnit": 4
     },
     "lib/core/EmptyState/illustrations/EmptyHourglass.vue": {
-      "unscopedStyle": 1,
       "stylePxUnit": 1
     },
-    "lib/core/EmptyState/illustrations/EmptyLogs.vue": {
-      "unscopedStyle": 1
-    },
     "lib/core/EmptyState/illustrations/EmptyPipeline.vue": {
-      "unscopedStyle": 1,
       "stylePxUnit": 2
     },
-    "lib/core/EmptyState/illustrations/EmptyQuery.vue": {
-      "unscopedStyle": 1
-    },
     "lib/core/EmptyState/illustrations/EmptyReport.vue": {
-      "unscopedStyle": 1,
       "stylePxUnit": 3
     },
     "lib/core/EmptyState/illustrations/EmptySchedule.vue": {
-      "unscopedStyle": 1,
       "stylePxUnit": 2
     },
     "lib/core/EmptyState/illustrations/EmptyServiceGraph.vue": {
       "stylePxUnit": 12
     },
     "lib/core/EmptyState/illustrations/EmptyTrace.vue": {
-      "unscopedStyle": 1,
       "stylePxUnit": 1
     },
     "lib/core/EmptyState/illustrations/EmptyWaiting.vue": {
-      "unscopedStyle": 1,
       "stylePxUnit": 2
     },
     "lib/core/EmptyState/OEmptyState.vue": {
@@ -989,30 +915,24 @@
       "styleBlockHex": 4,
       "stylePxUnit": 2
     },
-    "plugins/metrics/MetricLegends.vue": {
-      "unscopedStyle": 1
-    },
     "plugins/metrics/MetricList.vue": {
       "unscopedStyle": 1,
       "arbZ": 1
     },
     "plugins/metrics/SyntaxGuideMetrics.vue": {
-      "unscopedStyle": 1,
       "arbPx": 16
     },
     "plugins/pipelines/CustomNode.vue": {
       "inlineHexStyle": 1,
       "arbRadius": 1,
-      "unscopedStyle": 1,
       "arbPx": 13,
       "arbZ": 7,
-      "styleBlockHex": 18,
-      "stylePxUnit": 22
+      "styleBlockHex": 10,
+      "stylePxUnit": 11
     },
     "plugins/pipelines/PipelineFlow.vue": {
       "inlineHexStyle": 1,
       "inlineHexBind": 1,
-      "unscopedStyle": 1,
       "arbZ": 1,
       "stylePxUnit": 1
     },
@@ -1057,8 +977,7 @@
     },
     "plugins/traces/metrics/TracesAnalysisDashboard.vue": {
       "unscopedStyle": 1,
-      "styleBlockHex": 6,
-      "stylePxUnit": 1
+      "styleBlockHex": 6
     },
     "plugins/traces/metrics/TracesMetricsContextMenu.vue": {
       "arbZ": 1
@@ -1126,7 +1045,7 @@
       "inlineHexStyle": 1,
       "unscopedStyle": 3,
       "styleBlockHex": 61,
-      "stylePxUnit": 71
+      "stylePxUnit": 60
     },
     "plugins/traces/TraceTree.vue": {
       "unscopedStyle": 1,
@@ -1293,7 +1212,6 @@
       "darkMechanism": 1
     },
     "views/OverviewTab.vue": {
-      "unscopedStyle": 1,
       "arbZ": 1
     },
     "views/RUM/AppErrors.vue": {

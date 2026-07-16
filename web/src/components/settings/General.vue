@@ -514,7 +514,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Irreversible-action warning callout -->
       <div
-        class="flex items-start gap-2 rounded border border-(--color-banner-error-soft-border) bg-(--color-banner-error-soft-bg) px-3 py-2"
+        class="flex items-start gap-2 rounded-sm border border-banner-error-soft-border bg-banner-error-soft-bg px-3 py-2"
       >
         <OIcon
           name="warning"

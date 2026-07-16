@@ -1,8 +1,10 @@
 # O2 Style Migration — Style Blocks → Tailwind & Token-Layer Class Evacuation
 
-> **Status: POLICY APPROVED 2026-07-16 (§3 ruling). P0 ✅ · PQ ✅ · PQ2 ✅ · W1 COMPLETE (a–e) ✅ · W2 in progress (2026-07-16).**
+> **Status: POLICY APPROVED 2026-07-16 (§3 ruling). P0 ✅ · PQ ✅ · PQ2 ✅ · W1 COMPLETE (a–e) ✅ ·
+> W2.b.1 (EmptyState scoping) ✅ · W2.a in progress · W2.b.2+/c/d pending (2026-07-16).**
 > **The 4 token files now contain tokens only; `lint:token-purity` is zero-tolerance (baseline deleted).**
-> Execution log, findings that CORRECT this plan, and the remaining queue: **§10**.
+> ⚠ **`npm run lint:design` is currently RED (8 regressions)** — see the independent status audit **§13**.
+> Execution log, findings that CORRECT this plan, and the remaining queue: **§10–§13**.
 > ⚠ §1 counts and some §5/§9 claims are pre-execution estimates — several proved wrong; see §10.2.
 >
 > Written 2026-07-16 on `fix/token`. Companion to `O2_TOKEN_MIGRATION_PLAN.md` (Part II Phase E —
@@ -719,3 +721,62 @@ live probes in the running app for every family (F3 row heights, F4 body/h2/code
 helpers, F6 AI gradient, F7 cursors + label colors light&dark, F13/F17 samples, F14 resizer, F10 sticky
 thead, shimmer keyframes, navbar dark override) — all value-identical; deleted dead classes verified
 unstyled · logs + EmptyState + alerts suites pass.
+
+---
+
+## 13. STATUS AUDIT — independent re-measurement of the live tree (2026-07-16, latest)
+
+> Performed from scratch against every phase's definition-of-done (not from the logs above), after commits
+> through `aacbd776c5 "migrated component style"`. Where this section disagrees with §10–§12 the live
+> measurement wins.
+
+### 13.1 Phase scoreboard
+
+| Phase | Claimed | **Verified** | Evidence |
+|---|---|---|---|
+| P0 scaffolding | ✅ | ✅ **confirmed** | 3 scripts present; `lint:token-purity` wired in `package.json`; `utilities.css` + `base-elements.css` (292 lines) imported |
+| PQ Quasar CSS/vars | ✅ | ✅ **confirmed** | 0 `--q-*` refs, 0 defs, 0 `q-*` template classes, 0 `.q-*` CSS selectors; `check-css-tokens.mjs` allowlist removed (documented in-file) |
+| PQ2 Quasar JS | ✅ | ✅ **confirmed, one documented keeper** | remaining `.q-*` in JS = the deliberate `.q-field` contract in `ODialog.vue` / `ODrawer.vue` (§11.1 keeper + the open `clearBodyValidation()` item) + 2 explanatory comments. Nothing else |
+| W1.a–e token purity | ✅ | ✅ **confirmed** | `lint:token-purity` green in zero-tolerance mode; `component.css` now **1,481 lines** (4,367 at plan time; §12 said 1,700 — trimmed further since), tokens + `@theme` only |
+| W2.b.1 EmptyState scoping | ✅ | ✅ **confirmed** | `.es-*` blocks scoped (still per-file — consolidation correctly dropped per §12.3.2) |
+| W2.a easy tier | in progress | 🟡 **~20% by unscoped-count** | unscoped blocks **204 → 162**; files with any block **231 → 216**; scoped blocks now 63; **30 keep-comments** adopted |
+| W2.b.2 scrollbar dedup | — | ⬜ not started | `::-webkit-scrollbar` still in **19** `.vue` files |
+| W2.c hard tier | — | ⬜ not started | `O2AIChat.vue` block still ~1,349 lines; `styleBlockHex` 535 |
+| W2.d enforcement flips | — | ⬜ not started (correct — gated on a/b/c) | `enforce-style-attribute` still warn; no `styleKeepComment` category yet |
+
+### 13.2 Live debt counters (plan-time → now)
+
+| Category | Plan §1.1 | **Now** | Δ |
+|---|---|---|---|
+| `unscopedStyle` | 204 | **162** | −42 |
+| `styleBlockHex` | 632 (real baseline 480, §10.2.8) | **535** | see note |
+| `hexClass` | 139 | **32** | −107 |
+| `rawPalette` | 57 | **53** | −4 |
+| `themeTernary` | 151 | **10** | −141 |
+| `darkMechanism` | 310 | **33** | −277 |
+| `arbTextSize` | 302 | **6** | −296 |
+| `stylePxUnit` | 1,015 | **1,016** | flat (ratchet-only, by design) |
+
+Note on `styleBlockHex` 535: it *includes* the ~66 hexes that W1.a moved verbatim out of the token layer
+into `IncidentRCAAnalysis.vue`/`SearchResult.vue` (deliberate deferral, §11.2). The `themeTernary`/
+`darkMechanism`/`arbTextSize` collapses came from the branch's parallel dark-mode + typography work, not W2.
+
+### 13.3 🔴 Action needed: `npm run lint:design` fails with 8 regressions
+
+| File / category | Cause | Disposition |
+|---|---|---|
+| `IncidentRCAAnalysis.vue` `styleBlockHex` +48, `stylePxUnit` +17 | **F9 verbatim colocation** (§11.2) — debt moved from component.css (not ratchet-scanned) into a `.vue` (scanned) | Deliberate + documented. **Surgically add baseline entries for exactly these two files** (tokenisation deferred to W2.c), or tokenize now |
+| `SearchResult.vue` `styleBlockHex` +18, `stylePxUnit` +22 | **F11 verbatim colocation** — same mechanics | same as above |
+| `OverrideConfigPopup.vue` `arbTextSize` +3 | new arbitrary text sizes introduced on the branch | **fix properly** (`text-2xs`/`text-compact`/`text-xs`) |
+| `TableRenderer.vue` `bareRounded` +1 · `General.vue` `bareRounded` +1 · `AddFunction.vue` `arbPx` +1 | pre-existing before this migration (§10.3) | fix properly (2 are regex false-positive candidates — see PENDING §7 note on `bareRounded`) |
+| *(after the above)* | the committed baseline is stale vs the many *improvements* | re-run `--baseline` and commit, locking in the −42/−107/−141/−277/−296 gains |
+
+### 13.4 Outstanding queue (unchanged in substance, restated with live numbers)
+
+1. **Unblock CI** — §13.3 (small: 4 real fixes + 2 documented baseline entries + re-baseline).
+2. **W2.a** — 162 unscoped blocks to burn down, batched per §5.3 (SFC tag-balance check per batch, §10.4 lesson).
+3. **utilities.css "unlayered legacy" section** — **1,465 lines / 164 class selectors, zero `@utility`** (deliberate staging, §12.2). Every rule still owes a §3.1 ladder pass during W2; this file must shrink toward the "deliberately tiny" §3.2 target, not stabilize.
+4. **W2.b.2/3** — scrollbar dedup (19 files) → the base-elements global + one shared treatment; `.index-table`/`.index-menu`/`.card-container` (178 consumers → component, §10.2.5).
+5. **W2.c** — hard-tier files (O2AIChat ~1,349-line block first among equals); D6 light code-bg pick still the only open design call.
+6. **W2.d** — flips: `unscopedStyle`/`styleBlockHex` → zero-tolerance, `enforce-style-attribute` → error, add the `styleKeepComment` category (30 keep-comments already in the wild, format matches §3.1).
+7. **Deferred/open** — `ODialog`/`ODrawer` `clearBodyValidation()` dead path (§11.1, needs its own PR); 4 stale spec files (§11.4); D19/D20 final sweep (parked; `darkMechanism` already down to 33).
