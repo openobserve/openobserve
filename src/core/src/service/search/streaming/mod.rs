@@ -66,8 +66,7 @@ use crate::{
 
 pub mod cache;
 pub mod execution;
-pub mod sorting;
-pub use ::search::streaming::utils;
+pub use ::search::streaming::{sorting, utils};
 // Re-export commonly used functions for easier access
 #[cfg(feature = "enterprise")]
 pub use cache::write_partial_results_to_cache;

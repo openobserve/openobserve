@@ -21,7 +21,7 @@ use config::{
 };
 use log;
 
-use crate::common::meta::search::SortStrategy;
+use crate::SortStrategy;
 
 /// Determines and applies sorting to search results
 pub fn order_search_results(
