@@ -6633,6 +6633,7 @@ dependencies = [
  "utoipa",
  "utoipa-swagger-ui",
  "vrl",
+ "web",
  "zip 8.2.0",
 ]
 
@@ -11668,6 +11669,13 @@ dependencies = [
  "hashbrown 0.15.5",
  "indexmap",
  "semver",
+]
+
+[[package]]
+name = "web"
+version = "0.1.0"
+dependencies = [
+ "rust-embed-for-web",
 ]
 
 [[package]]

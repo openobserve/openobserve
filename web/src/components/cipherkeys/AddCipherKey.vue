@@ -28,141 +28,134 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </span>
       </template>
     </AppPageHeader>
-    <div
-      class="create-cipher-form"
-    >
-    <div style="height: calc(100vh -  var(--navbar-height) - 155px); overflow: auto">
-      <!-- Constrain the whole form to a sensible reading width on wide screens
-           while staying fluid below the breakpoint. Uses Tailwind's design-system
-           max-width token (max-w-3xl ≈ 48rem) instead of arbitrary px values. -->
-      <div class="w-full max-w-3xl">
-      <div class="flex">
-        <div class="w-1/3 o2-input flex mx-3 mt-3 mb-4">
-          <OInput
-            data-test="add-cipher-key-name-input"
-            v-model="formData.name"
-            :label="t('cipherKey.name') + ' *'"
-            class="w-full"
-            v-bind:readonly="isUpdatingCipherKey"
-            v-bind:disable="isUpdatingCipherKey"
-            :error="!!nameError"
-            :error-message="nameError"
-            @update:model-value="validateName()"
-            @blur="validateName()"
-            tabindex="0"
-          />
-        </div>
-      </div>
-
-      <div style="height: calc(100vh -  var(--navbar-height) - 300px);">
-      <OStepper
-        v-model="step"
-        orientation="vertical"
-        animated
-        navigable
-        class="mx-3 p-0 h-full"
-      >
-        <OStep
-          data-test="cipher-key-key-store-detils-step"
-          :name="1"
-          :title="
-            t('cipherKey.step1') +
-            ' (Type: ' +
-            getTypeLabel(formData.key.store.type) +
-            ')'
-          "
-          icon="edit"
-          :done="step > 1"
-        >
-          <div>
-            <div class="w-full">
-              <OSelect
-                data-test="add-cipher-key-type-input"
-                v-model="formData.key.store.type"
-                :label="t('cipherKey.type') + ' *'"
-                class="w-full"
-                :options="cipherKeyTypes"
-                labelKey="label"
-                valueKey="value"
-                :error="!!storeTypeError"
-                :error-message="storeTypeError"
-                @update:model-value="storeTypeError = ''"
-                tabindex="0"
-              />
+    <div class="create-cipher-form">
+      <!-- One OForm owns every field across the stepper (the children render
+           OForm* controls connected by name); a single Zod schema gates the
+           whole form. Inline form → the footer Save is type="submit" (Enter
+           works natively) and its spinner is form-driven via v-slot. -->
+      <OForm :form="form" v-slot="{ isSubmitting }">
+        <div style="height: calc(100vh -  var(--navbar-height) - 155px); overflow: auto">
+          <!-- Constrain the whole form to a sensible reading width on wide screens
+               while staying fluid below the breakpoint. Uses Tailwind's design-system
+               max-width token (max-w-3xl ≈ 48rem) instead of arbitrary px values. -->
+          <div class="w-full max-w-3xl">
+            <div class="flex">
+              <div class="w-1/3 o2-input flex mx-3 mt-3 mb-4">
+                <OFormInput
+                  data-test="add-cipher-key-name-input"
+                  name="name"
+                  :label="t('cipherKey.name')"
+                  required
+                  class="w-full"
+                  :readonly="isUpdatingCipherKey"
+                  :disabled="isUpdatingCipherKey"
+                  tabindex="0"
+                />
+              </div>
             </div>
-            <add-openobserve-type
-              v-if="formData.key.store.type == 'local'"
-              class="mt-2"
-              :submitAttempted="submitAttempted"
-              v-model:formData="formData"
-            />
-            <add-akeyless-type
-              v-else-if="formData.key.store.type == 'akeyless'"
-              ref="akeylessTypeRef"
-              class="mt-2"
-              v-model:formData="formData"
-            />
-            <div class="flex gap-2 mt-4">
-              <OButton
-                data-test="add-report-step1-continue-btn"
-                variant="primary"
-                size="sm-action"
-                @click="validateForm(2)"
+
+            <div style="height: calc(100vh -  var(--navbar-height) - 300px);">
+              <OStepper
+                v-model="step"
+                orientation="vertical"
+                animated
+                navigable
+                class="mx-3 p-0 h-full"
               >
-                Continue
-              </OButton>
+                <OStep
+                  data-test="cipher-key-key-store-detils-step"
+                  :name="1"
+                  :title="step1Title"
+                  icon="edit"
+                  :done="step > 1"
+                >
+                  <div>
+                    <div class="w-full">
+                      <OFormSelect
+                        data-test="add-cipher-key-type-input"
+                        name="key.store.type"
+                        :label="t('cipherKey.type')"
+                        required
+                        class="w-full"
+                        :options="cipherKeyTypes"
+                        labelKey="label"
+                        valueKey="value"
+                        tabindex="0"
+                      />
+                    </div>
+                    <add-openobserve-type
+                      v-if="storeType === 'local'"
+                      class="mt-2"
+                      :is-update="isUpdatingCipherKey"
+                    />
+                    <add-akeyless-type
+                      v-else-if="storeType === 'akeyless'"
+                      class="mt-2"
+                      :is-update="isUpdatingCipherKey"
+                    />
+                    <div class="flex gap-2 mt-4">
+                      <OButton
+                        data-test="add-report-step1-continue-btn"
+                        variant="primary"
+                        size="sm-action"
+                        :disabled="isSubmitting"
+                        @click="continueToStep2"
+                      >
+                        Continue
+                      </OButton>
+                    </div>
+                  </div>
+                </OStep>
+
+                <OStep
+                  data-test="cipher-key-encryption-mechanism-step"
+                  :name="2"
+                  :title="t('cipherKey.step2')"
+                  icon="add"
+                  :done="step > 2"
+                >
+                  <add-encryption-mechanism />
+                  <div class="flex gap-2 mt-4">
+                    <OButton
+                      data-test="add-cipher-key-step2-back-btn"
+                      variant="outline"
+                      size="sm-action"
+                      :disabled="isSubmitting"
+                      @click="step = 1"
+                    >
+                      {{ t('common.back') }}
+                    </OButton>
+                  </div>
+                </OStep>
+              </OStepper>
             </div>
           </div>
-        </OStep>
-
-        <OStep
-          data-test="cipher-key-encryption-mechanism-step"
-          :name="2"
-          :title="t('cipherKey.step2')"
-          icon="add"
-          :done="step > 2"
-        >
-          <add-encryption-mechanism ref="encryptionMechanismRef" v-model:formData="formData" />
-          <div class="flex gap-2 mt-4">
+        </div>
+        <div class="mx-2">
+          <div class="flex justify-end px-2 py-4 w-full gap-2 border-t border-border-default"
+            style="position: sticky; bottom: 0px; z-index: 2"
+          >
             <OButton
-              data-test="add-cipher-key-step2-back-btn"
+              data-test="add-cipher-key-cancel-btn"
               variant="outline"
               size="sm-action"
-              @click="step = 1"
+              :disabled="isSubmitting"
+              @click="openCancelDialog"
             >
-              {{ t('common.back') }}
+              {{ t('common.cancel') }}
+            </OButton>
+            <OButton
+              data-test="add-cipher-key-save-btn"
+              variant="primary"
+              size="sm-action"
+              type="submit"
+              :loading="isSubmitting"
+            >
+              {{ t('common.save') }}
             </OButton>
           </div>
-        </OStep>
-      </OStepper>
-      </div>
-      </div>
-    </div>
-    <div class="mx-2">
-            <div class="flex justify-end px-2 py-4 w-full gap-2 border-t border-border-default"
-      style="position: sticky; bottom: 0px; z-index: 2"
-      >
-        <OButton
-          data-test="add-cipher-key-cancel-btn"
-          variant="outline"
-          size="sm-action"
-          @click="openCancelDialog"
-        >
-          {{ t('common.cancel') }}
-        </OButton>
-        <OButton
-          :disabled="
-            (step === 1 && isUpdatingCipherKey == false) || isSubmitting
-          "
-          data-test="add-cipher-key-save-btn"
-          variant="primary"
-          size="sm-action"
-          @click="onSubmit"
-        >
-          {{ t('common.save') }}
-        </OButton>
-      </div>
-    </div>
+        </div>
+      </OForm>
     </div>
     <ConfirmDialog
       v-model="dialog.show"
@@ -174,80 +167,48 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   </div>
 </template>
 <script lang="ts" setup>
-import { ref, onBeforeMount, onActivated, computed } from "vue";
+import { ref, computed, onMounted, onActivated } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
-import {
-  isValidResourceName,
-  maxLengthCharValidation,
-} from "@/utils/zincutils";
 import AddOpenobserveType from "@/components/cipherkeys/AddOpenobserveType.vue";
 import AddAkeylessType from "@/components/cipherkeys/AddAkeylessType.vue";
 import AddEncryptionMechanism from "@/components/cipherkeys/AddEncryptionMechanism.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import CipherKeysService from "@/services/cipher_keys";
-import OButton from '@/lib/core/Button/OButton.vue';
-import OInput from '@/lib/forms/Input/OInput.vue';
-import OSelect from '@/lib/forms/Select/OSelect.vue';
+import OButton from "@/lib/core/Button/OButton.vue";
+import OForm from "@/lib/forms/Form/OForm.vue";
+import { useOForm } from "@/lib/forms/Form/useOForm";
+import OFormInput from "@/lib/forms/Input/OFormInput.vue";
+import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OStepper from "@/lib/navigation/Stepper/OStepper.vue";
 import OStep from "@/lib/navigation/Stepper/OStep.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import {
+  makeAddCipherKeySchema,
+  addCipherKeyDefaults,
+  type AddCipherKeyForm,
+} from "@/components/cipherkeys/AddCipherKey.schema";
 
 const emit = defineEmits(["cancel:hideform"]);
 const { t } = useI18n();
 const router = useRouter();
 const store = useStore();
-const addCipherKeyFormRef: any = ref();
-const nameError = ref('');
-const storeTypeError = ref('');
-// Flipped to true the first time the user clicks Continue. Passed down to
-// sub-forms so they can surface "X is required" errors on un-touched fields.
-const submitAttempted = ref(false);
-const isUpdatingCipherKey: any = ref(false);
+
+const isUpdatingCipherKey = ref(false);
 const step = ref(1);
-const isSubmitting = ref(false);
-const formData: any = ref({
-  name: "",
-  key: {
-    store: {
-      type: "local",
-      akeyless: {
-        base_url: "",
-        access_id: "",
-        auth: {
-          type: "access_key",
-          access_key: "",
-          ldap: {
-            username: "",
-            password: "",
-          },
-        },
-        store: {
-          type: "static_secret",
-          static_secret: "",
-          dfc: {
-            name: "",
-            iv: "",
-            encrypted_data: "",
-          },
-        },
-      },
-      local: "",
-    },
-    mechanism: {
-      type: "simple",
-      simple_algorithm: "aes-256-siv",
-    },
-  },
-});
-const cipherKeyTypes = computed(() => [
+// Continue advances the stepper by running a real form submit; this flag tells
+// the @submit handler to advance instead of save (footer Save / Enter saves).
+const pendingContinue = ref(false);
+// JSON snapshot of the form values at load, for the cancel "discard changes"
+// prompt and the edit "no changes detected" short-circuit (isUpdate diffing).
+const originalData = ref("");
+
+const cipherKeyTypes = [
   { label: "OpenObserve", value: "local" },
   { label: "Akeyless", value: "akeyless" },
-]);
-
-const originalData: any = ref("");
+];
 
 const dialog = ref({
   show: false,
@@ -256,17 +217,37 @@ const dialog = ref({
   okCallback: () => {},
 });
 
-onActivated(() => setupTemplateData());
-onBeforeMount(() => {
-  formData.value["isUpdate"] = isUpdatingCipherKey;
-  originalData.value = JSON.stringify(formData.value);
-  setupTemplateData();
+const getTypeLabel = (type: string) =>
+  cipherKeyTypes.find((item) => item.value === type)?.label;
+
+// The parent OWNS the form (headless useOForm): it renders <OForm>, so it sits
+// above the provide boundary and can't inject — yet it needs store.type
+// reactively to drive the OStepper's conditional child + the step-1 title.
+// useOForm + form.useStore gives that directly, with no mirror/subscribe; the
+// children inject this SAME form via <OForm :form="form">. The save is wired
+// here through useOForm (not @submit on the tag) — wrapped lazily so onFormSubmit
+// (declared below) resolves at submit time, not at setup.
+// Build the schema with useI18n's `t` so the three previously-translated
+// validation messages (provider-type / algorithm / secret required) render in
+// the active locale, exactly as they did before the migration.
+const addCipherKeySchema = makeAddCipherKeySchema(t);
+
+const form = useOForm<AddCipherKeyForm>({
+  defaultValues: addCipherKeyDefaults(),
+  schema: addCipherKeySchema,
+  onSubmit: (value) => onFormSubmit(value),
 });
 
-const getTypeLabel = (type: string) => {
-  return cipherKeyTypes.value.find((t) => t.value === type)?.label;
-};
+const storeType = form.useStore(
+  (s: any) => s?.values?.key?.store?.type ?? "local",
+);
 
+const step1Title = computed(
+  () => `${t("cipherKey.step1")} (Type: ${getTypeLabel(storeType.value)})`,
+);
+
+// Deep-merge the loaded record onto the default shape so any field the backend
+// omits keeps its schema default (used for edit prefill).
 function mergeObjects(base: any, updates: any) {
   for (const key in updates) {
     if (
@@ -274,10 +255,8 @@ function mergeObjects(base: any, updates: any) {
       typeof updates[key] === "object" &&
       !Array.isArray(updates[key])
     ) {
-      // If the value is an object, recursively merge
       base[key] = mergeObjects(base[key] || {}, updates[key]);
     } else {
-      // Otherwise, replace or add the value from updates
       base[key] = updates[key];
     }
   }
@@ -287,194 +266,142 @@ function mergeObjects(base: any, updates: any) {
 const setupTemplateData = () => {
   if (router.currentRoute.value.query.action === "edit") {
     isUpdatingCipherKey.value = true;
-    if (router.currentRoute.value.query.name) {
-      const name = String(router.currentRoute.value.query.name) || "";
-      if (name === "") {
-        toast({
-          variant: "error",
-          message: "Invalid cipher key name",
-        });
-        emit("cancel:hideform");
-        return;
-      }
-      CipherKeysService.get_by_name(
-        store.state.selectedOrganization.identifier,
-        name,
-      )
-        .then((response) => {
-          formData.value = mergeObjects({ ...formData.value }, response.data);
-          originalData.value = JSON.stringify(formData.value);
-        })
-        .catch((error) => {
-          if (error.status != 403) {
-            toast({
-              variant: "error",
-              message:
-                error.response.data.message || "Error fetching cipher key.",
-            });
-          }
-        });
+    const name = String(router.currentRoute.value.query.name || "");
+    if (name === "") {
+      toast({ variant: "error", message: "Invalid cipher key name" });
+      emit("cancel:hideform");
+      return;
     }
+    CipherKeysService.get_by_name(
+      store.state.selectedOrganization.identifier,
+      name,
+    )
+      .then((response) => {
+        // :default-values is read once at mount; re-seed via reset now the
+        // record has arrived (playbook §4: async edit prefill → form.reset).
+        const record = mergeObjects(
+          addCipherKeyDefaults(),
+          response.data,
+        ) as AddCipherKeyForm;
+        form.reset(record);
+        originalData.value = JSON.stringify(
+          form.state.values ?? record,
+        );
+      })
+      .catch((error) => {
+        if (error.status != 403) {
+          toast({
+            variant: "error",
+            message:
+              error.response?.data?.message || "Error fetching cipher key.",
+          });
+        }
+      });
   }
 };
 
-const validateName = (): boolean => {
-  if (!formData.value.name) {
-    nameError.value = 'Name is required';
-    return false;
+onActivated(() => setupTemplateData());
+onMounted(() => {
+  // Baseline for the cancel diff; edit mode re-snapshots after the record loads.
+  originalData.value = JSON.stringify(
+    form.state.values ?? addCipherKeyDefaults(),
+  );
+  setupTemplateData();
+});
+
+// Continue: validate the whole form by submitting through it (reveals any step-1
+// errors on the mounted fields); advance only when valid. pendingContinue makes
+// the @submit handler advance instead of save.
+const continueToStep2 = async () => {
+  pendingContinue.value = true;
+  try {
+    await form.handleSubmit();
+  } finally {
+    pendingContinue.value = false;
   }
-  if (!isValidResourceName(formData.value.name)) {
-    nameError.value = 'Characters like :, ?, /, #, and spaces are not allowed.';
-    return false;
-  }
-  if (formData.value.name.length > 50) {
-    nameError.value = 'Name must be 50 characters or less.';
-    return false;
-  }
-  if (!/^[a-zA-Z0-9_-]+$/.test(formData.value.name)) {
-    nameError.value = 'Only alphanumeric characters, underscores, and hyphens are allowed';
-    return false;
-  }
-  nameError.value = '';
-  return true;
 };
 
-const validateStoreType = (): boolean => {
-  if (!formData.value.key.store.type) {
-    storeTypeError.value = 'Type is required';
-    return false;
-  }
-  storeTypeError.value = '';
-  return true;
-};
-
-const onSubmit = () => {
-  const nameValid = validateName();
-  const typeValid = validateStoreType();
-  const mechanismValid = encryptionMechanismRef.value?.validate?.() ?? true;
-  if (!nameValid || !typeValid || !mechanismValid) {
-    toast({ variant: "error", message: 'Please fill all the required fields' });
+// @submit fires only when the whole schema passes. For a Continue submit we just
+// advance the stepper; for a footer Save / Enter submit we create or update.
+const onFormSubmit = async (value: AddCipherKeyForm) => {
+  if (pendingContinue.value) {
+    step.value = 2;
     return;
   }
-  isSubmitting.value = true;
   if (isUpdatingCipherKey.value) {
-    isSubmitting.value = false;
-    updateCipherKey();
+    await updateCipherKey(value);
   } else {
-    isSubmitting.value = false;
-    createCipherKey();
+    await createCipherKey(value);
   }
 };
 
-const createCipherKey = () => {
+const createCipherKey = async (value: AddCipherKeyForm) => {
   const dismiss = toast({
     variant: "loading",
     message: "Please wait while processing your request...",
-      timeout: 0,
-});
-  CipherKeysService.create(
-    store.state.selectedOrganization.identifier,
-    formData.value,
-  )
-    .then((response) => {
-      dismiss();
-      toast({
-        variant: "success",
-        message: "Cipher key created successfully",
-      });
-      emit("cancel:hideform");
-    })
-    .catch((error) => {
-      dismiss();
-      if (error.status != 403) {
-        toast({
-          variant: "error",
-          message: error.response.data.message,
-        });
-      }
-    });
-};
-
-function filterEditedAttributes(formdata: any, originalData: any) {
-  const result: any = {};
-
-  for (const key in formdata) {
-    const formValue = formdata[key];
-    const originalValue = originalData[key];
-
-    if (originalValue === undefined) {
-      // New attribute in formdata, keep it
-      result[key] = formValue;
-    } else if (
-      typeof formValue === "object" &&
-      formValue !== null &&
-      !Array.isArray(formValue)
-    ) {
-      // Recursively process nested objects
-      const nestedResult = filterEditedAttributes(formValue, originalValue);
-      if (Object.keys(nestedResult).length > 0) {
-        result[key] = nestedResult;
-      }
-    } else if (formValue !== originalValue) {
-      // Edited attribute, keep it
-      result[key] = formValue;
+    timeout: 0,
+  });
+  try {
+    // The service's CipherKeyData type declares a `provider` field the payload
+    // has never included (the old code passed an `any`-typed formData); cast to
+    // keep the real shape without editing the shared service type.
+    // `isUpdate` is a UI flag, NOT a form field — merged in here (outside the
+    // schema) so the request body stays byte-for-byte identical to the
+    // pre-migration payload. The backend ignores it (KeyAddRequest deserializes
+    // only `name` + `key`, no deny_unknown_fields), so this is purely parity.
+    await CipherKeysService.create(
+      store.state.selectedOrganization.identifier,
+      { ...value, isUpdate: isUpdatingCipherKey.value } as any,
+    );
+    dismiss();
+    toast({ variant: "success", message: "Cipher key created successfully" });
+    emit("cancel:hideform");
+  } catch (error: any) {
+    dismiss();
+    if (error.status != 403) {
+      toast({ variant: "error", message: error.response?.data?.message });
     }
   }
+};
 
-  return result;
-}
-
-const updateCipherKey = () => {
-  isSubmitting.value = true;
-  const dismiss = toast({
-    variant: "loading",
-    message: "Please wait while processing your request...",
-      timeout: 0,
-});
-
-  if (JSON.stringify(formData.value) == originalData.value) {
-    dismiss();
-    toast({
-      variant: "success",
-      message: "No changes detected",
-    });
+const updateCipherKey = async (value: AddCipherKeyForm) => {
+  const current = JSON.stringify(form.state.values ?? value);
+  if (current === originalData.value) {
+    toast({ variant: "success", message: "No changes detected" });
     emit("cancel:hideform");
     return;
   }
+  const dismiss = toast({
+    variant: "loading",
+    message: "Please wait while processing your request...",
+    timeout: 0,
+  });
+  try {
+    // Merge the `isUpdate` UI flag back into the body for payload parity with
+    // the pre-migration code (backend ignores it — see createCipherKey).
+    await CipherKeysService.update(
+      store.state.selectedOrganization.identifier,
+      { ...value, isUpdate: isUpdatingCipherKey.value } as any,
+      value.name,
+    );
+    dismiss();
+    toast({ variant: "success", message: "Cipher key updated successfully" });
+    emit("cancel:hideform");
+  } catch (error: any) {
+    dismiss();
+    if (error.status != 403) {
+      toast({ variant: "error", message: error.response?.data?.message });
+    }
+  }
+};
 
-  const editedData = filterEditedAttributes(
-    formData.value,
-    JSON.parse(originalData.value),
-  );
-
-  CipherKeysService.update(
-    store.state.selectedOrganization.identifier,
-    formData.value,
-    formData.value.name,
-  )
-    .then((response) => {
-      isSubmitting.value = false;
-      dismiss();
-      toast({
-        variant: "success",
-        message: "Cipher key updated successfully",
-      });
-      emit("cancel:hideform");
-    })
-    .catch((error) => {
-      isSubmitting.value = false;
-      dismiss();
-      if (error.status != 403) {
-        toast({
-          variant: "error",
-          message: error.response.data.message,
-        });
-      }
-    });
+const goToCipherList = () => {
+  emit("cancel:hideform");
 };
 
 const openCancelDialog = () => {
-  if (originalData.value === JSON.stringify(formData.value)) {
+  const current = JSON.stringify(form.state.values ?? {});
+  if (current === originalData.value) {
     goToCipherList();
     return;
   }
@@ -484,43 +411,15 @@ const openCancelDialog = () => {
   dialog.value.okCallback = goToCipherList;
 };
 
-const goToCipherList = () => {
-  emit("cancel:hideform");
-};
-
-// Template ref to the Akeyless sub-form so we can call its exposed
-// `validate()` method (which runs all field validators and sets the
-// inline error refs).
-const akeylessTypeRef = ref<any>(null);
-const encryptionMechanismRef = ref<any>(null);
-
-const validateStoreSecret = (): boolean => {
-  const type = formData.value.key.store.type;
-  if (type === 'local') {
-    const secret = formData.value.key.store.local;
-    if (!secret || (typeof secret === 'string' && secret.trim() === '')) {
-      return false;
-    }
-  }
-  if (type === 'akeyless') {
-    // Returns false if any required Akeyless field is missing; the child has
-    // already surfaced inline errors for whichever fields failed.
-    const ok = akeylessTypeRef.value?.validate?.();
-    if (ok === false) return false;
-  }
-  return true;
-};
-
-const validateForm = async (stepNumber: number) => {
-  // Flip submitAttempted so child sub-forms surface their inline errors on
-  // un-touched fields. Then run every validator (no short-circuit) so all
-  // missing fields show their errors at once.
-  submitAttempted.value = true;
-  const nameValid = validateName();
-  const typeValid = validateStoreType();
-  const secretValid = validateStoreSecret();
-  if (nameValid && typeValid && secretValid) {
-    step.value = stepNumber;
-  }
-};
+defineExpose({
+  form,
+  step,
+  isUpdatingCipherKey,
+  storeType,
+  cipherKeyTypes,
+  getTypeLabel,
+  dialog,
+  continueToStep2,
+  openCancelDialog,
+});
 </script>

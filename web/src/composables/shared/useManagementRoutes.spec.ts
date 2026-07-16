@@ -150,6 +150,11 @@ describe("useManagementRoutes", () => {
       expect(llmRoute).toBeUndefined();
     });
 
+    it("should NOT have genAiAgentMapping route in OSS builds", () => {
+      const genAiRoute = routes[0].children.find((child: any) => child.name === "genAiAgentMapping");
+      expect(genAiRoute).toBeUndefined();
+    });
+
     it("should have beforeEnter hook for general route", () => {
       const generalRoute = routes[0].children.find((child: any) => child.name === "general");
       expect(typeof generalRoute.beforeEnter).toBe("function");
@@ -357,7 +362,7 @@ describe("useManagementRoutes", () => {
 
     it("should have exactly 18 children routes when enterprise is enabled", () => {
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(18); // 7 base + llmProviders + 10 enterprise
+      expect(routes[0].children).toHaveLength(18); // 6 base + llmProviders + genAiAgentMapping + 10 enterprise
     });
   });
 
@@ -410,7 +415,7 @@ describe("useManagementRoutes", () => {
 
     it("should have exactly 9 children routes when cloud is enabled", () => {
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(9); // 7 base + llmProviders + 1 cloud
+      expect(routes[0].children).toHaveLength(9); // 6 base + llmProviders + genAiAgentMapping + 1 cloud
     });
   });
 
@@ -427,7 +432,7 @@ describe("useManagementRoutes", () => {
 
     it("should have exactly 19 children routes when both enterprise and cloud are enabled", () => {
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(19); // 7 base + llmProviders + 10 enterprise + 1 cloud
+      expect(routes[0].children).toHaveLength(19); // 6 base + llmProviders + genAiAgentMapping + 10 enterprise + 1 cloud
     });
 
     it("should have all enterprise routes when both are enabled", () => {
@@ -507,63 +512,63 @@ describe("useManagementRoutes", () => {
       config.isEnterprise = "false";
       config.isCloud = "false";
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(7); // Base routes include gen_ai_agent_mapping; llm_providers is enterprise/cloud-only
+      expect(routes[0].children).toHaveLength(6); // gen_ai_agent_mapping and llm_providers are enterprise/cloud-only
     });
 
     it("should handle isCloud as string 'false'", () => {
       config.isEnterprise = "false";
       config.isCloud = "false";
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(7); // Base routes include gen_ai_agent_mapping; llm_providers is enterprise/cloud-only
+      expect(routes[0].children).toHaveLength(6); // gen_ai_agent_mapping and llm_providers are enterprise/cloud-only
     });
 
     it("should handle isEnterprise as undefined", () => {
       (config as any).isEnterprise = undefined;
       config.isCloud = "false";
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(7); // Base routes include gen_ai_agent_mapping; llm_providers is enterprise/cloud-only
+      expect(routes[0].children).toHaveLength(6); // gen_ai_agent_mapping and llm_providers are enterprise/cloud-only
     });
 
     it("should handle isCloud as undefined", () => {
       config.isEnterprise = "false";
       (config as any).isCloud = undefined;
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(7); // Base routes include gen_ai_agent_mapping; llm_providers is enterprise/cloud-only
+      expect(routes[0].children).toHaveLength(6); // gen_ai_agent_mapping and llm_providers are enterprise/cloud-only
     });
 
     it("should handle both config values as undefined", () => {
       (config as any).isEnterprise = undefined;
       (config as any).isCloud = undefined;
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(7); // Base routes include gen_ai_agent_mapping; llm_providers is enterprise/cloud-only
+      expect(routes[0].children).toHaveLength(6); // gen_ai_agent_mapping and llm_providers are enterprise/cloud-only
     });
 
     it("should handle isEnterprise as non-string truthy value", () => {
       (config as any).isEnterprise = true;
       config.isCloud = "false";
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(7); // Base routes include gen_ai_agent_mapping; llm_providers is enterprise/cloud-only, since config comparison is strict "true"
+      expect(routes[0].children).toHaveLength(6); // gen_ai_agent_mapping and llm_providers are enterprise/cloud-only, since config comparison is strict "true"
     });
 
     it("should handle isCloud as non-string truthy value", () => {
       config.isEnterprise = "false";
       (config as any).isCloud = true;
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(7); // Base routes include gen_ai_agent_mapping; llm_providers is enterprise/cloud-only, since config comparison is strict "true"
+      expect(routes[0].children).toHaveLength(6); // gen_ai_agent_mapping and llm_providers are enterprise/cloud-only, since config comparison is strict "true"
     });
 
     it("should handle empty string for isEnterprise", () => {
       config.isEnterprise = "";
       config.isCloud = "false";
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(7); // Base routes include gen_ai_agent_mapping; llm_providers is enterprise/cloud-only
+      expect(routes[0].children).toHaveLength(6); // gen_ai_agent_mapping and llm_providers are enterprise/cloud-only
     });
 
     it("should handle empty string for isCloud", () => {
       config.isEnterprise = "false";
       config.isCloud = "";
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(7); // Base routes include gen_ai_agent_mapping; llm_providers is enterprise/cloud-only
+      expect(routes[0].children).toHaveLength(6); // gen_ai_agent_mapping and llm_providers are enterprise/cloud-only
     });
 
     it("should return the same structure on multiple calls", () => {
