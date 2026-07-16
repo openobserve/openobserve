@@ -4275,7 +4275,26 @@
       "logsWithCount": "Loglar ({count})",
       "tracesWithCount": "İzler ({count})",
       "metricsWithCount": "Metrikler ({count})"
-    }
+    },
+    "dangerZone": "Tehlikeli Bölge",
+    "deleteOrganization": "Kuruluşu sil",
+    "deleteOrganizationTitle": "Bu kuruluşu sil",
+    "deleteOrganizationDescription": "{name} kuruluşunu silinmek üzere zamanlar. Kuruluş herkes için — siz dahil — anında erişilemez hale gelir ve ek süre dolduğunda kalıcı olarak silinir. Bundan önce geri yüklemek için destek ekibiyle iletişime geçmeniz gerekir.",
+    "deleteOrganizationScopeLoading": "Bu kuruluşun içeriği denetleniyor…",
+    "deleteOrganizationScope": "{dashboards} pano · {streams} akış · {size} veri",
+    "deleteFactGracePeriod": "Ek süre",
+    "deleteFactGracePeriodDetail": "Silinene kadar destek ekibi geri yükleyebilir",
+    "deleteFactEverything": "Her şeyi siler",
+    "deleteFactEverythingDetail": "Tüm panolar, akışlar ve alınan veriler",
+    "deleteFactMembers": "{n} üyeyi etkiler | {n} üyeyi etkiler",
+    "deleteFactMembersDetail": "Tüm erişim anında iptal edilir",
+    "deleteFactOwner": "Yalnızca yöneticiler",
+    "deleteFactOwnerDetail": "Bu kuruluşta Yönetici rolü gerektirir",
+    "deleteOrganizationConfirm": "Bu işlem \"{name}\" kuruluşunu ve ona ait tüm akışları, panoları, uyarıları, işlem hatlarını, kullanıcıları ve ayarları silinmek üzere zamanlar.",
+    "deleteOrganizationWarning": "Kuruluş anında kullanılamaz hale gelir ve onu kullanan herkesten gizlenir. Veri alımı engellenir; zamanlanmış uyarılar, işlem hatları ve raporlar çalışmayı durdurur, bu nedenle silinmek üzere zamanlandığı sürece hiçbir bildirim gönderilmez.",
+    "deleteOrganizationRecoverable": "Ek süre boyunca geri yüklenebilir durumda tutulur, ancak onu kendiniz geri yükleyemezsiniz — silme başlar başlamaz bu kuruluşa erişiminizi kaybedersiniz ve yalnızca OpenObserve destek ekibi onu geri getirebilir. Ek süre dolduktan sonra verileri kalıcı olarak silinir ve hiç kimse tarafından kurtarılamaz.",
+    "deleteOrganizationTypeToConfirm": "Onaylamak için aşağıya {name} yazın:",
+    "deleteOrganizationInitiated": "Kuruluş silinmek üzere zamanlandı. Artık gizli; ek süre dolmadan geri yüklemek için destek ekibiyle iletişime geçin."
   },
   "reports": {
     "header": "Raporlar",

@@ -4275,7 +4275,26 @@
       "logsWithCount": "Logs ({count})",
       "tracesWithCount": "Traces ({count})",
       "metricsWithCount": "Metrics ({count})"
-    }
+    },
+    "dangerZone": "Gevarenzone",
+    "deleteOrganization": "Organisatie verwijderen",
+    "deleteOrganizationTitle": "Deze organisatie verwijderen",
+    "deleteOrganizationDescription": "Plant {name} in voor verwijdering. De organisatie wordt onmiddellijk ontoegankelijk voor iedereen — ook voor u — en wordt na afloop van de respijtperiode definitief gewist. Herstellen daarvóór kan alleen via de support.",
+    "deleteOrganizationScopeLoading": "Controleren wat deze organisatie bevat…",
+    "deleteOrganizationScope": "{dashboards} dashboards · {streams} streams · {size} aan gegevens",
+    "deleteFactGracePeriod": "Respijtperiode",
+    "deleteFactGracePeriodDetail": "Support kan de organisatie tot de verwijdering herstellen",
+    "deleteFactEverything": "Verwijdert alles",
+    "deleteFactEverythingDetail": "Alle dashboards, streams en opgenomen gegevens",
+    "deleteFactMembers": "Raakt {n} lid | Raakt {n} leden",
+    "deleteFactMembersDetail": "Alle toegang wordt onmiddellijk ingetrokken",
+    "deleteFactOwner": "Alleen beheerders",
+    "deleteFactOwnerDetail": "Vereist de beheerdersrol in deze organisatie",
+    "deleteOrganizationConfirm": "Hiermee worden \"{name}\" en alle bijbehorende streams, dashboards, waarschuwingen, pipelines, gebruikers en instellingen ingepland voor verwijdering.",
+    "deleteOrganizationWarning": "De organisatie is onmiddellijk niet meer beschikbaar en wordt verborgen voor iedereen die haar gebruikt. Opname wordt geblokkeerd en geplande waarschuwingen, pipelines en rapporten stoppen, dus er worden geen meldingen verzonden zolang de verwijdering gepland staat.",
+    "deleteOrganizationRecoverable": "De organisatie blijft tijdens de respijtperiode herstelbaar, maar u kunt haar niet zelf herstellen — u verliest de toegang zodra de verwijdering begint en alleen de OpenObserve-support kan haar terughalen. Na de respijtperiode worden de gegevens definitief verwijderd en kan niemand ze nog herstellen.",
+    "deleteOrganizationTypeToConfirm": "Typ ter bevestiging {name} hieronder:",
+    "deleteOrganizationInitiated": "Organisatie ingepland voor verwijdering. Ze is nu verborgen; neem contact op met de support om haar vóór het einde van de respijtperiode te herstellen."
   },
   "reports": {
     "header": "Rapporten",
