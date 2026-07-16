@@ -62,15 +62,6 @@ vi.mock("vue-router", () => ({
   }),
 }));
 
-vi.mock("echarts", () => ({
-  init: () => ({
-    setOption: vi.fn(),
-    resize: vi.fn(),
-    dispose: vi.fn(),
-  }),
-  registerMap: vi.fn(),
-}));
-
 vi.mock("@/services/synthetics", () => ({
   default: {
     listByFolderId: mockServiceList,
@@ -122,17 +113,9 @@ const baseStubs = {
       "emptyMessage",
     ],
   },
-  MonitorFormDrawer: {
-    template: '<div data-test="synthetic-monitoring-monitor-form-drawer" />',
-    props: ["open", "editTarget", "onlinePrivateLocations"],
-  },
   MoveAcrossFolders: {
     template: '<div data-test="synthetic-monitoring-move-dialog" />',
     props: ["type", "moduleId", "activeFolderId", "open"],
-  },
-  PrivateLocations: {
-    template: '<div data-test="synthetic-monitoring-private-locations" />',
-    props: ["locations"],
   },
   ODropdown: {
     template:
@@ -184,9 +167,7 @@ const baseStubs = {
     props: ["value", "size", "iconLeft"],
     inheritAttrs: true,
   },
-  Teleport: {
-    template: '<div><slot /></div>',
-  },
+
 };
 
 function mountPage() {

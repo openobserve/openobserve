@@ -162,107 +162,11 @@
           </template>
         </MonitorTable>
 
-        <!-- ── PRIVATE LOCATIONS ── -->
-        <PrivateLocations
-          v-else-if="activeTab === 'private'"
-          :locations="privateLocations"
-          data-test="synthetic-monitoring-private-locations"
-        />
+
       </div>
     </div>
 
 
-    <!-- Map dot tooltip -->
-    <Teleport to="body">
-      <div v-if="mapTip.show && mapTip.stat"
-        class="fixed z-[9999] px-3 py-2.5 bg-gray-800 text-gray-100 rounded-xl text-xs min-w-[10.625rem] pointer-events-auto shadow-lg"
-        :style="{ left: mapTip.x + 'px', top: mapTip.y + 'px' }"
-        @mouseenter="keepMapTip"
-        @mouseleave="hideMapTip">
-        <div class="flex items-center justify-between gap-2.5 mb-1.5">
-          <span class="text-[0.6875rem] opacity-65 whitespace-nowrap">{{ mapTip.stat.flag }} {{ mapTip.stat.label }}</span>
-          <span class="text-[0.6875rem] font-bold px-2 py-0.5 rounded whitespace-nowrap"
-            :class="{
-              'bg-status-success-bg/70 text-status-success-text': mapTip.stat.health === 'up',
-              'bg-status-error-bg/70 text-status-error-text': mapTip.stat.health === 'down',
-              'bg-status-warning-bg/70 text-status-warning-text': mapTip.stat.health === 'deg',
-            }">
-            {{ mapTip.stat.health === 'up' ? '✓ Healthy' : mapTip.stat.health === 'down' ? '✗ Outage' : '⚠ Degraded' }}
-          </span>
-        </div>
-        <hr class="border-white/10 mb-2" />
-        <div class="flex justify-between gap-4 mt-1 text-[0.6875rem]"><span>Uptime</span><span class="font-semibold">{{ mapTip.stat.uptime }}%</span></div>
-        <div class="flex justify-between gap-4 mt-1 text-[0.6875rem]"><span>Checks</span><span class="font-semibold">{{ mapTip.stat.total }}</span></div>
-        <div v-if="mapTip.stat.downCt" class="flex justify-between gap-4 mt-1 text-[0.6875rem]"><span>Down</span><span class="font-semibold text-status-error-text">{{ mapTip.stat.downCt }}</span></div>
-        <div v-if="mapTip.stat.degCt" class="flex justify-between gap-4 mt-1 text-[0.6875rem]"><span>Degraded</span><span class="font-semibold text-status-warning-text">{{ mapTip.stat.degCt }}</span></div>
-        <div class="flex justify-between gap-4 mt-1 text-[0.6875rem]"><span>City</span><span class="font-semibold">{{ mapTip.stat.city }}</span></div>
-      </div>
-    </Teleport>
-
-    <!-- Full Heatmap Modal -->
-    <ODialog v-model:open="showHeatmapModal" title="Global Health Heatmap" :width="94">
-      <template #header-right>
-        <div class="flex items-center gap-3 ml-2 flex-1">
-          <span class="flex items-center gap-1.5 text-[0.6875rem] text-text-secondary"><span class="inline-block w-2 h-2 rounded-full shrink-0 bg-status-success-text" /><span>Healthy</span></span>
-          <span class="flex items-center gap-1.5 text-[0.6875rem] text-text-secondary"><span class="inline-block w-2 h-2 rounded-full shrink-0 bg-status-warning-text" /><span>Degraded</span></span>
-          <span class="flex items-center gap-1.5 text-[0.6875rem] text-text-secondary"><span class="inline-block w-2 h-2 rounded-full shrink-0 bg-status-error-text" /><span>Down</span></span>
-        </div>
-      </template>
-      <div class="flex-none h-[clamp(22.5rem,46vw,33.75rem)] overflow-hidden p-0">
-        <div ref="heatmapChartEl" class="w-full h-full"></div>
-      </div>
-    </ODialog>
-
-    <!-- Active Issues Modal -->
-    <ODialog v-model:open="showIssuesModal" size="sm">
-      <template #header>
-        <OIcon :name="geoIssues.length ? 'error' : 'check-circle'" size="sm" :class="geoIssues.length ? 'text-status-error-text' : 'text-status-success-text'"/>
-        <span class="text-base font-semibold">Active Issues</span>
-      </template>
-      <div class="flex-1 overflow-y-auto">
-        <!-- All clear -->
-        <template v-if="!geoIssues.length">
-          <div class="flex flex-col items-center justify-center py-12 px-6 text-center">
-            <OIcon name="check-circle" size="lg" class="text-status-success-text"/>
-            <div class="font-semibold mt-2">All regions healthy</div>
-            <div class="text-xs text-text-secondary mt-1">No active issues detected across all monitoring locations.</div>
-          </div>
-        </template>
-        <!-- Issue rows -->
-        <template v-else>
-          <div v-if="geoLocStats.filter(s=>s.health!=='up').length >= 2" class="flex items-center gap-2 mx-4 mt-3 px-3 py-2 bg-status-warning-bg text-status-warning-text rounded-lg text-xs">
-            <OIcon name="warning-amber" size="sm"/> {{ geoLocStats.filter(s=>s.health!=='up').length }} regions simultaneously affected — possible CDN or upstream incident
-          </div>
-          <div class="px-4 pb-4 pt-2 flex flex-col gap-1.5">
-            <div v-for="issue in geoIssues" :key="issue.key" class="flex items-center justify-between px-3.5 py-3 rounded-xl border border-border-default" :class="issue.level==='error'?'bg-status-error-bg/5 border-status-error-text/20':'bg-status-warning-bg/5 border-status-warning-text/20'">
-              <div class="flex items-center gap-2.5">
-                <span class="w-2.5 h-2.5 rounded-full shrink-0" :class="issue.level==='error'?'bg-status-error-text':'bg-status-warning-text'"/>
-                <div>
-                  <div class="text-[0.8125rem] font-semibold">{{ issue.stat.flag }} {{ issue.stat.label }}</div>
-                  <div class="text-[0.6875rem] text-text-secondary mt-px">{{ issue.stat.city }}</div>
-                </div>
-              </div>
-              <div class="flex flex-col items-end gap-0.5">
-                <span class="text-[0.625rem] font-bold px-2 py-0.5 rounded-md whitespace-nowrap" :class="issue.level==='error'?'bg-status-error-bg text-status-error-text':'bg-status-warning-bg text-status-warning-text'">
-                  {{ issue.level==='error' ? issue.stat.downCt + ' down' : issue.stat.degCt + ' degraded' }}
-                </span>
-                <div class="text-xs font-bold" :class="issue.level==='error'?'text-status-error-text':'text-status-warning-text'">{{ issue.stat.uptime }}% uptime</div>
-                <div class="text-[0.625rem] text-text-secondary">{{ issue.stat.total }} checks</div>
-              </div>
-            </div>
-          </div>
-        </template>
-      </div>
-    </ODialog>
-
-    <!-- DRAWER -->
-    <MonitorFormDrawer
-      v-model:open="showDrawer"
-      :edit-target="editTarget"
-      :online-private-locations="onlinePrivateLocations"
-      data-test="synthetic-monitoring-monitor-form-drawer"
-      @save="() => {}"
-    />
 
     <!-- Duplicate check dialog -->
     <ODialog
@@ -323,10 +227,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, watch, nextTick } from "vue";
+import { ref, computed, onMounted, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
-import * as echarts from "echarts";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -344,8 +247,6 @@ import { mapResponseToBrowserCheck, buildCreateBrowserTestPayload } from '@/util
 import { SYNTHETIC_CHECK_TYPES, type SyntheticCheckType } from '@/types/synthetics'
 import type { IconName } from '@/lib/core/Icon/OIcon.icons'
 import { useI18n } from 'vue-i18n'
-import PrivateLocations, { type PrivateLocation } from '@/components/synthetic-monitoring/PrivateLocations.vue'
-import MonitorFormDrawer from '@/components/synthetic-monitoring/MonitorFormDrawer.vue'
 import syntheticsService from '@/services/synthetics'
 import { getFoldersListByType } from '@/utils/commons'
 import { toast } from '@/lib/feedback/Toast/useToast'
@@ -447,11 +348,6 @@ function dotClass(status: string) {
   }
 }
 
-function cssVar(name: string, fallback: string): string {
-  if (typeof window === "undefined") return fallback;
-  return getComputedStyle(document.body).getPropertyValue(name).trim() || fallback;
-}
-
 // ── Data loading ───────────────────────────────────────────────────────
 // Start in loading state so the table shows the skeleton on first render
 // instead of briefly flashing the empty state before the fetch completes.
@@ -518,8 +414,6 @@ const statusFilter   = ref("all");
 const typeFilter     = ref("all");
 const locationFilter = ref("all");
 const search         = ref("");
-const showDrawer     = ref(false);
-const editTarget     = ref<any>(null);
 
 // ── Folder state ───────────────────────────────────────────────────────
 const activeFolderId      = ref<string>((route.query.folder as string) ?? 'default')
@@ -601,186 +495,6 @@ const onMoveUpdated = async () => {
   await loadMonitors()
 }
 
-onUnmounted(() => {
-  if (mapTipTimer) clearTimeout(mapTipTimer);
-  heatmapChart?.dispose();
-});
-
-// ── Geo Checks ────────────────────────────────────────────────────────
-const geoAllLocations = [
-  { key:"US East",    label:"US East",    flag:"🇺🇸", city:"Virginia, USA"      },
-  { key:"US West",    label:"US West",    flag:"🇺🇸", city:"Oregon, USA"        },
-  { key:"EU West",    label:"EU West",    flag:"🇮🇪", city:"Dublin, Ireland"    },
-  { key:"EU Central", label:"EU Central", flag:"🇩🇪", city:"Frankfurt, Germany" },
-  { key:"AP SE",      label:"AP SE",      flag:"🇸🇬", city:"Singapore"          },
-  { key:"AP NE",      label:"AP NE",      flag:"🇯🇵", city:"Tokyo, Japan"       },
-];
-const geoAllRows = computed(() => {
-  return monitors.value
-    .map((m, mi) => {
-      const cells = geoAllLocations.map((loc, li) => {
-        const configured = m.locations.includes(loc.key);
-        if (!configured) return { loc: loc.key, status: "none" as const, ms: null };
-        const seed = (mi * 11 + li * 17 + loc.key.charCodeAt(0)) % 97;
-        let st: "up"|"down"|"deg";
-        if (m.status === "down")          st = "down";
-        else if (m.status === "degraded") st = seed % 4 === 0 ? "deg" : seed % 7 === 0 ? "down" : "up";
-        else                              st = seed % 11 === 0 ? "deg" : "up";
-        const ms = st === "down" ? null : 55 + seed * 4 + (st === "deg" ? 280 + seed * 2 : 0);
-        return { loc: loc.key, status: st, ms };
-      });
-      return { monitor: m, cells };
-    })
-    .sort((a, b) => {
-      const rank = (r: typeof a) => r.cells.some(c=>c.status==="down") ? 0 : r.cells.some(c=>c.status==="deg") ? 1 : 2;
-      return rank(a) - rank(b);
-    });
-});
-const geoLocStats = computed(() =>
-  geoAllLocations.map((loc, li) => {
-    const configured = geoAllRows.value.filter(r => r.cells[li].status !== "none");
-    const downCt = configured.filter(r => r.cells[li].status === "down").length;
-    const degCt  = configured.filter(r => r.cells[li].status === "deg").length;
-    const upCt   = configured.filter(r => r.cells[li].status === "up").length;
-    const total  = configured.length;
-    const uptime = total ? +(((upCt + degCt * 0.5) / total) * 100).toFixed(1) : 100;
-    const health: "up"|"down"|"deg" = downCt > 0 ? "down" : degCt > 0 ? "deg" : "up";
-    return { ...loc, total, upCt, degCt, downCt, uptime, health };
-  })
-);
-
-// ── Geo Map & Panels ───────────────────────────────────────────────────
-const geoMapLonLat: Record<string, [number, number]> = {
-  "US East":    [-77.0, 38.9],
-  "US West":    [-122.4, 45.5],
-  "EU West":    [-6.2, 53.3],
-  "EU Central": [8.7, 50.1],
-  "AP SE":      [103.8, 1.3],
-  "AP NE":      [139.7, 35.7],
-};
-
-const showHeatmapModal = ref(false);
-const heatmapChartEl = ref<HTMLElement | null>(null);
-let heatmapChart: echarts.ECharts | null = null;
-let worldGeoRegistered = false;
-
-const getHeatmapOption = () => {
-  // Read the theme so token colors are re-resolved when it flips.
-  void store.state.theme;
-  const landColor   = cssVar("--color-surface-subtle", "#e2e8f0");
-  const borderCol   = cssVar("--color-border-default", "#cbd5e1");
-  const oceanBg     = cssVar("--color-surface-base", "#f8fafc");
-  const labelColor  = cssVar("--color-text-primary", "#334155");
-  const upColor     = cssVar("--color-status-success-text", "#22c55e");
-  const downColor   = cssVar("--color-status-error-text", "#ef4444");
-  const degColor    = cssVar("--color-status-warning-text", "#f59e0b");
-  const upShadow    = cssVar("--color-status-success-text", "rgba(34,197,94,0.5)");
-  const downShadow  = cssVar("--color-status-error-text", "rgba(239,68,68,0.5)");
-  const degShadow   = cssVar("--color-status-warning-text", "rgba(245,158,11,0.5)");
-  const tooltipBg   = cssVar("--color-surface-overlay", "#ffffff");
-  const tooltipBorder = cssVar("--color-border-default", "#e2e8f0");
-  const labelBorderColor = cssVar("--color-surface-overlay", "#ffffff");
-  return {
-    backgroundColor: oceanBg,
-    geo: {
-      map: "world",
-      roam: false,
-      silent: true,
-      top: 0,
-      bottom: 0,
-      left: 0,
-      right: 0,
-      itemStyle: { areaColor: landColor, borderColor: borderCol, borderWidth: 0.5 },
-      emphasis: { itemStyle: { areaColor: landColor }, label: { show: false } },
-      select: { disabled: true },
-    },
-    tooltip: {
-      trigger: "item",
-      formatter: (params: any) => {
-        if (!params.data) return "";
-        const d = params.data;
-        const col = d.health === "up" ? upColor : d.health === "down" ? downColor : degColor;
-        const label = d.health === "up" ? "Healthy" : d.health === "down" ? "Outage" : "Degraded";
-        return `<div style="font-size:12px;line-height:1.7"><b>${d.flag} ${d.name}</b><br/><span style="color:${col}">${label}</span><br/>Uptime: ${d.uptime}%<br/>Checks: ${d.total}</div>`;
-      },
-      backgroundColor: tooltipBg,
-      borderColor: tooltipBorder,
-      textStyle: { color: labelColor },
-    },
-    series: [{
-      type: "effectScatter",
-      coordinateSystem: "geo",
-      rippleEffect: { brushType: "stroke", scale: 3.5, period: 2.5 },
-      symbolSize: (val: any, params: any) => Math.max(12, Math.min(26, 10 + (params.data.total ?? 0) * 0.7)),
-      data: geoLocStats.value.map(s => ({
-        name: s.label,
-        value: [geoMapLonLat[s.key][0], geoMapLonLat[s.key][1]],
-        health: s.health,
-        uptime: s.uptime,
-        total: s.total,
-        flag: s.flag,
-      })),
-      itemStyle: {
-        color: (params: any) => params.data.health === "up" ? upColor : params.data.health === "down" ? downColor : degColor,
-        borderColor: "rgba(255,255,255,0.8)",
-        borderWidth: 2,
-        shadowBlur: 12,
-        shadowColor: (params: any) => params.data.health === "up" ? upShadow : params.data.health === "down" ? downShadow : degShadow,
-      },
-      label: {
-        show: true,
-        position: "bottom",
-        distance: 8,
-        formatter: (params: any) => `${params.data.flag} ${params.data.name}`,
-        fontSize: 10,
-        fontWeight: 600,
-        color: labelColor,
-        textBorderColor: labelBorderColor,
-        textBorderWidth: 2,
-      },
-    }],
-  };
-};
-
-const initHeatmapChart = async () => {
-  await nextTick();
-  if (!heatmapChartEl.value) return;
-  if (!worldGeoRegistered) {
-    const worldJson = await import("@/assets/dashboard/maps/map.json");
-    echarts.registerMap("world", worldJson.default as any);
-    worldGeoRegistered = true;
-  }
-  heatmapChart = echarts.init(heatmapChartEl.value);
-  heatmapChart.setOption(getHeatmapOption());
-  await nextTick();
-  heatmapChart.resize();
-};
-
-watch(showHeatmapModal, (open) => {
-  if (!open) {
-    heatmapChart?.dispose();
-    heatmapChart = null;
-    return;
-  }
-  initHeatmapChart().catch((err) => {
-    console.error('Failed to initialize heatmap chart:', err);
-  });
-});
-const showIssuesModal  = ref(false);
-const geoIssues = computed(() => {
-  const list: { key: string; level: "error" | "warn"; stat: typeof geoLocStats.value[0] }[] = [];
-  geoLocStats.value.forEach(s => {
-    if (s.health === "down") list.push({ key: `${s.key}-down`, level: "error", stat: s });
-    else if (s.health === "deg") list.push({ key: `${s.key}-deg`, level: "warn", stat: s });
-  });
-  return list;
-});
-
-const mapTip = ref({ show: false, x: 0, y: 0, stat: null as any });
-let mapTipTimer: ReturnType<typeof setTimeout> | null = null;
-const keepMapTip = () => { if (mapTipTimer) { clearTimeout(mapTipTimer); mapTipTimer = null; } };
-const hideMapTip = () => { mapTipTimer = setTimeout(() => { mapTip.value.show = false; }, 100); };
-
 
 // ── Row click → Monitor Results page ───────────────────────────────────
 const openDetail = (monitor: any) => {
@@ -824,13 +538,6 @@ const enrichedMonitors = computed(() => {
 
 const browserMonitors = computed(() => enrichedMonitors.value.filter(m => m.type === 'BROWSER'))
 const apiMonitors     = computed(() => enrichedMonitors.value.filter(m => m.type === 'API'))
-
-const privateLocations = ref<PrivateLocation[]>([
-  { id:1, name:"Corp HQ",        region:"New York, US",  status:"Online",  monitors:12, workers:2, checks:36, version:"1.4.2", lastSeen:"5s ago" },
-  { id:2, name:"EU Data Center", region:"Frankfurt, DE", status:"Online",  monitors:8,  workers:3, checks:24, version:"1.4.2", lastSeen:"2s ago" },
-  { id:3, name:"APAC Office",    region:"Singapore",     status:"Offline", monitors:4,  workers:1, checks:0,  version:"1.3.9", lastSeen:"2h ago" },
-]);
-const onlinePrivateLocations = computed(() => privateLocations.value.filter(l=>l.status==="Online"));
 
 const statusTabs = computed(() => {
   const ms = enrichedMonitors.value
