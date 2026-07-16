@@ -8,9 +8,9 @@
     "arbRadius": 25,
     "unscopedStyle": 204,
     "arbZ": 48,
-    "styleBlockHex": 603,
+    "styleBlockHex": 597,
     "stylePxUnit": 1015,
-    "hexClass": 139,
+    "hexClass": 129,
     "inlineHexStyle": 21,
     "tsHex": 471,
     "inlineHexBind": 6,
@@ -573,7 +573,6 @@
       "stylePxUnit": 4
     },
     "components/MenuLink.vue": {
-      "hexClass": 1,
       "arbTextSize": 2
     },
     "components/O2AIChat.vue": {
@@ -965,7 +964,6 @@
       "bareRounded": 1
     },
     "lib/core/Button/OButton.vue": {
-      "hexClass": 9,
       "arbTextSize": 1,
       "arbPx": 1
     },
@@ -1617,7 +1615,7 @@
     },
     "views/HomeView.vue": {
       "unscopedStyle": 1,
-      "styleBlockHex": 22,
+      "styleBlockHex": 16,
       "stylePxUnit": 34
     },
     "views/Ingestion.vue": {

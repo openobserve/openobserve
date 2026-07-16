@@ -101,7 +101,7 @@
         <!-- AI Input Bar (shown in NL Mode) -->
         <div
           v-if="isAIMode"
-          class="p-3 bg-[linear-gradient(135deg,rgba(139,92,246,0.05)_0%,rgba(236,72,153,0.05)_100%)] border-b border-card-glass-border"
+          class="p-3 bg-[image:var(--color-gradient-ai-faint)] border-b border-card-glass-border"
         >
           <!-- Show streaming status with spinner -->
           <div v-if="isGenerating" class="ai-bar-streaming flex items-center gap-2 bg-surface-base rounded-lg py-2 px-3 text-(--q-primary)">
@@ -243,7 +243,7 @@ const buttonClasses = computed(() => {
   ];
 
   if (isAIMode.value) {
-    classes.push('bg-[linear-gradient(135deg,#8B5CF6_0%,#EC4899_100%)]! text-text-inverse! border-none! text-2xs! font-semibold! leading-[1rem]! transition-all! duration-300! ease-[ease]! shadow-[0_0.25rem_0.9375rem_0_rgba(139,92,246,0.3)]! px-3! w-23! hover:shadow-[0_0.375rem_1.25rem_0_rgba(139,92,246,0.5)]! hover:-translate-y-px active:translate-y-0');
+    classes.push('bg-[image:var(--color-gradient-ai)]! text-text-inverse! border-none! text-2xs! font-semibold! leading-[1rem]! transition-all! duration-300! ease-[ease]! shadow-[0_0.25rem_0.9375rem_0_rgba(139,92,246,0.3)]! px-3! w-23! hover:shadow-[0_0.375rem_1.25rem_0_rgba(139,92,246,0.5)]! hover:-translate-y-px active:translate-y-0');
   } else {
     classes.push('w-23!', 'o2-color-primary');
   }

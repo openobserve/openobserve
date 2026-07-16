@@ -453,7 +453,7 @@ export default defineComponent({
         var(--color-ai-input-bg, #ffffff)
       )
       padding-box,
-    linear-gradient(90deg, #f59e0b, #ec4899, #7b61ff) border-box !important;
+    var(--color-gradient-brand-ribbon) border-box !important;
   box-shadow:
     0 2px 4px rgba(15, 23, 42, 0.06),
     0 8px 20px -2px rgba(15, 23, 42, 0.12),
@@ -478,7 +478,7 @@ export default defineComponent({
   position: absolute;
   inset: -10px;
   border-radius: inherit;
-  background: linear-gradient(90deg, #f59e0b, #ec4899, #7b61ff);
+  background: var(--color-gradient-brand-ribbon);
   opacity: 0.22;
   filter: blur(22px);
   z-index: -1;

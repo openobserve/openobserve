@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <div
           v-if="badge && badge > 0"
-          class="menu-badge absolute -top-1 -right-2 min-w-4 h-4 px-1 bg-[linear-gradient(135deg,#ef4444_0%,#ec4899_100%)] border-2 border-[#0f172a] rounded-full text-[9px] font-bold text-text-inverse flex items-center justify-center leading-none shadow-[0_4px_8px_rgba(239,68,68,0.5)] animate-pulse z-1"
+          class="menu-badge absolute -top-1 -right-2 min-w-4 h-4 px-1 bg-[image:var(--color-gradient-notification)] border-2 border-[var(--color-grey-900)] rounded-full text-[9px] font-bold text-text-inverse flex items-center justify-center leading-none shadow-[0_4px_8px_rgba(239,68,68,0.5)] animate-pulse z-1"
           aria-live="polite"
           :aria-label="`${badge} notifications`"
         >

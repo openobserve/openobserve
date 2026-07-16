@@ -119,6 +119,8 @@
     --color-syntax-addition-bg: #033a16;
     --color-syntax-deletion-fg: #ffdcd7;
     --color-syntax-deletion-bg: #67060c;
+    /* AI idle washes are denser in dark for legibility */
+    --color-gradient-ai-subtle: linear-gradient(135deg, rgba(139,92,246,0.5) 0%, rgba(236,72,153,0.5) 100%);
 
     /* --- Surfaces (mapped — elevation order preserved from light mode) --- */
     --color-surface-base:         var(--d-base);    /* content card + table canvas (lifted) */

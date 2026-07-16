@@ -152,10 +152,10 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
   ].join(" "),
   // AI-themed gradient — purple→pink gradient background, white text
   "ai-gradient": [
-    "bg-[linear-gradient(135deg,#8B5CF6_0%,#EC4899_100%)] text-white border-0",
+    "bg-[image:var(--color-gradient-ai)] text-white border-0",
     "enabled:hover:shadow-[0_4px_12px_rgba(139,92,246,0.4)]",
     "enabled:active:opacity-90",
-    "focus-visible:ring-[3px] focus-visible:ring-[#8B5CF6]",
+    "focus-visible:ring-[3px] focus-visible:ring-ai-accent",
     "disabled:opacity-40",
   ].join(" "),
   // On-dark primary — white background with primary color text, for use on dark gradient panels
@@ -177,20 +177,20 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
   // Destination preview buttons — brand-colored CTAs inside alert destination preview cards
   // preview-slack: Slack green (#007a5a)
   "preview-slack": [
-    "bg-[#007a5a] text-white border-0 !rounded !text-sm !h-auto !py-2 !px-3",
-    "enabled:hover:bg-[#005a42]",
+    "bg-brand-slack text-text-inverse border-0 !rounded !text-sm !h-auto !py-2 !px-3",
+    "enabled:hover:bg-brand-slack-hover",
     "disabled:opacity-60",
   ].join(" "),
   // preview-teams: Microsoft Teams purple (#6264a7)
   "preview-teams": [
-    "bg-[#6264a7] text-white border-0 !rounded !h-auto !py-2 !px-4",
-    "enabled:hover:bg-[#464775]",
+    "bg-brand-teams text-text-inverse border-0 !rounded !h-auto !py-2 !px-4",
+    "enabled:hover:bg-brand-teams-hover",
     "disabled:opacity-60",
   ].join(" "),
   // preview-email: Email blue (#007bff)
   "preview-email": [
-    "bg-[#007bff] text-white border-0 !rounded !h-auto !py-3 !px-6",
-    "enabled:hover:bg-[#0056b3]",
+    "bg-brand-email text-text-inverse border-0 !rounded !h-auto !py-3 !px-6",
+    "enabled:hover:bg-brand-email-hover",
     "disabled:opacity-60",
   ].join(" "),
   // preview-action: Generic action button for destination previews with no brand color
@@ -201,9 +201,9 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
   ].join(" "),
   // webinar-dismiss: Inline text-link style for the webinar top bar banner dismiss button
   "webinar-dismiss": [
-    "bg-transparent border-0 text-[#1e3a8a] underline font-bold text-compact whitespace-nowrap",
+    "bg-transparent border-0 text-promo-webinar-link underline font-bold text-compact whitespace-nowrap",
     "!h-auto !p-0",
-    "enabled:hover:text-[#1e40af]",
+    "enabled:hover:text-promo-webinar-link-hover",
     "disabled:opacity-60",
   ].join(" "),
   // outline-primary: Subtle primary bg + primary text + primary border — always visually highlighted.

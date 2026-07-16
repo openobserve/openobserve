@@ -40,7 +40,7 @@ const logoSrc = computed(() =>
 
     <div class="welcome-hero__tagline mt-1 text-[13.5px] leading-[1.6] text-typography-meta max-w-[38rem] m-0">
       {{ t("aiAssistant.welcome.taglineLead") }}
-      <span class="welcome-hero__highlight font-semibold bg-[linear-gradient(90deg,#f59e0b,#ec4899,#7b61ff)] [background-clip:text] [-webkit-background-clip:text] text-transparent">{{
+      <span class="welcome-hero__highlight font-semibold bg-[image:var(--color-gradient-brand-ribbon)] [background-clip:text] [-webkit-background-clip:text] text-transparent">{{
         t("aiAssistant.welcome.taglineHighlight")
       }}</span
       >{{ t("aiAssistant.welcome.taglineTail") }}

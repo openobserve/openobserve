@@ -295,6 +295,26 @@
   --color-syntax-addition-bg: #f0fff4;
   --color-syntax-deletion-fg: #b31d28;
   --color-syntax-deletion-bg: #ffeef0;
+  /* Brand gradients — theme-independent (same in light/dark) unless noted.
+     One AI gradient reused across ~40 sites; -subtle/-faint are its idle washes
+     (dark alpha bumped in dark.css). */
+  --color-gradient-ai:        linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%);
+  --color-gradient-ai-subtle: linear-gradient(135deg, rgba(139,92,246,0.15) 0%, rgba(236,72,153,0.15) 100%);
+  --color-gradient-ai-faint:  linear-gradient(135deg, rgba(139,92,246,0.05) 0%, rgba(236,72,153,0.05) 100%);
+  --color-gradient-brand-ribbon: linear-gradient(90deg, #f59e0b, #ec4899, #7b61ff);
+  --color-gradient-notification: linear-gradient(135deg, #ef4444 0%, #ec4899 100%);
+  --color-gradient-danger:       linear-gradient(135deg, #f56565 0%, #e53e3e 100%);
+  --color-gradient-danger-hover: linear-gradient(135deg, #e53e3e 0%, #c53030 100%);
+  /* External brand colors (destination-preview CTAs, promo banner) — fixed,
+     theme-independent by design (replicate other products' brands). */
+  --color-brand-slack:        #007a5a;
+  --color-brand-slack-hover:  #005a42;
+  --color-brand-teams:        #6264a7;
+  --color-brand-teams-hover:  #464775;
+  --color-brand-email:        #007bff;
+  --color-brand-email-hover:  #0056b3;
+  --color-promo-webinar-link:       #1e3a8a;
+  --color-promo-webinar-link-hover: #1e40af;
   --color-hover-gray: color-mix(in srgb, var(--color-theme-accent) 2%, rgb(244, 244, 244));
   --color-hover-shadow: #dddddd;
   --color-icon-color: #808080;

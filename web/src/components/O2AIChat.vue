@@ -292,7 +292,7 @@
             <div class="message-content">
               <div
                 v-if="message.role === 'user'"
-                class="inline-flex items-center justify-center w-6 h-6 rounded-full text-text-inverse [background:linear-gradient(135deg,#8b5cf6_0%,#ec4899_100%)] dark:[background:linear-gradient(135deg,#4c63d2_0%,#5a67d8_100%)]"
+                class="inline-flex items-center justify-center w-6 h-6 rounded-full text-text-inverse [background:var(--color-gradient-ai)] dark:[background:var(--color-gradient-ai)]"
               >
                 <OIcon
                   size="sm"
@@ -1333,7 +1333,7 @@
                 @click="sendMessage"
                 variant="ai-gradient"
                 size="icon-xs-circle"
-                class="send-button bg-[linear-gradient(135deg,#8b5cf6_0%,#ec4899_100%)]! [transition:all_0.3s_ease]! shadow-[0_4px_15px_0_rgba(139,92,246,0.3)]!"
+                class="send-button bg-[image:var(--color-gradient-ai)]! [transition:all_0.3s_ease]! shadow-[0_4px_15px_0_rgba(139,92,246,0.3)]!"
               >
                 <OIcon name="send" size="sm" />
               </OButton>

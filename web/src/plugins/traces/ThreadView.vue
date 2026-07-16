@@ -159,7 +159,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="thread-bubble thread-bubble--user thread-user-row flex items-start gap-[0.625rem] mb-4 ml-auto max-w-[40%] w-fit py-[0.625rem] px-[0.875rem] rounded-lg text-[0.85rem] leading-normal whitespace-pre-wrap break-words bg-[linear-gradient(135deg,#f8f9ff_0%,#e8edff_100%)] border border-[#e0e6ff] text-[#2c3e50] shadow-[0_1px_2px_rgba(0,0,0,0.06)]"
         >
           <div
-            class="thread-user-avatar w-6 h-6 rounded-full bg-[linear-gradient(135deg,#8b5cf6_0%,#ec4899_100%)] text-white inline-flex items-center justify-content-center text-[0.7rem] font-bold shrink-0 cursor-default"
+            class="thread-user-avatar w-6 h-6 rounded-full bg-[image:var(--color-gradient-ai)] text-white inline-flex items-center justify-content-center text-[0.7rem] font-bold shrink-0 cursor-default"
             :title="group.userId || 'User'"
           >
             <OIcon name="person" size="sm" />

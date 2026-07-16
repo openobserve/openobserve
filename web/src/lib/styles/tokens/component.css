@@ -4271,6 +4271,14 @@ button.date-time-button {
   --color-banner-warning-text: var(--color-banner-warning-text);
   --color-ai-accent: var(--color-ai-accent);
   --color-sql-accent: var(--color-sql-accent);
+  --color-brand-slack: var(--color-brand-slack);
+  --color-brand-slack-hover: var(--color-brand-slack-hover);
+  --color-brand-teams: var(--color-brand-teams);
+  --color-brand-teams-hover: var(--color-brand-teams-hover);
+  --color-brand-email: var(--color-brand-email);
+  --color-brand-email-hover: var(--color-brand-email-hover);
+  --color-promo-webinar-link: var(--color-promo-webinar-link);
+  --color-promo-webinar-link-hover: var(--color-promo-webinar-link-hover);
   --color-bg-gray: var(--color-bg-gray);
   --color-cancel-query-bg: var(--color-cancel-query-bg);
   --color-card-glass-bg: var(--color-card-glass-bg);

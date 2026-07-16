@@ -30,8 +30,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         size="icon-toolbar"
         @click="scheduledPipelineRef?.toggleAIChat()"
         data-test="menu-link-ai-item"
-        class="bg-[linear-gradient(135deg,rgba(139,92,246,0.15)_0%,rgba(236,72,153,0.15)_100%)]! transition-[background,box-shadow] duration-300 hover:bg-[linear-gradient(135deg,#8b5cf6_0%,#ec4899_100%)]! hover:shadow-[0_0.25rem_0.75rem_0_rgba(139,92,246,0.35)]"
-        :class="store.state.isAiChatEnabled ? 'ai-btn-active bg-[linear-gradient(135deg,rgba(139,92,246,0.15)_0%,rgba(236,72,153,0.15)_100%)]!' : ''"
+        class="bg-[image:var(--color-gradient-ai-subtle)]! transition-[background,box-shadow] duration-300 hover:bg-[image:var(--color-gradient-ai)]! hover:shadow-[0_0.25rem_0.75rem_0_rgba(139,92,246,0.35)]"
+        :class="store.state.isAiChatEnabled ? 'ai-btn-active bg-[image:var(--color-gradient-ai-subtle)]!' : ''"
       >
         <img :src="scheduledPipelineRef?.getBtnLogo" class="header-icon ai-icon opacity-70 transition-[transform] duration-[0.6s] ease-[ease]" :class="store.state.isAiChatEnabled ? 'opacity-100!' : ''" />
       </OButton>

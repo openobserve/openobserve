@@ -67,7 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="menu-link-ai-item"
             variant="ghost"
             size="icon-toolbar"
-            class="[background:linear-gradient(135deg,rgba(139,92,246,0.15)_0%,rgba(236,72,153,0.15)_100%)]! transition-[background,box-shadow] duration-300 ease-[ease] hover:[background:linear-gradient(135deg,#8B5CF6_0%,#EC4899_100%)]! hover:shadow-[0_0.25rem_0.75rem_0_rgba(139,92,246,0.35)] group"
+            class="[background:var(--color-gradient-ai-subtle)]! transition-[background,box-shadow] duration-300 ease-[ease] hover:[background:var(--color-gradient-ai)]! hover:shadow-[0_0.25rem_0.75rem_0_rgba(139,92,246,0.35)] group"
             @mouseenter="isHovered = true"
             @mouseleave="isHovered = false"
           >
