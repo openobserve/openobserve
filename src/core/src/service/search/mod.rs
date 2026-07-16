@@ -64,7 +64,6 @@ use crate::{
     },
 };
 
-pub mod bloom_pruner;
 pub mod cache;
 #[cfg(feature = "enterprise")]
 pub mod cardinality;
@@ -83,7 +82,7 @@ pub mod tantivy;
 pub mod utils;
 pub mod work_group;
 
-pub use ::search::{index, inspector};
+pub use ::search::{bloom_pruner, index, inspector};
 pub use searcher::Searcher;
 
 /// The result of search in cluster

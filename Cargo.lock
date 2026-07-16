@@ -9246,6 +9246,7 @@ dependencies = [
  "serde_json",
  "sqlparser",
  "tantivy",
+ "thiserror 2.0.18",
  "tokio",
  "tonic",
  "tracing",
