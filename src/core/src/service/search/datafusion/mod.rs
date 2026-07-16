@@ -20,7 +20,7 @@ pub mod exec;
 pub mod merge;
 pub mod optimizer;
 pub mod plan;
-pub mod table_provider;
+pub use search::datafusion::table_provider;
 pub mod udf;
 
 pub use search::datafusion::{peak_memory_pool, plan_metrics, planner, storage, udaf};

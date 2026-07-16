@@ -13,4 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+pub mod catalog;
 pub mod empty_table;
+pub mod enrich_table;
+mod helpers;
+pub mod listing_adapter;
+pub mod memtable;
+pub mod uniontable;

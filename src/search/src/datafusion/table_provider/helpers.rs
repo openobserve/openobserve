@@ -38,7 +38,7 @@ use o2_enterprise::enterprise::search::sampling::execution::generate_row_group_a
 #[cfg(all(feature = "enterprise", feature = "vortex"))]
 use o2_enterprise::enterprise::search::vortex::generate_vortex_access_plan;
 
-use crate::service::search::{datafusion::storage, index::IndexCondition};
+use crate::{datafusion::storage, index::IndexCondition};
 
 /// Row group size used by writers before the `row_group_size` puffin property
 /// existed. Any .ttv file without the property was produced with this value.

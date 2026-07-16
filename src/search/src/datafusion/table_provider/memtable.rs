@@ -29,7 +29,7 @@ use datafusion::{
 };
 use hashbrown::HashMap;
 
-use crate::service::search::{
+use crate::{
     datafusion::table_provider::helpers::{apply_combined_filter, apply_projection},
     index::IndexCondition,
 };

@@ -34,7 +34,7 @@ use datafusion::{
 use rayon::prelude::*;
 use tonic::async_trait;
 
-use crate::service::search::{
+use crate::{
     datafusion::table_provider::helpers::{apply_combined_filter, generate_access_plan},
     index::IndexCondition,
 };

@@ -28,7 +28,7 @@ use datafusion::{
     sql::TableReference,
 };
 
-use crate::service::search::datafusion::{
+use crate::datafusion::{
     distributed_plan::enrich_exec::EnrichExec, table_provider::helpers::apply_combined_filter,
 };
 
