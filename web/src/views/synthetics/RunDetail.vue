@@ -98,7 +98,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           icon-left="open_in_new"
           data-test="synthetics-run-detail-trace-btn"
         >
-          Open Playwright Trace
+          {{ t('synthetics.runDetail.openTrace') }}
         </OButton>
         <OButton
           variant="outline"
@@ -106,7 +106,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           icon-left="replay"
           data-test="synthetics-run-detail-rerun-btn"
         >
-          Rerun
+          {{ t('synthetics.journey.reRun') }}
         </OButton>
       </template>
     </AppPageHeader>
@@ -119,25 +119,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OTab name="summary" data-test="synthetics-run-detail-tab-summary">
         <span class="flex items-center gap-1.5">
           <OIcon name="article" size="sm" />
-          Summary
+          {{ t('synthetics.runDetail.tabSummary') }}
         </span>
       </OTab>
       <OTab name="logs" data-test="synthetics-run-detail-tab-logs">
         <span class="flex items-center gap-1.5">
           <OIcon name="search" size="sm" />
-          Logs
+          {{ t('synthetics.runDetail.tabLogs') }}
         </span>
       </OTab>
       <OTab name="traces" data-test="synthetics-run-detail-tab-traces">
         <span class="flex items-center gap-1.5">
           <OIcon name="account-tree" size="sm" />
-          Traces
+          {{ t('synthetics.runDetail.tabTraces') }}
         </span>
       </OTab>
       <OTab name="rum" data-test="synthetics-run-detail-tab-rum">
         <span class="flex items-center gap-1.5">
           <OIcon name="devices" size="sm" />
-          RUM
+          {{ t('synthetics.runDetail.tabRum') }}
         </span>
       </OTab>
     </OTabs>
@@ -250,7 +250,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       />
                     </template>
                     <span class="text-[11.5px] font-semibold text-status-error-text">
-                      View full error &amp; stack trace
+                      {{ t('synthetics.runDetail.viewFullError') }}
                     </span>
                   </OButton>
                   <pre
@@ -276,11 +276,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="text-primary-700"
                   />
                   <span class="font-bold text-sm text-text-heading"
-                    >Session Replay</span
+                    >{{ t('synthetics.runDetail.sessionReplay') }}</span
                   >
                   <span class="flex-1" />
                   <span class="font-mono text-[11px] text-text-secondary">
-                    Step {{ selectedStep.id }} of {{ steps.length }}
+                    {{ t('synthetics.runDetail.stepOf', { selected: selectedStep.id, total: steps.length }) }}
                   </span>
                 </OCardSection>
                 <OSeparator />
@@ -299,7 +299,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- ── Right: Execution Timeline ── -->
               <div class="flex-1 min-w-0 flex flex-col">
                 <div class="flex items-center gap-2 px-3 py-4">
-                  <h4 class="font-bold text-sm text-text-heading m-0">Steps</h4>
+                  <h4 class="font-bold text-sm text-text-heading m-0">{{ t('synthetics.journey.steps') }}</h4>
                   <OBadge variant="default" size="sm">{{ steps.length }}</OBadge>
                   <span class="flex-1" />
                 </div>
@@ -322,7 +322,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <img
                         v-if="row.screenshotKey"
                         :src="screenshotUrl(row.screenshotKey)"
-                        alt="Step screenshot"
+                        :alt="t('synthetics.runDetail.screenshotAlt')"
                         class="w-full h-full object-cover"
                       />
                       <OIcon
@@ -355,7 +355,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 >
                                   <img
                                     :src="screenshotUrl(row.screenshotKey)"
-                                    alt="Step screenshot"
+                                    :alt="t('synthetics.runDetail.screenshotAlt')"
                                     class="w-full h-full object-contain transition-opacity group-hover:opacity-90"
                                   />
                                 </OButton>
@@ -369,7 +369,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               <template v-else>
                                 <OIcon name="image" :class="row.status === 'fail' ? 'text-status-error-text' : 'text-text-caption'" size="lg" />
                                 <span class="text-xs font-semibold" :class="row.status === 'fail' ? 'text-status-error-text' : 'text-text-caption'">
-                                  {{ row.status === 'fail' ? 'Failure screenshot' : 'Screenshot placeholder' }}
+                                  {{ row.status === 'fail' ? t('synthetics.runDetail.failureScreenshot') : t('synthetics.runDetail.screenshotPlaceholder') }}
                                 </span>
                               </template>
                             </div>
@@ -378,13 +378,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                         <div class="flex-1 flex flex-col gap-4">
                           <dl class="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 text-sm">
-                            <dt class="text-sm font-semibold text-text-secondary capitalize tracking-wide">Action</dt>
+                            <dt class="text-sm font-semibold text-text-secondary capitalize tracking-wide">{{ t('synthetics.runDetail.detailAction') }}</dt>
                             <dd class="text-text-secondary">{{ row.action }}</dd>
-                            <dt class="text-sm font-semibold text-text-secondary capitalize tracking-wide">Selector</dt>
+                            <dt class="text-sm font-semibold text-text-secondary capitalize tracking-wide">{{ t('synthetics.runDetail.detailSelector') }}</dt>
                             <dd class="text-text-secondary">{{ row.detail }}</dd>
-                            <dt class="text-sm font-semibold text-text-secondary capitalize tracking-wide">URL</dt>
+                            <dt class="text-sm font-semibold text-text-secondary capitalize tracking-wide">{{ t('synthetics.runDetail.detailUrl') }}</dt>
                             <dd class="truncate text-text-secondary">{{ row.detail }}</dd>
-                            <dt class="text-sm font-semibold text-text-secondary capitalize tracking-wide">Duration</dt>
+                            <dt class="text-sm font-semibold text-text-secondary capitalize tracking-wide">{{ t('synthetics.results.duration') }}</dt>
                             <dd class="text-text-secondary">{{ row.durStr }}</dd>
                           </dl>
 
@@ -395,7 +395,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           >
                             <div class="flex items-center gap-2 px-3 py-2 bg-[var(--color-badge-error-soft-bg)]">
                               <OIcon name="error" size="sm" class="text-status-error-text" aria-hidden="true" />
-                              <span class="text-xs font-semibold text-text-heading flex-1">Error</span>
+                              <span class="text-xs font-semibold text-text-heading flex-1">{{ t('synthetics.results.error') }}</span>
                             </div>
                             <div class="px-3 py-3">
                               <pre
@@ -411,7 +411,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                   data-test="synthetics-run-detail-toggle-step-error-btn"
                                   @click="toggleStepError(row.id)"
                                 >
-                                  {{ expandedStepErrors.has(row.id) ? 'Show less' : 'Show full error' }}
+                                  {{ expandedStepErrors.has(row.id) ? t('synthetics.runDetail.showLess') : t('synthetics.runDetail.showFullError') }}
                                 </OButton>
                                 <OButton
                                   variant="ghost"
@@ -419,7 +419,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                   data-test="synthetics-run-detail-step-view-error-btn"
                                   @click="openErrorFullscreen(row.id)"
                                 >
-                                  View full error
+                                  {{ t('synthetics.runDetail.viewFullErrorBtn') }}
                                 </OButton>
                               </div>
                             </div>
@@ -443,13 +443,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="synthetics-run-detail-logs-empty"
             >
               <template #title>
-                <span>No correlated logs</span>
+                <span>{{ t('synthetics.runDetail.noCorrelatedLogs') }}</span>
               </template>
               <template #description>
-                <span
-                  >Correlated observability data will appear here when your
-                  application is sending logs to OpenObserve.</span
-                >
+                <span>{{ t('synthetics.runDetail.noCorrelatedLogsDesc') }}</span>
               </template>
             </OEmptyState>
           </div>
@@ -464,13 +461,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="synthetics-run-detail-traces-empty"
             >
               <template #title>
-                <span>No correlated traces</span>
+                <span>{{ t('synthetics.runDetail.noCorrelatedTraces') }}</span>
               </template>
               <template #description>
-                <span
-                  >Correlated observability data will appear here when your
-                  application is sending traces to OpenObserve.</span
-                >
+                <span>{{ t('synthetics.runDetail.noCorrelatedTracesDesc') }}</span>
               </template>
             </OEmptyState>
           </div>
@@ -485,13 +479,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="synthetics-run-detail-rum-empty"
             >
               <template #title>
-                <span>No correlated RUM data</span>
+                <span>{{ t('synthetics.runDetail.noCorrelatedRum') }}</span>
               </template>
               <template #description>
-                <span
-                  >Correlated observability data will appear here when your
-                  application is sending RUM data to OpenObserve.</span
-                >
+                <span>{{ t('synthetics.runDetail.noCorrelatedRumDesc') }}</span>
               </template>
             </OEmptyState>
           </div>
@@ -519,7 +510,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <img
         v-if="lightboxStep.screenshotKey"
         :src="screenshotUrl(lightboxStep.screenshotKey)"
-        alt="Step screenshot"
+        :alt="t('synthetics.runDetail.screenshotAlt')"
         class="max-w-full max-h-[85vh] object-contain"
       />
     </div>
@@ -548,7 +539,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
           <span
             class="text-sm font-semibold text-text-heading flex-1"
-            >Error</span
+            >{{ t('synthetics.results.error') }}</span
           >
         </div>
         <div class="px-4 py-3">
@@ -883,11 +874,11 @@ function toDisplayRun(detail: SyntheticRunDetail | null): DisplayRun {
     hasReplay: false,
     ...(hasIssue
       ? {
-          errorType: detail.error ? detail.error.split(":")[0] : "Error",
+          errorType: detail.error ? detail.error.split(":")[0] : t('synthetics.results.error'),
           errorReason: detail.error || "",
           errorStack: detail.error || "",
           failedStepLabel: detail.failedStep
-            ? "Failed at: " + detail.failedStep
+            ? t('synthetics.runDetail.failedAtStep', { step: detail.failedStep })
             : undefined,
           failedStepId: 1,
         }
@@ -934,7 +925,7 @@ const lightboxStep = computed(() => {
 
 const lightboxTitle = computed(() => {
   const s = lightboxStep.value;
-  return s ? `Step ${s.id}: ${s.action}` : "";
+  return s ? t('synthetics.runDetail.lightboxTitle', { id: s.id, action: s.action }) : "";
 });
 
 function openLightbox(id: number) {
@@ -958,7 +949,7 @@ const errorStep = computed(() => {
 
 const errorTitle = computed(() => {
   const s = errorStep.value;
-  return s ? `Step ${s.id}: ${s.action} — Error` : "";
+  return s ? t('synthetics.runDetail.errorFullscreenTitle', { id: s.id, action: s.action }) : "";
 });
 
 function openErrorFullscreen(id: number) {
@@ -1048,14 +1039,14 @@ const statusIcon = computed(() =>
   isErrorRun.value ? "error" : isFailed.value ? "cancel" : "check-circle",
 );
 const statusLabel = computed(() =>
-  isErrorRun.value ? "Error" : isFailed.value ? "Failed" : "Passed",
+  isErrorRun.value ? t('synthetics.results.error') : isFailed.value ? t('synthetics.results.failed') : t('synthetics.results.passed'),
 );
 
 const statusChip = computed(() => {
   if (isErrorRun.value) {
     return {
-      label: "Status",
-      value: "Error",
+      label: t('synthetics.results.status'),
+      value: t('synthetics.results.error'),
       icon: "error",
       colorClass: "text-status-error-text",
     };
@@ -1063,15 +1054,15 @@ const statusChip = computed(() => {
   if (currentRun.value.status === "fail") {
     const stepNum = failedStepInfo.value?.step?.id;
     return {
-      label: "Status",
-      value: stepNum ? `Failed at Step ${stepNum}` : "Failed",
+      label: t('synthetics.results.status'),
+      value: stepNum ? t('synthetics.runDetail.failedAtStep', { step: stepNum }) : t('synthetics.results.failed'),
       icon: "cancel",
       colorClass: "text-status-error-text",
     };
   }
   return {
-    label: "Status",
-    value: "Passed",
+    label: t('synthetics.results.status'),
+    value: t('synthetics.results.passed'),
     icon: "check-circle",
     colorClass: "text-status-success-text",
   };
@@ -1079,19 +1070,19 @@ const statusChip = computed(() => {
 
 const infoChips = computed(() => [
   statusChip.value,
-  { label: "Duration", value: fmtDur(currentRun.value.duration), icon: "schedule" },
+  { label: t('synthetics.results.duration'), value: fmtDur(currentRun.value.duration), icon: "schedule" },
   {
-    label: "Browser",
+    label: t('synthetics.results.steps.browser'),
     value: currentRun.value.browser,
     icon: browserIcon(currentRun.value.browser),
   },
   {
-    label: "Device",
+    label: t('synthetics.results.device'),
     value: currentRun.value.device,
     icon: deviceIcon(currentRun.value.device),
   },
   {
-    label: "Location",
+    label: t('synthetics.results.location'),
     value: currentRun.value.location,
     icon: locationIcon(currentRun.value.location),
   },
@@ -1107,7 +1098,7 @@ watch(
     emit("update-status", {
       variant: isErr ? "error-soft" : isF ? "error" : "success",
       icon: isErr ? "error" : isF ? "cancel" : "check-circle",
-      label: isErr ? "Error" : isF ? "Failed" : "Passed",
+      label: isErr ? t('synthetics.results.error') : isF ? t('synthetics.results.failed') : t('synthetics.results.passed'),
       url: currentRun.value.url,
       timestamp: currentRun.value.timestamp,
     });

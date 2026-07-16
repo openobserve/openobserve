@@ -3,8 +3,8 @@
 
     <!-- PAGE HEADER -->
     <AppPageHeader
-      title="Synthetic Checks"
-      subtitle="Proactively monitor uptime, performance, and user journeys from global locations"
+      :title="t('synthetics.pageTitle')"
+      :subtitle="t('synthetics.pageSubtitle')"
       class="px-4 border-b border-border-default"
       icon="radar"
     >
@@ -88,7 +88,7 @@
               <div class="flex-1 min-w-0">
                 <OInput
                   v-model="search"
-                  :placeholder="searchAcrossFolders ? 'Search across all folders...' : activeTab === 'browser' ? 'Search browser tests...' : 'Search this folder...'"
+                  :placeholder="searchAcrossFolders ? t('synthetics.search.allFoldersPlaceholder') : activeTab === 'browser' ? t('synthetics.search.browserPlaceholder') : t('synthetics.search.folderPlaceholder')"
                   data-test="synthetic-monitoring-search-input"
                   class="w-full"
                 >
@@ -98,10 +98,10 @@
                       @update:model-value="(v) => { searchAcrossFolders = v === 'all' }"
                     >
                       <OToggleGroupItem value="this" size="xs" icon-left="folder-outline" data-test="synthetic-monitoring-search-this-folder-btn">
-                        This folder
+                        {{ t('synthetics.search.thisFolder') }}
                       </OToggleGroupItem>
                       <OToggleGroupItem value="all" size="xs" icon-left="search" data-test="synthetic-monitoring-search-all-folders-btn">
-                        All folders
+                        {{ t('synthetics.search.allFolders') }}
                       </OToggleGroupItem>
                     </OToggleGroup>
                   </template>
@@ -126,7 +126,7 @@
               class="w-8!"
               icon-left="refresh"
               :loading="loading"
-              title="Refresh"
+              :title="t('common.refresh')"
               data-test="synthetic-monitoring-refresh-btn"
               @click="loadMonitors()"
             />
@@ -143,9 +143,9 @@
     <ODialog
       v-model:open="showDuplicateDialog"
       size="sm"
-      title="Duplicate Check"
-      primary-button-label="Save"
-      secondary-button-label="Cancel"
+      :title="t('synthetics.dialog.duplicateTitle')"
+      :primary-button-label="t('common.save')"
+      :secondary-button-label="t('common.cancel')"
       :primary-button-disabled="isDuplicating || !duplicateName.trim()"
       data-test="synthetic-monitoring-duplicate-dialog"
       @click:primary="saveDuplicate"
@@ -154,14 +154,14 @@
       <div class="flex flex-col gap-3 py-1">
         <OInput
           v-model="duplicateName"
-          label="Name"
-          placeholder="Check name"
+          :label="t('synthetics.checkDetails.name')"
+          :placeholder="t('synthetics.checkDetails.namePlaceholder')"
           data-test="synthetic-monitoring-duplicate-name-input"
         />
         <OInput
           v-model="duplicateFolder"
-          label="Folder"
-          placeholder="default"
+          :label="t('synthetics.checkDetails.folder')"
+          :placeholder="t('synthetics.checkDetails.folderPlaceholder')"
           data-test="synthetic-monitoring-duplicate-folder-input"
         />
       </div>
@@ -171,16 +171,16 @@
     <ODialog
       v-model:open="showBulkDeleteConfirm"
       size="sm"
-      title="Delete Checks"
-      primary-button-label="Delete"
-      secondary-button-label="Cancel"
+      :title="t('synthetics.dialog.bulkDeleteTitle')"
+      :primary-button-label="t('synthetics.table.delete')"
+      :secondary-button-label="t('common.cancel')"
       primary-button-variant="destructive"
       data-test="synthetic-monitoring-bulk-delete-dialog"
       @click:primary="bulkDeleteMonitors"
       @click:secondary="showBulkDeleteConfirm = false"
     >
       <p class="py-2">
-        Are you sure you want to delete {{ selectedMonitorIds.length }} monitor{{ selectedMonitorIds.length !== 1 ? 's' : '' }}? This action cannot be undone.
+        {{ t('synthetics.dialog.bulkDeleteBody', { count: selectedMonitorIds.length }) }}
       </p>
     </ODialog>
 
@@ -437,18 +437,18 @@ const openBulkDeleteConfirm = () => {
 
 const bulkDeleteMonitors = async () => {
   const org = orgIdentifier.value
-  const dismiss = toast({ variant: 'loading', message: 'Deleting checks…', timeout: 0 })
+  const dismiss = toast({ variant: 'loading', message: t('synthetics.toast.bulkDeleteToast'), timeout: 0 })
   try {
     await syntheticsService.bulkDelete(org, { ids: selectedMonitorIds.value }, searchAcrossFolders.value ? undefined : activeFolderId.value)
     selectedMonitorIds.value = []
     dismiss()
-    toast({ variant: 'success', message: 'Checks deleted successfully.' })
+    toast({ variant: 'success', message: t('synthetics.toast.bulkDeleteSuccess') })
     await loadMonitors()
   } catch (err: any) {
     dismiss()
     toast({
       variant: 'error',
-      message: err?.response?.data?.message || err?.response?.data?.error || 'Failed to delete checks.',
+      message: err?.response?.data?.message || err?.response?.data?.error || t('synthetics.toast.bulkDeleteFailed'),
     })
     console.error('[synthetics] bulk delete failed', err)
   } finally {
@@ -485,7 +485,7 @@ const typeTabs = computed(() => [
   ...SYNTHETIC_CHECK_TYPES.map(ct => ({ key: ct, label: t(`synthetics.tabs.${ct}`) })),
 ]);
 
-const locationOpts = ref<{ label: string; value: string }[]>([{ label: 'All locations', value: 'all' }]);
+const locationOpts = ref<{ label: string; value: string }[]>([{ label: t('synthetics.filters.allLocations'), value: 'all' }]);
 
 async function loadLocations() {
   try {
@@ -493,7 +493,7 @@ async function loadLocations() {
     const locations: { id: string; name: string; region: string; provider: string }[] =
       (res.data as any).locations ?? [];
     locationOpts.value = [
-      { label: 'All locations', value: 'all' },
+      { label: t('synthetics.filters.allLocations'), value: 'all' },
       ...locations.map((loc) => ({ label: `${loc.name} (${loc.region})`, value: loc.name })),
     ];
   } catch (err) {
@@ -515,14 +515,14 @@ const enrichedMonitors = computed(() => {
 const statusTabs = computed(() => {
   const ms = enrichedMonitors.value
   const tabs = [
-    { filter: 'all',      label: 'All',      count: ms.length },
-    { filter: 'passed',   label: 'Passed',   count: ms.filter(m => m.status === 'passed').length },
-    { filter: 'warning',  label: 'Warning',  count: ms.filter(m => m.status === 'warning').length },
-    { filter: 'failed',   label: 'Failed',   count: ms.filter(m => m.status === 'failed').length },
+    { filter: 'all',      label: t('synthetics.filters.all'),      count: ms.length },
+    { filter: 'passed',   label: t('synthetics.filters.passed'),   count: ms.filter(m => m.status === 'passed').length },
+    { filter: 'warning',  label: t('synthetics.filters.warning'),  count: ms.filter(m => m.status === 'warning').length },
+    { filter: 'failed',   label: t('synthetics.filters.failed'),   count: ms.filter(m => m.status === 'failed').length },
   ]
   const unknownCount = ms.filter(m => m.status === 'unknown').length
   if (unknownCount > 0) {
-    tabs.push({ filter: 'unknown', label: 'Unknown', count: unknownCount })
+    tabs.push({ filter: 'unknown', label: t('synthetics.labels.unknown'), count: unknownCount })
   }
   return tabs
 })
@@ -544,11 +544,11 @@ const filteredMonitors = computed(() =>
 )
 
 const footerTitle = computed(() =>
-  activeTab.value === 'browser' ? 'Browser Tests' : 'Checks'
+  activeTab.value === 'browser' ? t('synthetics.footer.browserTests') : t('synthetics.footer.checks')
 )
 
 const emptyMessage = computed(() =>
-  activeTab.value === 'browser' ? 'No browser tests found.' : 'No checks found. Adjust filters or create your first check.'
+  activeTab.value === 'browser' ? t('synthetics.empty.browserTests') : t('synthetics.empty.checks')
 )
 
 // ── Selected monitors (resolved from IDs) ────────────────────────────────
@@ -561,20 +561,20 @@ const selectedMonitors = computed(() =>
 async function bulkPauseMonitors() {
   const toPause = selectedMonitors.value.filter(m => m.enabled)
   if (toPause.length === 0) {
-    toast({ variant: 'error', message: 'No enabled checks selected to pause.' })
+    toast({ variant: 'error', message: t('synthetics.table.noEnabledToPause') })
     return
   }
   bulkActionLoading.value = true
-  const dismiss = toast({ variant: 'loading', message: `Pausing ${toPause.length} check(s)…`, timeout: 0 })
+  const dismiss = toast({ variant: 'loading', message: t('synthetics.table.bulkPauseToast', { count: toPause.length }), timeout: 0 })
   const results = await Promise.allSettled(
     toPause.map(m => syntheticsService.enable(orgIdentifier.value, String(m.id), { enabled: false }))
   )
   dismiss()
   const failed = results.filter(r => r.status === 'rejected').length
   if (failed > 0) {
-    toast({ variant: 'warning', message: `${toPause.length - failed} succeeded, ${failed} failed.` })
+    toast({ variant: 'warning', message: t('synthetics.table.bulkPartialSuccess', { success: toPause.length - failed, fail: failed }) })
   } else {
-    toast({ variant: 'success', message: `Paused ${toPause.length} check(s).` })
+    toast({ variant: 'success', message: t('synthetics.table.bulkPauseSuccess', { count: toPause.length }) })
   }
   bulkActionLoading.value = false
   selectedMonitorIds.value = []
@@ -584,20 +584,20 @@ async function bulkPauseMonitors() {
 async function bulkEnableMonitors() {
   const toEnable = selectedMonitors.value.filter(m => !m.enabled)
   if (toEnable.length === 0) {
-    toast({ variant: 'error', message: 'No disabled checks selected to enable.' })
+    toast({ variant: 'error', message: t('synthetics.table.noDisabledToEnable') })
     return
   }
   bulkActionLoading.value = true
-  const dismiss = toast({ variant: 'loading', message: `Enabling ${toEnable.length} check(s)…`, timeout: 0 })
+  const dismiss = toast({ variant: 'loading', message: t('synthetics.table.bulkEnableToast', { count: toEnable.length }), timeout: 0 })
   const results = await Promise.allSettled(
     toEnable.map(m => syntheticsService.enable(orgIdentifier.value, String(m.id), { enabled: true }))
   )
   dismiss()
   const failed = results.filter(r => r.status === 'rejected').length
   if (failed > 0) {
-    toast({ variant: 'warning', message: `${toEnable.length - failed} succeeded, ${failed} failed.` })
+    toast({ variant: 'warning', message: t('synthetics.table.bulkPartialSuccess', { success: toEnable.length - failed, fail: failed }) })
   } else {
-    toast({ variant: 'success', message: `Enabled ${toEnable.length} check(s).` })
+    toast({ variant: 'success', message: t('synthetics.table.bulkEnableSuccess', { count: toEnable.length }) })
   }
   bulkActionLoading.value = false
   selectedMonitorIds.value = []
@@ -607,20 +607,20 @@ async function bulkEnableMonitors() {
 async function bulkTriggerMonitors() {
   const toTrigger = selectedMonitors.value.filter(m => m.enabled)
   if (toTrigger.length === 0) {
-    toast({ variant: 'error', message: 'No enabled checks selected to trigger.' })
+    toast({ variant: 'error', message: t('synthetics.table.noEnabledToTrigger') })
     return
   }
   bulkActionLoading.value = true
-  const dismiss = toast({ variant: 'loading', message: `Triggering ${toTrigger.length} check(s)…`, timeout: 0 })
+  const dismiss = toast({ variant: 'loading', message: t('synthetics.table.bulkTriggerToast', { count: toTrigger.length }), timeout: 0 })
   const results = await Promise.allSettled(
     toTrigger.map(m => syntheticsService.run(orgIdentifier.value, String(m.id), {}))
   )
   dismiss()
   const failed = results.filter(r => r.status === 'rejected').length
   if (failed > 0) {
-    toast({ variant: 'warning', message: `${toTrigger.length - failed} succeeded, ${failed} failed.` })
+    toast({ variant: 'warning', message: t('synthetics.table.bulkPartialSuccess', { success: toTrigger.length - failed, fail: failed }) })
   } else {
-    toast({ variant: 'success', message: `Triggered ${toTrigger.length} check(s).` })
+    toast({ variant: 'success', message: t('synthetics.table.bulkTriggerSuccess', { count: toTrigger.length }) })
   }
   bulkActionLoading.value = false
   selectedMonitorIds.value = []
@@ -644,18 +644,18 @@ async function toggleEnabled(m: any) {
   const newEnabled = !m.enabled
   const id = String(m.id)
   toggleLoadingMap.value[id] = true
-  const dismiss = toast({ variant: 'loading', message: newEnabled ? 'Enabling monitor…' : 'Pausing monitor…', timeout: 0 })
+  const dismiss = toast({ variant: 'loading', message: newEnabled ? t('synthetics.toast.enablingSingle') : t('synthetics.toast.pausingSingle'), timeout: 0 })
   try {
     await syntheticsService.enable(org, id, { enabled: newEnabled })
     const found = monitors.value.find((mon) => String(mon.id) === id)
     if (found) found.enabled = newEnabled
     dismiss()
-    toast({ variant: 'success', message: newEnabled ? 'Monitor enabled.' : 'Monitor paused.' })
+    toast({ variant: 'success', message: newEnabled ? t('synthetics.toast.monitorEnabled') : t('synthetics.toast.monitorPaused') })
   } catch (err: any) {
     dismiss()
     toast({
       variant: 'error',
-      message: err?.response?.data?.message || err?.response?.data?.error || 'Failed to update monitor.',
+      message: err?.response?.data?.message || err?.response?.data?.error || t('synthetics.toast.updateFailed'),
     })
     console.error('[synthetics] toggle enable failed', err)
   } finally {
@@ -665,7 +665,7 @@ async function toggleEnabled(m: any) {
 
 function duplicateMonitor(m: any) {
   duplicateTarget.value = m
-  duplicateName.value = `Copy of ${m.name}`
+  duplicateName.value = t('synthetics.labels.copyOf', { name: m.name })
   duplicateFolder.value = m.folder || 'default'
   showDuplicateDialog.value = true
 }
@@ -673,7 +673,7 @@ function duplicateMonitor(m: any) {
 async function saveDuplicate() {
   if (!duplicateTarget.value) return
   isDuplicating.value = true
-  const dismiss = toast({ variant: 'loading', message: 'Duplicating monitor…', timeout: 0 })
+  const dismiss = toast({ variant: 'loading', message: t('synthetics.toast.duplicating'), timeout: 0 })
   try {
     const org = orgIdentifier.value
     const res = await syntheticsService.get(org, String(duplicateTarget.value.id))
@@ -684,14 +684,14 @@ async function saveDuplicate() {
     const payload = buildCreateBrowserTestPayload(check)
     await syntheticsService.create(org, payload)
     dismiss()
-    toast({ variant: 'success', message: 'Monitor duplicated successfully.' })
+    toast({ variant: 'success', message: t('synthetics.toast.duplicateSuccess') })
     showDuplicateDialog.value = false
     await loadMonitors()
   } catch (err: any) {
     dismiss()
     toast({
       variant: 'error',
-      message: err?.response?.data?.message || err?.response?.data?.error || 'Failed to duplicate monitor.',
+      message: err?.response?.data?.message || err?.response?.data?.error || t('synthetics.toast.duplicateFailed'),
     })
     console.error('[synthetics] duplicate failed', err)
   } finally {
@@ -702,7 +702,7 @@ async function saveDuplicate() {
 async function runMonitor(m: any) {
   const org = orgIdentifier.value
   const id = String(m.id)
-  const name = m.name || 'Unknown'
+  const name = m.name || t('synthetics.labels.unknown')
 
   // Prevent duplicate triggers while already running
   if (triggerLoadingMap.value[id]) return
@@ -711,22 +711,22 @@ async function runMonitor(m: any) {
   if (!m.enabled) {
     toast({
       variant: 'error',
-      message: `Cannot trigger "${name}" — monitor is paused. Enable it first.`,
+      message: t('synthetics.toast.triggerDisabled', { name }),
     })
     return
   }
 
   triggerLoadingMap.value[id] = true
-  const dismiss = toast({ variant: 'loading', message: `Triggering "${name}"…`, timeout: 0 })
+  const dismiss = toast({ variant: 'loading', message: t('synthetics.toast.triggeringSingle', { name }), timeout: 0 })
   try {
     await syntheticsService.run(org, id, {})
     dismiss()
-    toast({ variant: 'success', message: `Run triggered for "${name}".` })
+    toast({ variant: 'success', message: t('synthetics.toast.triggerSuccessSingle', { name }) })
   } catch (err: any) {
     dismiss()
     toast({
       variant: 'error',
-      message: err?.response?.data?.message || `Failed to trigger "${name}".`,
+      message: err?.response?.data?.message || t('synthetics.toast.triggerFailedSingle', { name }),
     })
     console.error('[synthetics] run failed', err)
   } finally {
@@ -736,17 +736,17 @@ async function runMonitor(m: any) {
 
 async function deleteMonitor(m: any) {
   const org = orgIdentifier.value
-  const dismiss = toast({ variant: 'loading', message: 'Deleting monitor…', timeout: 0 })
+  const dismiss = toast({ variant: 'loading', message: t('synthetics.toast.deletingSingle'), timeout: 0 })
   try {
     await syntheticsService.delete(org, String(m.id), activeFolderId.value)
     monitors.value = monitors.value.filter((mon) => String(mon.id) !== String(m.id))
     dismiss()
-    toast({ variant: 'success', message: 'Monitor deleted.' })
+    toast({ variant: 'success', message: t('synthetics.toast.deleteSuccessSingle') })
   } catch (err: any) {
     dismiss()
     toast({
       variant: 'error',
-      message: err?.response?.data?.message || err?.response?.data?.error || 'Failed to delete monitor.',
+      message: err?.response?.data?.message || err?.response?.data?.error || t('synthetics.toast.deleteFailedSingle'),
     })
     console.error('[synthetics] delete failed', err)
   }

@@ -259,7 +259,7 @@
     <template #bottom>
       <div class="flex w-full justify-between items-center h-12 gap-1">
         <span class="text-xs text-secondary min-w-25">
-          <template v-if="localSelectedIds.length > 0">{{ localSelectedIds.length }} of {{ data.length }} selected</template>
+          <template v-if="localSelectedIds.length > 0">{{ t('synthetics.table.selectedCount', { selected: localSelectedIds.length, total: data.length }) }}</template>
           <template v-else>{{ data.length }} {{ footerTitle }}</template>
         </span>
         <template v-if="localSelectedIds.length > 0">

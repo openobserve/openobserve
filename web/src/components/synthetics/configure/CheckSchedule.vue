@@ -97,7 +97,7 @@ function buildTimezoneOptions(): { label: string; value: string }[] {
   try {
     const browserTz = Intl.DateTimeFormat().resolvedOptions().timeZone
     const options: { label: string; value: string }[] = [
-      { label: `Browser Time (${browserTz})`, value: `Browser Time (${browserTz})` },
+      { label: t('synthetics.scheduleAlert.browserTime', { tz: browserTz }), value: t('synthetics.scheduleAlert.browserTime', { tz: browserTz }) },
       { label: 'UTC', value: 'UTC' },
     ]
     // @ts-ignore - supportedValuesOf not in all TS versions
@@ -233,7 +233,7 @@ const startTime = computed({
         <OInput
           v-model="cron"
           :label="t('synthetics.scheduleAlert.cronExpression')"
-          :placeholder="t('synthetics.scheduleAlert.cronPlaceholder')"
+          placeholder="*/5 * * * *"
           class="w-83!"
           data-test="synthetics-check-schedule-cron-input"
         />

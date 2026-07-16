@@ -1,6 +1,7 @@
 <script setup lang="ts">
 // Copyright 2026 OpenObserve Inc.
 import { computed, onUnmounted, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useStore } from 'vuex'
 import OIcon from '@/lib/core/Icon/OIcon.vue'
 import OButton from '@/lib/core/Button/OButton.vue'
@@ -23,6 +24,7 @@ const props = defineProps<{
 }>()
 
 const store = useStore()
+const { t } = useI18n()
 const { executeQuery, cancelAll } = useLLMStreamQuery()
 
 // ── Data loading ──────────────────────────────────────────────────────────
@@ -73,7 +75,7 @@ interface LocationGroup {
 const locationGroups = computed<LocationGroup[]>(() => {
   const map = new Map<string, RunLocationResult[]>()
   for (const ex of executions.value) {
-    const key = ex.location || '(unknown)'
+    const key = ex.location || t('synthetics.runRowExpansion.unknownLocation')
     if (!map.has(key)) map.set(key, [])
     map.get(key)!.push(ex)
   }
@@ -131,10 +133,10 @@ function statusDot(s: RunStatus) {
 }
 
 function statusLabel(s: RunStatus) {
-  return s === 'passed' ? 'Passed'
-    : s === 'warning' ? 'Warning'
-    : s === 'error' ? 'Error'
-    : 'Failed'
+  return s === 'passed' ? t('synthetics.results.passed')
+    : s === 'warning' ? t('synthetics.results.warning')
+    : s === 'error' ? t('synthetics.results.error')
+    : t('synthetics.results.failed')
 }
 
 function fmtDuration(ms: number) {
@@ -182,8 +184,8 @@ function failedAtStep(steps: StepResult[]): string {
     <!-- No data -->
     <div v-else-if="!executions.length" class="flex items-center gap-2 p-4 text-xs text-text-muted">
       <OIcon name="info" size="sm" />
-      <span v-if="runStatus === 'error'">Probe infrastructure error — no execution data was recorded for this run.</span>
-      <span v-else>No execution data found for this run.</span>
+      <span v-if="runStatus === 'error'">{{ t('synthetics.runRowExpansion.probeInfraError') }}</span>
+      <span v-else>{{ t('synthetics.runRowExpansion.noExecutionData') }}</span>
     </div>
 
     <!-- Location groups -->
@@ -194,7 +196,7 @@ function failedAtStep(steps: StepResult[]): string {
         class="flex items-center gap-2 px-4 py-2 text-xs text-amber-600 bg-amber-500/10 border-b border-amber-500/20"
       >
         <OIcon name="warning" size="xs" />
-        This run passed but some checks were flaky (passed on retry).
+        {{ t('synthetics.runRowExpansion.flakyWarning') }}
       </div>
 
       <div class="flex flex-col divide-y divide-border-default">
@@ -225,7 +227,7 @@ function failedAtStep(steps: StepResult[]): string {
             </span>
             <span class="text-text-muted">{{ fmtDuration(group.durationMs) }}</span>
             <span class="ml-auto text-text-muted">
-              {{ group.execs.length }} execution{{ group.execs.length !== 1 ? 's' : '' }}
+              {{ t('synthetics.runRowExpansion.executions', { count: group.execs.length }) }}
             </span>
           </OButton>
 
@@ -237,11 +239,11 @@ function failedAtStep(steps: StepResult[]): string {
               <table class="w-full text-xs">
                 <thead>
                   <tr class="bg-surface-panel border-b border-border-default">
-                    <th class="px-3 py-2 text-left font-semibold text-text-muted uppercase tracking-wide text-[0.62rem]">Browser</th>
-                    <th class="px-3 py-2 text-left font-semibold text-text-muted uppercase tracking-wide text-[0.62rem]">Device</th>
-                    <th class="px-3 py-2 text-left font-semibold text-text-muted uppercase tracking-wide text-[0.62rem]">Status</th>
-                    <th class="px-3 py-2 text-right font-semibold text-text-muted uppercase tracking-wide text-[0.62rem]">Duration</th>
-                    <th class="px-3 py-2 text-left font-semibold text-text-muted uppercase tracking-wide text-[0.62rem]">Failed at</th>
+                    <th class="px-3 py-2 text-left font-semibold text-text-muted uppercase tracking-wide text-[0.62rem]">{{ t('synthetics.runRowExpansion.browserHeader') }}</th>
+                    <th class="px-3 py-2 text-left font-semibold text-text-muted uppercase tracking-wide text-[0.62rem]">{{ t('synthetics.runRowExpansion.deviceHeader') }}</th>
+                    <th class="px-3 py-2 text-left font-semibold text-text-muted uppercase tracking-wide text-[0.62rem]">{{ t('synthetics.results.status') }}</th>
+                    <th class="px-3 py-2 text-right font-semibold text-text-muted uppercase tracking-wide text-[0.62rem]">{{ t('synthetics.results.duration') }}</th>
+                    <th class="px-3 py-2 text-left font-semibold text-text-muted uppercase tracking-wide text-[0.62rem]">{{ t('synthetics.runRowExpansion.failedAtHeader') }}</th>
                   </tr>
                 </thead>
                 <tbody class="divide-y divide-border-default">
@@ -262,7 +264,7 @@ function failedAtStep(steps: StepResult[]): string {
                       <span class="flex items-center gap-1.5 font-semibold" :class="STATUS_COLOR[ex.status]">
                         <span class="text-base leading-none">{{ statusDot(ex.status) }}</span>
                         {{ statusLabel(ex.status) }}
-                        <span v-if="ex.status === 'warning'" class="font-normal text-text-muted">(flaky)</span>
+                        <span v-if="ex.status === 'warning'" class="font-normal text-text-muted">{{ t('synthetics.runRowExpansion.flaky') }}</span>
                       </span>
                     </td>
                     <td class="px-3 py-2 text-right tabular-nums text-text-secondary">{{ fmtDuration(ex.durationMs) }}</td>

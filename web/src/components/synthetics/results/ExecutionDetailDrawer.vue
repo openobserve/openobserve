@@ -1,8 +1,11 @@
 <script setup lang="ts">
 // Copyright 2026 OpenObserve Inc.
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import OIcon from '@/lib/core/Icon/OIcon.vue'
 import type { RunLocationResult, RecordedStep, StepResult } from '@/composables/synthetics/syntheticResultsSchema'
+
+const { t } = useI18n()
 
 const props = defineProps<{
   execution: RunLocationResult | null
@@ -115,14 +118,14 @@ function fmtDuration(ms: number) {
             v-if="execution.error && !execution.steps.length"
             class="mx-5 mt-4 rounded border border-[var(--color-warning-500)]/30 bg-[var(--color-warning-500)]/10 px-4 py-3 shrink-0"
           >
-            <p class="text-xs font-semibold text-[var(--color-warning-600)] mb-1">Probe error</p>
+            <p class="text-xs font-semibold text-[var(--color-warning-600)] mb-1">{{ t('synthetics.executionDetail.probeError') }}</p>
             <p class="text-xs text-[var(--color-warning-600)] font-mono whitespace-pre-wrap leading-relaxed">{{ execution.error }}</p>
           </div>
 
           <!-- Steps -->
           <div class="flex-1 overflow-y-auto px-5 py-4">
             <p v-if="!mergedSteps.length" class="text-xs text-text-muted italic">
-              No step data available.
+              {{ t('synthetics.executionDetail.noStepData') }}
             </p>
 
             <div v-else class="flex flex-col gap-3">
@@ -167,7 +170,7 @@ function fmtDuration(ms: number) {
                   <a :href="artifactUrlFn(step.screenshotKey)" target="_blank" class="block">
                     <img
                       :src="artifactUrlFn(step.screenshotKey)"
-                      :alt="`Step ${i + 1} screenshot`"
+                      :alt="t('synthetics.runDetail.stepOf', { selected: i + 1, total: mergedSteps.length }) + ' ' + t('synthetics.runDetail.screenshotAlt')"
                       class="w-full object-contain max-h-64"
                       loading="lazy"
                     />

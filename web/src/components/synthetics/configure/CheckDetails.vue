@@ -55,7 +55,7 @@ const tagInput = ref('')
 
 const folderOptions = computed(() => {
   const opts = (props.folders ?? []).map((f) => ({ label: f.name, value: f.folderId }))
-  return opts.length ? opts : [{ label: 'Default', value: 'default' }]
+  return opts.length ? opts : [{ label: t('synthetics.checkDetails.defaultFolder'), value: 'default' }]
 })
 
 function addTag() {

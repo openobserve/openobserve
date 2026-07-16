@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       class="flex items-center gap-2 px-[0.875rem] pt-[0.625rem] pb-[0.5rem]"
     >
-      <span class="font-bold text-xs text-text-heading"> Status Timeline </span>
+      <span class="font-bold text-xs text-text-heading"> {{ t('synthetics.timeline.title') }} </span>
       <span class="flex-1" />
       <span
         class="inline-flex items-center gap-1.5 text-xs text-text-secondary"
@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span
           class="w-[0.4375rem] h-[0.4375rem] rounded-full bg-[var(--color-badge-error-solid-bg)]"
         />
-        {{ failCount }} Failed
+        {{ failCount }} {{ t('synthetics.timeline.failed') }}
       </span>
       <span
         class="inline-flex items-center gap-1.5 text-xs text-text-secondary"
@@ -44,7 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span
           class="w-[0.4375rem] h-[0.4375rem] rounded-full bg-[var(--color-badge-orange-solid-bg)]"
         />
-        {{ mixedCount }} Warning
+        {{ mixedCount }} {{ t('synthetics.timeline.warning') }}
       </span>
       <span
         class="inline-flex items-center gap-1.5 text-xs text-text-secondary"
@@ -52,7 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span
           class="w-[0.4375rem] h-[0.4375rem] rounded-full bg-[var(--color-badge-success-solid-bg)]"
         />
-        {{ passCount }} Passed
+        {{ passCount }} {{ t('synthetics.timeline.passed') }}
       </span>
     </div>
     <div class="border-t border-border-default" />
@@ -63,7 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="icon-xs"
           :disabled="!canScrollLeft"
           data-test="synthetics-timeline-scroll-left-btn"
-          aria-label="Scroll timeline left"
+          :aria-label="t('synthetics.timeline.scrollLeft')"
           @click="scrollTimeline('left')"
         >
           <OIcon name="chevron-left" size="xs" />
@@ -90,13 +90,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="w-2 h-2 rounded-full shrink-0 bg-[var(--color-badge-success-solid-bg)]"
                     />
                     <span class="text-text-secondary"
-                      >{{ passCountLocal(seg.executions) }} passed</span
+                      >{{ t('synthetics.timeline.tooltipPassed', { count: passCountLocal(seg.executions) }) }}</span
                     >
                     <span
                       class="w-2 h-2 rounded-full shrink-0 bg-[var(--color-badge-error-solid-bg)]"
                     />
                     <span class="text-text-secondary"
-                      >{{ failCountLocal(seg.executions) }} failed</span
+                      >{{ t('synthetics.timeline.tooltipFailed', { count: failCountLocal(seg.executions) }) }}</span
                     >
                   </div>
                   <template
@@ -155,7 +155,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="icon-xs"
           :disabled="!canScrollRight"
           data-test="synthetics-timeline-scroll-right-btn"
-          aria-label="Scroll timeline right"
+          :aria-label="t('synthetics.timeline.scrollRight')"
           @click="scrollTimeline('right')"
         >
           <OIcon name="chevron-right" size="xs" />
@@ -174,6 +174,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, ref } from "vue";
+import { useI18n } from "vue-i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -182,6 +183,8 @@ import firefoxSvgUrl from "@/assets/images/synthetics/firefox.svg";
 import webkitSvgUrl from "@/assets/images/synthetics/webkit.svg";
 
 defineOptions({ name: "MonitorStatusTimeline" });
+
+const { t } = useI18n();
 
 const MAX_VISIBLE = 30;
 
@@ -279,7 +282,7 @@ const rangeLabel = computed(() => {
   );
   const start = page * MAX_VISIBLE + 1;
   const end = Math.min((page + 1) * MAX_VISIBLE, total);
-  return "Showing " + start + "-" + end + " of " + total + " runs";
+  return t('synthetics.timeline.rangeLabel', { start, end, total });
 });
 
 function scrollTimeline(direction: "left" | "right") {

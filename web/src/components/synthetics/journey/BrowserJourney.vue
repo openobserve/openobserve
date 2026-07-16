@@ -162,6 +162,15 @@ const multiSelectEnabled = computed(() =>
 // All Chrome-extension messaging lives in the composable; this component only
 // reflects its reactive state and merges the result into the journey on stop.
 const { t } = useI18n()
+
+// Chrome UI element names — must stay in English across all locales
+// because they reference the actual Chrome browser interface.
+const CHROME_UI = {
+  details: 'Details',
+  allowIncognito: 'Allow in Incognito',
+  recorderName: 'OpenObserve Recorder',
+} as const
+
 const recorder = useSyntheticsRecorder()
 const isRecording = recorder.isRecording
 const capturedSteps = recorder.liveSteps
@@ -209,7 +218,7 @@ function validateJourneySteps(): boolean {
     // navigation was blocked, then expand the step to see inline details.
     const firstErrId = erroredIds[0]
     const stepIdx = props.modelValue.findIndex((s) => s.id === firstErrId)
-    const stepLabel = props.modelValue[stepIdx]?.name || `Step ${(stepIdx ?? 0) + 1}`
+    const stepLabel = props.modelValue[stepIdx]?.name || t('synthetics.results.steps.step', { step: (stepIdx ?? 0) + 1 })
     if (firstStepError.value && (!first || first.id === firstErrId)) {
       toast({ variant: 'error', message: t('synthetics.validation.firstStepMustNavigate') })
     } else {
@@ -407,7 +416,7 @@ const valueActions = VALUE_ACTIONS_CONST
 const selectorTypeOptions = SELECTOR_TYPE_OPTIONS
 
 function valueActionLabel(action: string): string {
-  return VALUE_LABELS[action] || 'Value'
+  return VALUE_LABELS[action] || t('synthetics.journey.valueFallback')
 }
 
 function valueWidthClass(action: string): string {
@@ -525,7 +534,7 @@ function openChromeExtensions() {
           icon-left="stop"
           class="w-24!"
         >
-          Stop
+          {{ t('synthetics.journey.stop') }}
         </OButton>
         <OButton
           v-else
@@ -557,11 +566,11 @@ function openChromeExtensions() {
         {{ t('synthetics.journey.incognitoDescription') }}
       </p>
       <ol class="list-decimal pl-4 text-xs text-text-body flex flex-col gap-1 m-0">
-        <li>{{ t('synthetics.journey.incognitoStep1') }} <code class="font-mono text-text-code">chrome://extensions</code></li>
-        <li>{{ t('synthetics.journey.incognitoStep2') }} <strong>{{ t('synthetics.journey.extensionsRecorderName') }}</strong> {{ t('synthetics.journey.extension') }}</li>
-        <li>{{ t('synthetics.journey.incognitoStep3') }} <strong>{{ t('synthetics.journey.extensionsDetails') }}</strong></li>
-        <li>{{ t('synthetics.journey.incognitoStep4') }} <strong>{{ t('synthetics.journey.extensionsAllowIncognito') }}</strong></li>
-        <li>{{ t('synthetics.journey.incognitoStep5') }} <strong>{{ t('synthetics.journey.retry') }}</strong></li>
+        <li>{{ t('synthetics.journey.incognitoStep1Full') }}</li>
+        <li>{{ t('synthetics.journey.incognitoStep2Full', { name: CHROME_UI.recorderName }) }}</li>
+        <li>{{ t('synthetics.journey.incognitoStep3Full', { button: CHROME_UI.details }) }}</li>
+        <li>{{ t('synthetics.journey.incognitoStep4Full', { setting: CHROME_UI.allowIncognito }) }}</li>
+        <li>{{ t('synthetics.journey.incognitoStep5Full', { button: t('synthetics.journey.retry') }) }}</li>
       </ol>
       <div class="flex items-center gap-2">
         <OButton
@@ -570,7 +579,7 @@ function openChromeExtensions() {
           data-test="synthetics-journey-incognito-retry-btn"
           @click="emit('replay')"
         >
-          Retry
+          {{ t('synthetics.journey.retry') }}
         </OButton>
         <OButton
           variant="ghost"
@@ -578,7 +587,7 @@ function openChromeExtensions() {
           data-test="synthetics-journey-incognito-dismiss-btn"
           @click="emit('clear-results')"
         >
-          Dismiss
+          {{ t('synthetics.journey.dismiss') }}
         </OButton>
         <span class="flex-1" />
         <OButton
@@ -587,7 +596,7 @@ function openChromeExtensions() {
           data-test="synthetics-journey-incognito-extensions-btn"
           @click="openChromeExtensions"
         >
-          Open chrome://extensions
+          {{ t('synthetics.journey.openExtensions') }}
         </OButton>
       </div>
     </div>
@@ -604,10 +613,10 @@ function openChromeExtensions() {
         class="text-sm text-text-heading"
         data-test="synthetics-journey-replay-banner-text"
       >
-        Replaying…
+        {{ t('synthetics.journey.replaying') }}
       </span>
       <span class="text-sm text-text-secondary">
-        {{ stepResults?.size ?? 0 }} of {{ modelValue.length }} steps
+        {{ t('synthetics.journey.replayProgress', { current: stepResults?.size ?? 0, total: modelValue.length }) }}
       </span>
     </div>
 
@@ -654,7 +663,7 @@ function openChromeExtensions() {
       <span class="text-sm text-text-heading">{{ t('synthetics.journey.replayStopped', { completed: stepResults?.size ?? 0, total: modelValue.length }) }}</span>
       <span class="flex-1" />
       <OButton variant="outline" size="xs" data-test="synthetics-journey-stopped-retry-btn" @click="emit('replay')">
-        Re-run
+        {{ t('synthetics.journey.reRun') }}
       </OButton>
       <OButton variant="ghost" size="xs" data-test="synthetics-journey-clear-results-btn" @click="emit('clear-results')">
         <OIcon name="close" size="sm" />
@@ -705,7 +714,7 @@ function openChromeExtensions() {
       <!-- Waiting for first step -->
       <div v-else class="flex flex-col items-center justify-center gap-3 py-16 text-center">
         <OIcon name="fiber-manual-record" size="xl" class="text-text-muted animate-pulse" aria-hidden="true" />
-        <p class="text-sm text-text-secondary m-0">Waiting for actions in the browser…</p>
+        <p class="text-sm text-text-secondary m-0">{{ t('synthetics.journey.waitingForActions') }}</p>
       </div>
     </template>
 
@@ -757,7 +766,7 @@ function openChromeExtensions() {
           <div class="flex gap-2">
             <OSelect
               :model-value="row.action"
-              label="Action"
+              :label="t('synthetics.journey.actionLabel')"
               :options="actionOptions"
               class="w-50! shrink-0"
               :error="firstStepError && props.modelValue[0]?.id === row.id"
@@ -767,8 +776,8 @@ function openChromeExtensions() {
             />
             <OInput
               :model-value="row.name ?? ''"
-              label="Step name (optional)"
-              placeholder="Enter a descriptive name"
+              :label="t('synthetics.journey.stepNameOptional')"
+              :placeholder="t('synthetics.journey.stepNamePlaceholder')"
               class="w-100!"
               data-test="synthetics-journey-step-name-input"
               @update:model-value="(v: any) => handleStepUpdate(row, { name: v })"
@@ -779,7 +788,7 @@ function openChromeExtensions() {
             <div class="flex gap-2 w-fit!">
               <OSelect
                 :model-value="row.selectorType ?? 'CSS'"
-                label="Selector type"
+                :label="t('synthetics.journey.selectorTypeLabel')"
                 :options="selectorTypeOptions"
                 class="w-50! shrink-0"
                 data-test="synthetics-journey-step-selector-type-select"
@@ -787,12 +796,12 @@ function openChromeExtensions() {
               />
               <OInput
                 :model-value="row.selector ?? ''"
-                label="Selector"
+                :label="t('synthetics.journey.selectorLabel')"
                 placeholder="#my-button or .class-name"
                 class="w-100!"
                 :required="true"
                 :error="selectorErrors.has(row.id)"
-                :error-message="selectorErrors.has(row.id) ? t('synthetics.validation.selectorRequired', { step: row.name || 'Step ' + (props.modelValue.indexOf(row) + 1) }) : ''"
+                :error-message="selectorErrors.has(row.id) ? t('synthetics.validation.selectorRequired', { step: row.name || t('synthetics.results.steps.step', { step: props.modelValue.indexOf(row) + 1 }) }) : ''"
                 data-test="synthetics-journey-step-selector-input"
                 @update:model-value="(v: any) => { handleStepUpdate(row, { selector: v }); clearSelectorError(row.id) }"
               />
@@ -815,8 +824,8 @@ function openChromeExtensions() {
           <!-- Timeout -->
           <OInput
             :model-value="String(row.timeout ?? '')"
-            label="Timeout (ms)"
-            placeholder="30000"
+            :label="t('synthetics.journey.timeoutLabel')"
+            :placeholder="t('synthetics.journey.timeoutPlaceholder')"
             type="number"
             class="w-50!"
             data-test="synthetics-journey-step-timeout-input"
@@ -829,7 +838,7 @@ function openChromeExtensions() {
     <!-- Delete confirmation dialog -->
     <ConfirmDialog
       v-model:model-value="deleteConfirm.show"
-      :title="'Delete Step'"
+      :title="t('synthetics.journey.deleteStep')"
       :message="deleteConfirmMessage"
       :ok-label="t('synthetics.journey.delete')"
       ok-color="danger"

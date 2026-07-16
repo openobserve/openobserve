@@ -15,6 +15,7 @@
 
 <script setup lang="ts" generic="TData extends Record<string, any>">
 import { computed } from "vue";
+import { useI18n } from "vue-i18n";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
@@ -23,6 +24,8 @@ import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { ACTION_LABELS, ACTION_ICONS } from "@/constants/synthetics";
+
+const { t } = useI18n();
 
 // ── Re-export StepDotState for consumers ──────────────────────────
 export type StepDotState = "pending" | "active" | "pass" | "fail" | "skip";
@@ -145,7 +148,7 @@ const isEditor = computed(() => props.mode === "editor");
 const columns = computed<OTableColumnDef<TData>[]>(() => {
   if (isEditor.value) {
     return [
-      { id: "details", header: "Step", size: 200, meta: { autoWidth: true } },
+      { id: "details", header: t('synthetics.journey.stepHeader'), size: 200, meta: { autoWidth: true } },
       { id: "actions", header: "", size: 128, isAction: true },
     ];
   }
@@ -153,9 +156,9 @@ const columns = computed<OTableColumnDef<TData>[]>(() => {
   return [
     { id: "step", header: "", size: 44 },
     { id: "screenshot", header: "", size: 90 },
-    { id: "details", header: "Step", size: 200, meta: { autoWidth: true } },
+    { id: "details", header: t('synthetics.journey.stepHeader'), size: 200, meta: { autoWidth: true } },
     { id: "progress", header: "", size: 100 },
-    { id: "duration", header: "Duration", size: 80 },
+    { id: "duration", header: t('synthetics.journey.durationHeader'), size: 80 },
   ];
 });
 
@@ -309,7 +312,7 @@ function handleUpdateExpanded(ids: string[]) {
           v-if="!readonly"
           variant="ghost"
           size="xs"
-          aria-label="Insert step below"
+          :aria-label="t('synthetics.journey.insertStepBelow')"
           data-test="synthetics-journey-step-insert-btn"
           :disabled="isLocked"
           @click="emit('insert-below', row)"
@@ -321,7 +324,7 @@ function handleUpdateExpanded(ids: string[]) {
           v-if="!readonly"
           variant="ghost"
           size="xs"
-          aria-label="Duplicate step"
+          :aria-label="t('synthetics.journey.duplicateStep')"
           data-test="synthetics-journey-step-duplicate-btn"
           data-row-action="duplicate"
           :disabled="isLocked"
@@ -334,7 +337,7 @@ function handleUpdateExpanded(ids: string[]) {
           v-if="!readonly"
           variant="ghost"
           size="xs"
-          aria-label="Delete step"
+          :aria-label="t('synthetics.journey.deleteStepAria')"
           data-test="synthetics-journey-step-delete-btn"
           data-row-action="delete"
           :disabled="isLocked"

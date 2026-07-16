@@ -1,10 +1,13 @@
 <script setup lang="ts">
 // Copyright 2026 OpenObserve Inc.
 import { onMounted, onUnmounted, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import type { BrowserStep } from '@/types/synthetics'
 import OButton from '@/lib/core/Button/OButton.vue'
 import OIcon from '@/lib/core/Icon/OIcon.vue'
 import BrowserJourneyStep from './BrowserJourneyStep.vue'
+
+const { t } = useI18n()
 
 const props = defineProps<{
   startUrl: string
@@ -90,7 +93,7 @@ onUnmounted(() => {
       <!-- Red dot + timer -->
       <span class="flex items-center gap-1.5">
         <span class="w-2 h-2 rounded-full bg-[var(--color-status-error-text)] animate-pulse inline-block" aria-hidden="true" />
-        <span class="text-sm font-semibold text-status-error-text">Recording</span>
+        <span class="text-sm font-semibold text-status-error-text">{{ t('synthetics.journey.recording') }}</span>
         <span class="font-mono text-sm text-text-body">{{ formatTime(recordingSeconds) }}</span>
       </span>
 
@@ -102,14 +105,14 @@ onUnmounted(() => {
 
       <!-- Actions -->
       <div class="flex items-center gap-2 shrink-0">
-        <OButton variant="ghost" size="sm" @click="emit('cancel')">Cancel</OButton>
+        <OButton variant="ghost" size="sm" @click="emit('cancel')">{{ t('synthetics.journey.cancel') }}</OButton>
         <OButton
           variant="primary"
           size="sm"
           data-test="synthetics-record-stop-btn"
           @click="stopRecording"
         >
-          Stop &amp; Review
+          {{ t('synthetics.journey.stopAndReview') }}
         </OButton>
       </div>
     </div>
@@ -117,19 +120,19 @@ onUnmounted(() => {
     <!-- Info banner -->
     <div class="flex items-center gap-2 px-4 py-2 border-b border-border-default bg-surface-base">
       <OIcon name="open-in-new" size="sm" class="text-text-muted" aria-hidden="true" />
-      <span class="text-xs text-text-secondary flex-1">Recording in a separate incognito window</span>
-      <OButton variant="outline" size="sm">Show window</OButton>
+      <span class="text-xs text-text-secondary flex-1">{{ t('synthetics.journey.recordingIncognitoInfo') }}</span>
+      <OButton variant="outline" size="sm">{{ t('synthetics.journey.showWindow') }}</OButton>
     </div>
 
     <!-- Captured steps -->
     <div class="flex-1 overflow-y-auto p-4">
       <div class="flex items-center gap-2 mb-3">
-        <h3 class="text-base font-semibold text-text-heading m-0">Journey</h3>
+        <h3 class="text-base font-semibold text-text-heading m-0">{{ t('synthetics.journey.journeyHeading') }}</h3>
         <span class="text-xs font-medium bg-status-error-bg text-status-error-text rounded-full px-2 py-0.5 flex items-center gap-1">
           <span class="w-1.5 h-1.5 rounded-full bg-[var(--color-status-error-text)] animate-pulse inline-block" aria-hidden="true" />
-          capturing live
+          {{ t('synthetics.journey.capturingLive') }}
         </span>
-        <span class="text-sm text-text-muted">({{ capturedSteps.length }} steps)</span>
+        <span class="text-sm text-text-muted">{{ t('synthetics.journey.stepCount', { count: capturedSteps.length }) }}</span>
       </div>
 
       <!-- Live step list -->
@@ -154,7 +157,7 @@ onUnmounted(() => {
         class="flex flex-col items-center justify-center gap-3 py-16 text-center"
       >
         <OIcon name="fiber-manual-record" size="xl" class="text-text-muted animate-pulse" aria-hidden="true" />
-        <p class="text-sm text-text-secondary m-0">Waiting for actions in the browser…</p>
+        <p class="text-sm text-text-secondary m-0">{{ t('synthetics.journey.waitingForActions') }}</p>
       </div>
     </div>
   </div>

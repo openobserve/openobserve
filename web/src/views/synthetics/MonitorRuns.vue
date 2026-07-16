@@ -43,9 +43,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="shrink-0 px-2 border-b border-border-default"
     >
       <OTab name="overview" data-test="monitor-runs-tab-overview">
-        Overview
+        {{ t('synthetics.runs.tabOverview') }}
       </OTab>
-      <OTab name="steps" data-test="monitor-runs-tab-steps"> Steps </OTab>
+      <OTab name="steps" data-test="monitor-runs-tab-steps"> {{ t('synthetics.runs.tabSteps') }} </OTab>
     </OTabs>
 
     <div class="flex-1 min-h-0">
@@ -101,7 +101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div
                     class="flex items-center gap-2 px-[0.875rem] pt-[0.625rem] pb-[0.5rem]"
                   >
-                    <span class="font-bold text-sm text-text-heading">Status Timeline</span>
+                    <span class="font-bold text-sm text-text-heading">{{ t('synthetics.runs.statusTimeline') }}</span>
                   </div>
                   <div class="border-t border-border-default" />
                   <div class="flex items-center justify-center py-6 text-[0.75rem] text-status-error-text">
@@ -227,7 +227,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="flex items-center gap-2 px-2 pt-[0.625rem] pb-[0.5rem]"
                   >
                     <span class="font-bold text-sm text-text-heading">
-                      Response Time
+                      {{ t('synthetics.results.responseTime') }}
                     </span>
                     <span class="flex-1" />
                     <OBadge v-if="!histogramError" variant="default" size="sm">
@@ -238,7 +238,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="inline-flex items-center gap-1 text-xs text-status-error-text"
                     >
                       <OIcon name="error_outline" size="xs" />
-                      Error
+                      {{ t('synthetics.results.error') }}
                     </span>
                   </div>
                   <div class="border-t border-border-default" />
@@ -261,18 +261,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="flex items-center gap-2 px-2 pt-[0.625rem] pb-[0.5rem]"
                   >
                     <span class="font-bold text-sm text-text-heading">
-                      Errors Over Time
+                      {{ t('synthetics.runs.errorsOverTime') }}
                     </span>
                     <span class="flex-1" />
                     <OBadge v-if="!histogramError" variant="error" size="sm">
-                      {{ failCount }} failed
+                      {{ t('synthetics.runs.failedCount', { count: failCount }) }}
                     </OBadge>
                     <span
                       v-else
                       class="inline-flex items-center gap-1 text-xs text-status-error-text"
                     >
                       <OIcon name="error_outline" size="xs" />
-                      Error
+                      {{ t('synthetics.results.error') }}
                     </span>
                   </div>
                   <div class="border-t border-border-default" />
@@ -347,7 +347,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="flex items-center gap-2 px-2 pt-[0.625rem] pb-[0.5rem]"
                   >
                     <span class="font-bold text-sm text-text-heading">
-                      Pass Rate by {{ dim }}
+                      {{ dim === 'Browser' ? t('synthetics.runs.passRateByBrowser') : dim === 'Location' ? t('synthetics.runs.passRateByLocation') : t('synthetics.runs.passRateByDevice') }}
                     </span>
                   </div>
                   <div class="border-t border-border-default" />
@@ -372,7 +372,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     <OIcon name="language" size="sm" class="text-primary-700" />
                     <span class="font-bold text-sm text-text-heading">
-                      Pass Rate by Browser
+                      {{ t('synthetics.runs.passRateByBrowser') }}
                     </span>
                   </div>
                   <div class="border-t border-border-default" />
@@ -422,7 +422,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="text-primary-700"
                     />
                     <span class="font-bold text-sm text-text-heading">
-                      Pass Rate by Location
+                      {{ t('synthetics.runs.passRateByLocation') }}
                     </span>
                   </div>
                   <div class="border-t border-border-default" />
@@ -467,7 +467,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     <OIcon name="devices" size="sm" class="text-primary-700" />
                     <span class="font-bold text-sm text-text-heading">
-                      Pass Rate by Device
+                      {{ t('synthetics.runs.passRateByDevice') }}
                     </span>
                   </div>
                   <div class="border-t border-border-default" />
@@ -565,7 +565,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OInput
                   v-model="locatorFilter"
                   size="sm"
-                  placeholder="Locator contains…"
+                  :placeholder="t('synthetics.runs.locatorPlaceholder')"
                   class="w-[170px]"
                   data-test="monitor-runs-filter-locator"
                 />
@@ -580,7 +580,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <span class="flex-1" />
               <span class="text-xs text-text-secondary">
-                {{ filteredRuns.length }} of {{ allRuns.length }} runs
+                {{ t('synthetics.runs.filterCount', { current: filteredRuns.length, total: allRuns.length }) }}
               </span>
             </div>
 
@@ -591,7 +591,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="monitor-runs-error-filter-badge"
             >
               <span class="text-xs text-text-secondary"
-                >Filtering by error:</span
+                >{{ t('synthetics.runs.filteringByErrorLabel') }}</span
               >
               <OBadge variant="error" size="sm" class="gap-1">
                 {{ errorFilter }}
@@ -811,7 +811,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="monitor-runs-steps-retry-btn"
                   @click="emit('refresh')"
                 >
-                  Retry
+                  {{ t('synthetics.journey.retry') }}
                 </OButton>
               </div>
             </template>
@@ -895,7 +895,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <!-- Empty -->
                   <template #empty>
                     <div class="flex items-center justify-center py-12 text-sm text-[var(--color-text-secondary)]">
-                      No step data for the selected time range
+                      {{ t('synthetics.runs.noStepData') }}
                     </div>
                   </template>
                 </OTable>
@@ -912,11 +912,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <div class="flex items-center gap-2.5">
               <span class="font-bold text-sm text-text-heading">
-                Error patterns
+                {{ t('synthetics.runs.errorPatterns') }}
               </span>
               <span class="text-xs text-text-secondary">
-                Normalized across {{ windowLabel }} &middot; click a row to
-                filter runs
+                {{ t('synthetics.runs.errorPatternsWindowDesc', { window: windowLabel }) }}
               </span>
             </div>
 
@@ -924,9 +923,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div
                 class="grid grid-cols-[1fr_100px_160px_32px] gap-2.5 px-4 py-2 bg-surface-subtle border-b border-border-default text-[11px] font-semibold text-text-secondary uppercase tracking-wide"
               >
-                <span>Error Pattern</span>
-                <span>Count</span>
-                <span>Last Seen</span>
+                <span>{{ t('synthetics.runs.errorPattern') }}</span>
+                <span>{{ t('synthetics.runs.count') }}</span>
+                <span>{{ t('synthetics.runs.lastSeen') }}</span>
                 <span />
               </div>
               <div
@@ -1088,12 +1087,12 @@ const timeRangeMicros = ref<{ startTime: number; endTime: number } | null>(
 function formatWindowLabel(startMicros: number, endMicros: number): string {
   const diffMs = (endMicros - startMicros) / 1000;
   const hours = Math.round(diffMs / 3600000);
-  if (hours >= 48) return `Last ${Math.round(hours / 24)} days`;
-  if (hours >= 24) return "Last 24 hours";
-  if (hours >= 2) return `Last ${hours} hours`;
+  if (hours >= 48) return t('synthetics.runs.windowDays', { days: Math.round(hours / 24) });
+  if (hours >= 24) return t('synthetics.runs.window24h');
+  if (hours >= 2) return t('synthetics.runs.windowHours', { hours });
   const minutes = Math.round(diffMs / 60000);
-  if (minutes >= 60) return "Last 1 hour";
-  return `Last ${minutes} minutes`;
+  if (minutes >= 60) return t('synthetics.runs.window1h');
+  return t('synthetics.runs.windowMinutes', { minutes });
 }
 const windowLabel = computed(() =>
   timeRangeMicros.value
@@ -1101,7 +1100,7 @@ const windowLabel = computed(() =>
         timeRangeMicros.value.startTime,
         timeRangeMicros.value.endTime,
       )
-    : "Last 24 hours",
+    : t('synthetics.runs.window24h'),
 );
 const statusFilter = ref("all");
 const browserFilter = ref("all");
@@ -1152,20 +1151,20 @@ async function handleEmptyStateAction(id: string) {
     runTriggerLoading.value = true;
     const dismiss = toast({
       variant: "loading",
-      message: `Triggering a run for "${props.monitorName}"…`,
+      message: t('synthetics.toast.triggeringSingle', { name: props.monitorName }),
       timeout: 0,
     });
     try {
       await syntheticsService.run(orgIdentifier.value, props.monitorId, {});
       dismiss();
-      toast({ variant: "success", message: `Run triggered for "${props.monitorName}".` });
+      toast({ variant: "success", message: t('synthetics.toast.triggerSuccessSingle', { name: props.monitorName }) });
       // Emit refresh so parent reloads data
       emit("refresh");
     } catch (err: any) {
       dismiss();
       toast({
         variant: "error",
-        message: err?.response?.data?.message || `Failed to trigger "${props.monitorName}".`,
+        message: err?.response?.data?.message || t('synthetics.toast.triggerFailedSingle', { name: props.monitorName }),
       });
     } finally {
       runTriggerLoading.value = false;
@@ -1186,7 +1185,7 @@ function uniqueValues(key: "browser" | "device" | "location"): string[] {
   return Array.from(vals).sort();
 }
 const browserOptions = computed<SelectOption[]>(() => [
-  { label: "All browsers", value: "all", icon: "language" },
+  { label: t('synthetics.filters.allBrowsers'), value: "all", icon: "language" },
   ...uniqueValues("browser").map((v) => ({
     label: v,
     value: v,
@@ -1194,7 +1193,7 @@ const browserOptions = computed<SelectOption[]>(() => [
   })),
 ]);
 const deviceOptions = computed<SelectOption[]>(() => [
-  { label: "All devices", value: "all", icon: "devices" },
+  { label: t('synthetics.filters.allDevices'), value: "all", icon: "devices" },
   ...uniqueValues("device").map((v) => ({
     label: deviceLabel(v),
     value: v,
@@ -1202,7 +1201,7 @@ const deviceOptions = computed<SelectOption[]>(() => [
   })),
 ]);
 const locationOptions = computed<SelectOption[]>(() => [
-  { label: "All locations", value: "all", icon: "location-on" },
+  { label: t('synthetics.filters.allLocations'), value: "all", icon: "location-on" },
   ...uniqueValues("location").map((v) => ({
     label: v,
     value: v,
@@ -1210,15 +1209,15 @@ const locationOptions = computed<SelectOption[]>(() => [
   })),
 ]);
 const durationOptions: SelectOption[] = [
-  { label: "Any duration", value: "all" },
-  { label: "< 5s", value: "fast" },
-  { label: "5–15s", value: "mid" },
-  { label: "> 15s", value: "slow" },
+  { label: t('synthetics.filters.anyDuration'), value: "all" },
+  { label: t('synthetics.filters.durationFast'), value: "fast" },
+  { label: t('synthetics.filters.durationMid'), value: "mid" },
+  { label: t('synthetics.filters.durationSlow'), value: "slow" },
 ];
 const actionOptions: SelectOption[] = [
-  { label: "Any action", value: "all" },
-  { label: "click", value: "click" },
-  { label: "type", value: "type" },
+  { label: t('synthetics.filters.anyAction'), value: "all" },
+  { label: t('synthetics.filters.actionClick'), value: "click" },
+  { label: t('synthetics.filters.actionType'), value: "type" },
 ];
 
 // ── Helper: map SyntheticRun to MockRun shape used by computed properties ─
@@ -1326,11 +1325,11 @@ const kpiCards = computed<KpiCard[]>(() => {
     return [
       {
         key: "last-run",
-        label: "Last Run",
+        label: t('synthetics.results.lastRun'),
         value: k.lastRunStatus
           ? k.lastRunStatus === "failed"
-            ? "Failed"
-            : "Passed"
+            ? t('synthetics.results.failed')
+            : t('synthetics.results.passed')
           : "—",
         valueClass:
           k.lastRunStatus === "failed"
@@ -1339,17 +1338,17 @@ const kpiCards = computed<KpiCard[]>(() => {
       },
       {
         key: "pass-rate",
-        label: "Pass Rate",
+        label: t('synthetics.runs.passRate'),
         value: k.totalRuns > 0 ? k.uptimePct.toFixed(1) + "%" : "—",
       },
       {
         key: "p95-duration",
-        label: "p95 Duration",
+        label: t('synthetics.results.p95Duration'),
         value: effectiveP95Ms.value > 0 ? fmtDur(effectiveP95Ms.value) : "—",
       },
       {
         key: "retry-rate",
-        label: "Retry Rate",
+        label: t('synthetics.runs.retryRate'),
         value:
           k.totalRuns > 0
             ? ((k.retriedRuns / k.totalRuns) * 100).toFixed(1) + "%"
@@ -1358,7 +1357,7 @@ const kpiCards = computed<KpiCard[]>(() => {
       },
       {
         key: "failed-runs",
-        label: "Failed Runs",
+        label: t('synthetics.results.failedRuns'),
         value: String(k.failedRuns),
         valueClass: k.failedRuns > 0 ? "text-status-error-text!" : undefined,
       },
@@ -1375,18 +1374,18 @@ const kpiCards = computed<KpiCard[]>(() => {
       : "100%";
   const lastRun = allRuns.value[0];
   return [
-    { key: "pass-rate", label: "Pass Rate", value: fallbackPassPct },
-    { key: "p95-duration", label: "p95 Duration", value: "—" },
-    { key: "retry-rate", label: "Retry Rate", value: "0.0%" },
+    { key: "pass-rate", label: t('synthetics.runs.passRate'), value: fallbackPassPct },
+    { key: "p95-duration", label: t('synthetics.results.p95Duration'), value: "—" },
+    { key: "retry-rate", label: t('synthetics.runs.retryRate'), value: "0.0%" },
     {
       key: "failed-runs",
-      label: "Failed Runs",
+      label: t('synthetics.results.failedRuns'),
       value: String(totalFails.value),
     },
     {
       key: "last-run",
-      label: "Last Run",
-      value: lastRun?.status === "fail" ? "Failed" : "Passed",
+      label: t('synthetics.results.lastRun'),
+      value: lastRun?.status === "fail" ? t('synthetics.results.failed') : t('synthetics.results.passed'),
       valueClass:
         lastRun?.status === "fail"
           ? "text-status-error-text!"
@@ -1455,14 +1454,10 @@ const timelineSegments = computed<TimelineSegment[]>(() => {
     const failCount = executions.length - passCount;
     const title =
       status === "all-pass"
-        ? "All " + executions.length + " passed"
+        ? t('synthetics.runs.timelineAllPassed', { count: executions.length })
         : status === "all-fail"
-          ? "All " + executions.length + " failed"
-          : passCount +
-            " passed, " +
-            failCount +
-            " failed of " +
-            executions.length;
+          ? t('synthetics.runs.timelineAllFailed', { count: executions.length })
+          : t('synthetics.runs.timelineMixed', { passed: passCount, failed: failCount, total: executions.length });
 
     const execDetails: TimelineExecution[] = executions.map((e) => ({
       location: e.location,
@@ -1527,7 +1522,7 @@ const timelineStartLabel = computed(() => {
   return formatTimelineDate(timeRangeMicros.value.startTime / 1000);
 });
 const timelineEndLabel = computed(() => {
-  if (!timeRangeMicros.value) return "Now";
+  if (!timeRangeMicros.value) return t('synthetics.runs.timelineNow');
   return formatTimelineDate(timeRangeMicros.value.endTime / 1000);
 });
 
@@ -1624,9 +1619,9 @@ const deviceBreakdown = computed<BreakdownItem[]>(() => {
 
 // ── Status filter options ────────────────────────────────────────────────
 const statusOptions = [
-  { key: "all", label: "All", dot: "var(--color-text-secondary)" },
-  { key: "pass", label: "Passed", dot: "var(--color-status-success-text)" },
-  { key: "fail", label: "Failed", dot: "var(--color-status-error-text)" },
+  { key: "all", label: t('synthetics.filters.all'), dot: "var(--color-text-secondary)" },
+  { key: "pass", label: t('synthetics.results.passed'), dot: "var(--color-status-success-text)" },
+  { key: "fail", label: t('synthetics.results.failed'), dot: "var(--color-status-error-text)" },
 ];
 
 // ── Mock fallback data (used by Overview/Errors tabs when no real data) ────
@@ -1737,7 +1732,7 @@ const failedStepOptions = computed<SelectOption[]>(() => {
   const meta = stepMeta();
   const withLocator = stepNames().filter((n) => meta[n].locator);
   return [
-    { label: "Any failed step", value: "all" },
+    { label: t('synthetics.filters.anyFailedStep'), value: "all" },
     ...withLocator.map((n) => ({ label: n, value: n })),
   ];
 });
@@ -1766,10 +1761,10 @@ const visibleRuns = computed<VisibleRun[]>(() => {
       id: run.id,
       statusBadgeVariant: isFail ? "error-soft" : "success-soft",
       statusIcon: isFail ? "cancel" : "check_circle",
-      statusLabel: isFail ? "Failed" : "Passed",
+      statusLabel: isFail ? t('synthetics.results.failed') : t('synthetics.results.passed'),
       scheduledTs: run.scheduledTs,
       lastRunTs: run.timestamp,
-      triggerType: run.triggerType === "manual" ? "Manual" : "Schedule",
+      triggerType: run.triggerType === "manual" ? t('synthetics.runs.triggerManual') : t('synthetics.runs.triggerSchedule'),
       duration: fmtDur(run.duration),
       location: run.location,
       browser: run.browser,
@@ -1784,31 +1779,31 @@ const visibleRuns = computed<VisibleRun[]>(() => {
 });
 
 const runColumns: OTableColumnDef[] = [
-  { id: "status", header: "Status", accessorKey: "status", size: 60 },
+  { id: "status", header: t('synthetics.table.status'), accessorKey: "status", size: 60 },
   {
     id: "last_run_at",
-    header: "Last Run At",
+    header: t('synthetics.table.lastRunAt'),
     accessorKey: "lastRunTs",
     size: 100,
   },
   {
     id: "duration",
-    header: "Duration",
+    header: t('synthetics.results.duration'),
     accessorKey: "duration",
     size: 50,
   },
-  { id: "location", header: "Location", accessorKey: "location", size: 110 },
-  { id: "browser", header: "Browser", accessorKey: "browser", size: 100 },
-  { id: "device", header: "Device", accessorKey: "device", size: 90 },
+  { id: "location", header: t('synthetics.results.location'), accessorKey: "location", size: 110 },
+  { id: "browser", header: t('synthetics.results.steps.browser'), accessorKey: "browser", size: 100 },
+  { id: "device", header: t('synthetics.results.device'), accessorKey: "device", size: 90 },
   {
     id: "trigger_type",
-    header: "Trigger",
+    header: t('synthetics.table.trigger'),
     accessorKey: "triggerType",
     size: 90,
   },
   {
     id: "scheduled_at",
-    header: "Scheduled At",
+    header: t('synthetics.table.scheduledAt'),
     accessorKey: "scheduledTs",
     size: 100,
   },
@@ -1898,12 +1893,12 @@ const stepTableRows = computed<StepTableRow[]>(() => {
 });
 
 const stepTableColumns: OTableColumnDef<StepTableRow>[] = [
-  { id: "name", header: "Step Name", accessorKey: "name", meta: { isName: true } },
-  { id: "failRate", header: "Fail Rate", accessorKey: "failRatePct", size: 110, meta: { align: "right" } },
-  { id: "flakyRate", header: "Flaky Rate", accessorKey: "flakyRatePct", size: 100, meta: { align: "right" } },
-  { id: "avgDuration", header: "Avg Duration", accessorKey: "avgDurationMs", size: 100, meta: { align: "right" } },
-  { id: "p95Duration", header: "p95 Duration", accessorKey: "p95DurationMs", size: 96, meta: { align: "right" } },
-  { id: "maxDuration", header: "Max Duration", accessorKey: "maxDurationMs", size: 100, meta: { align: "right" } },
+  { id: "name", header: t('synthetics.results.steps.stepName'), accessorKey: "name", meta: { isName: true } },
+  { id: "failRate", header: t('synthetics.results.steps.failRate'), accessorKey: "failRatePct", size: 110, meta: { align: "right" } },
+  { id: "flakyRate", header: t('synthetics.results.steps.flakyRate'), accessorKey: "flakyRatePct", size: 100, meta: { align: "right" } },
+  { id: "avgDuration", header: t('synthetics.results.steps.avgDuration'), accessorKey: "avgDurationMs", size: 100, meta: { align: "right" } },
+  { id: "p95Duration", header: t('synthetics.results.steps.p95Duration'), accessorKey: "p95DurationMs", size: 96, meta: { align: "right" } },
+  { id: "maxDuration", header: t('synthetics.results.steps.maxDuration'), accessorKey: "maxDurationMs", size: 100, meta: { align: "right" } },
 ];
 
 // ── Chart options ────────────────────────────────────────────────────────
@@ -1974,7 +1969,7 @@ const responseChartOption = computed(() => {
               lineStyle: { color: p95Color, type: "dashed" as const },
               data: [{ yAxis: p95Ms.value }],
               label: {
-                formatter: "p95 " + p95Label.value,
+                formatter: t('synthetics.runs.chartP95', { value: p95Label.value }),
                 color: p95Color,
                 fontSize: 10,
               },
@@ -2024,7 +2019,7 @@ const errorChartOption = computed(() => {
     grid: { left: 44, right: 16, top: 16, bottom: 28 },
     tooltip: {
       trigger: "axis" as const,
-      valueFormatter: (val: number) => String(val) + " failures",
+      valueFormatter: (val: number) => t('synthetics.runs.chartFailures', { count: val }),
     },
     xAxis: {
       type: "category" as const,

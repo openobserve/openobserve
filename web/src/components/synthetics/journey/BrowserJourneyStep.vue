@@ -1,6 +1,7 @@
 <script setup lang="ts">
 // Copyright 2026 OpenObserve Inc.
 import { computed, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { copyToClipboard } from '@/utils/clipboard'
 import type { BrowserStep, SelectorType, StepReplayResult, WireStep } from '@/types/synthetics'
 import {
@@ -26,6 +27,8 @@ import OIcon from '@/lib/core/Icon/OIcon.vue'
 import OBadge from '@/lib/core/Badge/OBadge.vue'
 import OCheckbox from '@/lib/forms/Checkbox/OCheckbox.vue'
 import OSpinner from '@/lib/feedback/Spinner/OSpinner.vue'
+
+const { t } = useI18n()
 
 const props = defineProps<{
   step: BrowserStep
@@ -59,7 +62,7 @@ const displayName = computed(() => props.step.name || actionLabel.value)
 const selectorPreview = computed(() => props.step.selector || props.step.value || '')
 const showSelector = computed(() => SELECTOR_ACTIONS.includes(props.step.action))
 const showValue = computed(() => VALUE_ACTIONS.includes(props.step.action))
-const valueLabel = computed(() => VALUE_LABELS[props.step.action] || 'Value')
+const valueLabel = computed(() => VALUE_LABELS[props.step.action] || t('synthetics.journey.valueFallback'))
 
 function update(patch: Partial<BrowserStep>) {
   // Patch edited fields into wire instead of clearing it, so replay still has
@@ -153,18 +156,18 @@ const errorIconName = computed<string>(() => {
 /** Map structuredError.name to human label. */
 const errorLabel = computed<string>(() => {
   switch (se.value?.name) {
-    case 'TimeoutError': return 'Timeout Error'
-    case 'TargetClosedError': return 'Tab closed'
-    default: return 'Error'
+    case 'TimeoutError': return t('synthetics.stepErrors.timeout')
+    case 'TargetClosedError': return t('synthetics.stepErrors.tabClosed')
+    default: return t('synthetics.stepErrors.default')
   }
 })
 
 /** Exit reason tag (e.g. "hit timeout", "tab closed"). */
 const exitReasonTag = computed<string>(() => {
   const name = se.value?.name
-  if (name === 'TimeoutError') return 'hit timeout'
-  if (name === 'TargetClosedError') return 'tab closed'
-  return 'exit'
+  if (name === 'TimeoutError') return t('synthetics.stepErrors.hitTimeout')
+  if (name === 'TargetClosedError') return t('synthetics.stepErrors.tabClosedReason')
+  return t('synthetics.stepErrors.exitReason')
 })
 
 /** Formatted duration for the error card info box. */
@@ -222,7 +225,7 @@ function toggleExpanded() {
           :class="stepNumberClass"
           class="ml-1"
           :data-test="replayDotState ? `synthetics-journey-step-dot-${index}` : undefined"
-          :aria-label="replayDotState ? `Step ${index + 1} ${replayDotState}` : undefined"
+          :aria-label="replayDotState ? t('synthetics.journey.stepNumberAria', { number: index + 1, state: replayDotState }) : undefined"
         >
           <OSpinner v-if="stepNumberSpinning" variant="ring" size="xs" class="text-primary-500" />
           <template v-else>{{ index + 1 }}</template>
@@ -258,7 +261,7 @@ function toggleExpanded() {
         <OButton
           variant="ghost"
           size="xs"
-          :aria-label="expanded ? 'Collapse step' : 'Expand step'"
+          :aria-label="expanded ? t('synthetics.journey.collapseStep') : t('synthetics.journey.expandStep')"
           data-test="synthetics-journey-step-expand-btn"
           @click="toggleExpanded"
         >
@@ -268,7 +271,7 @@ function toggleExpanded() {
         <OButton
           variant="ghost"
           size="xs"
-          aria-label="Insert step below"
+          :aria-label="t('synthetics.journey.insertStepBelow')"
           data-test="synthetics-journey-step-insert-btn"
           :disabled="replayLocked"
           @click="emit('insert-below')"
@@ -279,7 +282,7 @@ function toggleExpanded() {
         <OButton
           variant="ghost"
           size="xs"
-          aria-label="Duplicate step"
+          :aria-label="t('synthetics.journey.duplicateStep')"
           data-test="synthetics-journey-step-duplicate-btn"
           :disabled="replayLocked"
           @click="emit('duplicate')"
@@ -290,7 +293,7 @@ function toggleExpanded() {
         <OButton
           variant="ghost"
           size="xs"
-          aria-label="Delete step"
+          :aria-label="t('synthetics.journey.deleteStepAria')"
           data-test="synthetics-journey-step-delete-btn"
           :disabled="replayLocked"
           class="hover:text-status-error-text"
@@ -332,7 +335,7 @@ function toggleExpanded() {
             @click="toggleStackTrace"
           >
             <OIcon :name="showStackTrace ? 'expand-less' : 'expand-more'" size="xs" />
-            {{ showStackTrace ? 'Hide' : 'Show' }} stack trace
+            {{ showStackTrace ? t('synthetics.journey.hideStackTrace') : t('synthetics.journey.showStackTrace') }} stack trace
           </OButton>
           <OButton
             v-if="showStackTrace"
@@ -354,11 +357,11 @@ function toggleExpanded() {
       <!-- Info boxes -->
       <div v-if="se?.selector" class="flex gap-4 px-3 pb-3">
         <div class="flex flex-col gap-1">
-          <span class="text-[11px] font-medium text-text-label">Selector (Test ID)</span>
+          <span class="text-[11px] font-medium text-text-label">{{ t('synthetics.stepErrors.selectorTestId') }}</span>
           <span class="text-xs font-mono text-status-error-text">{{ se.selector }}</span>
         </div>
         <div class="flex flex-col gap-1">
-          <span class="text-[11px] font-medium text-text-label">Waited</span>
+          <span class="text-[11px] font-medium text-text-label">{{ t('synthetics.stepErrors.waited') }}</span>
           <span class="text-xs font-mono text-text-secondary">{{ errorDurationFormatted }} · {{ exitReasonTag }}</span>
         </div>
       </div>
@@ -372,7 +375,7 @@ function toggleExpanded() {
           @click="emit('retry-replay')"
           icon-left="replay"
         >
-          Re-run
+          {{ t('synthetics.journey.reRun') }}
         </OButton>
       </div>
     </div>
@@ -385,7 +388,7 @@ function toggleExpanded() {
       <!-- Action select -->
       <OSelect
         v-model="actionComputed"
-        label="Action"
+        :label="t('synthetics.journey.actionLabel')"
         :options="actionOptions"
         class="w-[25rem]!"
         data-test="synthetics-journey-step-action-select"
@@ -394,8 +397,8 @@ function toggleExpanded() {
       <!-- Step name -->
       <OInput
         v-model="nameComputed"
-        label="Step name (optional)"
-        placeholder="Enter a descriptive name"
+        :label="t('synthetics.journey.stepNameOptional')"
+        :placeholder="t('synthetics.journey.stepNamePlaceholder')"
         data-test="synthetics-journey-step-name-input"
       />
 
@@ -404,14 +407,14 @@ function toggleExpanded() {
         <div class="flex gap-2">
           <OSelect
             v-model="selectorTypeComputed"
-            label="Selector type"
+            :label="t('synthetics.journey.selectorTypeLabel')"
             :options="selectorTypeOptions"
             class="w-[25rem]! shrink-0"
             data-test="synthetics-journey-step-selector-type-select"
           />
           <OInput
             v-model="selectorComputed"
-            label="Selector"
+            :label="t('synthetics.journey.selectorLabel')"
             placeholder="#my-button or .class-name"
             class="flex-1"
             data-test="synthetics-journey-step-selector-input"
@@ -431,8 +434,8 @@ function toggleExpanded() {
       <!-- Timeout -->
       <OInput
         v-model="timeoutComputed"
-        label="Timeout (ms)"
-        placeholder="30000"
+        :label="t('synthetics.journey.timeoutLabel')"
+        :placeholder="t('synthetics.journey.timeoutPlaceholder')"
         type="number"
         data-test="synthetics-journey-step-timeout-input"
       />

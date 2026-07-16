@@ -1,6 +1,7 @@
 <script setup lang="ts">
 // Copyright 2026 OpenObserve Inc.
 import { computed, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useStore } from 'vuex'
 import ODrawer from '@/lib/overlay/Drawer/ODrawer.vue'
 import OBadge from '@/lib/core/Badge/OBadge.vue'
@@ -13,6 +14,8 @@ import {
   type RunStatus,
 } from '@/composables/synthetics/syntheticResultsSchema'
 import syntheticsService from '@/services/synthetics'
+
+const { t } = useI18n()
 
 const props = defineProps<{
   runId: string
@@ -87,10 +90,10 @@ function statusVariant(s: RunStatus) {
 }
 
 function statusLabel(s: RunStatus) {
-  if (s === 'passed') return 'Passed'
-  if (s === 'warning') return 'Warning'
-  if (s === 'error') return 'Error'
-  return 'Failed'
+  if (s === 'passed') return t('synthetics.results.passed')
+  if (s === 'warning') return t('synthetics.results.warning')
+  if (s === 'error') return t('synthetics.results.error')
+  return t('synthetics.results.failed')
 }
 
 function fmtDuration(ms: number) {
@@ -120,7 +123,7 @@ function toggleSteps(executionId: string) {
   <ODrawer
     :open="open"
     size="lg"
-    title="Run Detail"
+    :title="t('synthetics.runDetail.title')"
     :sub-title="fmtTime(scheduledTs)"
     @update:open="(v) => { if (!v) emit('close') }"
   >
@@ -158,7 +161,7 @@ function toggleSteps(executionId: string) {
         class="flex flex-col items-center gap-3 py-16 text-text-muted px-5"
       >
         <OIcon name="error_outline" size="xl" class="text-status-error-text" />
-        <p class="text-sm font-medium text-status-error-text">Failed to load run data</p>
+        <p class="text-sm font-medium text-status-error-text">{{ t('synthetics.runDetail.loadFailed') }}</p>
         <p class="text-xs font-mono text-text-caption text-center max-w-sm">{{ queryError }}</p>
       </div>
 
@@ -168,9 +171,9 @@ function toggleSteps(executionId: string) {
         class="flex flex-col items-center gap-3 py-16 text-text-muted px-5"
       >
         <OIcon name="hourglass_empty" size="xl" />
-        <p class="text-sm font-medium">No execution data found</p>
+        <p class="text-sm font-medium">{{ t('synthetics.runDetail.noExecutionData') }}</p>
         <p class="text-xs text-text-caption text-center">
-          Stream data for run <code class="font-mono">{{ runId }}</code> was not found in the ±5 min window around the scheduled time.
+          {{ t('synthetics.runDetail.noExecutionDataDesc', { runId: runId }) }}
         </p>
       </div>
 
@@ -179,15 +182,15 @@ function toggleSteps(executionId: string) {
         <!-- Summary strip -->
         <div class="grid grid-cols-3 gap-x-6 px-5 py-4 border-b border-border-default bg-surface-panel shrink-0">
           <div>
-            <p class="text-[0.65rem] font-semibold uppercase tracking-[0.06em] text-text-muted mb-[0.2rem]">Max Duration</p>
+            <p class="text-[0.65rem] font-semibold uppercase tracking-[0.06em] text-text-muted mb-[0.2rem]">{{ t('synthetics.runDetail.maxDuration') }}</p>
             <p class="text-[0.9rem] font-semibold text-text-primary">{{ fmtDuration(overallDurationMs) }}</p>
           </div>
           <div>
-            <p class="text-[0.65rem] font-semibold uppercase tracking-[0.06em] text-text-muted mb-[0.2rem]">Locations</p>
+            <p class="text-[0.65rem] font-semibold uppercase tracking-[0.06em] text-text-muted mb-[0.2rem]">{{ t('synthetics.runDetail.locations') }}</p>
             <p class="text-[0.9rem] font-semibold text-text-primary">{{ locations.length }}</p>
           </div>
           <div>
-            <p class="text-[0.65rem] font-semibold uppercase tracking-[0.06em] text-text-muted mb-[0.2rem]">Run ID</p>
+            <p class="text-[0.65rem] font-semibold uppercase tracking-[0.06em] text-text-muted mb-[0.2rem]">{{ t('synthetics.runDetail.runId') }}</p>
             <p class="text-xs font-mono text-text-secondary truncate mt-0.5" :title="runId">{{ runId }}</p>
           </div>
         </div>
@@ -220,7 +223,7 @@ function toggleSteps(executionId: string) {
               >
                 <p class="text-xs font-semibold text-status-error-text flex items-center gap-1.5 mb-1.5">
                   <OIcon name="cancel" size="xs" />
-                  Error
+                  {{ t('synthetics.results.error') }}
                 </p>
                 <pre class="whitespace-pre-wrap font-mono text-xs text-text-secondary leading-relaxed bg-status-error-bg rounded px-3 py-2 border border-[var(--color-status-error-text)]">{{ loc.error }}</pre>
               </div>
@@ -235,9 +238,9 @@ function toggleSteps(executionId: string) {
                   @click="toggleSteps(loc.executionId)"
                 >
                   <OIcon :name="expandedSteps.has(loc.executionId) ? 'expand_less' : 'expand_more'" size="sm" />
-                  Steps ({{ loc.steps.length }})
+                  {{ t('synthetics.runDetail.stepsCount', { count: loc.steps.length }) }}
                   <span v-if="loc.steps.some(s => s.status === 'fail')" class="ml-1 text-status-error-text">
-                    · {{ loc.steps.filter(s => s.status === 'fail').length }} failed
+                    · {{ t('synthetics.runDetail.failedCount', { count: loc.steps.filter(s => s.status === 'fail').length }) }}
                   </span>
                 </OButton>
 
@@ -264,7 +267,7 @@ function toggleSteps(executionId: string) {
 
               <!-- Screenshots -->
               <div v-if="loc.steps.some(s => s.screenshotKey)" class="px-4 py-3">
-                <p class="text-xs font-semibold text-text-heading mb-2">Screenshots</p>
+                <p class="text-xs font-semibold text-text-heading mb-2">{{ t('synthetics.runDetail.screenshots') }}</p>
                 <div class="grid grid-cols-2 gap-2">
                   <div
                     v-for="step in loc.steps.filter(s => s.screenshotKey)"
@@ -298,7 +301,7 @@ function toggleSteps(executionId: string) {
                   class="inline-flex items-center gap-2 text-xs font-medium text-text-link hover:text-text-link-hover bg-surface-panel border border-border-default rounded px-3 py-1.5 transition-colors"
                 >
                   <OIcon name="download" size="xs" />
-                  Download trace.zip
+                  {{ t('synthetics.runDetail.downloadTrace', { filename: 'trace.zip' }) }}
                 </a>
               </div>
 

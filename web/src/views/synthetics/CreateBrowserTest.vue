@@ -32,17 +32,24 @@ const route = useRoute()
 const store = useStore()
 const { t } = useI18n()
 
+// Chrome UI element names — must stay in English across all locales
+// because they reference the actual Chrome browser interface.
+const CHROME_UI_LABELS = {
+  details: 'Details',
+  allowIncognito: 'Allow in Incognito',
+} as const
+
 // Three top-level phases:
 //   gate            → URL + name inputs
 //   extension-setup → install extension checklist (only when extension not yet installed)
 //   editor          → tabbed check editor
 const phase = ref<'gate' | 'extension-setup' | 'editor'>('gate')
 const headerTitle = computed(() => {
-  if (phase.value === 'gate') return 'New browser check'
-  if (phase.value === 'extension-setup') return 'Set up the recorder'
+  if (phase.value === 'gate') return t('synthetics.createBrowserTest.newBrowserCheck')
+  if (phase.value === 'extension-setup') return t('synthetics.createBrowserTest.setupRecorder')
   if (isLoadingEdit.value) return t('synthetics.createBrowserTest.loading')
   if (loadError.value) return t('synthetics.createBrowserTest.loadFailedTitle')
-  return check.value.name || 'Untitled check'
+  return check.value.name || t('synthetics.createBrowserTest.untitledCheck')
 })
 const folderName = computed(() => {
   const fid = check.value.folder
@@ -363,20 +370,20 @@ async function saveCheck() {
 
   isSaving.value = true
   validationErrors.value = {}
-  const dismiss = toast({ variant: 'loading', message: 'Saving check…', timeout: 0 })
+  const dismiss = toast({ variant: 'loading', message: t('synthetics.newCheck.saving'), timeout: 0 })
   try {
     const org = store.state.selectedOrganization.identifier
     if (editId.value) {
       await syntheticsService.update(org, editId.value, apiPayload.value, check.value.folder)
       dismiss()
-      toast({ variant: 'success', message: 'Check updated successfully.' })
+      toast({ variant: 'success', message: t('synthetics.newCheck.updated') })
       isDirty.value = false
       router.push({ name: 'synthetic', query: { folder: check.value.folder } })
     } else {
       const res = await syntheticsService.create(org, apiPayload.value, check.value.folder)
       const savedId = res.data?.id ?? crypto.randomUUID()
       dismiss()
-      toast({ variant: 'success', message: 'Check saved successfully.' })
+      toast({ variant: 'success', message: t('synthetics.newCheck.saved') })
       isDirty.value = false
       router.push({ name: 'synthetic', query: { folder: check.value.folder } })
     }
@@ -384,7 +391,7 @@ async function saveCheck() {
     dismiss()
     toast({
       variant: 'error',
-      message: err?.response?.data?.message || 'Failed to save check.',
+      message: err?.response?.data?.message || t('synthetics.newCheck.saveFailed'),
     })
     console.error('[synthetics] save failed', err)
   } finally {
@@ -458,7 +465,7 @@ function onClearResults() {
     <AppPageHeader
       :title="headerTitle"
       :subtitle="folderName"
-      :back="{ label: 'Checks', to: { name: 'synthetic' }, dataTest: 'synthetics-create-back-btn' }"
+      :back="{ label: t('synthetics.newCheck.back'), to: { name: 'synthetic' }, dataTest: 'synthetics-create-back-btn' }"
       class="shrink-0 px-4 border-b border-border-default"
     />
 
@@ -469,17 +476,17 @@ function onClearResults() {
           <EmptyBrowserCheck :width="140" />
         </div>
         <p class="mb-8 pb-4 ">
-          Tell us where to start — you'll record the journey next. Everything else (schedule, alerts, RUM) gets set up after.
+          {{ t('synthetics.createBrowserTest.gateDescription') }}
         </p>
 
         <div class="mb-6">
           <label for="synthetics-start-url" class="mb-1 block">
-            Starting URL <span class="text-status-error-text">*</span>
+            {{ t('synthetics.createBrowserTest.startingUrl') }} <span class="text-status-error-text">*</span>
           </label>
           <OInput
             id="synthetics-start-url"
             v-model="startUrl"
-            placeholder="https://shop.example.com/"
+            :placeholder="t('synthetics.checkDetails.startingUrlPlaceholder')"
             :error="!!urlError"
             :error-message="urlError"
             data-test="synthetics-create-url-input"
@@ -490,18 +497,18 @@ function onClearResults() {
               <OIcon name="link" size="sm" />
             </template>
           </OInput>
-          <small class="mt-1 block">Supports &#123;&#123;variables&#125;&#125; like &#123;&#123;baseUrl&#125;&#125;.</small>
+          <small class="mt-1 block">{{ t('synthetics.createBrowserTest.variablesHint', { variables: '{{variables}}', baseUrl: '{{baseUrl}}' }) }}</small>
         </div>
 
         <div class="mb-8">
-          <label for="synthetics-check-name" class="mb-1 block">Name</label>
+          <label for="synthetics-check-name" class="mb-1 block">{{ t('synthetics.checkDetails.name') }}</label>
           <OInput
             id="synthetics-check-name"
             v-model="checkName"
-            placeholder="Checkout Smoke Test"
+            :placeholder="t('synthetics.checkDetails.namePlaceholder')"
             data-test="synthetics-create-name-input"
           />
-          <small class="mt-1 block">Auto-filled from the page — edit if you like.</small>
+          <small class="mt-1 block">{{ t('synthetics.createBrowserTest.nameHint') }}</small>
         </div>
 
         <div class="flex gap-3 mb-6">
@@ -514,7 +521,7 @@ function onClearResults() {
             <template #prefix>
               <OIcon name="smart-display" size="sm" />
             </template>
-            Record journey
+            {{ t('synthetics.journey.recordJourney') }}
           </OButton>
           <OButton
             variant="outline"
@@ -525,13 +532,13 @@ function onClearResults() {
             <template #prefix>
               <OIcon name="edit" size="sm" />
             </template>
-            Build manually
+            {{ t('synthetics.createBrowserTest.buildManually') }}
           </OButton>
         </div>
 
         <small class="flex items-center gap-1">
           <OIcon name="bolt" size="sm" aria-hidden="true" />
-          This is all we need to start. After recording you can replay it here, then save to configure schedule, alerts and more.
+          {{ t('synthetics.createBrowserTest.gateFooter') }}
         </small>
       </div>
     </main>
@@ -546,7 +553,7 @@ function onClearResults() {
         </div>
 
         <p class="mb-8 text-left pb-4">
-          We'll open <strong>{{ check.url }}</strong> in a fresh incognito tab and capture your clicks and inputs — <strong>no code</strong>.
+          {{ t('synthetics.createBrowserTest.setupDescription', { url: check.url }) }}
         </p>
 
         <div class="rounded-xl border border-border-default divide-y divide-border-default mb-6">
@@ -560,8 +567,8 @@ function onClearResults() {
             </span>
             <div class="flex-1 min-w-0 flex justify-between">
               <div class="flex flex-col items-start">
-                <h4 class="text-sm font-semibold text-text-heading m-0 pb-1">Install the OpenObserve Recorder</h4>
-                <p class="text-xs text-text-secondary m-0 mb-3">A lightweight Chrome extension that captures your actions.</p>
+                <h4 class="text-sm font-semibold text-text-heading m-0 pb-1">{{ t('synthetics.createBrowserTest.setupStep1Title') }}</h4>
+                <p class="text-xs text-text-secondary m-0 mb-3">{{ t('synthetics.createBrowserTest.setupStep1Description') }}</p>
               </div>
               <div class="flex items-center gap-3 px-3">
                 <!-- <a
@@ -592,13 +599,13 @@ function onClearResults() {
                   data-test="synthetics-setup-recheck-btn"
                   @click="probeExtension"
                 >
-                  Check again
+                  {{ t('synthetics.createBrowserTest.setupCheckAgain') }}
                 </OButton>
                 <span
                   v-else
                   class="text-sm font-medium text-status-success-text!"
                   data-test="synthetics-setup-installed-label"
-                >Installed ✓</span>
+                >{{ t('synthetics.createBrowserTest.setupInstalled') }}</span>
               </div>
             </div>
           </div>
@@ -611,12 +618,12 @@ function onClearResults() {
             >2</span>
             <div class="flex-1 min-w-0 flex justify-between">
               <div class="flex flex-col items-start">
-                <h4 class="text-sm font-semibold text-text-heading m-0 mb-1">Allow it in Incognito</h4>
-                <p class="text-xs text-text-secondary m-0 mb-3">Open <code>chrome://extensions</code> → Details → enable Allow in Incognito.</p>
+                <h4 class="text-sm font-semibold text-text-heading m-0 mb-1">{{ t('synthetics.createBrowserTest.setupStep2Title') }}</h4>
+                <p class="text-xs text-text-secondary m-0 mb-3">{{ t('synthetics.createBrowserTest.setupIncognitoHint', { details: CHROME_UI_LABELS.details, setting: CHROME_UI_LABELS.allowIncognito }) }}</p>
               </div>
               <OSwitch
                 v-model="incognitoAllowed"
-                label="Done"
+                :label="t('synthetics.createBrowserTest.setupIncognitoDone')"
                 :disabled="!extensionInstalled"
                 data-test="synthetics-setup-incognito-switch"
               />
@@ -633,7 +640,7 @@ function onClearResults() {
           icon-left="smart-display"
           @click="onExtensionSetupRecord"
         >
-          Open &amp; Record
+          {{ t('synthetics.createBrowserTest.setupOpenRecord') }}
         </OButton>
 
         <div class="text-center">
@@ -644,7 +651,7 @@ function onClearResults() {
             data-test="synthetics-setup-skip-link"
             @click="onExtensionSetupSkip"
           >
-            Skip — I'll build the steps manually
+            {{ t('synthetics.createBrowserTest.setupSkip') }}
           </OButton>
         </div>
       </div>
@@ -669,7 +676,7 @@ function onClearResults() {
       >
         <OStep
           :name="1"
-          title="Journey"
+          :title="t('synthetics.createBrowserTest.stepJourney')"
           icon="stacked-line-chart"
           :done="journeyStepDone"
           class="h-full!"
@@ -695,7 +702,7 @@ function onClearResults() {
         </OStep>
         <OStep
           :name="2"
-          title="Configure"
+          :title="t('synthetics.createBrowserTest.stepConfigure')"
           icon="tune"
           :done="false"
         >
@@ -721,7 +728,7 @@ function onClearResults() {
         <template v-if="currentStep === 1">
           <!-- Selection actions — moved from BrowserJourney, kept on the left -->
           <template v-if="journeySelectionState.count > 0 && !journeySelectionState.isRecording">
-            <span class="text-sm text-text-secondary whitespace-nowrap">{{ journeySelectionState.count }} selected</span>
+            <span class="text-sm text-text-secondary whitespace-nowrap">{{ t('synthetics.journey.selectedCount', { count: journeySelectionState.count }) }}</span>
             <OButton
               variant="outline-destructive"
               size="sm"
@@ -729,16 +736,16 @@ function onClearResults() {
               @click="showBulkDeleteDialog = true"
             >
               <template #icon-left><OIcon name="delete" size="sm" /></template>
-              Delete
+              {{ t('synthetics.journey.delete') }}
             </OButton>
           </template>
           <span class="flex-1" aria-hidden="true" />
 
           <OButton variant="ghost" size="sm" data-test="synthetics-create-cancel-btn" @click="router.push({ name: 'synthetic' })">
-            Cancel
+            {{ t('common.cancel') }}
           </OButton>
           <OButton variant="primary" size="sm" data-test="synthetics-create-continue-btn" @click="onContinueToConfigure">
-            Continue
+            {{ t('synthetics.createBrowserTest.continue') }}
             <template #suffix><OIcon name="chevron-right" size="sm" /></template>
           </OButton>
         </template>
@@ -747,14 +754,14 @@ function onClearResults() {
         <template v-else-if="currentStep === 2">
           <span class="flex-1" aria-hidden="true" />
           <OButton variant="ghost" size="sm" data-test="synthetics-create-cancel-btn" @click="router.push({ name: 'synthetic' })">
-            Cancel
+            {{ t('common.cancel') }}
           </OButton>
           <OButton variant="outline" size="sm" data-test="synthetics-create-back-to-journey-btn" @click="currentStep = 1">
             <template #prefix><OIcon name="chevron-left" size="sm" /></template>
-            Back
+            {{ t('common.goBack') }}
           </OButton>
           <OButton variant="primary" size="sm" :loading="isSaving" data-test="synthetics-create-save-btn" @click="saveCheck">
-            {{ editId ? 'Update check' : 'Save check' }}
+            {{ editId ? t('synthetics.newCheck.updateCheck') : t('synthetics.newCheck.saveCheck') }}
             <template #suffix><OIcon name="save" size="sm" /></template>
           </OButton>
         </template>
@@ -764,30 +771,30 @@ function onClearResults() {
       <ODialog
         v-model:open="showUnsavedDialog"
         size="sm"
-        title="Unsaved changes"
-        primary-button-label="Leave"
-        secondary-button-label="Stay"
+        :title="t('synthetics.newCheck.unsavedTitle')"
+        :primary-button-label="t('synthetics.newCheck.leave')"
+        :secondary-button-label="t('synthetics.newCheck.stay')"
         data-test="synthetics-create-unsaved-dialog"
         @click:primary="onConfirmLeave"
         @click:secondary="showUnsavedDialog = false"
       >
-        <p class="py-2">You have unsaved changes. Are you sure you want to leave?</p>
+        <p class="py-2">{{ t('synthetics.newCheck.unsavedBody') }}</p>
       </ODialog>
 
       <!-- Bulk delete confirmation dialog — moved from BrowserJourney -->
       <ODialog
         v-model:open="showBulkDeleteDialog"
         size="sm"
-        title="Delete steps"
-        primary-button-label="Delete"
-        secondary-button-label="Cancel"
+        :title="t('synthetics.journey.bulkDeleteStepsTitle')"
+        :primary-button-label="t('synthetics.journey.delete')"
+        :secondary-button-label="t('common.cancel')"
         primary-button-variant="destructive"
         data-test="synthetics-journey-bulk-delete-dialog"
         @click:primary="onDeleteSelected"
         @click:secondary="showBulkDeleteDialog = false"
       >
         <p class="py-2">
-          Delete {{ journeySelectionState.count }} step{{ journeySelectionState.count !== 1 ? 's' : '' }}? This cannot be undone.
+          {{ t('synthetics.journey.bulkDeleteStepsBody', { count: journeySelectionState.count }) }}
         </p>
       </ODialog>
     </div>
