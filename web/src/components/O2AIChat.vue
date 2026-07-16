@@ -275,12 +275,8 @@
                     class="text-[14px] font-[600] ml-[30px] text-center"
                     >O2 Assistant</span
                   >
-                  <OBadge
-                    variant="primary-outline"
-                    size="sm"
-                    class="ml-[8px] uppercase tracking-[0.5px] font-semibold"
-                    >BETA</OBadge
-                  >
+                  <!-- Same shared Beta tag as the Workflows screens. -->
+                  <BetaBadge class="ml-2" />
                 </div>
               </div>
             </div>
@@ -1412,7 +1408,7 @@ import {
   getDashboardEventType,
 } from "@/composables/useAiDashboardEvents";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
+import BetaBadge from "@/components/common/BetaBadge.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
@@ -1465,7 +1461,7 @@ export default defineComponent({
   components: {
     OSeparator,
     OButton,
-    OBadge,
+    BetaBadge,
     ConfirmDialog,
     RichTextInput,
     O2AIConfirmDialog,

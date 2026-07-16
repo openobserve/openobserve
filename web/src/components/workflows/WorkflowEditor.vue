@@ -33,14 +33,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          back chevron in the module-icon slot, the workflow name input inline
          after the title, and the Test / Cancel / Save actions right-aligned. -->
     <AppPageHeader
-      :title="
-        workflowObj.isEditWorkflow
-          ? workflowObj.currentSelectedWorkflow.name || t('workflow.header')
-          : t('workflow.header')
-      "
+      :title="headerTitle"
       :back="{ label: t('workflow.header'), onClick: goBack, dataTest: 'workflow-editor-back' }"
       class="px-4 border-b border-border-default"
     >
+      <!-- Beta tag inside the title line (see WorkflowsList: #title-trail sits
+           after the title+subtitle column, stranding it far from the title). -->
+      <template #title>
+        <span class="inline-flex items-center gap-2 min-w-0">
+          <span class="truncate">{{ headerTitle }}</span>
+          <BetaBadge />
+        </span>
+      </template>
       <!-- Name is editable on CREATE only; on edit it's shown read-only as the
            header title (mirrors the pipeline editor, where the name input is
            gated to the create route). Enable/disable status isn't shown here —
@@ -205,6 +209,7 @@ import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import BetaBadge from "@/components/common/BetaBadge.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { getUUID } from "@/utils/zincutils";
 
@@ -230,6 +235,15 @@ const emit = defineEmits<{ (e: "saved"): void }>();
 const { t } = useI18n();
 const router = useRouter();
 const store = useStore();
+
+// On edit the saved name is the title; on create it's the module name (the name
+// is typed in the title-trail input instead). Shared by the `title` prop (which
+// feeds the h1's tooltip) and the `#title` slot that renders it next to the Beta tag.
+const headerTitle = computed(() =>
+  workflowObj.isEditWorkflow
+    ? workflowObj.currentSelectedWorkflow.name || t("workflow.header")
+    : t("workflow.header"),
+);
 const {
   resetWorkflowData,
   editNode,

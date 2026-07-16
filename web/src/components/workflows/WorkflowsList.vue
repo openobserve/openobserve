@@ -40,15 +40,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :subtitle="t('workflow.subtitle')"
           icon="schema"
         >
+          <!-- Beta tag rides INSIDE the title line. `#title-trail` would place it
+               after the whole title+subtitle column — i.e. past the subtitle's
+               width — leaving it stranded far from the word "Workflows". -->
           <template #title>
             <span class="inline-flex items-center gap-2">
               {{ t("workflow.header") }}
-              <OBadge
-                variant="primary-outline"
-                size="sm"
-                class="uppercase tracking-wide font-semibold"
-                >{{ t("workflow.beta") }}</OBadge
-              >
+              <BetaBadge />
             </span>
           </template>
           <template #actions>
@@ -118,7 +116,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
 
             <template #cell-trigger="{ row }">
-              <OTag :value="row.trigger" variant="amber-soft" />
+              <OTag
+                :value="row.trigger"
+                variant="amber-soft"
+                data-test="workflow-list-trigger-tag"
+              />
             </template>
 
             <template #cell-actions="{ row }">
@@ -232,7 +234,7 @@ import PageLayout from "@/components/common/PageLayout.vue";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
+import BetaBadge from "@/components/common/BetaBadge.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";

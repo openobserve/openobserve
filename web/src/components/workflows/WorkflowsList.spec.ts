@@ -241,7 +241,11 @@ describe("WorkflowsList", () => {
       wrapper = mountList();
       await flushPromises();
       expect(rows(wrapper)[0].trigger).toBe(t("workflow.triggerAlertFired"));
-      expect(wrapper.find(".o-tag").text()).toBe(t("workflow.triggerAlertFired"));
+      // target the trigger tag explicitly: the header's Beta tag is also an
+      // `.o-tag`, so a bare `.find(".o-tag")` would match that one instead.
+      expect(
+        wrapper.find('[data-test="workflow-list-trigger-tag"]').text(),
+      ).toBe(t("workflow.triggerAlertFired"));
     });
 
     it("shows a dash when the graph has no trigger node", async () => {

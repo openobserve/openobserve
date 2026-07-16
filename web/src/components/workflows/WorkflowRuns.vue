@@ -44,6 +44,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       }"
       class="px-4 border-b border-border-default"
     >
+      <!-- Beta tag inside the title line (see WorkflowsList: #title-trail sits
+           after the title+subtitle column, stranding it far from the title). -->
+      <template #title>
+        <span class="inline-flex items-center gap-2 min-w-0">
+          <span class="truncate">{{
+            workflowName || t("workflow.runs.title")
+          }}</span>
+          <BetaBadge />
+        </span>
+      </template>
       <template #actions>
         <OButton
           variant="outline"
@@ -91,6 +101,7 @@ import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import BetaBadge from "@/components/common/BetaBadge.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 

@@ -357,6 +357,7 @@
     }
   },
   "common": {
+    "beta": "Beta",
     "close": "Close",
     "cancel": "Cancel",
     "ok": "OK",
@@ -1779,7 +1780,6 @@
   },
   "workflow": {
     "header": "Workflows",
-    "beta": "Beta",
     "subtitle": "Automate Actions With Triggers, Logic, And Destinations",
     "create": "Add Workflow",
     "createTitle": "Create Workflow",
