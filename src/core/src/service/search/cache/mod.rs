@@ -69,7 +69,7 @@ use crate::{
 
 pub mod cacher;
 pub mod multi;
-pub mod result_utils;
+pub use ::search::cache::result_utils;
 
 // Define cache version
 const CACHE_VERSION: &str = "v3";

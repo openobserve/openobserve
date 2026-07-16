@@ -74,7 +74,7 @@ pub mod grpc_search;
 pub mod grpc_server;
 pub mod partition;
 mod searcher;
-pub mod sql;
+pub use ::search::sql;
 pub mod streaming;
 #[cfg(feature = "enterprise")]
 pub mod super_cluster;
