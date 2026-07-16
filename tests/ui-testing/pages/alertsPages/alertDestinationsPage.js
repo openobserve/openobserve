@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test';
 import { CommonActions } from '../commonActions';
 import { AlertsPage } from './alertsPage.js';
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
+const { getOrgIdentifier } = require('../../playwright-tests/utils/cloud-auth.js');
 
 export class AlertDestinationsPage {
     constructor(page) {
@@ -1041,37 +1042,45 @@ export class AlertDestinationsPage {
         await this.page.locator(this.prebuiltDestinationSelector).waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
 
         const card = this.page.locator(`${this.destinationTypeCard}[data-type="${type}"]`);
-        // The type-specific field that only appears once the form has transitioned after
-        // picking a card (custom → URL input; prebuilt → destination name input).
-        const confirmField = type === 'custom'
-            ? this.page.locator(this.urlInput)
-            : this.page.locator(this.destinationNameInput);
 
-        // Click the card and CONFIRM the form transitioned. The card list re-renders while
-        // the prebuilt-templates fetch resolves, which can detach the card mid-click or
-        // absorb the click without transitioning — the previous single try/catch could
-        // return with the form still on the selector (or hidden), so the very next
-        // field-fill would time out. Re-click (cards stay visible after selection, so this
-        // is idempotent) until the type-specific field is actually visible.
+        // Confirm the transition on the TYPE-SPECIFIC credential field, NOT the generic
+        // destination-name input. In PrebuiltDestinationForm.vue every credential field is
+        // behind `v-if="destinationType === '<type>'"`, so that field rendering is the only
+        // reliable proof the card click actually registered the type. The name input renders
+        // for every prebuilt form, so confirming on it returned "ready" while the card click
+        // had been absorbed (the card list re-renders as prebuilt-templates load) and the
+        // credential field's v-if never rendered — the root of the intermittent
+        // "webhook/integration-key/instance-url field not visible" failures across Teams,
+        // PagerDuty, ServiceNow, etc. The field being visible is also a deterministic
+        // ready-signal, so no arbitrary settle is needed afterwards.
+        const typeConfirmSelector = {
+            slack: '[data-test="slack-webhook-url-input-field"]',
+            discord: '[data-test="discord-webhook-url-input-field"]',
+            msteams: '[data-test="msteams-webhook-url-input-field"]',
+            pagerduty: '[data-test="pagerduty-integration-key-input-field"]',
+            opsgenie: '[data-test="opsgenie-api-key-input-field"]',
+            servicenow: '[data-test="servicenow-instance-url-input-field"]',
+            email: this.recipientsInputField,
+            custom: this.urlInput,
+        }[type] || this.destinationNameInput;
+        const confirmField = this.page.locator(typeConfirmSelector).first();
+
+        // Re-click the card until the type-specific field renders (cards stay visible after
+        // selection, so re-clicking is idempotent). This recovers the case where the first
+        // click(s) were absorbed while the card list was still re-rendering.
         let transitioned = false;
-        for (let attempt = 1; attempt <= 4 && !transitioned; attempt++) {
+        for (let attempt = 1; attempt <= 5 && !transitioned; attempt++) {
             await card.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
             await card.click({ force: true, timeout: 10000 }).catch((e) => {
                 testLogger.debug('selectDestinationType card click attempt failed', { type, attempt, error: e.message });
             });
-            transitioned = await confirmField.isVisible({ timeout: 5000 }).catch(() => false);
+            transitioned = await confirmField.isVisible({ timeout: 6000 }).catch(() => false);
             if (!transitioned) {
-                testLogger.warn('Destination form did not transition after selecting type, retrying', { type, attempt });
-                await this.page.waitForTimeout(1000);
+                testLogger.warn('Type-specific field not rendered after selecting type, re-selecting', { type, attempt });
             }
         }
-        // Final explicit wait so a genuine failure surfaces on the confirm field.
-        if (!transitioned) {
-            await confirmField.waitFor({ state: 'visible', timeout: 15000 });
-        }
-        // Hard settle (min 5s) so the type-specific form (fields, prebuilt template) fully
-        // renders before the caller starts filling — under load the render lags the transition.
-        await this.page.waitForTimeout(5000);
+        // Final explicit wait so a genuine failure surfaces on the type-specific field.
+        await confirmField.waitFor({ state: 'visible', timeout: 15000 });
         testLogger.debug('Selected destination type and form loaded', { type });
     }
 
@@ -1080,10 +1089,12 @@ export class AlertDestinationsPage {
      * @param {string} url - Webhook URL
      */
     async fillWebhookUrl(url) {
-        await this.page.waitForTimeout(5000);
+        // selectDestinationType() now confirms this type-specific field is rendered before
+        // returning, so it is present here — just wait for visibility, fill, and verify.
         const input = this.page.locator(this.webhookInputAnyField).first();
         await input.waitFor({ state: 'visible', timeout: 15000 });
         await input.fill(url);
+        await expect(input).toHaveValue(url, { timeout: 5000 });
         testLogger.debug('Filled webhook URL');
     }
 
@@ -1426,50 +1437,51 @@ export class AlertDestinationsPage {
      * @param {string} name - Destination name
      */
     async expectDestinationInList(name) {
-        // Wait for any loading spinners to disappear
-        await this.page.waitForLoadState('networkidle', { timeout: 20000 }).catch(() => {});
+        // ── Backend truth first (deterministic) ──────────────────────────────────────────
+        // Poll the destination's own API endpoint (session cookies via page.request) until it
+        // is registered. This separates two failure modes the rendered list conflates:
+        //   • the destination genuinely doesn't exist (a create/edit silently didn't persist) —
+        //     the list shows "0 of 0" and blind row-retries just time out with a vague error;
+        //   • the destination DOES exist but the list transiently rendered empty (fetch race) —
+        //     which we then resolve by re-driving the UI.
+        // If the API says it never exists, surface THAT clearly instead of "not found in list".
+        const baseUrl = process.env.ZO_BASE_URL;
+        const org = getOrgIdentifier();
+        const detailUrl = `${baseUrl}/api/${org}/alerts/destinations/${encodeURIComponent(name)}`;
+        let apiStatus = 0;
+        await expect.poll(async () => {
+            const resp = await this.page.request.get(detailUrl).catch(() => null);
+            apiStatus = resp ? resp.status() : 0;
+            // Terminal states: exists (200), gone (404), or auth-inconclusive (401/403).
+            return apiStatus === 200 || apiStatus === 404 || apiStatus === 401 || apiStatus === 403;
+        }, { timeout: 20000, intervals: [1000, 1500, 2000, 3000] }).toBe(true).catch(() => {});
+        testLogger.debug('Destination backend pre-check', { name, apiStatus });
+        if (apiStatus === 404) {
+            await this.page.screenshot({ path: `test-results/destination-not-found-${name}.png`, fullPage: true }).catch(() => {});
+            throw new Error(`Destination "${name}" does not exist on the backend (API 404) — the create/edit did not persist. Screenshot: test-results/destination-not-found-${name}.png`);
+        }
 
-        // Navigate to destinations page to ensure we're in the right place
-        await this.navigateToDestinations();
-
-        // Wait for OTable to render
-        await this.page.locator(this.destinationsListTable).waitFor({ state: 'visible', timeout: 20000 }).catch(() => {});
-
-        // Use the OInput search/filter input (fill the inner native field) to scope rows
+        // ── UI check ─────────────────────────────────────────────────────────────────────
+        // The destination is registered (or auth was inconclusive). Navigate fresh so the list
+        // re-fetches, search to scope, and confirm the row — retrying the whole navigate+search
+        // so a transient empty list ("0 of 0") re-fetches and renders the row.
         const searchField = this.page.locator(this.destinationListSearchInputField);
-        if (await searchField.isVisible().catch(() => false)) {
-            await searchField.fill('');
-            await searchField.fill(name);
-            testLogger.debug('Used search to filter for destination', { name });
-        }
-
-        // Anchor on the destination-specific delete-button data-test (uniquely identifies the row)
         const rowAnchor = this.getDeleteDestinationBtn(name);
-
-        let retries = 3;
-        while (retries > 0) {
-            try {
-                await expect(rowAnchor).toBeVisible({ timeout: 5000 });
-                testLogger.debug('Destination found in list', { name });
-                return;
-            } catch (error) {
-                retries--;
-                if (retries === 0) {
-                    testLogger.error('Destination not found after all attempts', { name });
-                    // Take screenshot for debugging
-                    await this.page.screenshot({ path: `test-results/destination-not-found-${name}.png`, fullPage: true }).catch(() => {});
-                    throw new Error(`Destination "${name}" not found in list after multiple attempts. Screenshot saved to test-results/destination-not-found-${name}.png`);
-                }
-                testLogger.debug(`Destination not visible, retrying... (${retries} attempts left)`);
-                // Refresh the page and re-search
-                await this.page.reload({ waitUntil: 'domcontentloaded' });
-                await this.page.locator(this.destinationsListTable).waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
-                if (await searchField.isVisible().catch(() => false)) {
-                    await searchField.fill('');
-                    await searchField.fill(name);
-                }
+        for (let attempt = 1; attempt <= 4; attempt++) {
+            await this.navigateToDestinations();
+            await this.page.locator(this.destinationsListTable).waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
+            if (await searchField.isVisible().catch(() => false)) {
+                await searchField.fill('');
+                await searchField.fill(name);
             }
+            if (await rowAnchor.isVisible({ timeout: 8000 }).catch(() => false)) {
+                testLogger.debug('Destination found in list', { name, attempt });
+                return;
+            }
+            testLogger.debug('Destination row not visible yet, re-navigating and re-searching', { name, attempt });
         }
+        await this.page.screenshot({ path: `test-results/destination-not-found-${name}.png`, fullPage: true }).catch(() => {});
+        throw new Error(`Destination "${name}" is registered on the backend (API ${apiStatus}) but did not render in the list after retries. Screenshot: test-results/destination-not-found-${name}.png`);
     }
 
     /**

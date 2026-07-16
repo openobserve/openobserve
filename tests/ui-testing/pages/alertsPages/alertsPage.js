@@ -1003,17 +1003,31 @@ export class AlertsPage {
             testLogger.info('Alert not immediately visible, navigating to alerts and searching', { alertName: nameToVerify });
             await this.page.locator(this.locators.alertMenuItem).click();
             await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-            await this.page.waitForTimeout(2000);
 
-            // Search for the alert
+            // Re-search across attempts: under concurrent load the alerts-list refetch after a
+            // fresh create can lag, so a single search + one long wait intermittently missed the
+            // row. Re-type the filter each attempt — and reload once to force a fresh list fetch —
+            // until the row renders. Deterministic (each probe waits for the actual cell); no
+            // reliance on one slow fetch landing inside a fixed window.
             const inputField = this.page.locator(this.locators.alertSearchInputField);
-            await inputField.waitFor({ state: 'attached', timeout: 10000 });
-            await inputField.fill(nameToVerify, { force: true });
-            await this.page.waitForTimeout(2000);
+            let found = false;
+            for (let attempt = 1; attempt <= 4 && !found; attempt++) {
+                if (attempt === 3) {
+                    // Force a fresh list fetch before the final attempts.
+                    await this.page.reload({ waitUntil: 'domcontentloaded' }).catch(() => {});
+                    await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+                }
+                await inputField.waitFor({ state: 'attached', timeout: 10000 }).catch(() => {});
+                await inputField.fill('', { force: true }).catch(() => {});
+                await inputField.fill(nameToVerify, { force: true });
+                found = await this.page.getByRole('cell', { name: nameToVerify }).first()
+                    .isVisible({ timeout: 10000 }).catch(() => false);
+                if (!found) testLogger.warn('Alert row not visible after search, re-searching', { alertName: nameToVerify, attempt });
+            }
         }
 
-        // Use a longer timeout since the alert list may take time to reload
-        await expect(this.page.getByRole('cell', { name: nameToVerify }).first()).toBeVisible({ timeout: 30000 });
+        // Final deterministic assertions (the row is present by now under normal + slow paths).
+        await expect(this.page.getByRole('cell', { name: nameToVerify }).first()).toBeVisible({ timeout: 15000 });
         await expect(this.page.locator(this.locators.pauseStartAlert.replace('{alertName}', nameToVerify)).first()).toBeVisible({ timeout: 10000 });
     }
 

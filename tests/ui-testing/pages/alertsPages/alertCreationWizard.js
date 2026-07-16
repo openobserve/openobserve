@@ -550,6 +550,15 @@ export class AlertCreationWizard {
         testLogger.info('Selected destination', { destinationName });
 
         // ==================== SUBMIT ====================
+        // Deterministic success signal = the alert-save API response. The success toast is
+        // transient (OToast auto-dismisses) and under concurrent load can land after the wait
+        // window or be missed entirely — racing it caused the intermittent flake. Arm a
+        // waitForResponse on the POST/PUT to /alerts BEFORE clicking, so we sync on the true
+        // save-complete event; the toast/'15 Mins' row then become fast, best-effort checks.
+        const savePromise = this.page.waitForResponse(
+            (r) => /\/alerts$/.test(new URL(r.url()).pathname) && ['POST', 'PUT'].includes(r.request().method()),
+            { timeout: 45000 }
+        ).catch(() => null);
         // The submit button sits inside a scroll container that clips it from the viewport.
         // Playwright's force:true doesn't bypass scroll-container clipping, so we use a
         // native DOM click via evaluate() which has no viewport restrictions.
@@ -558,17 +567,23 @@ export class AlertCreationWizard {
             const btn = document.querySelector(selector);
             if (btn) btn.click();
         }, this.locators.alertSubmitButton);
+        const saveResp = await savePromise;
+        const savedViaApi = !!(saveResp && saveResp.ok());
+        testLogger.info('Alert save API response', { matched: !!saveResp, status: saveResp ? saveResp.status() : null });
         // OToast renders the message in 3 elements (sr-only ARIA span, sr-only title div,
         // visible message div) — scope to the visible `o-toast-message` data-test to avoid
-        // strict-mode violation per AGENT_RULES §2.
-        await expect(
-            this.page
-                .locator('[data-test="o-toast-message"]')
-                .filter({ hasText: this.locators.alertSuccessMessage })
-                .first()
-        ).toBeVisible({ timeout: 30000 });
-        await expect(this.page.getByRole('cell', { name: '15 Mins' }).first()).toBeVisible({ timeout: 10000 });
-        testLogger.info('Successfully created scheduled alert', { alertName: randomAlertName });
+        // strict-mode violation per AGENT_RULES §2. Best-effort when the API already confirmed.
+        const toastSeen = await this.page
+            .locator('[data-test="o-toast-message"]')
+            .filter({ hasText: this.locators.alertSuccessMessage })
+            .first()
+            .isVisible({ timeout: savedViaApi ? 10000 : 30000 })
+            .catch(() => false);
+        if (!savedViaApi && !toastSeen) {
+            throw new Error('Scheduled alert save not confirmed by API response or success toast');
+        }
+        await expect(this.page.getByRole('cell', { name: '15 Mins' }).first()).toBeVisible({ timeout: 15000 });
+        testLogger.info('Successfully created scheduled alert', { alertName: randomAlertName, savedViaApi, toastSeen });
 
         return randomAlertName;
     }
