@@ -46,5 +46,6 @@ pub mod stream;
 pub mod synthetics;
 pub mod system_settings;
 pub mod timed_annotations;
+pub mod traces;
 pub mod triggers;
 pub mod user;

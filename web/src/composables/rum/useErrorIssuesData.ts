@@ -89,6 +89,11 @@ const useErrorIssuesData = () => {
   const isLoadingChart = ref(false);
   const isLoadingKpis = ref(false);
 
+  // Raw server error ({ code, message, error_detail }) from the last issues
+  // search, or null when the last run succeeded. The view watches this to
+  // squiggle the offending field in the filter editor.
+  const lastQueryError = ref<any>(null);
+
   // Supersede in-flight runs: only the latest fetchAll may commit results.
   let runId = 0;
 
@@ -320,6 +325,7 @@ const useErrorIssuesData = () => {
     const deployTs = latestDeploy.value?.firstSeen ?? null;
 
     if (issuesR.status === "fulfilled") {
+      lastQueryError.value = null;
       issues.value = issuesR.value.map((hit: any) => ({
         ...hit,
         events: Number(hit.events) || 0,
@@ -336,6 +342,7 @@ const useErrorIssuesData = () => {
       }));
     } else {
       issues.value = [];
+      lastQueryError.value = (issuesR.reason as any)?.response?.data ?? null;
       toast({
         message:
           (issuesR.reason as any)?.response?.data?.message ||
@@ -384,6 +391,8 @@ const useErrorIssuesData = () => {
     isLoadingKpis,
     fetchAll,
     fetchTrend,
+    // Raw server error from the last issues search (for editor highlighting).
+    lastQueryError,
     // Exposed for callers needing the users-field fallback (e.g. columns).
     pickUserField,
   };
