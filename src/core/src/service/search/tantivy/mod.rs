@@ -13,18 +13,16 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-pub mod cache;
-mod partition;
-mod pruner;
-mod result;
-pub mod search;
-mod warm;
-
 use std::{ops::Bound, sync::Arc};
 
-use arrow::{
-    buffer::{BooleanBuffer, MutableBuffer},
-    util::bit_util,
+pub use ::search::tantivy::{
+    TantivyMultiResult, TantivyMultiResultBuilder, TantivyResult, cache, search,
+};
+use ::search::tantivy::{
+    cache::{self as tantivy_result_cache, CacheEntry},
+    partition::partition_tantivy_files,
+    selection_from_row_ids,
+    warm::WarmPlan,
 };
 use config::{
     INDEX_FIELD_NAME_FOR_ALL, TIMESTAMP_COL_NAME,
@@ -43,8 +41,6 @@ use futures::{StreamExt, stream};
 use hashbrown::HashMap;
 use infra::{cache::file_data, errors::Error};
 use itertools::Itertools;
-pub use result::{TantivyMultiResult, TantivyMultiResultBuilder};
-pub use search::TantivyResult;
 use tantivy::{
     Directory, ReloadPolicy, Term,
     query::{BooleanQuery, Occur, RangeQuery},
@@ -56,11 +52,6 @@ use tantivy_utils::puffin_directory::{
 use tokio::sync::Semaphore;
 use tokio_stream::StreamExt as _;
 
-use self::{
-    cache::{self as tantivy_result_cache, CacheEntry},
-    partition::partition_tantivy_files,
-    warm::WarmPlan,
-};
 use crate::service::search::{
     grpc::{QueryParams, calc_target_partitions, storage::cache_files},
     index::IndexCondition,
@@ -631,16 +622,6 @@ fn guard_matched_rows(
         ));
     }
     Ok(None)
-}
-
-/// Build a per-row match bitmap of length `num_rows` from matched row ids.
-fn selection_from_row_ids(num_rows: usize, row_ids: impl Iterator<Item = u32>) -> BooleanBuffer {
-    let mut buffer = MutableBuffer::from_len_zeroed(bit_util::ceil(num_rows, 8));
-    let slice = buffer.as_slice_mut();
-    for id in row_ids {
-        bit_util::set_bit(slice, id as usize);
-    }
-    BooleanBuffer::new(buffer.into(), 0, num_rows)
 }
 
 fn get_cache_entry(tantivy_result: TantivyResult) -> CacheEntry {

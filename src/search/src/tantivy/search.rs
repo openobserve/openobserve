@@ -38,7 +38,7 @@ use tantivy::{
     query::Query,
 };
 
-use crate::service::search::index::IndexCondition;
+use crate::index::IndexCondition;
 
 #[derive(Debug, Clone)]
 pub enum TantivyResult {

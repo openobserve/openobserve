@@ -19,6 +19,7 @@ pub mod enrichment;
 pub mod index;
 pub mod inspector;
 pub mod sql;
+pub mod tantivy;
 pub mod udf;
 pub mod utils;
 

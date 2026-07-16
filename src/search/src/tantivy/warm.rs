@@ -26,10 +26,10 @@ use tantivy::{
 };
 use tantivy_utils::puffin_directory::reader::warm_up_terms;
 
-use crate::service::search::index::IndexCondition;
+use crate::index::IndexCondition;
 
 #[derive(Default)]
-pub(super) struct WarmPlan {
+pub struct WarmPlan {
     exact_postings: HashMap<Field, HashMap<Term, bool>>,
     exact_term_info: Option<Term>,
     full_posting_fields: HashSet<Field>,
@@ -38,7 +38,7 @@ pub(super) struct WarmPlan {
 }
 
 impl WarmPlan {
-    pub(super) fn build(
+    pub fn build(
         condition: &IndexCondition,
         query: &dyn Query,
         idx_optimize_rule: &Option<IndexOptimizeMode>,
@@ -152,7 +152,7 @@ impl WarmPlan {
         self.exact_postings.retain(|_, terms| !terms.is_empty());
     }
 
-    pub(super) async fn execute(self, segment_reader: &SegmentReader) -> anyhow::Result<()> {
+    pub async fn execute(self, segment_reader: &SegmentReader) -> anyhow::Result<()> {
         let exact_postings = self.exact_postings;
         let base_warmup = warm_up_terms(
             segment_reader,
@@ -199,7 +199,7 @@ mod tests {
     };
 
     use super::*;
-    use crate::service::search::index::Condition;
+    use crate::index::Condition;
 
     fn schema() -> Schema {
         let mut builder = Schema::builder();

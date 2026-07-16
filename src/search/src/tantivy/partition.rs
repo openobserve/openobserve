@@ -17,7 +17,7 @@ use config::meta::{inverted_index::IndexOptimizeMode, stream::FileKey};
 
 // partition the tantivy files by time range
 // the return file groups should execute one by one
-pub(super) fn partition_tantivy_files(
+pub fn partition_tantivy_files(
     index_parquet_files: Vec<FileKey>,
     idx_optimize_mode: &Option<IndexOptimizeMode>,
     target_partitions: usize,
