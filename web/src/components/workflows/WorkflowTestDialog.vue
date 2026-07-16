@@ -38,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="flex flex-col gap-4 text-left h-full p-4">
       <!-- Run-from selector -->
       <div class="flex flex-col gap-1">
-        <OText as="label" class="text-[12px] font-medium">
+        <OText as="label" class="text-xs font-medium">
           {{ t("workflow.test.runFrom") }}
         </OText>
         <OSelect
@@ -54,7 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Sample input editor — fills the remaining drawer height -->
       <div class="flex flex-col gap-1 flex-1 min-h-0">
         <div class="flex items-center justify-between">
-          <OText as="label" class="text-[12px] font-medium">
+          <OText as="label" class="text-xs font-medium">
             {{ t("workflow.test.inputLabel") }}
           </OText>
           <OButton

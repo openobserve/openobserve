@@ -46,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OBadge
                 variant="primary-outline"
                 size="sm"
-                class="uppercase tracking-[0.5px] font-semibold"
+                class="uppercase tracking-wide font-semibold"
                 >{{ t("workflow.beta") }}</OBadge
               >
             </span>

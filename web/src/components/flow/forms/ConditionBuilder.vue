@@ -51,7 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :stream-fields="fields"
           :group="conditionGroup"
           :depth="0"
-          condition-input-width="w-[130px]"
+          condition-input-width="w-[8.125rem]"
           :allow-custom-columns="allowCustomColumns"
           :module="module"
           @add-condition="(g) => updateGroup(g)"

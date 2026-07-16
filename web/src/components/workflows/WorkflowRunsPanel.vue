@@ -34,12 +34,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="flex items-center justify-between gap-2 px-3 py-2 border-b border-border-default shrink-0"
     >
       <div class="min-w-0">
-        <div class="text-[13px] font-semibold text-text-primary leading-tight">
+        <div
+          class="text-[0.8125rem] font-semibold text-text-primary leading-tight"
+        >
           {{ t("workflow.history.title") }}
         </div>
         <div
           v-if="workflowName"
-          class="text-[11px] text-text-secondary truncate leading-tight"
+          class="text-[0.6875rem] text-text-secondary truncate leading-tight"
         >
           {{ workflowName }}
         </div>
@@ -221,9 +223,13 @@ const getStatusVariant = (status: string) => {
 
 const rows = computed(() => runs.value);
 
-// Highlight the run currently loaded on the canvas.
+// Highlight the run currently loaded on the canvas. `!` (important) so the tint
+// wins over OTable's default/hover row background — keeping the list and canvas
+// in sync without a scoped :deep() override.
 const rowClass = (row: any) =>
-  row.run_id && row.run_id === props.selectedRunId ? "wf-run-selected" : "";
+  row.run_id && row.run_id === props.selectedRunId
+    ? "bg-select-item-hover-bg!"
+    : "";
 
 // Feed the shared timeline: one bar per run, coloured by success/error.
 const timelineHistory = computed(() =>
@@ -332,10 +338,3 @@ watch(
 
 defineExpose({ fetchHistory });
 </script>
-
-<style scoped>
-/* Selected run row — subtle primary tint so the list and canvas stay in sync. */
-:deep(tr.wf-run-selected) {
-  background: var(--color-select-item-hover-bg) !important;
-}
-</style>

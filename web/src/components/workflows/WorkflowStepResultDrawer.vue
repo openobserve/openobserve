@@ -46,13 +46,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            flex-1 + min-h-0 so it fills the drawer body down to the footer. -->
       <div
         ref="ioContainerRef"
-        class="io-container flex gap-2 flex-1 min-h-0"
-        :class="{ 'io-container-dark': isDark }"
+        data-test="workflow-step-io-container"
+        class="flex gap-2 flex-1 min-h-0"
+        :class="{
+          'bg-surface-subtle p-3 h-screen max-h-screen items-stretch':
+            isFullscreen,
+        }"
       >
         <!-- Input -->
-        <div class="io-section w-1/2">
+        <div class="flex flex-col h-full min-w-0 w-1/2">
           <div
-            class="section-label font-bold flex items-center justify-between"
+            class="text-text-primary text-sm mb-2 font-bold flex items-center justify-between"
           >
             <div>{{ t("workflow.test.stepResult.input") }}</div>
             <div class="flex items-center gap-1">
@@ -80,7 +84,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <!-- Test mode: input is EDITABLE and Replay re-runs from this step with
                it. History mode: read-only per-node input captured for the run. -->
-          <div class="io-content-box">
+          <div
+            class="flex-1 min-h-0 border border-border-default rounded overflow-hidden bg-code-bg"
+          >
             <CodeQueryEditor
               editor-id="workflow-step-input"
               language="json"
@@ -92,16 +98,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div
             v-if="!isHistory && editableInput && inputInvalid"
-            class="wf-input-error mt-1"
+            data-test="workflow-step-result-input-error"
+            class="text-xs leading-snug text-input-error-text mt-1"
           >
             {{ t("workflow.test.invalidJson") }}
           </div>
         </div>
 
         <!-- Output -->
-        <div class="io-section w-1/2">
+        <div class="flex flex-col h-full min-w-0 w-1/2">
           <div
-            class="section-label font-bold flex items-center justify-between"
+            class="text-text-primary text-sm mb-2 font-bold flex items-center justify-between"
           >
             <div>{{ t("workflow.test.stepResult.output") }}</div>
             <div class="flex items-center gap-1">
@@ -127,18 +134,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OButton>
             </div>
           </div>
-          <div class="io-content-box">
+          <div
+            class="flex-1 min-h-0 border border-border-default rounded overflow-hidden bg-code-bg"
+          >
             <!-- The step errored — show the error message(s) as the output. -->
-            <div v-if="errorMessages.length" class="io-errors">
+            <div
+              v-if="errorMessages.length"
+              class="h-full overflow-auto px-3 py-2.5 flex flex-col gap-1.5"
+            >
               <div
                 v-for="(m, i) in errorMessages"
                 :key="i"
-                class="io-error-line"
+                data-test="workflow-step-result-error-line"
+                class="text-xs leading-snug whitespace-pre-wrap text-status-error-text"
               >
                 {{ m }}
               </div>
             </div>
-            <div v-else class="no-data-message">
+            <div
+              v-else
+              data-test="workflow-step-result-no-output"
+              class="h-full flex items-center justify-center p-8 text-center italic text-sm text-text-secondary"
+            >
               {{ t("workflow.test.stepResult.noOutput") }}
             </div>
           </div>
@@ -199,8 +216,6 @@ import {
 
 const { t } = useI18n();
 const store = useStore();
-
-const isDark = computed(() => store.state.theme === "dark");
 
 const nodeId = computed(() => workflowObj.testRun.resultDrawer.nodeId);
 const result = computed<any>(() => workflowObj.testRun.result);
@@ -344,75 +359,3 @@ const onOpenChange = (open: boolean) => {
   if (!open) close();
 };
 </script>
-
-<style scoped>
-.io-section {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  min-width: 0;
-}
-.section-label {
-  color: var(--o2-text-primary);
-  font-size: 14px;
-  margin-bottom: 0.5rem;
-}
-.io-content-box {
-  flex: 1;
-  min-height: 0;
-  border: 1px solid var(--o2-border-color, var(--color-border-default));
-  border-radius: 4px;
-  overflow: hidden;
-  background-color: var(--o2-code-bg);
-}
-.no-data-message {
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 2rem;
-  text-align: center;
-  font-style: italic;
-  font-size: 14px;
-  color: var(--o2-text-secondary, #8a94a6);
-}
-.io-errors {
-  height: 100%;
-  overflow: auto;
-  padding: 10px 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-.io-error-line {
-  font-size: 12px;
-  line-height: 1.4;
-  color: #b91c1c;
-  white-space: pre-wrap;
-}
-.wf-input-error {
-  font-size: 11px;
-  line-height: 1.3;
-  color: #b91c1c;
-}
-
-/* Fullscreen: the io-container fills the screen with both panels stretched. */
-.io-container:fullscreen {
-  background-color: #f5f5f5;
-  padding: 0.75rem;
-  height: 100vh;
-  max-height: 100vh;
-  gap: 0.5rem;
-  align-items: stretch;
-}
-.io-container:fullscreen .io-section {
-  flex: 1;
-}
-.io-container:fullscreen .io-content-box {
-  height: calc(100vh - 80px);
-  max-height: unset;
-}
-.io-container-dark:fullscreen {
-  background: #1e1e1e;
-}
-</style>

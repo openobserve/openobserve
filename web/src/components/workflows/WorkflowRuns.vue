@@ -66,7 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Persistent runs list (master-detail). -->
       <div
-        class="w-[440px] max-w-[46%] shrink-0 mb-3 rounded-xl overflow-hidden border border-border-default bg-surface-base flex flex-col min-h-0"
+        class="w-[27.5rem] max-w-[46%] shrink-0 mb-3 rounded-xl overflow-hidden border border-border-default bg-surface-base flex flex-col min-h-0"
       >
         <WorkflowRunsPanel
           :org-id="orgId"

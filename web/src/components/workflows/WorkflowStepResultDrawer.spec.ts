@@ -209,7 +209,7 @@ describe("WorkflowStepResultDrawer", () => {
 
     it("renders each NodeErrors message as the Output — first tuple element only", () => {
       const wrapper = mountDrawer();
-      const lines = wrapper.findAll(".io-error-line");
+      const lines = wrapper.findAll("[data-test='workflow-step-result-error-line']");
       expect(lines).toHaveLength(2);
       expect(lines[0].text()).toBe("boom");
       expect(lines[1].text()).toBe("bad record");
@@ -224,26 +224,26 @@ describe("WorkflowStepResultDrawer", () => {
         },
       });
       const wrapper = mountDrawer();
-      expect(wrapper.find(".io-error-line").text()).toBe("flat message");
+      expect(wrapper.find("[data-test='workflow-step-result-error-line']").text()).toBe("flat message");
     });
 
     it("shows the no-output placeholder when the node has no error entries", () => {
       setup({ result: { errors: {}, ranNodeIds: [], blockedNodeIds: [] } });
       const wrapper = mountDrawer();
-      expect(wrapper.find(".io-error-line").exists()).toBe(false);
-      expect(wrapper.find(".no-data-message").text()).toBe(
+      expect(wrapper.find("[data-test='workflow-step-result-error-line']").exists()).toBe(false);
+      expect(wrapper.find("[data-test='workflow-step-result-no-output']").text()).toBe(
         i18n.global.t("workflow.test.stepResult.noOutput"),
       );
     });
 
     it("tolerates a null result and a malformed errors entry", () => {
       setup({ result: null });
-      expect(mountDrawer().find(".no-data-message").exists()).toBe(true);
+      expect(mountDrawer().find("[data-test='workflow-step-result-no-output']").exists()).toBe(true);
 
       setup({
         result: { errors: { f1: { errors: "not-an-array" } } },
       });
-      expect(mountDrawer().find(".no-data-message").exists()).toBe(true);
+      expect(mountDrawer().find("[data-test='workflow-step-result-no-output']").exists()).toBe(true);
     });
   });
 
@@ -265,25 +265,25 @@ describe("WorkflowStepResultDrawer", () => {
     it("shows the invalid-JSON hint for a malformed payload", async () => {
       setup({ input: "{oops" });
       const wrapper = mountDrawer();
-      expect(wrapper.find(".wf-input-error").text()).toBe(
+      expect(wrapper.find("[data-test='workflow-step-result-input-error']").text()).toBe(
         i18n.global.t("workflow.test.invalidJson"),
       );
     });
 
     it("treats a non-array payload as invalid", () => {
       setup({ input: '{"a":1}' });
-      expect(mountDrawer().find(".wf-input-error").exists()).toBe(true);
+      expect(mountDrawer().find("[data-test='workflow-step-result-input-error']").exists()).toBe(true);
     });
 
     it("treats an empty payload as invalid (nothing to replay)", () => {
       setup({ input: "   " });
       const wrapper = mountDrawer();
-      expect(wrapper.find(".wf-input-error").exists()).toBe(true);
+      expect(wrapper.find("[data-test='workflow-step-result-input-error']").exists()).toBe(true);
       expect(replayBtn(wrapper).attributes("disabled")).toBeDefined();
     });
 
     it("hides the invalid-JSON hint for a valid array", () => {
-      expect(mountDrawer().find(".wf-input-error").exists()).toBe(false);
+      expect(mountDrawer().find("[data-test='workflow-step-result-input-error']").exists()).toBe(false);
     });
   });
 
@@ -322,12 +322,12 @@ describe("WorkflowStepResultDrawer", () => {
       setup({ input: "{oops", result: historyResult() });
       const wrapper = mountDrawer();
       expect(replayBtn(wrapper).exists()).toBe(false);
-      expect(wrapper.find(".wf-input-error").exists()).toBe(false);
+      expect(wrapper.find("[data-test='workflow-step-result-input-error']").exists()).toBe(false);
     });
 
     it("still shows the error output for the past run", () => {
       setup({ result: historyResult() });
-      expect(mountDrawer().findAll(".io-error-line")).toHaveLength(2);
+      expect(mountDrawer().findAll("[data-test='workflow-step-result-error-line']")).toHaveLength(2);
     });
   });
 
@@ -466,7 +466,7 @@ describe("WorkflowStepResultDrawer", () => {
       const wrapper = mountDrawer();
       await fsButtons(wrapper)[0].trigger("click");
       expect(mockToggleFullscreen).toHaveBeenCalledWith(
-        wrapper.find(".io-container").element,
+        wrapper.find("[data-test='workflow-step-io-container']").element,
       );
     });
 
@@ -487,7 +487,7 @@ describe("WorkflowStepResultDrawer", () => {
 
     it("flips the icon + title once the document reports fullscreen", async () => {
       const wrapper = mountDrawer();
-      const el = wrapper.find(".io-container").element;
+      const el = wrapper.find("[data-test='workflow-step-io-container']").element;
       expect(wrapper.findAll('[data-icon="fullscreen"]')).toHaveLength(2);
 
       Object.defineProperty(document, "fullscreenElement", {

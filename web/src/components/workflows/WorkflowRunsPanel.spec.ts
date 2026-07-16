@@ -121,7 +121,7 @@ describe("WorkflowRunsPanel", () => {
       .findComponent(OTableStub as any)
       .props("rowClass") as (row: any) => string;
 
-    expect(rowClass({ run_id: "run-2" })).toBe("wf-run-selected");
+    expect(rowClass({ run_id: "run-2" })).toBe("bg-select-item-hover-bg!");
     expect(rowClass({ run_id: "run-9" })).toBe("");
   });
 

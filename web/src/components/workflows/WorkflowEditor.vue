@@ -288,8 +288,8 @@ const stepItems = computed(() =>
       icon: img ? `img:${img}` : m?.icon || "help",
       iconTint:
         m?.category === "action"
-          ? "bg-[#e6f6ee] text-[#1f9d63]"
-          : "bg-[#fdf3e2] text-[#e0891d]",
+          ? "bg-badge-success-soft-bg text-badge-success-soft-text"
+          : "bg-badge-warning-soft-bg text-badge-warning-soft-text",
     };
   }),
 );

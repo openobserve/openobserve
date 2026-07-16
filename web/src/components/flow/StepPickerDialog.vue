@@ -125,9 +125,13 @@ const filtered = computed(() => {
 });
 </script>
 
+<!--
+  Hover tint uses color-mix() over --color-* tokens (a computed blend Tailwind
+  can't express cleanly as a utility), so it stays a small scoped rule.
+-->
 <style scoped>
 .flow-step-card:hover {
-  border-color: var(--color-primary-600, #3f7994);
+  border-color: var(--color-primary-600);
   background: color-mix(in srgb, var(--color-primary-600) 4%, var(--color-card-bg));
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary-600) 12%, transparent);
 }

@@ -453,9 +453,9 @@ describe("WorkflowEditor", () => {
       expect(items.map((i) => i.key)).toEqual(["condition", "function", "destination"]);
       expect(items[0].title).toBe(t("workflow.node.condition"));
       expect(items[0].description).toBe(t("workflow.node.conditionDesc"));
-      // action-category steps get the green tint, logic ones the amber tint
-      expect(items[2].iconTint).toContain("#e6f6ee");
-      expect(items[0].iconTint).toContain("#fdf3e2");
+      // action-category steps get the success tint, logic ones the warning tint
+      expect(items[2].iconTint).toContain("badge-success-soft");
+      expect(items[0].iconTint).toContain("badge-warning-soft");
     });
 
     it("stages the picked step after the source node and closes the picker", async () => {
