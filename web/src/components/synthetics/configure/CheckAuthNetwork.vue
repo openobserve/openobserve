@@ -137,15 +137,15 @@ function removeCookie(index: number) {
 </script>
 
 <template>
-  <div class="rounded-lg border border-[var(--color-border-default)] mb-4">
-    <div class="flex items-center border-b border-[var(--color-border-default)] py-[10px] px-3">
-      <div class="w-[3px] h-4 rounded-sm mr-2 shrink-0 bg-[var(--color-primary-600)]" />
-      <h3 class="text-base font-semibold text-[var(--color-text-heading)]">
+  <div class="rounded-lg border border-border-default mb-4">
+    <div class="flex items-center border-b border-border-default py-[0.625rem] px-3">
+      <div class="w-[0.1875rem] h-4 rounded-sm mr-2 shrink-0 bg-primary-600" />
+      <h3 class="text-base font-semibold text-text-heading">
         {{ t('synthetics.authNetwork.title') }}
       </h3>
       <OBadge variant="default-soft" size="sm" class="ml-2">{{ t('synthetics.authNetwork.optional') }}</OBadge>
       <div class="flex-1" />
-      <span v-if="summary" class="text-xs text-[var(--color-text-muted)]">{{ summary }}</span>
+      <span v-if="summary" class="text-xs text-text-muted">{{ summary }}</span>
     </div>
     <div class="px-3 py-2 flex flex-col gap-4">
 
@@ -164,7 +164,7 @@ function removeCookie(index: number) {
             data-test="synthetics-check-auth-network-username-input"
           />
           <div>
-            <label class="text-sm font-medium text-[var(--color-text-body)] mb-1 block">
+            <label class="text-sm font-medium text-text-body mb-1 block">
               {{ t('synthetics.authNetwork.password') }}
               <OBadge variant="default-soft" size="sm" class="ml-1">{{ t('synthetics.authNetwork.secret') }}</OBadge>
             </label>
@@ -182,7 +182,7 @@ function removeCookie(index: number) {
       <OSeparator />
 
       <div class="flex flex-col gap-3">
-        <h4 class="text-sm font-medium text-[var(--color-text-body)]">{{ t('synthetics.authNetwork.variables') }}</h4>
+        <h4 class="text-sm font-medium text-text-body">{{ t('synthetics.authNetwork.variables') }}</h4>
 
         <ul v-if="variables.length" class="flex flex-col gap-2">
           <li
@@ -198,7 +198,7 @@ function removeCookie(index: number) {
                 class="flex-1"
                 @update:model-value="updateVariable(index, 'name', String($event))"
               />
-              <span class="text-[var(--color-text-muted)] shrink-0">=</span>
+              <span class="text-text-muted shrink-0">=</span>
               <OInput
                 :model-value="variable.value"
                 :type="variable.secure ? 'password' : 'text'"
@@ -255,7 +255,7 @@ function removeCookie(index: number) {
         <OSeparator />
 
         <div class="flex flex-col gap-3">
-          <h4 class="text-sm font-medium text-[var(--color-text-body)]">{{ t('synthetics.authNetwork.customHeaders') }}</h4>
+          <h4 class="text-sm font-medium text-text-body">{{ t('synthetics.authNetwork.customHeaders') }}</h4>
           <ul v-if="headers.length" class="flex flex-col gap-2">
             <li
               v-for="(header, index) in headers"
@@ -269,7 +269,7 @@ function removeCookie(index: number) {
                 class="flex-1"
                 @update:model-value="updateHeader(index, 'key', String($event))"
               />
-              <span class="text-[var(--color-text-muted)] shrink-0">:</span>
+              <span class="text-text-muted shrink-0">:</span>
               <OInput
                 :model-value="header.value"
                 :placeholder="t('synthetics.authNetwork.headerValuePlaceholder')"
@@ -277,15 +277,14 @@ function removeCookie(index: number) {
                 class="flex-1"
                 @update:model-value="updateHeader(index, 'value', String($event))"
               />
-              <button
-                type="button"
+              <OButton
+                variant="ghost"
+                size="icon-sm"
+                icon-left="delete"
                 :aria-label="t('synthetics.authNetwork.removeHeader', { index })"
                 :data-test="`synthetics-check-auth-network-remove-header-${index}-btn`"
-                class="flex items-center text-[var(--color-text-muted)] hover:text-[var(--color-text-body)] transition-colors shrink-0"
                 @click="removeHeader(index)"
-              >
-                <OIcon name="delete-outline" size="sm" />
-              </button>
+              />
             </li>
           </ul>
           <OButton
@@ -304,7 +303,7 @@ function removeCookie(index: number) {
         <OSeparator />
 
         <div class="flex flex-col gap-3">
-          <h4 class="text-sm font-medium text-[var(--color-text-body)]">{{ t('synthetics.authNetwork.preSetCookies') }}</h4>
+          <h4 class="text-sm font-medium text-text-body">{{ t('synthetics.authNetwork.preSetCookies') }}</h4>
           <ul v-if="cookies.length" class="flex flex-col gap-2">
             <li
               v-for="(cookie, index) in cookies"
@@ -332,15 +331,14 @@ function removeCookie(index: number) {
                 class="flex-1"
                 @update:model-value="updateCookie(index, 'domain', String($event))"
               />
-              <button
-                type="button"
+              <OButton
+                variant="ghost"
+                size="icon-sm"
+                icon-left="delete"
                 :aria-label="t('synthetics.authNetwork.removeCookie', { index })"
                 :data-test="`synthetics-check-auth-network-remove-cookie-${index}-btn`"
-                class="flex items-center text-[var(--color-text-muted)] hover:text-[var(--color-text-body)] transition-colors shrink-0"
                 @click="removeCookie(index)"
-              >
-                <OIcon name="delete-outline" size="sm" />
-              </button>
+              />
             </li>
           </ul>
           <OButton

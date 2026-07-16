@@ -78,10 +78,10 @@ function removeAssertion(index: number) {
 </script>
 
 <template>
-  <div class="rounded-lg border border-[var(--color-border-default)] mb-4">
-    <div class="flex items-center border-b border-[var(--color-border-default)] py-[10px] px-3">
-      <div class="w-[3px] h-4 rounded-sm mr-2 shrink-0 bg-[var(--color-primary-600)]" />
-      <h3 class="text-base font-semibold text-[var(--color-text-heading)]">{{ t('synthetics.protocolConfig.http.title') }}</h3>
+  <div class="rounded-lg border border-border-default mb-4">
+    <div class="flex items-center border-b border-border-default py-[0.625rem] px-3">
+      <div class="w-[0.1875rem] h-4 rounded-sm mr-2 shrink-0 bg-primary-600" />
+      <h3 class="text-base font-semibold text-text-heading">{{ t('synthetics.protocolConfig.http.title') }}</h3>
     </div>
     <div class="px-3 py-2 flex flex-col gap-4">
       <div class="flex items-end gap-2">
@@ -109,7 +109,7 @@ function removeAssertion(index: number) {
 
       <!-- Headers -->
       <div>
-        <label class="text-sm font-medium text-[var(--color-text-body)] mb-1 block">{{ t('synthetics.protocolConfig.http.headers') }}</label>
+        <label class="text-sm font-medium text-text-body mb-1 block">{{ t('synthetics.protocolConfig.http.headers') }}</label>
         <div v-for="(h, i) in cfg.headers" :key="i" class="flex items-center gap-2 mb-2">
           <div class="flex-1 min-w-0">
             <OInput
@@ -156,7 +156,7 @@ function removeAssertion(index: number) {
 
       <!-- Assertions -->
       <div>
-        <label class="text-sm font-medium text-[var(--color-text-body)] mb-1 block">{{ t('synthetics.protocolConfig.http.assertions') }}</label>
+        <label class="text-sm font-medium text-text-body mb-1 block">{{ t('synthetics.protocolConfig.http.assertions') }}</label>
         <div v-for="(a, i) in cfg.assertions" :key="i" class="flex items-center gap-2 mb-2">
           <OSelect
             :model-value="a.field"

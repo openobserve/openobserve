@@ -119,7 +119,7 @@ function stepDetail(row: TData): string {
 // ── Status dot rendering ───────────────────────────────────────────
 function dotClass(state: StepDotState | undefined): string {
   if (!state) {
-    return "w-6 h-6 rounded-full flex items-center justify-center shrink-0 border border-[var(--o2-text-muted)] text-[var(--o2-text-muted)] text-xs font-semibold";
+    return "w-6 h-6 rounded-full flex items-center justify-center shrink-0 border border-[var(--color-text-muted)] text-text-muted text-xs font-semibold";
   }
   switch (state) {
     case "active":
@@ -131,7 +131,7 @@ function dotClass(state: StepDotState | undefined): string {
     case "skip":
       return "w-6 h-6 rounded-full flex items-center justify-center shrink-0 bg-[var(--color-badge-default-soft-bg)] text-[var(--color-badge-default-soft-text)] border border-[var(--color-badge-default-soft-text)] text-xs font-semibold opacity-50";
     default:
-      return "w-6 h-6 rounded-full flex items-center justify-center shrink-0 border border-[var(--o2-text-muted)] text-[var(--o2-text-muted)] text-xs font-semibold";
+      return "w-6 h-6 rounded-full flex items-center justify-center shrink-0 border border-[var(--color-text-muted)] text-text-muted text-xs font-semibold";
   }
 }
 
@@ -217,7 +217,7 @@ function handleUpdateExpanded(ids: string[]) {
     <!-- ── cell-screenshot: Thumbnail (results mode) ───────────── -->
     <template v-if="mode === 'results'" #cell-screenshot="{ row }">
       <div
-        class="w-18 h-12 shrink-0 rounded border border-[var(--o2-border-color)] bg-surface-subtle flex items-center justify-center overflow-hidden"
+        class="w-18 h-12 shrink-0 rounded border border-border-default bg-surface-subtle flex items-center justify-center overflow-hidden"
       >
         <slot name="screenshot-thumb" :row="row">
           <OIcon name="image" size="xs" class="text-text-caption" />
@@ -234,14 +234,14 @@ function handleUpdateExpanded(ids: string[]) {
           :class="[
             getDotState(row) ? dotClass(getDotState(row)) : '',
             'shrink-0 tabular-nums',
-            getDotState(row) ? '' : 'text-sm text-[var(--o2-text-muted)] w-6 text-center',
+            getDotState(row) ? '' : 'text-sm text-text-muted w-6 text-center',
           ]"
         >
           <OSpinner
             v-if="getDotState(row) === 'active'"
             variant="ring"
             size="xs"
-            class="text-[var(--o2-primary-color)]"
+            class="text-primary-500"
           />
           <template v-else>{{ (data as any[]).indexOf(row) + 1 }}</template>
         </span>
@@ -250,12 +250,12 @@ function handleUpdateExpanded(ids: string[]) {
 
         <!-- Action icon chip -->
         <span
-          class="bg-[var(--o2-primary-50)] rounded p-1 shrink-0 flex items-center"
+          class="bg-primary-50 rounded p-1 shrink-0 flex items-center"
         >
           <OIcon
             :name="actionIcon(row)"
             size="sm"
-            class="text-[var(--o2-primary-color)]"
+            class="text-primary-500"
             aria-hidden="true"
           />
         </span>
@@ -266,14 +266,14 @@ function handleUpdateExpanded(ids: string[]) {
         </div>
 
         <!-- Step display name -->
-        <span class="text-sm text-[var(--o2-text-body)] flex-1 truncate min-w-0">
+        <span class="text-sm text-text-body flex-1 truncate min-w-0">
           {{ stepName(row) }}
         </span>
 
         <!-- Selector/value preview (editor mode only) -->
         <span
           v-if="mode === 'editor' && stepDetail(row)"
-          class="font-mono text-xs text-[var(--o2-text-secondary)] truncate max-w-[25%] shrink-0"
+          class="font-mono text-xs text-text-secondary truncate max-w-[25%] shrink-0"
         >
           {{ stepDetail(row) }}
         </span>
@@ -292,7 +292,7 @@ function handleUpdateExpanded(ids: string[]) {
 
     <!-- ── cell-duration: Duration text (results mode) ─────────── -->
     <template v-if="mode === 'results'" #cell-duration="{ row }">
-      <span class="text-xs text-[var(--o2-text-secondary)] shrink-0 font-mono tabular-nums">
+      <span class="text-xs text-text-secondary shrink-0 font-mono tabular-nums">
         {{ (row as any).durStr ?? "" }}
       </span>
     </template>
@@ -338,7 +338,7 @@ function handleUpdateExpanded(ids: string[]) {
           data-test="synthetics-journey-step-delete-btn"
           data-row-action="delete"
           :disabled="isLocked"
-          class="hover:text-[var(--o2-status-error)]"
+          class="hover:text-status-error-text"
           @click="emit('delete', row)"
         >
           <OIcon name="delete" size="sm" aria-hidden="true" />

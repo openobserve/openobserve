@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="inline-flex items-center gap-1.5 text-xs text-text-secondary"
       >
         <span
-          class="w-[7px] h-[7px] rounded-full bg-[var(--color-badge-error-solid-bg)]"
+          class="w-[0.4375rem] h-[0.4375rem] rounded-full bg-[var(--color-badge-error-solid-bg)]"
         />
         {{ failCount }} Failed
       </span>
@@ -42,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="inline-flex items-center gap-1.5 text-xs text-text-secondary"
       >
         <span
-          class="w-[7px] h-[7px] rounded-full bg-[var(--color-badge-orange-solid-bg)]"
+          class="w-[0.4375rem] h-[0.4375rem] rounded-full bg-[var(--color-badge-orange-solid-bg)]"
         />
         {{ mixedCount }} Warning
       </span>
@@ -50,7 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="inline-flex items-center gap-1.5 text-xs text-text-secondary"
       >
         <span
-          class="w-[7px] h-[7px] rounded-full bg-[var(--color-badge-success-solid-bg)]"
+          class="w-[0.4375rem] h-[0.4375rem] rounded-full bg-[var(--color-badge-success-solid-bg)]"
         />
         {{ passCount }} Passed
       </span>
@@ -58,14 +58,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="border-t border-border-default" />
     <div class="flex flex-col gap-1 py-2 px-[0.875rem]">
       <div class="flex items-center gap-1">
-        <button
-          class="shrink-0 inline-flex items-center justify-center w-5 h-5 rounded bg-transparent border-none cursor-pointer text-text-secondary hover:bg-surface-subtle disabled:opacity-30 disabled:cursor-default transition-colors"
+        <OButton
+          variant="ghost"
+          size="icon-xs"
           :disabled="!canScrollLeft"
-          @click="scrollTimeline('left')"
+          data-test="synthetics-timeline-scroll-left-btn"
           aria-label="Scroll timeline left"
+          @click="scrollTimeline('left')"
         >
           <OIcon name="chevron-left" size="xs" />
-        </button>
+        </OButton>
         <div
           ref="scrollRef"
           class="flex-1 overflow-hidden flex rounded h-[26px] gap-0.5"
@@ -74,7 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             v-for="seg in segments"
             :key="seg.runId"
-            class="shrink-0 h-full min-w-[3px] cursor-pointer transition-all duration-100 hover:scale-y-[1.35]"
+            class="shrink-0 h-full min-w-[0.1875rem] cursor-pointer transition-all duration-100 hover:scale-y-[1.35]"
             :style="{ width: segmentWidthPct }"
             :class="seg.color"
           >
@@ -148,14 +150,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OTooltip>
           </div>
         </div>
-        <button
-          class="shrink-0 inline-flex items-center justify-center w-5 h-5 rounded bg-transparent border-none cursor-pointer text-text-secondary hover:bg-surface-subtle disabled:opacity-30 disabled:cursor-default transition-colors"
+        <OButton
+          variant="ghost"
+          size="icon-xs"
           :disabled="!canScrollRight"
-          @click="scrollTimeline('right')"
+          data-test="synthetics-timeline-scroll-right-btn"
           aria-label="Scroll timeline right"
+          @click="scrollTimeline('right')"
         >
           <OIcon name="chevron-right" size="xs" />
-        </button>
+        </OButton>
       </div>
       <div
         class="flex justify-between text-[10.5px] font-mono tabular-nums text-text-secondary"
@@ -171,6 +175,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import chromiumSvgUrl from "@/assets/images/synthetics/chromium.svg";
 import firefoxSvgUrl from "@/assets/images/synthetics/firefox.svg";

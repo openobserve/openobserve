@@ -29,10 +29,10 @@ const selectedLocations = computed({
 </script>
 
 <template>
-  <div class="rounded-lg border border-[var(--color-border-default)] mb-4">
-    <div class="flex items-center border-b border-[var(--color-border-default)] py-[10px] px-3">
-      <div class="w-[3px] h-4 rounded-sm mr-2 shrink-0 bg-[var(--color-primary-600)]" />
-      <h3 class="text-base font-semibold text-[var(--color-text-heading)]">
+  <div class="rounded-lg border border-border-default mb-4">
+    <div class="flex items-center border-b border-border-default py-[0.625rem] px-3">
+      <div class="w-[0.1875rem] h-4 rounded-sm mr-2 shrink-0 bg-primary-600" />
+      <h3 class="text-base font-semibold text-text-heading">
         {{ t('synthetics.locations.title') }}
       </h3>
     </div>
@@ -61,7 +61,7 @@ const selectedLocations = computed({
 
     <div
       v-else
-      class="flex items-center justify-center rounded-md border border-dashed border-[var(--color-border-default)] px-3 py-3 text-sm text-[var(--color-text-muted)]"
+      class="flex items-center justify-center rounded-md border border-dashed border-border-default px-3 py-3 text-sm text-text-muted"
       data-test="synthetics-check-locations-empty"
     >
       {{ t('synthetics.locations.empty') }}

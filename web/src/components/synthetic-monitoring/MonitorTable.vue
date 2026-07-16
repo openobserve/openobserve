@@ -94,7 +94,7 @@
           v-for="(tick, i) in (row as any).history"
           :key="i"
           class="spark-bar"
-          :class="tick.status === 'up' ? 'bg-success-500' : tick.status === 'down' ? 'bg-error-500' : 'bg-warning-500'"
+          :class="tick.status === 'up' ? 'bg-[var(--color-success-500)]' : tick.status === 'down' ? 'bg-[var(--color-error-500)]' : 'bg-[var(--color-warning-500)]'"
           @mouseenter="showSparkTip($event, tick)"
           @mouseleave="hideSparkTip"
         />
@@ -106,7 +106,7 @@
       <span
         v-if="(row as any).responseTime"
         class="font-mono text-sm font-semibold"
-        :class="parseFloat((row as any).responseTime) < 300 ? 'text-success-600' : parseFloat((row as any).responseTime) < 1000 ? 'text-warning-600' : 'text-error-600'"
+        :class="parseFloat((row as any).responseTime) < 300 ? 'text-[var(--color-success-600)]' : parseFloat((row as any).responseTime) < 1000 ? 'text-[var(--color-warning-600)]' : 'text-[var(--color-error-600)]'"
       >{{ (row as any).responseTime }}</span>
       <span v-else class="text-sm">—</span>
     </template>
@@ -123,7 +123,7 @@
           />
           <span
             :class="'font-mono text-sm font-semibold min-w-[2.75rem] text-right text-xs '
-              + ((row as any).uptime >= 99 ? 'text-success-600' : (row as any).uptime >= 95 ? 'text-amber-600' : 'text-error-600')"
+              + ((row as any).uptime >= 99 ? 'text-[var(--color-success-600)]' : (row as any).uptime >= 95 ? 'text-[var(--color-warning-600)]' : 'text-[var(--color-error-600)]')"
           >{{ (row as any).uptime }}%</span>
         </div>
       </template>
@@ -134,7 +134,7 @@
     <template #cell-locations="{ row }">
       <div class="flex items-center gap-1 cursor-default" @mouseenter="showLoc($event, (row as any).locations)" @mouseleave="hideLoc">
         <span class="text-xs truncate max-w-[4.375rem]">{{ (row as any).locations[0] }}</span>
-        <span v-if="(row as any).locations.length > 1" class="text-xs font-bold px-1 py-0.5 rounded bg-black/10 dark:bg-white/10 whitespace-nowrap shrink-0">+{{ (row as any).locations.length - 1 }}</span>
+        <span v-if="(row as any).locations.length > 1" class="text-xs font-bold px-1 py-0.5 rounded bg-[var(--color-surface-subtle)] whitespace-nowrap shrink-0">+{{ (row as any).locations.length - 1 }}</span>
       </div>
     </template>
 
@@ -158,7 +158,7 @@
           :data-test="`${dataTest}-toggle-spinner`"
         >
           <OSpinner size="xs" />
-          <OTooltip side="bottom" :content="(row as any).enabled ? 'Pausing…' : 'Enabling…'" />
+          <OTooltip side="bottom" :content="(row as any).enabled ? t('synthetics.table.pausing') : t('synthetics.table.enabling')" />
         </div>
         <OButton
           v-else
@@ -203,7 +203,7 @@
               :data-test="`${dataTest}-trigger-spinner`"
             >
               <OSpinner size="xs" />
-              <OTooltip side="bottom" content="Triggering…" />
+              <OTooltip side="bottom" :content="t('synthetics.table.triggering')" />
             </div>
             <OButton
               v-else
@@ -327,7 +327,7 @@
       <div class="stt-header">
         <span class="stt-time">{{ sparkTip.tick.hour }} – {{ sparkTip.tick.nextHour }}</span>
         <span class="stt-badge" :class="'stt-badge--' + sparkTip.tick.status">
-          {{ sparkTip.tick.status === 'up' ? '✓ Up' : sparkTip.tick.status === 'down' ? '✗ Down' : '⚠ Degraded' }}
+          {{ sparkTip.tick.status === 'up' ? t('synthetics.table.statusUp') : sparkTip.tick.status === 'down' ? t('synthetics.table.statusDown') : t('synthetics.table.statusDegraded') }}
         </span>
       </div>
       <div class="stt-divider" />
@@ -335,10 +335,10 @@
         <div v-for="c in sparkTip.tick.checks" :key="c.loc" class="stt-check">
           <span class="stt-dot" :class="c.ok ? 'stt-dot--up' : 'stt-dot--down'" />
           <span class="stt-loc">{{ c.loc }}</span>
-          <span class="stt-ms">{{ c.ms !== null ? c.ms + 'ms' : 'Timeout' }}</span>
+          <span class="stt-ms">{{ c.ms !== null ? c.ms + t('synthetics.table.ms') : t('synthetics.table.timeout') }}</span>
         </div>
       </div>
-      <div v-if="sparkTip.tick.avgMs !== null" class="stt-avg">Avg · {{ sparkTip.tick.avgMs }}ms</div>
+      <div v-if="sparkTip.tick.avgMs !== null" class="stt-avg">{{ t('synthetics.table.avg') }} · {{ sparkTip.tick.avgMs }}{{ t('synthetics.table.ms') }}</div>
       <div class="stt-arrow" />
     </div>
   </Teleport>

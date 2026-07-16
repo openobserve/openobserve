@@ -86,16 +86,16 @@ onUnmounted(() => {
 <template>
   <div class="flex flex-col min-h-screen">
     <!-- Recording banner -->
-    <div class="flex items-center gap-3 px-4 py-2 bg-[var(--o2-status-error-subtle)] border-b border-[var(--o2-border-color)]">
+    <div class="flex items-center gap-3 px-4 py-2 bg-status-error-bg border-b border-border-default">
       <!-- Red dot + timer -->
       <span class="flex items-center gap-1.5">
-        <span class="w-2 h-2 rounded-full bg-[var(--o2-status-error)] animate-pulse inline-block" aria-hidden="true" />
-        <span class="text-sm font-semibold text-[var(--o2-status-error)]">Recording</span>
-        <span class="font-mono text-sm text-[var(--o2-text-body)]">{{ formatTime(recordingSeconds) }}</span>
+        <span class="w-2 h-2 rounded-full bg-[var(--color-status-error-text)] animate-pulse inline-block" aria-hidden="true" />
+        <span class="text-sm font-semibold text-status-error-text">Recording</span>
+        <span class="font-mono text-sm text-text-body">{{ formatTime(recordingSeconds) }}</span>
       </span>
 
       <!-- Current URL -->
-      <span class="flex items-center gap-1 text-xs text-[var(--o2-text-secondary)] truncate flex-1 min-w-0">
+      <span class="flex items-center gap-1 text-xs text-text-secondary truncate flex-1 min-w-0">
         <OIcon name="shield" size="sm" class="shrink-0" aria-hidden="true" />
         <span class="truncate">{{ currentUrl }}</span>
       </span>
@@ -115,21 +115,21 @@ onUnmounted(() => {
     </div>
 
     <!-- Info banner -->
-    <div class="flex items-center gap-2 px-4 py-2 border-b border-[var(--o2-border-color)] bg-[var(--o2-card-bg)]">
-      <OIcon name="open-in-new" size="sm" class="text-[var(--o2-text-muted)]" aria-hidden="true" />
-      <span class="text-xs text-[var(--o2-text-secondary)] flex-1">Recording in a separate incognito window</span>
+    <div class="flex items-center gap-2 px-4 py-2 border-b border-border-default bg-surface-base">
+      <OIcon name="open-in-new" size="sm" class="text-text-muted" aria-hidden="true" />
+      <span class="text-xs text-text-secondary flex-1">Recording in a separate incognito window</span>
       <OButton variant="outline" size="sm">Show window</OButton>
     </div>
 
     <!-- Captured steps -->
     <div class="flex-1 overflow-y-auto p-4">
       <div class="flex items-center gap-2 mb-3">
-        <h3 class="text-base font-semibold text-[var(--o2-text-heading)] m-0">Journey</h3>
-        <span class="text-xs font-medium bg-[var(--o2-status-error-subtle)] text-[var(--o2-status-error)] rounded-full px-2 py-0.5 flex items-center gap-1">
-          <span class="w-1.5 h-1.5 rounded-full bg-[var(--o2-status-error)] animate-pulse inline-block" aria-hidden="true" />
+        <h3 class="text-base font-semibold text-text-heading m-0">Journey</h3>
+        <span class="text-xs font-medium bg-status-error-bg text-status-error-text rounded-full px-2 py-0.5 flex items-center gap-1">
+          <span class="w-1.5 h-1.5 rounded-full bg-[var(--color-status-error-text)] animate-pulse inline-block" aria-hidden="true" />
           capturing live
         </span>
-        <span class="text-sm text-[var(--o2-text-muted)]">({{ capturedSteps.length }} steps)</span>
+        <span class="text-sm text-text-muted">({{ capturedSteps.length }} steps)</span>
       </div>
 
       <!-- Live step list -->
@@ -153,8 +153,8 @@ onUnmounted(() => {
         v-else
         class="flex flex-col items-center justify-center gap-3 py-16 text-center"
       >
-        <OIcon name="fiber-manual-record" size="xl" class="text-[var(--o2-text-muted)] animate-pulse" aria-hidden="true" />
-        <p class="text-sm text-[var(--o2-text-secondary)] m-0">Waiting for actions in the browser…</p>
+        <OIcon name="fiber-manual-record" size="xl" class="text-text-muted animate-pulse" aria-hidden="true" />
+        <p class="text-sm text-text-secondary m-0">Waiting for actions in the browser…</p>
       </div>
     </div>
   </div>

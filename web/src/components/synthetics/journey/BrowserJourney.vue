@@ -68,7 +68,7 @@ const deleteConfirmMessage = computed(() => {
   const step = deleteConfirm.value.step
   if (!step) return ''
   const label = step.name || `#${props.modelValue.indexOf(step) + 1}`
-  return `Are you sure you want to delete step "${label}"?`
+  return t('synthetics.journey.confirmDeleteMessage', { label })
 })
 
 // ── Drag-and-drop ──────────────────────────────────────────────────────────
@@ -448,12 +448,12 @@ function openChromeExtensions() {
         @update:model-value="toggleSelectAll()"
       />
       <div class="flex">
-        <h3 class="text-base font-semibold text-[var(--o2-text-heading)] mr-0">Steps</h3>
+        <h3 class="text-base font-semibold text-text-heading mr-0">{{ t('synthetics.journey.steps') }}</h3>
         <OBadge variant="default" size="sm" class="ml-1">{{ modelValue.length }}</OBadge>
       </div>
       <OInput
         v-model="filterQuery"
-        placeholder="Filter steps..."
+        :placeholder="t('synthetics.journey.filterSteps')"
         class="flex-1 min-w-[8rem]!"
         data-test="synthetics-journey-filter-input"
       />
@@ -468,7 +468,7 @@ function openChromeExtensions() {
           @click="addStep"
           icon-left="add"
         >
-          Add Step
+          {{ t('synthetics.journey.addStep') }}
         </OButton>
 
         <!-- Run replay / Stop / Re-run — positionally stable, same slot -->
@@ -482,7 +482,7 @@ function openChromeExtensions() {
             @click="emit('replay')"
             icon-left="replay"
           >
-            Replay
+            {{ t('synthetics.journey.replay') }}
           </OButton>
           <OButton
             v-else-if="replayPhase === 'running'"
@@ -492,7 +492,7 @@ function openChromeExtensions() {
             @click="emit('stop-replay')"
             icon-left="stop"
           >
-            Stop
+            {{ t('synthetics.journey.stop') }}
           </OButton>
           <OButton
             v-else-if="isReplayTerminal"
@@ -502,7 +502,7 @@ function openChromeExtensions() {
             @click="emit('replay')"
             icon-left="replay"
           >
-            Replay
+            {{ t('synthetics.journey.replay') }}
           </OButton>
         </template>
 
@@ -513,7 +513,7 @@ function openChromeExtensions() {
           data-test="synthetics-journey-cancel-btn"
           @click="cancelRecording"
         >
-          Cancel
+          {{ t('synthetics.journey.cancel') }}
         </OButton>
 
         <OButton
@@ -537,7 +537,7 @@ function openChromeExtensions() {
           icon-left="smart-display"
           class="w-24!"
         >
-          Record
+          {{ t('synthetics.journey.record') }}
         </OButton>
       </div>
     </div>
@@ -545,23 +545,23 @@ function openChromeExtensions() {
     <!-- Incognito blocked warning card (pre-flight failure) -->
     <div
       v-if="blockedReason === 'incognito'"
-      class="flex flex-col gap-3 px-3 py-3 mb-3 rounded-lg border border-[var(--o2-warning-300)] bg-[var(--o2-warning-50)]"
+      class="flex flex-col gap-3 px-3 py-3 mb-3 rounded-lg border border-[var(--color-warning-300)] bg-warning-50"
       role="alert"
       data-test="synthetics-journey-incognito-warning"
     >
       <div class="flex items-center gap-2">
-        <OIcon name="visibility-off" size="sm" class="text-[var(--o2-warning-600)]" aria-hidden="true" />
-        <span class="text-sm font-semibold text-[var(--o2-text-heading)]">Can't open the Incognito window</span>
+        <OIcon name="visibility-off" size="sm" class="text-warning-600" aria-hidden="true" />
+        <span class="text-sm font-semibold text-text-heading">{{ t('synthetics.journey.incognitoTitle') }}</span>
       </div>
-      <p class="text-xs text-[var(--o2-text-secondary)] m-0">
-        Replays run in a clean Incognito session. The OpenObserve Recorder extension needs permission to run in Incognito mode.
+      <p class="text-xs text-text-secondary m-0">
+        {{ t('synthetics.journey.incognitoDescription') }}
       </p>
-      <ol class="list-decimal pl-4 text-xs text-[var(--o2-text-body)] flex flex-col gap-1 m-0">
-        <li>Open <code class="font-mono text-[var(--o2-text-code)]">chrome://extensions</code></li>
-        <li>Find the <strong>OpenObserve Recorder</strong> extension</li>
-        <li>Click <strong>Details</strong></li>
-        <li>Enable <strong>Allow in Incognito</strong></li>
-        <li>Return here and click <strong>Retry</strong></li>
+      <ol class="list-decimal pl-4 text-xs text-text-body flex flex-col gap-1 m-0">
+        <li>{{ t('synthetics.journey.incognitoStep1') }} <code class="font-mono text-text-code">chrome://extensions</code></li>
+        <li>{{ t('synthetics.journey.incognitoStep2') }} <strong>{{ t('synthetics.journey.extensionsRecorderName') }}</strong> {{ t('synthetics.journey.extension') }}</li>
+        <li>{{ t('synthetics.journey.incognitoStep3') }} <strong>{{ t('synthetics.journey.extensionsDetails') }}</strong></li>
+        <li>{{ t('synthetics.journey.incognitoStep4') }} <strong>{{ t('synthetics.journey.extensionsAllowIncognito') }}</strong></li>
+        <li>{{ t('synthetics.journey.incognitoStep5') }} <strong>{{ t('synthetics.journey.retry') }}</strong></li>
       </ol>
       <div class="flex items-center gap-2">
         <OButton
@@ -595,18 +595,18 @@ function openChromeExtensions() {
     <!-- Replay running banner -->
     <div
       v-if="replayPhase === 'running'"
-      class="flex items-center gap-2 mx-2 px-3 py-2 mb-3 rounded bg-[var(--color-badge-primary-soft-bg)] border border-[var(--o2-border-color)]"
+      class="flex items-center gap-2 mx-2 px-3 py-2 mb-3 rounded bg-[var(--color-badge-primary-soft-bg)] border border-border-default"
       role="status"
       data-test="synthetics-journey-replay-banner"
     >
-      <OIcon name="sync" size="sm" class="animate-spin text-[var(--o2-primary-color)]" aria-hidden="true" />
+      <OIcon name="sync" size="sm" class="animate-spin text-primary-500" aria-hidden="true" />
       <span
-        class="text-sm text-[var(--o2-text-heading)]"
+        class="text-sm text-text-heading"
         data-test="synthetics-journey-replay-banner-text"
       >
         Replaying…
       </span>
-      <span class="text-sm text-[var(--o2-text-secondary)]">
+      <span class="text-sm text-text-secondary">
         {{ stepResults?.size ?? 0 }} of {{ modelValue.length }} steps
       </span>
     </div>
@@ -619,7 +619,7 @@ function openChromeExtensions() {
       data-test="synthetics-journey-passed-banner"
     >
       <OIcon name="check-circle" size="sm" class="text-[var(--color-timeline-dot-success)]" aria-hidden="true" />
-      <span class="text-sm text-badge-success-ol-text font-semi-bold">Replay passed — all {{ modelValue.length }} steps completed successfully</span>
+      <span class="text-sm text-badge-success-ol-text font-semi-bold">{{ t('synthetics.journey.replayPassed', { count: modelValue.length }) }}</span>
       <span class="flex-1" />
       <OButton variant="ghost" size="xs" data-test="synthetics-journey-clear-results-btn" @click="emit('clear-results')">
         <OIcon name="close" size="sm" />
@@ -635,7 +635,7 @@ function openChromeExtensions() {
     >
       <OIcon name="error" size="sm" class="mt-0.5 text-badge-error-ol-text" aria-hidden="true" />
       <div class="flex flex-col gap-0.5 flex-1 min-w-0">
-        <span class="text-sm text-badge-error-ol-text font-semibold">Replay failed — stopped at step {{ firstFailedIndex + 1 }} of {{ modelValue.length }}</span>
+        <span class="text-sm text-badge-error-ol-text font-semibold">{{ t('synthetics.journey.replayFailed', { failed: firstFailedIndex + 1, total: modelValue.length }) }}</span>
         <span v-if="failedStepResult?.stepName" class="text-xs truncate text-badge-error-ol-text pt-1">{{ failedStepResult.stepName }}</span>
       </div>
       <OButton variant="ghost" size="xs" data-test="synthetics-journey-clear-results-btn" @click="emit('clear-results')">
@@ -646,12 +646,12 @@ function openChromeExtensions() {
     <!-- Replay stopped banner -->
     <div
       v-else-if="replayPhase === 'stopped'"
-      class="flex items-center gap-2 px-3 py-2 mb-3 rounded bg-[var(--o2-bg-subtle)] border border-[var(--o2-border-color)]"
+      class="flex items-center gap-2 px-3 py-2 mb-3 rounded bg-surface-subtle border border-border-default"
       role="status"
       data-test="synthetics-journey-stopped-banner"
     >
-      <OIcon name="stop" size="sm" class="text-[var(--o2-text-secondary)]" aria-hidden="true" />
-      <span class="text-sm text-[var(--o2-text-heading)]">Replay stopped at step {{ stepResults?.size ?? 0 }} of {{ modelValue.length }}</span>
+      <OIcon name="stop" size="sm" class="text-text-secondary" aria-hidden="true" />
+      <span class="text-sm text-text-heading">{{ t('synthetics.journey.replayStopped', { completed: stepResults?.size ?? 0, total: modelValue.length }) }}</span>
       <span class="flex-1" />
       <OButton variant="outline" size="xs" data-test="synthetics-journey-stopped-retry-btn" @click="emit('replay')">
         Re-run
@@ -664,7 +664,7 @@ function openChromeExtensions() {
     <!-- Recorder error (extension missing / failed to start) -->
     <div
       v-if="recordingError && !isRecording"
-      class="flex items-center gap-2 px-3 py-2 mb-3 rounded bg-[var(--o2-status-error-subtle)] text-[var(--o2-status-error)] text-sm"
+      class="flex items-center gap-2 px-3 py-2 mb-3 rounded bg-status-error-bg text-status-error-text text-sm"
       role="alert"
       data-test="synthetics-journey-record-error"
     >
@@ -675,18 +675,18 @@ function openChromeExtensions() {
     <!-- Live capture area (shown while recording) -->
     <template v-if="isRecording">
       <!-- Recording banner with current URL + controls -->
-      <div class="flex items-center gap-3 px-3 py-2 mb-3 rounded bg-[var(--o2-status-error-subtle)] border border-[var(--o2-border-color)]">
+      <div class="flex items-center gap-3 px-3 py-2 mb-3 rounded bg-status-error-bg border border-border-default">
         <span class="flex items-center gap-1.5">
           <span class="relative inline-flex items-center justify-center w-[0.7rem] h-[0.7rem]" aria-hidden="true">
-            <span class="absolute w-[0.7rem] h-[0.7rem] rounded-full bg-[var(--o2-status-error-text)] z-1" />
-            <span class="absolute w-[0.7rem] h-[0.7rem] rounded-full bg-[var(--o2-status-error-text)] opacity-0 animate-[recording-pulse-expand_1.5s_ease-out_infinite]" />
+            <span class="absolute w-[0.7rem] h-[0.7rem] rounded-full bg-status-error-text z-1" />
+            <span class="absolute w-[0.7rem] h-[0.7rem] rounded-full bg-status-error-text opacity-0 animate-[recording-pulse-expand_1.5s_ease-out_infinite]" />
           </span>
-          <span class="text-sm font-semibold text-[var(--o2-status-error)] pl-1.5">Recording</span>
+          <span class="text-sm font-semibold text-status-error-text pl-1.5">{{ t('synthetics.journey.recording') }}</span>
         </span>
-        <span class="flex items-center gap-1 text-xs text-[var(--o2-text-secondary)] truncate flex-1 min-w-0">
+        <span class="flex items-center gap-1 text-xs text-text-secondary truncate flex-1 min-w-0">
           <span class="truncate">{{ currentUrl }}</span>
         </span>
-        <span class="text-xs text-[var(--o2-text-muted)]">{{ capturedSteps.length }} steps</span>
+        <span class="text-xs text-text-muted">{{ capturedSteps.length }} steps</span>
       </div>
 
       <JourneySteps
@@ -704,8 +704,8 @@ function openChromeExtensions() {
 
       <!-- Waiting for first step -->
       <div v-else class="flex flex-col items-center justify-center gap-3 py-16 text-center">
-        <OIcon name="fiber-manual-record" size="xl" class="text-[var(--o2-text-muted)] animate-pulse" aria-hidden="true" />
-        <p class="text-sm text-[var(--o2-text-secondary)] m-0">Waiting for actions in the browser…</p>
+        <OIcon name="fiber-manual-record" size="xl" class="text-text-muted animate-pulse" aria-hidden="true" />
+        <p class="text-sm text-text-secondary m-0">Waiting for actions in the browser…</p>
       </div>
     </template>
 
@@ -715,11 +715,11 @@ function openChromeExtensions() {
       v-else-if="modelValue.length === 0"
       class="flex flex-col items-center justify-center gap-4 py-16 text-center"
     >
-      <OIcon name="open-in-browser" size="xl" class="text-[var(--o2-text-muted)]" aria-hidden="true" />
-      <h3 class="text-base font-semibold text-[var(--o2-text-heading)] m-0">No steps yet</h3>
+      <OIcon name="open-in-browser" size="xl" class="text-text-muted" aria-hidden="true" />
+      <h3 class="text-base font-semibold text-text-heading m-0">{{ t('synthetics.journey.noSteps') }}</h3>
       <div class="flex items-center gap-3">
-        <OButton variant="primary" size="sm" @click="onRecordButtonClick">Record journey</OButton>
-        <OButton variant="outline" size="sm" @click="addStep">Add a step manually</OButton>
+        <OButton variant="primary" size="sm" @click="onRecordButtonClick">{{ t('synthetics.journey.recordJourney') }}</OButton>
+        <OButton variant="outline" size="sm" @click="addStep">{{ t('synthetics.journey.addStepManually') }}</OButton>
       </div>
     </div>
 
@@ -831,7 +831,7 @@ function openChromeExtensions() {
       v-model:model-value="deleteConfirm.show"
       :title="'Delete Step'"
       :message="deleteConfirmMessage"
-      ok-label="Delete"
+      :ok-label="t('synthetics.journey.delete')"
       ok-color="danger"
       @update:ok="confirmDelete"
       @update:cancel="cancelDelete"

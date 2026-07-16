@@ -111,7 +111,7 @@ const timeoutComputed = computed({
 // ── Status dot visual mapping (combines with step number during replay) ─────
 /** Tailwind classes for the step number badge (replay = colored circle). */
 const stepNumberClass = computed(() => {
-  if (!props.replayDotState) return 'w-6! text-center text-sm tabular-nums text-[var(--o2-text-muted)]'
+  if (!props.replayDotState) return 'w-6! text-center text-sm tabular-nums text-text-muted'
   switch (props.replayDotState) {
     case 'active':
       return 'w-6 h-6 rounded-full flex items-center justify-center shrink-0 bg-[var(--color-badge-primary-soft-bg)] text-[var(--color-badge-primary-soft-text)] border border-[var(--color-badge-primary-soft-text)] text-white text-xs font-semi-bold'
@@ -122,7 +122,7 @@ const stepNumberClass = computed(() => {
     case 'skip':
       return 'w-6 h-6 rounded-full flex items-center justify-center shrink-0 bg-[var(--color-badge-default-soft-bg)] text-[var(--color-badge-default-soft-text)] border border-[var(--color-badge-default-soft-text)]  text-xs font-semi-bold'
     default:
-      return 'w-6 h-6 rounded-full flex items-center justify-center shrink-0 border border-[var(--o2-border)] text-[var(--o2-text-muted)] border border-[var(--o2-text-muted)]  text-xs font-semi-bold'
+      return 'w-6 h-6 rounded-full flex items-center justify-center shrink-0 border border-border-default text-text-muted border border-[var(--color-text-muted)]  text-xs font-semi-bold'
   }
 })
 
@@ -190,16 +190,16 @@ function toggleExpanded() {
 </script>
 
 <template>
-  <div class="rounded border border-[var(--o2-border-color)] bg-[var(--o2-card-bg)] mb-1">
+  <div class="rounded border border-border-default bg-surface-base mb-1">
     <!-- Compact row -->
     <div
       class="flex items-center gap-2 px-2 h-9 min-h-9 group relative"
-      :class="[rowOpacityClass, { 'border-b border-[var(--o2-border-color)]': expanded }, showErrorCard && 'bg-[var(--color-badge-error-soft-bg)]']"
+      :class="[rowOpacityClass, { 'border-b border-border-default': expanded }, showErrorCard && 'bg-[var(--color-badge-error-soft-bg)]']"
 
     >
       <!-- Drag handle — visibility:hidden during replay to preserve layout -->
       <span
-        class="cursor-grab text-[var(--o2-text-muted)] opacity-0 group-hover:opacity-100 transition-opacity shrink-0 absolute left-[-0.1rem]"
+        class="cursor-grab text-text-muted opacity-0 group-hover:opacity-100 transition-opacity shrink-0 absolute left-[-0.1rem]"
         :class="{ 'invisible': replayDotState }"
         data-test="synthetics-journey-step-drag-handle"
         aria-hidden="true"
@@ -224,28 +224,28 @@ function toggleExpanded() {
           :data-test="replayDotState ? `synthetics-journey-step-dot-${index}` : undefined"
           :aria-label="replayDotState ? `Step ${index + 1} ${replayDotState}` : undefined"
         >
-          <OSpinner v-if="stepNumberSpinning" variant="ring" size="xs" class="text-[var(--o2-primary-color)]" />
+          <OSpinner v-if="stepNumberSpinning" variant="ring" size="xs" class="text-primary-500" />
           <template v-else>{{ index + 1 }}</template>
         </span>
       </span>
 
       <!-- Action icon chip -->
-      <span class="bg-[var(--o2-primary-50)] rounded p-1 shrink-0 flex items-center">
-        <OIcon :name="actionIcon" size="sm" class="text-[var(--o2-primary-color)]" aria-hidden="true" />
+      <span class="bg-primary-50 rounded p-1 shrink-0 flex items-center">
+        <OIcon :name="actionIcon" size="sm" class="text-primary-500" aria-hidden="true" />
       </span>
 
       <!-- Action label badge -->
       <OBadge variant="default" size="sm">{{ actionLabel }}</OBadge>
 
       <!-- Step display name -->
-      <span class="text-sm text-[var(--o2-text-body)] flex-1 truncate min-w-0">
+      <span class="text-sm text-text-body flex-1 truncate min-w-0">
         {{ displayName }}
       </span>
 
       <!-- Selector/value preview -->
       <span
         v-if="selectorPreview"
-        class="font-mono text-xs text-[var(--o2-text-secondary)] truncate max-w-[25%] shrink-0"
+        class="font-mono text-xs text-text-secondary truncate max-w-[25%] shrink-0"
       >
         {{ selectorPreview }}
       </span>
@@ -293,7 +293,7 @@ function toggleExpanded() {
           aria-label="Delete step"
           data-test="synthetics-journey-step-delete-btn"
           :disabled="replayLocked"
-          class="hover:text-[var(--o2-status-error)]"
+          class="hover:text-status-error-text"
           @click="emit('delete')"
         >
           <OIcon name="delete" size="sm" aria-hidden="true" />
@@ -309,42 +309,44 @@ function toggleExpanded() {
     >
       <!-- Header -->
       <div class="flex items-center gap-2 px-3 py-2 bg-[var(--color-badge-error-soft-bg)]">
-        <OIcon :name="errorIconName" size="sm" class="text-[var(--o2-status-error)]" aria-hidden="true" />
-        <span class="text-xs font-semibold text-[var(--o2-text-heading)] flex-1">{{ errorLabel }}</span>
-        <span class="text-xs font-mono text-[var(--o2-text-secondary)]">{{ exitReasonTag }} · {{ errorDurationFormatted }}</span>
+        <OIcon :name="errorIconName" size="sm" class="text-status-error-text" aria-hidden="true" />
+        <span class="text-xs font-semibold text-text-heading flex-1">{{ errorLabel }}</span>
+        <span class="text-xs font-mono text-text-secondary">{{ exitReasonTag }} · {{ errorDurationFormatted }}</span>
       </div>
 
       <!-- Error message -->
       <div class="px-3 py-3">
-        <p class="text-[12.5px] text-[var(--o2-text-body)] m-0">
+        <p class="text-[12.5px] text-text-body m-0">
           {{ se?.message || props.replayResult?.error }}
         </p>
       </div>
 
       <!-- Stack trace (collapsible) -->
       <div v-if="se?.stack && false" class="px-3 pb-3">
-        <button
-          type="button"
-          class="text-xs text-[var(--o2-text-link)] bg-transparent border-0 cursor-pointer p-0 flex items-center gap-1"
-          @click="toggleStackTrace"
-          data-test="synthetics-journey-step-stack-toggle"
-        >
-          <OIcon :name="showStackTrace ? 'expand-less' : 'expand-more'" size="xs" />
-          {{ showStackTrace ? 'Hide' : 'Show' }} stack trace
+        <div class="flex items-center gap-1">
+          <OButton
+            variant="ghost"
+            size="xs"
+            class="text-xs text-text-link"
+            data-test="synthetics-journey-step-stack-toggle"
+            @click="toggleStackTrace"
+          >
+            <OIcon :name="showStackTrace ? 'expand-less' : 'expand-more'" size="xs" />
+            {{ showStackTrace ? 'Hide' : 'Show' }} stack trace
+          </OButton>
           <OButton
             v-if="showStackTrace"
             variant="ghost"
             size="xs"
-            class="ml-1"
             data-test="synthetics-journey-step-stack-copy"
             @click.stop="copyStackTrace"
           >
             <OIcon name="content-copy" size="xs" />
           </OButton>
-        </button>
+        </div>
         <pre
           v-if="showStackTrace"
-          class="mt-2 bg-[var(--o2-code-bg)] rounded p-3 overflow-x-auto max-h-[300px] overflow-y-auto text-xs font-mono leading-relaxed m-0"
+          class="mt-2 bg-code-bg rounded p-3 overflow-x-auto max-h-[300px] overflow-y-auto text-xs font-mono leading-relaxed m-0"
           data-test="synthetics-journey-step-stack-content"
         >{{ se.stack }}</pre>
       </div>
@@ -352,12 +354,12 @@ function toggleExpanded() {
       <!-- Info boxes -->
       <div v-if="se?.selector" class="flex gap-4 px-3 pb-3">
         <div class="flex flex-col gap-1">
-          <span class="text-[11px] font-medium text-[var(--o2-text-label)]">Selector (Test ID)</span>
-          <span class="text-xs font-mono text-[var(--o2-status-error)]">{{ se.selector }}</span>
+          <span class="text-[11px] font-medium text-text-label">Selector (Test ID)</span>
+          <span class="text-xs font-mono text-status-error-text">{{ se.selector }}</span>
         </div>
         <div class="flex flex-col gap-1">
-          <span class="text-[11px] font-medium text-[var(--o2-text-label)]">Waited</span>
-          <span class="text-xs font-mono text-[var(--o2-text-secondary)]">{{ errorDurationFormatted }} · {{ exitReasonTag }}</span>
+          <span class="text-[11px] font-medium text-text-label">Waited</span>
+          <span class="text-xs font-mono text-text-secondary">{{ errorDurationFormatted }} · {{ exitReasonTag }}</span>
         </div>
       </div>
 

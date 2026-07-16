@@ -170,10 +170,10 @@ const startTime = computed({
 </script>
 
 <template>
-  <div class="rounded-lg border border-[var(--color-border-default)] mb-4">
-    <div class="flex items-center border-b border-[var(--color-border-default)] py-[10px] px-3">
-      <div class="w-[3px] h-4 rounded-sm mr-2 shrink-0 bg-[var(--color-primary-600)]" />
-      <h3 class="text-base font-semibold text-[var(--color-text-heading)]">
+  <div class="rounded-lg border border-border-default mb-4">
+    <div class="flex items-center border-b border-border-default py-[0.625rem] px-3">
+      <div class="w-[0.1875rem] h-4 rounded-sm mr-2 shrink-0 bg-primary-600" />
+      <h3 class="text-base font-semibold text-text-heading">
         {{ t('synthetics.scheduleAlert.schedule') }}
       </h3>
     </div>
@@ -183,7 +183,7 @@ const startTime = computed({
       <div class="flex items-end gap-8 flex-wrap">
         <!-- Frequency -->
         <div>
-          <label class="text-sm font-medium text-[var(--color-text-body)] mb-1 block">
+          <label class="text-sm font-medium text-text-body mb-1 block">
             {{ t('synthetics.scheduleAlert.frequency') }}
           </label>
           <OToggleGroup
@@ -217,7 +217,7 @@ const startTime = computed({
               {{ t('synthetics.scheduleAlert.scheduleLater') }}
             </OToggleGroupItem>
           </OToggleGroup>
-          <OIcon name="info-outline" size="sm" class="cursor-pointer text-[var(--color-text-muted)]">
+          <OIcon name="info-outline" size="sm" class="cursor-pointer text-text-muted">
             <OTooltip side="right" align="center">
               <template #content>
                 {{ t('synthetics.scheduleAlert.scheduleNowTooltip') }}<br />

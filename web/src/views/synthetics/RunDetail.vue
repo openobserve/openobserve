@@ -158,7 +158,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div
                   v-for="i in 5"
                   :key="i"
-                  class="card-container rounded-lg flex flex-row items-center px-[0.875rem] py-[0.625rem] gap-1.5 bg-[var(--o2-card-bg)] border border-[var(--o2-border-color)]"
+                  class="card-container rounded-lg flex flex-row items-center px-[0.875rem] py-[0.625rem] gap-1.5 bg-surface-base border border-border-default"
                 >
                   <OSkeleton type="circle" class="h-4 w-4 shrink-0" />
                   <OSkeleton type="text" class="h-4 w-20" />
@@ -174,7 +174,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div
                   v-for="chip in infoChips"
                   :key="chip.label"
-                  class="card-container rounded-lg flex flex-row items-center px-[0.875rem] py-[0.625rem] gap-1.5 bg-[var(--o2-card-bg)] border border-[var(--o2-border-color)]"
+                  class="card-container rounded-lg flex flex-row items-center px-[0.875rem] py-[0.625rem] gap-1.5 bg-surface-base border border-border-default"
                 >
                   <OIcon
                     v-if="chip.icon"
@@ -185,7 +185,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                   <span
                     class="text-sm leading-none truncate"
-                    :class="chip.colorClass || 'text-[var(--o2-text-body)]'"
+                    :class="chip.colorClass || 'text-text-body'"
                   >
                     {{ chip.value }}
                   </span>
@@ -204,7 +204,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div
                     v-for="i in 4"
                     :key="i"
-                    class="flex items-center gap-2 rounded border border-[var(--o2-border-color)] p-2"
+                    class="flex items-center gap-2 rounded border border-border-default p-2"
                   >
                     <OSkeleton type="rect" class="h-12 w-18 shrink-0 rounded" />
                     <OSkeleton type="circle" class="h-6 w-6 shrink-0" />
@@ -224,12 +224,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="flex items-start gap-2 p-3">
                 <OIcon
                   name="error"
-                  class="text-[var(--o2-status-error-text)] shrink-0"
+                  class="text-status-error-text shrink-0"
                   size="md"
                 />
                 <div class="flex-1 min-w-0">
                   <div class="flex items-center gap-2 flex-wrap">
-                    <span class="text-[13.5px] font-bold text-[var(--o2-status-error-text)]">
+                    <span class="text-[13.5px] font-bold text-status-error-text">
                       {{ currentRun.errorType }}
                     </span>
                   </div>
@@ -249,13 +249,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :class="{ 'rotate-180': stackOpen }"
                       />
                     </template>
-                    <span class="text-[11.5px] font-semibold text-[var(--o2-status-error-text)]">
+                    <span class="text-[11.5px] font-semibold text-status-error-text">
                       View full error &amp; stack trace
                     </span>
                   </OButton>
                   <pre
                     v-if="stackOpen && currentRun.errorStack"
-                    class="mt-2 text-[11px] leading-[1.6] text-text-body bg-[var(--o2-code-bg)] rounded-md p-[10px_12px] overflow-auto whitespace-pre-wrap font-mono"
+                    class="mt-2 text-[11px] leading-[1.6] text-text-body bg-code-bg rounded-md p-[10px_12px] overflow-auto whitespace-pre-wrap font-mono"
                     data-test="synthetics-run-detail-error-stack"
                   >{{ currentRun.errorStack }}</pre>
                 </div>
@@ -337,10 +337,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <template #expansion="{ row }">
                       <div class="flex gap-4 p-3">
                         <div class="w-[40%] shrink-0">
-                          <div class="rounded border border-[var(--o2-border-color)] overflow-hidden">
+                          <div class="rounded border border-border-default overflow-hidden">
                             <div
                               class="aspect-[16/10] flex items-center justify-center overflow-hidden"
-                              :class="row.status === 'fail' ? 'bg-[var(--o2-status-error-bg)]' : 'bg-surface-subtle'"
+                              :class="row.status === 'fail' ? 'bg-status-error-bg' : 'bg-surface-subtle'"
                             >
                               <div
                                 v-if="row.screenshotKey"
@@ -360,10 +360,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                   />
                                 </OButton>
                                 <div
-                                  class="absolute top-2 right-2 flex items-center justify-center w-7 h-7 rounded-md bg-[var(--o2-card-bg)]/80 opacity-0 group-hover:opacity-100 transition-opacity shadow-sm pointer-events-none"
+                                  class="absolute top-2 right-2 flex items-center justify-center w-7 h-7 rounded-md bg-surface-base/80 opacity-0 group-hover:opacity-100 transition-opacity shadow-sm pointer-events-none"
                                   aria-hidden="true"
                                 >
-                                  <OIcon name="fullscreen" size="sm" class="text-[var(--o2-text-heading)]" />
+                                  <OIcon name="fullscreen" size="sm" class="text-text-heading" />
                                 </div>
                               </div>
                               <template v-else>
@@ -394,22 +394,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             :data-test="`synthetics-run-detail-step-error-card-${row.id}`"
                           >
                             <div class="flex items-center gap-2 px-3 py-2 bg-[var(--color-badge-error-soft-bg)]">
-                              <OIcon name="error" size="sm" class="text-[var(--o2-status-error-text)]" aria-hidden="true" />
-                              <span class="text-xs font-semibold text-[var(--o2-text-heading)] flex-1">Error</span>
+                              <OIcon name="error" size="sm" class="text-status-error-text" aria-hidden="true" />
+                              <span class="text-xs font-semibold text-text-heading flex-1">Error</span>
                             </div>
                             <div class="px-3 py-3">
                               <pre
-                                class="text-[12.5px] text-[var(--o2-text-body)] m-0 whitespace-pre-wrap font-mono leading-relaxed"
+                                class="text-[12.5px] text-text-body m-0 whitespace-pre-wrap font-mono leading-relaxed"
                                 :class="{ 'max-h-[96px] overflow-hidden': !expandedStepErrors.has(row.id) && (row.error?.length ?? 0) > 200 }"
                               >{{ row.error }}</pre>
                               <div class="flex items-center gap-2 mt-1.5">
-                                <button
+                                <OButton
                                   v-if="(row.error?.length ?? 0) > 200"
-                                  class="text-xs font-semibold text-[var(--o2-text-link)] hover:underline cursor-pointer"
+                                  variant="ghost"
+                                  size="xs"
+                                  class="text-xs font-semibold text-text-link"
+                                  data-test="synthetics-run-detail-toggle-step-error-btn"
                                   @click="toggleStepError(row.id)"
                                 >
                                   {{ expandedStepErrors.has(row.id) ? 'Show less' : 'Show full error' }}
-                                </button>
+                                </OButton>
                                 <OButton
                                   variant="ghost"
                                   size="xs"
@@ -509,7 +512,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="flex items-center justify-center h-full p-6"
       :class="
         lightboxStep.status === 'fail'
-          ? 'bg-[var(--o2-status-error-bg)]'
+          ? 'bg-status-error-bg'
           : 'bg-surface-subtle'
       "
     >
@@ -540,17 +543,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OIcon
             name="error"
             size="sm"
-            class="text-[var(--o2-status-error-text)]"
+            class="text-status-error-text"
             aria-hidden="true"
           />
           <span
-            class="text-sm font-semibold text-[var(--o2-text-heading)] flex-1"
+            class="text-sm font-semibold text-text-heading flex-1"
             >Error</span
           >
         </div>
         <div class="px-4 py-3">
           <pre
-            class="text-sm text-[var(--o2-text-body)] m-0 whitespace-pre-wrap font-mono leading-relaxed"
+            class="text-sm text-text-body m-0 whitespace-pre-wrap font-mono leading-relaxed"
           >{{ errorStep.error }}</pre>
         </div>
       </div>
@@ -726,8 +729,8 @@ function buildSteps(detail: SyntheticRunDetail | null): StepRow[] {
       statusIcon: isFail ? "cancel" : "check-circle",
       durStr: fmtDur(ex.duration_ms),
       durColor: isFail
-        ? "var(--o2-status-error-text)"
-        : "var(--o2-text-secondary)",
+        ? "var(--color-status-error-text)"
+        : "var(--color-text-secondary)",
       error: ex.error,
       screenshotKey: ex.screenshot_key,
     };
@@ -1054,7 +1057,7 @@ const statusChip = computed(() => {
       label: "Status",
       value: "Error",
       icon: "error",
-      colorClass: "text-[var(--o2-status-error-text)]",
+      colorClass: "text-status-error-text",
     };
   }
   if (currentRun.value.status === "fail") {
@@ -1063,14 +1066,14 @@ const statusChip = computed(() => {
       label: "Status",
       value: stepNum ? `Failed at Step ${stepNum}` : "Failed",
       icon: "cancel",
-      colorClass: "text-[var(--o2-status-error-text)]",
+      colorClass: "text-status-error-text",
     };
   }
   return {
     label: "Status",
     value: "Passed",
     icon: "check-circle",
-    colorClass: "text-[var(--o2-status-success-text)]",
+    colorClass: "text-status-success-text",
   };
 });
 

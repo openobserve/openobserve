@@ -29,25 +29,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           v-for="card in kpiCards"
           :key="card.label"
-          class="kpi-card card-container rounded-lg flex flex-col px-[0.875rem] pt-[0.625rem] pb-[0.625rem] gap-[0.25rem]"
+          class="bg-surface-base border border-border-default transition-shadow duration-200 hover:shadow-[0_0.0625rem_0.375rem_rgba(0,0,0,0.08)] card-container rounded-lg flex flex-col px-[0.875rem] pt-[0.625rem] pb-[0.625rem] gap-[0.25rem]"
           :data-test="`synthetic-monitor-results-kpi-${card.key}`"
         >
           <div class="flex flex-col gap-[0.25rem]">
             <div
-              class="kpi-label text-[0.7rem] font-semibold text-[var(--o2-text-muted)]"
+              class="kpi-label text-[0.7rem] font-semibold text-text-muted"
             >
               {{ card.label }}
             </div>
             <div class="flex items-baseline gap-[0.2rem]">
               <span
-                class="text-[1.4rem] font-bold leading-none text-[var(--o2-text-primary)]"
+                class="text-[1.4rem] font-bold leading-none text-text-primary"
                 :class="card.valueClass"
               >
                 {{ card.value }}
               </span>
               <span
                 v-if="card.unit"
-                class="text-[0.8rem] font-semibold text-[var(--o2-text-secondary)]"
+                class="text-[0.8rem] font-semibold text-text-secondary"
               >
                 {{ card.unit }}
               </span>
@@ -65,48 +65,48 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Response Time chart -->
       <section
-        class="card-container rounded-lg px-[0.875rem] py-[0.75rem] mb-[0.625rem]"
+        class="bg-surface-base border border-border-default rounded-lg px-[0.875rem] py-[0.75rem] mb-[0.625rem]"
         data-test="synthetic-monitor-results-response-time-chart"
       >
         <header class="flex items-baseline gap-[0.5rem] mb-[0.5rem]">
           <h4
-            class="text-[0.85rem] font-semibold text-[var(--o2-text-heading)]"
+            class="text-[0.85rem] font-semibold text-text-heading"
           >
             {{ t("synthetics.results.responseTime") }}
           </h4>
-          <small class="text-[var(--o2-text-caption)]">
+          <small class="text-text-caption">
             {{ t("synthetics.results.responseTimeSubtitle") }}
           </small>
         </header>
-        <div ref="chartEl" class="response-time-chart" />
+        <div ref="chartEl" class="w-full h-56" />
       </section>
 
       <!-- Runs table (expandable) -->
       <section
-        class="card-container rounded-lg overflow-hidden"
+        class="bg-surface-base border border-border-default rounded-lg overflow-hidden"
         data-test="synthetic-monitor-results-runs-section"
       >
         <header class="flex items-center justify-between px-[0.875rem] pt-[0.75rem] pb-[0.5rem]">
-          <h4 class="text-[0.85rem] font-semibold text-[var(--o2-text-heading)]">
+          <h4 class="text-[0.85rem] font-semibold text-text-heading">
             {{ t("synthetics.results.recentRuns") }}
           </h4>
-          <span v-if="runsTotal" class="text-xs text-[var(--o2-text-muted)]">{{ runsTotal }} runs</span>
+          <span v-if="runsTotal" class="text-xs text-text-muted">{{ runsTotal }} runs</span>
         </header>
 
         <!-- Loading skeleton -->
         <div v-if="runsLoading" class="flex flex-col gap-1 px-4 py-3">
-          <div v-for="i in 5" :key="i" class="runs-skel h-9 rounded" />
+          <div v-for="i in 5" :key="i" class="mrd-runs-skel bg-[var(--color-border-default)] animate-pulse h-9 rounded" />
         </div>
 
         <!-- Empty -->
-        <div v-else-if="!runRows.length" class="flex items-center justify-center py-12 text-sm text-[var(--o2-text-muted)]">
+        <div v-else-if="!runRows.length" class="flex items-center justify-center py-12 text-sm text-text-muted">
           {{ t("synthetics.results.noRuns") }}
         </div>
 
         <!-- Table -->
         <div v-else class="runs-list">
           <!-- Column headers -->
-          <div class="runs-header grid text-[0.65rem] font-semibold uppercase tracking-wider text-[var(--o2-text-muted)] px-4 py-1.5 border-b border-[var(--o2-border-color)]">
+          <div class="grid grid-cols-[1.8fr_1.4fr_1fr_0.8fr_0.8fr] gap-2  text-[0.65rem] font-semibold uppercase tracking-wider text-text-muted px-4 py-1.5 border-b border-border-default">
             <span class="pl-5">Status</span>
             <span>Started</span>
             <span class="text-right">Duration</span>
@@ -118,12 +118,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             v-for="run in runRows"
             :key="run.id"
-            class="border-b border-[var(--o2-border-color)] last:border-b-0"
+            class="border-b border-border-default last:border-b-0"
           >
             <!-- Summary row -->
-            <button
-              class="runs-row w-full grid items-center px-4 py-2.5 text-xs text-left hover:bg-[var(--o2-surface-hover)] transition-colors"
-              :class="run.status === 'pending' ? 'cursor-default' : 'cursor-pointer'"
+            <OButton
+              variant="ghost"
+              size="xs"
+              class="w-full grid grid-cols-[1.8fr_1.4fr_1fr_0.8fr_0.8fr] gap-2  items-center px-4 py-2.5 text-xs text-left"
+              :data-test="`synthetics-dashboard-toggle-run-${run.id}-btn`"
               :disabled="run.status === 'pending'"
               @click="run.status !== 'pending' && toggleRunExpansion(run.id)"
             >
@@ -133,16 +135,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-if="run.status !== 'pending'"
                   :name="expandedRunIds.has(run.id) ? 'expand_more' : 'chevron_right'"
                   size="xs"
-                  class="text-[var(--o2-text-muted)] shrink-0"
+                  class="text-text-muted shrink-0"
                 />
                 <span v-else class="w-3.5 h-3.5 shrink-0 flex items-center justify-center">
-                  <span class="run-status-spinner inline-block" />
+                  <span class="w-2 h-2 rounded-full border-[0.09375rem] border-current border-t-transparent animate-spin inline-block" />
                 </span>
                 <span
-                  class="run-status flex items-center gap-1.5 font-semibold"
-                  :class="`run-status--${run.status}`"
+                  class="flex items-center gap-1.5 font-semibold"
+                  :class="run.status === 'passed' ? 'text-[var(--color-success-600)]' : run.status === 'warning' ? 'text-[var(--color-status-warning-text)]' : run.status === 'pending' ? 'text-text-muted' : 'text-status-error-text'"
                 >
-                  <span v-if="run.status !== 'pending'" class="run-status-dot" />
+                  <span v-if="run.status !== 'pending'" class="w-2 h-2 rounded-full bg-current" />
                   {{
                     run.status === 'passed' ? t('synthetics.results.passed')
                     : run.status === 'warning' ? t('synthetics.results.warning')
@@ -152,13 +154,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   }}
                 </span>
               </span>
-              <span class="text-[var(--o2-text-secondary)]">{{ relativeFromNow(run.scheduledTs / 1000) }}</span>
-              <span class="text-right tabular-nums text-[var(--o2-text-secondary)]">
+              <span class="text-text-secondary">{{ relativeFromNow(run.scheduledTs / 1000) }}</span>
+              <span class="text-right tabular-nums text-text-secondary">
                 {{ run.durationMs ? formatDuration(run.durationMs) : '—' }}
               </span>
-              <span class="text-[var(--o2-text-muted)]">{{ run.jobsDone }}/{{ run.jobCount }}</span>
-              <span class="text-[var(--o2-text-muted)] capitalize">{{ run.triggerType || 'scheduled' }}</span>
-            </button>
+              <span class="text-text-muted">{{ run.jobsDone }}/{{ run.jobCount }}</span>
+              <span class="text-text-muted capitalize">{{ run.triggerType || 'scheduled' }}</span>
+            </OButton>
 
             <!-- Inline expansion -->
             <RunRowExpansion
@@ -181,6 +183,7 @@ import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import * as echarts from "echarts";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import KpiSparkline from "@/plugins/traces/KpiSparkline.vue";
 import RunRowExpansion from "@/components/synthetics/results/RunRowExpansion.vue";
 import {
@@ -261,9 +264,9 @@ const kpiCards = computed<KpiCard[]>(() => {
         lastStatus === "passed"
           ? "text-[#16a34a]!"
           : lastStatus === "warning"
-            ? "text-[var(--o2-status-warning-text)]!"
+            ? "text-status-warning-text!"
             : lastStatus === "failed" || lastStatus === "error"
-              ? "text-[var(--o2-status-error-text)]!"
+              ? "text-status-error-text!"
               : undefined,
     },
   ];
@@ -353,10 +356,10 @@ function cssVar(name: string, fallback: string): string {
 }
 
 function buildChartOption(): echarts.EChartsOption {
-  const lineColor = cssVar("--o2-primary-color", "#3b82f6");
-  const axisColor = cssVar("--o2-text-caption", "#6c707e");
-  const splitColor = cssVar("--o2-border-color", "#e2e8f0");
-  const p95Color = cssVar("--o2-status-warning-text", "#f59e0b");
+  const lineColor = cssVar("--color-primary-500", "#3b82f6");
+  const axisColor = cssVar("--color-text-caption", "#6c707e");
+  const splitColor = cssVar("--color-border-default", "#e2e8f0");
+  const p95Color = cssVar("--color-status-warning-text", "#f59e0b");
 
   const seriesData = buckets.value.map((b) => [b.tsMs, b.avgMs]);
 
@@ -448,90 +451,9 @@ async function refresh(startTime?: number, endTime?: number) {
 defineExpose({ refresh });
 </script>
 
-<style scoped lang="scss">
-.kpi-card {
-  background: var(--o2-card-bg);
-  border: 1px solid var(--o2-border-color);
-  transition: box-shadow 0.2s ease;
-
-  &:hover {
-    box-shadow: 0 1px 6px rgba(0, 0, 0, 0.08);
-  }
-}
-
-.card-container {
-  background: var(--o2-card-bg);
-  border: 1px solid var(--o2-border-color);
-}
-
-.response-time-chart {
-  width: 100%;
-  height: 14rem;
-}
-
-.run-status {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.375rem;
-  font-weight: 600;
-
-  &--passed {
-    color: #16a34a;
-  }
-  &--warning {
-    color: var(--o2-status-warning-text);
-  }
-  &--failed, &--error {
-    color: var(--o2-status-error-text);
-  }
-  &--pending {
-    color: var(--o2-text-muted);
-  }
-
-  .run-status-dot {
-    width: 0.5rem;
-    height: 0.5rem;
-    border-radius: 50%;
-    background: currentColor;
-  }
-
-  .run-status-spinner {
-    width: 0.5rem;
-    height: 0.5rem;
-    border-radius: 50%;
-    border: 1.5px solid currentColor;
-    border-top-color: transparent;
-    animation: spin 0.8s linear infinite;
-  }
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
-
-// ── Runs table ──────────────────────────────────────────────────────────
-
-$cols: 1.8fr 1.4fr 1fr 0.8fr 0.8fr;
-
-.runs-header,
-.runs-row {
-  display: grid;
-  grid-template-columns: $cols;
-  gap: 0.5rem;
-  align-items: center;
-}
-
-.runs-skel {
-  background: var(--o2-border-color);
-  animation: skel-pulse 1.4s ease-in-out infinite;
-  &:nth-child(2) { animation-delay: 0.1s; }
-  &:nth-child(3) { animation-delay: 0.2s; }
-  &:nth-child(4) { animation-delay: 0.3s; }
-  &:nth-child(5) { animation-delay: 0.4s; }
-}
-
-@keyframes skel-pulse {
-  0%, 100% { opacity: 1; }
-  50%       { opacity: 0.4; }
-}
+<style>
+.mrd-runs-skel:nth-child(2) { animation-delay: 0.1s; }
+.mrd-runs-skel:nth-child(3) { animation-delay: 0.2s; }
+.mrd-runs-skel:nth-child(4) { animation-delay: 0.3s; }
+.mrd-runs-skel:nth-child(5) { animation-delay: 0.4s; }
 </style>

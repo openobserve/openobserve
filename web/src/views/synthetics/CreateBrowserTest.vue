@@ -454,7 +454,7 @@ function onClearResults() {
 
 <template>
   <!-- ── Non-loading: shared wrapper with page header ── -->
-  <div class="flex flex-col h-full bg-[var(--o2-body-primary-bg)]">
+  <div class="flex flex-col h-full bg-surface-base">
     <AppPageHeader
       :title="headerTitle"
       :subtitle="folderName"
@@ -474,7 +474,7 @@ function onClearResults() {
 
         <div class="mb-6">
           <label for="synthetics-start-url" class="mb-1 block">
-            Starting URL <span class="text-[var(--color-status-error-text)]">*</span>
+            Starting URL <span class="text-status-error-text">*</span>
           </label>
           <OInput
             id="synthetics-start-url"
@@ -540,8 +540,8 @@ function onClearResults() {
     <main v-else-if="phase === 'extension-setup'" class="flex-1 flex flex-col items-center justify-center">
       <div class="max-w-[48rem] w-full mx-auto py-4 px-4">
         <div class="flex justify-center mb-6">
-          <div class="rounded-2xl border border-[var(--o2-border-color)] bg-[var(--o2-card-bg)] p-6 flex items-center justify-center">
-            <OIcon name="open-in-browser" size="xl" class="text-[var(--o2-primary-color)]" aria-hidden="true" />
+          <div class="rounded-2xl border border-border-default bg-surface-base p-6 flex items-center justify-center">
+            <OIcon name="open-in-browser" size="xl" class="text-primary-500" aria-hidden="true" />
           </div>
         </div>
 
@@ -549,26 +549,26 @@ function onClearResults() {
           We'll open <strong>{{ check.url }}</strong> in a fresh incognito tab and capture your clicks and inputs — <strong>no code</strong>.
         </p>
 
-        <div class="rounded-xl border border-[var(--o2-border-color)] divide-y divide-[var(--o2-border-color)] mb-6">
+        <div class="rounded-xl border border-border-default divide-y divide-border-default mb-6">
           <!-- Step 1 -->
           <div class="flex items-start gap-4 p-4">
             <span
-            class="flex-shrink-0 w-7 h-7 rounded-full bg-[var(--o2-primary-color)] text-[var(--o2-text-inverse)] flex items-center justify-center text-sm font-semibold"
-            :class="extensionInstalled ? 'bg-[var(--o2-status-success-text)]!': ''"
+            class="flex-shrink-0 w-7 h-7 rounded-full bg-primary-500 text-text-inverse flex items-center justify-center text-sm font-semibold"
+            :class="extensionInstalled ? 'bg-[var(--color-status-success-text)]!': ''"
             >
               1
             </span>
             <div class="flex-1 min-w-0 flex justify-between">
               <div class="flex flex-col items-start">
-                <h4 class="text-sm font-semibold text-[var(--o2-text-heading)] m-0 pb-1">Install the OpenObserve Recorder</h4>
-                <p class="text-xs text-[var(--o2-text-secondary)] m-0 mb-3">A lightweight Chrome extension that captures your actions.</p>
+                <h4 class="text-sm font-semibold text-text-heading m-0 pb-1">Install the OpenObserve Recorder</h4>
+                <p class="text-xs text-text-secondary m-0 mb-3">A lightweight Chrome extension that captures your actions.</p>
               </div>
               <div class="flex items-center gap-3 px-3">
                 <!-- <a
                   href="https://openobserve.ai/docs/synthetics/recorder/"
                   target="_blank"
                   rel="noopener noreferrer"
-                  class="text-sm text-[var(--o2-text-link)] underline"
+                  class="text-sm text-text-link underline"
                   data-test="synthetics-setup-install-link"
                 >
                   <OButton
@@ -596,7 +596,7 @@ function onClearResults() {
                 </OButton>
                 <span
                   v-else
-                  class="text-sm font-medium text-[var(--o2-status-success-text)]!"
+                  class="text-sm font-medium text-status-success-text!"
                   data-test="synthetics-setup-installed-label"
                 >Installed ✓</span>
               </div>
@@ -607,12 +607,12 @@ function onClearResults() {
           <div class="flex items-start gap-4 p-4" :class="{ 'opacity-60': !extensionInstalled }">
             <span
               class="flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-sm font-semibold"
-              :class="extensionInstalled ? incognitoAllowed ? 'bg-[var(--o2-status-success-text)]! text-[var(--o2-text-inverse)]' : 'bg-[var(--o2-primary-color)] text-[var(--o2-text-inverse)]' : 'bg-[var(--o2-bg-subtle)] text-[var(--o2-text-muted)]'"
+              :class="extensionInstalled ? incognitoAllowed ? 'bg-[var(--color-status-success-text)]! text-text-inverse' : 'bg-primary-500 text-text-inverse' : 'bg-surface-subtle text-text-muted'"
             >2</span>
             <div class="flex-1 min-w-0 flex justify-between">
               <div class="flex flex-col items-start">
-                <h4 class="text-sm font-semibold text-[var(--o2-text-heading)] m-0 mb-1">Allow it in Incognito</h4>
-                <p class="text-xs text-[var(--o2-text-secondary)] m-0 mb-3">Open <code>chrome://extensions</code> → Details → enable Allow in Incognito.</p>
+                <h4 class="text-sm font-semibold text-text-heading m-0 mb-1">Allow it in Incognito</h4>
+                <p class="text-xs text-text-secondary m-0 mb-3">Open <code>chrome://extensions</code> → Details → enable Allow in Incognito.</p>
               </div>
               <OSwitch
                 v-model="incognitoAllowed"
@@ -637,14 +637,15 @@ function onClearResults() {
         </OButton>
 
         <div class="text-center">
-          <button
-            type="button"
-            class="text-sm text-[var(--o2-text-link)] underline bg-transparent border-0 cursor-pointer p-0"
+          <OButton
+            variant="ghost"
+            size="sm"
+            class="text-sm text-text-link underline"
             data-test="synthetics-setup-skip-link"
             @click="onExtensionSetupSkip"
           >
             Skip — I'll build the steps manually
-          </button>
+          </OButton>
         </div>
       </div>
     </main>
@@ -715,12 +716,12 @@ function onClearResults() {
       </OStepper>
 
       <!-- Sticky footer — tab-aware, always visible -->
-      <div class="flex items-center px-3 py-2.5 gap-2 border-t border-[var(--o2-border-color)] shrink-0 bg-[var(--o2-body-primary-bg)]">
+      <div class="flex items-center px-3 py-2.5 gap-2 border-t border-border-default shrink-0 bg-surface-base">
         <!-- Journey step: Cancel | Selection actions (left) | Replay status + Continue (right) -->
         <template v-if="currentStep === 1">
           <!-- Selection actions — moved from BrowserJourney, kept on the left -->
           <template v-if="journeySelectionState.count > 0 && !journeySelectionState.isRecording">
-            <span class="text-sm text-[var(--o2-text-secondary)] whitespace-nowrap">{{ journeySelectionState.count }} selected</span>
+            <span class="text-sm text-text-secondary whitespace-nowrap">{{ journeySelectionState.count }} selected</span>
             <OButton
               variant="outline-destructive"
               size="sm"

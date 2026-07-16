@@ -201,7 +201,7 @@ const showAssertions = computed(
         <!-- ── Result ── -->
         <div class="rounded-lg border border-border-default">
           <div class="flex items-center border-b border-border-default py-2 px-3">
-            <div class="w-[3px] h-4 rounded-sm mr-2 shrink-0 bg-[var(--color-primary-600)]" />
+            <div class="w-[0.1875rem] h-4 rounded-sm mr-2 shrink-0 bg-primary-600" />
             <h3 class="text-base font-semibold text-text-heading">{{ t('synthetics.protocolRun.result') }}</h3>
           </div>
           <div class="px-3 py-3 grid grid-cols-2 gap-3">
@@ -226,7 +226,7 @@ const showAssertions = computed(
             </div>
             <div v-if="run.error" class="col-span-2 flex flex-col gap-1.5 p-3 rounded-md bg-surface-subtle">
               <span class="text-xs text-text-muted">{{ t('synthetics.protocolRun.error') }}</span>
-              <span class="text-sm font-medium text-[var(--color-status-error-text)] break-all">{{ run.error }}</span>
+              <span class="text-sm font-medium text-status-error-text break-all">{{ run.error }}</span>
             </div>
           </div>
         </div>
@@ -234,7 +234,7 @@ const showAssertions = computed(
         <!-- ── Timing breakdown ── -->
         <div v-if="timingBars.length" class="rounded-lg border border-border-default">
           <div class="flex items-center border-b border-border-default py-2 px-3">
-            <div class="w-[3px] h-4 rounded-sm mr-2 shrink-0 bg-[var(--color-primary-600)]" />
+            <div class="w-[0.1875rem] h-4 rounded-sm mr-2 shrink-0 bg-primary-600" />
             <h3 class="text-base font-semibold text-text-heading">{{ t('synthetics.protocolRun.timings') }}</h3>
           </div>
           <div class="px-3 py-3 flex flex-col gap-2">
@@ -242,7 +242,7 @@ const showAssertions = computed(
               <span class="w-[5rem] shrink-0 text-xs text-text-secondary">{{ t(`synthetics.protocolRun.phase.${bar.phase}`) }}</span>
               <div class="flex-1 h-3 rounded-sm bg-surface-subtle overflow-hidden">
                 <div
-                  class="h-full rounded-sm bg-[var(--color-primary-600)]"
+                  class="h-full rounded-sm bg-primary-600"
                   :style="{ width: bar.pct + '%' }"
                 />
               </div>
@@ -259,7 +259,7 @@ const showAssertions = computed(
         <!-- ── Assertions (http) ── -->
         <div v-if="showAssertions" class="rounded-lg border border-border-default">
           <div class="flex items-center border-b border-border-default py-2 px-3">
-            <div class="w-[3px] h-4 rounded-sm mr-2 shrink-0 bg-[var(--color-primary-600)]" />
+            <div class="w-[0.1875rem] h-4 rounded-sm mr-2 shrink-0 bg-primary-600" />
             <h3 class="text-base font-semibold text-text-heading">{{ t('synthetics.protocolRun.assertions') }}</h3>
             <OBadge
               class="ml-2"
@@ -285,7 +285,7 @@ const showAssertions = computed(
         <!-- ── TLS certificate ── -->
         <div v-if="certExpiryDate" class="rounded-lg border border-border-default">
           <div class="flex items-center border-b border-border-default py-2 px-3">
-            <div class="w-[3px] h-4 rounded-sm mr-2 shrink-0 bg-[var(--color-primary-600)]" />
+            <div class="w-[0.1875rem] h-4 rounded-sm mr-2 shrink-0 bg-primary-600" />
             <h3 class="text-base font-semibold text-text-heading">{{ t('synthetics.protocolRun.tlsCert') }}</h3>
           </div>
           <div class="px-3 py-3 flex items-center gap-2 text-sm">
@@ -303,7 +303,7 @@ const showAssertions = computed(
         <!-- ── Probe ── -->
         <div class="rounded-lg border border-border-default">
           <div class="flex items-center border-b border-border-default py-2 px-3">
-            <div class="w-[3px] h-4 rounded-sm mr-2 shrink-0 bg-[var(--color-primary-600)]" />
+            <div class="w-[0.1875rem] h-4 rounded-sm mr-2 shrink-0 bg-primary-600" />
             <h3 class="text-base font-semibold text-text-heading">{{ t('synthetics.protocolRun.probe') }}</h3>
           </div>
           <div class="px-3 py-3 grid grid-cols-2 gap-3 text-sm">

@@ -3,6 +3,7 @@
 import { computed, onUnmounted, ref, watch } from 'vue'
 import { useStore } from 'vuex'
 import OIcon from '@/lib/core/Icon/OIcon.vue'
+import OButton from '@/lib/core/Button/OButton.vue'
 import { useLLMStreamQuery } from '@/plugins/traces/composables/useLLMStreamQuery'
 import {
   buildRunDetailSql,
@@ -118,10 +119,10 @@ function worstStatus(statuses: RunStatus[]): RunStatus {
 }
 
 const STATUS_COLOR: Record<RunStatus | 'pending', string> = {
-  passed:  'text-green-500',
+  passed:  'text-[var(--color-success-500)]',
   warning: 'text-amber-500',
-  failed:  'text-red-500',
-  error:   'text-orange-500',
+  failed:  'text-[var(--color-error-500)]',
+  error:   'text-[var(--color-warning-500)]',
   pending: 'text-gray-400',
 }
 
@@ -160,26 +161,26 @@ function failedAtStep(steps: StepResult[]): string {
 </script>
 
 <template>
-  <div class="run-expansion border-t border-[var(--o2-border-color)] bg-[var(--o2-surface-secondary)]">
+  <div class="run-expansion border-t border-border-default bg-surface-panel">
 
     <!-- Loading skeleton -->
     <div v-if="loading" class="flex flex-col gap-2 p-4">
       <div class="flex gap-3 items-center py-2">
-        <div class="skel h-4 w-24 rounded" />
-        <div class="skel h-4 w-16 rounded" />
-        <div class="skel h-4 w-40 rounded" />
+        <div class="bg-[var(--color-border-default)] animate-pulse h-4 w-24 rounded" />
+        <div class="bg-[var(--color-border-default)] animate-pulse h-4 w-16 rounded" />
+        <div class="bg-[var(--color-border-default)] animate-pulse h-4 w-40 rounded" />
       </div>
-      <div class="skel h-24 w-full rounded" />
+      <div class="bg-[var(--color-border-default)] animate-pulse h-24 w-full rounded" />
     </div>
 
     <!-- Query error -->
-    <div v-else-if="queryError" class="flex items-center gap-2 p-4 text-xs text-[var(--o2-status-error-text)]">
+    <div v-else-if="queryError" class="flex items-center gap-2 p-4 text-xs text-status-error-text">
       <OIcon name="error_outline" size="sm" />
       <span>{{ queryError }}</span>
     </div>
 
     <!-- No data -->
-    <div v-else-if="!executions.length" class="flex items-center gap-2 p-4 text-xs text-[var(--o2-text-muted)]">
+    <div v-else-if="!executions.length" class="flex items-center gap-2 p-4 text-xs text-text-muted">
       <OIcon name="info" size="sm" />
       <span v-if="runStatus === 'error'">Probe infrastructure error — no execution data was recorded for this run.</span>
       <span v-else>No execution data found for this run.</span>
@@ -196,61 +197,64 @@ function failedAtStep(steps: StepResult[]): string {
         This run passed but some checks were flaky (passed on retry).
       </div>
 
-      <div class="flex flex-col divide-y divide-[var(--o2-border-color)]">
+      <div class="flex flex-col divide-y divide-border-default">
         <div
           v-for="group in locationGroups"
           :key="group.location"
           class="location-group"
         >
           <!-- Location header row — click to expand/collapse -->
-          <button
-            class="w-full flex items-center gap-2 px-4 py-2.5 text-xs font-medium text-left hover:bg-[var(--o2-surface-hover)] transition-colors"
+          <OButton
+            variant="ghost"
+            size="xs"
+            class="w-full justify-start gap-2 px-4 py-2.5 text-xs font-medium text-left"
+            :data-test="`synthetics-run-row-toggle-location-${group.location}-btn`"
             @click="toggleLocation(group.location)"
           >
             <OIcon
               :name="expandedLocations.has(group.location) ? 'expand_more' : 'chevron_right'"
               size="sm"
-              class="text-[var(--o2-text-muted)] shrink-0"
+              class="text-text-muted shrink-0"
             />
             <span :class="STATUS_COLOR[group.status]" class="font-bold text-sm">
               {{ statusDot(group.status) }}
             </span>
-            <span class="text-[var(--o2-text-heading)] font-semibold">{{ group.location }}</span>
+            <span class="text-text-heading font-semibold">{{ group.location }}</span>
             <span :class="STATUS_COLOR[group.status]" class="font-medium">
               {{ statusLabel(group.status) }}
             </span>
-            <span class="text-[var(--o2-text-muted)]">{{ fmtDuration(group.durationMs) }}</span>
-            <span class="ml-auto text-[var(--o2-text-muted)]">
+            <span class="text-text-muted">{{ fmtDuration(group.durationMs) }}</span>
+            <span class="ml-auto text-text-muted">
               {{ group.execs.length }} execution{{ group.execs.length !== 1 ? 's' : '' }}
             </span>
-          </button>
+          </OButton>
 
           <!-- Location expansion: execution table -->
           <div v-if="expandedLocations.has(group.location)" class="px-4 pb-3">
 
             <!-- Execution summary table -->
-            <div class="rounded border border-[var(--o2-border-color)] overflow-hidden mb-3">
+            <div class="rounded border border-border-default overflow-hidden mb-3">
               <table class="w-full text-xs">
                 <thead>
-                  <tr class="bg-[var(--o2-surface-secondary)] border-b border-[var(--o2-border-color)]">
-                    <th class="px-3 py-2 text-left font-semibold text-[var(--o2-text-muted)] uppercase tracking-wide text-[0.62rem]">Browser</th>
-                    <th class="px-3 py-2 text-left font-semibold text-[var(--o2-text-muted)] uppercase tracking-wide text-[0.62rem]">Device</th>
-                    <th class="px-3 py-2 text-left font-semibold text-[var(--o2-text-muted)] uppercase tracking-wide text-[0.62rem]">Status</th>
-                    <th class="px-3 py-2 text-right font-semibold text-[var(--o2-text-muted)] uppercase tracking-wide text-[0.62rem]">Duration</th>
-                    <th class="px-3 py-2 text-left font-semibold text-[var(--o2-text-muted)] uppercase tracking-wide text-[0.62rem]">Failed at</th>
+                  <tr class="bg-surface-panel border-b border-border-default">
+                    <th class="px-3 py-2 text-left font-semibold text-text-muted uppercase tracking-wide text-[0.62rem]">Browser</th>
+                    <th class="px-3 py-2 text-left font-semibold text-text-muted uppercase tracking-wide text-[0.62rem]">Device</th>
+                    <th class="px-3 py-2 text-left font-semibold text-text-muted uppercase tracking-wide text-[0.62rem]">Status</th>
+                    <th class="px-3 py-2 text-right font-semibold text-text-muted uppercase tracking-wide text-[0.62rem]">Duration</th>
+                    <th class="px-3 py-2 text-left font-semibold text-text-muted uppercase tracking-wide text-[0.62rem]">Failed at</th>
                   </tr>
                 </thead>
-                <tbody class="divide-y divide-[var(--o2-border-color)]">
+                <tbody class="divide-y divide-border-default">
                   <tr
                     v-for="ex in group.execs"
                     :key="ex.executionId"
-                    class="hover:bg-[var(--o2-surface-hover)] transition-colors cursor-pointer"
+                    class="hover:bg-surface-subtle-hover transition-colors cursor-pointer"
                     @click="openDrawer(ex)"
                   >
                     <td class="px-3 py-2 font-medium capitalize">{{ ex.browserEngine }}</td>
                     <td class="px-3 py-2">
                       <span class="flex items-center gap-1">
-                        <OIcon :name="deviceIcon(ex.device)" size="xs" class="text-[var(--o2-text-muted)]" />
+                        <OIcon :name="deviceIcon(ex.device)" size="xs" class="text-text-muted" />
                         {{ ex.device || '—' }}
                       </span>
                     </td>
@@ -258,11 +262,11 @@ function failedAtStep(steps: StepResult[]): string {
                       <span class="flex items-center gap-1.5 font-semibold" :class="STATUS_COLOR[ex.status]">
                         <span class="text-base leading-none">{{ statusDot(ex.status) }}</span>
                         {{ statusLabel(ex.status) }}
-                        <span v-if="ex.status === 'warning'" class="font-normal text-[var(--o2-text-muted)]">(flaky)</span>
+                        <span v-if="ex.status === 'warning'" class="font-normal text-text-muted">(flaky)</span>
                       </span>
                     </td>
-                    <td class="px-3 py-2 text-right tabular-nums text-[var(--o2-text-secondary)]">{{ fmtDuration(ex.durationMs) }}</td>
-                    <td class="px-3 py-2 text-[var(--o2-text-muted)] font-mono truncate max-w-[12rem]">
+                    <td class="px-3 py-2 text-right tabular-nums text-text-secondary">{{ fmtDuration(ex.durationMs) }}</td>
+                    <td class="px-3 py-2 text-text-muted font-mono truncate max-w-[12rem]">
                       {{ ex.status !== 'passed' ? failedAtStep(ex.steps) : '—' }}
                     </td>
                   </tr>
@@ -284,14 +288,3 @@ function failedAtStep(steps: StepResult[]): string {
   </div>
 </template>
 
-
-<style scoped lang="scss">
-.skel {
-  background: var(--o2-border-color);
-  animation: skel-pulse 1.4s ease-in-out infinite;
-}
-@keyframes skel-pulse {
-  0%, 100% { opacity: 1; }
-  50%       { opacity: 0.4; }
-}
-</style>
