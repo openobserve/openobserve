@@ -98,6 +98,26 @@ export function useSyntheticResults() {
     failureInstances: [],
   });
 
+  // ── Stream schema fields ─────────────────────────────────────────────────
+  //
+  // The stream schema only contains fields some ingested row has carried
+  // (browser-only fields are absent on protocol-only deployments, `error`
+  // is absent until a run has failed, …) and the search API rejects queries
+  // naming absent fields. Query builders take this set and substitute
+  // literals for missing columns. getStream caches, so repeat calls are cheap.
+  async function fetchSchemaFields(): Promise<Set<string>> {
+    try {
+      const stream: any = await getStream(SYNTHETIC_RESULTS_STREAM, "logs", true);
+      return new Set(
+        ((stream?.schema ?? []) as { name: string }[]).map((f) => f.name),
+      );
+    } catch {
+      // Schema not available — an empty set selects literals for every
+      // optional column, which cannot fail.
+      return new Set();
+    }
+  }
+
   // ── Effective p95 — falls back to client-side computation from runs ──────
   //
   // The SQL approx_percentile_cont may return 0 when the DataFusion fork
@@ -199,24 +219,7 @@ export function useSyntheticResults() {
     try {
       const interval = bucketInterval(endTime - startTime);
 
-      // Fetch the stream schema: it only contains fields some ingested row
-      // has carried (browser-only fields are absent on protocol-only
-      // deployments, `error` is absent until a run has failed, …) and the
-      // search API rejects queries naming absent fields. The runs query
-      // substitutes literals for missing columns; the KPI query gates its
-      // optional `attempts` clause.
-      let schemaFields = new Set<string>();
-      try {
-        const stream: any = await getStream(
-          SYNTHETIC_RESULTS_STREAM, "logs", true,
-        );
-        schemaFields = new Set(
-          ((stream?.schema ?? []) as { name: string }[]).map((f) => f.name),
-        );
-      } catch {
-        // Schema not available — an empty set selects literals for every
-        // optional column, which cannot fail.
-      }
+      const schemaFields = await fetchSchemaFields();
       const hasAttemptsField = schemaFields.has("attempts");
 
       // Group 1: KPI + last-run — both feed KPI cards. Resolves
@@ -301,7 +304,7 @@ export function useSyntheticResults() {
     runDetail.value = null;
     try {
       const rows = await executeQuery(
-        buildRunDetailSql(monitorId, runId, executionId),
+        buildRunDetailSql(monitorId, runId, executionId, await fetchSchemaFields()),
         startTime,
         endTime,
         "logs",
@@ -332,7 +335,7 @@ export function useSyntheticResults() {
     protocolRunDetail.value = null;
     try {
       const rows = await executeQuery(
-        buildProtocolRunDetailSql(monitorId, runId, executionId),
+        buildProtocolRunDetailSql(monitorId, runId, executionId, await fetchSchemaFields()),
         startTime,
         endTime,
         "logs",

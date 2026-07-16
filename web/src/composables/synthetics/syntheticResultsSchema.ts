@@ -512,19 +512,63 @@ ORDER BY ${F.timestamp} DESC
 LIMIT ${limit}`;
 }
 
+/** Columns for the browser run-detail query — same literal-fallback scheme as
+ * RUNS_COLUMNS (trace_key/step blobs are absent until a browser probe result
+ * has been ingested; a browser check whose only rows are dispatcher errors
+ * must still open). */
+const RUN_DETAIL_COLUMNS: { field: string; alias: string; fallback: string }[] = [
+  { field: F.timestamp, alias: "ts", fallback: "0" },
+  { field: F.status, alias: "status", fallback: "''" },
+  { field: F.duration, alias: "duration", fallback: "0" },
+  { field: F.location, alias: "location", fallback: "''" },
+  { field: F.device, alias: "device", fallback: "''" },
+  { field: F.engine, alias: "engine", fallback: "''" },
+  { field: F.error, alias: "error", fallback: "''" },
+  { field: F.monitorName, alias: "synthetics_name", fallback: "''" },
+  { field: "job_id", alias: "job_id", fallback: "''" },
+  { field: F.executionId, alias: "execution_id", fallback: "''" },
+  { field: "trace_key", alias: "trace_key", fallback: "''" },
+  { field: "last_attempt_steps", alias: "last_attempt_steps", fallback: "''" },
+  { field: "recorded_steps", alias: "recorded_steps", fallback: "''" },
+];
+
+/** run/execution WHERE clauses restricted to fields that exist in the schema.
+ * Older dispatcher/reaper error rows carry job_id but no execution_id (and the
+ * oldest reaper rows no run_id); for protocol checks and reaped jobs
+ * execution_id == job_id, so the execution match accepts either field. */
+function runExecutionWhere(
+  runId: string,
+  executionId: string,
+  schemaFields: Set<string> | null,
+): string {
+  const rid = escapeSqlLiteral(runId);
+  const eid = escapeSqlLiteral(executionId);
+  const has = (f: string) => schemaFields === null || schemaFields.has(f);
+  const clauses: string[] = [];
+  if (has("run_id")) clauses.push(`run_id = '${rid}'`);
+  const execMatch: string[] = [];
+  if (has(F.executionId)) execMatch.push(`${F.executionId} = '${eid}'`);
+  if (has("job_id")) execMatch.push(`job_id = '${eid}'`);
+  if (execMatch.length > 0) clauses.push(`(${execMatch.join(" OR ")})`);
+  return clauses.map((c) => ` AND ${c}`).join("");
+}
+
 /** Per-execution results for a single run — one row per engine×device combo. */
 export function buildRunDetailSql(
   monitorId: string,
   runId: string,
   executionId: string,
+  schemaFields: Set<string> | null = null,
 ): string {
   const id = escapeSqlLiteral(monitorId);
-  const rid = escapeSqlLiteral(runId);
-  const eid = escapeSqlLiteral(executionId);
-  return `SELECT ${F.timestamp} as ts, ${F.status} as status, ${F.duration} as duration, ${F.location} as location, ${F.device} as device, ${F.engine} as engine, ${F.error} as error, ${F.monitorName} as synthetics_name, job_id, execution_id, trace_key, last_attempt_steps, recorded_steps
+  const has = (f: string) => schemaFields === null || schemaFields.has(f);
+  const select = RUN_DETAIL_COLUMNS.map(({ field, alias, fallback }) =>
+    `${has(field) ? field : fallback} as ${alias}`,
+  ).join(", ");
+  const orderBy = has(F.location) ? `\nORDER BY ${F.location} ASC` : "";
+  return `SELECT ${select}
 FROM ${TABLE}
-WHERE ${F.monitorId} = '${id}' AND run_id = '${rid}' AND execution_id = '${eid}'
-ORDER BY ${F.location} ASC`;
+WHERE ${F.monitorId} = '${id}'${runExecutionWhere(runId, executionId, schemaFields)}${orderBy}`;
 }
 
 /**
@@ -537,14 +581,11 @@ export function buildProtocolRunDetailSql(
   monitorId: string,
   runId: string,
   executionId: string,
+  schemaFields: Set<string> | null = null,
 ): string {
   const id = escapeSqlLiteral(monitorId);
-  const rid = escapeSqlLiteral(runId);
-  const eid = escapeSqlLiteral(executionId);
-  // Older dispatcher/reaper error rows carry job_id but no execution_id;
-  // for protocol checks execution_id == job_id, so match either.
   return `SELECT * FROM ${TABLE}
-WHERE ${F.monitorId} = '${id}' AND run_id = '${rid}' AND (execution_id = '${eid}' OR job_id = '${eid}')
+WHERE ${F.monitorId} = '${id}'${runExecutionWhere(runId, executionId, schemaFields)}
 LIMIT 1`;
 }
 
