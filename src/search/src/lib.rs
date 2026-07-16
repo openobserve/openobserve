@@ -13,11 +13,18 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+pub mod bloom_pruner;
 #[cfg(feature = "enterprise")]
 pub mod cipher;
+pub mod datafusion;
 pub mod enrichment;
 pub mod file_cache;
+pub mod index;
+pub mod inspector;
+pub mod sql;
+pub mod tantivy;
 pub mod types;
+pub mod utils;
 
 use config::meta::{
     search::{Response, ScanStats},
