@@ -4275,7 +4275,26 @@
       "logsWithCount": "Logs ({count})",
       "tracesWithCount": "Traces ({count})",
       "metricsWithCount": "Métricas ({count})"
-    }
+    },
+    "dangerZone": "Zona de perigo",
+    "deleteOrganization": "Excluir organização",
+    "deleteOrganizationTitle": "Excluir esta organização",
+    "deleteOrganizationDescription": "Agenda a exclusão de {name}. Ela fica inacessível para todos — inclusive para você — imediatamente e é apagada permanentemente quando o período de carência terminar. Restaurá-la antes disso exige contato com o suporte.",
+    "deleteOrganizationScopeLoading": "Verificando o que esta organização contém…",
+    "deleteOrganizationScope": "{dashboards} painéis · {streams} streams · {size} de dados",
+    "deleteFactGracePeriod": "Período de carência",
+    "deleteFactGracePeriodDetail": "O suporte pode restaurá-la até a exclusão",
+    "deleteFactEverything": "Exclui tudo",
+    "deleteFactEverythingDetail": "Todos os painéis, streams e dados ingeridos",
+    "deleteFactMembers": "Afeta {n} membro | Afeta {n} membros",
+    "deleteFactMembersDetail": "Todo o acesso é revogado imediatamente",
+    "deleteFactOwner": "Somente administradores",
+    "deleteFactOwnerDetail": "Requer a função de administrador nesta organização",
+    "deleteOrganizationConfirm": "Isso agendará a exclusão de \"{name}\" — e de todos os seus streams, painéis, alertas, pipelines, usuários e configurações.",
+    "deleteOrganizationWarning": "A organização fica indisponível imediatamente e é ocultada de todos que a utilizam. A ingestão é bloqueada e alertas, pipelines e relatórios agendados param de ser executados, portanto nenhuma notificação é enviada enquanto ela estiver agendada para exclusão.",
+    "deleteOrganizationRecoverable": "Ela é mantida em estado recuperável durante o período de carência, mas você não poderá restaurá-la — você perde o acesso a esta organização assim que a exclusão começa, e somente o suporte da OpenObserve pode trazê-la de volta. Após o período de carência, seus dados são excluídos permanentemente e não podem ser recuperados por ninguém.",
+    "deleteOrganizationTypeToConfirm": "Para confirmar, digite {name} abaixo:",
+    "deleteOrganizationInitiated": "Organização agendada para exclusão. Ela agora está oculta; entre em contato com o suporte para restaurá-la antes do fim do período de carência."
   },
   "reports": {
     "header": "Relatórios",

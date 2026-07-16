@@ -4275,7 +4275,26 @@
       "logsWithCount": "Logs ({count})",
       "tracesWithCount": "Traces ({count})",
       "metricsWithCount": "Métriques ({count})"
-    }
+    },
+    "dangerZone": "Zone de danger",
+    "deleteOrganization": "Supprimer l'organisation",
+    "deleteOrganizationTitle": "Supprimer cette organisation",
+    "deleteOrganizationDescription": "Programme la suppression de {name}. Elle devient immédiatement inaccessible à tous — y compris à vous — puis est définitivement effacée à la fin du délai de grâce. La restaurer avant nécessite de contacter le support.",
+    "deleteOrganizationScopeLoading": "Vérification du contenu de cette organisation…",
+    "deleteOrganizationScope": "{dashboards} tableaux de bord · {streams} flux · {size} de données",
+    "deleteFactGracePeriod": "Délai de grâce",
+    "deleteFactGracePeriodDetail": "Le support peut la restaurer jusqu'à l'effacement",
+    "deleteFactEverything": "Supprime tout",
+    "deleteFactEverythingDetail": "Tous les tableaux de bord, flux et données ingérées",
+    "deleteFactMembers": "Concerne {n} membre | Concerne {n} membres",
+    "deleteFactMembersDetail": "Tous les accès sont révoqués immédiatement",
+    "deleteFactOwner": "Administrateurs uniquement",
+    "deleteFactOwnerDetail": "Nécessite le rôle Administrateur dans cette organisation",
+    "deleteOrganizationConfirm": "Cette action programmera la suppression de « {name} » et de tous ses flux, tableaux de bord, alertes, pipelines, utilisateurs et paramètres.",
+    "deleteOrganizationWarning": "L'organisation devient immédiatement indisponible et est masquée pour toutes les personnes qui l'utilisent. L'ingestion est bloquée et les alertes, pipelines et rapports planifiés cessent de s'exécuter : aucune notification n'est envoyée tant que la suppression est programmée.",
+    "deleteOrganizationRecoverable": "Elle reste récupérable pendant le délai de grâce, mais vous ne pourrez pas la restaurer vous-même : vous perdez l'accès à cette organisation dès le début de la suppression, et seul le support OpenObserve peut la rétablir. Passé le délai de grâce, ses données sont définitivement supprimées et ne peuvent être récupérées par personne.",
+    "deleteOrganizationTypeToConfirm": "Pour confirmer, saisissez {name} ci-dessous :",
+    "deleteOrganizationInitiated": "Organisation programmée pour suppression. Elle est désormais masquée ; contactez le support pour la restaurer avant la fin du délai de grâce."
   },
   "reports": {
     "header": "Rapports",
