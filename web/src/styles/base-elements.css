@@ -1,0 +1,23 @@
+/* Copyright 2026 OpenObserve Inc. */
+/* ============================================================
+   BASE ELEMENTS — the app's element reset / typography layer.
+   ============================================================
+   The ONE legitimate global stylesheet (O2_STYLE_MIGRATION_PLAN.md §3.2).
+   Element selectors here are RESETS, not classes — they style bare HTML the
+   app renders everywhere (html/body, headings, links, ::placeholder,
+   scrollbars, @media print).
+
+   Receives, from lib/styles/tokens/component.css during W1:
+     F4  element typography / reset   (W1.b)
+     F16 global scrollbar theming     (W1.a)
+     F18 @media print overrides       (W1.a)
+
+   RULES:
+   - Everything lives in `@layer base` so any utility beats it.
+   - Colours via var(--color-*) only — never a raw hex.
+   - rem units (1px hairline borders excepted).
+   - Element/pseudo-element selectors ONLY. A `.class` rule does not belong
+     here — it goes to utilities.css (last resort) or a component (preferred).
+   - Imported from tailwind.css at component.css's original position so the
+     cascade order is unchanged (plan risk R10).
+   ============================================================ */

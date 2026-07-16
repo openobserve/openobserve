@@ -31,10 +31,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div>
         <div
           data-test="rum-upload-source-maps-file-dropzone"
-          class="border-2 border-dashed border-card-glass-border rounded-lg p-8 text-center cursor-pointer transition-all duration-300 bg-(--q-background) hover:border-(--q-primary) dark:border-[rgba(255,255,255,0.1)] dark:hover:bg-[color-mix(in_srgb,var(--color-theme-accent)_5%,transparent)]"
+          class="border-2 border-dashed border-card-glass-border rounded-lg p-8 text-center cursor-pointer transition-all duration-300 bg-(--color-surface-base) hover:border-(--color-theme-accent) dark:border-[rgba(255,255,255,0.1)] dark:hover:bg-[color-mix(in_srgb,var(--color-theme-accent)_5%,transparent)]"
           :class="[
-            isDragging ? 'border-(--q-primary)! bg-[color-mix(in_srgb,var(--color-theme-accent)_5%,transparent)]! border-solid! dark:bg-[color-mix(in_srgb,var(--color-theme-accent)_10%,transparent)]!' : '',
-            field.state.value ? 'p-6! text-left! border-solid! border-(--q-positive)! bg-[color-mix(in_srgb,var(--color-status-positive)_2%,transparent)]! dark:bg-[color-mix(in_srgb,var(--color-status-positive)_5%,transparent)]!' : ''
+            isDragging ? 'border-(--color-theme-accent)! bg-[color-mix(in_srgb,var(--color-theme-accent)_5%,transparent)]! border-solid! dark:bg-[color-mix(in_srgb,var(--color-theme-accent)_10%,transparent)]!' : '',
+            field.state.value ? 'p-6! text-left! border-solid! border-(--color-status-positive)! bg-[color-mix(in_srgb,var(--color-status-positive)_2%,transparent)]! dark:bg-[color-mix(in_srgb,var(--color-status-positive)_5%,transparent)]!' : ''
           ]"
           @dragover.prevent="isDragging = true"
           @dragleave.prevent="isDragging = false"

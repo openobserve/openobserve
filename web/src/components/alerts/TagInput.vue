@@ -54,7 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model="inputValue"
           type="text"
           :placeholder="modelValue.length > 0 ? '' : placeholder"
-          class="tag-input [flex:1_1_100px] min-w-25 border-0 outline-none bg-transparent p-1 text-sm text-(--q-color-text-primary)"
+          class="tag-input [flex:1_1_100px] min-w-25 border-0 outline-none bg-transparent p-1 text-sm text-(--color-text-primary)"
           @keydown.enter.prevent="addTag"
           @input="handleInput"
           @keydown.delete="handleBackspace"
@@ -135,16 +135,16 @@ const handleBackspace = () => {
 
 <style>
 .tag-input-wrapper:focus-within {
-  border-color: var(--q-primary);
+  border-color: var(--color-theme-accent);
 }
 
 .tag-input-wrapper:focus-within .tag-input-label {
-  color: var(--q-primary);
+  color: var(--color-theme-accent);
 }
 
 .tag-input-wrapper.has-content .tag-input-label {
   transform: translateY(-8px) scale(0.75);
-  color: var(--q-primary);
+  color: var(--color-theme-accent);
 }
 
 .tag-input::placeholder {

@@ -13,8 +13,8 @@
           <OCardSection role="body">
             <div class="log-viewer flex flex-col gap-3">
               <!-- Sample Log 1 -->
-              <div class="log-line group p-4 bg-(--q-dark-page,#f5f5f5) rounded-lg border-2 border-transparent cursor-pointer transition-all duration-200 relative hover:border-(--q-primary) hover:bg-(--q-dark-page,#eeeeee)" @click="selectLog(sampleLog1)">
-                <div class="log-timestamp font-mono text-xs text-[var(--q-primary)] mb-2">2025-12-02 10:23:45</div>
+              <div class="log-line group p-4 bg-(--color-surface-base,#f5f5f5) rounded-lg border-2 border-transparent cursor-pointer transition-all duration-200 relative hover:border-(--color-theme-accent) hover:bg-(--color-surface-base,#eeeeee)" @click="selectLog(sampleLog1)">
+                <div class="log-timestamp font-mono text-xs text-[var(--color-theme-accent)] mb-2">2025-12-02 10:23:45</div>
                 <div class="log-content flex flex-col gap-1 text-compact">
                   <div><strong>service.name:</strong> checkout-api</div>
                   <div><strong>k8s.cluster:</strong> prod-us-west</div>
@@ -24,12 +24,12 @@
                     timeout
                   </div>
                 </div>
-                <OIcon name="link" size="sm" class="absolute top-4 right-4 opacity-0 transition-opacity duration-200 text-[var(--q-primary)] group-hover:opacity-100" />
+                <OIcon name="link" size="sm" class="absolute top-4 right-4 opacity-0 transition-opacity duration-200 text-[var(--color-theme-accent)] group-hover:opacity-100" />
               </div>
 
               <!-- Sample Log 2 -->
-              <div class="log-line group p-4 bg-(--q-dark-page,#f5f5f5) rounded-lg border-2 border-transparent cursor-pointer transition-all duration-200 relative hover:border-(--q-primary) hover:bg-(--q-dark-page,#eeeeee)" @click="selectLog(sampleLog2)">
-                <div class="log-timestamp font-mono text-xs text-[var(--q-primary)] mb-2">2025-12-02 10:24:12</div>
+              <div class="log-line group p-4 bg-(--color-surface-base,#f5f5f5) rounded-lg border-2 border-transparent cursor-pointer transition-all duration-200 relative hover:border-(--color-theme-accent) hover:bg-(--color-surface-base,#eeeeee)" @click="selectLog(sampleLog2)">
+                <div class="log-timestamp font-mono text-xs text-[var(--color-theme-accent)] mb-2">2025-12-02 10:24:12</div>
                 <div class="log-content flex flex-col gap-1 text-compact">
                   <div><strong>service.name:</strong> inventory-service</div>
                   <div><strong>k8s.cluster:</strong> prod-us-east</div>
@@ -38,12 +38,12 @@
                     <strong>message:</strong> Database connection timeout
                   </div>
                 </div>
-                <OIcon name="link" size="sm" class="absolute top-4 right-4 opacity-0 transition-opacity duration-200 text-[var(--q-primary)] group-hover:opacity-100" />
+                <OIcon name="link" size="sm" class="absolute top-4 right-4 opacity-0 transition-opacity duration-200 text-[var(--color-theme-accent)] group-hover:opacity-100" />
               </div>
 
               <!-- Sample Log 3 -->
-              <div class="log-line group p-4 bg-(--q-dark-page,#f5f5f5) rounded-lg border-2 border-transparent cursor-pointer transition-all duration-200 relative hover:border-(--q-primary) hover:bg-(--q-dark-page,#eeeeee)" @click="selectLog(sampleLog3)">
-                <div class="log-timestamp font-mono text-xs text-[var(--q-primary)] mb-2">2025-12-02 10:25:30</div>
+              <div class="log-line group p-4 bg-(--color-surface-base,#f5f5f5) rounded-lg border-2 border-transparent cursor-pointer transition-all duration-200 relative hover:border-(--color-theme-accent) hover:bg-(--color-surface-base,#eeeeee)" @click="selectLog(sampleLog3)">
+                <div class="log-timestamp font-mono text-xs text-[var(--color-theme-accent)] mb-2">2025-12-02 10:25:30</div>
                 <div class="log-content flex flex-col gap-1 text-compact">
                   <div><strong>service.name:</strong> user-auth</div>
                   <div><strong>k8s.cluster:</strong> prod-us-west</div>
@@ -53,7 +53,7 @@
                     user_123
                   </div>
                 </div>
-                <OIcon name="link" size="sm" class="absolute top-4 right-4 opacity-0 transition-opacity duration-200 text-[var(--q-primary)] group-hover:opacity-100" />
+                <OIcon name="link" size="sm" class="absolute top-4 right-4 opacity-0 transition-opacity duration-200 text-[var(--color-theme-accent)] group-hover:opacity-100" />
               </div>
             </div>
           </OCardSection>
@@ -126,7 +126,7 @@
           This query would be executed to fetch related
           {{ queryPreview.type }}:
         </div>
-        <pre class="query-preview bg-(--q-dark-page,#f5f5f5) p-4 rounded-sm font-mono text-xs overflow-x-auto whitespace-pre-wrap wrap-break-word">{{ queryPreview.sql }}</pre>
+        <pre class="query-preview bg-(--color-surface-base,#f5f5f5) p-4 rounded-sm font-mono text-xs overflow-x-auto whitespace-pre-wrap wrap-break-word">{{ queryPreview.sql }}</pre>
       </div>
     </ODialog>
   </div>

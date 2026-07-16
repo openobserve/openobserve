@@ -4,7 +4,7 @@
         <div class="flex flex-col">
         <span class="text-(--text-lg) font-semibold leading-(--leading-xl) text-text-heading">{{ message }}</span>
         <br />
-        <span class="text-(--text-md) font-normal leading-(--leading-md) text-text-body">{{ subtitle }}</span>
+        <span class="text-(--text-base) font-normal leading-(--leading-md) text-text-body">{{ subtitle }}</span>
         </div>
   </div>
     </div>

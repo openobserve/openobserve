@@ -4,7 +4,12 @@
 @import "../lib/styles/tokens/base.css";
 @import "../lib/styles/tokens/semantic.css";
 @import "../lib/styles/tokens/component.css";
+/* Element reset/typography layer. Imported at component.css's position so the
+   rules W1 evacuates out of component.css keep their cascade order (risk R10). */
+@import "./base-elements.css";
 @import "../lib/styles/tokens/dark.css";
+/* Shared @utility definitions — last resort, kept deliberately tiny (§3.2). */
+@import "./utilities.css";
 
 @plugin "@tailwindcss/typography";
 
@@ -145,8 +150,11 @@ html.theme-reveal::view-transition-new(root) {
 }
 
 @layer base {
+  /* Tailwind's v3-compat default border colour. Token-backed so it follows the
+     theme — the previous raw #e5e7eb painted light-grey borders in dark mode on
+     any element that sets a border-width without a colour. */
   *, :before, :after {
-    border-color: #e5e7eb;
+    border-color: var(--color-border-default);
   }
 
 }

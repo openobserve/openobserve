@@ -743,7 +743,7 @@ const renderMarkdown = (content: string): string => {
 }
 
 .messages-view .message-item .message-content a {
-  color: var(--q-primary);
+  color: var(--color-theme-accent);
   text-decoration: none;
 }
 

@@ -9,7 +9,7 @@
         :class="selected === opt.value ? selectedCardClass : unselectedCardClass"
         @click="selected = opt.value"
       >
-        <OIcon :name="opt.icon" size="lg" :class="selected === opt.value ? 'text-[var(--q-primary)]' : 'text-icon-color'" />
+        <OIcon :name="opt.icon" size="lg" :class="selected === opt.value ? 'text-[var(--color-theme-accent)]' : 'text-icon-color'" />
         <div>
           <div class="font-semibold text-sm">{{ opt.label }}</div>
           <div class="text-xs mt-0.5 text-text-secondary">{{ opt.description }}</div>
@@ -103,7 +103,7 @@ const activeCommand = computed(() => {
   return `Invoke-WebRequest -Uri ${script} -OutFile install.ps1 ; .\\install.ps1 -URL ${endpoint.value.url}/api/${props.currOrgIdentifier}/ -AUTH_KEY [BASIC_PASSCODE]`;
 });
 
-const selectedCardClass = "border-[var(--q-primary)] bg-status-info-bg";
+const selectedCardClass = "border-[var(--color-theme-accent)] bg-status-info-bg";
 
 const unselectedCardClass =
   "border-border-default bg-surface-base hover:border-border-strong";

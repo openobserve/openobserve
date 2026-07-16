@@ -1,6 +1,9 @@
 # O2 Style Migration — Style Blocks → Tailwind & Token-Layer Class Evacuation
 
-> **Status: POLICY APPROVED 2026-07-16 (see §3 ruling) — execution NOT started.**
+> **Status: POLICY APPROVED 2026-07-16 (§3 ruling). P0 ✅ DONE · PQ ✅ DONE (2026-07-16). W1 / W2 not started.**
+> Execution log, findings that CORRECT this plan, and the remaining queue: **§10**.
+> ⚠ §1 counts and some §5/§9 claims are pre-execution estimates — several proved wrong; see §10.2.
+>
 > Written 2026-07-16 on `fix/token`. Companion to `O2_TOKEN_MIGRATION_PLAN.md` (Part II Phase E —
 > this document **supersedes and extends** Phase E), `O2_TOKEN_DECISIONS.md` (D1–D20), and
 > `O2_TOKEN_MIGRATION_PENDING.md`.
@@ -12,6 +15,11 @@
 > all `.q-*` rules and `q-*` classes are dead: delete them / replace with Tailwind equivalents (verified:
 > `quasar` absent from `package.json`, zero `<q-*>` tags in templates). Whatever style blocks survive at
 > the end must be `scoped`.
+>
+> ⚠ **CORRECTION (PQ execution, §10.2.1): "all `q-*` classes are dead" is FALSE for `.q-field`.**
+> It is a live runtime contract — `ODialog`/`ODrawer` query it via `querySelectorAll`/`closest`, the
+> cipherkeys forms hand-add it, and both specs encode it. It was deliberately kept. All `.q-*` **CSS**
+> is gone; dead `.q-*` **JS** remains and needs its own phase (PQ2).
 >
 > Two workstreams, one end state:
 > - **W1 — Token-layer purity:** zero class/element/keyframe definitions inside the 4 token files
@@ -445,3 +453,104 @@ Total ≈ **35–45 PRs**, each independently shippable and ratchet-frozen. W1 a
 4. **`--q-secondary` in WebinarBanner** — promo art per D13; pick its replacement token (promo token vs theme secondary) during PQ.
 
 Execution starts on explicit go-ahead: P0 + PQ first, then W1.a + the first W2.a batch concurrently.
+
+---
+
+## 10. Execution log — P0 + PQ (2026-07-16)
+
+### 10.1 What landed
+
+**P0 — scaffolding (complete)**
+- `scripts/check-token-purity.mjs` + `token-purity-baseline.json`, wired as `npm run lint:token-purity`.
+  Ratchet mode, **baseline 249**. Deleting the baseline file flips it to zero-tolerance (that IS the W1.e step).
+  `--list` prints every offending construct; `--baseline` re-writes.
+- `scripts/find-class-consumers.mjs` — pre-flight for §7.3. Classifies hits into definitions / consumers /
+  specs / dynamic-construction candidates and prints a verdict
+  (`NO CONSUMERS` / `SELF-CONTAINED` / `HAS CONSUMERS`).
+- `scripts/css-selector-diff.mjs` — §7.2 output-CSS diff. Normalises + sorts declarations so a pure MOVE
+  hashes identically and produces zero diff noise.
+- `src/styles/base-elements.css` + `src/styles/utilities.css` skeletons, imported from `tailwind.css`
+  with base-elements at **component.css's exact position** (risk R10 mitigated).
+- `tailwind.css` raw `#e5e7eb` → `var(--color-border-default)`.
+
+**PQ — Quasar-exit purge (complete)**
+- 119 `--q-primary` refs → `--color-theme-accent`; both alias definitions deleted.
+- All other phantom `--q-*` mapped per §5.7; **zero `--q-*` refs and zero `--q-*` definitions remain.**
+- `check-css-tokens.mjs`: `QUASAR_REAL` allowlist **removed** — any `--q-*` now fails CI forever.
+- 37 dead `.q-*` CSS rules deleted across 19 files; 6 now-empty `<style>` blocks removed.
+  `unscopedStyle` 204 → **198**; files with a style block 231 → **227**.
+- Provably-inert `q-*` template classes removed (`q-fieldset`, `q-caption`, `q-btn-primary`, `q-pb` —
+  each verified to have zero CSS definitions and zero JS selectors).
+
+New tokens registered (all in `@theme inline`, verified resolving live in both themes):
+`--color-promo-webinar-accent` (amber-400, decorative) · `--color-promo-webinar-accent-text`
+(amber-700 — the badge LABEL needs it; amber-400 on the near-white banner is ~1.7:1 and fails a11y) ·
+`--color-section-accent-secondary` (teal-600 light / teal-400 dark).
+
+### 10.2 Findings that CORRECT this plan — read before starting W1/W2
+
+1. **`.q-field` is NOT dead — the §3/§9 ruling "all `q-*` classes are dead → delete" is wrong for it.**
+   `ODialog.vue:217` / `ODrawer.vue:200` call `body.querySelectorAll('.q-field')` and
+   `closest('.q-field, .q-input, .q-select')` at runtime, the cipherkeys forms hand-add
+   `class="flex q-field"` to 5 labels, and `ODialog.spec.ts` / `ODrawer.spec.ts` encode the contract.
+   **Deliberately left intact.** §7.5's `grep '\.q-[a-z]' → 0` DoD is therefore NOT met and should be
+   amended: the target is zero `.q-*` in **CSS** (achieved), not in JS.
+2. **Dead Quasar *JS* is a whole unscoped category** the plan never mentions. All now-inert:
+   `useAlertForm.ts:1124,1418` (`.q-field--error`), `utils/alerts/focusManager.ts:154`
+   (`.q-field__native`), `JsonPreview.vue:622` (`closest('.q-btn')` — always null now),
+   `AlertList.vue:921-930` (`.q-drawer__content`, `q-drawer__backdrop`, `q-layout__shadow` — its
+   click-outside guard is likely misbehaving today). **Needs its own phase (suggest PQ2).**
+3. **A second guard hole existed and is now closed.** `check-css-tokens.mjs` only regexed literal
+   `var(--x)`, so Tailwind v4's shorthand `bg-(--x)` / `text-(--x)` — which compiles to a
+   **no-fallback** `var(--x)` — bypassed the checker entirely. Closing it revealed **17** phantom
+   tokens, not the ~25 the plan guessed at (of which only ~10 were visible in the literal `var()` form).
+4. **Three phantom tokens were NOT Quasar at all** and are unrelated to PQ — they were hiding behind
+   the same shorthand hole: `--text-md` (`UsageReportBanner.vue:7`), `--color-border` and
+   `--color-card-bg-solid` (`ScorerFormPage.vue` ×3). All near-miss typos for real tokens
+   (`--text-base`, `--color-border-default`, `--color-card-bg`); fixed.
+5. **`.card-container` has 178 consumers across 102 files**, not the ~5 implied by §1.1/§5.2.
+   "Inline utilities at call sites" (§5.2 F5) is not viable at that scale — it needs a component.
+   Re-scope F5 before starting W1.b.
+6. **The `tailwind.css` hex swap was a real dark-mode bug fix, not a no-op.** Verified live:
+   the default border on a bare 1px element was `#e5e7eb` (light grey) in **dark** mode; it is now
+   `#454545`. Light mode moves `#e5e7eb` → `#e5e5e5` (imperceptible).
+7. **`--color-theme-accent` is runtime-driven by `theme.ts`** (observed `rgba(107,118,227,1)`, not the
+   static `#3F7994` in semantic.css). The `--q-primary` rename is still provably value-identical because
+   `--q-primary` was *defined as* `var(--color-theme-accent)` in both themes.
+8. **§1.1 counts drifted** from the live tree: `styleBlockHex` baseline is 480 (plan says 632);
+   `tailwind.css`'s raw hex was at L149, not L85–90.
+
+### 10.3 Pre-existing, NOT caused by this work
+
+`npm run lint:design` **already fails on `fix/token`** with 3 regressions above baseline —
+`TableRenderer.vue [bareRounded]`, `AddFunction.vue [arbPx]`, `General.vue [bareRounded]`.
+Confirmed present before any change here. The baseline was deliberately **not** re-written, since
+re-baselining would silently freeze that debt in as accepted.
+
+### 10.4 Verification performed
+
+`lint:tokens` (green with the allowlist removed AND the shorthand hole closed — strictly stronger than
+before) · `lint:token-purity` (249, at baseline) · `type-check` (clean) · `stylelint` (0 errors,
+unchanged 174 warnings) · `eslint` on all 67 changed files (0 errors; 31 pre-existing
+`enforce-style-attribute` warnings) · unit tests for every touched area (ODialog, ODrawer,
+SearchFieldList, AlertList, SyntaxGuideMetrics, JsonPreview, QueryEditorDialog, TraceDetailsSidebar,
+AddAlert, ServiceGraph, EvalTemplateEditor, PlayerEventsSidebar, RenderDashboardCharts) — all pass ·
+SFC tag-balance check across all 67 changed `.vue` files · live token resolution probed in the running
+dev server in **both** themes.
+
+> Regression caught during verification: the dead-rule sweep removed EvalTemplateEditor.vue's closing
+> `</script>` along with its style block (SFC failed to parse). Fixed, and an SFC tag-balance check over
+> every changed file is now part of the routine — **worth repeating for every W2 batch**, since removing
+> whole `<style>` blocks is exactly the W2.a expected outcome.
+
+### 10.5 Next up
+
+**PQ2 (new, small):** retire the dead Quasar JS in §10.2.2, and decide the `.q-field` contract —
+either rename it off the `q-` namespace (ODialog + ODrawer + 5 cipherkeys labels + both specs together)
+or document it as an intentional keeper.
+Then **W1.a** (quick wins: F15/F12/F1/F18/F16 + single-consumer F2/F9/F11) and the first **W2.a** batch,
+which are independent and can run in parallel.
+
+Open design calls: §9 #2 (D6 light code-bg `#ffffff` vs `#f6f8fa`) is still open — blocks only the
+O2AIChat/OCodeBlock/TraceErrorTab syntax-theme PRs. §9 #1 (EmptyState → wrapper component) and #3
+(F10 → colocate) confirmed as the plan's own recommended defaults. §9 #4 resolved: promo amber.

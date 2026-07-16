@@ -1,0 +1,23 @@
+/* Copyright 2026 OpenObserve Inc. */
+/* ============================================================
+   SHARED UTILITIES — deliberately minimal.
+   ============================================================
+   Ladder step 4 of O2_STYLE_MIGRATION_PLAN.md §3.1 — the LAST RESORT.
+
+   Before adding anything here, exhaust the ladder in order:
+     1. DELETE            — the rule is dead / duplicates Tailwind.
+     2. Template utilities — the template owns the element → put bare Tailwind
+                             utilities on it. (The default destination.)
+     3. Extract a component — the markup+style repeats → build/extend an O*
+                             component whose TEMPLATE carries the utilities.
+                             **Preferred over any shared class** (§3 ruling).
+     4. @utility (here)    — ONLY for a pure styling concern with no markup of
+                             its own to componentize, recurring across ≥3 files.
+                             Realistically: scrollbar treatment. Little else
+                             should ever qualify. If torn between 3 and 4 → 3.
+
+   RULES:
+   - Colours via var(--color-*) only — never a raw hex.
+   - rem units (1px hairline borders excepted).
+   - Each @utility carries a one-line comment saying why it is not a component.
+   ============================================================ */

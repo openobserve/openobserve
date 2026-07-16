@@ -1148,11 +1148,6 @@ watch(
   background-color: var(--color-interactive-hover-bg));
 }
 
-/* Splitter separator bar — visible narrow divider */
-.analysis-splitter-smooth.q-splitter--vertical > .q-splitter__separator {
-  width: 10px !important;
-}
-
 /* Dark mode support */
 .dark .analysis-content {
   background: #2a2a2a !important;

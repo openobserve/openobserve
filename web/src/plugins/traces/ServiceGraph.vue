@@ -1891,9 +1891,4 @@ export default defineComponent({
   animation: sg-edge-flow 0.5s linear infinite;
   animation-fill-mode: both;
 }
-
-.dark [data-test="service-graph-stream-selector"] .q-field,
-.dark [data-test="service-graph-search-input"] .q-field {
-  background: var(--color-surface-base);
-}
 </style>

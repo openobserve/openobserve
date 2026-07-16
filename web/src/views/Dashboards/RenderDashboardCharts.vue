@@ -1699,12 +1699,6 @@ export default defineComponent({
   expressed as inline  utilities in the template above.
 -->
 <style>
-/* Table top toolbar (dynamic DOM — cannot be inlined) */
-.q-table__top {
-  border-bottom: 1px solid var(--color-border-default);
-  justify-content: flex-end;
-}
-
 /* When grid is static (disabled), hide resize handles */
 .grid-stack.grid-stack-static .ui-resizable-handle {
   display: none !important;
@@ -1783,13 +1777,6 @@ export default defineComponent({
    * print pagination, prevents browsers from honouring panel heights. */
   .grid-stack-item-content {
     overflow: visible !important;
-  }
-
-  /* Virtual-scroll inserts padding divs above/below the rendered
-   * rows to simulate the full scroll height. In print mode these become
-   * empty white space. Hide them so no blank gaps appear in table panels. */
-  .q-virtual-scroll__padding {
-    display: none !important;
   }
 }
 

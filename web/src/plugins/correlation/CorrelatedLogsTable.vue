@@ -1307,23 +1307,6 @@ const unifiedChips = computed<DimensionChip[]>(() =>
   color: var(--color-text-primary);
 }
 
-// Dimension dropdown styling (matches TelemetryCorrelationDashboard)
-.dimension-dropdown {
-  :deep(.q-field__control) {
-    min-height: 2rem;
-    padding: 0 0.5rem;
-  }
-
-  :deep(.q-field__native) {
-    font-size: 0.875rem;
-    padding: 0.25rem 0;
-  }
-
-  :deep(.q-field__append) {
-    padding-left: 0.25rem;
-  }
-}
-
 // Table skeleton container
 [data-test="table-skeleton"] {
   animation: fadeIn 0.3s ease-in;

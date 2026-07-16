@@ -110,7 +110,7 @@
                   <ODropdownSeparator />
                   <OButton
                     variant="ghost"
-                    class="clear-all-btn w-full text-[var(--q-negative)] text-compact hover:bg-[color-mix(in_srgb,var(--color-status-negative)_10%,transparent)]"
+                    class="clear-all-btn w-full text-[var(--color-status-negative)] text-compact hover:bg-[color-mix(in_srgb,var(--color-status-negative)_10%,transparent)]"
                     @click.stop="clearAllConversations"
                   >
                     <template #icon-left>
@@ -271,7 +271,7 @@
                     class="text-sm font-[600] ml-7.5 text-center"
                     >O2 Assistant</span
                   >
-                  <span class="o2-ai-beta-text ml-2 relative text-[var(--q-primary)] text-3xs px-1 rounded-lg text-center border border-[var(--q-primary)] uppercase font-semibold [letter-spacing:0.5px] w-8.5">BETA</span>
+                  <span class="o2-ai-beta-text ml-2 relative text-[var(--color-theme-accent)] text-3xs px-1 rounded-lg text-center border border-[var(--color-theme-accent)] uppercase font-semibold [letter-spacing:0.5px] w-8.5">BETA</span>
                 </div>
               </div>
             </div>
@@ -5946,7 +5946,7 @@ export default defineComponent({
 .chat-container .fixed-analyzing-indicator .analyzing-message {
   font-size: 14px;
   font-weight: 500;
-  color: var(--q-primary);
+  color: var(--color-theme-accent);
 }
 
 .chat-container .fixed-analyzing-indicator .tool-call-info {
@@ -5980,7 +5980,7 @@ export default defineComponent({
   padding: 2px 8px;
   border-radius: 4px;
   background: color-mix(in srgb, var(--color-theme-accent) 10%, transparent);
-  color: var(--q-primary);
+  color: var(--color-theme-accent);
   font-weight: 500;
 }
 
@@ -6041,11 +6041,11 @@ export default defineComponent({
 
 
 .chat-container .auto-nav-toggle-btn.auto-nav-enabled .auto-nav-icon {
-  color: var(--q-primary) !important;
+  color: var(--color-theme-accent) !important;
 }
 
 .chat-container .auto-nav-toggle-btn.auto-nav-enabled .auto-nav-label {
-  color: var(--q-primary);
+  color: var(--color-theme-accent);
 }
 
 
@@ -6247,7 +6247,7 @@ export default defineComponent({
 }
 
 .code-type-label {
-  color: var(--q-primary);
+  color: var(--color-theme-accent);
 }
 
 .dark .code-type-label {

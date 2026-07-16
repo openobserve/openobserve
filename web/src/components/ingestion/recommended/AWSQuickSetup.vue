@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OIcon
             name="rocket-launch"
             size="xl"
-            class="text-[var(--q-primary)]"
+            class="text-[var(--color-theme-accent)]"
           />
           <div>
             <h6 class="text-xl! font-bold m-0 mb-2!">

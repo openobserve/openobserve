@@ -4,7 +4,7 @@
     <!-- Quick Install Section -->
     <div class="mb-6 p-4 rounded-lg" :class="quickInstallBgClass">
       <div class="flex items-start gap-3">
-        <OIcon name="rocket-launch" size="xl" class="text-[var(--q-primary)]" />
+        <OIcon name="rocket-launch" size="xl" class="text-[var(--color-theme-accent)]" />
         <div class="flex-1">
           <h6 class="text-xl! font-bold m-0 mb-2!">Quick Install (Recommended)</h6>
           <p class="text-sm mt-0 mb-6!" :class="descriptionClass">

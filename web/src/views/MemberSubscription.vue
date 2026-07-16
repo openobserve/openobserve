@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- <div
       v-if="status == 'error' && error !== ''"
-      class="subscription_message q-btn-primary"
+      class="subscription_message"
     >
       <b>Please click the button below to proceed with your subscription after taking above mentioned action.</b><br />
       <OButton variant="primary" class="mt-3" @click="ProcessSubscription(queryString, 'confirm')">Confirm Member Subscription</OButton>

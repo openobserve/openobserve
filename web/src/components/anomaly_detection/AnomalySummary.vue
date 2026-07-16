@@ -104,19 +104,19 @@ onMounted(async () => {
 /* Styles for clickable spans (v-html content) */
 .summary-text .summary-clickable {
   cursor: default;
-  color: var(--q-primary);
+  color: var(--color-theme-accent);
   font-weight: 600;
   padding: 0.125rem 0.375rem;
   margin: 0 0.125rem;
   border-radius: 0.25rem;
   background: linear-gradient(
     135deg,
-    color-mix(in srgb, var(--q-primary) 8%, transparent),
-    color-mix(in srgb, var(--q-primary) 12%, transparent)
+    color-mix(in srgb, var(--color-theme-accent) 8%, transparent),
+    color-mix(in srgb, var(--color-theme-accent) 12%, transparent)
   );
   display: inline;
   position: relative;
-  box-shadow: 0 0 0 0.0625rem color-mix(in srgb, var(--q-primary) 15%, transparent);
+  box-shadow: 0 0 0 0.0625rem color-mix(in srgb, var(--color-theme-accent) 15%, transparent);
   line-height: 1.6;
   vertical-align: baseline;
   white-space: nowrap;
@@ -128,10 +128,10 @@ onMounted(async () => {
   border-radius: 0.375rem;
   background: linear-gradient(
     135deg,
-    color-mix(in srgb, var(--q-primary) 5%, transparent),
-    color-mix(in srgb, var(--q-primary) 8%, transparent)
+    color-mix(in srgb, var(--color-theme-accent) 5%, transparent),
+    color-mix(in srgb, var(--color-theme-accent) 8%, transparent)
   );
-  border-left: 0.1875rem solid var(--q-primary);
+  border-left: 0.1875rem solid var(--color-theme-accent);
   font-size: 0.875rem;
   line-height: 1.7;
   font-style: italic;

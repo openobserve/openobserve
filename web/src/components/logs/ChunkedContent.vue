@@ -55,7 +55,7 @@ Usage:
         <OIcon name="expand-more" size="xs" class="mr-1" />
         Load more ({{ chunkInfo.loadedSizeKB }}KB / {{ chunkInfo.totalSizeKB }}KB)
       </OButton>
-      <span class="text-sm font-medium text-(--q-primary)">
+      <span class="text-sm font-medium text-(--color-theme-accent)">
         Showing chunk {{ chunkInfo.currentChunk }} of {{ chunkInfo.totalChunks }}
       </span>
     </div>

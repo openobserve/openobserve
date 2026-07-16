@@ -18,7 +18,7 @@
   <div data-test="dashboard-join-pop-up" class="w-156 flex flex-col max-h-[54vh] overflow-hidden">
     <div class="flex justify-between items-center mb-3.75" data-test="dashboard-join-pop-up-header">
       <div class="flex-1 gap-2">
-        <div class="flex items-center gap-2 text-(--q-primary)">
+        <div class="flex items-center gap-2 text-(--color-theme-accent)">
           <LeftJoinSvg class="h-5.25" />
           <label>Join</label>
         </div>
@@ -31,7 +31,7 @@
         />
       </div>
 
-      <div class="flex items-center gap-2 pt-5.25 px-2.5 text-(--q-primary)">
+      <div class="flex items-center gap-2 pt-5.25 px-2.5 text-(--color-theme-accent)">
         <LeftJoinLineSvg class="h-10 w-14.5" />
       </div>
 
@@ -39,7 +39,7 @@
         <label for="joinType">Join type</label>
         <div class="flex justify-center items-center gap-2">
           <div
-            class="flex flex-col items-center cursor-pointer transition-opacity duration-200 text-(--q-primary) hover:opacity-80"
+            class="flex flex-col items-center cursor-pointer transition-opacity duration-200 text-(--color-theme-accent) hover:opacity-80"
             @click="handleJoinTypeChange('left')"
             :aria-label="t('panel.leftJoin')"
             data-test="dashboard-join-type-left"
@@ -48,7 +48,7 @@
             <div :class="getJoinTypeLabelClass('left')">Left</div>
           </div>
           <div
-            class="flex flex-col items-center cursor-pointer transition-opacity duration-200 text-(--q-primary) hover:opacity-80"
+            class="flex flex-col items-center cursor-pointer transition-opacity duration-200 text-(--color-theme-accent) hover:opacity-80"
             @click="handleJoinTypeChange('inner')"
             :aria-label="t('panel.innerJoin')"
             data-test="dashboard-join-type-inner"
@@ -57,7 +57,7 @@
             <div :class="getJoinTypeLabelClass('inner')">Inner</div>
           </div>
           <div
-            class="flex flex-col items-center cursor-pointer transition-opacity duration-200 text-(--q-primary) hover:opacity-80"
+            class="flex flex-col items-center cursor-pointer transition-opacity duration-200 text-(--color-theme-accent) hover:opacity-80"
             @click="handleJoinTypeChange('right')"
             :aria-label="t('panel.rightJoin')"
             data-test="dashboard-join-type-right"
@@ -68,12 +68,12 @@
         </div>
       </div>
 
-      <div class="flex items-center gap-2 pt-5.25 px-2.5 text-(--q-primary)">
+      <div class="flex items-center gap-2 pt-5.25 px-2.5 text-(--color-theme-accent)">
         <RightJoinLineSvg class="h-10 w-14.5" />
       </div>
 
       <div class="flex-1 gap-2">
-        <div class="flex items-center gap-2 text-(--q-primary)">
+        <div class="flex items-center gap-2 text-(--color-theme-accent)">
           <RightJoinSvg class="h-5.25" />
           <label>On</label>
         </div>

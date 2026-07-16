@@ -119,9 +119,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style>
-:deep(.query-editor-splitter .q-splitter__separator) {
-  background-color: transparent !important;
-}
-</style>

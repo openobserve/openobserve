@@ -25,17 +25,14 @@ const EXTS = new Set([".css", ".vue", ".ts"]);
 // renamed off the `--o2-` namespace. If you find a `--o2-*` here, delete it and
 // fix the usage — never re-exempt it.
 const ALLOW_PREFIXES = [/^--reka-/, /^--tw-/, /^--vf-/];
-// The ONLY real Quasar-injected custom properties (set by Quasar's runtime).
-// The `--q-` prefix is deliberately NOT allowlisted — 18 invented pseudo-Quasar
-// tokens (`--q-text-secondary`, `--q-primary-rgb`, `--q-background`, …) used to
-// hide behind the prefix allowlist and render as *undefined* at runtime
-// (O2_TOKEN_MIGRATION_PLAN §3.F). Only these exact names are legitimate.
-const QUASAR_REAL = [
-  "--q-primary", "--q-secondary", "--q-accent", "--q-positive", "--q-negative",
-  "--q-info", "--q-warning", "--q-dark", "--q-dark-page", "--q-transition-duration",
-];
+// NOTE: there is deliberately NO `--q-*` allowlist. Quasar is out of the
+// dependency tree (absent from package.json, zero <q-*> tags), so NOTHING
+// injects `--q-*` at runtime any more. The old "10 real Quasar variables"
+// exemption outlived Quasar itself and became a guard hole: it let phantom
+// refs like `--q-secondary` / `--q-dark-page` resolve to nothing and silently
+// void their declarations (O2_STYLE_MIGRATION_PLAN §2.4, phase PQ).
+// Any `--q-*` reference is now a hard failure, forever.
 const ALLOW_EXACT = new Set([
-  ...QUASAR_REAL,
   // Non-o2 custom properties set per-element at runtime via Vue `:style`
   // bindings — dynamic values with no static `--x:` definition.
   "--node-color", // plugins/pipelines/CustomNode.vue  :style={ '--node-color': ... }
@@ -69,6 +66,14 @@ function walk(dir, files = []) {
 const DECL_RE = /(--[A-Za-z0-9_-]+)\s*:/g;
 // var(--x) or var(--x, fallback) — only flag the no-fallback form.
 const VAR_RE = /var\(\s*(--[A-Za-z0-9_-]+)\s*(,[^)]*)?\)/g;
+// Tailwind v4 CSS-variable shorthand: `bg-(--x)`, `text-(--x)`, `border-(--x)`.
+// The compiler expands these to a bare `var(--x)` with NO fallback, so a phantom
+// token voids the declaration exactly like `var(--x)` does — but VAR_RE never
+// sees the `var(` text, so this form slipped past the guard entirely. The
+// fallback form `(--x,#fff)` is safe and skipped, mirroring VAR_RE.
+// Requires a utility prefix (`bg`, `text`, `border-t`, …) before the `-(`, which
+// is what distinguishes the shorthand from an ordinary `var(` / `calc(` call.
+const TW_SHORTHAND_RE = /[A-Za-z0-9\]]-\(\s*(--[A-Za-z0-9_-]+)\s*(,[^)]*)?\)/g;
 // ANY --o2-* occurrence, in any syntax (var(), Tailwind `[var(--o2-x)]` /
 // `(--o2-x)` shorthand, `:style` keys, raw text). The whole vocabulary is banned,
 // so a fallback does NOT make it acceptable — unlike the undefined-ref check.
@@ -83,11 +88,13 @@ for (const file of walk(SRC_DIR)) {
   const lines = text.split("\n");
   lines.forEach((line, i) => {
     for (const m of line.matchAll(DECL_RE)) defined.add(m[1]);
-    for (const m of line.matchAll(VAR_RE)) {
-      const [, name, fallback] = m;
-      if (fallback) continue; // has a fallback, safe either way
-      if (!referenced.has(name)) referenced.set(name, []);
-      referenced.get(name).push({ file: file.replace(SRC_DIR + "/", "src/"), line: i + 1 });
+    for (const re of [VAR_RE, TW_SHORTHAND_RE]) {
+      for (const m of line.matchAll(re)) {
+        const [, name, fallback] = m;
+        if (fallback) continue; // has a fallback, safe either way
+        if (!referenced.has(name)) referenced.set(name, []);
+        referenced.get(name).push({ file: file.replace(SRC_DIR + "/", "src/"), line: i + 1 });
+      }
     }
     for (const m of line.matchAll(O2_RE)) {
       const name = m[0];

@@ -279,7 +279,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <span
                         :class="
                           item.errors > 0
-                            ? 'text-[var(--q-negative)] font-semibold'
+                            ? 'text-[var(--color-status-negative)] font-semibold'
                             : ''
                         "
                         >{{ item.errors }}</span
@@ -408,7 +408,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <span
                       :class="
                         item.errors > 0
-                          ? 'text-[var(--q-negative)] font-semibold'
+                          ? 'text-[var(--color-status-negative)] font-semibold'
                           : ''
                       "
                       >{{ item.errors }}</span

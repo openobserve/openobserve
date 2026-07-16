@@ -424,7 +424,7 @@ onMounted(async () => {
     outline: 2px solid transparent;
   }
   50% {
-    outline: 2px solid var(--q-primary);
+    outline: 2px solid var(--color-theme-accent);
     border-radius: 4px;
   }
 }

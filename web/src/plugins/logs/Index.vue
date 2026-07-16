@@ -3636,23 +3636,8 @@ export default defineComponent({
 </script>
 
 <style>
-.logPage .index-menu .field_list .field_overlay .field_label,
-.logPage .q-field__native,
-.logPage .q-field__input,
-.logPage .q-table tbody td {
+.logPage .index-menu .field_list .field_overlay .field_label {
   font-size: 12px !important;
-}
-
-.logPage .q-table__top {
-  padding: 0px !important;
-}
-
-.logPage .q-table__control {
-  width: 100%;
-}
-
-.logPage .logsPageMainSection > .q-field__control-container {
-  padding-top: 0px !important;
 }
 
 .logPage .thirdlevel {

@@ -26,7 +26,7 @@
         <div
           v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled"
           class="flex items-center gap-2 py-1 px-2 rounded-sm element-box-shadow"
-          style="background-color: var(--q-dark-page)"
+          style="background-color: var(--color-surface-base)"
         >
           <OSwitch
             :data-test="`${dataTestPrefix}-nlp-mode-toggle`"
@@ -104,7 +104,7 @@
           class="p-3 bg-[image:var(--color-gradient-ai-faint)] border-b border-card-glass-border"
         >
           <!-- Show streaming status with spinner -->
-          <div v-if="isGenerating" class="ai-bar-streaming flex items-center gap-2 bg-surface-base rounded-lg py-2 px-3 text-(--q-primary)">
+          <div v-if="isGenerating" class="ai-bar-streaming flex items-center gap-2 bg-surface-base rounded-lg py-2 px-3 text-(--color-theme-accent)">
             <img :src="nlpIcon" alt="AI" class="w-5 h-5" />
             <OSpinner variant="dots" size="xs" />
             <span class="text-sm text-text-secondary">{{ aiStatusText || t('search.analyzingQuery') }}</span>

@@ -809,12 +809,12 @@ function fireConfetti() {
 <style scoped lang="scss">
 /* Design tokens scoped to this card (light + dark), ported from the prototype. */
 .dirC-demo {
-  /* Accent follows the app theme color (--q-primary), not a fixed brand hue.
+  /* Accent follows the app theme color (--color-theme-accent), not a fixed brand hue.
      Soft tints are translucent so they read on both light + dark panels. */
-  --clay: var(--q-primary, #3f7994);
-  --clay-bright: var(--q-primary, #3f7994);
-  --clay-soft: color-mix(in srgb, var(--q-primary, #3f7994) 16%, transparent);
-  --clay-soft-2: color-mix(in srgb, var(--q-primary, #3f7994) 8%, transparent);
+  --clay: var(--color-theme-accent, #3f7994);
+  --clay-bright: var(--color-theme-accent, #3f7994);
+  --clay-soft: color-mix(in srgb, var(--color-theme-accent, #3f7994) 16%, transparent);
+  --clay-soft-2: color-mix(in srgb, var(--color-theme-accent, #3f7994) 8%, transparent);
   --ok: #16a34a;
   --ok-soft: #e6f4ec;
   --warn: #f59e0b;

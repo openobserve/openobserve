@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       class="flex items-center py-2.5 px-3 border-b border-border-default"
     >
-      <div class="w-0.75 h-4 rounded-xs mr-2 shrink-0 bg-[var(--q-primary)]" />
+      <div class="w-0.75 h-4 rounded-xs mr-2 shrink-0 bg-[var(--color-theme-accent)]" />
       <span
         class="text-compact font-semibold tracking-[0.01em] text-text-primary"
       >{{

@@ -582,13 +582,6 @@
   --color-label-chip-pattern-text: #88ADF7;
 }
 
-/* ── Quasar / Tailwind compat vars (dark) ── */
-:root.dark,
-.dark :root,
-.dark {
-  --q-primary: var(--color-theme-accent);
-}
-
 /* ToggleGroup — primary variant dark overrides */
 .dark [data-variant="primary"] {
     --color-toggle-track-bg: var(--color-primary-900);
@@ -638,6 +631,9 @@
 .dark {
   --color-actions-column-shawdow: rgba(125, 125, 125, 0.694);
   --color-bg-gray: color-mix(in srgb, var(--color-theme-accent) 5%, rgb(42, 42, 42));
+  /* Lighter teal step so the VRL section bar stays visible on dark surfaces.
+     (--color-promo-* is deliberately NOT overridden — promo art is theme-independent.) */
+  --color-section-accent-secondary: var(--color-teal-400);
   --color-card-glass-border: rgba(255, 255, 255, 0.40);
   --color-card-glass-bg: var(--color-surface-base);
   --color-card-glass-solid: var(--color-surface-base);

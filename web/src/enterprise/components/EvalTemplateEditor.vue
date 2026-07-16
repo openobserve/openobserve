@@ -48,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div style="display: flex; gap: 1rem; margin-bottom: 1rem">
           <div style="flex: 1; display: flex; flex-direction: column">
             <div class="flex items-center gap-1 mb-2">
-              <label class="text-xs font-medium mb-0 text-(--q-color-text) leading-none">{{ t("evalTemplate.templateName") }} *</label>
+              <label class="text-xs font-medium mb-0 text-(--color-text-primary) leading-none">{{ t("evalTemplate.templateName") }} *</label>
               <OIcon name="info" size="xs" class="opacity-45 cursor-default shrink-0 hover:opacity-75">
                 <OTooltip :content="t('evalTemplate.tooltipName')" side="top" />
               </OIcon>
@@ -59,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div style="flex: 1; display: flex; flex-direction: column">
             <div class="flex items-center gap-1 mb-2">
-              <label class="text-xs font-medium mb-0 text-(--q-color-text) leading-none">{{ t("common.description") }}</label>
+              <label class="text-xs font-medium mb-0 text-(--color-text-primary) leading-none">{{ t("common.description") }}</label>
               <OIcon name="info" size="xs" class="opacity-45 cursor-default shrink-0 hover:opacity-75">
                 <OTooltip :content="t('evalTemplate.tooltipDescription')" side="top" />
               </OIcon>
@@ -74,7 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div style="display: flex; gap: 1rem; margin-bottom: 1rem">
           <div style="flex: 0 0 200px; display: flex; flex-direction: column">
             <div class="flex items-center gap-1 mb-2">
-              <label class="text-xs font-medium mb-0 text-(--q-color-text) leading-none">{{ t("evalTemplate.responseType") }} *</label>
+              <label class="text-xs font-medium mb-0 text-(--color-text-primary) leading-none">{{ t("evalTemplate.responseType") }} *</label>
               <OIcon name="info" size="xs" class="opacity-45 cursor-default shrink-0 hover:opacity-75">
                 <OTooltip :content="t('evalTemplate.tooltipResponseType')" side="top" />
               </OIcon>
@@ -91,7 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; overflow: hidden">
             <div class="flex items-center gap-1 mb-2">
-              <label class="text-xs font-medium mb-0 text-(--q-color-text) leading-none">{{ t("evalTemplate.dimensions") }} *</label>
+              <label class="text-xs font-medium mb-0 text-(--color-text-primary) leading-none">{{ t("evalTemplate.dimensions") }} *</label>
               <OIcon name="info" size="xs" class="opacity-45 cursor-default shrink-0 hover:opacity-75">
                 <OTooltip :content="t('evalTemplate.tooltipDimensions')" side="top" />
               </OIcon>
@@ -112,7 +112,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Row 3: Prompt Template -->
         <div style="display: flex; flex-direction: column; flex: 1; min-height: 0">
           <div class="flex items-center gap-1 mb-2">
-            <label class="text-xs font-medium mb-0 text-(--q-color-text) leading-none">{{ t("evalTemplate.promptTemplate") }} *</label>
+            <label class="text-xs font-medium mb-0 text-(--color-text-primary) leading-none">{{ t("evalTemplate.promptTemplate") }} *</label>
             <OIcon name="info" size="xs" class="opacity-45 cursor-default shrink-0 hover:opacity-75">
               <OTooltip :content="t('evalTemplate.tooltipPromptTemplate')" side="top" />
             </OIcon>
@@ -303,58 +303,3 @@ onBeforeMount(async () => {
   }
 });
 </script>
-
-<style scoped lang="scss">
-:deep(.dimensions-select) {
-  .q-field__bottom {
-    display: none !important;
-  }
-}
-
-:deep(.dimensions-select.q-field--auto-height) {
-  max-width: 100%;
-  min-width: 0;
-
-  .q-field__control {
-    height: 40px !important;
-    max-height: 40px !important;
-    overflow: hidden !important;
-    display: flex;
-    align-items: center;
-  }
-
-  .q-field__control-container {
-    padding-top: 0 !important;
-    padding-bottom: 0 !important;
-    padding-right: 36px;
-    display: flex;
-    align-items: center;
-    overflow: hidden;
-    height: 100%;
-  }
-
-  .q-field__native {
-    height: 100% !important;
-    min-height: unset !important;
-    gap: 4px;
-    overflow-x: auto !important;
-    overflow-y: hidden !important;
-    display: flex !important;
-    flex-wrap: nowrap !important;
-    align-items: center !important;
-    padding-top: 0 !important;
-    padding-bottom: 0 !important;
-    scrollbar-width: none;
-    -ms-overflow-style: none;
-
-    &::-webkit-scrollbar {
-      display: none;
-    }
-  }
-
-  input {
-    min-width: 80px !important;
-    flex-shrink: 0 !important;
-  }
-}
-</style>

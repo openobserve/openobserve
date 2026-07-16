@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <div class="dialog-split-layout flex max-h-[92vh]" :class="{ 'cloud-layout': dialogConfig.isCloudLayout }">
         <!-- Left Panel - Hero Section (hidden for Cloud) -->
-        <div v-if="!dialogConfig.isCloudLayout" class="hero-panel [flex:0_0_35%] bg-[linear-gradient(135deg,var(--q-primary)_0%,color-mix(in_srgb,var(--q-primary)_85%,black_15%)_100%)] p-10 flex flex-col relative text-white overflow-y-auto min-h-0">
+        <div v-if="!dialogConfig.isCloudLayout" class="hero-panel [flex:0_0_35%] bg-[linear-gradient(135deg,var(--color-theme-accent)_0%,color-mix(in_srgb,var(--color-theme-accent)_85%,black_15%)_100%)] p-10 flex flex-col relative text-white overflow-y-auto min-h-0">
 
           <div class="flex-1 flex flex-col justify-center items-center max-w-100 w-full m-auto">
             <div class="w-20 h-20 bg-[rgba(255,255,255,0.15)] rounded-[16px] flex items-center justify-center mb-6 backdrop-blur-[10px]">
@@ -100,7 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 size="lg"
                 @click="handlePrimaryButtonClick"
                 data-test="enterprise-upgrade-download-btn"
-                class="bg-white! text-[var(--q-primary)]! font-bold! py-2.5 px-8 text-sm rounded-lg! shadow-[0_4px_16px_rgba(0,0,0,0.15)] transition-all duration-300 [transition-timing-function:cubic-bezier(0.4,0,0.2,1)] [letter-spacing:0.3px] hover:[transform:translateY(-3px)_scale(1.02)] hover:shadow-[0_8px_24px_rgba(0,0,0,0.25)] active:[transform:translateY(-1px)_scale(0.98)]"
+                class="bg-white! text-[var(--color-theme-accent)]! font-bold! py-2.5 px-8 text-sm rounded-lg! shadow-[0_4px_16px_rgba(0,0,0,0.15)] transition-all duration-300 [transition-timing-function:cubic-bezier(0.4,0,0.2,1)] [letter-spacing:0.3px] hover:[transform:translateY(-3px)_scale(1.02)] hover:shadow-[0_8px_24px_rgba(0,0,0,0.25)] active:[transform:translateY(-1px)_scale(0.98)]"
               >
                 {{ dialogConfig.primaryButtonText }}
                 <template v-if="dialogConfig.primaryButtonIcon" #icon-right>
@@ -157,7 +157,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               ]"
               @click="feature.link && openFeatureLink(feature.link)"
             >
-              <div class="shrink-0 w-7.5 h-7.5 rounded-lg flex items-center justify-center text-[var(--q-primary)] bg-[color-mix(in_srgb,var(--color-theme-accent)_10%,transparent)] dark:bg-[color-mix(in_srgb,var(--color-theme-accent)_15%,transparent)]">
+              <div class="shrink-0 w-7.5 h-7.5 rounded-lg flex items-center justify-center text-[var(--color-theme-accent)] bg-[color-mix(in_srgb,var(--color-theme-accent)_10%,transparent)] dark:bg-[color-mix(in_srgb,var(--color-theme-accent)_15%,transparent)]">
                 <OIcon :name="feature.icon" size="sm" />
               </div>
               <div class="flex-1 min-w-0">
@@ -188,7 +188,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               ]"
               @click="feature.link && openFeatureLink(feature.link)"
             >
-              <div class="shrink-0 w-7.5 h-7.5 rounded-lg flex items-center justify-center text-[var(--q-primary)] bg-[color-mix(in_srgb,var(--color-theme-accent)_10%,transparent)] dark:bg-[color-mix(in_srgb,var(--color-theme-accent)_15%,transparent)]">
+              <div class="shrink-0 w-7.5 h-7.5 rounded-lg flex items-center justify-center text-[var(--color-theme-accent)] bg-[color-mix(in_srgb,var(--color-theme-accent)_10%,transparent)] dark:bg-[color-mix(in_srgb,var(--color-theme-accent)_15%,transparent)]">
                 <OIcon :name="feature.icon" size="sm" />
               </div>
               <div class="flex-1 min-w-0">
@@ -222,7 +222,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               ]"
               @click="feature.link && openFeatureLink(feature.link)"
             >
-              <div class="shrink-0 w-7.5 h-7.5 rounded-lg flex items-center justify-center text-[var(--q-primary)] bg-[color-mix(in_srgb,var(--color-theme-accent)_10%,transparent)] dark:bg-[color-mix(in_srgb,var(--color-theme-accent)_15%,transparent)]">
+              <div class="shrink-0 w-7.5 h-7.5 rounded-lg flex items-center justify-center text-[var(--color-theme-accent)] bg-[color-mix(in_srgb,var(--color-theme-accent)_10%,transparent)] dark:bg-[color-mix(in_srgb,var(--color-theme-accent)_15%,transparent)]">
                 <OIcon :name="feature.icon" size="sm" />
               </div>
               <div class="flex-1 min-w-0">

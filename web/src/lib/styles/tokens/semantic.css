@@ -221,11 +221,6 @@
   --color-label-chip-pattern-text: #2E55A3;
 }
 
-/* ── Quasar / Tailwind compat vars (light) ── */
-:root {
-  --q-primary: var(--color-theme-accent);
-}
-
 /* ── Legacy aliases (_legacy-variables.scss) ── */
 :root {
   --navbar-height: 36px;
@@ -321,6 +316,17 @@
   --color-brand-email-hover:  #0056b3;
   --color-promo-webinar-link:       #1e3a8a;
   --color-promo-webinar-link-hover: #1e40af;
+  /* Home-banner accent (D13 promo art — theme-independent, matches the amber
+     header top-bar). `-accent` is decorative only (gradient wash, border tint,
+     blur blobs, badge dot); `-accent-text` is the darker step the badge LABEL
+     needs to stay legible on the near-white banner. */
+  --color-promo-webinar-accent:      var(--color-amber-400);
+  --color-promo-webinar-accent-text: var(--color-amber-700);
+  /* Secondary section-header accent bar. The alert/query editors mark most
+     sections with a --color-theme-accent bar and VRL-editor sections with a
+     deliberately DIFFERENT hue; this token carries that distinction (it rode on
+     Quasar's teal --q-secondary until Quasar was removed). Dark step in dark.css. */
+  --color-section-accent-secondary: var(--color-teal-600);
   /* AI-chat message bubbles — subtle theme-aware gradient tints (dark in dark.css). */
   --color-chat-bubble-user: linear-gradient(135deg, #f0f4ff 0%, #e8f0fe 100%);
   --color-chat-bubble-ai:   linear-gradient(135deg, #f8f9ff 0%, #e8edff 100%);

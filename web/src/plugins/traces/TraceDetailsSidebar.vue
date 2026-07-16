@@ -2150,21 +2150,8 @@ export default defineComponent({
 </script>
 
 <style>
-.attributes-view-toggle .q-btn {
-  padding: 0.25rem 0.5rem;
-}
-
 .span_details_tab-panels .o-tab-panel {
   height: 100%;
-}
-
-.traces-correlated-metrics-container .q-splitter--vertical .q-splitter__separator {
-  height: 100% !important;
-}
-
-.traces-correlated-metrics-container .q-card {
-  box-shadow: none !important;
-  border: 1px solid var(--color-border-default) !important;
 }
 
 .traces-correlated-metrics-container .card-container {
@@ -2260,20 +2247,8 @@ export default defineComponent({
   border-bottom-right-radius: 0.5rem;
 }
 
-.trace-detail-tab-table table.q-table {
-  background: var(--color-surface-base);
-  backdrop-filter: blur(0.625rem);
-  border: 0.125rem solid var(--color-table-header-border);
-}
-
 .table-header .table-head-chip {
   padding: 0px;
-}
-
-.table-header .table-head-chip .q-table th.sortable {
-  cursor: pointer;
-  text-transform: capitalize;
-  font-weight: bold;
 }
 
 .table-header.isClosable {
@@ -2281,58 +2256,8 @@ export default defineComponent({
   position: relative;
 }
 
-.table-header.isClosable .q-table-col-close {
-  transform: translateX(26px);
-  position: absolute;
-  margin-top: 2px;
-  color: grey;
-  transition: transform 0.3s cubic-bezier(0.25, 0.8, 0.5, 1);
-}
-
-.table-header .q-table th.sortable {
-  cursor: pointer;
-  text-transform: capitalize;
-  font-weight: bold;
-}
-
 .table-header .log_json_content {
   white-space: pre-wrap;
-}
-
-.q-table__top {
-  padding-left: 0;
-  padding-top: 0;
-}
-
-.q-table thead tr,
-.q-table tbody td,
-.q-table th,
-.q-table td {
-  height: 25px;
-  padding: 0px 5px;
-  font-size: 0.75rem;
-}
-
-.q-table__bottom {
-  width: 100%;
-}
-
-.q-table__bottom {
-  min-height: 40px;
-  padding-top: 0;
-  padding-bottom: 0;
-}
-
-.q-td {
-  overflow: hidden;
-  min-width: 100px;
-}
-
-.q-td .expanded {
-  margin: 0;
-  white-space: pre-wrap;
-  word-wrap: break-word;
-  word-break: break-all;
 }
 
 /* Hide filter action buttons until the row is hovered */
@@ -2735,27 +2660,6 @@ export default defineComponent({
 </style>
 
 <style>
-.span_details_tabs .q-tab__indicator {
-  display: none;
-}
-
-.span_details_tabs .q-tab--active {
-  border-bottom: 1px solid var(--q-primary);
-}
-
-.span_details_tab-panels .q-tab-panel {
-  padding: 8px 8px 8px 8px;
-  overflow-y: auto;
-  overflow-x: hidden;
-  height: 100%;
-}
-
-.view-span-logs-btn .q-btn__content {
-  display: flex;
-  align-items: center;
-  font-size: 12px;
-}
-
 .trace-sidebar-highlight {
   background-color: var(--color-table-highlight-bg);
 }

@@ -407,7 +407,7 @@ function onRowBlur() {
   top: 0;
   bottom: 0;
   width: 1.5px;
-  background-color: var(--q-primary, #6366f1);
+  background-color: var(--color-theme-accent, #6366f1);
   opacity: 0.55;
   z-index: 0;
 }

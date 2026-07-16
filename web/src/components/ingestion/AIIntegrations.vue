@@ -256,7 +256,7 @@ export default defineComponent({
 .ai-menu-mono {
   display: grid;
   place-items: center;
-  background: var(--q-primary, var(--color-accent));
+  background: var(--color-theme-accent, var(--color-accent));
   color: var(--color-text-inverse);
   font-size: 10.5px;
   font-weight: 700;

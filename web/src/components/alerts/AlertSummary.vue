@@ -33,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         round
         variant="ghost"
         size="icon-circle-sm"
-        class="scroll-to-bottom-btn transition-all duration-300 ease-[ease] pointer-events-auto backdrop-blur-sm shadow-[0_2px_8px_rgba(0,0,0,0.2)] border-2! border-[var(--q-primary)]! text-[var(--q-primary)]! bg-[rgba(255,255,255,0.95)]! dark:bg-[rgba(30,30,30,0.9)]! hover:scale-110 hover:shadow-[0_4px_12px_rgba(0,0,0,0.3)] hover:bg-white! hover:opacity-80 dark:hover:bg-[rgba(40,40,40,0.95)]! dark:hover:opacity-80 active:scale-100"
+        class="scroll-to-bottom-btn transition-all duration-300 ease-[ease] pointer-events-auto backdrop-blur-sm shadow-[0_2px_8px_rgba(0,0,0,0.2)] border-2! border-[var(--color-theme-accent)]! text-[var(--color-theme-accent)]! bg-[rgba(255,255,255,0.95)]! dark:bg-[rgba(30,30,30,0.9)]! hover:scale-110 hover:shadow-[0_4px_12px_rgba(0,0,0,0.3)] hover:bg-white! hover:opacity-80 dark:hover:bg-[rgba(40,40,40,0.95)]! dark:hover:opacity-80 active:scale-100"
         @click="scrollToBottomSmooth"
       >
         <OIcon name="arrow-downward" size="sm" />
@@ -145,20 +145,20 @@ onMounted(async () => {
 /* Styles for clickable spans (v-html content) */
 .summary-text .summary-clickable {
   cursor: pointer;
-  color: var(--q-primary);
+  color: var(--color-theme-accent);
   font-weight: 600;
   padding: 0.125rem 0.375rem;
   margin: 0 0.125rem;
   border-radius: 0.25rem;
   background: linear-gradient(
     135deg,
-    color-mix(in srgb, var(--q-primary) 8%, transparent),
-    color-mix(in srgb, var(--q-primary) 12%, transparent)
+    color-mix(in srgb, var(--color-theme-accent) 8%, transparent),
+    color-mix(in srgb, var(--color-theme-accent) 12%, transparent)
   );
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   display: inline;
   position: relative;
-  box-shadow: 0 0 0 0.0625rem color-mix(in srgb, var(--q-primary) 15%, transparent);
+  box-shadow: 0 0 0 0.0625rem color-mix(in srgb, var(--color-theme-accent) 15%, transparent);
   line-height: 1.6;
   vertical-align: baseline;
   white-space: nowrap;
@@ -167,20 +167,20 @@ onMounted(async () => {
 .summary-text .summary-clickable:hover {
   background: linear-gradient(
     135deg,
-    color-mix(in srgb, var(--q-primary) 15%, transparent),
-    color-mix(in srgb, var(--q-primary) 20%, transparent)
+    color-mix(in srgb, var(--color-theme-accent) 15%, transparent),
+    color-mix(in srgb, var(--color-theme-accent) 20%, transparent)
   );
   transform: translateY(-0.0625rem);
   box-shadow:
-    0 0 0 0.0625rem color-mix(in srgb, var(--q-primary) 25%, transparent),
-    0 0.125rem 0.5rem color-mix(in srgb, var(--q-primary) 15%, transparent);
+    0 0 0 0.0625rem color-mix(in srgb, var(--color-theme-accent) 25%, transparent),
+    0 0.125rem 0.5rem color-mix(in srgb, var(--color-theme-accent) 15%, transparent);
 }
 
 .summary-text .summary-clickable:active {
   transform: translateY(0) scale(0.98);
-  background: color-mix(in srgb, var(--q-primary) 18%, transparent);
+  background: color-mix(in srgb, var(--color-theme-accent) 18%, transparent);
   box-shadow:
-    0 0 0 0.0625rem color-mix(in srgb, var(--q-primary) 30%, transparent),
+    0 0 0 0.0625rem color-mix(in srgb, var(--color-theme-accent) 30%, transparent),
     inset 0 0.0625rem 0.125rem rgba(0, 0, 0, 0.1);
 }
 
@@ -190,10 +190,10 @@ onMounted(async () => {
   border-radius: 0.375rem;
   background: linear-gradient(
     135deg,
-    color-mix(in srgb, var(--q-primary) 5%, transparent),
-    color-mix(in srgb, var(--q-primary) 8%, transparent)
+    color-mix(in srgb, var(--color-theme-accent) 5%, transparent),
+    color-mix(in srgb, var(--color-theme-accent) 8%, transparent)
   );
-  border-left: 0.1875rem solid var(--q-primary);
+  border-left: 0.1875rem solid var(--color-theme-accent);
   font-size: 0.875rem;
   line-height: 1.7;
   font-style: italic;

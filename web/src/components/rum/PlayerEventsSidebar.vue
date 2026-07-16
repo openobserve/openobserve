@@ -261,11 +261,3 @@ const handleEventClick = (event: any) => {
   emit("event-emitted", "event-click", event);
 };
 </script>
-
-<style>
-.event-type-selector .q-field__control .q-field__native span {
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  overflow: hidden;
-}
-</style>

@@ -17,7 +17,7 @@
             ref="yesButtonRef"
             variant="outline"
             :block="true"
-            class="confirmation-btn confirm-btn w-full text-sm font-semibold rounded-md normal-case tracking-normal transition-all duration-200 text-[var(--q-primary)] border-2 border-border-default bg-surface-base hover:bg-button-ghost-primary-hover-bg hover:border-[var(--q-primary)]"
+            class="confirmation-btn confirm-btn w-full text-sm font-semibold rounded-md normal-case tracking-normal transition-all duration-200 text-[var(--color-theme-accent)] border-2 border-border-default bg-surface-base hover:bg-button-ghost-primary-hover-bg hover:border-[var(--color-theme-accent)]"
             :class="{ 'btn-focused': isFocusedYes }"
             tabindex="0"
             @click="handleConfirm"
@@ -54,7 +54,7 @@
             ref="yesButtonRef"
             variant="outline"
             :block="true"
-            class="confirmation-btn confirm-btn w-full text-sm font-semibold rounded-md normal-case tracking-normal transition-all duration-200 text-[var(--q-primary)] border-2 border-border-default bg-surface-base hover:bg-button-ghost-primary-hover-bg hover:border-[var(--q-primary)]"
+            class="confirmation-btn confirm-btn w-full text-sm font-semibold rounded-md normal-case tracking-normal transition-all duration-200 text-[var(--color-theme-accent)] border-2 border-border-default bg-surface-base hover:bg-button-ghost-primary-hover-bg hover:border-[var(--color-theme-accent)]"
             :class="{ 'btn-focused': isFocusedYes }"
             tabindex="0"
             @click="handleConfirm"
@@ -411,8 +411,8 @@ onUnmounted(() => {
 
 .confirmation-btn.confirm-btn.btn-focused {
   color: var(--color-white) !important;
-  background-color: var(--q-primary) !important;
-  border-color: var(--q-primary) !important;
+  background-color: var(--color-theme-accent) !important;
+  border-color: var(--color-theme-accent) !important;
   box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.4) !important;
 }
 

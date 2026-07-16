@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="step-content rounded-lg min-h-full w-full min-w-0 overflow-hidden box-border bg-surface-overlay border border-border-default">
       <!-- Section header -->
       <div class="section-header flex items-center gap-0 py-2.5 px-3 border-b border-border-default">
-        <div class="section-header-accent w-0.75 h-4 rounded-sm mr-2 shrink-0 bg-[var(--q-primary)]" />
+        <div class="section-header-accent w-0.75 h-4 rounded-sm mr-2 shrink-0 bg-[var(--color-theme-accent)]" />
         <span class="section-header-title text-compact font-semibold tracking-[0.01em] text-text-primary">{{ t('alerts.queryConfig.sectionTitle') }}</span>
       </div>
       <div class="px-3 py-2 min-w-0 w-full box-border">
@@ -430,12 +430,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       name="filter-alt"
                       size="xs"
                       :class="filterCount > 0
-                        ? 'text-[var(--q-primary)]'
+                        ? 'text-[var(--color-theme-accent)]'
                         : ('text-text-secondary')"
                     />
                     <span class="text-xs font-semibold"
                           :class="filterCount > 0
-                            ? 'text-[var(--q-primary)]'
+                            ? 'text-[var(--color-theme-accent)]'
                             : ('text-text-body')">
                       filters
                     </span>
@@ -505,12 +505,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   name="filter-alt"
                   size="xs"
                   :class="filterCount > 0
-                    ? 'text-[var(--q-primary)]'
+                    ? 'text-[var(--color-theme-accent)]'
                     : ('text-text-secondary')"
                 />
                 <span class="text-xs font-semibold"
                       :class="filterCount > 0
-                        ? 'text-[var(--q-primary)]'
+                        ? 'text-[var(--color-theme-accent)]'
                         : ('text-text-body')">
                   filters
                 </span>
@@ -571,7 +571,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="flex items-center justify-between shrink-0 h-9 px-2.5"
                   :class="'bg-surface-subtle border-b border-border-default'">
                   <div class="flex items-center gap-2">
-                    <div class="w-0.75 h-3.5 rounded-sm shrink-0 bg-(--q-primary)" />
+                    <div class="w-0.75 h-3.5 rounded-sm shrink-0 bg-(--color-theme-accent)" />
                     <span class="text-xs font-semibold">{{ localTab === 'sql' ? t('alerts.sqlEditor') : t('alerts.promqlEditor') }}</span>
                   </div>
                   <!-- fx toggle shown here only when VRL is not yet enabled -->
@@ -615,7 +615,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="flex items-center justify-between shrink-0 h-9 px-2.5"
                   :class="'bg-surface-subtle border-b border-border-default'">
                   <div class="flex items-center gap-2">
-                    <div class="w-0.75 h-3.5 rounded-sm shrink-0 bg-(--q-secondary)" />
+                    <div class="w-0.75 h-3.5 rounded-sm shrink-0 bg-(--color-section-accent-secondary)" />
                     <span class="text-xs font-semibold">VRL Editor</span>
                   </div>
                   <div class="flex items-center gap-1">

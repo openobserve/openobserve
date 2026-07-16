@@ -253,7 +253,7 @@
 
             <div
               v-if="formValues.extraMetadataFields.length"
-              class="flex flex-col gap-1.5 border border-(--color-border) rounded-md p-[8px_10px] bg-(--color-card-bg-solid)"
+              class="flex flex-col gap-1.5 border border-border-default rounded-md p-[8px_10px] bg-card-bg"
               data-test="scorer-form-extra-fields"
             >
               <div class="grid grid-cols-[minmax(120px,1fr)_110px_minmax(140px,2fr)_28px] gap-2 items-center text-3xs font-semibold uppercase tracking-[0.04em]">
@@ -515,7 +515,7 @@
           <div class="mb-3">
             <div
               v-if="formValues.customHeaders.length"
-              class="flex flex-col gap-1.5 border border-(--color-border) rounded-md p-[8px_10px] bg-(--color-card-bg-solid)"
+              class="flex flex-col gap-1.5 border border-border-default rounded-md p-[8px_10px] bg-card-bg"
               data-test="scorer-form-remote-headers"
             >
               <div class="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_28px] gap-1.5 items-center text-3xs font-semibold uppercase tracking-[0.04em]">
@@ -646,7 +646,7 @@
       >
         {{ schemaPreviewError }}
       </p>
-      <pre class="m-0 max-h-[60vh] overflow-auto p-3 rounded-md bg-(--color-card-bg-solid) border border-(--color-border) font-normal text-xs font-(family-name:--font-mono) text-(--color-text-primary) whitespace-pre [tab-size:2]" v-else>{{ schemaPreview }}</pre>
+      <pre class="m-0 max-h-[60vh] overflow-auto p-3 rounded-md bg-card-bg border border-border-default font-normal text-xs font-(family-name:--font-mono) text-(--color-text-primary) whitespace-pre [tab-size:2]" v-else>{{ schemaPreview }}</pre>
 
       <template #footer>
         <div class="flex items-center justify-between gap-2 w-full">

@@ -26,6 +26,7 @@
     "lint:ci": "eslint \"src/**/*.vue\" --no-fix",
     "lint:styles": "stylelint \"src/**/*.{css,vue}\"",
     "lint:tokens": "node scripts/check-css-tokens.mjs",
+    "lint:token-purity": "node scripts/check-token-purity.mjs",
     "lint:design": "node scripts/check-design-consistency.mjs"
   },
   "dependencies": {

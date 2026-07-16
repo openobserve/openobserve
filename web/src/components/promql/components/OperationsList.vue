@@ -291,17 +291,6 @@ defineExpose({
 </script>
 
 <style>
-/* Deep override — must stay in CSS */
-:deep(
-  .operation-label-selector.q-field--labeled.showLabelOnTop.q-select
-    .q-field__control-container
-    .q-field__native
-    > :first-child
-) {
-  text-transform: none;
-  max-width: 75% !important;
-}
-
 /* drag-handle :active state — compound pseudo-class selector, keep in CSS */
 .drag-handle:active {
   cursor: grabbing;

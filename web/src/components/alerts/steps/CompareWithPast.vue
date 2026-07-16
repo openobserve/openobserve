@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div ref="multiWindowContainerRef" class="step-compare-with-past w-full h-full flex flex-col mx-auto">
     <div class="step-content rounded-lg flex-1 min-h-0 overflow-auto bg-surface-overlay border border-border-default">
       <div class="section-header flex items-center gap-0 py-2.5 px-3 border-b border-border-default">
-        <div class="section-header-accent w-0.75 h-4 rounded-xs mr-2 shrink-0 bg-[var(--q-primary)]" />
+        <div class="section-header-accent w-0.75 h-4 rounded-xs mr-2 shrink-0 bg-[var(--color-theme-accent)]" />
         <span class="section-header-title text-compact font-semibold text-text-primary">{{ t('alerts.steps.compareWithPast') }}</span>
       </div>
       <div class="px-3 pb-2">

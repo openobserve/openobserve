@@ -1,6 +1,6 @@
 <template>
-  <div v-if="show" class="flex flex-col h-full bg-(--q-background) border-l border-(--q-border-color)">
-    <div class="correlation-header flex items-center justify-between py-3 px-4 border-b border-(--q-border-color) bg-(--q-header-bg)">
+  <div v-if="show" class="flex flex-col h-full bg-(--color-surface-base) border-l border-(--color-border-default)">
+    <div class="correlation-header flex items-center justify-between py-3 px-4 border-b border-(--color-border-default) bg-(--color-surface-panel)">
       <div class="header-content flex items-center gap-2">
         <OIcon name="link" size="sm" />
         <span class="header-title font-semibold text-sm">Related Telemetry</span>
@@ -17,19 +17,19 @@
       <!-- Loading State -->
       <div v-if="loading" class="flex flex-col items-center justify-center gap-3 py-8 px-4 text-center">
         <OSpinner size="sm" />
-        <span class="text-compact text-(--q-text-secondary)">Finding related data...</span>
+        <span class="text-compact text-(--color-text-secondary)">Finding related data...</span>
       </div>
 
       <!-- Error State -->
       <div v-else-if="error" class="flex flex-col items-center justify-center gap-3 py-8 px-4 text-center">
         <OIcon name="error-outline" size="md" />
-        <span class="text-compact text-(--q-negative)">{{ error }}</span>
+        <span class="text-compact text-(--color-status-negative)">{{ error }}</span>
       </div>
 
       <!-- No Correlation Available -->
       <div v-else-if="!correlationResult" class="flex flex-col items-center justify-center gap-3 py-8 px-4 text-center">
         <OIcon name="info-outline" size="md" />
-        <span class="text-compact text-(--q-text-secondary)">No related telemetry found</span>
+        <span class="text-compact text-(--color-text-secondary)">No related telemetry found</span>
       </div>
 
       <!-- Correlation Results -->

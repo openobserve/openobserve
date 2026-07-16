@@ -56,10 +56,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       valueKey="value"
     />
     <fieldset
-      class="q-fieldset p-3 w-full border border-[lightgray] rounded-sm relative"
+      class="p-3 w-full border border-[lightgray] rounded-sm relative"
       v-if="authType != ''"
     >
-      <legend class="q-caption px-2 text-xs text-(--q-color-dark) ml-2 py-0 px-1">
+      <legend class="px-2 text-xs text-(--color-text-primary) ml-2 py-0 px-1">
         {{ getAuthenticationTypeLabel(authType) }}
         Configuration
       </legend>
@@ -132,10 +132,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       valueKey="value"
     />
     <fieldset
-      class="q-fieldset p-3 w-full border border-[lightgray] rounded-sm relative"
+      class="p-3 w-full border border-[lightgray] rounded-sm relative"
       v-if="secretType != ''"
     >
-      <legend class="q-caption px-2 text-xs text-(--q-color-dark) ml-2 py-0 px-1">
+      <legend class="px-2 text-xs text-(--color-text-primary) ml-2 py-0 px-1">
         {{ getSecretOptionLabel(secretType) }}
         Configuration
       </legend>

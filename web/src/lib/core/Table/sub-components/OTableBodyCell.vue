@@ -263,7 +263,7 @@ function handleClick() {
         </button>
         <span
           v-else
-          class="w-[7px] h-[7px] bg-(--q-primary,#6366f1) opacity-75 rounded-[1px] shadow-[0_0_0_2px_var(--color-table-cell-bg,#fff)] z-3 relative"
+          class="w-[7px] h-[7px] bg-(--color-theme-accent,#6366f1) opacity-75 rounded-[1px] shadow-[0_0_0_2px_var(--color-table-cell-bg,#fff)] z-3 relative"
           aria-hidden="true"
         />
       </span>
@@ -337,7 +337,7 @@ function handleClick() {
   top: calc(50% + 9px);
   bottom: 0;
   width: 1.5px;
-  background-color: var(--q-primary, #6366f1);
+  background-color: var(--color-theme-accent, #6366f1);
   opacity: 0.55;
   z-index: 1;
 }
@@ -353,7 +353,7 @@ function handleClick() {
   top: 0;
   bottom: 0;
   width: 1.5px;
-  background-color: var(--q-primary, #6366f1);
+  background-color: var(--color-theme-accent, #6366f1);
   opacity: 0.55;
   z-index: 1;
 }
@@ -369,7 +369,7 @@ function handleClick() {
      chevron center so the line doesn't run into the icon. */
   width: calc(var(--tree-x, 0) - var(--tree-parent-x, 0) - 9px);
   height: 1.5px;
-  background-color: var(--q-primary, #6366f1);
+  background-color: var(--color-theme-accent, #6366f1);
   opacity: 0.55;
   z-index: 1;
 }

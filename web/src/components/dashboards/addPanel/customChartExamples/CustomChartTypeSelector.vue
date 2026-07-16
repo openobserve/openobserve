@@ -71,7 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="scrollToCategory(category.chartLabel)"
               class="flex items-center px-3 py-2 cursor-pointer rounded-sm mb-1 transition-all duration-200 hover:bg-black/4"
               :class="{
-                'bg-(--q-primary) text-text-inverse font-semibold': selectedCategory === category.chartLabel,
+                'bg-(--color-theme-accent) text-text-inverse font-semibold': selectedCategory === category.chartLabel,
               }"
               data-test="chart-category-item"
             >
@@ -122,7 +122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OCard
                   class="cursor-pointer transition-all duration-200 h-full hover:shadow-[0_4px_12px_rgba(0,0,0,0.15)] hover:-translate-y-0.5"
                   :class="{
-                    'border-2 border-(--q-primary) shadow-[0_4px_12px_color-mix(in_srgb,var(--color-theme-accent)_30%,transparent)]': selectedChart?.value === chart.value,
+                    'border-2 border-(--color-theme-accent) shadow-[0_4px_12px_color-mix(in_srgb,var(--color-theme-accent)_30%,transparent)]': selectedChart?.value === chart.value,
                   }"
                   @click="selectChart(chart)"
                   data-test="chart-type-card"

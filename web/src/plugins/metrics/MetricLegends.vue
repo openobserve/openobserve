@@ -64,9 +64,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style>
-.q-btn:before {
-  border: 0px solid var(--color-input-border);
-}
-</style>
