@@ -3,7 +3,7 @@
     class="skeleton-box bg-skeleton-base relative overflow-hidden rounded-sm"
     :class="[
       variantClass,
-      rounded-sm && 'rounded-lg',
+      rounded && 'rounded-lg',
       circle && 'rounded-full aspect-square'
     ]"
     :style="{
@@ -49,7 +49,7 @@ const store = useStore()
 const variantClass = computed(() => {
   switch (props.variant) {
     case 'text':    return 'rounded-sm'
-    case 'title':   return 'rounded-sm'
+    case 'title':   return 'rounded'
     case 'button':  return 'rounded-md'
     case 'avatar':  return 'rounded-full'
     case 'image':   return 'rounded-lg'
