@@ -6859,11 +6859,14 @@ version = "0.1.0"
 dependencies = [
  "arrow",
  "arrow-schema",
+ "async-trait",
  "config",
+ "enrichment",
  "o2_enterprise",
  "serde",
  "serde_json",
  "utoipa",
+ "vrl",
 ]
 
 [[package]]

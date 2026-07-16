@@ -13,9 +13,12 @@ default = []
 enterprise = []
 
 [dependencies]
+async-trait.workspace = true
 config.workspace = true
 serde.workspace = true
 utoipa.workspace = true
+vector-enrichment.workspace = true
+vrl.workspace = true
 
 [dev-dependencies]
 arrow.workspace = true
