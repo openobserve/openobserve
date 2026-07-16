@@ -79,7 +79,7 @@ pub mod streaming;
 #[cfg(feature = "enterprise")]
 pub mod super_cluster;
 pub mod tantivy;
-pub mod utils;
+pub use ::search::utils;
 pub mod work_group;
 
 pub use ::search::{bloom_pruner, index, inspector};

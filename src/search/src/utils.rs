@@ -18,6 +18,13 @@ use sqlparser::ast::{BinaryOperator, Expr};
 
 use crate::sql::Sql;
 
+mod runtime;
+
+pub use runtime::{
+    AsyncDefer, ScanStatsVisitor, check_query_default_limit_exceeded,
+    is_default_query_limit_exceeded, is_permissable_function_error,
+};
+
 pub fn get_ts_col_order_by(
     parsed_sql: &Sql,
     ts_col: &str,

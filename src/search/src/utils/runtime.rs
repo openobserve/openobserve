@@ -19,14 +19,16 @@ use std::{
     sync::{Arc, atomic::Ordering},
 };
 
-pub use ::search::utils::{conjunction, is_field, is_value, split_conjunction, trim_quotes};
 use config::meta::search::{PARTIAL_ERROR_RESPONSE_MESSAGE, ScanStats};
 use datafusion::physical_plan::{ExecutionPlan, ExecutionPlanVisitor};
 use infra::runtime::DATAFUSION_RUNTIME;
 use tokio::sync::Mutex;
 
-use super::datafusion::distributed_plan::remote_scan_exec::RemoteScanExec;
-use crate::{common::meta::search::CAPPED_RESULTS_MSG, service::search::sql::Sql};
+#[cfg(test)]
+use super::{conjunction, is_field, is_value, split_conjunction, trim_quotes};
+use crate::{
+    CAPPED_RESULTS_MSG, datafusion::distributed_plan::remote_scan_exec::RemoteScanExec, sql::Sql,
+};
 
 type Cleanup = Pin<Box<dyn Future<Output = ()> + Send>>;
 
