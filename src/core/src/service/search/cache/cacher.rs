@@ -25,6 +25,7 @@ use infra::cache::{
 };
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::search::cache::streaming_agg::STREAMING_AGGS_CACHE_DIR;
+pub use search::utils::get_ts_col_order_by;
 
 use crate::{
     common::meta::search::{
@@ -620,60 +621,6 @@ pub async fn get_results(file_path: &str, file_name: &str) -> std::io::Result<St
             std::io::ErrorKind::NotFound,
             "File not found",
         )),
-    }
-}
-
-pub fn get_ts_col_order_by(
-    parsed_sql: &Sql,
-    _ts_col: &str,
-    _is_aggregate: bool,
-) -> Option<(String, bool)> {
-    let mut is_descending = true;
-    let order_by = &parsed_sql.order_by;
-    let result_ts_col = {
-        #[cfg(not(feature = "enterprise"))]
-        {
-            let mut ts_col = String::new();
-            for (original, alias) in &parsed_sql.aliases {
-                if original == _ts_col || original.contains("histogram") {
-                    ts_col = alias.clone();
-                }
-            }
-            if !_is_aggregate
-                && (parsed_sql
-                    .columns
-                    .iter()
-                    .any(|(_, v)| v.contains(&_ts_col.to_owned()))
-                    || parsed_sql.order_by.iter().any(|v| v.0.eq(&_ts_col)))
-            {
-                ts_col = _ts_col.to_string();
-            }
-            ts_col
-        }
-
-        #[cfg(feature = "enterprise")]
-        {
-            match o2_enterprise::enterprise::search::cache_ts_util::get_timestamp_column_name(
-                &parsed_sql.sql,
-            ) {
-                Some(result) => result,
-                None => "".to_string(),
-            }
-        }
-    };
-
-    if !order_by.is_empty() && !result_ts_col.is_empty() {
-        for (field, order) in order_by {
-            if is_timestamp_field(field, &result_ts_col) {
-                is_descending = order == &OrderBy::Desc;
-                break;
-            }
-        }
-    };
-    if result_ts_col.is_empty() {
-        None
-    } else {
-        Some((result_ts_col, is_descending))
     }
 }
 

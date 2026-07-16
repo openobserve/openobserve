@@ -26,9 +26,30 @@ use config::{
 use infra::errors::Error;
 use proto::cluster_rpc;
 
-use crate::service::search::{
-    cache::cacher::get_ts_col_order_by, partition::aggregate::is_streaming_aggregate, sql::Sql,
-};
+use crate::{sql::Sql, utils::get_ts_col_order_by};
+
+/// Determine whether a streaming aggregate query should be used for the given SQL query.
+#[cfg(feature = "enterprise")]
+pub fn is_streaming_aggregate(sql: &str, ts_column: Option<&str>) -> bool {
+    use config::utils::sql::is_simple_aggregate_query;
+    use o2_enterprise::enterprise::search::cache_aggs_util;
+
+    let feature_query_streaming_aggs = config::get_config().common.feature_query_streaming_aggs;
+    let mut is_cachable_aggs = is_simple_aggregate_query(sql).unwrap_or(false);
+
+    let analysis: Result<cache_aggs_util::CacheAggregationAnalysisResult, String> =
+        cache_aggs_util::analyze_count_aggregation_pattern(sql);
+    if let Ok(result) = analysis {
+        is_cachable_aggs = result.matches_pattern || is_cachable_aggs;
+    }
+
+    ts_column.is_none() && is_cachable_aggs && feature_query_streaming_aggs
+}
+
+#[cfg(not(feature = "enterprise"))]
+pub fn is_streaming_aggregate(_sql: &str, _ts_column: Option<&str>) -> bool {
+    false
+}
 
 /// SQL-derived context for a search partition request.
 ///
@@ -124,7 +145,7 @@ mod tests {
     use config::meta::stream::StreamType;
 
     use super::*;
-    use crate::service::search::sql::Sql;
+    use crate::sql::Sql;
 
     fn ob(col: &str, dir: OrderBy) -> (String, OrderBy) {
         (col.to_string(), dir)
@@ -175,7 +196,7 @@ mod tests {
         use hashbrown::HashMap;
         use sqlparser::{ast::VisitMut, dialect::GenericDialect, parser::Parser};
 
-        use crate::service::search::sql::visitor::column::ColumnVisitor;
+        use crate::sql::visitor::column::ColumnVisitor;
 
         let mut stmt = Parser::parse_sql(&GenericDialect {}, sql_str)
             .unwrap()

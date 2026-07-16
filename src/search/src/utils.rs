@@ -13,7 +13,58 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use config::meta::sql::OrderBy;
 use sqlparser::ast::{BinaryOperator, Expr};
+
+use crate::sql::Sql;
+
+pub fn get_ts_col_order_by(
+    parsed_sql: &Sql,
+    ts_col: &str,
+    is_aggregate: bool,
+) -> Option<(String, bool)> {
+    let mut is_descending = true;
+    let order_by = &parsed_sql.order_by;
+    let result_ts_col = {
+        #[cfg(not(feature = "enterprise"))]
+        {
+            let mut result = String::new();
+            for (original, alias) in &parsed_sql.aliases {
+                if original == ts_col || original.contains("histogram") {
+                    result = alias.clone();
+                }
+            }
+            if !is_aggregate
+                && (parsed_sql
+                    .columns
+                    .iter()
+                    .any(|(_, value)| value.contains(&ts_col.to_owned()))
+                    || parsed_sql.order_by.iter().any(|value| value.0 == ts_col))
+            {
+                result = ts_col.to_string();
+            }
+            result
+        }
+
+        #[cfg(feature = "enterprise")]
+        {
+            o2_enterprise::enterprise::search::cache_ts_util::get_timestamp_column_name(
+                &parsed_sql.sql,
+            )
+            .unwrap_or_default()
+        }
+    };
+
+    for (field, order) in order_by {
+        if (field == &result_ts_col || field.trim_matches('"') == result_ts_col)
+            && !result_ts_col.is_empty()
+        {
+            is_descending = order == &OrderBy::Desc;
+            break;
+        }
+    }
+    (!result_ts_col.is_empty()).then_some((result_ts_col, is_descending))
+}
 
 pub fn split_conjunction(expr: &Expr) -> Vec<&Expr> {
     split_conjunction_inner(expr, Vec::new())

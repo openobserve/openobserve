@@ -18,7 +18,7 @@ use std::cmp::max;
 use chrono::Duration;
 use config::get_config;
 
-use crate::service::search::{
+use crate::{
     partition::sql_context::PartitionSqlContext,
     sql::visitor::histogram_interval::{
         convert_histogram_interval_to_seconds, generate_histogram_interval,

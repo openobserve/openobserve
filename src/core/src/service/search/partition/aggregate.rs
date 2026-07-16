@@ -17,7 +17,6 @@
 use {
     crate::service::search::partition::sql_context::PartitionSqlContext,
     config::meta::search::SearchPartitionRequest,
-    config::utils::sql::is_simple_aggregate_query,
     config::{
         ider,
         meta::{
@@ -26,7 +25,6 @@ use {
         },
     },
     infra::errors::Error,
-    o2_enterprise::enterprise::search::cache_aggs_util,
     o2_enterprise::enterprise::search::{
         cache::streaming_agg::{
             self, StreamingAggsPartitionStrategy, create_aggregation_cache_file_path,
@@ -36,26 +34,6 @@ use {
         datafusion::distributed_plan::streaming_aggs_exec,
     },
 };
-
-/// Determine whether a streaming aggregate query should be used for the given SQL query.
-#[cfg(feature = "enterprise")]
-pub fn is_streaming_aggregate(sql: &str, ts_column: Option<&str>) -> bool {
-    let feature_query_streaming_aggs = config::get_config().common.feature_query_streaming_aggs;
-    let mut is_cachable_aggs = is_simple_aggregate_query(sql).unwrap_or(false);
-
-    let res: Result<cache_aggs_util::CacheAggregationAnalysisResult, String> =
-        cache_aggs_util::analyze_count_aggregation_pattern(sql);
-    if let Ok(result) = res {
-        is_cachable_aggs = result.matches_pattern || is_cachable_aggs;
-    }
-
-    ts_column.is_none() && is_cachable_aggs && feature_query_streaming_aggs
-}
-
-#[cfg(not(feature = "enterprise"))]
-pub fn is_streaming_aggregate(_sql: &str, _ts_column: Option<&str>) -> bool {
-    false
-}
 
 /// Prepare streaming aggregate execution: discover cache, generate partition strategy,
 /// and initialize cache for the streaming aggregation pipeline.
