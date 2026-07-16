@@ -270,7 +270,11 @@ pub async fn submit_job(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Search Jobs", "operation": "list"})),
-        ("x-o2-mcp" = json!({"description": "List all search jobs", "category": "search"}))
+        ("x-o2-mcp" = json!({
+            "description": "List all search jobs",
+            "category": "search",
+            "summary_fields": ["id", "org_id", "stream_type", "stream_names", "status", "created_at"]
+        }))
     )
 )]
 pub async fn list_status(Path(org_id): Path<String>) -> Response {
