@@ -1081,7 +1081,7 @@ export class AlertDestinationsPage {
         // they stay gone — verified by watching count→0 for 25s+. A wait can't recover an
         // unmounted element, so when the fields don't settle we re-open the form (fresh mount,
         // like the always-stable first destination) and re-select. Deterministic — not a retry.
-        for (let openAttempt = 1; openAttempt <= 3; openAttempt++) {
+        for (let openAttempt = 1; openAttempt <= 4; openAttempt++) {
             await this.page.locator(this.prebuiltDestinationSelector).waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
             const card = this.page.locator(`${this.destinationTypeCard}[data-type="${type}"]`);
             await card.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
@@ -1096,22 +1096,39 @@ export class AlertDestinationsPage {
             }
             await expect.poll(cardSelected, { timeout: 8000, intervals: [400, 800, 1200] }).toBe(true).catch(() => {});
 
+            // Let the prebuilt TEMPLATE auto-load settle BEFORE judging field stability. Picking a
+            // type fires a template fetch whose completion re-renders the form and (on a reused
+            // form) unmounts the fields. That fetch can land AFTER a short stability window — so
+            // without this the fields looked "stable" here, then unmounted during the caller's
+            // fills (fillWebhookUrl → fillDestinationName). Waiting for the network to go idle ties
+            // us to the actual fetch, so the unmount happens inside the stability check below (and
+            // triggers a remount) instead of leaking into the fills.
+            await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+
             // Wait for BOTH fields to be STABLE (settled past any re-render), not just present.
-            // A healthy field settles in ~1-2s so this returns fast; the 12s cap only bounds how
-            // long we tolerate the UNMOUNTED case before remounting — kept short to protect the
-            // per-test time budget under CI's parallel load (multiple remounts add up).
+            // A healthy field settles in ~1-2s so this returns fast; the caps only bound how long
+            // we tolerate the UNMOUNTED case before remounting. The name field settles a touch
+            // later than the credential field, so it gets a longer budget.
             const credStable = await this._waitForFieldStable(confirmField, { stableMs: 1500, timeout: 12000 });
-            const nameStable = credStable && await this._waitForFieldStable(nameField, { stableMs: 1000, timeout: 8000 });
+            const nameStable = credStable && await this._waitForFieldStable(nameField, { stableMs: 1000, timeout: 12000 });
             if (credStable && nameStable) {
                 testLogger.debug('Selected destination type and form loaded', { type, openAttempt });
                 return;
             }
 
-            // Fields unmounted and stuck — re-open the form to force a fresh mount, then retry.
-            testLogger.warn('Destination fields did not stabilise after type-select; re-opening form to remount', { type, openAttempt, credStable, nameStable });
-            await this.page.locator(this.cancelButton).first().click({ force: true, timeout: 10000 }).catch(() => {});
-            await this.page.locator(this.addDestinationTitle).first().waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
-            await this.clickNewDestination();
+            // Fields unmounted and stuck — remount to force a fresh render, then retry. A light
+            // remount (cancel + re-open) first; if the stale parent state persists, escalate to a
+            // full page reload + fresh navigate — a guaranteed clean mount, like the always-stable
+            // first destination — which recovers the cases cancel+reopen can't.
+            testLogger.warn('Destination fields did not stabilise after type-select; remounting', { type, openAttempt, credStable, nameStable });
+            if (openAttempt === 1) {
+                await this.page.locator(this.cancelButton).first().click({ force: true, timeout: 10000 }).catch(() => {});
+                await this.page.locator(this.addDestinationTitle).first().waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+                await this.clickNewDestination();
+            } else {
+                await this.navigateToDestinations();
+                await this.clickNewDestination();
+            }
         }
         // Surface a clear failure if remounts didn't recover it.
         await confirmField.waitFor({ state: 'visible', timeout: 15000 });
@@ -1483,14 +1500,28 @@ export class AlertDestinationsPage {
         const baseUrl = process.env.ZO_BASE_URL;
         const org = getOrgIdentifier();
         const detailUrl = `${baseUrl}/api/${org}/alerts/destinations/${encodeURIComponent(name)}`;
+        const listUrl = `${baseUrl}/api/${org}/alerts/destinations?page_num=0&page_size=1000`;
+        // Confirm the destination is in the LIST the UI renders from — not just that the single
+        // GET returns 200. The detail endpoint can report 200 while the (paginated) list endpoint
+        // the UI actually reads hasn't reindexed the new row yet, which surfaced as "registered on
+        // backend but did not render in the list". Poll the list endpoint so we only drive the UI
+        // once the row will genuinely be there. 404 on detail = definitively gone (didn't persist).
         let apiStatus = 0;
+        let inList = false;
         await expect.poll(async () => {
-            const resp = await this.page.request.get(detailUrl).catch(() => null);
-            apiStatus = resp ? resp.status() : 0;
-            // Terminal states: exists (200), gone (404), or auth-inconclusive (401/403).
-            return apiStatus === 200 || apiStatus === 404 || apiStatus === 401 || apiStatus === 403;
-        }, { timeout: 20000, intervals: [1000, 1500, 2000, 3000] }).toBe(true).catch(() => {});
-        testLogger.debug('Destination backend pre-check', { name, apiStatus });
+            const detail = await this.page.request.get(detailUrl).catch(() => null);
+            apiStatus = detail ? detail.status() : 0;
+            if (apiStatus === 404) return true;               // definitively gone
+            if (apiStatus === 401 || apiStatus === 403) return true; // auth-inconclusive → rely on UI
+            const listResp = await this.page.request.get(listUrl).catch(() => null);
+            if (listResp && listResp.ok()) {
+                const body = await listResp.json().catch(() => null);
+                const arr = (body && (body.list || body.destinations)) || (Array.isArray(body) ? body : []);
+                inList = arr.some((d) => (d && (d.name || d)) === name);
+            }
+            return inList;
+        }, { timeout: 30000, intervals: [1000, 1500, 2000, 3000] }).toBe(true).catch(() => {});
+        testLogger.debug('Destination backend pre-check', { name, apiStatus, inList });
         if (apiStatus === 404) {
             await this.page.screenshot({ path: `test-results/destination-not-found-${name}.png`, fullPage: true }).catch(() => {});
             throw new Error(`Destination "${name}" does not exist on the backend (API 404) — the create/edit did not persist. Screenshot: test-results/destination-not-found-${name}.png`);
@@ -1502,12 +1533,21 @@ export class AlertDestinationsPage {
         // so a transient empty list ("0 of 0") re-fetches and renders the row.
         const searchField = this.page.locator(this.destinationListSearchInputField);
         const rowAnchor = this.getDeleteDestinationBtn(name);
-        for (let attempt = 1; attempt <= 4; attempt++) {
+        const skeleton = this.page.locator('[data-test="o2-table-skeleton-body"]');
+        for (let attempt = 1; attempt <= 5; attempt++) {
             await this.navigateToDestinations();
             await this.page.locator(this.destinationsListTable).waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
+            // The list renders a loading SKELETON (TenstackTable) while the destinations fetch is
+            // in flight — real rows aren't in the DOM yet. Wait for the skeleton to clear before
+            // checking for the row, else we search an all-placeholder table and never find it
+            // (the exact "inList=true but did not render" failure). Reload on the next attempt if
+            // the fetch is genuinely stuck.
+            await skeleton.first().waitFor({ state: 'hidden', timeout: 20000 }).catch(() => {});
             if (await searchField.isVisible().catch(() => false)) {
                 await searchField.fill('');
-                await searchField.fill(name);
+                // Last attempt: leave the search cleared to render the full list, in case the
+                // scoped search itself is the thing failing to surface the (confirmed) row.
+                if (attempt < 5) await searchField.fill(name);
             }
             if (await rowAnchor.isVisible({ timeout: 8000 }).catch(() => false)) {
                 testLogger.debug('Destination found in list', { name, attempt });
@@ -1516,7 +1556,7 @@ export class AlertDestinationsPage {
             testLogger.debug('Destination row not visible yet, re-navigating and re-searching', { name, attempt });
         }
         await this.page.screenshot({ path: `test-results/destination-not-found-${name}.png`, fullPage: true }).catch(() => {});
-        throw new Error(`Destination "${name}" is registered on the backend (API ${apiStatus}) but did not render in the list after retries. Screenshot: test-results/destination-not-found-${name}.png`);
+        throw new Error(`Destination "${name}" is registered on the backend (API ${apiStatus}, inList=${inList}) but did not render in the list after retries. Screenshot: test-results/destination-not-found-${name}.png`);
     }
 
     /**
