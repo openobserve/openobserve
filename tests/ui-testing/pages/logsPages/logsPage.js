@@ -3890,6 +3890,29 @@ export class LogsPage {
         await expect(inputLocator).toHaveValue(text || '', { timeout: 5000 });
     }
 
+    /**
+     * Wait until the field-list sidebar has actually been populated from the stream
+     * schema. The sidebar renders one expandable row per schema field
+     * (data-test="log-search-expand-<field>-field-btn"); on slow/cloud environments
+     * the schema fetch that follows stream selection can lag well past any fixed
+     * sleep, leaving the list empty. Downstream field-search / add-to-table steps then
+     * see zero fields and fail non-deterministically (fieldCount === 0, "field expand
+     * button not found"). Gate on the first expandable field row rendering so callers
+     * always operate against a populated list — a deterministic replacement for
+     * arbitrary waitForTimeout() buffers after stream selection / refresh.
+     * The expandable rows only render once the stream's fields have indexed VALUES,
+     * so this doubles as a data-ready gate. Cloud/alpha indexing after ingestion can
+     * lag well past 30s under parallel load (the global setup itself allows 90s), so
+     * the default timeout is deliberately generous rather than arbitrary.
+     * @param {number} timeout - max wait for the schema-driven field list to render
+     */
+    async waitForFieldListReady(timeout = 60000) {
+        await this.page
+            .locator('[data-test^="log-search-expand-"]')
+            .first()
+            .waitFor({ state: 'visible', timeout });
+    }
+
     async clickExpandLabel(label) {
         return await this.clickElementByLabel(label, 'Expand');
     }

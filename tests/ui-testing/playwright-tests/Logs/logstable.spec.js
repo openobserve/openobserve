@@ -26,8 +26,11 @@ test.describe("Logs Table Field Management - Complete Test Suite", () => {
     testLogger.info('Quick mode state ensured');
     
     await pageManager.logsPage.clickSearchBarRefreshButton();
-    await page.waitForTimeout(2000);
-    
+    // Deterministically wait for the schema-driven field list to populate instead of a
+    // fixed sleep — on cloud/alpha the schema fetch after stream selection can lag,
+    // leaving the sidebar empty so field-search/add-to-table steps see zero fields.
+    await pageManager.logsPage.waitForFieldListReady();
+
     testLogger.info('Field management test setup completed');
   });
 
@@ -78,13 +81,30 @@ test.describe("Logs Table Field Management - Complete Test Suite", () => {
     // Verify field appears in table
     await pageManager.logsPage.expectFieldInTableHeader(fieldName);
     testLogger.info('Field added to table successfully');
-    
+
+    // The added column only survives a reload via the "logFilterField" localStorage
+    // entry, which updateUrlQueryParams() writes on a watcher AFTER the column renders
+    // in the DOM. Reloading before that write commits loses the column (root cause of
+    // the flaky failure). Wait for the field to actually appear in localStorage before
+    // reloading — a deterministic gate on the real persistence condition.
+    await page.waitForFunction(
+      (field) => {
+        const raw = window.localStorage.getItem('logFilterField');
+        return !!raw && raw.includes(field);
+      },
+      fieldName,
+      { timeout: 10000 },
+    );
+
     // Refresh the page
     await page.reload();
     await page.waitForLoadState('domcontentloaded');
-    await page.waitForTimeout(2000);
+    // After reload the logs page auto-runs the restored query; wait for the results
+    // table to actually re-render (deterministic, replaces a fixed 2s sleep) so the
+    // persisted field column has a table to be restored into before we assert it.
+    await expect(page.locator('[data-test="logs-search-result-logs-table"]')).toBeVisible({ timeout: 30000 });
     testLogger.info('Page refreshed');
-    
+
     // Verify field is still visible in table after refresh
     await pageManager.logsPage.expectFieldInTableHeader(fieldName);
     testLogger.info('Field persistence after page refresh verified successfully');
@@ -263,20 +283,24 @@ test.describe("Logs Table Field Management - Complete Test Suite", () => {
     
     for (const searchTerm of searchVariations) {
       await pageManager.logsPage.fillIndexFieldSearchInput(searchTerm);
-      await page.waitForTimeout(500);
-      
-      // Verify that fields matching the search are visible regardless of case
-      const fieldCount = await pageManager.logsPage.countMatchingFields();
-      
-      // Should find at least some fields for kubernetes/container searches
+
+      // Every variation is a kubernetes/container term, so the filtered list must end
+      // up with matching fields. Poll the count instead of counting once after a fixed
+      // sleep — the field list re-filters on a debounce after the input settles, and
+      // under parallel load that render can lag past a 500ms wait (yielding a false 0).
       if (searchTerm.toLowerCase().includes('kubernetes') || searchTerm.toLowerCase().includes('container')) {
-        expect(fieldCount).toBeGreaterThan(0);
-        testLogger.info(`Search term "${searchTerm}" found ${fieldCount} fields`);
+        await expect
+          .poll(() => pageManager.logsPage.countMatchingFields(), {
+            timeout: 10000,
+            message: `field search "${searchTerm}" produced no matching fields`,
+          })
+          .toBeGreaterThan(0);
+        testLogger.info(`Search term "${searchTerm}" found matching fields`);
       }
-      
-      // Clear search for next iteration
+
+      // Clear search for next iteration and wait for the input to actually reset so the
+      // next variation filters from the full list.
       await pageManager.logsPage.fillIndexFieldSearchInput("");
-      await page.waitForTimeout(300);
     }
     
     testLogger.info('Field search case insensitivity test completed successfully');
