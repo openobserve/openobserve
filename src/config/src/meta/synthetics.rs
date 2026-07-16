@@ -223,7 +223,14 @@ impl SyntheticType {
     pub fn secret_config_paths(&self) -> &'static [&'static str] {
         match self {
             Self::Ssh => &["/auth/secret"],
-            Self::Browser => &["/secrets/*/value"],
+            // Header values are encrypted too: not every header is a secret,
+            // but until the probe applies top-level auth, Authorization /
+            // API-key headers are the only way to call authed targets — and
+            // storing those in plaintext is exactly the bug this mechanism
+            // exists to prevent. Encrypting non-secret header values is
+            // harmless (decrypted at edit-read and probe resolve).
+            Self::Http | Self::Api => &["/headers/*/value"],
+            Self::Browser => &["/secrets/*/value", "/headers/*/value"],
             _ => &[],
         }
     }
@@ -1238,9 +1245,16 @@ mod tests {
         assert_eq!(SyntheticType::Ssh.secret_config_paths(), &["/auth/secret"]);
         assert_eq!(
             SyntheticType::Browser.secret_config_paths(),
-            &["/secrets/*/value"]
+            &["/secrets/*/value", "/headers/*/value"]
         );
-        assert!(SyntheticType::Http.secret_config_paths().is_empty());
+        assert_eq!(
+            SyntheticType::Http.secret_config_paths(),
+            &["/headers/*/value"]
+        );
+        assert_eq!(
+            SyntheticType::Api.secret_config_paths(),
+            &["/headers/*/value"]
+        );
         assert!(SyntheticType::Tcp.secret_config_paths().is_empty());
         assert!(SyntheticType::Tls.secret_config_paths().is_empty());
         assert!(SyntheticType::Ping.secret_config_paths().is_empty());
