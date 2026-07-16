@@ -39,7 +39,7 @@ mod select;
 mod topn;
 mod utils;
 
-use crate::service::search::datafusion::{
+use crate::datafusion::{
     distributed_plan::{empty_exec::NewEmptyExec, remote_scan_exec::RemoteScanExec},
     optimizer::physical_optimizer::index_optimizer::{
         count::is_simple_count,
@@ -339,7 +339,7 @@ mod tests {
     };
 
     use super::*;
-    use crate::service::search::datafusion::{
+    use crate::datafusion::{
         distributed_plan::node::RemoteScanNode,
         optimizer::physical_optimizer::{
             index_optimizer::utils::tests::get_remote_scan, remote_scan::RemoteScanRule,

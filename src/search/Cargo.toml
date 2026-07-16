@@ -12,29 +12,44 @@ enterprise = ["dep:o2_enterprise"]
 [dependencies]
 anyhow.workspace = true
 arrow.workspace = true
+arrow-flight.workspace = true
 arrow-schema.workspace = true
+async-stream.workspace = true
 async-trait.workspace = true
+bytes.workspace = true
 chrono.workspace = true
 config.workspace = true
 datafusion.workspace = true
+datafusion-proto.workspace = true
+flight.workspace = true
 futures.workspace = true
+futures-util.workspace = true
 hashbrown.workspace = true
 infra.workspace = true
 itertools.workspace = true
 log.workspace = true
+md5.workspace = true
 memchr.workspace = true
 o2_enterprise = { workspace = true, optional = true, default-features = false }
 opentelemetry.workspace = true
 parking_lot.workspace = true
+parquet.workspace = true
 proto.workspace = true
+prost.workspace = true
+rand.workspace = true
+rayon.workspace = true
 regex.workspace = true
 regex-syntax.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 sqlparser.workspace = true
+tantivy.workspace = true
+tokio.workspace = true
+tonic.workspace = true
 utoipa.workspace = true
 vector-enrichment.workspace = true
 vrl.workspace = true
 
 [dev-dependencies]
-tokio.workspace = true
+tracing.workspace = true
+tracing-opentelemetry.workspace = true

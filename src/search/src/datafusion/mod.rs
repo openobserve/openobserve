@@ -17,6 +17,7 @@ pub mod distributed_plan;
 pub mod optimizer;
 pub mod peak_memory_pool;
 pub mod plan;
+pub mod plan_metrics;
 pub mod planner;
 pub mod table_provider;
 pub mod udaf;

@@ -56,7 +56,7 @@ pub mod tests {
     };
 
     use super::*;
-    use crate::service::search::datafusion::distributed_plan::remote_scan_exec::RemoteScanExec;
+    use crate::datafusion::distributed_plan::remote_scan_exec::RemoteScanExec;
 
     fn empty_plan() -> Arc<dyn ExecutionPlan> {
         let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Int32, false)]));

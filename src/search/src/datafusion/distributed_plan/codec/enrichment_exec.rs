@@ -25,7 +25,7 @@ use datafusion_proto::{convert_required, protobuf::proto_error};
 use prost::Message;
 use proto::cluster_rpc;
 
-use crate::service::search::datafusion::distributed_plan::enrichment_exec::EnrichmentExec;
+use crate::datafusion::distributed_plan::enrichment_exec::EnrichmentExec;
 
 pub fn try_decode(
     node: cluster_rpc::EnrichmentExecNode,

@@ -35,7 +35,7 @@ use datafusion::{
 use flight::common::Metrics;
 use futures::StreamExt;
 
-use crate::service::search::datafusion::{
+use crate::datafusion::{
     distributed_plan::display::DisplayableExecutionPlan, plan_metrics::get_cluster_metrics,
 };
 

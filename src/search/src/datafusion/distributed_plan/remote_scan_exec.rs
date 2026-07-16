@@ -42,7 +42,7 @@ use parking_lot::Mutex;
 use rand::prelude::SliceRandom;
 
 use super::node::RemoteScanNode;
-use crate::service::search::datafusion::distributed_plan::{
+use crate::datafusion::distributed_plan::{
     codec::get_physical_extension_codec,
     common::{EmptyStream, QueryContext, get_empty_stream, process_partial_err},
     decoder_stream::FlightDecoderStream,
@@ -436,7 +436,7 @@ mod tests {
     use datafusion::physical_plan::empty::EmptyExec;
 
     use super::*;
-    use crate::service::search::datafusion::distributed_plan::node::RemoteScanNode;
+    use crate::datafusion::distributed_plan::node::RemoteScanNode;
 
     #[derive(Debug)]
     struct TestNode;

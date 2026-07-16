@@ -23,7 +23,7 @@ use datafusion::common::TableReference;
 use hashbrown::HashMap;
 use proto::cluster_rpc::{IndexInfo, KvItem, QueryIdentifier, SearchInfo, SuperClusterInfo};
 
-use crate::service::search::sql::histogram::histogram_bucket_start;
+use crate::sql::histogram::histogram_bucket_start;
 
 #[derive(Debug, Clone)]
 pub struct RemoteScanNodes {

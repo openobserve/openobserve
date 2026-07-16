@@ -23,7 +23,7 @@ use datafusion::{
     physical_plan::{ExecutionPlan, analyze::AnalyzeExec},
 };
 
-use crate::service::search::datafusion::distributed_plan::{
+use crate::datafusion::distributed_plan::{
     distribute_analyze_exec::DistributeAnalyzeExec, remote_scan_exec::RemoteScanExec,
 };
 
@@ -69,7 +69,7 @@ mod tests {
     use datafusion::physical_plan::empty::EmptyExec;
 
     use super::*;
-    use crate::service::search::datafusion::distributed_plan::node::RemoteScanNode;
+    use crate::datafusion::distributed_plan::node::RemoteScanNode;
 
     fn get_schema() -> SchemaRef {
         Arc::new(Schema::new(vec![

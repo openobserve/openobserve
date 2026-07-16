@@ -26,14 +26,14 @@ use prost::Message;
 use proto::cluster_rpc;
 #[cfg(feature = "enterprise")]
 use {
-    crate::service::search::datafusion::distributed_plan::enrichment_exec::EnrichmentExec,
+    crate::datafusion::distributed_plan::enrichment_exec::EnrichmentExec,
     o2_enterprise::enterprise::search::datafusion::distributed_plan::{
         agg_topk_exec::AggregateTopkExec, streaming_aggs_exec::exec::StreamingAggsExec,
         tmp_exec::TmpExec,
     },
 };
 
-use crate::service::search::datafusion::{
+use crate::datafusion::{
     distributed_plan::empty_exec::NewEmptyExec, plan::deduplication_exec::DeduplicationExec,
 };
 

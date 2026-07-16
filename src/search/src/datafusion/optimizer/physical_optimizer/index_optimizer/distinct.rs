@@ -29,7 +29,7 @@ use datafusion::{
 };
 use hashbrown::HashSet;
 
-use crate::service::search::datafusion::optimizer::physical_optimizer::{
+use crate::datafusion::optimizer::physical_optimizer::{
     index_optimizer::utils::is_complex_plan,
     utils::{get_column_name, is_column, is_only_timestamp_filter},
 };
@@ -178,7 +178,7 @@ mod tests {
     use datafusion::{catalog::MemTable, prelude::SessionContext};
 
     use super::*;
-    use crate::service::search::datafusion::udf::str_match_udf;
+    use crate::datafusion::udf::str_match_udf;
 
     #[tokio::test]
     async fn test_is_simple_distinct() {

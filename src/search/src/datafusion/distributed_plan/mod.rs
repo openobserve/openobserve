@@ -13,4 +13,15 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+pub mod codec;
+mod common;
+mod decoder_stream;
+pub mod display;
+pub mod distribute_analyze_exec;
 pub mod empty_exec;
+pub mod enrich_exec;
+#[cfg(feature = "enterprise")]
+pub mod enrichment_exec;
+pub mod node;
+pub mod remote_scan_exec;
+mod utils;

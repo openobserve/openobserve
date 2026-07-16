@@ -40,7 +40,7 @@ use datafusion::{
     scalar::ScalarValue,
 };
 
-use crate::service::search::datafusion::{
+use crate::datafusion::{
     distributed_plan::empty_exec::NewEmptyExec,
     optimizer::physical_optimizer::utils::{
         disjunction, extract_column, extract_int64_literal, extract_string_literal,
@@ -494,9 +494,7 @@ mod tests {
     };
 
     use super::*;
-    use crate::service::search::datafusion::{
-        table_provider::empty_table::NewEmptyTable, udf::match_all_udf,
-    };
+    use crate::datafusion::{table_provider::empty_table::NewEmptyTable, udf::match_all_udf};
 
     #[test]
     fn test_rewrite_match_physical_new_name() {
@@ -644,9 +642,7 @@ mod tests {
         let provider = NewEmptyTable::new("t", schema).with_partitions(8);
         ctx.register_table("t", Arc::new(provider)).unwrap();
         ctx.register_udf(match_all_udf::MATCH_ALL_UDF.clone());
-        ctx.register_udf(
-            crate::service::search::datafusion::udf::str_match_udf::STR_MATCH_UDF.clone(),
-        );
+        ctx.register_udf(crate::datafusion::udf::str_match_udf::STR_MATCH_UDF.clone());
 
         let sql =
             "select count(*) from t where match_all('test') and str_match(message, 'success')";

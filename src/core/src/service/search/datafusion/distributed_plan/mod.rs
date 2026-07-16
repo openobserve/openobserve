@@ -22,23 +22,13 @@ use datafusion::{
     },
     physical_plan::ExecutionPlan,
 };
-
-use crate::service::search::datafusion::distributed_plan::empty_exec::NewEmptyExec;
-
-pub mod codec;
-mod common;
-mod decoder_stream;
-pub mod display;
-pub mod distribute_analyze_exec;
-pub use search::datafusion::distributed_plan::empty_exec;
-pub mod enrich_exec;
+use search::datafusion::distributed_plan::empty_exec::NewEmptyExec;
 #[cfg(feature = "enterprise")]
-pub mod enrichment_exec;
-pub mod node;
-pub mod remote_scan_exec;
+pub use search::datafusion::distributed_plan::enrichment_exec;
+pub use search::datafusion::distributed_plan::{
+    codec, display, distribute_analyze_exec, empty_exec, enrich_exec, node, remote_scan_exec,
+};
 pub mod rewrite;
-
-mod utils;
 
 pub struct NewEmptyExecVisitor {
     plan: Option<Arc<dyn ExecutionPlan>>,

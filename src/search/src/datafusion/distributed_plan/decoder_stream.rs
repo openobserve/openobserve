@@ -29,7 +29,7 @@ use flight::{
 use futures::{Stream, StreamExt, ready};
 use tonic::Streaming;
 
-use crate::service::search::{
+use crate::{
     datafusion::distributed_plan::common::{QueryContext, process_partial_err},
     inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
 };

@@ -24,7 +24,7 @@ use datafusion::{
     physical_plan::{ExecutionPlan, aggregates::AggregateExec},
 };
 
-use crate::service::search::datafusion::optimizer::physical_optimizer::{
+use crate::datafusion::optimizer::physical_optimizer::{
     index_optimizer::utils::is_complex_plan, utils::is_count_rows_aggregate,
 };
 
@@ -96,7 +96,7 @@ mod tests {
     use datafusion::{common::Result, prelude::SessionContext};
 
     use super::*;
-    use crate::service::search::datafusion::table_provider::empty_table::NewEmptyTable;
+    use crate::datafusion::table_provider::empty_table::NewEmptyTable;
 
     #[tokio::test]
     async fn test_is_simple_count() -> Result<()> {

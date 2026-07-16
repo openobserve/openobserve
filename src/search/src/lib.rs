@@ -15,6 +15,8 @@
 
 pub mod datafusion;
 pub mod enrichment;
+pub mod index;
+pub mod inspector;
 pub mod sql;
 pub mod udf;
 pub mod utils;

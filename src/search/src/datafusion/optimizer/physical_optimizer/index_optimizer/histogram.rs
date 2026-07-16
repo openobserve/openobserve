@@ -33,7 +33,7 @@ use datafusion::{
 };
 use hashbrown::HashSet;
 
-use crate::service::search::datafusion::optimizer::physical_optimizer::{
+use crate::datafusion::optimizer::physical_optimizer::{
     index_optimizer::utils::is_complex_plan,
     utils::{get_column_name, is_column, is_count_rows_aggregate},
 };
@@ -313,7 +313,7 @@ mod tests {
     };
 
     use super::*;
-    use crate::service::search::datafusion::{
+    use crate::datafusion::{
         optimizer::{
             logical_optimizer::rewrite_histogram::RewriteHistogram,
             physical_optimizer::index_optimizer::utils::tests::get_partial_aggregate_plan,

@@ -41,7 +41,7 @@ use datafusion::{
 use hashbrown::HashSet;
 use parking_lot::Mutex;
 
-use crate::service::search::{
+use crate::{
     datafusion::{
         optimizer::physical_optimizer::utils::{
             extract_string_literal, get_column_name, is_column, is_only_timestamp_filter, is_value,
@@ -330,7 +330,7 @@ mod tests {
     };
 
     use super::{is_expr_valid_for_index, *};
-    use crate::service::search::{
+    use crate::{
         datafusion::{
             optimizer::physical_optimizer::utils::is_only_timestamp_filter,
             udf::{

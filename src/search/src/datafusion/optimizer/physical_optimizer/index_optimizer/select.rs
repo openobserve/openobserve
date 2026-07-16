@@ -24,7 +24,7 @@ use datafusion::{
     physical_plan::{ExecutionPlan, sorts::sort_preserving_merge::SortPreservingMergeExec},
 };
 
-use crate::service::search::datafusion::optimizer::physical_optimizer::{
+use crate::datafusion::optimizer::physical_optimizer::{
     index_optimizer::utils::is_complex_plan,
     utils::{get_column_name, is_column},
 };

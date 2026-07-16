@@ -29,10 +29,10 @@ use datafusion::{
 };
 
 #[cfg(feature = "enterprise")]
-use crate::service::search::datafusion::optimizer::physical_optimizer::enrichment::{
+use crate::datafusion::optimizer::physical_optimizer::enrichment::{
     is_enrichment_table, should_use_enrichment_broadcast_join,
 };
-use crate::service::search::datafusion::optimizer::physical_optimizer::utils::is_aggregate_exec;
+use crate::datafusion::optimizer::physical_optimizer::utils::is_aggregate_exec;
 
 #[derive(Default, Debug)]
 pub struct JoinReorderRule;
@@ -109,7 +109,7 @@ mod tests {
     };
 
     use super::*;
-    use crate::service::search::datafusion::{
+    use crate::datafusion::{
         optimizer::logical_optimizer::limit_join_right_side::LimitJoinRightSide,
         planner::extension_planner::OpenobserveQueryPlanner,
         table_provider::empty_table::NewEmptyTable,

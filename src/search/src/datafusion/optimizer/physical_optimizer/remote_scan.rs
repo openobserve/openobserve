@@ -36,13 +36,13 @@ use hashbrown::HashMap;
 use proto::cluster_rpc::{self, KvItem};
 #[cfg(feature = "enterprise")]
 use {
-    crate::service::search::datafusion::optimizer::physical_optimizer::broadcast_join::broadcast_join_rewrite,
-    crate::service::search::datafusion::optimizer::physical_optimizer::enrichment::enrichment_broadcast_join_rewrite,
-    crate::service::search::datafusion::optimizer::physical_optimizer::enrichment::should_use_enrichment_broadcast_join,
+    crate::datafusion::optimizer::physical_optimizer::broadcast_join::broadcast_join_rewrite,
+    crate::datafusion::optimizer::physical_optimizer::enrichment::enrichment_broadcast_join_rewrite,
+    crate::datafusion::optimizer::physical_optimizer::enrichment::should_use_enrichment_broadcast_join,
     o2_enterprise::enterprise::search::datafusion::optimizer::broadcast_join::should_use_broadcast_join,
 };
 
-use crate::service::search::{
+use crate::{
     datafusion::{
         distributed_plan::{
             empty_exec::NewEmptyExec, node::RemoteScanNodes, remote_scan_exec::RemoteScanExec,

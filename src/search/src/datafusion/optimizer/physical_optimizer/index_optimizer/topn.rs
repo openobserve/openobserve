@@ -28,7 +28,7 @@ use datafusion::{
 };
 use hashbrown::HashSet;
 
-use crate::service::search::datafusion::optimizer::physical_optimizer::{
+use crate::datafusion::optimizer::physical_optimizer::{
     index_optimizer::utils::is_complex_plan,
     utils::{get_column_name, is_column, is_count_rows_aggregate},
 };
@@ -180,7 +180,7 @@ mod tests {
     use datafusion::{catalog::MemTable, prelude::SessionContext};
 
     use super::*;
-    use crate::service::search::datafusion::udf::match_all_udf;
+    use crate::datafusion::udf::match_all_udf;
 
     #[tokio::test]
     async fn test_is_simple_topn() {

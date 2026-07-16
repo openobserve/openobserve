@@ -28,7 +28,7 @@ use o2_enterprise::enterprise::search::datafusion::distributed_plan::{
     broadcast_join_exec::BroadcastJoinExec, tmp_exec::TmpExec,
 };
 
-use crate::service::search::datafusion::{
+use crate::datafusion::{
     distributed_plan::node::RemoteScanNodes,
     optimizer::physical_optimizer::remote_scan::{
         RemoteScanRewriter, remote_scan_to_top_if_needed,
@@ -127,7 +127,7 @@ mod tests {
     use o2_enterprise::enterprise::search::datafusion::optimizer::broadcast_join::should_use_broadcast_join;
 
     use super::*;
-    use crate::service::search::datafusion::{
+    use crate::datafusion::{
         optimizer::physical_optimizer::join_reorder::JoinReorderRule,
         table_provider::empty_table::NewEmptyTable,
     };

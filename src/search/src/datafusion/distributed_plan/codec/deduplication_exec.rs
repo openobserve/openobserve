@@ -23,7 +23,7 @@ use datafusion::{
 use prost::Message;
 use proto::cluster_rpc;
 
-use crate::service::search::datafusion::plan::deduplication_exec::DeduplicationExec;
+use crate::datafusion::plan::deduplication_exec::DeduplicationExec;
 
 pub(super) fn try_decode(
     node: cluster_rpc::DeduplicationExecNode,

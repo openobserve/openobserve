@@ -119,7 +119,7 @@ mod tests {
     use o2_enterprise::enterprise::search::datafusion::distributed_plan::streaming_aggs_exec::exec::StreamingAggsExec;
 
     use super::*;
-    use crate::service::search::datafusion::udf::str_match_udf::STR_MATCH_UDF;
+    use crate::datafusion::udf::str_match_udf::STR_MATCH_UDF;
 
     #[tokio::test]
     async fn test_datafusion_codec() -> Result<()> {
