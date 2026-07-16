@@ -1386,7 +1386,7 @@ const unifiedChips = computed<DimensionChip[]>(() =>
 </style>
 
 <style lang="scss">
-.logs-table-container .container {
+.logs-table-container .o2-scroll-container {
   height: 100% !important;
 }
 </style>

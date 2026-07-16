@@ -15,6 +15,7 @@
 
 use std::{collections::HashSet, sync::Arc};
 
+use ::search::types::QueryParams;
 use arrow::array::{
     Array, Int64Array, TimestampMicrosecondArray, TimestampNanosecondArray, UInt64Array,
 };
@@ -41,10 +42,7 @@ use datafusion::{
 };
 use futures::TryStreamExt;
 
-use crate::service::search::{
-    grpc::{QueryParams, storage::tantivy_search},
-    index::IndexCondition,
-};
+use crate::service::search::{index::IndexCondition, tantivy::tantivy_search};
 
 #[derive(Debug)]
 pub struct TantivyOptimizeExec {

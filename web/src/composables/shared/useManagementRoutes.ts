@@ -89,24 +89,13 @@ const useManagementRoutes = () => {
             routeGuard(to, from, next);
           },
         },
-        {
-          path: "gen_ai_agent_mapping",
-          name: "genAiAgentMapping",
-          component: () =>
-            import("@/components/settings/GenAiAgentMappingSettings.vue"),
-          meta: {
-            keepAlive: true,
-            title: "GenAI Agent Mapping",
-          },
-          beforeEnter(to: any, from: any, next: any) {
-            routeGuard(to, from, next);
-          },
-        },
       ],
     },
   ];
-  // LLM Providers (used by the AI Observability / Online Evals flows) is an
-  // enterprise/cloud-only feature — not available in OSS builds.
+  // LLM Providers and GenAI Agent Mapping (used by the AI Observability /
+  // Online Evals flows) are enterprise/cloud-only features — the backend routes
+  // only exist behind the enterprise feature flag, so they must not be exposed
+  // in OSS builds.
   if (config.isEnterprise == "true" || config.isCloud == "true") {
     routes[0].children.push({
       path: "llm_providers",
@@ -115,6 +104,19 @@ const useManagementRoutes = () => {
         import("@/components/settings/LlmProvidersSettings.vue"),
       meta: {
         title: "LLM Providers",
+      },
+      beforeEnter(to: any, from: any, next: any) {
+        routeGuard(to, from, next);
+      },
+    });
+    routes[0].children.push({
+      path: "gen_ai_agent_mapping",
+      name: "genAiAgentMapping",
+      component: () =>
+        import("@/components/settings/GenAiAgentMappingSettings.vue"),
+      meta: {
+        keepAlive: true,
+        title: "GenAI Agent Mapping",
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);

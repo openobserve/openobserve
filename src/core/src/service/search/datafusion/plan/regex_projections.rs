@@ -19,7 +19,7 @@ use config::{datafusion::request::Request, meta::projections::ProjectionColumnMa
 use datafusion::common::tree_node::TreeNode;
 
 use crate::service::search::{
-    cluster::flight::{SearchContextBuilder, register_table},
+    datafusion::context::{SearchContextBuilder, register_table},
     sql::Sql,
 };
 

@@ -154,25 +154,46 @@ class FunctionsFormValidationPage {
   async typeInVrlEditor(code) {
     testLogger.info('Typing VRL code into editor');
     await this.functionEditor.waitFor({ state: 'visible', timeout: 15000 });
-    // Click the editor to ensure Monaco is focused/initialized (lazy-loaded async component)
+    // Focus the editor. Monaco is a lazy-loaded async chunk, so the wrapper
+    // (data-test element) renders BEFORE the Monaco instance is registered.
     await this.functionEditor.click();
-    await this.page.waitForTimeout(300);
-    // Use Monaco's executeEdits API to set the content and trigger onDidChangeModelContent,
-    // which propagates through unified-query-editor's @update:query to formData.function.
-    // keyboard.type() and keyboard.insertText() do NOT trigger the reactive update.
-    await this.page.evaluate((vrlCode) => {
+
+    const editorSelector = '[data-test="logs-vrl-function-editor"]';
+
+    // Poll until Monaco has loaded AND the function editor is registered. The
+    // page also mounts a separate Query editor, so scope the match to this
+    // container. This replaces a fixed 300ms sleep that raced Monaco's load on
+    // slow CI runners — a miss left the editor empty, submitting an empty
+    // function body (backend 400 "Function body cannot be empty", no success toast).
+    await this.page.waitForFunction((sel) => {
       const editors = window.monaco?.editor?.getEditors?.();
-      const container = document.querySelector('[data-test="logs-vrl-function-editor"]');
+      const container = document.querySelector(sel);
+      return !!(container && editors?.some(e => container.contains(e.getContainerDomNode())));
+    }, editorSelector, { timeout: 15000 });
+
+    // Type the content as a real user via Monaco's textarea. This is deliberate:
+    // executeEdits() sets the model value but does NOT drive the editor's
+    // onDidChangeModelContent listener that syncs @update:query → formData.function,
+    // so a save afterwards submits an empty function body (backend 400
+    // "Function body cannot be empty", no success toast). Real keystrokes fire it.
+    // Click the VISIBLE editor surface (.view-lines) to focus Monaco — its
+    // <textarea.inputarea> is a 1px hidden input Playwright refuses to click.
+    await this.functionEditor.locator('.view-lines').first().click();
+    await this.page.keyboard.type(code, { delay: 20 });
+
+    // Confirm the content actually landed in the Monaco model.
+    await this.page.waitForFunction(({ sel, vrlCode }) => {
+      const editors = window.monaco?.editor?.getEditors?.();
+      const container = document.querySelector(sel);
       const targetEditor = editors?.find(e => container?.contains(e.getContainerDomNode()));
-      if (targetEditor) {
-        targetEditor.executeEdits('playwright', [{
-          range: targetEditor.getModel().getFullModelRange(),
-          text: vrlCode
-        }]);
-      }
-    }, code);
-    // Wait for Vue reactivity to propagate from onDidChangeModelContent → emit → formData.function
-    await this.page.waitForTimeout(500);
+      return targetEditor?.getModel()?.getValue() === vrlCode;
+    }, { sel: editorSelector, vrlCode: code }, { timeout: 5000 });
+
+    // The editor's @update:query emit is DEBOUNCED (500ms) and flushed on blur.
+    // Blur the editor (focus the name field) so formData.function updates
+    // immediately — deterministic instead of racing the debounce timer.
+    await this.functionNameField.click();
+    await this.page.waitForTimeout(200);
   }
 
   async expectSuccessToast() {

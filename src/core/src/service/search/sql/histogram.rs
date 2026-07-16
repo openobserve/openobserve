@@ -23,6 +23,45 @@ use sqlparser::{
     parser::Parser,
 };
 
+use super::{RE_HISTOGRAM, visitor::histogram_interval::generate_histogram_interval};
+
+pub fn handle_histogram(
+    origin_sql: &mut String,
+    q_time_range: (i64, i64),
+    histogram_interval: i64,
+) {
+    let Some(captures) = RE_HISTOGRAM.captures(origin_sql.as_str()) else {
+        return;
+    };
+
+    let args = match captures.get(1) {
+        Some(args) => args
+            .as_str()
+            .split(',')
+            .map(|value| {
+                value
+                    .trim()
+                    .trim_matches(|value| value == '\'' || value == '"')
+            })
+            .collect::<Vec<_>>(),
+        None => return,
+    };
+
+    let interval = if histogram_interval > 0 {
+        format!("{histogram_interval} second")
+    } else {
+        args.get(1)
+            .map_or_else(|| generate_histogram_interval(q_time_range), |value| *value)
+            .to_string()
+    };
+    let field = args.first().unwrap_or(&"_timestamp");
+
+    *origin_sql = origin_sql.replace(
+        captures.get(0).unwrap().as_str(),
+        &format!("histogram({field},'{interval}')"),
+    );
+}
+
 /// Converts an original query to a histogram query
 /// Extracts WHERE clause and builds histogram query with provided stream name
 pub fn convert_to_histogram_query(
@@ -200,6 +239,16 @@ pub fn histogram_bucket_start(timestamp_us: i64, interval_us: i64) -> i64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_handle_histogram() {
+        // Test case 1: Basic histogram with numeric interval
+        let mut sql = "SELECT histogram(_timestamp, '10 seconds') FROM logs".to_string();
+        let time_range = (1640995200000000, 1641081600000000); // 2022-01-01 to 2022-01-02
+        handle_histogram(&mut sql, time_range, 10);
+        assert!(sql.contains("histogram(_timestamp,"));
+        assert!(sql.contains("second"));
+    }
 
     #[test]
     fn test_convert_simple_query() {

@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       ref="parentRef"
       :class="[
-        'container',
+        'o2-scroll-container',
         'table-container',
         'flex-1',
         'min-h-0',

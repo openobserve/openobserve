@@ -4,6 +4,7 @@
  */
 
 import searchService from "@/services/search";
+import { rangesFromServerError } from "@/utils/query/sqlDiagnostics";
 import CronExpressionParser from "cron-parser";
 import { b64EncodeUnicode } from "@/utils/zincutils";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -327,6 +328,8 @@ export interface ValidationContext {
   store: any;
   validateSqlQueryPromise: any;
   sqlQueryErrorMsg: any;
+  /** Ref<SqlErrorRange[]> — editor squiggle ranges (optional). */
+  sqlErrorRanges?: any;
   vrlFunctionError: any;
   buildQueryPayload: any;
   getParser: (sqlQuery: string) => boolean;
@@ -484,10 +487,14 @@ export const validateSqlQuery = async (
     store,
     validateSqlQueryPromise,
     sqlQueryErrorMsg,
+    sqlErrorRanges,
     vrlFunctionError,
     buildQueryPayload,
     getParser,
   } = context;
+  const clearRanges = () => {
+    if (sqlErrorRanges) sqlErrorRanges.value = [];
+  };
 
   // Delaying the validation by 300ms, as editor has debounce of 300ms. Else old value will be used for validation
   await new Promise((resolve) => setTimeout(resolve, 300));
@@ -495,6 +502,7 @@ export const validateSqlQuery = async (
   // Skip validation if SQL query is empty or only whitespace
   if (!formData.query_condition.sql || formData.query_condition.sql.trim() === '') {
     sqlQueryErrorMsg.value = "";
+    clearRanges();
     return;
   }
 
@@ -527,6 +535,7 @@ export const validateSqlQuery = async (
       })
       .then((res: any) => {
         sqlQueryErrorMsg.value = "";
+        clearRanges();
 
         if (res.data?.function_error) {
           vrlFunctionError.value = res.data.function_error;
@@ -546,6 +555,20 @@ export const validateSqlQuery = async (
 
         // Error message is displayed inline below the editor
         // No need for toast notification as it's redundant
+
+        // Locate the offending token in the SQL and squiggle it in the editor.
+        if (sqlErrorRanges) {
+          rangesFromServerError({
+            code: err.response?.data?.code,
+            message: err.response?.data?.message,
+            errorDetail: err.response?.data?.error_detail,
+            sqlMode: true,
+            query: formData.query_condition.sql,
+            streamName: formData.stream_name,
+          }).then((ranges) => {
+            sqlErrorRanges.value = ranges;
+          });
+        }
 
         reject("sql_error");
       });
