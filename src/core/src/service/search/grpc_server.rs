@@ -461,8 +461,19 @@ impl Search for Searcher {
                 }
             }
         } else {
-            // TODO YJDoc2 fix this
-            todo!();
+            let err = crate::service::workflows::get_data_for_run(&org_id, &w_id, &r_id)
+                .await
+                .map_err(|e| {
+                    log::error!("error getting workflow rn data for {org_id}/{w_id}/{r_id} : {e}");
+                    Status::internal(format!("error getting workflow run data : {e}"))
+                })?;
+            match err {
+                Some(v) => v,
+                None => {
+                    log::error!("workflow run data for {org_id}/{w_id}/{r_id} not found");
+                    return Err(Status::internal(format!("workflow run data not found")));
+                }
+            }
         };
 
         Ok(Response::new(GetWorkflowInputsResponse { data }))

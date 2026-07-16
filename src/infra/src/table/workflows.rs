@@ -398,3 +398,21 @@ pub async fn delete_run_data(
 
     Ok(())
 }
+
+pub async fn save_workflow_run_data(entry: WorkflowRunData) -> Result<(), anyhow::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let _lock = get_lock().await;
+
+    let model = workflow_run_data::ActiveModel {
+        org_id: Set(entry.org_id),
+        workflow_id: Set(entry.workflow_id),
+        run_id: Set(entry.run_id),
+        triggered_at: Set(entry.triggered_at),
+        data: Set(entry.data),
+        ..Default::default()
+    };
+    workflow_run_data::Entity::insert(model)
+        .exec(client)
+        .await?;
+    Ok(())
+}
