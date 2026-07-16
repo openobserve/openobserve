@@ -206,6 +206,64 @@ pub enum SyntheticType {
     Dns,
 }
 
+impl SyntheticType {
+    /// JSON paths inside this type's `config` blob whose string values are
+    /// credentials and must be AES-encrypted at rest (and decrypted on read).
+    ///
+    /// `*` matches every element of an array. Paths that don't exist in a given
+    /// config are skipped, so optional fields need no special casing.
+    ///
+    /// Any new type that embeds a secret in its config MUST declare it here —
+    /// this list is the single source of truth for the encryption walk in
+    /// `encrypt_synthetic_auth` / `decrypt_synthetic_secrets` (enterprise) and
+    /// the probe resolve path.
+    pub fn secret_config_paths(&self) -> &'static [&'static str] {
+        match self {
+            Self::Ssh => &["/auth/secret"],
+            Self::Browser => &["/secrets/*/value"],
+            _ => &[],
+        }
+    }
+}
+
+/// Walks `value` along `path` (`/`-separated, `*` = every array element) and
+/// applies `f` to each string found at the end of the path. Missing segments
+/// are skipped silently. Non-string leaves are ignored.
+pub fn for_each_string_at_path<E>(
+    value: &mut serde_json::Value,
+    path: &str,
+    f: &mut impl FnMut(&mut String) -> Result<(), E>,
+) -> Result<(), E> {
+    fn walk<E>(
+        value: &mut serde_json::Value,
+        segments: &[&str],
+        f: &mut impl FnMut(&mut String) -> Result<(), E>,
+    ) -> Result<(), E> {
+        let Some((head, rest)) = segments.split_first() else {
+            if let serde_json::Value::String(s) = value {
+                f(s)?;
+            }
+            return Ok(());
+        };
+        if *head == "*" {
+            if let serde_json::Value::Array(items) = value {
+                for item in items {
+                    walk(item, rest, f)?;
+                }
+            }
+        } else if let Some(child) = value.get_mut(*head) {
+            walk(child, rest, f)?;
+        }
+        Ok(())
+    }
+    let segments: Vec<&str> = path
+        .trim_start_matches('/')
+        .split('/')
+        .filter(|s| !s.is_empty())
+        .collect();
+    walk(value, &segments, f)
+}
+
 // ── SyntheticStatus ─────────────────────────────────────────────────────────────
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default, ToSchema)]
@@ -513,10 +571,19 @@ pub struct BrowserConfig {
     #[serde(default)]
     pub env: Vec<String>,
     #[serde(default)]
-    pub secrets: Vec<String>,
+    pub secrets: Vec<BrowserSecret>,
     #[serde(default = "default_browser_timeout_ms")]
     pub timeout_ms: u32,
     pub capture: Option<BrowserCapture>,
+}
+
+/// A recorder-captured secret form value (e.g. a password typed during a login
+/// step). `value` is AES-encrypted at rest — declared in
+/// `SyntheticType::secret_config_paths` as `/secrets/*/value`.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct BrowserSecret {
+    pub name: String,
+    pub value: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -1115,6 +1182,77 @@ mod tests {
         let json = serde_json::json!("browser");
         let mt: SyntheticType = serde_json::from_value(json).unwrap();
         assert_eq!(mt, SyntheticType::Browser);
+    }
+
+    #[test]
+    fn test_secret_config_paths() {
+        assert_eq!(SyntheticType::Ssh.secret_config_paths(), &["/auth/secret"]);
+        assert_eq!(
+            SyntheticType::Browser.secret_config_paths(),
+            &["/secrets/*/value"]
+        );
+        assert!(SyntheticType::Http.secret_config_paths().is_empty());
+        assert!(SyntheticType::Tcp.secret_config_paths().is_empty());
+        assert!(SyntheticType::Tls.secret_config_paths().is_empty());
+        assert!(SyntheticType::Ping.secret_config_paths().is_empty());
+        assert!(SyntheticType::Dns.secret_config_paths().is_empty());
+    }
+
+    #[test]
+    fn test_for_each_string_at_path_object() {
+        let mut v = serde_json::json!({"auth": {"type": "password", "secret": "hunter2"}});
+        for_each_string_at_path(&mut v, "/auth/secret", &mut |s| {
+            *s = format!("enc({s})");
+            Ok::<(), ()>(())
+        })
+        .unwrap();
+        assert_eq!(v["auth"]["secret"], "enc(hunter2)");
+        // sibling untouched
+        assert_eq!(v["auth"]["type"], "password");
+    }
+
+    #[test]
+    fn test_for_each_string_at_path_array_wildcard() {
+        let mut v = serde_json::json!({"secrets": [
+            {"name": "a", "value": "1"},
+            {"name": "b", "value": "2"},
+        ]});
+        for_each_string_at_path(&mut v, "/secrets/*/value", &mut |s| {
+            *s = format!("enc({s})");
+            Ok::<(), ()>(())
+        })
+        .unwrap();
+        assert_eq!(v["secrets"][0]["value"], "enc(1)");
+        assert_eq!(v["secrets"][1]["value"], "enc(2)");
+        assert_eq!(v["secrets"][0]["name"], "a");
+    }
+
+    #[test]
+    fn test_for_each_string_at_path_missing_and_nonstring() {
+        // Missing path — no-op, no error.
+        let mut v = serde_json::json!({"port": 22});
+        for_each_string_at_path(&mut v, "/auth/secret", &mut |_| {
+            panic!("must not visit");
+            #[allow(unreachable_code)]
+            Ok::<(), ()>(())
+        })
+        .unwrap();
+        // Non-string leaf — skipped.
+        let mut v = serde_json::json!({"auth": {"secret": 42}});
+        for_each_string_at_path(&mut v, "/auth/secret", &mut |_| {
+            panic!("must not visit");
+            #[allow(unreachable_code)]
+            Ok::<(), ()>(())
+        })
+        .unwrap();
+        assert_eq!(v["auth"]["secret"], 42);
+    }
+
+    #[test]
+    fn test_for_each_string_at_path_error_propagates() {
+        let mut v = serde_json::json!({"auth": {"secret": "x"}});
+        let res = for_each_string_at_path(&mut v, "/auth/secret", &mut |_| Err("boom"));
+        assert_eq!(res, Err("boom"));
     }
 
     #[test]

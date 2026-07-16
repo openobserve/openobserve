@@ -115,8 +115,13 @@ export function buildCreateBrowserTestPayload(check: BrowserCheck): Record<strin
       },
       ...(secrets?.length && { secrets: secrets.map(({ id: _id, ...s }) => s) }),
       ...(headers?.length && { headers: headers.map(({ id: _id, ...h }) => h) }),
-      ...(cookies?.length && { cookies: cookies.map(({ id: _id, ...c }) => c) }),
     },
+
+    // Cookies ride at the top level (like auth/variables) so the backend
+    // encrypts their values at rest and injects them via _AUTH_COOKIES.
+    ...(cookies?.length && {
+      cookies: cookies.map(({ name, value, domain }) => ({ name, value, domain })),
+    }),
 
     ...(auth && {
       auth: {
@@ -308,7 +313,7 @@ export function mapResponseToBrowserCheck(data: Record<string, unknown>): Browse
     destinations,
     retries, wait_before_retry_secs, alert_if_fails, cooldown_mins,
     target, folder_id,
-    variables, start, auth: apiAuth,
+    variables, start, auth: apiAuth, cookies: apiCookies,
     ...rest
   } = data as any
 
@@ -360,7 +365,14 @@ export function mapResponseToBrowserCheck(data: Record<string, unknown>): Browse
     }),
     ...(config?.secrets && { secrets: config.secrets }),
     ...(config?.headers && { headers: config.headers }),
-    ...(config?.cookies && { cookies: config.cookies }),
+    // Cookies are top-level on the wire (encrypted at rest server-side).
+    ...(apiCookies?.length && {
+      cookies: (apiCookies as any[]).map((c) => ({
+        name: c.name,
+        value: c.value,
+        domain: c.domain,
+      })),
+    }),
   } as BrowserCheck
 }
 
