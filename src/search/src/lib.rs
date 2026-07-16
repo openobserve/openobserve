@@ -15,8 +15,10 @@
 
 pub mod bloom_pruner;
 pub mod cache;
+pub mod cluster;
 pub mod datafusion;
 pub mod enrichment;
+pub mod grpc;
 pub mod grpc_search;
 pub mod index;
 pub mod inspector;

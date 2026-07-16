@@ -25,3 +25,6 @@ pub mod enrichment_exec;
 pub mod node;
 pub mod remote_scan_exec;
 mod utils;
+mod visitors;
+
+pub use visitors::{NewEmptyExecVisitor, ReplaceTableScanExec};

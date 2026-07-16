@@ -13,8 +13,24 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-pub mod cacher;
-pub mod flight;
-pub mod http;
+use config::meta::stream::StreamType;
+use datafusion::sql::TableReference;
 
-pub use ::search::cluster::{handle_metrics_response, handle_table_response};
+#[derive(Debug)]
+pub struct QueryParams {
+    pub trace_id: String,
+    pub org_id: String,
+    pub stream: TableReference,
+    pub stream_type: StreamType,
+    pub stream_name: String,
+    pub time_range: (i64, i64),
+    pub work_group: Option<String>,
+    pub use_inverted_index: bool,
+}
+
+/// Linear interpolation: cached_ratio=0 -> query_thread_num, cached_ratio=1 -> cpu_num.
+pub fn calc_target_partitions(cpu_num: usize, query_thread_num: usize, cached_ratio: f64) -> usize {
+    (cpu_num as i64
+        + ((query_thread_num as i64 - cpu_num as i64) as f64 * (1.0 - cached_ratio)) as i64)
+        as usize
+}
