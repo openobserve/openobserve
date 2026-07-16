@@ -17,7 +17,7 @@ the Free Software Foundation, either version 3 of the License, or
 
     <div
       v-else-if="loadError"
-      class="flex flex-col items-center justify-center flex-1 p-8 text-(--o2-text-muted)"
+      class="flex flex-col items-center justify-center flex-1 p-8 text-(--color-text-secondary)"
       data-test="scorer-library-error"
     >
       <OIcon name="error-outline" class="mb-2" style="width: 3em; height: 3em" />
@@ -29,7 +29,7 @@ the Free Software Foundation, either version 3 of the License, or
 
     <div
       v-else-if="providers.length === 0"
-      class="flex flex-col items-center justify-center flex-1 p-8 text-(--o2-text-muted)"
+      class="flex flex-col items-center justify-center flex-1 p-8 text-(--color-text-secondary)"
       data-test="scorer-library-no-providers"
     >
       Create a Provider first before importing LLM Judge scorers.
@@ -38,7 +38,7 @@ the Free Software Foundation, either version 3 of the License, or
     <div v-else class="flex flex-col min-h-0 flex-1">
       <div class="flex items-end gap-3 mb-4">
         <div class="flex items-center gap-2 shrink-0 w-60">
-          <label class="text-xs font-semibold text-(--o2-text) whitespace-nowrap">Provider</label>
+          <label class="text-xs font-semibold text-(--color-text-secondary) whitespace-nowrap">Provider</label>
           <OSelect
             v-model="selectedProviderId"
             :options="providerOptions"
@@ -60,7 +60,7 @@ the Free Software Foundation, either version 3 of the License, or
       <div class="flex items-center justify-between gap-3 mb-2 pl-4.25 pr-3">
         <label
           v-if="filteredEntries.length > 0"
-          class="inline-flex items-center gap-2 py-0.5 px-1 text-xs font-medium text-(--o2-text) select-none"
+          class="inline-flex items-center gap-2 py-0.5 px-1 text-xs font-medium text-(--color-text-secondary) select-none"
           data-test="scorer-library-select-all"
         >
           <OCheckbox
@@ -69,7 +69,7 @@ the Free Software Foundation, either version 3 of the License, or
           />
           <span>{{ allVisibleSelected ? "Clear all" : "Select all" }}</span>
         </label>
-        <span class="text-xs text-gray-500">
+        <span class="text-xs text-(--color-text-secondary)">
           {{ filteredEntries.length }} scorer(s)
         </span>
       </div>
@@ -81,12 +81,12 @@ the Free Software Foundation, either version 3 of the License, or
           class="mt-4 first:mt-0"
           :data-test="`scorer-library-section-${group.category}`"
         >
-          <h4 class="flex items-baseline gap-1.5 m-0 mb-1.5 text-xs font-bold uppercase tracking-[0.04em] text-(--o2-text)">
+          <h4 class="flex items-baseline gap-1.5 m-0 mb-1.5 text-xs font-bold uppercase tracking-[0.04em] text-(--color-text-heading)">
             <span>{{ group.category }}</span>
-            <span class="font-medium text-(--o2-text-muted)">({{ group.entries.length }})</span>
+            <span class="font-medium text-(--color-text-secondary)">({{ group.entries.length }})</span>
           </h4>
           <ul
-            class="flex flex-col rounded border border-border"
+            class="flex flex-col rounded border border-(--color-border-default)"
           >
             <li
               v-for="entry in group.entries"
@@ -94,8 +94,8 @@ the Free Software Foundation, either version 3 of the License, or
               class="flex items-center gap-2 px-3 py-2 cursor-pointer transition-colors duration-200 border-l-4"
               :class="[
                 isSelected(entry.name)
-                  ? 'selected-item bg-[color-mix(in_srgb,var(--o2-brand)_6%,transparent)] border-primary'
-                  : 'border-transparent hover:bg-gray-50',
+                  ? 'selected-item bg-[color-mix(in_srgb,var(--color-primary-600)_6%,transparent)] border-primary'
+                  : 'border-transparent hover:bg-(--color-table-row-hover-bg)',
               ]"
               :data-test="`scorer-library-item-${entry.name}`"
               @click="toggle(entry)"
@@ -111,7 +111,7 @@ the Free Software Foundation, either version 3 of the License, or
                 <span class="text-sm font-medium">{{ entry.displayName }}</span>
                 <span
                   v-if="entry.description"
-                  class="block text-xs text-muted-foreground"
+                  class="block text-xs text-(--color-text-secondary)"
                 >
                   {{ entry.description }}
                 </span>

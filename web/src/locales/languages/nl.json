@@ -484,6 +484,10 @@
   },
   "validation": {
     "required": "Dit veld is verplicht",
+    "fieldRequired": "Veld is verplicht!",
+    "alphanumeric": "Invoer moet alfanumeriek zijn",
+    "organizationNameRequired": "Organisatienaam is verplicht",
+    "selectOrganization": "Selecteer een organisatie",
     "invalidFormat": "Ongeldig formaat",
     "mustBeGreaterThan": "Moet groter zijn dan {value}",
     "mustBeLessThan": "Moet kleiner zijn dan {value}"
@@ -882,6 +886,12 @@
     "webVitals": "Vitalen voor het web",
     "errors": "Fouten",
     "api": "API",
+    "uploadSourceMapsForm": {
+      "serviceRequired": "Service is vereist",
+      "versionRequired": "Versie is vereist",
+      "fileRequired": "Selecteer een ZIP-bestand om te uploaden",
+      "fileTypeZip": "Alleen ZIP-bestanden zijn toegestaan"
+    },
     "emptyState": {
       "title": "Bewaak uw gebruikers met Real User Monitoring",
       "description": "RUM houdt echte gebruikersinteracties bij, zoals het laden van pagina's, fouten, API-aanroepen en herhalingen van sessies, zodat u precies kunt zien hoe gebruikers uw toepassing ervaren.",
@@ -1691,6 +1701,9 @@
     "labelIndex": "Indexeren",
     "add": "Stream toevoegen",
     "dataRetention": "Bewaring van gegevens (in dagen)",
+    "streamNameRequired": "Streamnaam is verplicht",
+    "streamTypeRequired": "Selecteer een streamtype",
+    "dataRetentionMin": "Gegevensbewaring moet minimaal 1 dag zijn",
     "indexing": "Indexering",
     "createStream": "Stream maken",
     "indexType": "Indextype",
@@ -1830,6 +1843,27 @@
     "dragDropNodesHere": "Knooppunten hierheen slepen en neerzetten",
     "promqlOnlyForMetrics": "ProMQL is alleen beschikbaar voor het streamtype voor statistieken",
     "invalidCronExpression": "Ongeldige cron-expressie",
+    "cronRequired": "Cron-expressie is verplicht",
+    "destResourceNameInvalid": "Tekens zoals :, ?, /, # en spaties zijn niet toegestaan.",
+    "urlTrailingSlash": "URL mag niet eindigen met een schuine streep",
+    "orgRequiredOpenobserve": "Organisatie is verplicht voor OpenObserve",
+    "streamRequiredOpenobserve": "Streamnaam is verplicht voor OpenObserve",
+    "endpointMustStartSlash": "Het endpointpad moet beginnen met /",
+    "indexRequiredEsbulk": "Indexnaam is verplicht voor ESBulk-indeling",
+    "separatorRequiredStringseparated": "Scheidingsteken is verplicht voor StringSeparated-indeling",
+    "ddSourceRequiredDatadog": "DD Source is verplicht voor Datadog",
+    "ddTagsRequiredDatadog": "DD Tags zijn verplicht voor Datadog",
+    "periodGreaterThanZero": "Periode moet groter zijn dan 0",
+    "frequencyGreaterThanSeconds": "Frequentie moet groter zijn dan {seconds} seconden.",
+    "minimumFrequencyMinutes": "Minimale frequentie moet {minutes} minuten zijn",
+    "streamSelectionNameInvalid": "Gebruik alleen alfanumerieke tekens en '+=,.@-_', zonder spaties.",
+    "functionAlreadyAssociated": "Functie is al gekoppeld",
+    "atLeastOneCondition": "Voeg minstens één voorwaarde toe",
+    "fillAllConditionFields": "Vul alle voorwaardevelden in (kolom, operator en waarde zijn verplicht)",
+    "selectExternalDestination": "Selecteer een externe bestemming uit de lijst",
+    "backfillNumericRange": "Moet tussen {min} en {max} liggen",
+    "selectValidTimeRange": "Selecteer een geldig tijdsbereik",
+    "startBeforeEndTime": "De starttijd moet vóór de eindtijd liggen",
     "thresholdShouldNotBeEmpty": "Drempelwaarde mag niet leeg zijn",
     "errorGettingResults": "Fout bij het verkrijgen van resultaten",
     "save": "Opslaan",
@@ -1881,6 +1915,11 @@
     "tooltipPromptTemplate": "De prompt die naar de LLM is gestuurd. Gebruik {input}, {output} en {context} als tijdelijke aanduidingen voor dynamische waarden tijdens de evaluatie."
   },
   "function": {
+    "csvFileRequired": "CSV-bestand is verplicht!",
+    "urlRequired": "URL is verplicht!",
+    "urlMustStartWithHttp": "URL moet beginnen met http:// of https://",
+    "nameRequired": "Dit veld is verplicht!",
+    "invalidMethodName": "Ongeldige methodenaam. Moet beginnen met een letter of onderstrepingsteken. Gebruik alleen letters, cijfers en onderstrepingstekens.",
     "header": "Functies",
     "subtitle": "Herbruikbare VRL-functies toegepast in pijpleidingen",
     "clickTestFunctionHint": "Klik op Test Function om de gebeurtenissen te zien",
@@ -3013,6 +3052,7 @@
       "inviteTitle": "Een organisatie uitnodigen",
       "inviteOrgIdLabel": "Identificatie van de organisatie",
       "inviteOrgIdPlaceholder": "Voer de identificatiecode van de organisatie in",
+      "inviteOrgIdRequired": "Identificatie van de organisatie is vereist",
       "sendInvite": "Uitnodiging verzenden",
       "inviteSent": "Uitnodiging succesvol verzonden",
       "inviteSameOrg": "Een organisatie kan zichzelf niet uitnodigen",
@@ -3979,6 +4019,16 @@
     "domainConfiguredCount": "{count} domein (s) geconfigureerd",
     "allowAllUsersFromDomain": "Alle gebruikers van {domain} toestaan",
     "allowOnlySpecificUsers": "Alleen specifieke gebruikers van {domain} toestaan",
+    "blockSpecificUsers": "Blokkeer alleen specifieke gebruikers van {domain}",
+    "blockAllUsersFromDomain": "Blokkeer alle gebruikers van {domain}",
+    "allUsersBlockedMessage": "Alle externe SSO-gebruikers met e-mailadressen die eindigen op {domain} worden uit het systeem geblokkeerd (gebruikersinterface, API en opname).",
+    "blockedUsersHint": "Geblokkeerde vermeldingen zijn alleen van toepassing op externe SSO-identiteiten (SSO-gebruikers en SSO-/tokenserviceaccounts). Ze negeren elke toestemingsregel en hebben betrekking op de gebruikersinterface, API en opname. Native accounts en door de API aangemaakte accounts worden niet beïnvloed. Verwijder ze in plaats daarvan.",
+    "addBlockedEmail": "E-mailadres blokkeren",
+    "blockedEmailPlaceholder": "bijv. gebruiker {domain}",
+    "domainNeedsBlockedEmails": "Domein '{domain}' moet minstens één e-mailadres hebben om specifieke gebruikers te kunnen blokkeren",
+    "confirmRemoveBlockedEmail": "Weet je zeker dat je de e-mail '{email}' wilt deblokkeren?",
+    "blockedEmailAdded": "E-mailadres succesvol geblokkeerd",
+    "blockedEmailRemoved": "E-mailadres succesvol gedeblokkeerd",
     "allUsersAllowedMessage": "Alle gebruikers met e-mailadressen die eindigen op {domain} kunnen inloggen.",
     "emailPlaceholder": "bijv. gebruiker {domain}",
     "addEmail": "E-mailadres toevoegen",
@@ -4283,7 +4333,16 @@
     "dimensionWidth": "Breedte (px)",
     "dimensionHeight": "Hoogte (px)",
     "imagePreview": "Inline voorbeeldafbeelding van het dashboard toevoegen",
-    "customDimensions": "Aangepaste afmetingen (geavanceerd)"
+    "customDimensions": "Aangepaste afmetingen (geavanceerd)",
+    "validation": {
+      "resourceNameInvalid": "Tekens zoals :, ?, /, # en spaties zijn niet toegestaan.",
+      "invalidCron": "Ongeldige cron-expressie!",
+      "cronSixFields": "De cron-expressie moet precies 6 velden bevatten: [Seconde] [Minuut] [Uur] [Dag van de maand] [Maand] [Dag van de week]",
+      "cronMinInterval": "De frequentie moet groter zijn dan {seconds} seconden.",
+      "dateFormat": "De datumnotatie is onjuist!",
+      "timeFormat": "De tijdnotatie is onjuist!",
+      "invalidEmails": "Voeg geldige e-mailadressen toe!"
+    }
   },
   "queries": {
     "runningQueries": "Zoekopdrachten uitvoeren",
@@ -4698,6 +4757,9 @@
     "search": "Zoekactie",
     "timezone": "Tijdzone",
     "zipFileRequired": "ZIP-bestand is vereist!",
+    "fieldRequired": "Veld is verplicht!",
+    "nameInvalidChars": "Tekens zoals :, ?, /, # en spaties zijn niet toegestaan.",
+    "invalidMethodName": "Ongeldige methodenaam. Moet beginnen met een letter of onderstrepingsteken. Gebruik alleen letters, cijfers en onderstrepingstekens.",
     "zipFile": "ZIP-bestand",
     "frequency": "Frequentie"
   },
@@ -4783,6 +4845,25 @@
     "providerTypeRequired": "Het type provider is vereist",
     "algorithmRequired": "Algoritme is vereist",
     "secretRequired": "Geheim is vereist",
+    "nameRequired": "Naam is vereist",
+    "nameMaxLength": "De naam mag maximaal 50 tekens lang zijn.",
+    "nameInvalidChars": "Alleen alfanumerieke tekens, underscores en koppeltekens zijn toegestaan",
+    "nameInvalidResource": "Tekens zoals :, ?, /, # en spaties zijn niet toegestaan.",
+    "typeRequired": "Type is vereist",
+    "baseURLRequired": "Basis-URL is vereist",
+    "baseURLInvalid": "Geef een correcte URL op.",
+    "baseURLHtmlNotAllowed": "HTML-tags zijn niet toegestaan",
+    "accessIdRequired": "Toegangs-ID is vereist",
+    "accessIdInvalid": "Toegangs-ID moet alfanumeriek zijn",
+    "authenticationTypeRequired": "Authenticatietype is vereist",
+    "secretTypeRequired": "Geheim type is vereist",
+    "accessKeyRequired": "Toegangssleutel is vereist",
+    "ldapUsernameRequired": "LDAP-gebruikersnaam is vereist",
+    "ldapUsernameInvalid": "Gebruikersnaam mag alleen alfanumerieke tekens, punten, underscores en koppeltekens bevatten",
+    "ldapPasswordRequired": "LDAP-wachtwoord is vereist",
+    "staticSecretNameRequired": "Naam van statisch geheim is vereist",
+    "dfcNameRequired": "DFC-naam is vereist",
+    "dfcEncryptedDataRequired": "DFC-gecodeerde gegevens zijn vereist",
     "storeType": "Soort winkel",
     "mechanismType": "Soort mechanisme",
     "actions": "Acties"
@@ -5572,7 +5653,11 @@
       "authEditNote": "Inloggegevens kunnen niet worden teruggelezen. Voer de API-sleutel alleen opnieuw in als je deze wilt roteren.",
       "cannotRename": "Kan na het aanmaken niet worden hernoemd.",
       "availableModelsHelp": "Optioneel. Door komma's gescheiden lijst van modellen die beschikbaar zijn op deze provider.",
-      "saveError": "Het opslaan van de provider is mislukt"
+      "saveError": "Het opslaan van de provider is mislukt",
+      "nameRequired": "Provider name is required",
+      "typeRequired": "Provider type is required",
+      "defaultModelRequired": "Default model is required",
+      "apiKeyRequired": "API key is required"
     },
     "scoreConfig": {
       "booleanValues": "true / false",
@@ -5689,6 +5774,12 @@
       "falseIsHealthyHint": "Scores van true veroorzaken kwaliteitsproblemen.",
       "thresholdEmptyHint": "Door dit leeg te laten, draagt deze dimensie niet bij aan kwaliteitsstatussignalen in het product. Scores worden nog steeds geregistreerd, maar veroorzaken geen probleemindicatoren.",
       "saveError": "Het opslaan van de scoreconfiguratie is mislukt",
+      "validation": {
+        "nameRequired": "Name is required",
+        "nameFormat": "Use lowercase letters, numbers, and underscores only",
+        "minRequired": "Min is required",
+        "maxRequired": "Max is required"
+      },
       "empty": {
         "title": "Nog geen scoreconfiguraties",
         "description": "Scoreconfiguraties definiëren de dimensies die je scorers produceren — naam, gegevenstype, waardebereik en gezonde drempelwaarde. Maak er een aan om met online evaluatie te beginnen.",
@@ -5922,6 +6013,20 @@
       },
       "requestBodyLabel": "Bodysjabloon aanvragen",
       "saveError": "Het opslaan van de scorer is mislukt",
+      "validation": {
+        "nameRequired": "Scorer name is required",
+        "scoreConfigRequired": "A score config is required",
+        "providerRequired": "A provider is required",
+        "endpointRequired": "An endpoint URL is required",
+        "bearerTokenRequired": "Token is required",
+        "basicUsernameRequired": "Username is required",
+        "basicPasswordRequired": "Password is required",
+        "apiKeyHeaderRequired": "Header name is required",
+        "apiKeyTokenRequired": "Token is required",
+        "timeoutInvalid": "Timeout must be 0 or greater",
+        "retriesInvalid": "Retries must be 0 or greater",
+        "duplicateFieldName": "Field names must be unique"
+      },
       "versionsLoadError": "Kon de versies van de scoreconfiguratie niet laden",
       "testPanel": {
         "title": "Test deze scorer",
@@ -6101,7 +6206,12 @@
       "selectAtLeastOne": "Selecteer minstens één scorer",
       "saveError": "Kon de evaluatietaak niet opslaan",
       "createdAndActivated": "Evaluatietaak aangemaakt en geactiveerd",
-      "createdButActivateFailed": "Evaluatietaak aangemaakt, maar activeren is mislukt"
+      "createdButActivateFailed": "Evaluatietaak aangemaakt, maar activeren is mislukt",
+      "validation": {
+        "nameRequired": "Job name is required",
+        "streamRequired": "A stream is required",
+        "samplingValueRequired": "A sampling value is required"
+      }
     }
   },
   "llmProviders": {

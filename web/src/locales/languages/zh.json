@@ -484,6 +484,10 @@
   },
   "validation": {
     "required": "此字段为必填字段",
+    "fieldRequired": "字段为必填项！",
+    "alphanumeric": "输入必须为字母数字",
+    "organizationNameRequired": "组织名称为必填项",
+    "selectOrganization": "请选择一个组织",
     "invalidFormat": "格式无效",
     "mustBeGreaterThan": "必须大于 {值}",
     "mustBeLessThan": "必须小于 {值}"
@@ -882,6 +886,12 @@
     "webVitals": "关键指标",
     "errors": "错误",
     "api": "API",
+    "uploadSourceMapsForm": {
+      "serviceRequired": "服务是必填项",
+      "versionRequired": "版本是必填项",
+      "fileRequired": "请选择要上传的 ZIP 文件",
+      "fileTypeZip": "仅允许 ZIP 文件"
+    },
     "emptyState": {
       "title": "使用真实用户监控监控您的用户",
       "description": "RUM 跟踪真实的用户交互——页面加载、错误、API 调用和会话重播——因此您可以确切地了解用户对应用程序的体验。",
@@ -1691,6 +1701,9 @@
     "labelIndex": "索引",
     "add": "添加数据流",
     "dataRetention": "数据保留（以天为单位）",
+    "streamNameRequired": "流名称为必填项",
+    "streamTypeRequired": "请选择流类型",
+    "dataRetentionMin": "数据保留时间必须至少为 1 天",
     "indexing": "索引",
     "createStream": "创建数据流",
     "indexType": "索引类型",
@@ -1830,6 +1843,27 @@
     "dragDropNodesHere": "将节点拖放到此处",
     "promqlOnlyForMetrics": "PromQL 仅适用于指标流类型",
     "invalidCronExpression": "无效的 cron 表达式",
+    "cronRequired": "Cron 表达式为必填项",
+    "destResourceNameInvalid": "不允许使用 :、?、/、# 等字符和空格。",
+    "urlTrailingSlash": "URL 结尾不应包含斜杠",
+    "orgRequiredOpenobserve": "OpenObserve 需要填写组织",
+    "streamRequiredOpenobserve": "OpenObserve 需要填写流名称",
+    "endpointMustStartSlash": "端点路径必须以 / 开头",
+    "indexRequiredEsbulk": "ESBulk 格式需要填写索引名称",
+    "separatorRequiredStringseparated": "StringSeparated 格式需要填写分隔符",
+    "ddSourceRequiredDatadog": "Datadog 需要填写 DD Source",
+    "ddTagsRequiredDatadog": "Datadog 需要填写 DD Tags",
+    "periodGreaterThanZero": "周期必须大于 0",
+    "frequencyGreaterThanSeconds": "频率必须大于 {seconds} 秒。",
+    "minimumFrequencyMinutes": "最小频率应为 {minutes} 分钟",
+    "streamSelectionNameInvalid": "仅使用字母数字和 '+=,.@-_' 字符，不含空格。",
+    "functionAlreadyAssociated": "该函数已关联",
+    "atLeastOneCondition": "请至少添加一个条件",
+    "fillAllConditionFields": "请填写所有条件字段（列、运算符和值均为必填项）",
+    "selectExternalDestination": "请从列表中选择外部目标",
+    "backfillNumericRange": "必须介于 {min} 和 {max} 之间",
+    "selectValidTimeRange": "请选择有效的时间范围",
+    "startBeforeEndTime": "开始时间必须早于结束时间",
     "thresholdShouldNotBeEmpty": "阈值不应为空",
     "errorGettingResults": "获取结果时出错",
     "save": "保存",
@@ -1881,6 +1915,11 @@
     "tooltipPromptTemplate": "提示已发送到 LLM。在评估时使用 {输入}、{输出} 和 {context} 作为动态值的占位符。"
   },
   "function": {
+    "csvFileRequired": "CSV 文件为必填项！",
+    "urlRequired": "URL 为必填项！",
+    "urlMustStartWithHttp": "URL 必须以 http:// 或 https:// 开头",
+    "nameRequired": "此字段为必填项！",
+    "invalidMethodName": "方法名称无效。必须以字母或下划线开头，且只能包含字母、数字和下划线。",
     "header": "函数",
     "subtitle": "应用于管道的可重复使用的 VRL 函数",
     "clickTestFunctionHint": "请单击 “测试功能” 查看事件",
@@ -3013,6 +3052,7 @@
       "inviteTitle": "邀请组织",
       "inviteOrgIdLabel": "组织标识符",
       "inviteOrgIdPlaceholder": "输入组织标识符",
+      "inviteOrgIdRequired": "组织标识符是必填项",
       "sendInvite": "发送邀请",
       "inviteSent": "邀请已成功发送",
       "inviteSameOrg": "组织无法邀请自己",
@@ -3979,6 +4019,16 @@
     "domainConfiguredCount": "{count} 个域已配置",
     "allowAllUsersFromDomain": "允许来自 {domain} 的所有用户",
     "allowOnlySpecificUsers": "仅允许来自 {domain} 的特定用户",
+    "blockSpecificUsers": "仅屏蔽来自 {domain} 的特定用户",
+    "blockAllUsersFromDomain": "屏蔽来自 {domain} 的所有用户",
+    "allUsersBlockedMessage": "所有电子邮件地址以 {domain} 结尾的外部 SSO 用户都将被禁止访问系统（用户界面、API 和提取）。",
+    "blockedUsersHint": "被封锁的条目仅适用于外部 SSO 身份（SSO 用户和 SSO/代币服务账户）。它们会覆盖任何允许规则，涵盖用户界面、API 和摄取。原生账户和 API 创建的账户不受影响，改为删除这些账户。",
+    "addBlockedEmail": "屏蔽电子邮件",
+    "blockedEmailPlaceholder": "例如用户 {域}",
+    "domainNeedsBlockedEmails": "在屏蔽特定用户时，域 “{domain}” 必须至少有一个电子邮件地址",
+    "confirmRemoveBlockedEmail": "您确定要解除对电子邮件 “{email}” 的封锁吗？",
+    "blockedEmailAdded": "电子邮件地址已成功封锁",
+    "blockedEmailRemoved": "电子邮件地址成功解除封锁",
     "allUsersAllowedMessage": "所有电子邮件地址以 {domain} 结尾的用户都将被允许登录。",
     "emailPlaceholder": "例如用户 {域}",
     "addEmail": "添加电子邮件",
@@ -4283,7 +4333,16 @@
     "dimensionWidth": "宽度 (px)",
     "dimensionHeight": "高度 (px)",
     "imagePreview": "包括内联仪表板预览图片",
-    "customDimensions": "自定义尺寸（高级）"
+    "customDimensions": "自定义尺寸（高级）",
+    "validation": {
+      "resourceNameInvalid": "不允许使用 :、?、/、# 等字符和空格。",
+      "invalidCron": "无效的 Cron 表达式！",
+      "cronSixFields": "Cron 表达式必须正好包含 6 个字段：[秒] [分钟] [小时] [日] [月] [星期]",
+      "cronMinInterval": "频率应大于 {seconds} 秒。",
+      "dateFormat": "日期格式不正确！",
+      "timeFormat": "时间格式不正确！",
+      "invalidEmails": "请添加有效的电子邮件！"
+    }
   },
   "queries": {
     "runningQueries": "运行查询",
@@ -4698,6 +4757,9 @@
     "search": "搜索操作",
     "timezone": "时区",
     "zipFileRequired": "ZIP 文件是必填的！",
+    "fieldRequired": "字段为必填项！",
+    "nameInvalidChars": "不允许使用 :、?、/、# 等字符和空格。",
+    "invalidMethodName": "方法名称无效。必须以字母或下划线开头。只能使用字母、数字和下划线。",
     "zipFile": "ZIP 文件",
     "frequency": "频率"
   },
@@ -4783,6 +4845,25 @@
     "providerTypeRequired": "提供商类型为必填项",
     "algorithmRequired": "算法是必需的",
     "secretRequired": "密钥为必填项",
+    "nameRequired": "名称为必填项",
+    "nameMaxLength": "名称不得超过50个字符。",
+    "nameInvalidChars": "仅允许使用字母数字字符、下划线和连字符",
+    "nameInvalidResource": "不允许使用 :、?、/、# 和空格等字符。",
+    "typeRequired": "类型为必填项",
+    "baseURLRequired": "基本网址为必填项",
+    "baseURLInvalid": "请提供正确的网址。",
+    "baseURLHtmlNotAllowed": "不允许使用HTML标签",
+    "accessIdRequired": "访问ID为必填项",
+    "accessIdInvalid": "访问ID应为字母数字",
+    "authenticationTypeRequired": "身份验证类型为必填项",
+    "secretTypeRequired": "密钥类型为必填项",
+    "accessKeyRequired": "访问密钥为必填项",
+    "ldapUsernameRequired": "LDAP 用户名为必填项",
+    "ldapUsernameInvalid": "用户名只能包含字母数字字符、点、下划线和连字符",
+    "ldapPasswordRequired": "LDAP 密码为必填项",
+    "staticSecretNameRequired": "静态密钥名称为必填项",
+    "dfcNameRequired": "DFC 名称为必填项",
+    "dfcEncryptedDataRequired": "DFC 加密数据为必填项",
     "storeType": "商店类型",
     "mechanismType": "机制类型",
     "actions": "操作"
@@ -5572,7 +5653,11 @@
       "authEditNote": "凭据无法回读。仅当您想轮换 API 密钥时才重新输入。",
       "cannotRename": "创建后无法重命名。",
       "availableModelsHelp": "可选。此提供商上可用模型的逗号分隔列表。",
-      "saveError": "无法保存提供商"
+      "saveError": "无法保存提供商",
+      "nameRequired": "Provider name is required",
+      "typeRequired": "Provider type is required",
+      "defaultModelRequired": "Default model is required",
+      "apiKeyRequired": "API key is required"
     },
     "scoreConfig": {
       "booleanValues": "true / false",
@@ -5689,6 +5774,12 @@
       "falseIsHealthyHint": "评分为 true 时触发质量问题。",
       "thresholdEmptyHint": "将此项留空意味着此维度不会影响整个产品的质量状态信号。评分仍会被记录，但不会触发问题指示器。",
       "saveError": "无法保存分数配置",
+      "validation": {
+        "nameRequired": "Name is required",
+        "nameFormat": "Use lowercase letters, numbers, and underscores only",
+        "minRequired": "Min is required",
+        "maxRequired": "Max is required"
+      },
       "empty": {
         "title": "尚无评分配置",
         "description": "评分配置定义了您的评分器产生的维度 — 名称、数据类型、值范围和健康阈值。创建一个以开始连接在线评估。",
@@ -5922,6 +6013,20 @@
       },
       "requestBodyLabel": "请求正文模板",
       "saveError": "无法保存评分器",
+      "validation": {
+        "nameRequired": "Scorer name is required",
+        "scoreConfigRequired": "A score config is required",
+        "providerRequired": "A provider is required",
+        "endpointRequired": "An endpoint URL is required",
+        "bearerTokenRequired": "Token is required",
+        "basicUsernameRequired": "Username is required",
+        "basicPasswordRequired": "Password is required",
+        "apiKeyHeaderRequired": "Header name is required",
+        "apiKeyTokenRequired": "Token is required",
+        "timeoutInvalid": "Timeout must be 0 or greater",
+        "retriesInvalid": "Retries must be 0 or greater",
+        "duplicateFieldName": "Field names must be unique"
+      },
       "versionsLoadError": "加载分数配置版本失败",
       "testPanel": {
         "title": "测试这个评分器",
@@ -6101,7 +6206,12 @@
       "selectAtLeastOne": "至少选择一名评分器",
       "saveError": "无法保存评测任务",
       "createdAndActivated": "评估作业已创建并激活",
-      "createdButActivateFailed": "评估作业已创建，但激活失败"
+      "createdButActivateFailed": "评估作业已创建，但激活失败",
+      "validation": {
+        "nameRequired": "Job name is required",
+        "streamRequired": "A stream is required",
+        "samplingValueRequired": "A sampling value is required"
+      }
     }
   },
   "llmProviders": {

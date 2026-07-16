@@ -2,7 +2,7 @@
 //
 // Validation schema for MemberInvitation.vue (the inline invite row).
 //
-// MemberInvitation had no Quasar `:rules` — it validated imperatively
+// MemberInvitation had no declarative validation rules — it validated imperatively
 // (`validateEmail()` per address + a button-disable on empty). This encodes that
 // intent into Zod: `email` is required AND every address (split on `;`/`,`) must
 // be a valid email. `role` defaults to "admin" (the old `selectedRole` default).

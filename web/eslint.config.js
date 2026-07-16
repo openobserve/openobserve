@@ -93,27 +93,27 @@ export default [
         {
           element: "q-menu",
           message:
-            'Use <ODropdown> from "@/lib/overlay/Dropdown/ODropdown.vue" instead of <q-menu>. See web/bannerImplementation/quasar-menu-migration.md.',
+            'Use <ODropdown> from "@/lib/overlay/Dropdown/ODropdown.vue" instead of <q-menu>.',
         },
         {
           element: "q-list",
           message:
-            'Drop <q-list> inside <ODropdown> (not needed), or replace standalone <q-list> with a native <ul> / <div> + Tailwind. See web/bannerImplementation/quasar-list-components-migration.md.',
+            'Drop <q-list> inside <ODropdown> (not needed), or replace standalone <q-list> with a native <ul> / <div> + Tailwind.',
         },
         {
           element: "q-item",
           message:
-            'Use <ODropdownItem> from "@/lib/overlay/Dropdown/ODropdownItem.vue" (inside <ODropdown>), or a native <li> / <div> + Tailwind (display rows). See web/bannerImplementation/quasar-list-components-migration.md.',
+            'Use <ODropdownItem> from "@/lib/overlay/Dropdown/ODropdownItem.vue" (inside <ODropdown>), or a native <li> / <div> + Tailwind (display rows).',
         },
         {
           element: "q-item-section",
           message:
-            "Use <ODropdownItem>'s #icon-left / #default / #icon-right slots (inside <ODropdown>), or a native <div class=\"flex ...\"> (display). See web/bannerImplementation/quasar-list-components-migration.md.",
+            "Use <ODropdownItem>'s #icon-left / #default / #icon-right slots (inside <ODropdown>), or a native <div class=\"flex ...\"> (display).",
         },
         {
           element: "q-item-label",
           message:
-            'Use plain text / <span class="text-sm">, <span class="block text-xs text-muted-foreground"> (caption), or <ODropdownGroup :label="..."> (header) instead of <q-item-label>. See web/bannerImplementation/quasar-list-components-migration.md.',
+            'Use plain text / <span class="text-sm">, <span class="block text-xs text-muted-foreground"> (caption), or <ODropdownGroup :label="..."> (header) instead of <q-item-label>.',
         },
         // Button
         {
@@ -354,18 +354,6 @@ export default [
         {
           element: "q-option-group",
           message: 'Use <OOptionGroup> from "@/lib/forms/OptionGroup/OOptionGroup.vue" instead of <q-option-group>. For form-bound fields use <OFormOptionGroup>.',
-        },
-      ],
-      "no-restricted-imports": [
-        "error",
-        {
-          paths: [
-            {
-              name: "quasar",
-              importNames: ["Notify"],
-              message: 'Use toast() from "@/lib/feedback/Toast/useToast" instead of Quasar Notify.',
-            },
-          ],
         },
       ],
     },

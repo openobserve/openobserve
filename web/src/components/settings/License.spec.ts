@@ -93,29 +93,9 @@ vi.mock('@/lib/feedback/Toast/useToast', () => ({
   toast: (...args: any[]) => mockToast(...args),
 }));
 
-// Mock useQuasar
 const mockDialog = vi.fn().mockReturnValue({
   onOk: vi.fn().mockReturnThis(),
   onCancel: vi.fn().mockReturnThis(),
-});
-
-vi.mock('quasar', async () => {
-  const actual = await vi.importActual('quasar');
-  return {
-    ...actual,
-    useQuasar: () => ({
-      dialog: mockDialog,
-      platform: {
-        has: {
-          touch: false,
-        },
-        is: {
-          mobile: false,
-          desktop: true,
-        },
-      },
-    }),
-  };
 });
 
 
@@ -164,24 +144,6 @@ describe('License.vue', () => {
         stubs: {
           LicensePeriod: true,
           ODialog: ODialogStub,
-        },
-        mocks: {
-          $q: {
-            notify: vi.fn(),
-            dialog: vi.fn().mockReturnValue({
-              onOk: vi.fn().mockReturnThis(),
-              onCancel: vi.fn().mockReturnThis(),
-            }),
-            platform: {
-              has: {
-                touch: false,
-              },
-              is: {
-                mobile: false,
-                desktop: true,
-              },
-            },
-          },
         },
       },
       ...options,

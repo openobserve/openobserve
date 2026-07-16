@@ -484,6 +484,10 @@
   },
   "validation": {
     "required": "Bu alan zorunludur",
+    "fieldRequired": "Alan zorunludur!",
+    "alphanumeric": "Girdi alfasayısal olmalıdır",
+    "organizationNameRequired": "Kuruluş adı zorunludur",
+    "selectOrganization": "Lütfen bir kuruluş seçin",
     "invalidFormat": "Geçersiz biçim",
     "mustBeGreaterThan": "{value} 'den büyük olmalıdır",
     "mustBeLessThan": "{value} 'den küçük olmalıdır"
@@ -882,6 +886,12 @@
     "webVitals": "Web Hayati Değerler",
     "errors": "Hatalar",
     "api": "API",
+    "uploadSourceMapsForm": {
+      "serviceRequired": "Hizmet gereklidir",
+      "versionRequired": "Versiyon gereklidir",
+      "fileRequired": "Lütfen yüklenecek bir ZIP dosyası seçin",
+      "fileTypeZip": "Yalnızca ZIP dosyalarına izin verilir"
+    },
     "emptyState": {
       "title": "Gerçek Kullanıcı İzleme ile kullanıcılarınızı izleyin",
       "description": "RUM, gerçek kullanıcı etkileşimlerini (sayfa yükleri, hatalar, API çağrıları ve oturum tekrarları) izler, böylece kullanıcıların uygulamanızı tam olarak nasıl deneyimlediğini görebilirsiniz.",
@@ -1691,6 +1701,9 @@
     "labelIndex": "Dizin",
     "add": "Akış Ekle",
     "dataRetention": "Veri Saklama (gün cinsinden)",
+    "streamNameRequired": "Akış adı gereklidir",
+    "streamTypeRequired": "Lütfen bir akış türü seçin",
+    "dataRetentionMin": "Veri saklama süresi en az 1 gün olmalıdır",
     "indexing": "İndeksleme",
     "createStream": "Akış Oluştur",
     "indexType": "Dizin Türü",
@@ -1830,6 +1843,27 @@
     "dragDropNodesHere": "Düğümleri buraya sürükleyip bırakın",
     "promqlOnlyForMetrics": "PromQL yalnızca metrik akış türü için kullanılabilir",
     "invalidCronExpression": "Geçersiz cron ifadesi",
+    "cronRequired": "Cron ifadesi gereklidir",
+    "destResourceNameInvalid": ":, ?, /, # gibi karakterler ve boşluklar kullanılamaz.",
+    "urlTrailingSlash": "URL sonunda eğik çizgi bulunmamalıdır",
+    "orgRequiredOpenobserve": "OpenObserve için kuruluş gereklidir",
+    "streamRequiredOpenobserve": "OpenObserve için akış adı gereklidir",
+    "endpointMustStartSlash": "Uç nokta yolu / ile başlamalıdır",
+    "indexRequiredEsbulk": "ESBulk formatı için dizin adı gereklidir",
+    "separatorRequiredStringseparated": "StringSeparated formatı için ayırıcı gereklidir",
+    "ddSourceRequiredDatadog": "Datadog için DD Source gereklidir",
+    "ddTagsRequiredDatadog": "Datadog için DD Tags gereklidir",
+    "periodGreaterThanZero": "Süre 0'dan büyük olmalıdır",
+    "frequencyGreaterThanSeconds": "Sıklık {seconds} saniyeden büyük olmalıdır.",
+    "minimumFrequencyMinutes": "Minimum sıklık {minutes} dakika olmalıdır",
+    "streamSelectionNameInvalid": "Yalnızca alfanümerik karakterler ve '+=,.@-_' kullanın, boşluk kullanmayın.",
+    "functionAlreadyAssociated": "İşlev zaten ilişkilendirilmiş",
+    "atLeastOneCondition": "Lütfen en az bir koşul ekleyin",
+    "fillAllConditionFields": "Lütfen tüm koşul alanlarını doldurun (sütun, operatör ve değer gereklidir)",
+    "selectExternalDestination": "Lütfen listeden harici bir hedef seçin",
+    "backfillNumericRange": "{min} ile {max} arasında olmalıdır",
+    "selectValidTimeRange": "Lütfen geçerli bir zaman aralığı seçin",
+    "startBeforeEndTime": "Başlangıç saati bitiş saatinden önce olmalıdır",
     "thresholdShouldNotBeEmpty": "Eşik boş olmamalıdır",
     "errorGettingResults": "Sonuç alınırken hata oluştu",
     "save": "Kaydet",
@@ -1881,6 +1915,11 @@
     "tooltipPromptTemplate": "LLM'ye gönderilen komut istemi. Değerlendirme sırasında dinamik değerler için yer tutucu olarak {input}, {output} ve {context} kullanın."
   },
   "function": {
+    "csvFileRequired": "CSV dosyası zorunludur!",
+    "urlRequired": "URL zorunludur!",
+    "urlMustStartWithHttp": "URL, http:// veya https:// ile başlamalıdır",
+    "nameRequired": "Bu alan zorunludur!",
+    "invalidMethodName": "Geçersiz yöntem adı. Bir harf veya alt çizgi ile başlamalıdır. Yalnızca harf, rakam ve alt çizgi kullanın.",
     "header": "Fonksiyonlar",
     "subtitle": "Boru hatlarında uygulanan yeniden kullanılabilir VRL fonksiyonları",
     "clickTestFunctionHint": "Etkinlikleri görmek için lütfen Test Fonksiyonu'na tıklayın",
@@ -3013,6 +3052,7 @@
       "inviteTitle": "Bir Organizasyonu Davet Edin",
       "inviteOrgIdLabel": "Organizasyon Tanımlayıcısı",
       "inviteOrgIdPlaceholder": "Kuruluş Kimliğini Girin",
+      "inviteOrgIdRequired": "Organizasyon Tanımlayıcısı gereklidir",
       "sendInvite": "Davet Gönder",
       "inviteSent": "Davet Başarıyla Gönderildi",
       "inviteSameOrg": "Bir kuruluş kendini davet edemez",
@@ -3979,6 +4019,16 @@
     "domainConfiguredCount": "{count} alan (lar) yapılandırıldı",
     "allowAllUsersFromDomain": "{domain} 'deki tüm kullanıcılara izin ver",
     "allowOnlySpecificUsers": "Yalnızca {domain} 'den belirli kullanıcılara izin ver",
+    "blockSpecificUsers": "{domain} 'den yalnızca belirli kullanıcıları engelleyin",
+    "blockAllUsersFromDomain": "{domain} adresindeki tüm kullanıcıları engelleyin",
+    "allUsersBlockedMessage": "{domain} ile biten e-posta adresleri olan tüm harici SSO kullanıcıları sistemden engellenecektir (UI, API ve alım).",
+    "blockedUsersHint": "Engellenen girişler yalnızca harici SSO kimlikleri için geçerlidir (SSO kullanıcıları ve SSO/belirteç hizmet hesapları). Herhangi bir izin kuralını geçersiz kılar ve kullanıcı arayüzü, API ve alımı kapsar. Yerel ve API tarafından oluşturulan hesaplar etkilenmez - bunun yerine bunları silin.",
+    "addBlockedEmail": "E-postayı Engelle",
+    "blockedEmailPlaceholder": "örn. kullanıcı {domain}",
+    "domainNeedsBlockedEmails": "Etki alanı '{domain}' belirli kullanıcıları engellerken en az bir e-posta adresine sahip olmalıdır",
+    "confirmRemoveBlockedEmail": "'{ email} 'e-postasının engelini kaldırmak istediğinizden emin misiniz?",
+    "blockedEmailAdded": "E-posta adresi başarıyla engellendi",
+    "blockedEmailRemoved": "E-posta adresi başarıyla kaldırıldı",
     "allUsersAllowedMessage": "{domain} ile biten e-posta adresleri olan tüm kullanıcıların giriş yapmasına izin verilir.",
     "emailPlaceholder": "örn. kullanıcı {domain}",
     "addEmail": "E-posta Ekle",
@@ -4283,7 +4333,16 @@
     "dimensionWidth": "Genişlik (piksel)",
     "dimensionHeight": "Yükseklik (piksel)",
     "imagePreview": "Satır içi gösterge paneli önizleme görüntüsünü ekleyin",
-    "customDimensions": "Özel Boyutlar (Gelişmiş)"
+    "customDimensions": "Özel Boyutlar (Gelişmiş)",
+    "validation": {
+      "resourceNameInvalid": ":, ?, /, # gibi karakterlere ve boşluklara izin verilmez.",
+      "invalidCron": "Geçersiz Cron ifadesi!",
+      "cronSixFields": "Cron ifadesi tam olarak 6 alana sahip olmalıdır: [Saniye] [Dakika] [Saat] [Ayın Günü] [Ay] [Haftanın Günü]",
+      "cronMinInterval": "Sıklık {seconds} saniyeden fazla olmalıdır.",
+      "dateFormat": "Tarih biçimi hatalı!",
+      "timeFormat": "Saat biçimi hatalı!",
+      "invalidEmails": "Geçerli e-postalar ekleyin!"
+    }
   },
   "queries": {
     "runningQueries": "Çalışan Sorgular",
@@ -4698,6 +4757,9 @@
     "search": "Arama Eylemi",
     "timezone": "Saat dilimi",
     "zipFileRequired": "ZIP Dosyası gereklidir!",
+    "fieldRequired": "Alan gereklidir!",
+    "nameInvalidChars": ":, ?, /, # gibi karakterlere ve boşluklara izin verilmez.",
+    "invalidMethodName": "Geçersiz yöntem adı. Bir harf veya alt çizgi ile başlamalıdır. Yalnızca harf, rakam ve alt çizgi kullanın.",
     "zipFile": "ZIP Dosyası",
     "frequency": "Frekans"
   },
@@ -4783,6 +4845,25 @@
     "providerTypeRequired": "Sağlayıcı tipi gereklidir",
     "algorithmRequired": "Algoritma gerekli",
     "secretRequired": "Sır gerekli",
+    "nameRequired": "İsim gereklidir",
+    "nameMaxLength": "İsim en fazla 50 karakter olmalıdır.",
+    "nameInvalidChars": "Yalnızca alfanümerik karakterler, alt çizgiler ve tireler kullanılabilir",
+    "nameInvalidResource": ":, ?, /, # ve boşluk gibi karakterlere izin verilmez.",
+    "typeRequired": "Tür gereklidir",
+    "baseURLRequired": "Temel URL gereklidir",
+    "baseURLInvalid": "Lütfen doğru bir URL girin.",
+    "baseURLHtmlNotAllowed": "HTML etiketlerine izin verilmez",
+    "accessIdRequired": "Erişim Kimliği gereklidir",
+    "accessIdInvalid": "Erişim Kimliği alfanümerik olmalıdır",
+    "authenticationTypeRequired": "Kimlik doğrulama türü gereklidir",
+    "secretTypeRequired": "Gizli türü gereklidir",
+    "accessKeyRequired": "Erişim Anahtarı gereklidir",
+    "ldapUsernameRequired": "LDAP Kullanıcı Adı gereklidir",
+    "ldapUsernameInvalid": "Kullanıcı adı yalnızca alfanümerik karakterler, noktalar, alt çizgiler ve tireler içerebilir",
+    "ldapPasswordRequired": "LDAP Şifresi gereklidir",
+    "staticSecretNameRequired": "Statik Gizli Adı gereklidir",
+    "dfcNameRequired": "DFC Adı gereklidir",
+    "dfcEncryptedDataRequired": "DFC Şifreli Verileri gereklidir",
     "storeType": "Mağaza Türü",
     "mechanismType": "Mekanizma Tipi",
     "actions": "Eylemler"
@@ -5572,7 +5653,11 @@
       "authEditNote": "Kimlik bilgileri geri okunamaz. API anahtarını yalnızca değiştirmek istiyorsanız yeniden girin.",
       "cannotRename": "Oluşturulduktan sonra yeniden adlandırılamaz.",
       "availableModelsHelp": "İsteğe bağlı. Bu Sağlayıcıda kullanılabilen modellerin virgülle ayrılmış listesi.",
-      "saveError": "Sağlayıcı kaydedilemedi"
+      "saveError": "Sağlayıcı kaydedilemedi",
+      "nameRequired": "Provider name is required",
+      "typeRequired": "Provider type is required",
+      "defaultModelRequired": "Default model is required",
+      "apiKeyRequired": "API key is required"
     },
     "scoreConfig": {
       "booleanValues": "true / false",
@@ -5689,6 +5774,12 @@
       "falseIsHealthyHint": "true puanları kalite sorunlarını tetikler.",
       "thresholdEmptyHint": "Bunu boş bırakmak, bu boyutun ürün genelindeki kalite durumu sinyallerine katkıda bulunmayacağı anlamına gelir. Puanlar yine de kaydedilir ancak sorun göstergelerini tetiklemez.",
       "saveError": "Puan yapılandırması kaydedilemedi",
+      "validation": {
+        "nameRequired": "Name is required",
+        "nameFormat": "Use lowercase letters, numbers, and underscores only",
+        "minRequired": "Min is required",
+        "maxRequired": "Max is required"
+      },
       "empty": {
         "title": "Henüz Puan Yapılandırması Yok",
         "description": "Puan Yapılandırmaları, puanlayıcılarınızın ürettiği boyutları tanımlar — ad, veri türü, değer aralığı ve sağlıklı eşik. Çevrimiçi değerlendirmeyi bağlamaya başlamak için bir tane oluşturun.",
@@ -5922,6 +6013,20 @@
       },
       "requestBodyLabel": "Gövde şablonu isteyin",
       "saveError": "Gol oyuncusu kurtarılamadı",
+      "validation": {
+        "nameRequired": "Scorer name is required",
+        "scoreConfigRequired": "A score config is required",
+        "providerRequired": "A provider is required",
+        "endpointRequired": "An endpoint URL is required",
+        "bearerTokenRequired": "Token is required",
+        "basicUsernameRequired": "Username is required",
+        "basicPasswordRequired": "Password is required",
+        "apiKeyHeaderRequired": "Header name is required",
+        "apiKeyTokenRequired": "Token is required",
+        "timeoutInvalid": "Timeout must be 0 or greater",
+        "retriesInvalid": "Retries must be 0 or greater",
+        "duplicateFieldName": "Field names must be unique"
+      },
       "versionsLoadError": "Puan yapılandırma sürümleri yüklenemedi",
       "testPanel": {
         "title": "Bu golcüyü test et",
@@ -6101,7 +6206,12 @@
       "selectAtLeastOne": "En az bir golcü seçin",
       "saveError": "Eval işi kaydedilemedi",
       "createdAndActivated": "Değerlendirme işi oluşturuldu ve etkinleştirildi",
-      "createdButActivateFailed": "Değerlendirme işi oluşturuldu ancak etkinleştirme başarısız oldu"
+      "createdButActivateFailed": "Değerlendirme işi oluşturuldu ancak etkinleştirme başarısız oldu",
+      "validation": {
+        "nameRequired": "Job name is required",
+        "streamRequired": "A stream is required",
+        "samplingValueRequired": "A sampling value is required"
+      }
     }
   },
   "llmProviders": {

@@ -12,6 +12,7 @@ import {
 } from "reka-ui";
 import { ref, watch, watchEffect, useSlots, computed, inject, provide, nextTick, useAttrs } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useScrollShadow } from "@/lib/overlay/useScrollShadow";
 import { FORM_SUBMIT_STATE_KEY } from "@/lib/forms/Form/OForm.types";
 
@@ -190,7 +191,7 @@ const contentStyle = computed(() => {
 });
 
 // ── Validation reset on cancel-path close ───────────────────────────────────
-/** Reset Quasar q-field validation for every field in the body slot so that
+/** Reset q-field validation for every field in the body slot so that
  *  cancel-path closes (Cancel button, ×, Escape, overlay click) never surface
  *  lazy-rules validation errors to the user. */
 function clearBodyValidation() {
@@ -404,12 +405,15 @@ watch(internalOpen, (open) => {
               <span
                 v-if="title"
                 class="text-base font-semibold text-dialog-header-text truncate block"
+                :data-test="titleDataTest"
               >
                 {{ title }}
+                <!-- Full title on hover (styled), so a truncated title is never lost. -->
+                <OTooltip :content="title" />
               </span>
               <span
                 v-if="subTitle"
-                class="text-sm text-dialog-content-text opacity-70 truncate block mt-0.5"
+                class="text-xs text-dialog-content-text opacity-70 truncate block mt-0.5"
               >
                 {{ subTitle }}
               </span>

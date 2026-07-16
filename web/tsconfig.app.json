@@ -3,7 +3,6 @@
   "exclude": ["src/**/__tests__/*", "node_modules", "dist", "src/**/*.spec.{ts,js}"],
   "compilerOptions": {
     "composite": true,
-    "baseUrl": ".",
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
     "sourceMap": true,

@@ -1,647 +1,359 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { mount, VueWrapper } from '@vue/test-utils';
-import { createStore } from 'vuex';
-import { createRouter, createWebHistory } from 'vue-router';
-import AddCipherKey from '@/components/cipherkeys/AddCipherKey.vue';
+// Copyright 2026 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-// Mock dependencies
-vi.mock('@/services/cipher_keys');
-vi.mock('@/utils/zincutils', () => ({
-  isValidResourceName: vi.fn(() => true),
-  maxLengthCharValidation: vi.fn(() => true)
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { mount, flushPromises } from "@vue/test-utils";
+import { createStore } from "vuex";
+import { createRouter, createWebHistory } from "vue-router";
+import { nextTick } from "vue";
+import AddCipherKey from "@/components/cipherkeys/AddCipherKey.vue";
+import CipherKeysService from "@/services/cipher_keys";
+import i18n from "@/locales";
+
+// The cipherkeys family is migrated to a SINGLE parent OForm + Zod
+// (AddCipherKey.schema.ts): the children render OForm* controls connected to
+// this form by name. These tests mount the REAL OForm (never stub it) so they
+// exercise the actual schema wiring — an empty required field must block submit
+// and NOT call the service (the gap that let the AddToDashboard bug ship).
+
+vi.mock("@/services/cipher_keys", () => ({
+  default: {
+    create: vi.fn(),
+    update: vi.fn(),
+    get_by_name: vi.fn(),
+    list: vi.fn(),
+    delete: vi.fn(),
+  },
 }));
 
-vi.mock('vue-i18n', () => ({
-  useI18n: () => ({
-    t: (key: string) => key
-  })
+// toast returns a dismiss() fn — keep it a no-op so the loading toast teardown
+// in the save handlers doesn't blow up.
+vi.mock("@/lib/feedback/Toast/useToast", () => ({
+  toast: vi.fn(() => vi.fn()),
 }));
 
-vi.mock('quasar', async () => {
-  const actual = await vi.importActual('quasar');
-  return {
-    ...actual,
-    useQuasar: () => ({
-      notify: vi.fn()
-    })
-  };
-});
+const flush = () => flushPromises();
 
+const setField = (wrapper: any, name: string, value: unknown) =>
+  wrapper.vm.form.setFieldValue(name, value);
 
-describe('AddCipherKey.vue', () => {
-  let wrapper: VueWrapper;
+// Drive a real submit (runs the schema + awaits the @submit handler).
+const submit = async (wrapper: any) => {
+  await wrapper.vm.form.handleSubmit();
+  await flush();
+};
+
+const fillValidLocal = (wrapper: any) => {
+  setField(wrapper, "name", "my-cipher-key");
+  setField(wrapper, "key.store.type", "local");
+  setField(wrapper, "key.store.local", "super-secret");
+};
+
+describe("AddCipherKey.vue", () => {
+  let wrapper: any;
   let store: any;
   let router: any;
-  let mockQuasar: any;
 
-  beforeEach(() => {
-    // Mock router
+  const createWrapper = async (routeQuery: Record<string, any> = {}) => {
+    store = createStore({
+      state: { selectedOrganization: { identifier: "test-org" } },
+    });
     router = createRouter({
       history: createWebHistory(),
-      routes: [
-        { path: '/', component: { template: '<div>Home</div>' } }
-      ]
+      routes: [{ path: "/", component: { template: "<div />" } }],
     });
+    router.push({ query: routeQuery });
+    await router.isReady();
 
-    // Mock store
-    store = createStore({
-      state: {
-        selectedOrganization: {
-          identifier: 'test-org'
-        }
-      },
-      mutations: {},
-      actions: {}
+    const w = mount(AddCipherKey, {
+      global: { plugins: [store, router, i18n] },
     });
+    await flush();
+    return w;
+  };
 
-    // Mock Quasar
-    mockQuasar = {
-      notify: vi.fn()
-    };
+  beforeEach(() => {
+    vi.clearAllMocks();
+    (CipherKeysService.create as any).mockResolvedValue({ data: {} });
+    (CipherKeysService.update as any).mockResolvedValue({ data: {} });
   });
 
   afterEach(() => {
-    if (wrapper) {
-      wrapper.unmount();
-    }
-    vi.clearAllMocks();
+    if (wrapper) wrapper.unmount();
   });
 
-  const createWrapper = (routeQuery = {}) => {
-    // Set up route query
-    router.push({ query: routeQuery });
-
-    return mount(AddCipherKey, {
-      global: {
-        plugins: [store, router],
-        provide: {
-          $q: mockQuasar
-        },
-        stubs: {
-          'OIcon': {
-            template: '<div class="OIcon-stub">{{ name }}</div>',
-            props: ['name', 'size']
-          },
-          'OSeparator': {
-            template: '<hr class="o-separator-stub" />'
-          },
-          'OStepper': {
-            template: '<div class="o-stepper-stub"><slot /></div>',
-            props: ['modelValue']
-          },
-          'OStep': {
-            template: '<div class="o-step-stub" :data-test="$attrs[\'data-test\']"><slot /></div>',
-            props: ['name', 'title', 'icon', 'done']
-          },
-          'OInput': {
-            template: '<input class="o-input-stub" :data-test="$attrs[\'data-test\']" :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)" />',
-            props: ['modelValue', 'label', 'readonly', 'disable', 'error', 'errorMessage']
-          },
-          'OSelect': {
-            template: '<select class="o-select-stub" :data-test="$attrs[\'data-test\']" :value="modelValue" @change="$emit(\'update:modelValue\', $event.target.value)"><slot /></select>',
-            props: ['modelValue', 'options', 'label', 'error', 'errorMessage']
-          },
-          'OButton': {
-            template: '<button class="o-btn-stub" :data-test="$attrs[\'data-test\']" @click="$emit(\'click\')" :disabled="disabled"><slot /></button>',
-            props: ['variant', 'size', 'disabled', 'label']
-          },
-          'AddOpenobserveType': {
-            template: '<div class="add-openobserve-type-stub"></div>',
-            props: ['formData', 'submitAttempted']
-          },
-          'AddAkeylessType': {
-            template: '<div class="add-akeyless-type-stub"></div>',
-            props: ['formData']
-          },
-          'AddEncryptionMechanism': {
-            template: '<div class="add-encryption-mechanism-stub"></div>',
-            props: ['formData']
-          },
-          'ConfirmDialog': {
-            template: '<div class="confirm-dialog-stub" v-if="modelValue">{{ title }}: {{ message }}</div>',
-            props: ['modelValue', 'title', 'message']
-          }
-        }
-      }
-    });
-  };
-
-  describe('Component Rendering', () => {
-    it('renders the component correctly', () => {
-      wrapper = createWrapper();
+  describe("rendering", () => {
+    it("mounts with the real OForm", async () => {
+      wrapper = await createWrapper();
       expect(wrapper.exists()).toBe(true);
+      expect(wrapper.findComponent({ name: "OForm" }).exists()).toBe(true);
     });
 
-    it('displays add title when not updating', () => {
-      wrapper = createWrapper();
-      const title = wrapper.find('[data-test="add-template-title"]');
-      expect(title.text()).toContain('cipherKey.add');
+    it("shows the create (not update) title in create mode", async () => {
+      wrapper = await createWrapper();
+      expect(
+        wrapper.find('[data-test="add-template-title"]').text(),
+      ).not.toContain("Update");
     });
 
-    it('displays update title when updating', async () => {
-      wrapper = createWrapper({ action: 'edit', name: 'test-key' });
-      const vm = wrapper.vm as any;
-      vm.isUpdatingCipherKey = true;
-      await wrapper.vm.$nextTick();
-      
-      const title = wrapper.find('[data-test="add-template-title"]');
-      expect(title.text()).toContain('cipherKey.update');
+    it("renders the name input, type select, and action buttons", async () => {
+      wrapper = await createWrapper();
+      expect(
+        wrapper.find('[data-test="add-cipher-key-name-input"]').exists(),
+      ).toBe(true);
+      expect(
+        wrapper.find('[data-test="add-cipher-key-type-input"]').exists(),
+      ).toBe(true);
+      expect(
+        wrapper.find('[data-test="add-cipher-key-cancel-btn"]').exists(),
+      ).toBe(true);
+      expect(
+        wrapper.find('[data-test="add-cipher-key-save-btn"]').exists(),
+      ).toBe(true);
     });
 
-    it('renders back button correctly', () => {
-      wrapper = createWrapper();
-      const backButton = wrapper.find('[data-test="app-page-header-back"]');
-      expect(backButton.exists()).toBe(true);
+    it("starts at step 1", async () => {
+      wrapper = await createWrapper();
+      expect(wrapper.vm.step).toBe(1);
     });
 
-    it('renders name input field', () => {
-      wrapper = createWrapper();
-      const nameInput = wrapper.find('[data-test="add-cipher-key-name-input"]');
-      expect(nameInput.exists()).toBe(true);
-    });
-
-    it('renders type select field', () => {
-      wrapper = createWrapper();
-      const typeSelect = wrapper.find('[data-test="add-cipher-key-type-input"]');
-      expect(typeSelect.exists()).toBe(true);
-    });
-
-    it('renders stepper component', () => {
-      wrapper = createWrapper();
-      const stepper = wrapper.find('.o-stepper-stub');
-      expect(stepper.exists()).toBe(true);
-    });
-
-    it('renders action buttons', () => {
-      wrapper = createWrapper();
-      const cancelBtn = wrapper.find('[data-test="add-cipher-key-cancel-btn"]');
+    // Pre-migration this button was step-gated (`step === 1 && !isUpdating`), so
+    // create-mode Save was dead on step 1. R3 drops that: Save always submits and
+    // the schema decides. The two assertions below are the whole contract — it is
+    // only safe to leave Save enabled BECAUSE an invalid submit reports why.
+    it("keeps the Save button enabled and submitting (R3 — never disabled)", async () => {
+      wrapper = await createWrapper();
       const saveBtn = wrapper.find('[data-test="add-cipher-key-save-btn"]');
-      
-      expect(cancelBtn.exists()).toBe(true);
-      expect(saveBtn.exists()).toBe(true);
+      expect(saveBtn.attributes("disabled")).toBeUndefined();
+      expect(saveBtn.attributes("type")).toBe("submit");
+    });
+
+    it("surfaces the name error when Save submits an empty form on step 1", async () => {
+      wrapper = await createWrapper();
+      expect(wrapper.vm.step).toBe(1);
+
+      await wrapper.find("form").trigger("submit");
+      await flush();
+
+      expect(CipherKeysService.create).not.toHaveBeenCalled();
+      expect(
+        wrapper.find('[data-test="add-cipher-key-name-input-error"]').text(),
+      ).toBe("Name is required");
     });
   });
 
-  describe('Form Data Management', () => {
-    it('initializes with default form data', () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      
-      expect(vm.formData.name).toBe('');
-      expect(vm.formData.key.store.type).toBe('local');
-      expect(vm.formData.key.mechanism.type).toBe('simple');
+  describe("validation gates the submit (real OForm)", () => {
+    it("blocks submit and does NOT create when required fields are empty", async () => {
+      wrapper = await createWrapper();
+      await submit(wrapper);
+      expect(wrapper.vm.form.state.isValid).toBe(false);
+      expect(CipherKeysService.create).not.toHaveBeenCalled();
     });
 
-    it('updates form data when name input changes', async () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      const nameInput = wrapper.find('[data-test="add-cipher-key-name-input"]');
-      
-      vm.formData.name = 'test-cipher-key';
-      await wrapper.vm.$nextTick();
-      
-      expect(vm.formData.name).toBe('test-cipher-key');
+    it("creates a local key when the form is valid", async () => {
+      wrapper = await createWrapper();
+      fillValidLocal(wrapper);
+      await submit(wrapper);
+
+      expect(wrapper.vm.form.state.isValid).toBe(true);
+      expect(CipherKeysService.create).toHaveBeenCalledTimes(1);
+      const [org, payload] = (CipherKeysService.create as any).mock.calls[0];
+      expect(org).toBe("test-org");
+      expect(payload.name).toBe("my-cipher-key");
+      expect(payload.key.store.local).toBe("super-secret");
+      // Payload parity with the pre-migration code: the `isUpdate` UI flag is
+      // merged into the body (false on create). Backend ignores it.
+      expect(payload.isUpdate).toBe(false);
+      expect(wrapper.emitted("cancel:hideform")).toBeTruthy();
     });
 
-    it('updates form data when type changes', async () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      
-      vm.formData.key.store.type = 'akeyless';
-      await wrapper.vm.$nextTick();
-      
-      expect(vm.formData.key.store.type).toBe('akeyless');
+    it("does NOT create when the local secret is missing", async () => {
+      wrapper = await createWrapper();
+      setField(wrapper, "name", "my-cipher-key");
+      setField(wrapper, "key.store.type", "local");
+      setField(wrapper, "key.store.local", "");
+      await submit(wrapper);
+      expect(CipherKeysService.create).not.toHaveBeenCalled();
     });
 
-    it('preserves original data for comparison', () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      
-      expect(vm.originalData).toBeTruthy();
-      expect(typeof vm.originalData).toBe('string');
-    });
-  });
+    it("creates an akeyless key when all conditional fields are valid", async () => {
+      wrapper = await createWrapper();
+      setField(wrapper, "name", "my-akeyless");
+      setField(wrapper, "key.store.type", "akeyless");
+      setField(wrapper, "key.store.akeyless.base_url", "https://api.akeyless.io");
+      setField(wrapper, "key.store.akeyless.access_id", "p-abc123");
+      setField(wrapper, "key.store.akeyless.auth.type", "access_key");
+      setField(wrapper, "key.store.akeyless.auth.access_key", "the-key");
+      setField(wrapper, "key.store.akeyless.store.type", "static_secret");
+      setField(wrapper, "key.store.akeyless.store.static_secret", "secret-name");
+      await submit(wrapper);
 
-  describe('Stepper Functionality', () => {
-    it('initializes with step 1', () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      expect(vm.step).toBe(1);
-    });
-
-    it('validates form and moves to next step', async () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-
-      // Set valid form data so validation passes
-      vm.formData.name = 'test-key';
-      vm.formData.key.store.type = 'local';
-      vm.formData.key.store.local = 'test-secret';
-      await wrapper.vm.$nextTick();
-
-      const continueBtn = wrapper.find('[data-test="add-report-step1-continue-btn"]');
-      await continueBtn.trigger('click');
-
-      expect(vm.step).toBe(2);
+      expect(CipherKeysService.create).toHaveBeenCalledTimes(1);
+      const [, payload] = (CipherKeysService.create as any).mock.calls[0];
+      expect(payload.key.store.type).toBe("akeyless");
+      expect(payload.key.store.akeyless.base_url).toBe(
+        "https://api.akeyless.io",
+      );
     });
 
-    it('moves back to step 1 when back button is clicked', async () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      vm.step = 2;
-      await wrapper.vm.$nextTick();
-      
-      const backBtn = wrapper.find('[data-test="add-cipher-key-step2-back-btn"]');
-      await backBtn.trigger('click');
-      
-      expect(vm.step).toBe(1);
-    });
-
-    it('shows correct step titles', () => {
-      wrapper = createWrapper();
-      const step1 = wrapper.find('[data-test="cipher-key-key-store-detils-step"]');
-      const step2 = wrapper.find('[data-test="cipher-key-encryption-mechanism-step"]');
-      
-      expect(step1.exists()).toBe(true);
-      expect(step2.exists()).toBe(true);
-    });
-
-    it('renders step content conditionally based on type', async () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      
-      // Test local type
-      vm.formData.key.store.type = 'local';
-      await wrapper.vm.$nextTick();
-      expect(wrapper.find('.add-openobserve-type-stub').exists()).toBe(true);
-      
-      // Test akeyless type
-      vm.formData.key.store.type = 'akeyless';
-      await wrapper.vm.$nextTick();
-      expect(wrapper.find('.add-akeyless-type-stub').exists()).toBe(true);
+    it("does NOT create an akeyless key with an invalid base URL", async () => {
+      wrapper = await createWrapper();
+      setField(wrapper, "name", "my-akeyless");
+      setField(wrapper, "key.store.type", "akeyless");
+      setField(wrapper, "key.store.akeyless.base_url", "not-a-url");
+      setField(wrapper, "key.store.akeyless.access_id", "p-abc123");
+      setField(wrapper, "key.store.akeyless.auth.type", "access_key");
+      setField(wrapper, "key.store.akeyless.auth.access_key", "the-key");
+      setField(wrapper, "key.store.akeyless.store.type", "static_secret");
+      setField(wrapper, "key.store.akeyless.store.static_secret", "secret-name");
+      await submit(wrapper);
+      expect(CipherKeysService.create).not.toHaveBeenCalled();
     });
   });
 
-  describe('Validation', () => {
-    it('applies name validation rules', () => {
-      wrapper = createWrapper();
-      const nameInput = wrapper.find('[data-test="add-cipher-key-name-input"]');
-      
-      expect(nameInput.exists()).toBe(true);
-      // Rules are passed as props in the stub
+  describe("stepper", () => {
+    it("Continue advances to step 2 only when the form is valid", async () => {
+      wrapper = await createWrapper();
+      fillValidLocal(wrapper);
+      await wrapper.vm.continueToStep2();
+      await nextTick();
+      expect(wrapper.vm.step).toBe(2);
+      // Advancing must not save.
+      expect(CipherKeysService.create).not.toHaveBeenCalled();
     });
 
-    it('applies type validation rules', () => {
-      wrapper = createWrapper();
-      const typeSelect = wrapper.find('[data-test="add-cipher-key-type-input"]');
-      
-      expect(typeSelect.exists()).toBe(true);
+    it("Continue stays on step 1 when the form is invalid", async () => {
+      wrapper = await createWrapper();
+      await wrapper.vm.continueToStep2();
+      await nextTick();
+      expect(wrapper.vm.step).toBe(1);
     });
 
-    it('disables name input when updating', async () => {
-      wrapper = createWrapper({ action: 'edit', name: 'test-key' });
-      const vm = wrapper.vm as any;
-      vm.isUpdatingCipherKey = true;
-      await wrapper.vm.$nextTick();
-      
-      const nameInput = wrapper.find('[data-test="add-cipher-key-name-input"]');
-      // The input props would be passed to the stub but might not be reflected as attributes
-      expect(nameInput.exists()).toBe(true);
+    it("Back returns to step 1", async () => {
+      wrapper = await createWrapper();
+      fillValidLocal(wrapper);
+      await wrapper.vm.continueToStep2();
+      await nextTick();
+      expect(wrapper.vm.step).toBe(2);
+
+      await wrapper
+        .find('[data-test="add-cipher-key-step2-back-btn"]')
+        .trigger("click");
+      expect(wrapper.vm.step).toBe(1);
     });
 
-    it('validates form before proceeding to next step', async () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      const validateSpy = vi.spyOn(vm, 'validateForm');
-      
-      const continueBtn = wrapper.find('[data-test="add-report-step1-continue-btn"]');
-      await continueBtn.trigger('click');
-      
-      expect(validateSpy).toHaveBeenCalledWith(2);
-    });
-  });
-
-  describe('Event Handling', () => {
-    it('emits cancel event when back button is clicked', async () => {
-      wrapper = createWrapper();
-      const backButton = wrapper.find('[data-test="app-page-header-back"]');
-
-      await backButton.trigger('click');
-
-      expect(wrapper.emitted('cancel:hideform')).toBeTruthy();
+    it("renders the akeyless child when store.type is akeyless", async () => {
+      wrapper = await createWrapper();
+      setField(wrapper, "key.store.type", "akeyless");
+      await nextTick();
+      expect(
+        wrapper.find('[data-test="add-cipher-key-akeyless-baseurl-input"]')
+          .exists(),
+      ).toBe(true);
     });
 
-    it('opens cancel dialog when cancel button is clicked', async () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      
-      // Make changes first to trigger dialog
-      vm.formData.name = 'changed-name';
-      
-      const cancelBtn = wrapper.find('[data-test="add-cipher-key-cancel-btn"]');
-      await cancelBtn.trigger('click');
-      
-      expect(vm.dialog.show).toBe(true);
-      expect(vm.dialog.title).toBe('Discard Changes');
-    });
-
-    it('submits form when save button is clicked', async () => {
-      wrapper = createWrapper();
-      const saveBtn = wrapper.find('[data-test="add-cipher-key-save-btn"]');
-      
-      await saveBtn.trigger('click');
-      
-      expect(wrapper.emitted()).toBeTruthy();
-    });
-
-    it('handles form submission correctly', async () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-
-      const saveBtn = wrapper.find('[data-test="add-cipher-key-save-btn"]');
-      await saveBtn.trigger('click');
-
-      // onSubmit validates and fails on empty name, so isSubmitting stays false
-      expect(vm.isSubmitting).toBe(false);
+    it("renders the openobserve secret child when store.type is local", async () => {
+      wrapper = await createWrapper();
+      expect(
+        wrapper.find('[data-test="add-cipher-key-openobserve-secret-input"]')
+          .exists(),
+      ).toBe(true);
     });
   });
 
-  describe('Type Management', () => {
-    it('provides correct cipher key type options', () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      
-      expect(vm.cipherKeyTypes).toEqual([
-        { label: 'OpenObserve', value: 'local' },
-        { label: 'Akeyless', value: 'akeyless' }
-      ]);
+  describe("edit mode", () => {
+    const record = {
+      name: "existing-key",
+      key: {
+        store: { type: "local", local: "loaded-secret" },
+        mechanism: { type: "simple", simple_algorithm: "aes-256-siv" },
+      },
+    };
+
+    beforeEach(() => {
+      (CipherKeysService.get_by_name as any).mockResolvedValue({ data: record });
     });
 
-    it('gets correct type label', () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      
-      expect(vm.getTypeLabel('local')).toBe('OpenObserve');
-      expect(vm.getTypeLabel('akeyless')).toBe('Akeyless');
-      expect(vm.getTypeLabel('unknown')).toBeUndefined();
+    it("loads the record, flips to update mode, and prefills the form", async () => {
+      wrapper = await createWrapper({ action: "edit", name: "existing-key" });
+      await flush();
+      expect(wrapper.vm.isUpdatingCipherKey).toBe(true);
+      expect(wrapper.find('[data-test="add-template-title"]').text()).toContain(
+        "Update",
+      );
+      expect(wrapper.vm.form.state.values.name).toBe("existing-key");
+      expect(wrapper.vm.form.state.values.key.store.local).toBe(
+        "loaded-secret",
+      );
     });
 
-    it('updates step title based on selected type', () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      
-      vm.formData.key.store.type = 'akeyless';
-      
-      const stepTitle = `${vm.t('cipherKey.step1')} (Type: ${vm.getTypeLabel('akeyless')})`;
-      expect(stepTitle).toContain('Akeyless');
-    });
-  });
-
-  describe('Data Merging', () => {
-    it('merges objects correctly', () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      
-      const base = { a: 1, b: { c: 2 } };
-      const updates = { b: { d: 3 }, e: 4 };
-      
-      const result = vm.mergeObjects(base, updates);
-      
-      expect(result).toEqual({
-        a: 1,
-        b: { c: 2, d: 3 },
-        e: 4
-      });
+    it("makes the name input readonly AND disabled in update mode", async () => {
+      wrapper = await createWrapper({ action: "edit", name: "existing-key" });
+      await flush();
+      const nameInput = wrapper.find(
+        '[data-test="add-cipher-key-name-input"] input',
+      );
+      // Pre-migration the name field carried BOTH readonly + disable in edit
+      // mode: readonly blocks typing, disabled gives the greyed "locked" look.
+      expect(nameInput.attributes("readonly")).toBeDefined();
+      expect(nameInput.attributes("disabled")).toBeDefined();
     });
 
-    it('handles null and array values correctly in merge', () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      
-      const base = { a: 1 };
-      const updates = { b: null, c: [1, 2, 3] };
-      
-      const result = vm.mergeObjects(base, updates);
-      
-      expect(result.b).toBeNull();
-      expect(result.c).toEqual([1, 2, 3]);
-    });
-  });
-
-  describe('Change Detection', () => {
-    it('detects no changes when data is unchanged', () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      
-      // originalData and formData should be the same initially
-      expect(vm.originalData).toBe(JSON.stringify(vm.formData));
+    it("short-circuits with no update call when nothing changed", async () => {
+      wrapper = await createWrapper({ action: "edit", name: "existing-key" });
+      await flush();
+      await submit(wrapper);
+      expect(CipherKeysService.update).not.toHaveBeenCalled();
+      expect(wrapper.emitted("cancel:hideform")).toBeTruthy();
     });
 
-    it('opens dialog when canceling with changes', async () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      
-      // Modify form data
-      vm.formData.name = 'changed-name';
-      
-      const cancelBtn = wrapper.find('[data-test="add-cipher-key-cancel-btn"]');
-      await cancelBtn.trigger('click');
-      
-      expect(vm.dialog.show).toBe(true);
-    });
-
-    it('directly cancels when no changes detected', async () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      const cancelBtn = wrapper.find('[data-test="add-cipher-key-cancel-btn"]');
-      
-      await cancelBtn.trigger('click');
-      
-      expect(wrapper.emitted('cancel:hideform')).toBeTruthy();
+    it("calls update when a field changed", async () => {
+      wrapper = await createWrapper({ action: "edit", name: "existing-key" });
+      await flush();
+      setField(wrapper, "key.store.local", "changed-secret");
+      await submit(wrapper);
+      expect(CipherKeysService.update).toHaveBeenCalledTimes(1);
+      const [org, payload, name] = (CipherKeysService.update as any).mock
+        .calls[0];
+      expect(org).toBe("test-org");
+      expect(payload.key.store.local).toBe("changed-secret");
+      // Payload parity: `isUpdate` flag merged into the body (true on update).
+      expect(payload.isUpdate).toBe(true);
+      expect(name).toBe("existing-key");
     });
   });
 
-  describe('Save Button State', () => {
-    it('disables save button on step 1 when not updating', () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      vm.step = 1;
-      vm.isUpdatingCipherKey = false;
-      
-      const saveBtn = wrapper.find('[data-test="add-cipher-key-save-btn"]');
-      // Check the disabled prop is passed to stub
-      expect(saveBtn.exists()).toBe(true);
+  describe("cancel", () => {
+    it("emits cancel:hideform directly when there are no changes", async () => {
+      wrapper = await createWrapper();
+      await wrapper
+        .find('[data-test="add-cipher-key-cancel-btn"]')
+        .trigger("click");
+      expect(wrapper.emitted("cancel:hideform")).toBeTruthy();
+      expect(wrapper.vm.dialog.show).toBe(false);
     });
 
-    it('enables save button when updating on step 1', async () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      vm.step = 1;
-      vm.isUpdatingCipherKey = true;
-      await wrapper.vm.$nextTick();
-      
-      const saveBtn = wrapper.find('[data-test="add-cipher-key-save-btn"]');
-      expect(saveBtn.exists()).toBe(true);
-    });
-
-    it('disables save button when submitting', async () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      vm.isSubmitting = true;
-      await wrapper.vm.$nextTick();
-      
-      const saveBtn = wrapper.find('[data-test="add-cipher-key-save-btn"]');
-      expect(saveBtn.exists()).toBe(true);
-    });
-  });
-
-  describe('Dialog Management', () => {
-    it('initializes dialog with correct default state', () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      
-      expect(vm.dialog.show).toBe(false);
-      expect(vm.dialog.title).toBe('');
-      expect(vm.dialog.message).toBe('');
-      expect(typeof vm.dialog.okCallback).toBe('function');
-    });
-
-    it('shows confirm dialog with correct content', async () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      
-      // Make changes to trigger dialog
-      vm.formData.name = 'changed';
-      
-      const cancelBtn = wrapper.find('[data-test="add-cipher-key-cancel-btn"]');
-      await cancelBtn.trigger('click');
-      
-      expect(vm.dialog.show).toBe(true);
-      expect(vm.dialog.title).toBe('Discard Changes');
-      expect(vm.dialog.message).toBe('Are you sure you want to cancel changes?');
-    });
-
-    it('renders confirm dialog when shown', async () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      
-      vm.dialog.show = true;
-      vm.dialog.title = 'Test Title';
-      vm.dialog.message = 'Test Message';
-      await wrapper.vm.$nextTick();
-      
-      const dialog = wrapper.find('.confirm-dialog-stub');
-      expect(dialog.exists()).toBe(true);
-      expect(dialog.text()).toContain('Test Title: Test Message');
-    });
-  });
-
-  describe('Lifecycle Hooks', () => {
-    it('sets up template data on mount', () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      
-      expect(vm.formData.isUpdate).toBeDefined();
-      expect(vm.originalData).toBeTruthy();
-    });
-
-    it('handles edit mode setup correctly', () => {
-      wrapper = createWrapper({ action: 'edit', name: 'test-key' });
-      const vm = wrapper.vm as any;
-      
-      // setupTemplateData will be called which sets isUpdatingCipherKey
-      expect(wrapper.exists()).toBe(true);
-    });
-  });
-
-  describe('Form Submission Flow', () => {
-    it('sets submitting state during submission', async () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      
-      expect(vm.isSubmitting).toBe(false);
-      
-      // Mock form validation to resolve
-      vm.addCipherKeyFormRef = {
-        validate: vi.fn().mockResolvedValue(true)
-      };
-      
-      await vm.onSubmit();
-      
-      expect(vm.isSubmitting).toBe(false); // Reset after completion
-    });
-
-    it('handles validation errors correctly', async () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-
-      // Submit with empty name should trigger validation error
-      await vm.onSubmit();
-
-      expect(vm.nameError).toBe('Name is required');
-    });
-  });
-
-  describe('Edge Cases', () => {
-    it('handles missing route query parameters', () => {
-      wrapper = createWrapper();
-      expect(wrapper.exists()).toBe(true);
-    });
-
-    it('handles empty organization identifier', () => {
-      store.state.selectedOrganization.identifier = '';
-      wrapper = createWrapper();
-      expect(wrapper.exists()).toBe(true);
-    });
-
-    it('handles component unmounting gracefully', () => {
-      wrapper = createWrapper();
-      expect(() => wrapper.unmount()).not.toThrow();
-    });
-
-    it('handles step navigation edge cases', async () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      
-      // Test invalid step numbers
-      vm.step = 0;
-      await wrapper.vm.$nextTick();
-      expect(wrapper.exists()).toBe(true);
-      
-      vm.step = 999;
-      await wrapper.vm.$nextTick();
-      expect(wrapper.exists()).toBe(true);
-    });
-  });
-
-  describe('Component Structure', () => {
-    it('has correct main structure', () => {
-      wrapper = createWrapper();
-
-      expect(wrapper.find('[data-test="add-template-title"]').exists()).toBe(true);
-      expect(wrapper.find('.create-cipher-form').exists()).toBe(true);
-      expect(wrapper.find('.o-stepper-stub').exists()).toBe(true);
-    });
-
-    it('renders all required form elements', () => {
-      wrapper = createWrapper();
-      
-      expect(wrapper.find('[data-test="add-cipher-key-name-input"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="add-cipher-key-type-input"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="add-cipher-key-cancel-btn"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="add-cipher-key-save-btn"]').exists()).toBe(true);
-    });
-
-    it('maintains proper component hierarchy', () => {
-      wrapper = createWrapper();
-
-      const form = wrapper.find('.create-cipher-form');
-      const stepper = form.find('.o-stepper-stub');
-      const steps = stepper.findAll('.o-step-stub');
-
-      expect(form.exists()).toBe(true);
-      expect(stepper.exists()).toBe(true);
-      expect(steps.length).toBeGreaterThan(0);
+    it("opens the discard-changes dialog when there are unsaved changes", async () => {
+      wrapper = await createWrapper();
+      setField(wrapper, "name", "dirty-name");
+      await nextTick();
+      await wrapper
+        .find('[data-test="add-cipher-key-cancel-btn"]')
+        .trigger("click");
+      expect(wrapper.vm.dialog.show).toBe(true);
+      expect(wrapper.vm.dialog.title).toBe("Discard Changes");
     });
   });
 });

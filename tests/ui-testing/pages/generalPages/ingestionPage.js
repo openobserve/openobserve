@@ -1,16 +1,22 @@
 
 import logsdata from "../../../test-data/logs_data.json";
 const http = require('http');
+const https = require('https');
 const nodeFetch = require('node-fetch');
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
 const { getAuthHeaders, getOrgIdentifier } = require('../../playwright-tests/utils/cloud-auth.js');
 
 // node-fetch v2 keep-alive pooling + gzip decompression is the root cause of
 // "Premature close" / ECONNRESET flakiness in CI.
-const noKeepAliveAgent = new http.Agent({ keepAlive: false });
+// Pick the agent by protocol so both local (http://localhost) and cloud/alpha
+// (https://) ingestion URLs work — an http.Agent rejects https:// URLs.
+const noKeepAliveHttpAgent = new http.Agent({ keepAlive: false });
+const noKeepAliveHttpsAgent = new https.Agent({ keepAlive: false });
+const selectAgent = (parsedURL) =>
+  parsedURL.protocol === 'https:' ? noKeepAliveHttpsAgent : noKeepAliveHttpAgent;
 
 async function fetchWithRetry(url, options, maxRetries = 3) {
-  const requestOpts = { ...options, compress: false, agent: noKeepAliveAgent };
+  const requestOpts = { ...options, compress: false, agent: selectAgent };
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
       return await nodeFetch(url, requestOpts);

@@ -19,6 +19,7 @@ pub mod dashboards;
 pub mod destinations;
 pub mod events;
 pub mod model_pricing;
+pub mod org_status;
 pub mod pipelines;
 pub mod service_streams;
 pub mod system_settings;

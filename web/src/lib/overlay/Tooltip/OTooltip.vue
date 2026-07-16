@@ -19,6 +19,14 @@ const props = withDefaults(defineProps<TooltipProps>(), {
   delay: 700,
   maxWidth: "320px",
   disabled: false,
+  hoverable: false,
+  // MUST stay explicitly undefined. Vue casts an absent Boolean prop to `false`,
+  // so without this `open` is false rather than undefined — the `open !== undefined`
+  // guard below then passes, TooltipRoot receives `open: false`, and reka switches
+  // into CONTROLLED mode locked shut. Wrapper mode never emits update:open, so the
+  // tooltip could never open: hovering left the trigger at data-state="closed"
+  // forever. Child mode was unaffected because it drives `open` itself.
+  open: undefined,
 });
 
 defineSlots<TooltipSlots>();
@@ -37,6 +45,25 @@ let cleanupFn: (() => void) | null = null;
 // delay for free from reka's `delay-duration`; child mode wires its own hover
 // listeners, so it has to honour `props.delay` here too.
 let childShowTimer: ReturnType<typeof setTimeout> | null = null;
+// Grace-period close timer used only when `hoverable` is set. On leaving the
+// trigger we wait briefly before closing so the pointer can travel onto the
+// bubble; entering the bubble cancels this timer and keeps the tooltip open.
+let childHideTimer: ReturnType<typeof setTimeout> | null = null;
+const HOVERABLE_GRACE_MS = 120;
+
+// Called from the content bubble's hover handlers (child mode). Entering the
+// bubble cancels a pending close; leaving it closes the tooltip.
+const onContentEnter = () => {
+  if (!props.hoverable) return;
+  if (childHideTimer) {
+    clearTimeout(childHideTimer);
+    childHideTimer = null;
+  }
+};
+const onContentLeave = () => {
+  if (!props.hoverable) return;
+  childOpen.value = false;
+};
 
 onMounted(() => {
   if (!hasDefaultSlot.value && childAnchorRef.value) {
@@ -78,7 +105,17 @@ onMounted(() => {
           clearTimeout(childShowTimer);
           childShowTimer = null;
         }
-        childOpen.value = false;
+        if (props.hoverable) {
+          // Delay the close so the pointer can reach the bubble; onContentEnter
+          // cancels this timer if it lands there in time.
+          if (childHideTimer) clearTimeout(childHideTimer);
+          childHideTimer = setTimeout(() => {
+            childOpen.value = false;
+            childHideTimer = null;
+          }, HOVERABLE_GRACE_MS);
+        } else {
+          childOpen.value = false;
+        }
       };
       parentEl.value.addEventListener("mouseenter", show);
       parentEl.value.addEventListener("mouseleave", hide);
@@ -92,6 +129,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   if (childShowTimer) clearTimeout(childShowTimer);
+  if (childHideTimer) clearTimeout(childHideTimer);
   cleanupFn?.();
 });
 
@@ -113,6 +151,10 @@ const contentClasses = computed(() => [
   "z-[10100] px-2.5 py-1.5",
   "bg-[var(--color-surface-overlay)] rounded-md",
   "text-xs text-[var(--color-text-primary)] font-medium leading-relaxed",
+  // Force long unbreakable tokens (file paths, hashes, URLs) to wrap inside the
+  // max-width box instead of overflowing onto the content behind the tooltip.
+  // overflow-wrap is inherited, so nested content (e.g. pre-wrap divs) wraps too.
+  "break-words",
   "data-[state=delayed-open]:animate-in data-[state=delayed-open]:fade-in-0 data-[state=delayed-open]:zoom-in-95",
   "data-[state=instant-open]:animate-in data-[state=instant-open]:fade-in-0",
   "data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95",
@@ -120,6 +162,8 @@ const contentClasses = computed(() => [
   "data-[side=bottom]:slide-in-from-top-1",
   "data-[side=left]:slide-in-from-right-1",
   "data-[side=right]:slide-in-from-left-1",
+  // Hoverable tooltips let the pointer land on the bubble and select its text.
+  props.hoverable ? "pointer-events-auto select-text cursor-text" : "",
   props.contentClass,
 ]);
 </script>
@@ -129,6 +173,7 @@ const contentClasses = computed(() => [
   <TooltipProvider v-if="hasDefaultSlot">
     <TooltipRoot
       :delay-duration="delay"
+      :disable-hoverable-content="!hoverable"
       v-bind="open !== undefined ? { open: disabled ? false : open } : {}"
       :disabled="disabled"
     >
@@ -145,7 +190,7 @@ const contentClasses = computed(() => [
           :style="contentStyle"
           :class="contentClasses"
         >
-          <span class="inline-flex items-center gap-1.5">
+          <span :class="(shortcut || shortcutId) ? 'inline-flex items-center gap-1.5' : ''">
             <slot name="content">{{ content }}</slot>
             <OShortcut
               v-if="shortcut || shortcutId"
@@ -187,8 +232,10 @@ const contentClasses = computed(() => [
             :align-offset="alignOffset"
             :style="contentStyle"
             :class="contentClasses"
+            @mouseenter="onContentEnter"
+            @mouseleave="onContentLeave"
           >
-            <span class="inline-flex items-center gap-1.5">
+            <span :class="(shortcut || shortcutId) ? 'inline-flex items-center gap-1.5' : ''">
               <slot name="content">{{ content }}</slot>
               <OShortcut
               v-if="shortcut || shortcutId"

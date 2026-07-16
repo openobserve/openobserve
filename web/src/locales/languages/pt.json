@@ -484,6 +484,10 @@
   },
   "validation": {
     "required": "Este campo é obrigatório",
+    "fieldRequired": "O campo é obrigatório!",
+    "alphanumeric": "A entrada deve ser alfanumérica",
+    "organizationNameRequired": "O nome da organização é obrigatório",
+    "selectOrganization": "Selecione uma organização",
     "invalidFormat": "Formato inválido",
     "mustBeGreaterThan": "Deve ser maior que {value}",
     "mustBeLessThan": "Deve ser menor que {value}"
@@ -882,6 +886,12 @@
     "webVitals": "Dados vitais da Web",
     "errors": "Erros",
     "api": "API",
+    "uploadSourceMapsForm": {
+      "serviceRequired": "O serviço é obrigatório",
+      "versionRequired": "A versão é obrigatória",
+      "fileRequired": "Selecione um arquivo ZIP para fazer upload",
+      "fileTypeZip": "Somente arquivos ZIP são permitidos"
+    },
     "emptyState": {
       "title": "Monitore seus usuários com o monitoramento real de usuários",
       "description": "O RUM rastreia interações reais do usuário — carregamentos de páginas, erros, chamadas de API e repetições de sessões — para que você possa ver exatamente como os usuários experimentam seu aplicativo.",
@@ -1691,6 +1701,9 @@
     "labelIndex": "Índice",
     "add": "Adicionar stream",
     "dataRetention": "Retenção de dados (em dias)",
+    "streamNameRequired": "O nome do stream é obrigatório",
+    "streamTypeRequired": "Selecione um tipo de stream",
+    "dataRetentionMin": "A retenção de dados deve ser de pelo menos 1 dia",
     "indexing": "Indexação",
     "createStream": "Criar stream",
     "indexType": "Tipo de índice",
@@ -1830,6 +1843,27 @@
     "dragDropNodesHere": "Arraste e solte os nós aqui",
     "promqlOnlyForMetrics": "O ProMQL só está disponível para o tipo de fluxo de métricas",
     "invalidCronExpression": "Expressão cron inválida",
+    "cronRequired": "A expressão cron é obrigatória",
+    "destResourceNameInvalid": "Caracteres como :, ?, /, # e espaços não são permitidos.",
+    "urlTrailingSlash": "A URL não deve terminar com uma barra",
+    "orgRequiredOpenobserve": "A organização é obrigatória para o OpenObserve",
+    "streamRequiredOpenobserve": "O nome do stream é obrigatório para o OpenObserve",
+    "endpointMustStartSlash": "O caminho do endpoint deve começar com /",
+    "indexRequiredEsbulk": "O nome do índice é obrigatório para o formato ESBulk",
+    "separatorRequiredStringseparated": "O separador é obrigatório para o formato StringSeparated",
+    "ddSourceRequiredDatadog": "DD Source é obrigatório para o Datadog",
+    "ddTagsRequiredDatadog": "Os DD Tags são obrigatórios para o Datadog",
+    "periodGreaterThanZero": "O período deve ser maior que 0",
+    "frequencyGreaterThanSeconds": "A frequência deve ser maior que {seconds} segundos.",
+    "minimumFrequencyMinutes": "A frequência mínima deve ser de {minutes} minutos",
+    "streamSelectionNameInvalid": "Use apenas caracteres alfanuméricos e '+=,.@-_', sem espaços.",
+    "functionAlreadyAssociated": "A função já está associada",
+    "atLeastOneCondition": "Adicione pelo menos uma condição",
+    "fillAllConditionFields": "Preencha todos os campos da condição (coluna, operador e valor são obrigatórios)",
+    "selectExternalDestination": "Selecione um destino externo da lista",
+    "backfillNumericRange": "Deve estar entre {min} e {max}",
+    "selectValidTimeRange": "Selecione um intervalo de tempo válido",
+    "startBeforeEndTime": "A hora de início deve ser antes da hora de término",
     "thresholdShouldNotBeEmpty": "O limite não deve estar vazio",
     "errorGettingResults": "Erro ao obter resultados",
     "save": "Salvar",
@@ -1881,6 +1915,11 @@
     "tooltipPromptTemplate": "O prompt enviado ao LLM. Use {input}, {output} e {context} como espaços reservados para valores dinâmicos no momento da avaliação."
   },
   "function": {
+    "csvFileRequired": "O arquivo CSV é obrigatório!",
+    "urlRequired": "A URL é obrigatória!",
+    "urlMustStartWithHttp": "A URL deve começar com http:// ou https://",
+    "nameRequired": "Este campo é obrigatório!",
+    "invalidMethodName": "Nome de método inválido. Deve começar com uma letra ou sublinhado. Use apenas letras, números e sublinhados.",
     "header": "Funções",
     "subtitle": "Funções VRL reutilizáveis aplicadas em pipelines",
     "clickTestFunctionHint": "Clique em Função de teste para ver os eventos",
@@ -3013,6 +3052,7 @@
       "inviteTitle": "Convide uma organização",
       "inviteOrgIdLabel": "Identificador da organização",
       "inviteOrgIdPlaceholder": "Insira o identificador da organização",
+      "inviteOrgIdRequired": "O identificador da organização é obrigatório",
       "sendInvite": "Enviar convite",
       "inviteSent": "Convite enviado com sucesso",
       "inviteSameOrg": "Uma organização não pode se convidar",
@@ -3979,6 +4019,16 @@
     "domainConfiguredCount": "{count} domínio (s) configurado (s)",
     "allowAllUsersFromDomain": "Permitir todos os usuários de {domain}",
     "allowOnlySpecificUsers": "Permitir somente usuários específicos de {domain}",
+    "blockSpecificUsers": "Bloquear somente usuários específicos de {domain}",
+    "blockAllUsersFromDomain": "Bloquear todos os usuários de {domain}",
+    "allUsersBlockedMessage": "Todos os usuários externos de SSO com endereços de e-mail terminados em {domain} serão bloqueados do sistema (UI, API e ingestão).",
+    "blockedUsersHint": "As entradas bloqueadas se aplicam somente a identidades externas de SSO (usuários de SSO e contas de serviço de SSO/Token). Eles substituem qualquer regra de permissão e abrangem UI, API e ingestão. As contas nativas e criadas pela API não são afetadas. Em vez disso, exclua-as.",
+    "addBlockedEmail": "Bloquear e-mail",
+    "blockedEmailPlaceholder": "por exemplo, usuário {domain}",
+    "domainNeedsBlockedEmails": "O domínio '{domain}' deve ter pelo menos um endereço de e-mail ao bloquear usuários específicos",
+    "confirmRemoveBlockedEmail": "Tem certeza de que deseja desbloquear o e-mail '{email}'?",
+    "blockedEmailAdded": "Endereço de e-mail bloqueado com sucesso",
+    "blockedEmailRemoved": "Endereço de e-mail desbloqueado com sucesso",
     "allUsersAllowedMessage": "Todos os usuários com endereços de e-mail que terminam em {domain} poderão fazer login.",
     "emailPlaceholder": "por exemplo, usuário {domain}",
     "addEmail": "Adicionar e-mail",
@@ -4283,7 +4333,16 @@
     "dimensionWidth": "Largura (px)",
     "dimensionHeight": "Altura (px)",
     "imagePreview": "Incluir imagem de visualização do painel em linha",
-    "customDimensions": "Dimensões personalizadas (avançadas)"
+    "customDimensions": "Dimensões personalizadas (avançadas)",
+    "validation": {
+      "resourceNameInvalid": "Caracteres como :, ?, /, # e espaços não são permitidos.",
+      "invalidCron": "Expressão Cron inválida!",
+      "cronSixFields": "A expressão Cron deve ter exatamente 6 campos: [Segundo] [Minuto] [Hora] [Dia do mês] [Mês] [Dia da semana]",
+      "cronMinInterval": "A frequência deve ser maior que {seconds} segundos.",
+      "dateFormat": "O formato da data está incorreto!",
+      "timeFormat": "O formato da hora está incorreto!",
+      "invalidEmails": "Adicione e-mails válidos!"
+    }
   },
   "queries": {
     "runningQueries": "Executando consultas",
@@ -4698,6 +4757,9 @@
     "search": "Ação de pesquisa",
     "timezone": "Fuso horário",
     "zipFileRequired": "O arquivo ZIP é necessário!",
+    "fieldRequired": "O campo é obrigatório!",
+    "nameInvalidChars": "Caracteres como :, ?, /, # e espaços não são permitidos.",
+    "invalidMethodName": "Nome de método inválido. Deve começar com uma letra ou sublinhado. Use apenas letras, números e sublinhados.",
     "zipFile": "Arquivo ZIP",
     "frequency": "Frequência"
   },
@@ -4783,6 +4845,25 @@
     "providerTypeRequired": "O tipo de provedor é obrigatório",
     "algorithmRequired": "O algoritmo é necessário",
     "secretRequired": "O segredo é obrigatório",
+    "nameRequired": "O nome é obrigatório",
+    "nameMaxLength": "O nome deve ter no máximo 50 caracteres.",
+    "nameInvalidChars": "Apenas caracteres alfanuméricos, sublinhados e hífens são permitidos",
+    "nameInvalidResource": "Caracteres como :, ?, /, # e espaços não são permitidos.",
+    "typeRequired": "O tipo é obrigatório",
+    "baseURLRequired": "A URL base é obrigatória",
+    "baseURLInvalid": "Forneça uma URL correta.",
+    "baseURLHtmlNotAllowed": "Tags HTML não são permitidas",
+    "accessIdRequired": "O ID de acesso é obrigatório",
+    "accessIdInvalid": "O ID de acesso deve ser alfanumérico",
+    "authenticationTypeRequired": "O tipo de autenticação é obrigatório",
+    "secretTypeRequired": "O tipo de segredo é obrigatório",
+    "accessKeyRequired": "A chave de acesso é obrigatória",
+    "ldapUsernameRequired": "O nome de usuário LDAP é obrigatório",
+    "ldapUsernameInvalid": "O nome de usuário só pode conter caracteres alfanuméricos, pontos, sublinhados e hífens",
+    "ldapPasswordRequired": "A senha do LDAP é obrigatória",
+    "staticSecretNameRequired": "O nome do segredo estático é obrigatório",
+    "dfcNameRequired": "O nome do DFC é obrigatório",
+    "dfcEncryptedDataRequired": "Os dados criptografados do DFC são obrigatórios",
     "storeType": "Tipo de loja",
     "mechanismType": "Tipo de mecanismo",
     "actions": "Ações"
@@ -5572,7 +5653,11 @@
       "authEditNote": "As credenciais não podem ser lidas novamente. Insira a chave de API novamente apenas se quiser rotacioná-la.",
       "cannotRename": "Não pode ser renomeado após a criação.",
       "availableModelsHelp": "Opcional. Lista separada por vírgulas de modelos disponíveis neste Provedor.",
-      "saveError": "Falha ao salvar o provedor"
+      "saveError": "Falha ao salvar o provedor",
+      "nameRequired": "Provider name is required",
+      "typeRequired": "Provider type is required",
+      "defaultModelRequired": "Default model is required",
+      "apiKeyRequired": "API key is required"
     },
     "scoreConfig": {
       "booleanValues": "true / false",
@@ -5689,6 +5774,12 @@
       "falseIsHealthyHint": "Pontuações de true acionam problemas de qualidade.",
       "thresholdEmptyHint": "Deixar isto vazio significa que esta dimensão não contribuirá para os sinais de status de qualidade em todo o produto. As pontuações ainda serão registradas, mas não acionarão indicadores de problemas.",
       "saveError": "Falha ao salvar a configuração da pontuação",
+      "validation": {
+        "nameRequired": "Name is required",
+        "nameFormat": "Use lowercase letters, numbers, and underscores only",
+        "minRequired": "Min is required",
+        "maxRequired": "Max is required"
+      },
       "empty": {
         "title": "Nenhuma Configuração de Pontuação Ainda",
         "description": "As Configurações de Pontuação definem as dimensões que seus avaliadores produzem — nome, tipo de dados, intervalo de valores e limite saudável. Crie uma para começar a configurar a avaliação online.",
@@ -5922,6 +6013,20 @@
       },
       "requestBodyLabel": "Modelo de corpo da solicitação",
       "saveError": "Falha ao salvar o marcador",
+      "validation": {
+        "nameRequired": "Scorer name is required",
+        "scoreConfigRequired": "A score config is required",
+        "providerRequired": "A provider is required",
+        "endpointRequired": "An endpoint URL is required",
+        "bearerTokenRequired": "Token is required",
+        "basicUsernameRequired": "Username is required",
+        "basicPasswordRequired": "Password is required",
+        "apiKeyHeaderRequired": "Header name is required",
+        "apiKeyTokenRequired": "Token is required",
+        "timeoutInvalid": "Timeout must be 0 or greater",
+        "retriesInvalid": "Retries must be 0 or greater",
+        "duplicateFieldName": "Field names must be unique"
+      },
       "versionsLoadError": "Falha ao carregar as versões de configuração da pontuação",
       "testPanel": {
         "title": "Teste este marcador",
@@ -6101,7 +6206,12 @@
       "selectAtLeastOne": "Selecione pelo menos um marcador",
       "saveError": "Falha ao salvar o trabalho de avaliação",
       "createdAndActivated": "Trabalho de avaliação criado e ativado",
-      "createdButActivateFailed": "Trabalho de avaliação criado, mas a ativação falhou"
+      "createdButActivateFailed": "Trabalho de avaliação criado, mas a ativação falhou",
+      "validation": {
+        "nameRequired": "Job name is required",
+        "streamRequired": "A stream is required",
+        "samplingValueRequired": "A sampling value is required"
+      }
     }
   },
   "llmProviders": {

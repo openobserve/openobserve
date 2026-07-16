@@ -228,6 +228,11 @@ pub trait FileList: Sync + Send + 'static {
         date_range: (String, String),
     ) -> Result<StreamStats>;
     async fn org_stats_by_account(&self, org_id: &str, account: &str) -> Result<(i64, i64)>;
+    async fn delete_by_org(&self, org_id: &str) -> Result<()>;
+}
+
+pub async fn delete_by_org(org_id: &str) -> Result<()> {
+    CLIENT.delete_by_org(org_id).await
 }
 
 pub async fn health_check() -> Result<()> {

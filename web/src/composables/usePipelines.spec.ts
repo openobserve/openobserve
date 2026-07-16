@@ -302,7 +302,7 @@ describe('usePipelines', () => {
     });
   });
 
-  // Test 13: Quasar notification parameters
+  // Test 13: notification parameters
   it('should call notification with correct parameters', async () => {
     const mockError = {
       response: {

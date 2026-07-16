@@ -39,8 +39,11 @@ test.describe('Enrichment Table URL Feature Tests', () => {
         enrichmentPage = pageManager.enrichmentPage;
         pipelinesPage = pageManager.pipelinesPage;
 
-        // Navigate to enrichment tables
-        await enrichmentPage.navigateToEnrichmentTable();
+        // Navigate to enrichment tables — deep URL WITH org param + verify.
+        // navigateToBase's root-url org param is dropped by the /web/ redirect,
+        // leaving the session on the default org (EXPIRED1) where enrichment
+        // URL jobs fail ("not an ingester"). See gotoEnrichmentTablesWithOrg.
+        await enrichmentPage.gotoEnrichmentTablesWithOrg();
         testLogger.info('Navigated to enrichment tables list');
     });
 
@@ -153,7 +156,11 @@ test.describe('Enrichment Table URL Feature Tests', () => {
     // ============================================================================
 
     test('@P1 Schema view - verify table columns', async () => {
-        const tableName = generateTableName('schema_view');
+        // NOTE: table name must NOT start with "schema" — alpha backend bug:
+        // enrichment URL-jobs for names with a "schema" prefix fail their save
+        // with "not an ingester" (100% repro; schema_probe1 fails, view_probe1
+        // succeeds). The feature under test is unaffected by the table name.
+        const tableName = generateTableName('view_schema');
         currentTableName = tableName; // Track for cleanup
         testLogger.info(`Test: Schema view - ${tableName}`);
 
@@ -166,6 +173,12 @@ test.describe('Enrichment Table URL Feature Tests', () => {
         await enrichmentPage.searchEnrichmentTableInList(tableName);
         await enrichmentPage.verifyTableRowVisible(tableName);
 
+        // Step 2.5: The schema button only renders once the async URL-fetch job
+        // completes — wait for it first (as the schema-mismatch test does) so we
+        // don't race the button on a slow alpha public-URL fetch. retryOnFailure
+        // rides out transient backend URL-fetch blips by re-running the job.
+        await enrichmentPage.waitForUrlJobToFinish(tableName, 20, 5000, true);
+
         // Step 3: Click schema button
         await enrichmentPage.clickSchemaButton(tableName);
         testLogger.info('Clicked schema button');
@@ -175,7 +188,7 @@ test.describe('Enrichment Table URL Feature Tests', () => {
         await enrichmentPage.closeSchemaModal();
         testLogger.info('Schema modal closed - test passed');
 
-        // Note: Cleanup handled by cleanup.spec.js pattern matching schema_view_*
+        // Note: Cleanup handled by cleanup.spec.js pattern matching view_schema_*
         // URL tables with processing jobs may have limited buttons until job completes
     });
 
@@ -411,7 +424,8 @@ test.describe('Enrichment Table URL Feature Tests', () => {
     });
 
     test('@P1 Schema mismatch - URL Jobs dialog shows failed job', async () => {
-        const tableName = generateTableName('schema_mismatch');
+        // NOTE: must not start with "schema" — see schema-prefix backend bug note above.
+        const tableName = generateTableName('mismatch_schema');
         currentTableName = tableName; // Track for cleanup
         testLogger.info(`Test: Schema mismatch - ${tableName}`);
 

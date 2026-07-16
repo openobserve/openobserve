@@ -57,7 +57,7 @@ import {
   isStreamingEnabled,
   maxLengthCharValidation,
   validateUrl,
-  convertUnixToQuasarFormat,
+  convertUnixToDateFormat,
   getCronIntervalDifferenceInSeconds,
   isAboveMinRefreshInterval,
   getDueDays,
@@ -865,6 +865,7 @@ if .severity == "error" {
         expect(isValidResourceName("invalid#name")).toBe(false);
         expect(isValidResourceName("invalid name")).toBe(false);
         expect(isValidResourceName("invalid?name")).toBe(false);
+        expect(isValidResourceName("invalid/name")).toBe(false);
       });
     });
 
@@ -939,17 +940,17 @@ if .severity == "error" {
   });
 
   describe("Date and Time Utilities", () => {
-    describe("convertUnixToQuasarFormat", () => {
-      it("should convert unix microseconds to Quasar format", () => {
+    describe("convertUnixToDateFormat", () => {
+      it("should convert unix microseconds to date format", () => {
         const unixMicros = 1640995200000000; // 2022-01-01 00:00:00 UTC in microseconds
-        const result = convertUnixToQuasarFormat(unixMicros);
+        const result = convertUnixToDateFormat(unixMicros);
         expect(result).toContain("2022-01-01");
         expect(result).toContain("T");
       });
 
       it("should return empty string for falsy input", () => {
-        expect(convertUnixToQuasarFormat(0)).toBe("");
-        expect(convertUnixToQuasarFormat(null)).toBe("");
+        expect(convertUnixToDateFormat(0)).toBe("");
+        expect(convertUnixToDateFormat(null)).toBe("");
       });
     });
 

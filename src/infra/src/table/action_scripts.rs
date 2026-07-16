@@ -223,6 +223,17 @@ pub async fn is_empty() -> Result<bool, errors::Error> {
     Ok(len().await? == 0)
 }
 
+/// Deletes all action scripts belonging to the given org.
+pub async fn delete_by_org(org_id: &str) -> Result<(), errors::Error> {
+    let _lock = get_lock().await;
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    Entity::delete_many()
+        .filter(Column::OrgId.eq(org_id))
+        .exec(client)
+        .await?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use config::meta::actions::action::ExecutionDetailsType;

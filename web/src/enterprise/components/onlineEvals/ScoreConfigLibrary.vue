@@ -20,7 +20,7 @@ the Free Software Foundation, either version 3 of the License, or
 
     <div
       v-else-if="loadError"
-      class="flex flex-col items-center justify-center flex-1 p-8 text-(--o2-text-muted)"
+      class="flex flex-col items-center justify-center flex-1 p-8 text-(--color-text-secondary)"
       data-test="score-config-library-error"
     >
       <OIcon name="error-outline" class="mb-2" style="width: 3em; height: 3em" />
@@ -42,7 +42,7 @@ the Free Software Foundation, either version 3 of the License, or
       <div class="flex items-center justify-between gap-3 mb-2 pl-4.25 pr-3">
         <div
           v-if="filteredEntries.length > 0"
-          class="inline-flex items-center gap-2 py-0.5 px-1 text-xs font-medium text-(--o2-text) select-none"
+          class="inline-flex items-center gap-2 py-0.5 px-1 text-xs font-medium text-(--color-text-secondary) select-none"
           data-test="score-config-library-select-all"
         >
           <OCheckbox
@@ -51,7 +51,7 @@ the Free Software Foundation, either version 3 of the License, or
           />
           <span class="cursor-pointer" @click="toggleSelectAll">{{ allVisibleSelected ? "Clear all" : "Select all" }}</span>
         </div>
-        <span class="text-xs text-gray-500">
+        <span class="text-xs text-(--color-text-secondary)">
           {{ filteredEntries.length }} score config(s)
         </span>
       </div>
@@ -64,13 +64,13 @@ the Free Software Foundation, either version 3 of the License, or
           :data-test="`score-config-library-section-${group.dataType}`"
         >
           <div
-            class="flex items-baseline gap-1.5 mt-0 mx-0 mb-1.5 text-xs font-bold uppercase tracking-[0.04em] text-(--o2-text)"
+            class="flex items-baseline gap-1.5 mt-0 mx-0 mb-1.5 text-xs font-bold uppercase tracking-[0.04em] text-(--color-text-heading)"
           >
-            <span class="text-(--o2-text)">{{ group.label }}</span>
-            <span class="font-medium text-(--o2-text-muted)">({{ group.entries.length }})</span>
+            <span class="text-(--color-text-heading)">{{ group.label }}</span>
+            <span class="font-medium text-(--color-text-secondary)">({{ group.entries.length }})</span>
           </div>
           <ul
-            class="flex flex-col rounded border border-border"
+            class="flex flex-col rounded border border-(--color-border-default)"
           >
             <li
               v-for="entry in group.entries"
@@ -95,7 +95,7 @@ the Free Software Foundation, either version 3 of the License, or
                 <span class="text-sm font-medium">{{ entry.displayName }}</span>
                 <span
                   v-if="entry.description"
-                  class="block text-xs text-muted-foreground"
+                  class="block text-xs text-(--color-text-secondary)"
                 >
                   {{ entry.description }}
                 </span>

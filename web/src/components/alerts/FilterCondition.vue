@@ -246,8 +246,8 @@ const { t } = useI18n();
 const form = inject(FORM_CONTEXT_KEY, null);
 const formMode = computed(() => !!(props.namePrefix && form));
 
-// Inline error state (replaces Quasar :rules) — BARE MODE ONLY. In form mode
-// the schema owns validation and the OForm* wrappers surface errors (R3).
+// Inline error state — BARE MODE ONLY. In form mode the schema owns validation
+// and the OForm* wrappers surface errors (R3).
 const columnError = ref('');
 const operatorError = ref('');
 const valueError = ref('');

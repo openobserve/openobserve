@@ -48,7 +48,7 @@ vi.mock("@/components/promql/components/OperationsList.vue", () => ({
 
 // Mock the query modeller
 vi.mock("@/components/promql/operations/queryModeller", () => ({
-  promQueryModeller: {
+  promqlRenderer: {
     renderQuery: vi.fn((query) => {
       if (!query.metric) return "";
       let result = query.metric;

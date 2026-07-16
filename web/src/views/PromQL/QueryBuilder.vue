@@ -1,18 +1,17 @@
 <template>
   <div
     data-test="promql-query-builder"
-    class="px-2.5 max-w-350 mx-auto h-[calc(100vh-50px)] overflow-auto"
+    class="h-[calc(100vh-50px)] flex flex-col overflow-hidden"
   >
+    <AppPageHeader
+      title="PromQL Query Builder"
+      subtitle="Build and test PromQL queries visually"
+      icon="query-stats"
+      class="shrink-0 px-4 border-b border-border-default"
+    />
+    <div class="flex-1 overflow-auto px-2.5">
+      <div class="max-w-350 mx-auto py-2.5">
     <OCard>
-      <OCardSection role="header">
-        <div class="text-2xl font-semibold">PromQL Query Builder</div>
-        <div class="text-sm font-medium text-gray-400">
-          Build and test PromQL queries visually
-        </div>
-      </OCardSection>
-
-      <OSeparator />
-
       <OCardSection role="body">
         <!-- Query Builder Section -->
         <div class="flex flex-col gap-5">
@@ -86,13 +85,15 @@
         </OCard>
       </OCardSection>
     </OCard>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, watch } from "vue";
-import { PromVisualQuery } from "@/components/promql/types";
-import { promQueryModeller } from "@/components/promql/operations/queryModeller";
+import { PromqlBuilderQuery } from "@/components/promql/types";
+import { promqlRenderer } from "@/components/promql/operations/queryModeller";
 import MetricSelector from "@/components/promql/components/MetricSelector.vue";
 import LabelFilterEditor from "@/components/promql/components/LabelFilterEditor.vue";
 import OperationsList from "@/components/promql/components/OperationsList.vue";
@@ -100,13 +101,14 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import OCard from "@/lib/core/Card/OCard.vue";
+import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { copyToClipboard } from "@/utils/clipboard";
 
 
 // State
-const visualQuery = ref<PromVisualQuery>({
+const visualQuery = ref<PromqlBuilderQuery>({
   metric: "",
   labels: [],
   operations: [],
@@ -126,7 +128,7 @@ const generatedQuery = computed(() => {
   if (!visualQuery.value.metric && visualQuery.value.labels.length === 0) {
     return "";
   }
-  return promQueryModeller.renderQuery(visualQuery.value);
+  return promqlRenderer.renderQuery(visualQuery.value);
 });
 
 // Methods

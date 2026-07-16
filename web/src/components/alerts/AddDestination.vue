@@ -24,6 +24,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     "
   >
     <AppPageHeader
+      :title="destination ? t('alert_destinations.updateTitle') : t('alert_destinations.addTitle')"
+      title-data-test="add-destination-title"
       :back="{
         label: t('alert_destinations.header'),
         onClick: () => emit('cancel:hideform'),
@@ -31,15 +33,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="px-3 border-b border-border-default"
       style="flex-shrink: 0"
     >
-      <template #title>
-        <span data-test="add-destination-title">
-          {{
-            destination
-              ? t("alert_destinations.updateTitle")
-              : t("alert_destinations.addTitle")
-          }}
-        </span>
-      </template>
     </AppPageHeader>
     <div
       class="card-container py-2"

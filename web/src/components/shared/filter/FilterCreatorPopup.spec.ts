@@ -14,10 +14,9 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it, afterEach, vi } from "vitest";
-import { mount, VueWrapper } from "@vue/test-utils";
+import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import { createI18n } from "vue-i18n";
 import FilterCreatorPopup from "./FilterCreatorPopup.vue";
-
 
 const mockI18n = createI18n({
   locale: "en",
@@ -29,6 +28,9 @@ const mockI18n = createI18n({
   },
 });
 
+// Stub ONLY the ODialog overlay (so its body slot renders inline instead of
+// teleporting to document.body). The OForm + OForm* fields stay REAL so the
+// schema-validation wiring is exercised (playbook §5 / R22).
 const globalStubs = {
   ODialog: {
     name: "ODialog",
@@ -38,42 +40,11 @@ const globalStubs = {
       "open",
       "size",
       "title",
-      "subTitle",
-      "persistent",
-      "showClose",
-      "width",
-      "primaryButtonLabel",
+      "formId",
       "secondaryButtonLabel",
-      "neutralButtonLabel",
-      "primaryButtonVariant",
-      "secondaryButtonVariant",
-      "neutralButtonVariant",
-      "primaryButtonDisabled",
-      "secondaryButtonDisabled",
-      "neutralButtonDisabled",
-      "primaryButtonLoading",
-      "secondaryButtonLoading",
-      "neutralButtonLoading",
+      "primaryButtonLabel",
     ],
     emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
-  },
-  OButton: {
-    template: '<button class="o-btn" @click="$emit(\'click\')"><slot /></button>',
-    props: ["variant", "size"],
-    emits: ["click"],
-  },
-  OCardSection: { template: '<div class="o-card-section"><slot /></div>' },
-  OSelect: {
-    template:
-      '<select class="o-select" :value="modelValue" @change="$emit(\'update:modelValue\', $event.target.value)"><option v-for="o in options" :key="o.value||o" :value="o.value||o">{{ o.label||o }}</option></select>',
-    props: ["modelValue", "options", "label", "error", "errorMessage"],
-    emits: ["update:modelValue"],
-  },
-  OCheckbox: {
-    template:
-      '<input type="checkbox" class="o-checkbox" :value="value" :checked="Array.isArray(modelValue) && modelValue.includes(value)" />',
-    props: ["modelValue", "value"],
-    emits: ["update:modelValue"],
   },
 };
 
@@ -98,6 +69,14 @@ function mountComponent(props: Record<string, any> = {}) {
   });
 }
 
+const getForm = (wrapper: VueWrapper) =>
+  (wrapper.findComponent({ name: "OForm" }).vm as any).form;
+
+const submit = async (wrapper: VueWrapper) => {
+  await getForm(wrapper).handleSubmit();
+  await flushPromises();
+};
+
 describe("FilterCreatorPopup", () => {
   let wrapper: VueWrapper;
 
@@ -118,9 +97,18 @@ describe("FilterCreatorPopup", () => {
       expect(dialog.props("title")).toBe("custom_field");
     });
 
-    it("should render OSelect for operator", () => {
+    it("should wire the dialog footer to the form via form-id", () => {
       wrapper = mountComponent();
-      expect(wrapper.find(".o-select").exists()).toBe(true);
+      const dialog = wrapper.findComponent({ name: "ODialog" });
+      expect(dialog.props("formId")).toBe("filter-creator-popup-form");
+    });
+
+    it("should render the operator OFormSelect inside the real OForm", () => {
+      wrapper = mountComponent();
+      expect(wrapper.findComponent({ name: "OForm" }).exists()).toBe(true);
+      expect(
+        wrapper.find('[data-test="filter-creator-popup-operator-select"]').exists(),
+      ).toBe(true);
     });
 
     it("should display Values section label", () => {
@@ -136,40 +124,15 @@ describe("FilterCreatorPopup", () => {
     });
   });
 
-  describe("props initialization", () => {
-    it("should initialize selectedOperator from defaultOperator", () => {
-      wrapper = mountComponent({ defaultOperator: "LIKE" });
-      expect((wrapper.vm as any).selectedOperator).toBe("LIKE");
-    });
-
-    it("should initialize selectedValues from defaultValues", () => {
-      wrapper = mountComponent({ defaultValues: ["value2", "value3"] });
-      expect((wrapper.vm as any).selectedValues).toEqual(["value2", "value3"]);
-    });
-
-    it("should handle undefined defaultOperator", () => {
-      wrapper = mountComponent({ defaultOperator: undefined });
-      expect((wrapper.vm as any).selectedOperator).toBeUndefined();
-    });
-
-    it("should handle undefined defaultValues", () => {
-      wrapper = mountComponent({ defaultValues: undefined });
-      expect((wrapper.vm as any).selectedValues).toBeUndefined();
-    });
-
-    it("should handle null defaultOperator", () => {
-      wrapper = mountComponent({ defaultOperator: null });
-      expect((wrapper.vm as any).selectedOperator).toBeNull();
-    });
-  });
-
   describe("field values display", () => {
-    it("should render a checkbox for each fieldValue", () => {
+    it("should render a checkbox row for each fieldValue", () => {
       wrapper = mountComponent({
         fieldValues: ["a", "b", "c"],
         defaultValues: [],
       });
-      expect(wrapper.findAll(".o-checkbox")).toHaveLength(3);
+      expect(
+        wrapper.findAll('[data-test^="filter-creator-popup-value-"]'),
+      ).toHaveLength(3);
     });
 
     it("should show No values present when fieldValues is empty", () => {
@@ -191,15 +154,6 @@ describe("FilterCreatorPopup", () => {
       expect(wrapper.text()).toContain("option2");
     });
 
-    it("should handle 100 values without error", () => {
-      const longValues = Array.from(
-        { length: 100 },
-        (_, i) => `value_${i}`,
-      );
-      wrapper = mountComponent({ fieldValues: longValues, defaultValues: [] });
-      expect(wrapper.findAll(".o-checkbox")).toHaveLength(100);
-    });
-
     it("should handle special characters in field values", () => {
       const special = ["val@#$", "val with spaces", "val/slashes"];
       wrapper = mountComponent({ fieldValues: special, defaultValues: [] });
@@ -207,15 +161,16 @@ describe("FilterCreatorPopup", () => {
     });
   });
 
-  describe("applyFilter method", () => {
-    it("should emit apply with correct payload", () => {
-      wrapper = mountComponent();
-      const vm = wrapper.vm as any;
-      vm.selectedOperator = "LIKE";
-      vm.selectedValues = ["value1", "value2"];
+  describe("OForm schema validation (real form)", () => {
+    it("emits apply with the validated payload on submit", async () => {
+      wrapper = mountComponent({
+        defaultOperator: "LIKE",
+        defaultValues: ["value1", "value2"],
+      });
 
-      vm.applyFilter();
+      await submit(wrapper);
 
+      expect(getForm(wrapper).state.isValid).toBe(true);
       expect(wrapper.emitted("apply")).toBeTruthy();
       expect(wrapper.emitted("apply")![0]).toEqual([
         {
@@ -226,71 +181,64 @@ describe("FilterCreatorPopup", () => {
       ]);
     });
 
-    it("should include fieldName from props in emitted event", () => {
+    it("includes fieldName from props in emitted event", async () => {
       wrapper = mountComponent({ fieldName: "my_custom_field" });
-      (wrapper.vm as any).applyFilter();
+      await submit(wrapper);
       const emitted = wrapper.emitted("apply")![0][0] as any;
       expect(emitted.fieldName).toBe("my_custom_field");
     });
 
-    it("should emit apply with empty selectedValues", () => {
+    it("emits apply with empty selectedValues when none are selected", async () => {
       wrapper = mountComponent({ defaultValues: [] });
-      (wrapper.vm as any).applyFilter();
+      await submit(wrapper);
       const emitted = wrapper.emitted("apply")![0][0] as any;
       expect(emitted.selectedValues).toEqual([]);
     });
 
-    it("should emit apply when Apply button is clicked", async () => {
-      wrapper = mountComponent();
-      const dialog = wrapper.findComponent({ name: "ODialog" });
-      await dialog.vm.$emit("click:primary");
-      expect(wrapper.emitted("apply")).toBeTruthy();
-    });
+    // The restored required rule: an empty operator must block submit and the
+    // schema (not a disabled button) is what gates it.
+    it("blocks submit + does NOT emit apply when operator is empty", async () => {
+      wrapper = mountComponent({ defaultOperator: "", defaultValues: [] });
 
-    it("should close dialog when Cancel button is clicked", async () => {
-      wrapper = mountComponent();
-      const vm = wrapper.vm as any;
-      expect(vm.show).toBe(true);
-      const dialog = wrapper.findComponent({ name: "ODialog" });
-      await dialog.vm.$emit("click:secondary");
-      expect(vm.show).toBe(false);
+      await submit(wrapper);
+
+      expect(getForm(wrapper).state.isValid).toBe(false);
       expect(wrapper.emitted("apply")).toBeFalsy();
     });
 
-    it("emitted filter object has correct shape", () => {
-      wrapper = mountComponent();
-      (wrapper.vm as any).applyFilter();
+    it("collects a checkbox toggle into the emitted selectedValues", async () => {
+      wrapper = mountComponent({
+        fieldValues: ["value1", "value2"],
+        defaultOperator: "=",
+        defaultValues: [],
+      });
+
+      // Toggle the first value's checkbox (real OCheckbox inside the group).
+      await wrapper
+        .find('[data-test="filter-creator-popup-value-value1"] button[role="checkbox"]')
+        .trigger("click");
+
+      await submit(wrapper);
+
       const emitted = wrapper.emitted("apply")![0][0] as any;
-      expect(typeof emitted.fieldName).toBe("string");
-      expect(Array.isArray(emitted.selectedValues)).toBe(true);
+      expect(emitted.selectedValues).toEqual(["value1"]);
+    });
+
+    it("does NOT close the dialog implicitly on apply (parent owns closing)", async () => {
+      wrapper = mountComponent();
+      await submit(wrapper);
+      expect((wrapper.vm as any).show).toBe(true);
     });
   });
 
-  describe("selectedValues reactivity", () => {
-    it("should update selectedValues when mutated", async () => {
+  describe("cancel", () => {
+    it("should close dialog when Cancel (secondary) is clicked", async () => {
       wrapper = mountComponent();
-      const vm = wrapper.vm as any;
-      vm.selectedValues = ["value2", "value3"];
-      await wrapper.vm.$nextTick();
-      expect(vm.selectedValues).toEqual(["value2", "value3"]);
-    });
-
-    it("should handle empty selectedValues", async () => {
-      wrapper = mountComponent();
-      const vm = wrapper.vm as any;
-      vm.selectedValues = [];
-      await wrapper.vm.$nextTick();
-      expect(vm.selectedValues).toEqual([]);
-    });
-  });
-
-  describe("selectedOperator reactivity", () => {
-    it("should update selectedOperator when mutated", async () => {
-      wrapper = mountComponent();
-      const vm = wrapper.vm as any;
-      vm.selectedOperator = "!=";
-      await wrapper.vm.$nextTick();
-      expect(vm.selectedOperator).toBe("!=");
+      expect((wrapper.vm as any).show).toBe(true);
+      const dialog = wrapper.findComponent({ name: "ODialog" });
+      await dialog.vm.$emit("click:secondary");
+      expect((wrapper.vm as any).show).toBe(false);
+      expect(wrapper.emitted("apply")).toBeFalsy();
     });
   });
 
@@ -298,13 +246,6 @@ describe("FilterCreatorPopup", () => {
     it("should have an ODialog as root", () => {
       wrapper = mountComponent();
       expect(wrapper.find(".o-dialog").exists()).toBe(true);
-    });
-
-    it("should have at least 2 OCardSection elements", () => {
-      wrapper = mountComponent();
-      expect(wrapper.findAll(".o-card-section").length).toBeGreaterThanOrEqual(
-        2,
-      );
     });
 
     it("should handle empty operators array without error", () => {

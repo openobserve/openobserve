@@ -46,15 +46,18 @@
             :disabled="dashboardPanelDataPageKey === 'logs'"
             @update:model-value="onStreamTypeChange"
           />
+          <!-- Metric type as a LETTER (C/G/H/S/O), not a glyph. It used to be an
+               icon per type (a hash for Counter, bars for Histogram, a speedometer
+               for Gauge…) with no way to tell which was which. The `badge` renders
+               inline beside the name and costs no row height. -->
           <OSelect
             :model-value="currentStream"
             :label="t('dashboard.selectIndex')"
-            :options="filteredStreamsWithIcons"
+            :options="streamOptions"
             data-test="index-dropdown-stream"
             :loading="streamListLoading"
             label-key="name"
             value-key="name"
-            :icon-key="currentStreamType === 'metrics' ? '_icon' : undefined"
             searchable
             label-position="inside"
             :disabled="dashboardPanelDataPageKey === 'logs'"
@@ -62,18 +65,7 @@
             option-tooltip
             @search="onStreamSearch"
             @update:model-value="onStreamChange"
-          >
-            <template
-              v-if="currentStreamType === 'metrics' && selectedMetricTypeIcon"
-              #icon-left
-            >
-              <OIcon
-                size="sm"
-                :name="metricsIconMapping[selectedMetricTypeIcon || '']"
-                class="mb-0.5"
-              />
-            </template>
-          </OSelect>
+          />
       </template>
 
       <!-- Group header -->
@@ -447,6 +439,13 @@ import { useStore } from "vuex";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 import { useLoading } from "@/composables/useLoading";
 import useStreams from "@/composables/useStreams";
+import {
+  applyPromqlSeed,
+  metricsStreamsOf,
+} from "@/utils/dashboard/promqlSeed";
+import { isAutoSeededQuery } from "@/utils/metrics/metricPanelSeed";
+import { buildTypeFilterBuckets } from "@/utils/metrics/metricFamily";
+import { BADGE_LABELS, getBadgeStyle } from "@/utils/metrics/metricPalette";
 import useNotifications from "@/composables/useNotifications";
 import usePromqlSuggestions from "@/composables/usePromqlSuggestions";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -506,22 +505,38 @@ const currentPage = ref(1);
 
 const hideAllFieldsSelection = computed(() => props.hideAllFieldsSelection ?? false);
 
-// ── Stream type icons ─────────────────────────────────────────────────
+// ── Metric type labels ────────────────────────────────────────────────
 
-const metricsIconMapping: Record<string, string> = {
-  Summary: "description",
-  Gauge: "speed",
-  Histogram: "bar-chart",
-  Counter: "tag",
-};
+/**
+ * The badge is the type's INITIAL — `C`ounter, `G`auge, `H`istogram, `S`ummary,
+ * `O`ther — not the whole word: it sits beside metric names that are already
+ * long, and a full word pushed them into truncation. A letter is still learnable
+ * in a way the old per-type icons (a hash, bars, a speedometer) were not.
+ */
+const initialOf = (label: string) => label.charAt(0).toUpperCase();
 
-const selectedMetricTypeIcon = computed(() => {
-  return dashboardPanelData.meta.stream.streamResults.find(
-    (it: any) =>
-      it.name ==
-      dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
-        .fields.stream,
-  )?.metrics_meta?.metric_type;
+/**
+ * Stream name -> type-filter BUCKET id (`counter`, `gauge`, …), not its label.
+ *
+ * The bucket id is what both the label and the colour are keyed on, so it is
+ * what gets carried around. Mapping to the label here and recovering the id
+ * later with `label.toLowerCase()` worked only for as long as every label stayed
+ * the capitalized spelling of its id — the day one reads "Gauge (native)", or is
+ * translated, the lookup misses and the badge silently turns grey. Deriving the
+ * label from the id is safe; deriving the id from the label is not.
+ */
+const metricTypeBuckets = computed<Record<string, string>>(() => {
+  if (currentStreamType.value !== "metrics") return {};
+  const streams = (dashboardPanelData.meta.stream.streamResults ?? []) as any[];
+
+  // `buildTypeFilterBuckets`, not `buildMetricCards`: a badge needs one word per
+  // stream, and building the whole rule set — every variant, expression, legend
+  // and unit for every metric in the org — to get it was a heavy pass on a list
+  // that can run to thousands. This one runs the family model and the card-kind
+  // dispatch and stops. It also answers for the metadata-only family bases that
+  // `buildMetricCards` suppresses but the dropdown still lists, so the declared-
+  // type fallback that used to patch those up is gone.
+  return buildTypeFilterBuckets(streams);
 });
 
 // ── Stream type / stream v-model bridges ──────────────────────────────
@@ -620,13 +635,30 @@ watch(
   { immediate: true },
 );
 
-const filteredStreamsWithIcons = computed(() =>
-  (filteredStreams.value as any[]).map((s) => ({
-    ...s,
-    _icon: s.metrics_meta
-      ? metricsIconMapping[s.metrics_meta.metric_type] || undefined
-      : undefined,
-  })),
+const isDarkTheme = computed(() => store.state.theme === "dark");
+
+const streamOptions = computed(() =>
+  (filteredStreams.value as any[]).map((s) => {
+    // The bucket id drives BOTH the label and the colour, so neither is
+    // reconstructed from the other.
+    const bucket = metricTypeBuckets.value[s.name];
+    const type = bucket ? (BADGE_LABELS[bucket] ?? "Other") : undefined;
+    return {
+      ...s,
+      // The chip is the initial; hovering it spells the type out. `C` alone is
+      // compact but ambiguous (Counter? Count?) — the title is what resolves it.
+      badge: type ? initialOf(type) : undefined,
+      badgeTitle: type,
+      // Colour-coded from the SAME palette the Metrics Explorer badges use —
+      // Counter blue, Gauge green, Histogram purple, Summary orange, Other grey —
+      // so a type looks the same wherever you meet it. A badge that classifies
+      // must be colour-coded to be worth anything; the default green-on-every-row
+      // outline carried no information at all.
+      badgeStyle: bucket
+        ? getBadgeStyle(bucket, isDarkTheme.value)
+        : undefined,
+    };
+  }),
 );
 
 // ── Stream fields ──────────────────────────────────────────────────────
@@ -709,7 +741,7 @@ watch(
         .fields.stream_type === dashboardPanelData.meta.stream.streamResultsType
     ) {
       try {
-        // On stream change in PromQL mode, reset the query to `${stream}{}`.
+        // On stream change in PromQL mode, re-seed the query for the new stream.
         // Metrics: custom + builder. Add Panel: PromQL custom only (builder
         // regenerates via DashboardQueryBuilder; SQL is excluded — promql-only block).
         const promqlQuery =
@@ -746,9 +778,34 @@ watch(
           }
 
           if (!metricName || metricName !== streamName) {
-            dashboardPanelData.data.queries[
-              dashboardPanelData.layout.currentQueryIndex
-            ].query = streamName + "{}";
+            // Seed the metrics rule set's default for the new stream — the same
+            // query/unit/chart type the Metrics Explorer charts it with — rather
+            // than the bare `stream{}`, which is a raw cumulative counter.
+            //
+            // Only when the query is still one we generated. A query the user
+            // wrote is LEFT ALONE, which is stricter than the old behaviour: it
+            // reset the query to `stream{}` on every stream change, so a moment
+            // of curiosity about another metric silently destroyed a query that
+            // may have taken a while to get right. In Custom mode the query is
+            // what actually runs — the stream field only drives label
+            // suggestions — so leaving the two out of step is recoverable, and
+            // deleting their work is not. This is what the builder-mode path in
+            // DashboardQueryBuilder already does.
+            const streams = metricsStreamsOf(dashboardPanelData);
+            const slot =
+              dashboardPanelData.data.queries[
+                dashboardPanelData.layout.currentQueryIndex
+              ];
+            const seedOpts = {
+              chartType: dashboardPanelData.data.type,
+              requireBuilder: !slot?.customQuery,
+            };
+
+            if (isAutoSeededQuery(slot?.query, metricName, streams, seedOpts)) {
+              applyPromqlSeed(dashboardPanelData, streamName, {
+                previousStream: metricName,
+              });
+            }
           }
 
           fetchPromQLLabels(

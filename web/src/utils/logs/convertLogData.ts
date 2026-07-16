@@ -37,6 +37,11 @@ export const convertLogData = (
     tooltip: {
       show: true,
       trigger: "axis",
+      // Render the tooltip on <body> so it overflows the short (6.25rem)
+      // histogram strip instead of being clipped by the scroll container's
+      // overflow. confine:false lets it extend past the chart bounds.
+      appendToBody: true,
+      confine: false,
       textStyle: {
         fontSize: 12,
       },

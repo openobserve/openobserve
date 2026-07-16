@@ -496,6 +496,25 @@ export const BADGE_GROUPS = {
     fallback: { variant: "primary" },
   },
 
+  // Prometheus metric TYPE — the classifying badge on the Metrics Explorer's
+  // cards, the ⚙ function dialog and anywhere else a metric's kind is shown.
+  // One hue per kind, matching the explorer's palette (metricPalette.ts):
+  // Counter blue, Gauge green, Histogram purple, Summary orange, Other grey.
+  metricType: {
+    mode: "plain",
+    shape: "rounded",
+    // xs: this badge lives in dense card footers and dialog headers.
+    size: "xs",
+    values: {
+      counter: { variant: "blue-soft", label: "Counter" },
+      gauge: { variant: "success-soft", label: "Gauge" },
+      histogram: { variant: "purple-soft", label: "Histogram" },
+      summary: { variant: "orange-soft", label: "Summary" },
+      other: { variant: "default-soft", label: "Other" },
+    },
+    fallback: { variant: "default-soft", label: "Other" },
+  },
+
   // Metric/info chip — trace & thread toolbar chips (Service/Duration/Cost/Steps…)
   // that carry icon + label + value in the slot and get their accent from scoped
   // CSS (.toolbar-chip/.thread-chip/.llm-chip). Uniform neutral base; pill + sm.
@@ -659,7 +678,7 @@ export const BADGE_GROUPS = {
 
   // Field-name chips (ImportSemanticGroups dialogs) — decorative chips listing
   // field names. `highlight` = a group's member fields (primary), `muted` = the
-  // "current/old" side of a compare (light grey). Replaces dead Quasar
+  // "current/old" side of a compare (light grey). Replaces dead
   // `color="primary"/text-color/color="grey-4"` props that OTag silently ignored
   // (so these had been rendering default). pill + sm.
   fieldNameChip: {
@@ -924,12 +943,12 @@ export const BADGE_GROUPS = {
   },
 
   // Threshold-declaration flag (Score Config detail → Healthy threshold section).
-  // Muted, extra-small, rounded — its own group so the xs/rounded sizing stays
-  // scoped here and never leaks into the shared `fieldTag` chips.
+  // Muted, its own group so the label mapping stays scoped and never leaks into
+  // the shared `fieldTag` chips. Uses the default sm/pill sizing so it reads as a
+  // normal status chip, consistent with the sibling `evalDataType`/`evalStatus`.
   thresholdFlag: {
     mode: "plain",
-    shape: "rounded",
-    size: "xs",
+    shape: "pill",
     values: {
       notdeclared: { variant: "default-soft", labelKey: "onlineEvals.scoreConfig.detail.noThreshold" },
     },
