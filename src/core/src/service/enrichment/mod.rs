@@ -13,152 +13,15 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::BTreeMap, sync::Arc};
+use std::sync::Arc;
 
-use async_trait::async_trait;
-use config::{
-    stats::MemorySize,
-    utils::time::{now_micros, parse_str_to_time},
-};
-use vector_enrichment::{Case, IndexHandle, Table};
-use vrl::value::{KeyString, ObjectMap, Value};
+use config::utils::time::now_micros;
 
 use crate::service::db::enrichment_table;
 
 pub mod storage;
 
-#[derive(Clone)]
-pub struct StreamTableConfig {}
-
-#[derive(Debug, Clone)]
-pub struct StreamTable {
-    pub org_id: String,
-    pub stream_name: String,
-    pub data: Arc<Vec<vrl::value::Value>>,
-}
-
-impl MemorySize for StreamTable {
-    fn mem_size(&self) -> usize {
-        std::mem::size_of::<StreamTable>()
-            + self.org_id.mem_size()
-            + self.stream_name.mem_size()
-            + self.data.iter().map(|v| v.to_string().len()).sum::<usize>()
-    }
-}
-
-#[async_trait]
-impl Table for StreamTable {
-    fn find_table_row(
-        &self,
-        case: vector_enrichment::Case,
-        conditions: &[vector_enrichment::Condition],
-        select: Option<&[String]>,
-        _wildcard: Option<&Value>,
-        _index: Option<vector_enrichment::IndexHandle>,
-    ) -> Result<ObjectMap, vector_enrichment::Error> {
-        let resp = get_data(self, conditions, select, case);
-        let record = if resp.is_empty() {
-            ObjectMap::new()
-        } else {
-            resp.first().unwrap().clone()
-        };
-
-        Ok(record)
-    }
-
-    fn find_table_rows(
-        &self,
-        case: vector_enrichment::Case,
-        conditions: &[vector_enrichment::Condition],
-        select: Option<&[String]>,
-        _wildcard: Option<&Value>,
-        _index: Option<vector_enrichment::IndexHandle>,
-    ) -> Result<Vec<ObjectMap>, vector_enrichment::Error> {
-        let resp = get_data(self, conditions, select, case);
-        Ok(resp)
-    }
-
-    fn add_index(
-        &mut self,
-        _case: vector_enrichment::Case,
-        _fields: &[&str],
-    ) -> Result<vector_enrichment::IndexHandle, vector_enrichment::Error> {
-        Ok(IndexHandle(1))
-    }
-
-    fn index_fields(&self) -> Vec<(vector_enrichment::Case, Vec<String>)> {
-        Vec::new()
-    }
-
-    fn needs_reload(&self) -> bool {
-        false
-    }
-}
-
-fn get_data(
-    table: &StreamTable,
-    condition: &[vector_enrichment::Condition],
-    select: Option<&[String]>,
-    case: vector_enrichment::Case,
-) -> Vec<ObjectMap> {
-    // Return early since nothing to filter
-    if condition.is_empty() {
-        return vec![];
-    }
-    let mut resp = vec![];
-    let filtered = table.data.iter().filter(|v| {
-        if let Value::Object(map) = v {
-            // Check that ALL conditions match (AND logic)
-            condition.iter().all(|cond| match cond {
-                vector_enrichment::Condition::Equals { field, value } => match case {
-                    Case::Insensitive => match (map.get(*field), value) {
-                        (Some(Value::Bytes(bytes1)), Value::Bytes(bytes2)) => {
-                            match (std::str::from_utf8(bytes1), std::str::from_utf8(bytes2)) {
-                                (Ok(s1), Ok(s2)) => s1.eq_ignore_ascii_case(s2),
-                                (Err(_), Err(_)) => bytes1 == bytes2,
-                                _ => false,
-                            }
-                        }
-                        _ => false,
-                    },
-                    Case::Sensitive => map.get(*field).is_some_and(|v| v == value),
-                },
-                vector_enrichment::Condition::FromDate { field, from } => map
-                    .get(*field)
-                    .and_then(|v| v.as_str())
-                    .and_then(|v| parse_str_to_time(v.as_ref()).ok())
-                    .is_some_and(|d| d >= *from),
-                vector_enrichment::Condition::ToDate { field, to } => map
-                    .get(*field)
-                    .and_then(|v| v.as_str())
-                    .and_then(|v| parse_str_to_time(v.as_ref()).ok())
-                    .is_some_and(|d| d <= *to),
-                vector_enrichment::Condition::BetweenDates { field, from, to } => map
-                    .get(*field)
-                    .and_then(|v| v.as_str())
-                    .and_then(|v| parse_str_to_time(v.as_ref()).ok())
-                    .is_some_and(|d| d >= *from && d <= *to),
-            })
-        } else {
-            false
-        }
-    });
-
-    for map in filtered.filter_map(|v| v.as_object()) {
-        let btree_map = if let Some(val) = select {
-            val.iter()
-                .filter_map(|field| map.get_key_value(field.as_str()))
-                .map(|(k, v)| (k.clone(), v.clone()))
-                .collect::<BTreeMap<KeyString, Value>>()
-        } else {
-            map.clone()
-        };
-
-        resp.push(btree_map);
-    }
-
-    resp
-}
+pub use search::enrichment::StreamTable;
 
 // Global state for caching
 // static METADATA_CACHE: Lazy<Arc<RwLock<HashMap<String, EnrichmentTableMetadata>>>> =
@@ -237,7 +100,7 @@ pub async fn get_enrichment_table_inner(
 #[cfg(test)]
 mod tests {
     use serde_json::json;
-    use vector_enrichment::{Case, Condition};
+    use vector_enrichment::{Case, Condition, Table};
     use vrl::value::Value;
 
     use super::*;
@@ -609,7 +472,9 @@ mod tests {
             value: Value::from("Alice"),
         }];
 
-        let results = get_data(&table, &conditions, None, Case::Sensitive);
+        let results = table
+            .find_table_rows(Case::Sensitive, &conditions, None, None, None)
+            .unwrap();
         assert!(results.is_empty());
     }
 
@@ -627,7 +492,9 @@ mod tests {
             value: Value::from("Alice"),
         }];
 
-        let results = get_data(&table, &conditions, None, Case::Sensitive);
+        let results = table
+            .find_table_rows(Case::Sensitive, &conditions, None, None, None)
+            .unwrap();
         assert_eq!(results.len(), 1);
     }
 

@@ -6790,6 +6790,7 @@ dependencies = [
  "rustls",
  "rustls-native-certs",
  "sea-orm",
+ "search",
  "segment",
  "serde",
  "serde_json",
@@ -9203,6 +9204,22 @@ name = "seahash"
 version = "4.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1c107b6f4780854c8b126e228ea8869f4d7b71260f962fefb57b996b8959ba6b"
+
+[[package]]
+name = "search"
+version = "0.1.0"
+dependencies = [
+ "arrow",
+ "arrow-schema",
+ "async-trait",
+ "config",
+ "enrichment",
+ "o2_enterprise",
+ "serde",
+ "serde_json",
+ "utoipa",
+ "vrl",
+]
 
 [[package]]
 name = "security-framework"
