@@ -4279,7 +4279,26 @@
       "logsWithCount": "ログ（{count}）",
       "tracesWithCount": "トレース（{count}）",
       "metricsWithCount": "メトリクス（{count}）"
-    }
+    },
+    "dangerZone": "危険ゾーン",
+    "deleteOrganization": "組織を削除",
+    "deleteOrganizationTitle": "この組織を削除",
+    "deleteOrganizationDescription": "{name} を削除予定にします。すべてのユーザー（あなたを含む）が直ちにアクセスできなくなり、猶予期間の終了後に完全に消去されます。それまでに復元するにはサポートへの連絡が必要です。",
+    "deleteOrganizationScopeLoading": "この組織の内容を確認しています…",
+    "deleteOrganizationScope": "ダッシュボード {dashboards} 件 · ストリーム {streams} 件 · データ {size}",
+    "deleteFactGracePeriod": "猶予期間",
+    "deleteFactGracePeriodDetail": "消去までサポートが復元できます",
+    "deleteFactEverything": "すべてを削除",
+    "deleteFactEverythingDetail": "すべてのダッシュボード、ストリーム、取り込み済みデータ",
+    "deleteFactMembers": "メンバー {n} 名に影響 | メンバー {n} 名に影響",
+    "deleteFactMembersDetail": "すべてのアクセスが直ちに取り消されます",
+    "deleteFactOwner": "管理者のみ",
+    "deleteFactOwnerDetail": "この組織の管理者ロールが必要です",
+    "deleteOrganizationConfirm": "「{name}」と、そのすべてのストリーム、ダッシュボード、アラート、パイプライン、ユーザー、設定が削除予定になります。",
+    "deleteOrganizationWarning": "組織は直ちに利用できなくなり、使用しているすべてのユーザーから非表示になります。取り込みはブロックされ、スケジュールされたアラート、パイプライン、レポートは実行を停止するため、削除予定の間は通知は送信されません。",
+    "deleteOrganizationRecoverable": "猶予期間中は復元可能な状態で保持されますが、ご自身で復元することはできません。削除が開始された時点でこの組織へのアクセスを失い、OpenObserve のサポートのみが復元できます。猶予期間の経過後、データは完全に削除され、誰も復元できません。",
+    "deleteOrganizationTypeToConfirm": "確認のため、下に {name} と入力してください:",
+    "deleteOrganizationInitiated": "組織を削除予定にしました。現在は非表示です。猶予期間が終了する前に復元するにはサポートにご連絡ください。"
   },
   "reports": {
     "header": "レポート",

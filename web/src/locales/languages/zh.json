@@ -4279,7 +4279,26 @@
       "logsWithCount": "日志（{count}）",
       "tracesWithCount": "追踪（{count}）",
       "metricsWithCount": "指标（{count}）"
-    }
+    },
+    "dangerZone": "危险区域",
+    "deleteOrganization": "删除组织",
+    "deleteOrganizationTitle": "删除此组织",
+    "deleteOrganizationDescription": "将 {name} 安排删除。所有人（包括您）将立即无法访问该组织，宽限期结束后将被永久清除。在此之前如需恢复，请联系支持团队。",
+    "deleteOrganizationScopeLoading": "正在检查该组织包含的内容…",
+    "deleteOrganizationScope": "{dashboards} 个仪表板 · {streams} 个数据流 · {size} 数据",
+    "deleteFactGracePeriod": "宽限期",
+    "deleteFactGracePeriodDetail": "在清除前支持团队可以恢复",
+    "deleteFactEverything": "删除所有内容",
+    "deleteFactEverythingDetail": "所有仪表板、数据流和已采集的数据",
+    "deleteFactMembers": "影响 {n} 位成员 | 影响 {n} 位成员",
+    "deleteFactMembersDetail": "立即撤销所有访问权限",
+    "deleteFactOwner": "仅限管理员",
+    "deleteFactOwnerDetail": "需要该组织的管理员角色",
+    "deleteOrganizationConfirm": "此操作会将“{name}”及其所有数据流、仪表板、告警、管道、用户和设置安排删除。",
+    "deleteOrganizationWarning": "该组织将立即不可用，并对所有使用它的人隐藏。数据采集将被阻止，计划的告警、管道和报表将停止运行，因此在安排删除期间不会发送任何通知。",
+    "deleteOrganizationRecoverable": "在宽限期内，该组织将保持可恢复状态，但您无法自行恢复——删除一开始，您就会失去对该组织的访问权限，只有 OpenObserve 支持团队才能将其恢复。宽限期结束后，其数据将被永久删除，任何人都无法恢复。",
+    "deleteOrganizationTypeToConfirm": "如需确认，请在下方输入 {name}：",
+    "deleteOrganizationInitiated": "组织已安排删除。现已隐藏；如需在宽限期结束前恢复，请联系支持团队。"
   },
   "reports": {
     "header": "报表",
