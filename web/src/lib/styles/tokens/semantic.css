@@ -96,6 +96,12 @@
   /* Accent */
   --color-accent: var(--color-accent);
 
+  /* White / black — register so text-white / bg-white / text-black / border-white
+     are backed by our tokens (identical #fff/#000) and keep compiling after the
+     Phase-G default-palette removal. No component changes needed. */
+  --color-white: var(--color-white);
+  --color-black: var(--color-black);
+
   /* Brand / Primary (re-exports from base.css) */
   --color-primary-50:  var(--color-primary-50);
   --color-primary-100: var(--color-primary-100);
