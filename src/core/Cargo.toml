@@ -30,6 +30,7 @@ vortex = [
 ]
 
 [dependencies]
+o2_vrl.workspace = true
 search.workspace = true
 axum.workspace = true
 http.workspace = true

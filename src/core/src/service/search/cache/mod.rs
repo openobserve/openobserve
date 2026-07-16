@@ -1227,13 +1227,9 @@ pub async fn apply_regex_to_response(
             }
         };
 
-    let query_context = crate::service::search::datafusion::context::QueryExecutionContext::new(
-        crate::service::search::prepare_query_transforms(org_id),
-    );
     let projections: std::collections::HashMap<String, Vec<ProjectionColumnMapping>> =
         crate::service::search::datafusion::plan::regex_projections::get_columns_from_projections(
             sql,
-            &query_context,
         )
         .await?;
     if projections.is_empty() {

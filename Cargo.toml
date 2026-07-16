@@ -239,6 +239,7 @@ members = [
     "src/api_query",
     "src/api_common",
     "src/core",
+    "src/o2_vrl",
     "src/search",
     "src/jobs",
     "src/config",
@@ -269,6 +270,7 @@ flight = { path = "src/flight" }
 tantivy_utils = { path = "src/tantivy_utils" }
 web = { path = "src/web" }
 openobserve-core = { path = "src/core" }
+o2_vrl = { path = "src/o2_vrl" }
 search = { path = "src/search" }
 openobserve-api = { path = "src/api" }
 openobserve-api-management = { path = "src/api_management" }

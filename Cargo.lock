@@ -6249,6 +6249,18 @@ name = "o2_ratelimit"
 version = "0.1.0"
 
 [[package]]
+name = "o2_vrl"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "config",
+ "enrichment",
+ "serde_json",
+ "tokio",
+ "vrl",
+]
+
+[[package]]
 name = "objc2"
 version = "0.6.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6769,6 +6781,7 @@ dependencies = [
  "o2_dex",
  "o2_enterprise",
  "o2_openfga",
+ "o2_vrl",
  "object_store",
  "opentelemetry",
  "opentelemetry-proto",
@@ -6841,6 +6854,7 @@ dependencies = [
  "o2_dex",
  "o2_enterprise",
  "o2_openfga",
+ "o2_vrl",
  "openobserve-core",
  "prometheus",
  "proto",
@@ -9211,22 +9225,20 @@ version = "0.1.0"
 dependencies = [
  "arrow",
  "arrow-schema",
- "async-trait",
  "chrono",
  "config",
  "datafusion",
- "enrichment",
  "hashbrown 0.16.1",
  "infra",
  "log",
  "o2_enterprise",
+ "o2_vrl",
  "parking_lot 0.12.5",
  "serde",
  "serde_json",
  "tokio",
  "tracing",
  "utoipa",
- "vrl",
 ]
 
 [[package]]

@@ -80,14 +80,8 @@ pub async fn prepare_streaming_aggregate(
         };
 
         // check cardinality for group by fields
-        let query_context = crate::service::search::datafusion::context::QueryExecutionContext::new(
-            crate::service::search::prepare_query_transforms(&ctx.sql.org_id),
-        );
-        let group_by_fields = crate::service::search::sql::visitor::group_by::get_group_by_fields(
-            &ctx.sql,
-            &query_context,
-        )
-        .await?;
+        let group_by_fields =
+            crate::service::search::sql::visitor::group_by::get_group_by_fields(&ctx.sql).await?;
         let cardinality_map = crate::service::search::cardinality::check_cardinality(
             org_id,
             stream_type,

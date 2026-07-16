@@ -29,7 +29,7 @@ use config::{
     ider::SnowflakeIdGenerator,
     meta::{
         alerts::alert::Alert,
-        function::{VRLResultResolver, VRLRuntimeConfig},
+        function::VRLResultResolver,
         self_reporting::usage::{RequestStats, TriggerData, TriggerDataStatus, TriggerDataType},
         stream::{PartitionTimeLevel, StreamParams, StreamPartition, StreamType},
     },
@@ -41,10 +41,7 @@ use infra::{
     schema::STREAM_RECORD_ID_GENERATOR,
 };
 use proto::cluster_rpc::IngestionType;
-use vrl::{
-    compiler::{CompilationResult, TargetValueRef, runtime::Runtime},
-    prelude::state,
-};
+use vrl::compiler::{TargetValueRef, runtime::Runtime};
 
 use super::{
     db::{alerts::alert, pipeline},
@@ -55,11 +52,8 @@ use crate::{
     common::{
         infra::config::{REALTIME_ALERT_TRIGGERS, STREAM_ALERTS},
         meta::{ingestion::IngestionRequest, stream::SchemaRecords},
-        utils::{
-            functions::get_vrl_compiler_config,
-            js::{
-                JSRuntimeConfig, apply_js_fn as apply_js, compile_js_function as compile_js_func,
-            },
+        utils::js::{
+            JSRuntimeConfig, apply_js_fn as apply_js, compile_js_function as compile_js_func,
         },
     },
     service::{
@@ -71,6 +65,8 @@ use crate::{
 
 pub mod grpc;
 pub mod ingestion_service;
+
+pub use o2_vrl::compile_vrl_function;
 
 pub type TriggerAlertData = Vec<(Alert, Vec<Map<String, Value>>)>;
 
@@ -88,34 +84,6 @@ pub fn get_thread_id() -> usize {
     let cfg = config::get_config();
     // Use wrapping modulo to ensure even distribution across worker threads/buckets
     REQUEST_COUNTER.fetch_add(1, Ordering::Relaxed) % cfg.limit.http_worker_num
-}
-
-pub fn compile_vrl_function(func: &str, org_id: &str) -> Result<VRLRuntimeConfig, std::io::Error> {
-    if func.contains("get_env_var") {
-        return Err(std::io::Error::other("get_env_var is not supported"));
-    }
-
-    let external = state::ExternalEnv::default();
-    let vrl_config = get_vrl_compiler_config(org_id);
-    match vrl::compiler::compile_with_external(
-        func,
-        &vrl_config.functions,
-        &external,
-        vrl_config.config,
-    ) {
-        Ok(CompilationResult {
-            program,
-            warnings: _,
-            config,
-        }) => Ok(VRLRuntimeConfig {
-            program,
-            config,
-            fields: vec![],
-        }),
-        Err(e) => Err(std::io::Error::other(
-            vrl::diagnostic::Formatter::new(func, e).to_string(),
-        )),
-    }
 }
 
 /// Compile a JS function and return configuration

@@ -16,7 +16,8 @@
 use std::sync::LazyLock;
 
 use config::{
-    MMDB_ASN_FILE_NAME, MMDB_CITY_FILE_NAME,
+    GEO_IP_ASN_ENRICHMENT_TABLE, GEO_IP_CITY_ENRICHMENT_TABLE, MMDB_ASN_FILE_NAME,
+    MMDB_CITY_FILE_NAME,
     utils::download_utils::{download_file, is_digest_different},
 };
 #[cfg(feature = "enterprise")]
@@ -24,10 +25,7 @@ use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
 use tokio::time;
 
 use crate::{
-    common::{
-        infra::config::{GEOIP_ASN_TABLE, GEOIP_CITY_TABLE, MAXMIND_DB_CLIENT},
-        meta::maxmind::MaxmindClient,
-    },
+    common::{infra::config::MAXMIND_DB_CLIENT, meta::maxmind::MaxmindClient},
     service::enrichment_table::geoip::{Geoip, GeoipConfig, MMDB_INIT_NOTIFIER},
 };
 
@@ -156,8 +154,8 @@ async fn update_maxmind_table(fname: &str) {
         Ok(_) => {
             #[cfg(feature = "enterprise")]
             if get_o2_config().common.enable_enterprise_mmdb {
-                let mut geoip = crate::common::infra::config::GEOIP_ENT_TABLE.write();
-                *geoip = Some(
+                o2_vrl::register_global_enrichment_table(
+                    o2_enterprise::enterprise::common::config::GEO_IP_ENTERPRISE_ENRICHMENT_TABLE,
                     Geoip::new(GeoipConfig::new(
                         &get_o2_config().common.mmdb_enterprise_file_name,
                     ))
@@ -166,11 +164,15 @@ async fn update_maxmind_table(fname: &str) {
             }
 
             if fname.ends_with(MMDB_CITY_FILE_NAME) {
-                let mut geoip_city = GEOIP_CITY_TABLE.write();
-                *geoip_city = Some(Geoip::new(GeoipConfig::new(MMDB_CITY_FILE_NAME)).unwrap());
+                o2_vrl::register_global_enrichment_table(
+                    GEO_IP_CITY_ENRICHMENT_TABLE,
+                    Geoip::new(GeoipConfig::new(MMDB_CITY_FILE_NAME)).unwrap(),
+                );
             } else if fname.ends_with(MMDB_ASN_FILE_NAME) {
-                let mut geoip_asn = GEOIP_ASN_TABLE.write();
-                *geoip_asn = Some(Geoip::new(GeoipConfig::new(MMDB_ASN_FILE_NAME)).unwrap());
+                o2_vrl::register_global_enrichment_table(
+                    GEO_IP_ASN_ENRICHMENT_TABLE,
+                    Geoip::new(GeoipConfig::new(MMDB_ASN_FILE_NAME)).unwrap(),
+                );
             };
         }
         Err(e) => log::warn!("Failed to update maxmind table with path: {fname}, {e}"),

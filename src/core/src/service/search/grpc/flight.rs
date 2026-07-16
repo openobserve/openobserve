@@ -72,7 +72,7 @@ use crate::service::{
         grpc::QueryParams,
         index::IndexCondition,
         inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
-        match_file, prepare_query_transforms,
+        match_file,
     },
 };
 
@@ -98,7 +98,7 @@ pub async fn search(
         .await?;
 
     // register udf
-    register_udf(&ctx, prepare_query_transforms(&org_id))?;
+    register_udf(&ctx, &org_id)?;
     datafusion_functions_json::register_all(&mut ctx)?;
 
     // Decode physical plan from bytes

@@ -27,7 +27,7 @@ use datafusion::{
 use hashbrown::HashSet;
 
 use crate::service::search::{
-    datafusion::context::{QueryExecutionContext, SearchContextBuilder, register_table},
+    datafusion::context::{SearchContextBuilder, register_table},
     sql::{Sql, histogram::handle_histogram},
 };
 
@@ -545,7 +545,6 @@ pub async fn get_result_schema(
     mut sql: Sql,
     is_streaming: bool,
     use_cache: bool,
-    query_context: &QueryExecutionContext,
 ) -> Result<ResultSchemaExtractor, anyhow::Error> {
     if !is_streaming
         && use_cache
@@ -556,7 +555,7 @@ pub async fn get_result_schema(
 
     let sql_arc = Arc::new(sql.clone());
     let ctx = SearchContextBuilder::new()
-        .build(&Request::default(), &sql_arc, query_context)
+        .build(&Request::default(), &sql_arc)
         .await?;
     register_table(&ctx, &sql_arc).await?;
     let plan = ctx.state().create_logical_plan(&sql_arc.sql).await?;
@@ -605,13 +604,7 @@ mod tests {
         is_streaming: bool,
         use_cache: bool,
     ) -> Result<ResultSchemaExtractor, anyhow::Error> {
-        super::get_result_schema(
-            sql,
-            is_streaming,
-            use_cache,
-            &QueryExecutionContext::default(),
-        )
-        .await
+        super::get_result_schema(sql, is_streaming, use_cache).await
     }
 
     #[test]

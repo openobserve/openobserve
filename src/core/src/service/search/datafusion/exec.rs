@@ -56,10 +56,8 @@ use {
 };
 
 use super::{
-    peak_memory_pool::PeakMemoryPool,
-    planner::extension_planner::OpenobserveQueryPlanner,
-    storage::file_list,
-    udf::transform_udf::{PreparedQueryTransform, get_all_transform},
+    peak_memory_pool::PeakMemoryPool, planner::extension_planner::OpenobserveQueryPlanner,
+    storage::file_list, udf::transform_udf::get_all_transform,
 };
 use crate::service::search::{
     datafusion::{
@@ -288,7 +286,7 @@ impl<'a> DataFusionContextBuilder<'a> {
     }
 }
 
-pub fn register_udf(ctx: &SessionContext, transforms: Vec<PreparedQueryTransform>) -> Result<()> {
+pub fn register_udf(ctx: &SessionContext, org_id: &str) -> Result<()> {
     ctx.register_udf(super::udf::str_match_udf::STR_MATCH_UDF.clone());
     ctx.register_udf(super::udf::str_match_udf::STR_MATCH_IGNORE_CASE_UDF.clone());
     ctx.register_udf(super::udf::fuzzy_match_udf::FUZZY_MATCH_UDF.clone());
@@ -316,7 +314,7 @@ pub fn register_udf(ctx: &SessionContext, transforms: Vec<PreparedQueryTransform
         super::udaf::summary_percentile::SummaryPercentile::new(),
     ));
     ctx.register_udf(super::udf::cast_to_timestamp_udf::CAST_TO_TIMESTAMP_UDF.clone());
-    let udf_list = get_all_transform(transforms)?;
+    let udf_list = get_all_transform(org_id)?;
     for udf in udf_list {
         ctx.register_udf(udf.clone());
     }
@@ -770,7 +768,7 @@ mod tests {
     #[tokio::test]
     async fn test_register_udf() -> Result<()> {
         let ctx = SessionContext::new();
-        let result = register_udf(&ctx, Vec::new());
+        let result = register_udf(&ctx, "test_org");
 
         assert!(result.is_ok());
 

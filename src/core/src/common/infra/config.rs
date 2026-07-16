@@ -21,7 +21,6 @@ use config::{
         alerts::alert::Alert,
         destinations::{Destination, Template},
         folder::Folder,
-        function::Transform,
         pipeline::Pipeline,
         promql::ClusterLeader,
         ratelimit::CachedUserRoles,
@@ -33,24 +32,18 @@ use config::{
 use dashmap::DashMap;
 use hashbrown::HashMap;
 use infra::table::short_urls::ShortUrlRecord;
-use parking_lot::RwLock;
-pub use search::enrichment::ENRICHMENT_TABLES;
-use vector_enrichment::TableRegistry;
+pub use o2_vrl::{QUERY_FUNCTIONS, enrichment::ENRICHMENT_TABLES};
 
 use crate::{
     common::meta::{
         maxmind::MaxmindClient,
         organization::{OrgStatus, Organization, OrganizationSetting},
     },
-    service::{
-        db::scheduler as db_scheduler, enrichment_table::geoip::Geoip,
-        pipeline::batch_execution::ExecutablePipeline,
-    },
+    service::{db::scheduler as db_scheduler, pipeline::batch_execution::ExecutablePipeline},
 };
 
 // global cache variables
 pub static KVS: Lazy<RwHashMap<String, bytes::Bytes>> = Lazy::new(Default::default);
-pub static QUERY_FUNCTIONS: Lazy<RwHashMap<String, Transform>> = Lazy::new(DashMap::default);
 pub static USERS: Lazy<RwHashMap<String, infra::table::users::UserRecord>> =
     Lazy::new(DashMap::default);
 pub static ORG_USERS: Lazy<RwHashMap<String, infra::table::org_users::OrgUserRecord>> =
@@ -74,21 +67,8 @@ pub static REALTIME_ALERT_TRIGGERS: Lazy<RwAHashMap<String, db_scheduler::Trigge
     Lazy::new(Default::default);
 pub static ALERTS_TEMPLATES: Lazy<RwHashMap<String, Template>> = Lazy::new(Default::default);
 pub static DESTINATIONS: Lazy<RwHashMap<String, Destination>> = Lazy::new(Default::default);
-pub static ENRICHMENT_REGISTRY: Lazy<Arc<TableRegistry>> =
-    Lazy::new(|| Arc::new(TableRegistry::default()));
-
 pub static MAXMIND_DB_CLIENT: Lazy<Arc<tokio::sync::RwLock<Option<MaxmindClient>>>> =
     Lazy::new(|| Arc::new(tokio::sync::RwLock::new(None)));
-
-pub static GEOIP_CITY_TABLE: Lazy<Arc<RwLock<Option<Geoip>>>> =
-    Lazy::new(|| Arc::new(RwLock::new(None)));
-
-pub static GEOIP_ASN_TABLE: Lazy<Arc<RwLock<Option<Geoip>>>> =
-    Lazy::new(|| Arc::new(RwLock::new(None)));
-
-#[cfg(feature = "enterprise")]
-pub static GEOIP_ENT_TABLE: Lazy<Arc<RwLock<Option<Geoip>>>> =
-    Lazy::new(|| Arc::new(RwLock::new(None)));
 
 pub static STREAM_EXECUTABLE_PIPELINES: Lazy<RwAHashMap<StreamParams, Vec<ExecutablePipeline>>> =
     Lazy::new(Default::default);
@@ -139,10 +119,6 @@ mod tests {
         // Test Arc<RwLock> variables
         let users_rum_token = USERS_RUM_TOKEN.clone();
         assert_eq!(users_rum_token.len(), 0);
-
-        // Test enrichment registry
-        let registry = ENRICHMENT_REGISTRY.clone();
-        assert!(!std::ptr::eq(registry.as_ref(), std::ptr::null()));
     }
 
     #[tokio::test]
@@ -259,29 +235,6 @@ mod tests {
     }
 
     #[test]
-    fn test_geoip_tables() {
-        // Test GEOIP_CITY_TABLE
-        let city_table = GEOIP_CITY_TABLE.clone();
-        let read_guard = city_table.read();
-        assert!(read_guard.is_none());
-        drop(read_guard);
-
-        // Test GEOIP_ASN_TABLE
-        let asn_table = GEOIP_ASN_TABLE.clone();
-        let read_guard = asn_table.read();
-        assert!(read_guard.is_none());
-        drop(read_guard);
-
-        #[cfg(feature = "enterprise")]
-        {
-            // Test GEOIP_ENT_TABLE (only available with enterprise feature)
-            let ent_table = GEOIP_ENT_TABLE.clone();
-            let read_guard = ent_table.read();
-            assert!(read_guard.is_none());
-        }
-    }
-
-    #[test]
     fn test_dashmap_operations() {
         // Test basic DashMap operations on KVS
         let test_key = "test_key".to_string();
@@ -303,6 +256,8 @@ mod tests {
 
     #[test]
     fn test_query_functions_cache() {
+        use config::meta::function::Transform;
+
         let test_key = "test_function".to_string();
         let test_transform = Transform {
             function: "test_function".to_string(),

@@ -54,7 +54,7 @@ use crate::service::{
     search::{
         SearchResult,
         datafusion::{
-            context::{QueryExecutionContext, SearchContextBuilder, register_table},
+            context::{SearchContextBuilder, register_table},
             optimizer::{
                 context::{
                     PhysicalOptimizerContext, RemoteScanContext, StreamingAggregationContext,
@@ -64,7 +64,6 @@ use crate::service::{
             plan_metrics::get_peak_memory_from_ctx,
         },
         inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
-        prepare_query_transforms,
         sql::Sql,
         utils::{ScanStatsVisitor, check_query_default_limit_exceeded},
     },
@@ -384,7 +383,6 @@ pub async fn run_datafusion(
     let cfg = get_config();
 
     let is_complete_cache_hit = Arc::new(Mutex::new(false));
-    let query_context = QueryExecutionContext::new(prepare_query_transforms(&req.org_id));
     let ctx = SearchContextBuilder::new()
         .target_partitions(cfg.limit.cpu_num)
         .add_context(PhysicalOptimizerContext::RemoteScan(RemoteScanContext {
@@ -397,7 +395,7 @@ pub async fn run_datafusion(
             StreamingAggregationContext::new(&req, is_complete_cache_hit.clone()).await?,
         ))
         .add_context(PhysicalOptimizerContext::AggregateTopk)
-        .build(&req, &sql, &query_context)
+        .build(&req, &sql)
         .await?;
 
     log::info!(

@@ -28,21 +28,18 @@ use hashbrown::HashSet;
 use infra::errors::Error;
 
 use crate::service::search::{
-    datafusion::context::{QueryExecutionContext, SearchContextBuilder, register_table},
+    datafusion::context::{SearchContextBuilder, register_table},
     sql::Sql,
 };
 
 // get group by fields from sql, if sql is not a single table query, return empty vector
-pub async fn get_group_by_fields(
-    sql: &Sql,
-    query_context: &QueryExecutionContext,
-) -> Result<Vec<String>, Error> {
+pub async fn get_group_by_fields(sql: &Sql) -> Result<Vec<String>, Error> {
     if sql.schemas.len() != 1 {
         return Ok(vec![]);
     }
     let sql_arc = Arc::new(sql.clone());
     let ctx = SearchContextBuilder::new()
-        .build(&Request::default(), &sql_arc, query_context)
+        .build(&Request::default(), &sql_arc)
         .await?;
     register_table(&ctx, &sql_arc).await?;
     let plan = ctx.state().create_logical_plan(&sql_arc.sql).await?;

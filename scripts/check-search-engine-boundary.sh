@@ -9,6 +9,10 @@ cargo metadata --no-deps --format-version 1 \
   | jq -e '.packages[] | select(.name == "search") | all(.dependencies[]; .name != "openobserve-core")' \
   >/dev/null
 
+cargo metadata --no-deps --format-version 1 \
+  | jq -e '.packages[] | select(.name == "o2_vrl") | all(.dependencies[]; .name != "openobserve-core" and .name != "search")' \
+  >/dev/null
+
 candidate_paths=(
   src/core/src/service/search/datafusion
   src/core/src/service/search/sql

@@ -26,20 +26,8 @@ use super::{
         generate_physical_optimizer_rules,
     },
     table_provider::{catalog::StreamTypeProvider, empty_table::NewEmptyTable},
-    udf::transform_udf::PreparedQueryTransform,
 };
 use crate::service::search::sql::Sql;
-
-#[derive(Clone, Default)]
-pub struct QueryExecutionContext {
-    transforms: Vec<PreparedQueryTransform>,
-}
-
-impl QueryExecutionContext {
-    pub fn new(transforms: Vec<PreparedQueryTransform>) -> Self {
-        Self { transforms }
-    }
-}
 
 pub struct SearchContextBuilder {
     pub target_partitions: usize,
@@ -70,12 +58,7 @@ impl SearchContextBuilder {
         self
     }
 
-    pub async fn build(
-        self,
-        req: &Request,
-        sql: &Arc<Sql>,
-        query_context: &QueryExecutionContext,
-    ) -> Result<SessionContext> {
+    pub async fn build(self, req: &Request, sql: &Arc<Sql>) -> Result<SessionContext> {
         let analyzer_rules = generate_analyzer_rules(sql);
         let optimizer_rules = generate_optimizer_rules(sql);
         let physical_optimizer_rules = generate_physical_optimizer_rules(req, sql, self.contexts);
@@ -89,7 +72,7 @@ impl SearchContextBuilder {
             .build(self.target_partitions)
             .await?;
 
-        register_udf(&ctx, query_context.transforms.clone())?;
+        register_udf(&ctx, &sql.org_id)?;
         datafusion_functions_json::register_all(&mut ctx)?;
 
         Ok(ctx)

@@ -2027,10 +2027,7 @@ pub async fn result_schema(
             }
         };
 
-    let query_context = crate::service::search::datafusion::context::QueryExecutionContext::new(
-        crate::service::search::prepare_query_transforms(&org_id),
-    );
-    let res_schema = match get_result_schema(sql, is_streaming, use_cache, &query_context).await {
+    let res_schema = match get_result_schema(sql, is_streaming, use_cache).await {
         Ok(v) => v,
         Err(e) => {
             return (
