@@ -18,7 +18,7 @@ use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, Set, TransactionTrait, prel
 use serde::{Deserialize, Serialize};
 
 use super::{
-    entity::{workflow_errors, workflows},
+    entity::{workflow_errors, workflow_run_data, workflows},
     get_lock,
 };
 use crate::db::{ORM_CLIENT, connect_to_orm};
@@ -88,6 +88,29 @@ impl TryFrom<workflow_errors::Model> for WorkflowRunErrors {
             input_data: value.input_data,
         };
         Ok(ret)
+    }
+}
+
+pub struct WorkflowRunData {
+    pub id: i32,
+    pub org_id: String,
+    pub workflow_id: String,
+    pub run_id: String,
+    pub triggered_at: i64,
+    pub data: String,
+}
+
+impl From<workflow_run_data::Model> for WorkflowRunData {
+    fn from(value: workflow_run_data::Model) -> Self {
+        let ret = Self {
+            id: value.id,
+            org_id: value.org_id,
+            workflow_id: value.workflow_id,
+            run_id: value.run_id,
+            triggered_at: value.triggered_at,
+            data: value.data,
+        };
+        ret
     }
 }
 
@@ -300,4 +323,78 @@ pub async fn delete_all_errors_older_than(
     let ret: Result<Vec<_>, anyhow::Error> = errors.into_iter().map(|v| v.try_into()).collect();
 
     Ok(ret?)
+}
+
+pub async fn delete_all_runs_older_than(ts: i64) -> Result<Vec<WorkflowRunData>, anyhow::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let _lock = get_lock().await;
+
+    // ideally this could be delete returning, but sqlite does not
+    // support that with seaorm, so transaction instead, which is still not
+    // the same, but should be ok
+    let txn = client.begin().await?;
+
+    let data = match workflow_run_data::Entity::find()
+        .filter(workflow_run_data::Column::TriggeredAt.lte(ts))
+        .all(&txn)
+        .await
+    {
+        Ok(v) => v,
+        Err(e) => {
+            log::error!("db error in getting workflow runs to clean : {e}");
+            txn.rollback().await?;
+            return Err(e.into());
+        }
+    };
+
+    if let Err(e) = workflow_run_data::Entity::delete_many()
+        .filter(workflow_run_data::Column::TriggeredAt.lte(ts))
+        .exec(&txn)
+        .await
+    {
+        log::error!("db error in deleting workflow runs to clean : {e}");
+        txn.rollback().await?;
+        return Err(e.into());
+    };
+
+    txn.commit().await?;
+
+    let ret: Vec<_> = data.into_iter().map(|v| v.into()).collect();
+
+    Ok(ret)
+}
+
+pub async fn get_run_data(
+    org_id: &str,
+    workflow_id: &str,
+    run_id: &str,
+) -> Result<Option<String>, anyhow::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+
+    let ret = workflow_run_data::Entity::find()
+        .filter(workflow_run_data::Column::OrgId.eq(org_id))
+        .filter(workflow_run_data::Column::WorkflowId.eq(workflow_id))
+        .filter(workflow_run_data::Column::RunId.eq(run_id))
+        .one(client)
+        .await?;
+
+    Ok(ret.map(|v| v.data))
+}
+
+pub async fn delete_run_data(
+    org_id: &str,
+    workflow_id: &str,
+    run_id: &str,
+) -> Result<(), anyhow::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let _lock = get_lock().await;
+
+    workflow_run_data::Entity::delete_many()
+        .filter(workflow_run_data::Column::OrgId.eq(org_id))
+        .filter(workflow_run_data::Column::WorkflowId.eq(workflow_id))
+        .filter(workflow_run_data::Column::RunId.eq(run_id))
+        .exec(client)
+        .await?;
+
+    Ok(())
 }

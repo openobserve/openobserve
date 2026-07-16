@@ -200,6 +200,21 @@ pub async fn clean() {
             "cleaned {} old entries for workflow errors ",
             error_entries.len()
         );
+
+        let run_entries =
+            match infra::table::workflows::delete_all_runs_older_than(limit_time).await {
+                Ok(v) => v,
+                Err(e) => {
+                    log::error!(
+                        "error listing workflow runs older than {limit_time} for cleanup : {e}"
+                    );
+                    continue;
+                }
+            };
+        log::info!(
+            "cleaned {} old entries for workflow run data ",
+            run_entries.len()
+        );
     }
 }
 
