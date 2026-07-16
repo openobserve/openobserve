@@ -21,11 +21,11 @@ use axum::{
 };
 use serde::Deserialize;
 
+use crate::common::meta::http::HttpResponse as MetaHttpResponse;
+// Used only inside #[cfg(feature = "enterprise")] handler bodies.
+#[cfg(feature = "enterprise")]
 use crate::{
-    common::{
-        meta::http::HttpResponse as MetaHttpResponse,
-        utils::auth::{UserEmail, check_permissions},
-    },
+    common::utils::auth::{UserEmail, check_permissions},
     handler::http::extractors::Headers,
 };
 
