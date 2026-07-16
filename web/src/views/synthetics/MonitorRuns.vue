@@ -771,7 +771,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- ════════════ STEPS ════════════ -->
         <OTabPanel name="steps">
           <div
-            class="mx-auto px-2 py-2 flex flex-col gap-2"
+            class="mx-auto flex flex-col gap-2"
           >
             <!-- Loading skeleton -->
             <template v-if="stepsLoading || !stepsHasLoadedOnce">
@@ -825,11 +825,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :columns="stepTableColumns"
                   row-key="id"
                   :pagination="'none'"
-                  :sorting="'none'"
+                  :sorting="'client'"
                   :show-global-filter="false"
                   :show-header="true"
                   :dense="true"
                   :bordered="true"
+                  :enable-column-resize="true"
+                  :enable-column-reorder="true"
                   :fill-height="false"
                 >
                   <!-- cell-name: Step name -->
@@ -888,19 +890,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <div class="h-full rounded-full bg-[var(--color-primary-400)]" :style="{ width: row.maxDurationBarPct }" />
                       </div>
                     </div>
-                  </template>
-
-                  <!-- cell-trend: Sparkline SVG -->
-                  <template #cell-trend="{ row }">
-                    <svg viewBox="0 0 90 24" class="w-[90px] h-6 block">
-                      <polyline
-                        :points="row.trendPts"
-                        fill="none"
-                        :stroke="row.trendColor"
-                        stroke-width="1.5"
-                        vector-effect="non-scaling-stroke"
-                      />
-                    </svg>
                   </template>
 
                   <!-- Empty -->
@@ -1844,21 +1833,6 @@ function barColorForRate(pct: number): string {
       ? "var(--color-warning-500)"
       : "var(--color-status-success-text)";
 }
-function sparklinePts(rates: number[], width: number, height: number): string {
-  if (rates.length < 2) {
-    const y = height - Math.max(2, 2);
-    return `0,${y} ${width},${y}`;
-  }
-  const maxR = Math.max(...rates, 0.01);
-  const pts: string[] = [];
-  for (let i = 0; i < rates.length; i++) {
-    const x = (i / (rates.length - 1)) * width;
-    const y = height - Math.max(2, (rates[i] / maxR) * (height - 4));
-    pts.push(`${x.toFixed(1)},${y.toFixed(1)}`);
-  }
-  return pts.join(" ");
-}
-
 // ── Steps Analysis Table ──────────────────────────────────────────────────
 
 interface StepTableRow {
@@ -1882,8 +1856,6 @@ interface StepTableRow {
   p95Duration: string;
   p95DurationMs: number;
   p95DurationBarPct: string;
-  trendPts: string;
-  trendColor: string;
 }
 
 const stepTableRows = computed<StepTableRow[]>(() => {
@@ -1921,22 +1893,17 @@ const stepTableRows = computed<StepTableRow[]>(() => {
       p95Duration: fmtDur(g.p95DurationMs),
       p95DurationMs: g.p95DurationMs,
       p95DurationBarPct: Math.round((g.p95DurationMs / maxP95Duration) * 100) + "%",
-      trendPts: sparklinePts(g.recentRates, 90, 24),
-      trendColor: g.failRate >= 0.1
-        ? "var(--color-status-error-text)"
-        : "var(--color-primary-500)",
     };
   });
 });
 
 const stepTableColumns: OTableColumnDef<StepTableRow>[] = [
-  { id: "name", header: "Step Name", meta: { isName: true } },
-  { id: "failRate", header: "Fail Rate", size: 110, meta: { align: "right" } },
-  { id: "flakyRate", header: "Flaky Rate", size: 100, meta: { align: "right" } },
-  { id: "avgDuration", header: "Avg Duration", size: 100, meta: { align: "right" } },
-  { id: "p95Duration", header: "p95 Duration", size: 96, meta: { align: "right" } },
-  { id: "maxDuration", header: "Max Duration", size: 100, meta: { align: "right" } },
-  { id: "trend", header: "Trend", size: 100 },
+  { id: "name", header: "Step Name", accessorKey: "name", meta: { isName: true } },
+  { id: "failRate", header: "Fail Rate", accessorKey: "failRatePct", size: 110, meta: { align: "right" } },
+  { id: "flakyRate", header: "Flaky Rate", accessorKey: "flakyRatePct", size: 100, meta: { align: "right" } },
+  { id: "avgDuration", header: "Avg Duration", accessorKey: "avgDurationMs", size: 100, meta: { align: "right" } },
+  { id: "p95Duration", header: "p95 Duration", accessorKey: "p95DurationMs", size: 96, meta: { align: "right" } },
+  { id: "maxDuration", header: "Max Duration", accessorKey: "maxDurationMs", size: 100, meta: { align: "right" } },
 ];
 
 // ── Chart options ────────────────────────────────────────────────────────
