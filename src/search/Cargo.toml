@@ -21,6 +21,7 @@ chrono.workspace = true
 config.workspace = true
 datafusion.workspace = true
 datafusion-proto.workspace = true
+dashmap.workspace = true
 flight.workspace = true
 futures.workspace = true
 futures-util.workspace = true
@@ -32,6 +33,7 @@ md5.workspace = true
 memchr.workspace = true
 o2_enterprise = { workspace = true, optional = true, default-features = false }
 opentelemetry.workspace = true
+object_store.workspace = true
 parking_lot.workspace = true
 parquet.workspace = true
 proto.workspace = true

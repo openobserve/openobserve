@@ -20,11 +20,10 @@ pub mod exec;
 pub mod merge;
 pub mod optimizer;
 pub mod plan;
-pub mod storage;
 pub mod table_provider;
 pub mod udf;
 
-pub use search::datafusion::{peak_memory_pool, plan_metrics, planner, udaf};
+pub use search::datafusion::{peak_memory_pool, plan_metrics, planner, storage, udaf};
 
 #[derive(PartialEq, Debug)]
 pub enum MemoryPoolType {
