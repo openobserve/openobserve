@@ -26,8 +26,6 @@ use infra::cache::{
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::search::cache::streaming_agg::STREAMING_AGGS_CACHE_DIR;
 
-#[cfg(test)]
-use crate::service::search::sql::histogram::handle_histogram;
 use crate::{
     common::meta::search::{
         CacheQueryRequest, CachedQueryResponse, QueryDelta, ResultCacheSelectionStrategy,
@@ -1124,16 +1122,6 @@ mod tests {
             delta_end_time: 1747659600000000,
         }];
         assert_eq!(deltas, expected_deltas);
-    }
-
-    #[test]
-    fn test_handle_histogram() {
-        // Test case 1: Basic histogram with numeric interval
-        let mut sql = "SELECT histogram(_timestamp, '10 seconds') FROM logs".to_string();
-        let time_range = (1640995200000000, 1641081600000000); // 2022-01-01 to 2022-01-02
-        handle_histogram(&mut sql, time_range, 10);
-        assert!(sql.contains("histogram(_timestamp,"));
-        assert!(sql.contains("second"));
     }
 
     #[test]

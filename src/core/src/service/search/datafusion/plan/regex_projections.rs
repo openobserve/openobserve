@@ -48,12 +48,6 @@ mod tests {
 
     use super::*;
 
-    async fn get_columns_from_projections(
-        sql: Sql,
-    ) -> Result<HashMap<String, Vec<ProjectionColumnMapping>>, anyhow::Error> {
-        super::get_columns_from_projections(sql).await
-    }
-
     fn get_fields_default() -> Vec<Field> {
         vec![
             Field::new("log", DataType::Utf8, true),

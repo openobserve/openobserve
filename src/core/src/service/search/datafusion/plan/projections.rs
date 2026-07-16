@@ -599,14 +599,6 @@ mod tests {
 
     use super::*;
 
-    async fn get_result_schema(
-        sql: Sql,
-        is_streaming: bool,
-        use_cache: bool,
-    ) -> Result<ResultSchemaExtractor, anyhow::Error> {
-        super::get_result_schema(sql, is_streaming, use_cache).await
-    }
-
     #[test]
     fn test_operator_to_string_comparison_ops() {
         assert_eq!(operator_to_string(&Operator::Eq), "=");

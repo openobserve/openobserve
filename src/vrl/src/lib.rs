@@ -20,7 +20,7 @@
 use std::{collections::HashMap, sync::LazyLock};
 
 use config::{
-    RwHashMap,
+    DEFAULT_ORG, RwHashMap,
     meta::function::{Transform, VRLCompilerConfig, VRLRuntimeConfig},
 };
 use vector_enrichment::{Table, TableRegistry};
@@ -29,8 +29,6 @@ use vrl::compiler::{CompilationResult, runtime::Runtime};
 pub mod enrichment;
 
 use enrichment::ENRICHMENT_TABLES;
-
-const DEFAULT_ORG: &str = "default";
 
 /// Query and ingestion transform definitions, keyed by `org_id/function_name`.
 pub static QUERY_FUNCTIONS: LazyLock<RwHashMap<String, Transform>> =

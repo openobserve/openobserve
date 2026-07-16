@@ -241,6 +241,16 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_handle_histogram() {
+        // Test case 1: Basic histogram with numeric interval
+        let mut sql = "SELECT histogram(_timestamp, '10 seconds') FROM logs".to_string();
+        let time_range = (1640995200000000, 1641081600000000); // 2022-01-01 to 2022-01-02
+        handle_histogram(&mut sql, time_range, 10);
+        assert!(sql.contains("histogram(_timestamp,"));
+        assert!(sql.contains("second"));
+    }
+
+    #[test]
     fn test_convert_simple_query() {
         let original_query = "SELECT * FROM \"logs\" WHERE status = 500";
         let stream_names = vec!["logs".to_string()];
