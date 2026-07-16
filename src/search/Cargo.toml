@@ -24,6 +24,8 @@ itertools.workspace = true
 log.workspace = true
 memchr.workspace = true
 o2_enterprise = { workspace = true, optional = true, default-features = false }
+opentelemetry.workspace = true
+parking_lot.workspace = true
 proto.workspace = true
 regex.workspace = true
 regex-syntax.workspace = true

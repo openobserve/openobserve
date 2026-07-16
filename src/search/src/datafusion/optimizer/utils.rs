@@ -30,7 +30,7 @@ use datafusion::{
     scalar::ScalarValue,
 };
 
-use crate::service::search::datafusion::table_provider::empty_table::NewEmptyTable;
+use crate::datafusion::table_provider::empty_table::NewEmptyTable;
 
 // check if the plan is a complex query that we can't add sort _timestamp
 pub fn is_complex_query(plan: &LogicalPlan) -> bool {

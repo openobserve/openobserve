@@ -35,7 +35,7 @@ use datafusion::{
     scalar::ScalarValue,
 };
 
-use crate::service::search::{
+use crate::{
     datafusion::udf::histogram_udf::HISTOGRAM_UDF_NAME,
     sql::visitor::histogram_interval::generate_histogram_interval,
 };
@@ -287,7 +287,7 @@ mod tests {
         prelude::SessionContext,
     };
 
-    use crate::service::search::datafusion::{
+    use crate::datafusion::{
         optimizer::logical_optimizer::rewrite_histogram::RewriteHistogram, udf::histogram_udf,
     };
 

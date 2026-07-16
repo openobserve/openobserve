@@ -26,7 +26,7 @@ use datafusion::{
     prelude::Expr,
 };
 
-use crate::service::search::datafusion::distributed_plan::empty_exec::NewEmptyExec;
+use crate::datafusion::distributed_plan::empty_exec::NewEmptyExec;
 
 /// An empty plan that is useful for testing and generating plans
 /// without mapping them to actual data.

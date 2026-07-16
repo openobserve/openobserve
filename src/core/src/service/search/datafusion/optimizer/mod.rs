@@ -40,6 +40,7 @@ use datafusion::{
 };
 use hashbrown::HashSet;
 use infra::schema::get_stream_setting_index_fields;
+pub use search::datafusion::optimizer::{analyze, context, utils};
 #[cfg(feature = "enterprise")]
 use {
     crate::service::search::datafusion::optimizer::context::generate_streaming_agg_rules,
@@ -66,12 +67,8 @@ use crate::service::search::{
     },
     sql::Sql,
 };
-
-pub mod analyze;
-pub mod context;
 pub mod logical_optimizer;
 pub mod physical_optimizer;
-pub mod utils;
 
 pub fn generate_analyzer_rules(sql: &Sql) -> Vec<Arc<dyn AnalyzerRule + Send + Sync>> {
     vec![Arc::new(RemoveIndexFieldsRule::new(

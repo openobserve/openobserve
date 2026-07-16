@@ -27,7 +27,7 @@ use datafusion::{
 };
 use itertools::Itertools;
 
-use crate::service::search::datafusion::{
+use crate::datafusion::{
     optimizer::utils::{AddSortAndLimit, is_contain_deduplication_plan},
     plan::deduplication::DeduplicationLogicalNode,
 };
@@ -193,7 +193,7 @@ mod tests {
     };
 
     use super::LimitJoinRightSide;
-    use crate::service::search::datafusion::planner::extension_planner::OpenobserveQueryPlanner;
+    use crate::datafusion::planner::extension_planner::OpenobserveQueryPlanner;
 
     #[test]
     fn test_limit_join_right_side_name() {

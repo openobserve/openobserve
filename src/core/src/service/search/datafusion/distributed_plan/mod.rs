@@ -30,7 +30,7 @@ mod common;
 mod decoder_stream;
 pub mod display;
 pub mod distribute_analyze_exec;
-pub mod empty_exec;
+pub use search::datafusion::distributed_plan::empty_exec;
 pub mod enrich_exec;
 #[cfg(feature = "enterprise")]
 pub mod enrichment_exec;

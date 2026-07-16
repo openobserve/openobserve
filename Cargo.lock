@@ -9224,6 +9224,8 @@ dependencies = [
  "log",
  "memchr",
  "o2_enterprise",
+ "opentelemetry",
+ "parking_lot 0.12.5",
  "proto",
  "regex",
  "regex-syntax",

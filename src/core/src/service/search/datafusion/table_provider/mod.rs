@@ -31,7 +31,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 pub mod catalog;
-pub mod empty_table;
+pub use search::datafusion::table_provider::empty_table;
 pub mod enrich_table;
 mod helpers;
 pub mod listing_adapter;
