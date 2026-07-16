@@ -248,6 +248,7 @@ members = [
     "src/report_server",
     "src/flight",
     "src/tantivy_utils",
+    "src/web",
 ]
 resolver = "2"
 
@@ -265,6 +266,7 @@ proto = { path = "src/proto" }
 report_server = { path = "src/report_server" }
 flight = { path = "src/flight" }
 tantivy_utils = { path = "src/tantivy_utils" }
+web = { path = "src/web" }
 openobserve-core = { path = "src/core" }
 openobserve-api = { path = "src/api" }
 openobserve-api-management = { path = "src/api_management" }
