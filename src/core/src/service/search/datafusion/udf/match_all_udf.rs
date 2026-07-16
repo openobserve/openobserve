@@ -20,9 +20,7 @@ use datafusion::{
     common::{DataFusionError, Result},
     logical_expr::{ColumnarValue, ScalarUDF, ScalarUDFImpl, Signature, Volatility},
 };
-
-pub const MATCH_ALL_UDF_NAME: &str = "match_all";
-pub const FUZZY_MATCH_ALL_UDF_NAME: &str = "fuzzy_match_all";
+pub use search::udf::{FUZZY_MATCH_ALL_UDF_NAME, MATCH_ALL_UDF_NAME};
 
 pub static MATCH_ALL_UDF: Lazy<ScalarUDF> = Lazy::new(|| ScalarUDF::from(MatchAllUdf::new()));
 

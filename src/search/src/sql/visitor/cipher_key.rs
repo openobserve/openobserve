@@ -25,9 +25,7 @@ use sqlparser::{
     parser::Parser,
 };
 
-use crate::service::search::datafusion::udf::cipher_udf::{
-    DECRYPT_SLOW_UDF_NAME, DECRYPT_UDF_NAME, ENCRYPT_UDF_NAME,
-};
+use crate::udf::{DECRYPT_SLOW_UDF_NAME, DECRYPT_UDF_NAME, ENCRYPT_UDF_NAME};
 
 pub fn get_cipher_key_names(sql: &str) -> Result<Vec<String>, Error> {
     let dialect = &PostgreSqlDialect {};

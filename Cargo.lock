@@ -9209,14 +9209,23 @@ checksum = "1c107b6f4780854c8b126e228ea8869f4d7b71260f962fefb57b996b8959ba6b"
 name = "search"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "arrow",
  "arrow-schema",
  "async-trait",
+ "chrono",
  "config",
+ "datafusion",
  "enrichment",
+ "hashbrown 0.16.1",
+ "infra",
+ "log",
  "o2_enterprise",
+ "proto",
+ "regex",
  "serde",
  "serde_json",
+ "sqlparser",
  "utoipa",
  "vrl",
 ]

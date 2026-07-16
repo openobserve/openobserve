@@ -20,10 +20,7 @@ use hashbrown::HashMap;
 use infra::schema::{SchemaCache, get_stream_setting_fts_fields};
 use sqlparser::ast::{Expr, FunctionArguments, Query, TableFactor, VisitorMut, visit_expressions};
 
-use crate::service::search::datafusion::udf::{
-    match_all_hash_udf::MATCH_ALL_HASH_UDF_NAME,
-    match_all_udf::{FUZZY_MATCH_ALL_UDF_NAME, MATCH_ALL_UDF_NAME},
-};
+use crate::udf::{FUZZY_MATCH_ALL_UDF_NAME, MATCH_ALL_HASH_UDF_NAME, MATCH_ALL_UDF_NAME};
 
 /// get all item from match_all functions
 pub struct MatchVisitor {

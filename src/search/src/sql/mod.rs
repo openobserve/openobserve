@@ -38,7 +38,7 @@ use proto::cluster_rpc::SearchQuery;
 use regex::Regex;
 use sqlparser::{ast::VisitMut, dialect::PostgreSqlDialect, parser::Parser};
 
-use crate::service::search::sql::{
+use crate::sql::{
     rewriter::{
         add_o2_id::AddO2IdVisitor, add_timestamp::AddTimestampVisitor,
         match_all_raw::MatchAllRawVisitor, remove_dashboard_placeholder::RemoveDashboardAllVisitor,

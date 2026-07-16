@@ -15,41 +15,15 @@
 
 use std::sync::Arc;
 
-use config::datafusion::request::Request;
 use datafusion::{
     common::{
         Result,
-        tree_node::{TreeNode, TreeNodeRecursion, TreeNodeVisitor},
+        tree_node::{TreeNodeRecursion, TreeNodeVisitor},
     },
     physical_expr::utils::collect_columns,
     physical_plan::{ExecutionPlan, aggregates::AggregateExec},
 };
 use hashbrown::HashSet;
-use infra::errors::Error;
-
-use crate::service::search::{
-    cluster::flight::{SearchContextBuilder, register_table},
-    sql::Sql,
-};
-
-// get group by fields from sql, if sql is not a single table query, return empty vector
-pub async fn get_group_by_fields(sql: &Sql) -> Result<Vec<String>, Error> {
-    if sql.schemas.len() != 1 {
-        return Ok(vec![]);
-    }
-    let sql_arc = Arc::new(sql.clone());
-    let ctx = SearchContextBuilder::new()
-        .build(&Request::default(), &sql_arc)
-        .await?;
-    register_table(&ctx, &sql_arc).await?;
-    let plan = ctx.state().create_logical_plan(&sql_arc.sql).await?;
-    let physical_plan = ctx.state().create_physical_plan(&plan).await?;
-
-    // visit group by fields
-    let mut group_by_visitor = GroupByFieldVisitor::new();
-    physical_plan.visit(&mut group_by_visitor)?;
-    Ok(group_by_visitor.get_group_by_fields())
-}
 
 pub struct GroupByFieldVisitor {
     group_by_fields: HashSet<String>,

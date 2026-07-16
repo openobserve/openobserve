@@ -20,7 +20,7 @@ use hashbrown::HashMap;
 use infra::schema::SchemaCache;
 use sqlparser::ast::{BinaryOperator, Expr, Query, VisitorMut};
 
-use crate::service::search::{
+use crate::{
     sql::visitor::utils::generate_table_reference,
     utils::{is_field, is_value, split_conjunction, trim_quotes},
 };

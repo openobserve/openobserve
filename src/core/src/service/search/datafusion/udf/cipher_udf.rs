@@ -30,16 +30,10 @@ use datafusion::{
     sql::sqlparser::parser::ParserError,
 };
 use o2_enterprise::enterprise::cipher::Cipher;
+pub use search::udf::{DECRYPT_SLOW_UDF_NAME, DECRYPT_UDF_NAME, ENCRYPT_UDF_NAME};
 use serde_json::Value;
 
 use crate::cipher::registry::REGISTRY;
-
-/// The name of the decrypt UDF given to DataFusion.
-pub const DECRYPT_UDF_NAME: &str = "decrypt_path";
-/// The name of the decrypt UDF given to DataFusion.
-pub const ENCRYPT_UDF_NAME: &str = "encrypt";
-/// The name of the decrypt_slow UDF given to DataFusion.
-pub const DECRYPT_SLOW_UDF_NAME: &str = "decrypt";
 
 /// implementation of decrypt
 pub static DECRYPT_UDF: Lazy<ScalarUDF> = Lazy::new(|| {

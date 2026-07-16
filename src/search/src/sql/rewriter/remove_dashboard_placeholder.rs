@@ -21,8 +21,8 @@ use sqlparser::{
     tokenizer::Span,
 };
 
-use crate::service::search::{
-    datafusion::udf::{
+use crate::{
+    udf::{
         MATCH_FIELD_IGNORE_CASE_UDF_NAME, MATCH_FIELD_UDF_NAME, STR_MATCH_UDF_IGNORE_CASE_NAME,
         STR_MATCH_UDF_NAME,
     },

@@ -27,7 +27,7 @@ use sqlparser::{
     tokenizer::Span,
 };
 
-use crate::service::search::utils::conjunction;
+use crate::utils::conjunction;
 
 pub fn add_new_filters_with_and_operator(
     sql: &str,

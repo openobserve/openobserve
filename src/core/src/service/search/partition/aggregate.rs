@@ -80,8 +80,7 @@ pub async fn prepare_streaming_aggregate(
         };
 
         // check cardinality for group by fields
-        let group_by_fields =
-            crate::service::search::sql::visitor::group_by::get_group_by_fields(&ctx.sql).await?;
+        let group_by_fields = get_group_by_fields(&ctx.sql).await?;
         let cardinality_map = crate::service::search::cardinality::check_cardinality(
             org_id,
             stream_type,
@@ -204,4 +203,27 @@ pub async fn prepare_streaming_aggregate(
         streaming_id,
         streaming_aggs_cache_strategy,
     ))
+}
+
+#[cfg(feature = "enterprise")]
+async fn get_group_by_fields(sql: &crate::service::search::sql::Sql) -> Result<Vec<String>, Error> {
+    use datafusion::common::tree_node::TreeNode;
+    use search::sql::visitor::group_by::GroupByFieldVisitor;
+
+    use crate::service::search::cluster::flight::{SearchContextBuilder, register_table};
+
+    if sql.schemas.len() != 1 {
+        return Ok(vec![]);
+    }
+    let sql = std::sync::Arc::new(sql.clone());
+    let ctx = SearchContextBuilder::new()
+        .build(&config::datafusion::request::Request::default(), &sql)
+        .await?;
+    register_table(&ctx, &sql).await?;
+    let plan = ctx.state().create_logical_plan(&sql.sql).await?;
+    let physical_plan = ctx.state().create_physical_plan(&plan).await?;
+
+    let mut visitor = GroupByFieldVisitor::new();
+    physical_plan.visit(&mut visitor)?;
+    Ok(visitor.get_group_by_fields())
 }

@@ -101,7 +101,14 @@ fn single_stream_histogram_query(
 
 /// Detects the preferred histogram breakdown field from stream schema fields.
 pub fn detect_histogram_breakdown_field(schema_fields: &[String]) -> Option<String> {
-    for prioritized_field in HISTOGRAM_BREAKDOWN_FIELDS.iter() {
+    detect_histogram_breakdown_field_with_priorities(schema_fields, &HISTOGRAM_BREAKDOWN_FIELDS)
+}
+
+fn detect_histogram_breakdown_field_with_priorities(
+    schema_fields: &[String],
+    prioritized_fields: &[String],
+) -> Option<String> {
+    for prioritized_field in prioritized_fields {
         if let Some(field) = schema_fields
             .iter()
             .find(|field_name| field_name.eq_ignore_ascii_case(prioritized_field))
@@ -200,6 +207,11 @@ pub fn histogram_bucket_start(timestamp_us: i64, interval_us: i64) -> i64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn detect_histogram_breakdown_field(schema_fields: &[String]) -> Option<String> {
+        let prioritized_fields = ["severity", "log_level", "level", "status"].map(String::from);
+        detect_histogram_breakdown_field_with_priorities(schema_fields, &prioritized_fields)
+    }
 
     #[test]
     fn test_convert_simple_query() {

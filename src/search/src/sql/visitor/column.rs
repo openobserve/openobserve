@@ -24,7 +24,7 @@ use sqlparser::ast::{
     VisitorMut,
 };
 
-use crate::service::search::{sql::visitor::utils::FieldNameVisitor, utils::trim_quotes};
+use crate::{sql::visitor::utils::FieldNameVisitor, utils::trim_quotes};
 
 /// visit a sql to get all columns
 pub struct ColumnVisitor<'a> {

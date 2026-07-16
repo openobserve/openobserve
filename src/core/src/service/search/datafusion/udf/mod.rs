@@ -14,6 +14,11 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::{meta::function::ZoFunction, utils::json};
+pub use search::udf::{
+    FUZZY_MATCH_UDF_NAME, MATCH_FIELD_IGNORE_CASE_UDF_NAME, MATCH_FIELD_UDF_NAME,
+    REGEX_MATCH_UDF_NAME, REGEX_MATCHES_UDF_NAME, REGEX_NOT_MATCH_UDF_NAME,
+    STR_MATCH_UDF_IGNORE_CASE_NAME, STR_MATCH_UDF_NAME,
+};
 
 pub mod arr_descending_udf;
 pub mod arrcount_udf;
@@ -38,23 +43,6 @@ pub mod string_to_array_v2_udf;
 pub mod time_range_udf;
 pub mod to_arr_string_udf;
 pub mod transform_udf;
-
-/// The name of the str_match UDF given to DataFusion.
-pub const STR_MATCH_UDF_NAME: &str = "str_match";
-/// The name of the str_match_ignore_case UDF given to DataFusion.
-pub const STR_MATCH_UDF_IGNORE_CASE_NAME: &str = "str_match_ignore_case";
-/// The name of the match_field UDF given to DataFusion.
-pub const MATCH_FIELD_UDF_NAME: &str = "match_field";
-/// The name of the match_field_ignore_case UDF given to DataFusion.
-pub const MATCH_FIELD_IGNORE_CASE_UDF_NAME: &str = "match_field_ignore_case";
-/// The name of the fuzzy_match UDF given to DataFusion.
-pub const FUZZY_MATCH_UDF_NAME: &str = "fuzzy_match";
-/// The name of the regex_match UDF given to DataFusion.
-pub const REGEX_MATCH_UDF_NAME: &str = "re_match";
-/// The name of the not_regex_match UDF given to DataFusion.
-pub const REGEX_NOT_MATCH_UDF_NAME: &str = "re_not_match";
-/// The name of the regex_matches UDF given to DataFusion.
-pub const REGEX_MATCHES_UDF_NAME: &str = "re_matches";
 
 pub const DEFAULT_FUNCTIONS: [ZoFunction; 11] = [
     ZoFunction {
