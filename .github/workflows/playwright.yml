@@ -144,7 +144,10 @@ jobs:
         run: |
           # Pre-create the embed dir: the web leaf crate can compile early in
           # cargo's dependency graph, and RustEmbed hard-errors on a missing
-          # folder (empty is fine) if it wins the race against npm.
+          # folder if it wins the race against npm. Folder contents don't
+          # matter at compile time — release-ci has debug-assertions on, so
+          # rust-embed reads assets from /tmp/dist at RUNTIME (the e2e jobs
+          # stage the frontend-dist artifact there).
           mkdir -p /tmp/dist
           bash -c "cd web && npm run build && cp -r ./dist/. /tmp/dist/" &
           NPM_PID=$!
@@ -152,10 +155,6 @@ jobs:
           cargo build --profile release-ci --target x86_64-unknown-linux-gnu
           wait $NPM_PID
           test -f /tmp/dist/index.html
-          # Re-embed real assets if cargo won the race: build.rs has
-          # rerun-if-changed on /tmp/dist, so this recompiles only the web
-          # leaf crate + relink (no-op when npm finished first).
-          cargo build --profile release-ci --target x86_64-unknown-linux-gnu
 
       - name: Upload binary artifact
         uses: actions/upload-artifact@v4
