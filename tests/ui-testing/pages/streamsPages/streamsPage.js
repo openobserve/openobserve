@@ -174,11 +174,19 @@ export class StreamsPage {
             await this.waitForUI(2000);
             await this.page.locator('[data-test="menu-link-/streams-item"]').click({ force: true });
         }
-        await this.waitForUI(1000);
+        // Confirm the streams explorer actually rendered before returning. The
+        // search input is the first control every caller uses. Replaces a fixed
+        // 1s wait that let searchStream / clickAddStreamButton race an unloaded
+        // page on slow CI (the source of the 45s click timeouts on retry).
+        await this.page.locator('[data-test="streams-search-stream-input-field"]')
+            .waitFor({ state: 'visible', timeout: 30000 });
     }
 
     async searchStream(streamName) {
         const searchInput = this.page.locator('[data-test="streams-search-stream-input-field"]');
+        // Defensive wait so a still-loading streams page yields a clear failure
+        // and time to settle rather than a bare 45s click timeout.
+        await searchInput.waitFor({ state: 'visible', timeout: 30000 });
         await searchInput.click();
         await searchInput.fill(streamName);
         await this.waitForUI(3000);
@@ -438,13 +446,20 @@ export class StreamsPage {
     async navigateToExtendedRetention() {
         // Open the stream schema/detail view
         const schemaBtn = this.page.locator('[data-test="log-stream-table"] [data-test="log-stream-schema-btn"]').first();
-        await schemaBtn.waitFor({ state: 'visible', timeout: 10000 });
+        await schemaBtn.waitFor({ state: 'visible', timeout: 15000 });
         await schemaBtn.click();
-        await this.waitForUI(2000);
 
-        // Navigate to Extended Retention tab
-        await this.page.locator('[data-test="schema-extended-retention-tab"]').click();
-        await this.waitForUI(1000);
+        // Wait for the schema dialog's tab bar to render (the Extended Retention
+        // tab) instead of a fixed 2s sleep — on slow CI the dialog opens later,
+        // which previously left the tab click racing an unrendered dialog.
+        const retentionTab = this.page.locator('[data-test="schema-extended-retention-tab"]');
+        await retentionTab.waitFor({ state: 'visible', timeout: 15000 });
+        await retentionTab.click();
+
+        // Wait for the tab's date picker ("Select Date" button) to render before
+        // returning — this is the exact element the caller needs, so a fixed 1s
+        // wait was the source of the "date-time-btn not visible" CI failure.
+        await this.page.locator('[data-test="date-time-btn"]').waitFor({ state: 'visible', timeout: 15000 });
     }
 
     async selectDateRange(startIso, endIso) {
@@ -770,6 +785,10 @@ export class StreamsPage {
      */
     async clickAddStreamButton() {
         testLogger.info('Clicking Add Stream button');
+        // The Add Stream button renders only after zoConfig loads
+        // (v-if="isSchemaUDSEnabled"); wait for it explicitly so a slow CI page
+        // load yields a clear failure instead of a bare 45s click timeout.
+        await this.addStreamButton.waitFor({ state: 'visible', timeout: 30000 });
         await this.addStreamButton.click();
         await this.waitForUI(500);
     }
