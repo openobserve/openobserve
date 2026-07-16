@@ -73,14 +73,13 @@ test.describe("Alerts UI Operations", () => {
     timeout: FIVE_MINUTES_MS
   }, async ({ page }) => {
     const suffix = pm.alertsPage.generateRandomString();
-    // Pre-warmed per-run stream (ingested by global-setup-alpha1.js, reaped by
-    // /^auto_pw_stream_/ in cleanup). MUST match global-setup's SHARED_ALERT_STREAM.
-    // The alert wizard's stream dropdown serves a page-load-warmed in-memory cache; a
-    // stream ingested at test time registers in the backend in ~2s but is never in that
-    // cache, so the wizard can't select it. Pre-warming into the initial fetch (same as
-    // e2e_automate) is what makes it selectable. Per-run token keeps it unique so other
-    // branches' cleanup can't delete it mid-run. Tests still top-up ingest below.
-    const streamName = 'auto_pw_stream_' + (process.env.GITHUB_RUN_ID || 'local');
+    // Use the shared e2e_automate fixture: it is pre-ingested by global-setup (so it's in
+    // the alert wizard's page-load stream cache and is selectable) AND is universally
+    // protected from cleanup on every branch, so it can't be deleted mid-run. A dedicated
+    // auto_pw_stream_* fixture was fragile — on re-runs GITHUB_RUN_ID is stable, so the
+    // pre-test cleanup deleted the previous attempt's stream and global-setup's re-ingest
+    // hit the async "is being deleted" race, leaving the wizard dropdown empty.
+    const streamName = 'e2e_automate';
 
     // Ingest test data for the stream
     await pm.commonActions.ingestTestData(streamName);
@@ -134,14 +133,13 @@ test.describe("Alerts UI Operations", () => {
     timeout: THREE_MINUTES_MS
   }, async ({ page }) => {
     const suffix = pm.alertsPage.generateRandomString();
-    // Pre-warmed per-run stream (ingested by global-setup-alpha1.js, reaped by
-    // /^auto_pw_stream_/ in cleanup). MUST match global-setup's SHARED_ALERT_STREAM.
-    // The alert wizard's stream dropdown serves a page-load-warmed in-memory cache; a
-    // stream ingested at test time registers in the backend in ~2s but is never in that
-    // cache, so the wizard can't select it. Pre-warming into the initial fetch (same as
-    // e2e_automate) is what makes it selectable. Per-run token keeps it unique so other
-    // branches' cleanup can't delete it mid-run. Tests still top-up ingest below.
-    const streamName = 'auto_pw_stream_' + (process.env.GITHUB_RUN_ID || 'local');
+    // Use the shared e2e_automate fixture: it is pre-ingested by global-setup (so it's in
+    // the alert wizard's page-load stream cache and is selectable) AND is universally
+    // protected from cleanup on every branch, so it can't be deleted mid-run. A dedicated
+    // auto_pw_stream_* fixture was fragile — on re-runs GITHUB_RUN_ID is stable, so the
+    // pre-test cleanup deleted the previous attempt's stream and global-setup's re-ingest
+    // hit the async "is being deleted" race, leaving the wizard dropdown empty.
+    const streamName = 'e2e_automate';
 
     // Ensure stream has data
     await pm.commonActions.ingestTestData(streamName);
@@ -195,14 +193,13 @@ test.describe("Alerts UI Operations", () => {
     timeout: FIVE_MINUTES_MS
   }, async ({ page }) => {
     const suffix = pm.alertsPage.generateRandomString();
-    // Pre-warmed per-run stream (ingested by global-setup-alpha1.js, reaped by
-    // /^auto_pw_stream_/ in cleanup). MUST match global-setup's SHARED_ALERT_STREAM.
-    // The alert wizard's stream dropdown serves a page-load-warmed in-memory cache; a
-    // stream ingested at test time registers in the backend in ~2s but is never in that
-    // cache, so the wizard can't select it. Pre-warming into the initial fetch (same as
-    // e2e_automate) is what makes it selectable. Per-run token keeps it unique so other
-    // branches' cleanup can't delete it mid-run. Tests still top-up ingest below.
-    const streamName = 'auto_pw_stream_' + (process.env.GITHUB_RUN_ID || 'local');
+    // Use the shared e2e_automate fixture: it is pre-ingested by global-setup (so it's in
+    // the alert wizard's page-load stream cache and is selectable) AND is universally
+    // protected from cleanup on every branch, so it can't be deleted mid-run. A dedicated
+    // auto_pw_stream_* fixture was fragile — on re-runs GITHUB_RUN_ID is stable, so the
+    // pre-test cleanup deleted the previous attempt's stream and global-setup's re-ingest
+    // hit the async "is being deleted" race, leaving the wizard dropdown empty.
+    const streamName = 'e2e_automate';
 
     // Ensure stream has data
     await pm.commonActions.ingestTestData(streamName);

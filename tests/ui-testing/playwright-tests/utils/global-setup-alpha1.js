@@ -9,15 +9,6 @@ const AUTH_DIR = path.join(__dirname, 'auth');
 const AUTH_FILE = path.join(AUTH_DIR, 'user.json');
 const CLOUD_CONFIG_FILE = path.join(AUTH_DIR, 'cloud-config.json');
 
-// Shared, per-run alert stream pre-warmed here so the alert wizard's stream dropdown
-// (which serves a page-load-warmed in-memory cache) contains it. A stream ingested at
-// test time is registered by the backend in ~2s but is NEVER in that cache, so the
-// wizard can't see it — the exact reason the ui-operations stream-selection timed out.
-// Pre-warming into the initial fetch is the same mechanism that makes e2e_automate work.
-// Per-run token (GITHUB_RUN_ID) keeps it unique so other branches' cleanup can't delete
-// it mid-run; falls back to 'local' for local runs. Reaped by /^auto_pw_stream_/ in cleanup.
-const SHARED_ALERT_STREAM = 'auto_pw_stream_' + (process.env.GITHUB_RUN_ID || 'local');
-
 /**
  * Global setup for Alpha1 cloud tests
  * Handles Dex "Continue with Email" login flow with retry logic:
@@ -510,7 +501,6 @@ async function performGlobalIngestion(page) {
   // on the shared cloud org it was routinely stuck "being deleted" by other branch runs.
   const streams = [
     { name: 'e2e_automate', data: logsdata },
-    { name: SHARED_ALERT_STREAM, data: [{ level: 'info', job: 'test', log: 'test message for openobserve' }] },
   ];
 
   for (const stream of streams) {
@@ -552,12 +542,11 @@ async function performGlobalIngestion(page) {
 
       if (streamsResult.ok) {
         const hasE2e = streamsResult.names.includes('e2e_automate');
-        const hasShared = streamsResult.names.includes(SHARED_ALERT_STREAM);
-        if (hasE2e && hasShared) {
-          testLogger.info(`[alpha1] streams indexed after ${Date.now() - startTime}ms`);
+        if (hasE2e) {
+          testLogger.info(`[alpha1] e2e_automate indexed after ${Date.now() - startTime}ms`);
           break;
         }
-        testLogger.debug(`[alpha1] streams not yet indexed (e2e_automate=${hasE2e}, ${SHARED_ALERT_STREAM}=${hasShared}), waiting...`);
+        testLogger.debug(`[alpha1] e2e_automate not yet indexed, waiting...`);
       } else {
         testLogger.debug(`[alpha1] Streams API returned ${streamsResult.status}, retrying...`);
       }
@@ -657,7 +646,6 @@ async function performGlobalIngestionWithFetch() {
   // on the shared cloud org it was routinely stuck "being deleted" by other branch runs.
   const streams = [
     { name: 'e2e_automate', data: logsdata },
-    { name: SHARED_ALERT_STREAM, data: [{ level: 'info', job: 'test', log: 'test message for openobserve' }] },
   ];
 
   for (const stream of streams) {
@@ -690,8 +678,8 @@ async function performGlobalIngestionWithFetch() {
       if (r.ok) {
         const data = await r.json();
         const names = (data.list || []).map(s => s.name);
-        if (names.includes('e2e_automate') && names.includes(SHARED_ALERT_STREAM)) {
-          testLogger.info(`[alpha1] streams indexed after ${Date.now() - startTime}ms`);
+        if (names.includes('e2e_automate')) {
+          testLogger.info(`[alpha1] e2e_automate indexed after ${Date.now() - startTime}ms`);
           return;
         }
       }
