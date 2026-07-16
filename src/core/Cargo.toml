@@ -17,7 +17,7 @@ enterprise = [
     "dep:o2_enterprise",
     "dep:o2_openfga",
     "config/enterprise",
-    "openobserve-search/enterprise",
+    "search/enterprise",
 ]
 cloud = ["infra/cloud", "enterprise", "o2_enterprise/cloud"]
 vectorscan = ["o2_enterprise/vectorscan"]
@@ -29,7 +29,7 @@ vortex = [
 ]
 
 [dependencies]
-openobserve-search.workspace = true
+search.workspace = true
 axum.workspace = true
 http.workspace = true
 http-body.workspace = true

@@ -33,8 +33,8 @@ use config::{
 use dashmap::DashMap;
 use hashbrown::HashMap;
 use infra::table::short_urls::ShortUrlRecord;
-pub use openobserve_search::enrichment::ENRICHMENT_TABLES;
 use parking_lot::RwLock;
+pub use search::enrichment::ENRICHMENT_TABLES;
 use vector_enrichment::TableRegistry;
 
 use crate::{

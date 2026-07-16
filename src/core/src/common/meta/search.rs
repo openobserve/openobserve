@@ -13,4 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-pub use openobserve_search::*;
+pub use search::{
+    AuditContext, CAPPED_RESULTS_MSG, CacheQueryRequest, CachedQueryResponse,
+    MultiCachedQueryResponse, QueryDelta, ResultCacheSelectionStrategy, SearchResultType,
+    SortStrategy,
+};

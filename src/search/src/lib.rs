@@ -88,7 +88,6 @@ pub enum ResultCacheSelectionStrategy {
     Both,
 }
 
-// Implementing FromStr for ResultCacheSelectionStrategy
 impl From<&str> for ResultCacheSelectionStrategy {
     fn from(input: &str) -> Self {
         match input {
@@ -109,7 +108,6 @@ pub enum SearchResultType {
 
 /// Audit context for search operations
 #[derive(Debug, Clone)]
-#[allow(dead_code)]
 pub struct AuditContext {
     pub method: String,
     pub path: String,
@@ -306,7 +304,6 @@ mod tests {
 mod enterprise_tests {
     use arrow::array::record_batch;
     use arrow_schema::{DataType, Field};
-    #[cfg(feature = "enterprise")]
     use o2_enterprise::enterprise::common::streaming_agg_cache::{
         StreamingAggsCacheResultRecordBatch, calculate_record_batches_deltas,
     };

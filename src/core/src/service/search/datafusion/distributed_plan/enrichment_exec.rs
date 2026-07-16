@@ -37,9 +37,9 @@ use datafusion::{
     },
 };
 use futures::TryStreamExt;
-use openobserve_search::enrichment::ENRICHMENT_TABLES;
 use parquet::arrow::{ProjectionMask, arrow_reader::ParquetRecordBatchReaderBuilder};
 use rayon::prelude::*;
+use search::enrichment::ENRICHMENT_TABLES;
 
 #[derive(Debug, Clone)]
 pub struct EnrichmentExec {

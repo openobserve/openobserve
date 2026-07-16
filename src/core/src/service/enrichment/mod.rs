@@ -21,7 +21,7 @@ use crate::service::db::enrichment_table;
 
 pub mod storage;
 
-pub use openobserve_search::enrichment::StreamTable;
+pub use search::enrichment::StreamTable;
 
 // Global state for caching
 // static METADATA_CACHE: Lazy<Arc<RwLock<HashMap<String, EnrichmentTableMetadata>>>> =

@@ -1,12 +1,9 @@
 [package]
-name = "openobserve-search"
+name = "search"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 publish = false
-
-[lib]
-path = "src/lib.rs"
 
 [features]
 default = []

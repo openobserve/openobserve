@@ -6770,7 +6770,6 @@ dependencies = [
  "o2_enterprise",
  "o2_openfga",
  "object_store",
- "openobserve-search",
  "opentelemetry",
  "opentelemetry-proto",
  "parking_lot 0.12.5",
@@ -6791,6 +6790,7 @@ dependencies = [
  "rustls",
  "rustls-native-certs",
  "sea-orm",
+ "search",
  "segment",
  "serde",
  "serde_json",
@@ -6851,22 +6851,6 @@ dependencies = [
  "tokio",
  "tonic",
  "wal",
-]
-
-[[package]]
-name = "openobserve-search"
-version = "0.1.0"
-dependencies = [
- "arrow",
- "arrow-schema",
- "async-trait",
- "config",
- "enrichment",
- "o2_enterprise",
- "serde",
- "serde_json",
- "utoipa",
- "vrl",
 ]
 
 [[package]]
@@ -9220,6 +9204,22 @@ name = "seahash"
 version = "4.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1c107b6f4780854c8b126e228ea8869f4d7b71260f962fefb57b996b8959ba6b"
+
+[[package]]
+name = "search"
+version = "0.1.0"
+dependencies = [
+ "arrow",
+ "arrow-schema",
+ "async-trait",
+ "config",
+ "enrichment",
+ "o2_enterprise",
+ "serde",
+ "serde_json",
+ "utoipa",
+ "vrl",
+]
 
 [[package]]
 name = "security-framework"
