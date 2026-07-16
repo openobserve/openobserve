@@ -34,10 +34,7 @@ use proto::cluster_rpc::{self, IndexInfo, QueryIdentifier};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 use crate::service::{
-    promql::{
-        search::grpc::Context,
-        utils::{apply_label_selector, apply_matchers},
-    },
+    promql::{apply_label_selector, apply_matchers, search::grpc::Context},
     search::{
         datafusion::{
             distributed_plan::{
