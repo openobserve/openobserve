@@ -1010,6 +1010,7 @@ export class AlertsPage {
             // until the row renders. Deterministic (each probe waits for the actual cell); no
             // reliance on one slow fetch landing inside a fixed window.
             const inputField = this.page.locator(this.locators.alertSearchInputField);
+            const listSkeleton = this.page.locator('[data-test="o2-table-skeleton-body"]');
             let found = false;
             for (let attempt = 1; attempt <= 4 && !found; attempt++) {
                 if (attempt === 3) {
@@ -1020,6 +1021,10 @@ export class AlertsPage {
                 await inputField.waitFor({ state: 'attached', timeout: 10000 }).catch(() => {});
                 await inputField.fill('', { force: true }).catch(() => {});
                 await inputField.fill(nameToVerify, { force: true });
+                // The OTable shows a loading skeleton while the alerts list fetches — real rows
+                // aren't in the DOM yet, so checking now races an all-placeholder table. Wait for
+                // the skeleton to clear first.
+                await listSkeleton.first().waitFor({ state: 'hidden', timeout: 20000 }).catch(() => {});
                 found = await this.page.getByRole('cell', { name: nameToVerify }).first()
                     .isVisible({ timeout: 10000 }).catch(() => false);
                 if (!found) testLogger.warn('Alert row not visible after search, re-searching', { alertName: nameToVerify, attempt });
@@ -1027,6 +1032,7 @@ export class AlertsPage {
         }
 
         // Final deterministic assertions (the row is present by now under normal + slow paths).
+        await this.page.locator('[data-test="o2-table-skeleton-body"]').first().waitFor({ state: 'hidden', timeout: 20000 }).catch(() => {});
         await expect(this.page.getByRole('cell', { name: nameToVerify }).first()).toBeVisible({ timeout: 15000 });
         await expect(this.page.locator(this.locators.pauseStartAlert.replace('{alertName}', nameToVerify)).first()).toBeVisible({ timeout: 10000 });
     }

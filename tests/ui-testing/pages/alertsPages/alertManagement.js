@@ -30,9 +30,12 @@ export class AlertManagement {
         testLogger.info('Opened alert for editing (v3)', { alertName });
 
         // All fields are in a flat tab-based layout (v3 UI), no step navigation needed
-        // Change operator from Contains to = to verify update functionality
+        // Change operator from Contains to = to verify update functionality.
+        // Wait 15s (not 5s): opening the edit wizard fetches the alert and renders the conditions
+        // section asynchronously; under concurrent CI load the operator select lands well past 5s
+        // (the intermittent "alert-conditions-operator-select not visible" flake).
         const operatorDropdown = this.page.locator(this.locators.operatorSelect).first();
-        await expect(operatorDropdown).toBeVisible({ timeout: 5000 });
+        await expect(operatorDropdown).toBeVisible({ timeout: 15000 });
         await operatorDropdown.click();
         await this.page.waitForTimeout(500);
         await this.page.getByText('=', { exact: true }).click();

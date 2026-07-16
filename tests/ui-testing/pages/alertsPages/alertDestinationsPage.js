@@ -302,10 +302,13 @@ export class AlertDestinationsPage {
         // so paginating one-by-one is unreliable. The per-row delete button uses the
         // destination name as part of its data-test, giving us a row anchor without
         // relying on getByRole / getByText.
+        const listSkeleton = this.page.locator('[data-test="o2-table-skeleton-body"]');
         const searchField = this.page.locator(this.destinationListSearchInputField);
         if (await searchField.isVisible({ timeout: 5000 }).catch(() => false)) {
             await searchField.fill('');
             await searchField.fill(destinationName);
+            // Wait for the OTable loading skeleton to clear so we check real rows, not placeholders.
+            await listSkeleton.first().waitFor({ state: 'hidden', timeout: 20000 }).catch(() => {});
             const rowAnchor = this.getDeleteDestinationBtn(destinationName);
             try {
                 await rowAnchor.waitFor({ state: 'visible', timeout: 10000 });
@@ -320,6 +323,8 @@ export class AlertDestinationsPage {
         let isLastPage = false;
 
         while (!destinationFound && !isLastPage) {
+            // Wait for the loading skeleton to clear before checking the page's rows.
+            await listSkeleton.first().waitFor({ state: 'hidden', timeout: 20000 }).catch(() => {});
             try {
                 await this.page.getByRole('cell', { name: destinationName }).waitFor({ timeout: 5000 });
                 destinationFound = true;
