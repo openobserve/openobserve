@@ -181,6 +181,7 @@ import {
 import jsTransformService from "../../services/jstransform";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
+import config from "@/aws-exports";
 import segment from "../../services/segment_analytics";
 import TestFunction from "@/components/functions/TestFunction.vue";
 import FunctionsToolbar from "@/components/functions/FunctionsToolbar.vue";
@@ -300,14 +301,27 @@ export default defineComponent({
 
     let compilationErr = ref("");
 
-    // Transform type options for radio buttons
-    const transformTypeOptions = computed(() => {
-      const options = [
-        { label: t("function.vrl"), value: "0" },
-      ];
+    // JavaScript functions are an enterprise/cloud feature; OSS stays VRL-only.
+    // EXCEPT the _meta org, which keeps JS even on OSS — that predates the
+    // entitlement (SSO claim parsing) and must not break.
+    const isJsAllowed = computed(
+      () =>
+        config.isEnterprise === "true" ||
+        config.isCloud === "true" ||
+        store.state.selectedOrganization?.identifier === "_meta",
+    );
 
-      // JavaScript functions are only allowed in _meta organization (for SSO claim parsing)
-      if (store.state.selectedOrganization.identifier === "_meta") {
+    // Transform type options for the VRL/JS radio group.
+    const transformTypeOptions = computed(() => {
+      const options = [{ label: t("function.vrl"), value: "0" }];
+
+      // An already-JS function keeps the JS option even where JS isn't offered
+      // (e.g. a build that lost the entitlement), so editing it renders the right
+      // language instead of a radio group with nothing selected.
+      const editingJsFunction =
+        String((props.modelValue as any)?.transType ?? "0") === "1";
+
+      if (isJsAllowed.value || editingJsFunction) {
         options.push({ label: t("function.javascript"), value: "1" });
       }
 

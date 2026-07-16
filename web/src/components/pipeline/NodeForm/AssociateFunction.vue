@@ -53,11 +53,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            "editing an existing FUNCTION" (it locks the select). Editing a node
            must still let you re-point it at a different function, which is how
            this drawer has always behaved. -->
+      <!-- Pipelines execute VRL, so only VRL functions are selectable and the
+           inline editor is locked to VRL (a JS function created here could never
+           be attached to a pipeline node). -->
       <FunctionPicker
         ref="picker"
         :initial-name="initialName"
         :initial-after-flatten="initialAfterFlatten"
         :duplicate-names="associatedFunctions"
+        language="vrl"
         @expand="(v) => (creating = v)"
         @created="(fn) => emit('add:function', fn)"
       />

@@ -343,13 +343,6 @@ pub async fn update_function(
         }
     };
 
-    // JavaScript functions are only allowed in _meta org (for SSO claim parsing)
-    if func.trans_type.unwrap_or(0) == 1 && org_id != "_meta" {
-        return Ok(MetaHttpResponse::bad_request(
-            "JavaScript functions are only allowed in the '_meta' organization. Please use VRL functions for other organizations.",
-        ));
-    }
-
     if func == existing_fn {
         return Ok(MetaHttpResponse::json(func));
     }

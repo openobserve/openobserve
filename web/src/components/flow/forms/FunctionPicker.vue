@@ -15,17 +15,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <!--
-  Shared "pick a VRL function" body for the flow canvases (Pipelines + Workflows).
+  Shared "pick a function" body for the flow canvases (Pipelines + Workflows).
   Presentation + logic only — the surrounding chrome (drawer / modal + Save/Cancel)
   lives in each module's wrapper, which reads the result via the exposed
   `getPayload()`.
 
   Behaviour:
-   - Toggle between picking a saved VRL function and creating one inline (AddFunction).
+   - Toggle between picking a saved function and creating one inline (AddFunction).
    - Read-only definition preview of the selected function.
    - Optional "After Flattening" (RAF/RBF) toggle — shown when `showFlatten`.
-   - Self-fetches the VRL function list (trans_type !== 1), so callers don't have
-     to thread it through.
+   - Self-fetches the function list, filtered to the host's language (`language`):
+     a pipeline runs VRL, a workflow Function node runs JS — so each only offers
+     functions it can actually execute.
 
   Props:
     initialName          — preselected function name (edit mode)
@@ -204,6 +205,7 @@ import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import functionsService from "@/services/jstransform";
+import { isJsFunction } from "@/utils/functionLanguage";
 
 const AddFunction = defineAsyncComponent(
   () => import("@/components/functions/AddFunction.vue"),
@@ -219,8 +221,10 @@ const props = withDefaults(
     // Sample events to seed the inline function editor's "Events" panel (e.g. the
     // workflow alert payload). Omitted → the generic log sample.
     sampleEvents?: any[];
-    // Lock the inline editor to one language ('vrl' | 'javascript'), hiding the
-    // toggle. Workflow function nodes pass 'javascript'. Omitted → normal toggle.
+    // The host's execution language ('vrl' | 'javascript'). Two effects:
+    //   1. filters the selectable list to functions of that language, and
+    //   2. locks the inline editor to it, hiding the VRL/JS toggle.
+    // Workflow Function nodes pass 'javascript'; pipelines pass 'vrl'.
     language?: string;
     // Seed code for a fresh inline function (replaces the typewriter placeholder).
     defaultCode?: string;
@@ -288,7 +292,14 @@ const selectedDefinition = computed(
   () => functionDefs.value[selectedFunction.value] || "",
 );
 
-// Load saved VRL functions (skip JS functions, trans_type === 1).
+// Only functions written in the host's language are selectable: a pipeline runs
+// VRL, a workflow node runs JS. Offering the other kind would let a user attach a
+// function the node can't execute. (isJsFunction handles the transType /
+// trans_type field-name split — see utils/functionLanguage.)
+const wantsJs = computed(() => props.language === "javascript");
+const matchesHostLanguage = (func: any) =>
+  wantsJs.value ? isJsFunction(func) : !isJsFunction(func);
+
 const getFunctions = async () => {
   loading.value = true;
   try {
@@ -303,7 +314,7 @@ const getFunctions = async () => {
     const names: string[] = [];
     const defs: Record<string, string> = {};
     (res.data?.list || []).forEach((func: any) => {
-      if (func.trans_type !== 1) {
+      if (matchesHostLanguage(func)) {
         names.push(func.name);
         defs[func.name] = func.function;
       }

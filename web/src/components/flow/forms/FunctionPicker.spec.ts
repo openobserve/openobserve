@@ -68,10 +68,13 @@ function createWrapper(props: Record<string, any> = {}) {
 
 const listResponse = {
   data: {
+    // NOTE: the real /functions list response uses camelCase `transType` (a
+    // number), NOT snake_case `trans_type`. The fixture must match the API or
+    // the language filter silently passes/rejects everything.
     list: [
-      { name: "alpha", function: "def alpha(r): r", trans_type: 0 },
-      { name: "beta", function: "def beta(r): r", trans_type: 0 },
-      { name: "js_fn", function: "() => {}", trans_type: 1 }, // JS — excluded
+      { name: "alpha", function: "def alpha(r): r", transType: 0 },
+      { name: "beta", function: "def beta(r): r", transType: 0 },
+      { name: "js_fn", function: "() => {}", transType: 1 },
     ],
   },
 };
@@ -82,7 +85,10 @@ describe("FunctionPicker", () => {
   });
   afterEach(() => vi.clearAllMocks());
 
-  it("mounts and self-fetches the VRL function list (excludes JS trans_type 1)", async () => {
+  // The list is filtered to the HOST's execution language: a pipeline runs VRL,
+  // a workflow Function node runs JS. Offering the other kind would let a user
+  // attach a function the node could never execute.
+  it("defaults to the VRL list (excludes JS trans_type 1)", async () => {
     const wrapper = createWrapper();
     await flushPromises();
     expect(mockList).toHaveBeenCalled();
@@ -90,6 +96,24 @@ describe("FunctionPicker", () => {
     expect(opts).toContain("alpha");
     expect(opts).toContain("beta");
     expect(opts).not.toContain("js_fn");
+  });
+
+  it("language='vrl' (pipeline): offers only VRL functions", async () => {
+    const wrapper = createWrapper({ language: "vrl" });
+    await flushPromises();
+    const opts = wrapper.find(".o-select-options").text();
+    expect(opts).toContain("alpha");
+    expect(opts).toContain("beta");
+    expect(opts).not.toContain("js_fn");
+  });
+
+  it("language='javascript' (workflow): offers ONLY JS functions", async () => {
+    const wrapper = createWrapper({ language: "javascript" });
+    await flushPromises();
+    const opts = wrapper.find(".o-select-options").text();
+    expect(opts).toContain("js_fn");
+    expect(opts).not.toContain("alpha");
+    expect(opts).not.toContain("beta");
   });
 
   it("preselects initialName in edit mode", async () => {

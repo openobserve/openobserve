@@ -186,6 +186,7 @@ import {
   type Ref,
 } from "vue";
 import { getImageURL } from "@/utils/zincutils";
+import { isJsFunction } from "@/utils/functionLanguage";
 import AssociateFunction from "@/components/pipeline/NodeForm/AssociateFunction.vue";
 import functionsService from "@/services/jstransform";
 
@@ -771,9 +772,10 @@ const getFunctions = () => {
       functions.value = {};
       functionOptions.value = [];
       res.data.list.forEach((func: Function) => {
-        // Only include VRL functions (trans_type === 0 or undefined)
-        // JavaScript functions (trans_type === 1) cannot be used in pipelines
-        if (func.trans_type !== 1) {
+        // Pipelines execute VRL — JavaScript functions can't run here.
+        // (isJsFunction reads both transType/trans_type; the list response uses
+        // camelCase, so a bare `trans_type` check silently matched everything.)
+        if (!isJsFunction(func)) {
           functions.value[func.name] = func;
           functionOptions.value.push(func.name);
         }
@@ -1141,9 +1143,8 @@ const onNodeDragOver = (event: any) => {
 
 const updateNewFunction = (_function: Function) => {
   if (!functions.value[_function.name]) {
-    // Only add VRL functions (trans_type !== 1) to pipeline options
-    // JavaScript functions cannot be used in pipelines
-    if (_function.trans_type !== 1) {
+    // Pipelines execute VRL — a JS function must not enter the options.
+    if (!isJsFunction(_function)) {
       functions.value[_function.name] = _function;
       functionOptions.value.push(_function.name);
     }
