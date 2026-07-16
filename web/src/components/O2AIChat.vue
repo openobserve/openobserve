@@ -1367,6 +1367,7 @@
 import {
   defineComponent,
   ref,
+  reactive,
   onMounted,
   nextTick,
   watch,
@@ -1453,6 +1454,43 @@ marked.setOptions(markedOptions);
 function renderMarkdown(content: any) {
   return marked.parse(content);
 }
+
+// --- Shared, cross-instance streaming registry ---
+// O2AIChat is instantiated more than once (the Home page's inline AI tab and
+// the sidebar panel in MainLayout are SEPARATE component instances). When the
+// user starts a chat on Home and navigates to another page, the Home instance
+// unmounts and the sidebar instance mounts — a brand new setup() scope.
+//
+// For an in-flight stream to keep rendering after that hand-off, the detach/
+// re-attach bookkeeping MUST live outside setup() so both instances see the
+// same live array + AbortController. When these were per-instance, the sidebar
+// instance's map was empty, so loadChat() never re-attached and fell back to
+// the stale IndexedDB snapshot — the stream kept running but its text never
+// rendered in the new instance. Module scope is what makes the hand-off work.
+const backgroundStreams = new Set<AbortController>();
+const MAX_BACKGROUND_STREAMS = 3;
+
+// Map sessionId → live stream context for re-attachment when a (possibly
+// different) instance loads the same session. loadChat swaps chatMessages.value
+// back to `msgs` so processStream's isActive() becomes true again and the UI
+// updates in real-time.
+const backgroundStreamMap = new Map<
+  string,
+  {
+    msgs: ChatMessage[];
+    controller: AbortController;
+    chatId: number | null;
+  }
+>();
+
+// Cross-instance streaming status, keyed by sessionId. processStream runs in the
+// closure of the instance that STARTED it, so its completion resets isLoading on
+// THAT instance's ref — not on a different instance that re-attached to the same
+// stream (e.g. the sidebar taking over from the Home tab). Each instance watches
+// this shared reactive map for its current session and clears its own streaming
+// UI when the background turn finishes, so the sidebar's loading indicator
+// doesn't hang forever after re-attaching. true = streaming, false/absent = done.
+const sessionStreamingState = reactive<Record<string, boolean>>({});
 
 export default defineComponent({
   name: "O2AIChat",
@@ -1641,22 +1679,11 @@ export default defineComponent({
     // AbortController for managing request cancellation - allows users to stop ongoing AI requests
     const currentAbortController = ref<AbortController | null>(null);
 
-    // Background streams: when the user switches sessions while streaming,
-    // the detached stream continues in background and saves to IndexedDB on completion.
-    const backgroundStreams = new Set<AbortController>();
-    const MAX_BACKGROUND_STREAMS = 3;
-
-    // Map sessionId → live stream context for re-attachment when user navigates back.
-    // This allows loadChat to swap chatMessages.value back to the live array so that
-    // processStream's isActive() becomes true again and the UI updates in real-time.
-    const backgroundStreamMap = new Map<
-      string,
-      {
-        msgs: ChatMessage[];
-        controller: AbortController;
-        chatId: number | null;
-      }
-    >();
+    // NOTE: backgroundStreams / backgroundStreamMap / MAX_BACKGROUND_STREAMS are
+    // declared at MODULE scope (above defineComponent), not here. They must be
+    // shared across all O2AIChat instances so an in-flight stream started on the
+    // Home tab keeps rendering after navigating to a page where the sidebar
+    // instance takes over. See the comment on their declaration for why.
 
     // Typewriter animation state for LLM responses
     const displayedStreamingContent = ref("");
@@ -1680,6 +1707,10 @@ export default defineComponent({
     // Component readiness tracking
     const componentReady = ref(false);
     const pendingChips = ref<ReferenceChip[]>([]);
+
+    // Set true in onUnmounted so watchers firing during teardown don't re-attach
+    // a just-detached stream back to this dying instance (see chatUpdated watch).
+    const isUnmounting = ref(false);
 
     // Analyzing messages for loading indicator
     const ANALYZING_MESSAGES = [
@@ -2227,6 +2258,38 @@ export default defineComponent({
       scrollToBottom();
     };
 
+    /**
+     * Extract streamed assistant text from an SSE event.
+     *
+     * The o2-ai (opencode) backend emits streamed text as
+     *   {"type":"message_delta","content":"<plain string>"}
+     * and non-streamed notices as {"type":"message","content":"..."} — the text
+     * is ALWAYS the plain-string `content` field. We also defensively accept the
+     * handful of OpenAI-compatible shapes the enterprise RCA proxy can surface
+     * (`response`, `delta.content`, `choices[].delta.content`, `text`) so an
+     * agent/proxy variant doesn't silently render nothing. Returns the text, or
+     * null when the event carries no assistant text.
+     */
+    const extractStreamText = (data: any): string | null => {
+      if (data == null || typeof data !== "object") return null;
+
+      // Canonical o2-ai chat shape.
+      if (typeof data.content === "string") return data.content;
+
+      // Defensive fallbacks (OpenAI-style / RCA proxy formats).
+      if (typeof data.response === "string") return data.response;
+      if (data.delta && typeof data.delta.content === "string") {
+        return data.delta.content;
+      }
+      const firstChoice = Array.isArray(data.choices) ? data.choices[0] : null;
+      if (firstChoice && typeof firstChoice.delta?.content === "string") {
+        return firstChoice.delta.content;
+      }
+      if (typeof data.text === "string") return data.text;
+
+      return null;
+    };
+
     const processStream = async (
       reader: ReadableStreamDefaultReader<Uint8Array>,
     ) => {
@@ -2346,6 +2409,13 @@ export default defineComponent({
                 // Try to parse the JSON, handling potential errors
                 try {
                   const data = JSON.parse(jsonStr);
+
+                  // Dev-only: surface the raw SSE event shape so a schema change
+                  // on the agent side (field renames, new event types) is
+                  // immediately visible instead of silently dropping text.
+                  if (import.meta.env.DEV) {
+                    console.debug("[o2ai chat_stream event]", data);
+                  }
 
                   // Handle title events - AI-generated chat title from first message
                   if (data && data.type === "title") {
@@ -2885,7 +2955,10 @@ export default defineComponent({
                   }
 
                   // Handle streamed deltas and full/legacy message content.
-                  if (data && typeof data.content === "string") {
+                  // Tolerant of multiple shapes (content/text/delta/nested/OpenAI)
+                  // so an agent schema change doesn't silently drop text.
+                  const streamText = extractStreamText(data);
+                  if (typeof streamText === "string") {
                     // Complete any active tool call first (add green checkmark to chat)
                     if (activeToolCall.value) {
                       const completedToolBlock: ContentBlock = {
@@ -2906,11 +2979,17 @@ export default defineComponent({
                       if (isActive()) activeToolCall.value = null;
                     }
 
-                    const isMessageDelta = data.type === "message_delta";
+                    // Deltas (append verbatim) vs full/legacy messages (reformat
+                    // code fences). o2-ai streams text as type "message_delta";
+                    // any content arriving via a non-`content` fallback field is
+                    // also an incremental delta.
+                    const isMessageDelta =
+                      data.type === "message_delta" ||
+                      typeof data.content !== "string";
 
                     // Format code blocks with proper line breaks for full/legacy
                     // messages. Deltas must be appended exactly as received.
-                    let content = data.content;
+                    let content = streamText;
                     if (!isMessageDelta) {
                       content = content.replace(
                         /```(\w*)\s*([^`])/g,
@@ -3305,7 +3384,9 @@ export default defineComponent({
                 }
 
                 // Handle streamed deltas and full/legacy message content.
-                if (data && typeof data.content === "string") {
+                // Tolerant of multiple event shapes (see extractStreamText).
+                const streamText = extractStreamText(data);
+                if (typeof streamText === "string") {
                   if (activeToolCall.value) {
                     const completedToolBlock: ContentBlock = {
                       type: "tool_call",
@@ -3325,9 +3406,11 @@ export default defineComponent({
                     if (isActive()) activeToolCall.value = null;
                   }
 
-                  const isMessageDelta = data.type === "message_delta";
+                  const isMessageDelta =
+                    data.type === "message_delta" ||
+                    typeof data.content !== "string";
 
-                  let content = data.content;
+                  let content = streamText;
                   if (!isMessageDelta) {
                     content = content.replace(/```(\w*)\s*([^`])/g, "```$1\n$2");
                     content = content.replace(/([^`])\s*```/g, "$1\n```");
@@ -4185,6 +4268,24 @@ export default defineComponent({
             // Restore streaming UI state so loading indicator shows
             isLoading.value = true;
             startAnalyzingRotation();
+
+            // Prime the typewriter from whatever the stream has accumulated so
+            // far, in THIS fresh instance. processStream only syncs the segment
+            // refs and (re)starts the animation on the NEXT chunk that arrives
+            // while isActive(); text already streamed before we re-attached
+            // would otherwise sit invisible until the next delta. Reveal the
+            // existing text instantly, then let the ongoing stream continue.
+            const lastMsg = chatMessages.value[chatMessages.value.length - 1];
+            if (lastMsg?.role === "assistant" && lastMsg.contentBlocks?.length) {
+              const lastBlock =
+                lastMsg.contentBlocks[lastMsg.contentBlocks.length - 1];
+              if (lastBlock?.type === "text" && lastBlock.text) {
+                currentStreamingMessage.value = lastMsg.content || lastBlock.text;
+                currentTextSegment.value = lastBlock.text;
+                // Instant reveal (no per-char catch-up) for the backlog.
+                displayedStreamingContent.value = lastBlock.text;
+              }
+            }
           } else {
             // Normal load from IndexedDB snapshot (no active stream)
             const formattedMessages = chat.messages.map((msg: any) => ({
@@ -4277,8 +4378,20 @@ export default defineComponent({
       resetTypewriterState(); // Reset typewriter animation for new message
       startAnalyzingRotation(); // Start rotating analyzing messages
 
+      // Mark this session as actively streaming in the cross-instance registry
+      // so that if another instance re-attaches, it knows when to stop showing
+      // its own loading indicator (see sessionStreamingState declaration).
+      if (currentSessionId.value) {
+        sessionStreamingState[currentSessionId.value] = true;
+      }
+
       // Create new AbortController for this request - enables cancellation via Stop button
       currentAbortController.value = new AbortController();
+
+      // Captured for the shared streaming-status cleanup that runs on ALL exit
+      // paths (success, abort, error) below — the inner `streamSessionId` is
+      // block-scoped to the try, so it isn't visible in the trailing cleanup.
+      let streamSessionIdForCleanup: string | null = null;
 
       try {
         // Don't add empty assistant message here - wait for actual content
@@ -4338,6 +4451,7 @@ export default defineComponent({
         const streamController = currentAbortController.value;
         const streamMsgs = chatMessages.value;
         const streamSessionId = currentSessionId.value;
+        streamSessionIdForCleanup = streamSessionId;
 
         await processStream(reader);
 
@@ -4382,6 +4496,14 @@ export default defineComponent({
       isLoading.value = false;
       activeToolCall.value = null;
       stopAnalyzingRotation();
+
+      // Mark the session's stream as finished in the cross-instance registry so
+      // any OTHER instance that re-attached to it (e.g. the sidebar) can clear
+      // its own loading indicator. Runs on all exit paths (success/abort/error).
+      const doneSessionId = streamSessionIdForCleanup || currentSessionId.value;
+      if (doneSessionId) {
+        sessionStreamingState[doneSessionId] = false;
+      }
 
       // Clean up AbortController after request completion (success or error)
       currentAbortController.value = null;
@@ -5056,7 +5178,47 @@ export default defineComponent({
     watch(
       () => route.fullPath,
       () => {
+        // Was a turn actually streaming when the user navigated away?
+        const wasStreaming = !!currentAbortController.value;
+
         detachCurrentStream();
+
+        // Seamless hand-off: the Home page runs the chat in its own inline
+        // AI tab (centeredStart) with the sidebar closed. When the user leaves
+        // Home mid-stream, this inline instance unmounts; to let the streamed
+        // turn keep rendering, the sidebar panel must come up so its O2AIChat
+        // instance can re-attach to the (now module-shared) background stream
+        // and continue the typewriter. Only the Home/centered instance opens
+        // the sidebar, and only when a turn was actually in flight.
+        if (wasStreaming && props.centeredStart && !store.state.isAiChatEnabled) {
+          store.dispatch("setIsAiChatEnabled", true);
+        }
+      },
+    );
+
+    // When this instance has re-attached to a stream that another instance
+    // started (its processStream completion runs in the OTHER instance's
+    // closure and can't reset our isLoading), watch the shared streaming
+    // registry and clear our own streaming UI once that session finishes.
+    watch(
+      () => (currentSessionId.value ? sessionStreamingState[currentSessionId.value] : undefined),
+      (isStreaming, wasStreaming) => {
+        // Only react to a true→false transition (stream finished), and only if
+        // we're still showing the loading state for it.
+        if (wasStreaming === true && isStreaming === false && isLoading.value) {
+          isLoading.value = false;
+          activeToolCall.value = null;
+          stopAnalyzingRotation();
+          finalizeTextBlock();
+          if (typewriterAnimationId.value) {
+            cancelAnimationFrame(typewriterAnimationId.value);
+            typewriterAnimationId.value = null;
+          }
+          // Reflect the completed turn into the sync handshake + history so a
+          // later mount reads the finished chat, not a mid-stream snapshot.
+          store.dispatch("setCurrentChatTimestamp", currentChatId.value);
+          nextTick(() => scrollToBottom());
+        }
       },
     );
 
@@ -5086,6 +5248,11 @@ export default defineComponent({
     });
 
     onUnmounted(() => {
+      // Mark unmounting FIRST so any reactive watcher that fires during teardown
+      // (e.g. our own chatUpdated watch, triggered by the dispatch below) does
+      // not re-attach the just-detached stream back to this dying instance.
+      isUnmounting.value = true;
+
       // Detach (not abort) any in-flight request on unmount: this component
       // instance can be torn down by navigation (e.g. the Home page's
       // v-if="activeHomeTab === 'ai'" O2AIChat, or a route change) and we
@@ -5094,7 +5261,17 @@ export default defineComponent({
       // file is not enough — Vue gives no ordering guarantee that the watcher
       // fires before this unmount hook during the same navigation, so this
       // detach is the backstop that actually prevents the interruption.
+      const wasStreaming = !!currentAbortController.value;
       detachCurrentStream();
+
+      // Backstop for the sidebar hand-off: if this Home/centered instance is
+      // being torn down mid-stream and the route.fullPath watcher didn't
+      // already open the sidebar (no ordering guarantee between the two),
+      // open it now so the sidebar instance can re-attach and keep rendering
+      // the streamed turn. Dispatching when already enabled is a no-op.
+      if (wasStreaming && props.centeredStart && !store.state.isAiChatEnabled) {
+        store.dispatch("setIsAiChatEnabled", true);
+      }
 
       // Note: background streams are intentionally NOT aborted here.
       // detachCurrentStream() moves a turn's controller into backgroundStreams
@@ -5114,22 +5291,28 @@ export default defineComponent({
         titleIntervalId = null;
       }
 
-      //this step is added because we are using seperate instances of o2 ai chat component to make sync between them
-      //whenever a new chat is created or a new message is sent, the currentChatTimestamp is set to the chatId
-      //so we need to make sure that the currentChatTimestamp is set to the correct chatId
-      //and the chat gets updated when the component is unmounted so that the main layout component can load the correct chat
+      // We use separate O2AIChat instances (home inline tab + sidebar) and sync
+      // them via the store: publish which chat is current + a "chatUpdated" pulse
+      // so the SURVIVING instance loads it (its chatUpdated watch calls loadChat).
+      //
+      // CRITICAL: this dying instance must NOT call loadChat()/addNewChat() on
+      // itself here. detachCurrentStream() (above) just registered the in-flight
+      // turn in backgroundStreamMap for the survivor to re-attach to; calling
+      // loadChat() on ourselves would immediately re-attach it back to THIS
+      // instance and delete the map entry, so the survivor then finds nothing
+      // and falls back to the stale IndexedDB snapshot — the exact reason the
+      // streamed text stopped rendering after navigating away mid-stream.
+      // Only publish the handoff state; let the survivor act on it.
       store.dispatch("setCurrentChatTimestamp", currentChatId.value);
       store.dispatch("setChatUpdated", true);
-      if (store.state.currentChatTimestamp) {
-        loadChat(store.state.currentChatTimestamp);
-      }
-      if (!store.state.currentChatTimestamp) {
-        addNewChat();
-      }
     });
     //this watch is added to make sure that the chat gets updated
     // when the component is unmounted so that the main layout component can load the correct chat
     watch(chatUpdated, (newChatUpdated: boolean) => {
+      // A dying instance must not react to the handoff pulse it just published —
+      // otherwise it re-attaches its own detached stream and steals it from the
+      // surviving instance. Let the survivor handle it.
+      if (isUnmounting.value) return;
       if (newChatUpdated && store.state.currentChatTimestamp) {
         loadChat(store.state.currentChatTimestamp);
       }
@@ -5172,7 +5355,14 @@ export default defineComponent({
         const lastBlock =
           lastMessage.contentBlocks[lastMessage.contentBlocks.length - 1];
         if (lastBlock && lastBlock.type === "text") {
-          lastBlock.text = content;
+          // Additive-only: the stream handler writes the FULL accumulated
+          // textSegment into this block as it arrives; the typewriter only
+          // reveals a prefix of it. Never let a lagging/stalled typewriter
+          // reveal (or an empty reset) shorten what's already rendered — that
+          // was a source of "text arrived but nothing/less showed". Only grow.
+          if ((content?.length || 0) >= (lastBlock.text?.length || 0)) {
+            lastBlock.text = content;
+          }
         }
       }
     };
