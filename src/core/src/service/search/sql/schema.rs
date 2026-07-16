@@ -228,7 +228,7 @@ pub fn generate_quick_mode_fields(
     if let Some(settings) = unwrap_stream_settings(schema)
         && settings.is_llm_stream
     {
-        use crate::service::traces::schema_compat::{
+        use config::meta::traces::{
             GEN_AI_SENTINEL_COLUMN, OPTIONAL_GEN_AI_FIELDS, OPTIONAL_LLM_FIELDS,
             REQUIRED_GEN_AI_FIELDS, REQUIRED_LLM_FIELDS,
         };

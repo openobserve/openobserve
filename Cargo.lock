@@ -6633,6 +6633,7 @@ dependencies = [
  "utoipa",
  "utoipa-swagger-ui",
  "vrl",
+ "web",
  "zip 8.2.0",
 ]
 
@@ -6789,6 +6790,7 @@ dependencies = [
  "rustls",
  "rustls-native-certs",
  "sea-orm",
+ "search",
  "segment",
  "serde",
  "serde_json",
@@ -8740,9 +8742,9 @@ dependencies = [
 
 [[package]]
 name = "rust-embed-for-web"
-version = "11.3.0"
+version = "11.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c4e575354a7a8828ce39379d7e31135cd2358a8edbbc07f86e782e4ce550169b"
+checksum = "cc9de9fc1c7cb74c76c770e9ae5454c050aead66420ad59cdad7544e1a5d85fc"
 dependencies = [
  "rust-embed-for-web-impl",
  "rust-embed-for-web-utils",
@@ -8751,9 +8753,9 @@ dependencies = [
 
 [[package]]
 name = "rust-embed-for-web-impl"
-version = "11.3.0"
+version = "11.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "86772bd192343b5305aba01078be9e55e2c7b169b9e69dcee637473120bff9d7"
+checksum = "8527f04d3f734ff9ebab526fcc3e03d61d66386975b2cf898d6b2a221f7dee29"
 dependencies = [
  "brotli",
  "flate2",
@@ -8768,15 +8770,15 @@ dependencies = [
 
 [[package]]
 name = "rust-embed-for-web-utils"
-version = "11.3.0"
+version = "11.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "59a9c32c0e9a4d0f9eabc75413252215a8632acad4ec56f27232a2c70f738b58"
+checksum = "d05939009fc97b73cd5ccee07f5af565b2e3f676a60de30fe8c29419dd33b2c2"
 dependencies = [
  "base85rs",
  "chrono",
  "globset",
  "new_mime_guess",
- "sha2 0.10.9",
+ "sha2 0.11.0",
  "walkdir",
 ]
 
@@ -9202,6 +9204,22 @@ name = "seahash"
 version = "4.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1c107b6f4780854c8b126e228ea8869f4d7b71260f962fefb57b996b8959ba6b"
+
+[[package]]
+name = "search"
+version = "0.1.0"
+dependencies = [
+ "arrow",
+ "arrow-schema",
+ "async-trait",
+ "config",
+ "enrichment",
+ "o2_enterprise",
+ "serde",
+ "serde_json",
+ "utoipa",
+ "vrl",
+]
 
 [[package]]
 name = "security-framework"
@@ -11668,6 +11686,13 @@ dependencies = [
  "hashbrown 0.15.5",
  "indexmap",
  "semver",
+]
+
+[[package]]
+name = "web"
+version = "0.1.0"
+dependencies = [
+ "rust-embed-for-web",
 ]
 
 [[package]]
