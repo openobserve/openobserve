@@ -6496,6 +6496,14 @@
       "leave": "Leave",
       "stay": "Stay"
     },
+    "tabs": {
+      "all": "All Checks",
+      "browser": "Browser",
+      "http": "HTTP",
+      "tcp": "TCP",
+      "tls": "TLS",
+      "ssh": "SSH"
+    },
     "protocolConfig": {
       "timeoutMs": "Timeout (ms)",
       "port": "Port",

@@ -42,33 +42,14 @@
 
       <!-- RIGHT MAIN: filter bar + table -->
       <div class="flex-1 flex flex-col overflow-hidden min-w-0">
-        <!-- Tab switcher (only visible when multi-type tests are enabled) -->
-        <div v-if="areMultiTypeTestEnabled" class="flex items-center gap-2 px-3 py-2 border-b border-border-default">
-          <OToggleGroup
-            :model-value="activeTab"
-            @update:model-value="(v) => { activeTab = v as string }"
-          >
-            <OToggleGroupItem v-for="tab in tabs" :key="tab.key" :value="tab.key" size="sm">
-              {{ tab.label }}
-            </OToggleGroupItem>
-          </OToggleGroup>
-          <template v-if="activeTab === 'private'">
-            <div class="flex-1" />
-            <OButton variant="primary">
-              <template #icon-left><OIcon name="add" size="sm" /></template>
-              Add Location
-            </OButton>
-          </template>
-        </div>
 
-        <!-- ── CHECKS TABLE (All Checks / Browser Tests / API Tests) ── -->
+        <!-- ── CHECKS TABLE ── -->
         <MonitorTable
-          v-if="activeTab === 'monitors' || activeTab === 'browser' || activeTab === 'api'"
           :mode="monitorTableMode"
-          :data="activeTab === 'browser' ? browserMonitors : activeTab === 'api' ? apiMonitors : filteredMonitors"
+          :data="filteredMonitors"
           :loading="loading"
-          :footer-title="activeTab === 'browser' ? 'Browser Tests' : activeTab === 'api' ? 'API Tests' : 'Checks'"
-          :empty-message="activeTab === 'browser' ? 'No browser tests found.' : activeTab === 'api' ? 'No API tests found.' : 'No checks found. Adjust filters or create your first check.'"
+          :footer-title="footerTitle"
+          :empty-message="emptyMessage"
           :selected-ids="selectedMonitorIds"
           :show-folder-column="searchAcrossFolders"
           data-test="synthetic-monitoring-monitors-table"
@@ -92,25 +73,22 @@
         >
           <!-- Toolbar content rendered inside OTable's toolbar bar -->
           <template #toolbar>
-            <div class="flex items-center gap-2 w-full">
-              <!-- Status filter -- only on All Checks tab -->
-              <template v-if="activeTab === 'monitors'">
-                <OToggleGroup
-                  :model-value="statusFilter"
-                  @update:model-value="(v) => { statusFilter = v as string }"
-                >
-                  <OToggleGroupItem v-for="s in statusTabs" :key="s.filter" :value="s.filter" size="sm">
-                    <span v-if="s.filter !== 'all'" class="w-1.5 h-1.5 rounded-full shrink-0" :class="dotClass(s.filter)" />
-                    {{ s.label }} <span class="text-[0.6875rem] font-bold">{{ s.count }}</span>
-                  </OToggleGroupItem>
-                </OToggleGroup>
-              </template>
+            <div class="flex items-center gap-2 flex-1 min-w-0">
+              <!-- Type tabs -->
+              <OToggleGroup
+                :model-value="activeTab"
+                @update:model-value="(v) => { activeTab = v as string; typeFilter = v === 'all' ? 'all' : (v as string).toUpperCase() }"
+              >
+                <OToggleGroupItem v-for="tab in typeTabs" :key="tab.key" :value="tab.key" size="sm">
+                  {{ tab.label }}
+                </OToggleGroupItem>
+              </OToggleGroup>
 
               <!-- Search -->
               <div class="flex-1 min-w-0">
                 <OInput
                   v-model="search"
-                  :placeholder="searchAcrossFolders ? 'Search across all folders...' : activeTab === 'browser' ? 'Search browser tests...' : activeTab === 'api' ? 'Search API tests...' : 'Search this folder...'"
+                  :placeholder="searchAcrossFolders ? 'Search across all folders...' : activeTab === 'browser' ? 'Search browser tests...' : 'Search this folder...'"
                   data-test="synthetic-monitoring-search-input"
                   class="w-full"
                 >
@@ -130,21 +108,14 @@
                 </OInput>
               </div>
 
-              <!-- Type + Location dropdowns -- only on All Checks tab -->
-              <template v-if="activeTab === 'monitors'">
-                <OSelect
-                  v-if="areMultiTypeTestEnabled"
-                  v-model="typeFilter"
-                  :options="typeOpts"
-                  size="md"
-                />
-                <OSelect
-                  v-if="areMultiTypeTestEnabled"
-                  v-model="locationFilter"
-                  :options="locationOpts"
-                  size="md"
-                />
-              </template>
+              <!-- Status filter -->
+              <OSelect
+                v-if="false"
+                v-model="statusFilter"
+                :options="statusOpts"
+                size="md"
+                class="w-28!"
+              />
             </div>
           </template>
 
@@ -395,6 +366,9 @@ async function initPage() {
 
   await loadMonitors(activeFolderId.value)
 
+  // Load locations after monitors — not critical for initial render.
+  loadLocations()
+
   const editId = route.query.edit
   if (typeof editId === 'string' && editId) {
     const monitor = monitors.value.find((m) => String(m.id) === editId)
@@ -406,10 +380,8 @@ onMounted(() => {
   initPage()
 })
 
-const areMultiTypeTestEnabled = false;
-
-const activeTab      = ref("monitors");
-const monitorTableMode = computed(() => activeTab.value as 'monitors' | 'browser' | 'api');
+const activeTab      = ref("all");
+const monitorTableMode = computed(() => activeTab.value === 'browser' ? 'browser' : 'all');
 const statusFilter   = ref("all");
 const typeFilter     = ref("all");
 const locationFilter = ref("all");
@@ -508,22 +480,26 @@ const openDetail = (monitor: any) => {
 };
 
 
-const tabs = [
-  { key:"monitors", label:"All Checks",     count:30   },
-  { key:"browser",  label:"Browser Tests",    count:5    },
-  { key:"api",      label:"API Tests",        count:6    },
-  { key:"private",  label:"Private Locations",count:null },
-];
+const typeTabs = computed(() => [
+  { key: 'all', label: t('synthetics.tabs.all') },
+  ...SYNTHETIC_CHECK_TYPES.map(ct => ({ key: ct, label: t(`synthetics.tabs.${ct}`) })),
+]);
 
-const typeOpts = [
-  { label:"All types", value:"all" },
-  ...["HTTP","Browser","API","TCP","Ping","DNS"].map(v=>({ label:v, value:v })),
-];
-const locationOpts = [
-  { label:"All locations", value:"all" },
-  { label:"US East",      value:"US East" },{ label:"US West",    value:"US West" },
-  { label:"EU West",      value:"EU West" },{ label:"EU Central", value:"EU Central" },{ label:"AP Southeast", value:"AP SE" },
-];
+const locationOpts = ref<{ label: string; value: string }[]>([{ label: 'All locations', value: 'all' }]);
+
+async function loadLocations() {
+  try {
+    const res = await syntheticsService.getLocations(orgIdentifier.value);
+    const locations: { id: string; name: string; region: string; provider: string }[] =
+      (res.data as any).locations ?? [];
+    locationOpts.value = [
+      { label: 'All locations', value: 'all' },
+      ...locations.map((loc) => ({ label: `${loc.name} (${loc.region})`, value: loc.name })),
+    ];
+  } catch (err) {
+    console.error('[synthetics] failed to load locations', err);
+  }
+}
 
 const monitors = ref<DisplayMonitor[]>([])
 
@@ -535,9 +511,6 @@ const enrichedMonitors = computed(() => {
     folder_name: folders.find((f: any) => f.folderId === m.folderId)?.name ?? m.folderId ?? '—',
   }))
 })
-
-const browserMonitors = computed(() => enrichedMonitors.value.filter(m => m.type === 'BROWSER'))
-const apiMonitors     = computed(() => enrichedMonitors.value.filter(m => m.type === 'API'))
 
 const statusTabs = computed(() => {
   const ms = enrichedMonitors.value
@@ -554,6 +527,13 @@ const statusTabs = computed(() => {
   return tabs
 })
 
+const statusOpts = computed(() =>
+  statusTabs.value.map(s => ({
+    label: `${s.label} (${s.count})`,
+    value: s.filter,
+  }))
+)
+
 const filteredMonitors = computed(() =>
   enrichedMonitors.value.filter(m =>
     (statusFilter.value === 'all' || m.status === statusFilter.value) &&
@@ -561,6 +541,14 @@ const filteredMonitors = computed(() =>
     (locationFilter.value === 'all' || m.locations.includes(locationFilter.value)) &&
     (!search.value || m.name.toLowerCase().includes(search.value.toLowerCase()) || m.url.toLowerCase().includes(search.value.toLowerCase()))
   )
+)
+
+const footerTitle = computed(() =>
+  activeTab.value === 'browser' ? 'Browser Tests' : 'Checks'
+)
+
+const emptyMessage = computed(() =>
+  activeTab.value === 'browser' ? 'No browser tests found.' : 'No checks found. Adjust filters or create your first check.'
 )
 
 // ── Selected monitors (resolved from IDs) ────────────────────────────────

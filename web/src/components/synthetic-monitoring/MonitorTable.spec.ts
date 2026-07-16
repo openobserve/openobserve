@@ -149,7 +149,7 @@ const OEmptyStateStub = {
 function mountMonitorTable(props: Record<string, unknown> = {}) {
   return mount(MonitorTable, {
     props: {
-      mode: "monitors",
+      mode: "all",
       data: mockMonitorList,
       ...props,
     },
@@ -224,8 +224,8 @@ describe("MonitorTable", () => {
       ).toBe(true);
     });
 
-    it("should render correct columns for monitors mode", () => {
-      wrapper = mountMonitorTable({ mode: "monitors" });
+    it("should render correct columns for all mode", () => {
+      wrapper = mountMonitorTable({ mode: "all" });
       const { columns } = getOTableProps(wrapper);
       const ids = columns.map((c) => c.id);
       expect(ids).toEqual([
@@ -258,27 +258,9 @@ describe("MonitorTable", () => {
       ]);
     });
 
-    it("should render correct columns for api mode", () => {
-      wrapper = mountMonitorTable({ mode: "api" });
-      const { columns } = getOTableProps(wrapper);
-      const ids = columns.map((c) => c.id);
-      expect(ids).toEqual([
-        "name",
-        "method",
-        "url",
-        "assertions",
-        "history",
-        "responseTime",
-        "uptime",
-        "lastCheck",
-        "status",
-        "actions",
-      ]);
-    });
-
     it("should include folder column after name when showFolderColumn is true", () => {
       wrapper = mountMonitorTable({
-        mode: "monitors",
+        mode: "all",
         showFolderColumn: true,
       });
       const { columns } = getOTableProps(wrapper);
@@ -299,7 +281,7 @@ describe("MonitorTable", () => {
 
     it("should not include folder column when showFolderColumn is false", () => {
       wrapper = mountMonitorTable({
-        mode: "monitors",
+        mode: "all",
         showFolderColumn: false,
       });
       const { columns } = getOTableProps(wrapper);
@@ -617,7 +599,7 @@ describe("MonitorTable", () => {
   describe("folder column", () => {
     it("should emit navigate-to-folder when folder name cell is clicked", async () => {
       wrapper = mountMonitorTable({
-        mode: "monitors",
+        mode: "all",
         showFolderColumn: true,
       });
       // The first row's folder_name cell — the outer div with cursor-pointer

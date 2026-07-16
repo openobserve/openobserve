@@ -362,7 +362,7 @@ import OTooltip from '@/lib/overlay/Tooltip/OTooltip.vue'
 import OEmptyState from '@/lib/core/EmptyState/OEmptyState.vue'
 import { resolveBadge } from '@/lib/core/Badge/badgeGroups'
 
-type Mode = 'monitors' | 'browser' | 'api'
+type Mode = 'all' | 'browser'
 
 const props = withDefaults(defineProps<{
   mode: Mode
@@ -502,8 +502,6 @@ const columns = computed<OTableColumnDef[]>(() => {
   let cols: OTableColumnDef[]
   if (props.mode === 'browser') {
     cols = [TEST_NAME_COL, URL_COL, STEPS_COL, HISTORY_COL, PAGE_LOAD_COL, UPTIME_COL, LAST_RUN_COL, STATUS_COL, ACTIONS_COL]
-  } else if (props.mode === 'api') {
-    cols = [TEST_NAME_COL, METHOD_COL, ENDPOINT_COL, ASSERTIONS_COL, HISTORY_COL, P50_COL, UPTIME_COL, LAST_RUN_COL, STATUS_COL, ACTIONS_COL]
   } else {
     cols = [NAME_COL, URL_COL, TYPE_COL, STATUS_COL, RESPONSE_TIME_COL, LOCATIONS_COL, INTERVAL_COL, LAST_CHECK_COL, ACTIONS_COL]
   }
