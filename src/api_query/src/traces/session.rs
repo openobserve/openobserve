@@ -85,6 +85,9 @@ use crate::{
         })),
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"description": "List recent LLM sessions from a trace stream: session_id, trace count, token usage, cost, error count.", "category": "traces"}))
     )
 )]
 pub async fn get_latest_sessions(
@@ -647,6 +650,9 @@ pub async fn get_latest_sessions(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"description": "Get per-turn trace summaries for a single LLM session by session_id.", "category": "traces"}))
     )
 )]
 pub async fn get_session_details(
