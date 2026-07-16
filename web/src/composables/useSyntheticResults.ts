@@ -53,7 +53,7 @@ const EMPTY_KPI: SyntheticKpi = {
 
 /**
  * Orchestration layer for KPI cards and Response Time chart.
- * Runs data is fetched separately via the REST /runs endpoint in MonitorResultsDashboard.
+ * Runs data is fetched separately via the REST /runs endpoint.
  */
 export function useSyntheticResults() {
   const store = useStore();

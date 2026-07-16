@@ -7,6 +7,7 @@ import OInput from '@/lib/forms/Input/OInput.vue'
 import OSelect from '@/lib/forms/Select/OSelect.vue'
 import OSwitch from '@/lib/forms/Switch/OSwitch.vue'
 import OButton from '@/lib/core/Button/OButton.vue'
+import OTag from '@/lib/core/Badge/OTag.vue'
 import OIcon from '@/lib/core/Icon/OIcon.vue'
 
 const props = defineProps<{
@@ -151,25 +152,27 @@ function handleTagKeydown(event: KeyboardEvent) {
             {{ t('synthetics.checkDetails.add') }}
           </OButton>
         </div>
-        <ul v-if="check.tags.length > 0" class="flex flex-wrap gap-2">
-          <li
+        <div v-if="check.tags.length > 0" class="flex flex-wrap gap-2">
+          <OTag
             v-for="(tag, index) in check.tags"
             :key="tag"
-            class="inline-flex items-center gap-1 rounded px-2 py-0.5 text-xs border border-border-default text-text-body"
+            size="xs"
+            class="px-2"
+            type="selectionChip"
           >
-            <span>{{ tag }}</span>
-            <OButton
-              variant="ghost"
-              size="icon-xs"
-              :aria-label="t('synthetics.checkDetails.removeTag', { tag })"
-              :data-test="`synthetics-check-details-remove-tag-${index}-btn`"
-              class="text-text-muted hover:text-text-body transition-colors"
-              @click="removeTag(index)"
-            >
-              <OIcon name="close" size="xs" />
-            </OButton>
-          </li>
-        </ul>
+              <span class="px-0.5">{{ tag }}</span>
+              <OButton
+                variant="ghost"
+                size="chip"
+                :aria-label="t('synthetics.checkDetails.removeTag', { tag })"
+                :data-test="`synthetics-check-details-remove-tag-${index}-btn`"
+                class="text-text-muted hover:text-text-body transition-colors"
+                @click="removeTag(index)"
+              >
+                <OIcon name="close" size="xs" />
+              </OButton>
+          </OTag>
+        </div>
       </div>
     </div>
   </div>

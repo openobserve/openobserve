@@ -287,7 +287,7 @@ export const mockTimelineSegments = [
   },
 ];
 
-// ── KPI fixtures (for MonitorResultsDashboard / MonitorRuns) ────────────────
+// ── KPI fixtures (for MonitorRuns) ────────────────
 
 export const mockKpiData = {
   uptimePct: 99.65,

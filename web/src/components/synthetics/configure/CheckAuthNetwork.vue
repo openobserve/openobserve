@@ -228,7 +228,7 @@ function removeCookie(index: number) {
 
               <OButton
                 icon-only
-                icon-left="delete"
+                icon-left="close"
                 variant="ghost"
                 size="sm"
                 :aria-label="t('synthetics.authNetwork.removeVariable', { index })"
@@ -280,7 +280,7 @@ function removeCookie(index: number) {
               <OButton
                 variant="ghost"
                 size="icon-sm"
-                icon-left="delete"
+                icon-left="close"
                 :aria-label="t('synthetics.authNetwork.removeHeader', { index })"
                 :data-test="`synthetics-check-auth-network-remove-header-${index}-btn`"
                 @click="removeHeader(index)"
@@ -334,7 +334,7 @@ function removeCookie(index: number) {
               <OButton
                 variant="ghost"
                 size="icon-sm"
-                icon-left="delete"
+                icon-left="close"
                 :aria-label="t('synthetics.authNetwork.removeCookie', { index })"
                 :data-test="`synthetics-check-auth-network-remove-cookie-${index}-btn`"
                 @click="removeCookie(index)"
