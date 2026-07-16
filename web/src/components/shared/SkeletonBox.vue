@@ -49,7 +49,7 @@ const store = useStore()
 const variantClass = computed(() => {
   switch (props.variant) {
     case 'text':    return 'rounded-sm'
-    case 'title':   return 'rounded'
+    case 'title':   return 'rounded-sm'
     case 'button':  return 'rounded-md'
     case 'avatar':  return 'rounded-full'
     case 'image':   return 'rounded-lg'

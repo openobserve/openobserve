@@ -120,11 +120,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <span
                         v-if="event.type !== 'SeverityUpgrade' && event.type !== 'SeverityOverride'"
                         class="inline-flex items-center px-2 py-0.5 rounded-sm text-xs font-semibold"
-                        :style="{
-                          backgroundColor: store.state.theme === 'dark' ? getEventBadgeColor(event) + '30' : getEventBadgeColor(event) + '15',
-                          border: `1px solid ${getEventBadgeColor(event)}${store.state.theme === 'dark' ? '50' : '30'}`,
-                          color: store.state.theme === 'dark' ? '#ffffff' : getEventBadgeColor(event)
-                        }"
+                        :style="badgeStyle(getEventBadgeColor(event))"
                       >
                         {{ getEventBadgeText(event) }}
                       </span>
@@ -139,11 +135,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <template v-if="event.type === 'ai_analysis_begin' || event.type === 'ai_analysis_complete' || event.type === 'ai_analysis_failed'">
                         <span
                           class="inline-flex items-center px-2 py-0.5 rounded-sm text-xs font-semibold"
-                          :style="{
-                            backgroundColor: store.state.theme === 'dark' ? getEventBadgeColor(event) + '30' : getEventBadgeColor(event) + '15',
-                            border: `1px solid ${getEventBadgeColor(event)}${store.state.theme === 'dark' ? '50' : '30'}`,
-                            color: store.state.theme === 'dark' ? '#ffffff' : getEventBadgeColor(event)
-                          }"
+                          :style="badgeStyle(getEventBadgeColor(event))"
                         >
                           AI SRE
                           <OTooltip v-if="event.type === 'ai_analysis_failed' && getFailureTooltip(event)" :delay="300" side="bottom" align="start" :max-width="'24rem'" :content="getFailureTooltip(event)" />
@@ -157,11 +149,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <template v-else-if="event.type === 'Alert'">
                         <span
                           class="inline-flex items-center px-2 py-0.5 rounded-sm text-xs font-semibold"
-                          :style="{
-                            backgroundColor: store.state.theme === 'dark' ? getEventBadgeColor(event) + '30' : getEventBadgeColor(event) + '15',
-                            border: `1px solid ${getEventBadgeColor(event)}${store.state.theme === 'dark' ? '50' : '30'}`,
-                            color: store.state.theme === 'dark' ? '#ffffff' : getEventBadgeColor(event)
-                          }"
+                          :style="badgeStyle(getEventBadgeColor(event))"
                         >
                           {{ getEventBadgeText(event) }}
                         </span>
@@ -179,11 +167,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <span
                           v-if="event.type !== 'SeverityUpgrade' && event.type !== 'SeverityOverride'"
                           class="inline-flex items-center px-2 py-0.5 rounded-sm text-xs font-semibold"
-                          :style="{
-                            backgroundColor: store.state.theme === 'dark' ? getEventBadgeColor(event) + '30' : getEventBadgeColor(event) + '15',
-                            border: `1px solid ${getEventBadgeColor(event)}${store.state.theme === 'dark' ? '50' : '30'}`,
-                            color: store.state.theme === 'dark' ? '#ffffff' : getEventBadgeColor(event)
-                          }"
+                          :style="badgeStyle(getEventBadgeColor(event))"
                         >
                           {{ getEventBadgeText(event) }}
                         </span>
@@ -427,17 +411,17 @@ const getCurrentUserInitials = (): string => {
 // Get avatar color based on username
 const getAvatarColor = (username: string): string => {
   const colors = [
-    "#EF4444", // red
-    "#F59E0B", // amber
-        "#8B5CF6", // purple
+    "var(--color-error-500)", // red
+    "var(--color-amber-500)", // amber
+        "var(--color-ai-accent)", // purple
 
-    "#3B82F6", // blue
-        "#10B981", // green
-    "#EC4899", // pink
-    "#06B6D4", // cyan
-    "#F97316", // orange
-    "#14B8A6", // teal
-    "#6366F1", // indigo
+    "var(--color-blue-500)", // blue
+        "var(--color-success-500)", // green
+    "var(--color-purple-500)", // pink
+    "var(--color-cyan-500)", // cyan
+    "var(--color-orange-500)", // orange
+    "var(--color-teal-500)", // teal
+    "var(--color-indigo-500)", // indigo
   ];
 
   const firstChar = username.charAt(0).toUpperCase();
@@ -466,24 +450,38 @@ const getEventIcon = (event: any): string => {
   }
 };
 
-// Get event badge color
+// Event badge color — resolves to a design token (var()) per event type.
+// Semantic reuse: error/warning/success/info map to status primitives; AI +
+// dimension events use the shared AI accent; the rest use categorical hues.
 const getEventBadgeColor = (event: any): string => {
   switch (event.type) {
-    case "Created": return "#6366F1"; // indigo
-    case "Alert": return "#F59E0B"; // amber
+    case "Created": return "var(--color-indigo-500)";
+    case "Alert": return "var(--color-amber-500)";
     case "SeverityUpgrade":
-    case "SeverityOverride": return "#EF4444"; // red
-    case "Acknowledged": return "#3B82F6"; // blue
-    case "Resolved": return "#059669"; // darker green
-    case "Reopened": return "#F97316"; // orange
-    case "DimensionsUpgraded": return "#8B5CF6"; // purple
-    case "TitleChanged": return "#6366F1"; // indigo
-    case "AssignmentChanged": return "#06B6D4"; // cyan
+    case "SeverityOverride": return "var(--color-error-500)";
+    case "Acknowledged": return "var(--color-blue-500)";
+    case "Resolved": return "var(--color-success-600)";
+    case "Reopened": return "var(--color-orange-500)";
+    case "DimensionsUpgraded": return "var(--color-ai-accent)";
+    case "TitleChanged": return "var(--color-indigo-500)";
+    case "AssignmentChanged": return "var(--color-cyan-500)";
     case "ai_analysis_begin":
-    case "ai_analysis_complete": return "#8B5CF6"; // purple
-    case "ai_analysis_failed": return "#EF4444"; // red
-    default: return "#6B7280"; // gray
+    case "ai_analysis_complete": return "var(--color-ai-accent)";
+    case "ai_analysis_failed": return "var(--color-error-500)";
+    default: return "var(--color-grey-500)";
   }
+};
+
+// Build the badge inline style from an event color token. Tint strengths are
+// theme-conditional (denser bg/border + white text in dark) via color-mix, so
+// the token stays the single color source. (Theme read migrates in the D19/D20 sweep.)
+const badgeStyle = (c: string) => {
+  const isDark = store.state.theme === "dark";
+  return {
+    backgroundColor: `color-mix(in srgb, ${c} ${isDark ? "19%" : "8%"}, transparent)`,
+    border: `1px solid color-mix(in srgb, ${c} ${isDark ? "31%" : "19%"}, transparent)`,
+    color: isDark ? "var(--color-grey-0)" : c,
+  };
 };
 
 // Get event badge text
@@ -509,12 +507,12 @@ const getEventBadgeText = (event: any): string => {
 // Get severity color based on priority level
 const getSeverityColor = (severity: string): string => {
   switch (severity) {
-    case "P1": return "#EF4444"; // red
-    case "P2": return "#F97316"; // orange
-    case "P3": return "#F59E0B"; // amber
-    case "P4": return "#3B82F6"; // blue
-    case "P5": return "#6B7280"; // gray
-    default: return "#6B7280"; // gray
+    case "P1": return "var(--color-error-500)"; // red
+    case "P2": return "var(--color-orange-500)"; // orange
+    case "P3": return "var(--color-amber-500)"; // amber
+    case "P4": return "var(--color-blue-500)"; // blue
+    case "P5": return "var(--color-grey-500)"; // gray
+    default: return "var(--color-grey-500)"; // gray
   }
 };
 
@@ -532,7 +530,7 @@ const getInlineEventText = (event: any): string => {
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
   const bold = (text: string) => `<span style="font-weight: 600; color: ${eventColor};">${esc(text)}</span>`;
-  const severityBadge = (severity: string) => `<span style="display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; background-color: ${getSeverityColor(severity)}${opacity}; color: ${isDark ? '#ffffff' : getSeverityColor(severity)}; border: 1px solid ${getSeverityColor(severity)}${isDark ? '60' : '40'};">${esc(severity)}</span>`;
+  const severityBadge = (severity: string) => `<span style="display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; background-color: color-mix(in srgb, ${getSeverityColor(severity)} ${isDark ? '31%' : '25%'}, transparent); color: ${isDark ? 'var(--color-grey-0)' : getSeverityColor(severity)}; border: 1px solid color-mix(in srgb, ${getSeverityColor(severity)} ${isDark ? '38%' : '25%'}, transparent);">${esc(severity)}</span>`;
   const isSystemEvent = getUserId(event) === 'System';
 
   switch (event.type) {

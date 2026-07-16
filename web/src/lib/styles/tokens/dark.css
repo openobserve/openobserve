@@ -90,6 +90,35 @@
     --color-text-inverse:     var(--color-grey-900);     /* text on light/colored bg */
     --color-accent:           var(--color-primary-400);  /* brand accent — lighter shade for dark surfaces */
     --color-sql-accent:       #A78BFA;                    /* SQL/query violet — lighter for dark surfaces */
+    /* Trace DAG node-type palette (dark) — lighter step per hue */
+    --color-dag-node-generation: #66bb6a;
+    --color-dag-node-embedding:  #64b5f6;
+    --color-dag-node-agent:      #ce93d8;
+    --color-dag-node-tool:       #ffb74d;
+    --color-dag-node-chain:      #7986cb;
+    --color-dag-node-retriever:  #4dd0e1;
+    --color-dag-node-task:       #4db6ac;
+    --color-dag-node-evaluator:  #f48fb1;
+    --color-dag-node-workflow:   #b39ddb;
+    --color-dag-node-rerank:     #4fc3f7;
+    --color-dag-node-guardrail:  #ef5350;
+    --color-dag-node-event:      #ffd54f;
+    --color-dag-node-default:    #9e9e9e;
+    /* Code syntax highlighting — GitHub dark palette */
+    --color-syntax-bg:       #0d1117;
+    --color-syntax-text:     #c9d1d9;
+    --color-syntax-keyword:  #ff7b72;
+    --color-syntax-function: #d2a8ff;
+    --color-syntax-number:   #79c0ff;
+    --color-syntax-string:   #a5d6ff;
+    --color-syntax-builtin:  #ffa657;
+    --color-syntax-comment:  #8b949e;
+    --color-syntax-tag:      #7ee787;
+    --color-syntax-bullet:   #f2cc60;
+    --color-syntax-addition-fg: #aff5b4;
+    --color-syntax-addition-bg: #033a16;
+    --color-syntax-deletion-fg: #ffdcd7;
+    --color-syntax-deletion-bg: #67060c;
 
     /* --- Surfaces (mapped — elevation order preserved from light mode) --- */
     --color-surface-base:         var(--d-base);    /* content card + table canvas (lifted) */

@@ -1,5 +1,39 @@
 # O2 Token Migration — Decision Register
 
+> ## ✅ DECISIONS RECORDED — 2026-07-16
+>
+> **Cross-cutting rule (D18): reuse existing tokens/names first; mint a new token ONLY when it's genuinely needed and actually used. Stay in control of the token count — no token sprawl "for migration's sake."** This governs every item below.
+>
+> **Execution order:** do D1–D18 first; **park the dark-mechanism sweep (D19/D20)** and run it last as its own separate commits.
+>
+> | # | Decision | Status |
+> |---|---|---|
+> | D1 | Trace DAG: derive border/bg from ONE base color per node type via transparency; split ONLY where hues differ. **ANALYSIS DONE: all 14 types are single-hue → 42 tokens collapse to 13 base tokens** (span folds into default; border=base, bg=`color-mix(base 12%, surface)`, text=`color-mix(base 82%, black)`/lighter in dark). Keeping 13 distinct (not reusing status tokens) since the viz must distinguish 14 span types. | ✅ plan set → execute (13 tokens) |
+> | D2 | Incident KPI chips. **ANALYSIS DONE:** the "chips" and "overview KPIs" are the SAME 5 stat cards (one location, not two). Home overview tab does NOT reuse them (already tokenized — it's the model). An existing `--color-badge-{color}-soft-{bg,text}` palette already matches the chip pattern. → map amber/blue/purple to existing badge-soft; green→success-soft, rose→error-soft. **Net new tokens: 0.** Extract a shared category-chip. | ✅ reuse existing badges → execute (0 new) |
+> | D3 | Event badges. **ANALYSIS DONE:** real `getEventBadgeColor` = 9 semantic event types, ALL map to EXISTING tokens (red→error-500, amber→warning, green→status-positive, orange→orange-500, blue→status-info-text, indigo/purple/cyan→respective -500). **Net new tokens: 0.** ⚠ Do NOT collapse blue+purple→accent (accent is teal #3F7994 — would merge Acknowledged & DimensionsUpgraded into one color). | ✅ reuse existing tokens → execute (0 new) |
+> | D4 | `TraceEvaluationsView.vue` — **CONFIRMED UNUSED** (0 imports/routes/specs). → **DELETE** (pre-authorized). | ✅ ready to delete |
+> | D5 | Keep `traceColors.ts` + `colorPalette.ts` as chart palette homes. **themes.ts REVIEW DONE: token wiring is CORRECT** (flows through setProperty, no bypass). Warnings to verify: (1) dead `themeColorOpacity` field (12× set, 0 reads); (2) first-paint flash — CSS static default is teal `#3F7994` but O2 Signature is indigo `#6B76E3`; (3) dead `isDefault` gradient branches in theme.ts; (4) Crimson Ink uses orange=error / indigo=success (deliberate? eyeball it); (5) O2 Pulse same hex light+dark. | ✅ correct → cleanups + your eyeball on 2/4/5 |
+> | D6 | Shared `--color-syntax-*`. **ANALYSIS DONE:** O2AIChat + OCodeBlock use the IDENTICAL github/github-dark palette; SetupCardRenderer has no syntax colors (inherits OCodeBlock). → **9 core tokens** (bg, text, keyword, function, number, string, builtin, comment, tag) + up to 5 optional diff/markdown extras (O2AIChat only). ⚠ ONE visual call: light code-bg is `#ffffff` (chat) vs `#f6f8fa` (OCodeBlock) — pick one. | ✅ 9 tokens → execute after bg pick |
+> | D7 | `ServiceGraphEdgeSidePanel.vue` — **CONFIRMED DEAD** (0 imports/specs); Node panel is live (ServiceGraph + ServicesCatalog). → **DELETE Edge on your confirm.** Will also map where the Node panel appears in the UI. | ⏸ awaiting your delete confirm |
+> | D8 | O2AIChat — reuse existing/semantic tokens, derive gradients FROM tokens, minimize new colors; fix the scoped-CSS mess. Part of style-block migration. | queued (Phase E) |
+> | D9 | ThreadView/ThreadToolCalls — same approach as D8 (reuse + minimize). | queued (Phase E) |
+> | D10 | SetupCardRenderer — migrate private `--clay/--panel/--text-*` vars to global tokens. No separate mindset. | queued |
+> | D11 | `TraceDetailsSidebar.vue` — **CONFIRMED ALIVE** (async-loaded in FlameGraphView). → migrate mechanically, do NOT remove. | ✅ migrate |
+> | D12 | Tokenize the Slack/Teams/Email brand replicas as **component-specific brand tokens** (create the tokens; don't allowlist). | ✅ execute (brand tokens) |
+> | D13 | Webinar banner — create promo tokens; also tokenize OButton's `webinar-dismiss` color. Deliberate color choice → give it a token. | ✅ execute (promo tokens) |
+> | D14 | Gradients. **ANALYSIS DONE:** the identical AI purple→pink gradient is used at **19 sites** → ONE `--color-gradient-ai` token reused everywhere (your reuse instinct confirmed). Full AI family = 3–4 tokens (solid + subtle + faint + maybe dark variant) covering ~40 sites. +3 distinct: brand-ribbon (3 sites), notification badge (1), stop/danger (2). Reuse existing usage-banner + skeleton tokens for those (LicensePeriod bug: hardcodes usage-banner pattern). Allowlist: radial halos, data-driven conics, one-off bubbles. ⚠ 1 call: merge the 2 darker AI variants into `-ai` or keep distinct? | ✅ ~7 tokens → execute after merge call |
+> | D15 | z-index ladder — **SKIP** (not needed now). | ⏭ skipped |
+> | D16 | **Font standardization is a MUST** — build a role-named semantic size scale (e.g. `text-heading`…) with usage guidance; migrate ALL random `text-[..px]`; enforce. Bigger than the 10px floor. | ✅ execute (new scope) |
+> | D17 | Re-register a minimal white/black set but **eliminate raw `bg-white`/`text-black`**. | ✅ execute (Phase G) |
+> | D18 | **PRINCIPLE:** reuse first, minimize new tokens, only create what's used. Governs all. | ✅ standing rule |
+> | D19+D20 | Unify dark mode to `useTheme().isDark` + single `.dark`; migrate all. **PARK for now**, run last as separate commits. | ⏸ parked (last) |
+>
+> Detail for each decision is retained below (original register).
+
+---
+
+# O2 Token Migration — Decision Register (detail)
+
 > Companion to `O2_TOKEN_MIGRATION_PLAN.md` and `O2_TOKEN_MIGRATION_PENDING.md`.
 > Every item here is a **design/product decision** that blocks the final migration
 > phases (E and G). Once each is answered, the migration is 100% executable with

@@ -1,20 +1,20 @@
 {
   "totals": {
-    "themeTernary": 174,
-    "darkMechanism": 377,
-    "arbTextSize": 323,
-    "rawPalette": 88,
+    "themeTernary": 151,
+    "darkMechanism": 310,
+    "arbTextSize": 302,
+    "rawPalette": 57,
     "arbPx": 174,
     "arbRadius": 25,
-    "unscopedStyle": 206,
-    "arbZ": 49,
-    "styleBlockHex": 805,
-    "stylePxUnit": 1082,
-    "hexClass": 244,
-    "inlineHexStyle": 27,
-    "inlineHexBind": 11,
+    "unscopedStyle": 204,
+    "arbZ": 48,
+    "styleBlockHex": 603,
+    "stylePxUnit": 1015,
+    "hexClass": 139,
+    "inlineHexStyle": 21,
     "tsHex": 471,
-    "bareRounded": 9
+    "inlineHexBind": 6,
+    "bareRounded": 10
   },
   "files": {
     "App.vue": {
@@ -115,11 +115,11 @@
       "unscopedStyle": 1
     },
     "components/alerts/IncidentDetailDrawer.vue": {
-      "rawPalette": 30,
-      "themeTernary": 25,
+      "rawPalette": 10,
+      "themeTernary": 15,
       "arbTextSize": 10,
       "unscopedStyle": 1,
-      "darkMechanism": 28,
+      "darkMechanism": 18,
       "styleBlockHex": 2,
       "stylePxUnit": 2
     },
@@ -135,11 +135,9 @@
       "stylePxUnit": 10
     },
     "components/alerts/IncidentTimeline.vue": {
-      "inlineHexStyle": 5,
-      "inlineHexBind": 4,
-      "themeTernary": 13,
+      "themeTernary": 2,
       "unscopedStyle": 1,
-      "darkMechanism": 14,
+      "darkMechanism": 4,
       "stylePxUnit": 2
     },
     "components/alerts/PrebuiltDestinationSelector.vue": {
@@ -792,7 +790,7 @@
       "stylePxUnit": 3
     },
     "components/shared/SkeletonBox.vue": {
-      "bareRounded": 2,
+      "bareRounded": 3,
       "unscopedStyle": 1
     },
     "components/TelemetryCorrelationPanel.vue": {
@@ -974,7 +972,7 @@
     "lib/core/Code/OCodeBlock.vue": {
       "themeTernary": 1,
       "darkMechanism": 2,
-      "styleBlockHex": 31,
+      "styleBlockHex": 2,
       "stylePxUnit": 5
     },
     "lib/core/Collapsible/OCollapsible.vue": {
@@ -1380,15 +1378,6 @@
       "unscopedStyle": 1,
       "stylePxUnit": 4
     },
-    "plugins/traces/ServiceGraphEdgeSidePanel.vue": {
-      "hexClass": 8,
-      "themeTernary": 2,
-      "unscopedStyle": 1,
-      "arbZ": 1,
-      "darkMechanism": 46,
-      "styleBlockHex": 169,
-      "stylePxUnit": 59
-    },
     "plugins/traces/ServiceGraphNodeSidePanel.vue": {
       "hexClass": 1,
       "arbTextSize": 1,
@@ -1441,7 +1430,6 @@
       "stylePxUnit": 9
     },
     "plugins/traces/TraceDAG.vue": {
-      "hexClass": 97,
       "arbTextSize": 1,
       "unscopedStyle": 1,
       "darkMechanism": 1,
@@ -1461,16 +1449,6 @@
       "darkMechanism": 28,
       "styleBlockHex": 61,
       "stylePxUnit": 71
-    },
-    "plugins/traces/TraceEvaluationsView.vue": {
-      "rawPalette": 11,
-      "inlineHexStyle": 1,
-      "inlineHexBind": 1,
-      "arbTextSize": 21,
-      "unscopedStyle": 1,
-      "darkMechanism": 1,
-      "styleBlockHex": 4,
-      "stylePxUnit": 8
     },
     "plugins/traces/TraceTree.vue": {
       "arbTextSize": 1,

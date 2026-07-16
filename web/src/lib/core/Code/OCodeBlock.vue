@@ -179,13 +179,13 @@ const onCopy = () => {
   display: block;
 }
 .o2-win-dots i:nth-child(1) {
-  background: #ec6a5e;
+  background: var(--color-status-negative);
 }
 .o2-win-dots i:nth-child(2) {
-  background: #f4bf4f;
+  background: var(--color-warning);
 }
 .o2-win-dots i:nth-child(3) {
-  background: #61c454;
+  background: var(--color-status-positive);
 }
 .o2-code-file {
   font-size: 0.72rem;
@@ -222,84 +222,20 @@ const onCopy = () => {
   padding: 0;
 }
 
-/* ===================== LIGHT THEME ===================== */
-.o2-light {
-  background: #f6f8fa;
-  border-color: rgba(0, 0, 0, 0.1);
-
-  .o2-code-toolbar {
-    background: rgba(0, 0, 0, 0.03);
-    border-bottom-color: rgba(0, 0, 0, 0.08);
-  }
-  .o2-code-pre code {
-    color: #24292e;
-  }
-  // github (light) token palette
-  :deep(.hljs-doctag),
-  :deep(.hljs-keyword),
-  :deep(.hljs-meta .hljs-keyword),
-  :deep(.hljs-template-tag),
-  :deep(.hljs-template-variable),
-  :deep(.hljs-type),
-  :deep(.hljs-variable.language_) {
-    color: #d73a49;
-  }
-  :deep(.hljs-title),
-  :deep(.hljs-title.class_),
-  :deep(.hljs-title.function_) {
-    color: #6f42c1;
-  }
-  :deep(.hljs-attr),
-  :deep(.hljs-attribute),
-  :deep(.hljs-literal),
-  :deep(.hljs-meta),
-  :deep(.hljs-number),
-  :deep(.hljs-operator),
-  :deep(.hljs-variable),
-  :deep(.hljs-selector-attr),
-  :deep(.hljs-selector-class),
-  :deep(.hljs-selector-id) {
-    color: #005cc5;
-  }
-  :deep(.hljs-regexp),
-  :deep(.hljs-string),
-  :deep(.hljs-meta .hljs-string) {
-    color: #032f62;
-  }
-  :deep(.hljs-built_in),
-  :deep(.hljs-symbol) {
-    color: #e36209;
-  }
-  :deep(.hljs-comment),
-  :deep(.hljs-code),
-  :deep(.hljs-formula) {
-    color: #6a737d;
-  }
-  :deep(.hljs-name),
-  :deep(.hljs-quote),
-  :deep(.hljs-selector-tag),
-  :deep(.hljs-selector-pseudo) {
-    color: #22863a;
-  }
-  :deep(.hljs-section) {
-    color: #005cc5;
-    font-weight: 600;
-  }
-}
-
-/* ===================== DARK THEME ===================== */
+/* ============ CODE THEME (token-driven; wrapper follows global theme,
+   tokens flip via dark.css, so one rule set covers both) ============ */
+.o2-light,
 .o2-dark {
-  background: #0d1117;
-  border-color: rgba(255, 255, 255, 0.08);
+  background: var(--color-syntax-bg);
+  border-color: var(--color-border-default);
 
   .o2-code-toolbar {
-    background: rgba(255, 255, 255, 0.04);
-    border-bottom-color: rgba(255, 255, 255, 0.08);
+    background: color-mix(in srgb, var(--color-syntax-text) 4%, transparent);
+    border-bottom-color: var(--color-border-subtle);
   }
   .o2-code-pre code {
-    color: #c9d1d9;
+    color: var(--color-syntax-text);
   }
-  // github-dark token palette
   :deep(.hljs-doctag),
   :deep(.hljs-keyword),
   :deep(.hljs-meta .hljs-keyword),
@@ -307,12 +243,12 @@ const onCopy = () => {
   :deep(.hljs-template-variable),
   :deep(.hljs-type),
   :deep(.hljs-variable.language_) {
-    color: #ff7b72;
+    color: var(--color-syntax-keyword);
   }
   :deep(.hljs-title),
   :deep(.hljs-title.class_),
   :deep(.hljs-title.function_) {
-    color: #d2a8ff;
+    color: var(--color-syntax-function);
   }
   :deep(.hljs-attr),
   :deep(.hljs-attribute),
@@ -324,30 +260,30 @@ const onCopy = () => {
   :deep(.hljs-selector-attr),
   :deep(.hljs-selector-class),
   :deep(.hljs-selector-id) {
-    color: #79c0ff;
+    color: var(--color-syntax-number);
   }
   :deep(.hljs-regexp),
   :deep(.hljs-string),
   :deep(.hljs-meta .hljs-string) {
-    color: #a5d6ff;
+    color: var(--color-syntax-string);
   }
   :deep(.hljs-built_in),
   :deep(.hljs-symbol) {
-    color: #ffa657;
+    color: var(--color-syntax-builtin);
   }
   :deep(.hljs-comment),
   :deep(.hljs-code),
   :deep(.hljs-formula) {
-    color: #8b949e;
+    color: var(--color-syntax-comment);
   }
   :deep(.hljs-name),
   :deep(.hljs-quote),
   :deep(.hljs-selector-tag),
   :deep(.hljs-selector-pseudo) {
-    color: #7ee787;
+    color: var(--color-syntax-tag);
   }
   :deep(.hljs-section) {
-    color: #1f6feb;
+    color: var(--color-syntax-number);
     font-weight: 600;
   }
 }

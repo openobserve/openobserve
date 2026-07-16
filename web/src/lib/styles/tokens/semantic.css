@@ -262,6 +262,39 @@
   --color-lang-vrl-bg: rgba(245, 158, 11, 0.12);
   --color-lang-promql-text: #10B981;
   --color-lang-promql-bg: rgba(16, 185, 129, 0.12);
+  /* Trace DAG node-type palette (LLM span types). ONE base color per type;
+     at the call site border = base, bg = base@12% over surface, text = base
+     mixed toward the foreground. Dark values live in dark.css — the base flips,
+     so consumers need NO dark: variant. */
+  --color-dag-node-generation: #4caf50;
+  --color-dag-node-embedding:  #2196f3;
+  --color-dag-node-agent:      #9c27b0;
+  --color-dag-node-tool:       #ff9800;
+  --color-dag-node-chain:      #3f51b5;
+  --color-dag-node-retriever:  #00bcd4;
+  --color-dag-node-task:       #009688;
+  --color-dag-node-evaluator:  #e91e63;
+  --color-dag-node-workflow:   #673ab7;
+  --color-dag-node-rerank:     #03a9f4;
+  --color-dag-node-guardrail:  #f44336;
+  --color-dag-node-event:      #ffc107;
+  --color-dag-node-default:    #9e9e9e;
+  /* Code syntax highlighting (highlight.js) — GitHub light palette. Shared by
+     O2AIChat + OCodeBlock; dark values in dark.css so one rule covers both themes. */
+  --color-syntax-bg:       #f6f8fa;
+  --color-syntax-text:     #24292e;
+  --color-syntax-keyword:  #d73a49;
+  --color-syntax-function: #6f42c1;
+  --color-syntax-number:   #005cc5;
+  --color-syntax-string:   #032f62;
+  --color-syntax-builtin:  #e36209;
+  --color-syntax-comment:  #6a737d;
+  --color-syntax-tag:      #22863a;
+  --color-syntax-bullet:   #735c0f;
+  --color-syntax-addition-fg: #22863a;
+  --color-syntax-addition-bg: #f0fff4;
+  --color-syntax-deletion-fg: #b31d28;
+  --color-syntax-deletion-bg: #ffeef0;
   --color-hover-gray: color-mix(in srgb, var(--color-theme-accent) 2%, rgb(244, 244, 244));
   --color-hover-shadow: #dddddd;
   --color-icon-color: #808080;

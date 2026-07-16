@@ -46,20 +46,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <template #node-custom="{ data }">
           <Handle v-if="data.hasIncoming" type="target" :position="Position.Top"
-            class="w-2 h-2 bg-[#1976d2] border-2 border-white rounded-full shadow-[0_1px_3px_rgba(0,0,0,0.15)]" />
+            class="w-2 h-2 bg-info border-2 border-surface-base rounded-full shadow-[0_1px_3px_rgba(0,0,0,0.15)]" />
           <div
-            class="p-[6px_12px] rounded-md bg-white border-2 border-[#1976d2] min-w-20 max-w-45 min-h-7 shadow-[0_2px_6px_rgba(0,0,0,0.1)] transition-all duration-200 cursor-pointer text-center flex flex-col items-center justify-center hover:shadow-[0_4px_12px_rgba(0,0,0,0.15)] hover:[transform:translateY(-2px)] dark:bg-[#2a2a2a] dark:border-[#64b5f6] dark:text-border-default"
+            class="p-[6px_12px] rounded-md bg-surface-base border-2 border-info min-w-20 max-w-45 min-h-7 shadow-[0_2px_6px_rgba(0,0,0,0.1)] transition-all duration-200 cursor-pointer text-center flex flex-col items-center justify-center hover:shadow-[0_4px_12px_rgba(0,0,0,0.15)] hover:[transform:translateY(-2px)]"
             :class="[
               {
-                'border-[#c62828]! bg-[#ffebee]! dark:border-[#ef5350]! dark:bg-[#3a1a1a]!': data.span_status === 'ERROR',
-                'border-[#2e7d32]! dark:border-[#66bb6a]!': data.span_status === 'OK' && !data.gen_ai_operation_name,
+                'border-status-negative! bg-status-error-bg!': data.span_status === 'ERROR',
+                'border-status-positive!': data.span_status === 'OK' && !data.gen_ai_operation_name,
               },
               getObservationTypeClass(data.gen_ai_operation_name),
             ]"
             @click="handleNodeClick(data.span_id)"
           >
             <div
-              class="text-compact text-[#1976d2] font-semibold break-words max-w-40 leading-[1.3] whitespace-nowrap overflow-hidden text-ellipsis dark:text-[#90caf9]"
+              class="text-compact text-info font-semibold break-words max-w-40 leading-[1.3] whitespace-nowrap overflow-hidden text-ellipsis"
               :class="getObservationTypeTextClass(data.gen_ai_operation_name)"
             >{{ data.operation_name }}</div>
             <OTag
@@ -71,7 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </div>
           <Handle v-if="data.hasOutgoing" type="source" :position="Position.Bottom"
-            class="w-2 h-2 bg-[#1976d2] border-2 border-white rounded-full shadow-[0_1px_3px_rgba(0,0,0,0.15)]" />
+            class="w-2 h-2 bg-info border-2 border-surface-base rounded-full shadow-[0_1px_3px_rgba(0,0,0,0.15)]" />
         </template>
       </VueFlow>
     </div>
@@ -442,38 +442,43 @@ export default defineComponent({
       event: "event",
     };
 
+    // Node border+bg derived from ONE base token per type: border = base,
+    // bg = base@12% over the surface. The base flips light/dark (see dark.css),
+    // so no dark: variant is needed. Full literal classes so Tailwind compiles them.
     const llmNodeStyles: Record<string, string> = {
-      generation: 'border-[#4caf50] bg-[#e8f5e9] dark:border-[#66bb6a] dark:bg-[#1a2e1a]',
-      embedding:  'border-[#2196f3] bg-[#e3f2fd] dark:border-[#64b5f6] dark:bg-[#1a2a3a]',
-      agent:      'border-[#9c27b0] bg-[#f3e5f5] dark:border-[#ce93d8] dark:bg-[#2a1a2e]',
-      tool:       'border-[#ff9800] bg-[#fff3e0] dark:border-[#ffb74d] dark:bg-[#2e2218]',
-      chain:      'border-[#3f51b5] bg-[#e8eaf6] dark:border-[#7986cb] dark:bg-[#1a1a2e]',
-      retriever:  'border-[#00bcd4] bg-[#e0f7fa] dark:border-[#4dd0e1] dark:bg-[#1a2a2e]',
-      task:       'border-[#009688] bg-[#e0f2f1] dark:border-[#4db6ac] dark:bg-[#1a2e2a]',
-      evaluator:  'border-[#e91e63] bg-[#fce4ec] dark:border-[#f48fb1] dark:bg-[#2e1a22]',
-      workflow:   'border-[#673ab7] bg-[#ede7f6] dark:border-[#b39ddb] dark:bg-[#221a2e]',
-      rerank:     'border-[#03a9f4] bg-[#e1f5fe] dark:border-[#4fc3f7] dark:bg-[#1a2a3a]',
-      guardrail:  'border-[#f44336] bg-[#ffebee] dark:border-[#ef5350] dark:bg-[#2e1a1a]',
-      span:       'border-[#9e9e9e] bg-[#f5f5f5] dark:border-[#9e9e9e] dark:bg-[#262626]',
-      event:      'border-[#ffc107] bg-[#fff8e1] dark:border-[#ffd54f] dark:bg-[#2e2a18]',
-      default:    'border-[#9e9e9e] bg-[#fafafa] dark:border-[#9e9e9e] dark:bg-[#262626]',
+      generation: 'border-[var(--color-dag-node-generation)] bg-[color-mix(in_srgb,var(--color-dag-node-generation)_12%,var(--color-surface-base))]',
+      embedding:  'border-[var(--color-dag-node-embedding)] bg-[color-mix(in_srgb,var(--color-dag-node-embedding)_12%,var(--color-surface-base))]',
+      agent:      'border-[var(--color-dag-node-agent)] bg-[color-mix(in_srgb,var(--color-dag-node-agent)_12%,var(--color-surface-base))]',
+      tool:       'border-[var(--color-dag-node-tool)] bg-[color-mix(in_srgb,var(--color-dag-node-tool)_12%,var(--color-surface-base))]',
+      chain:      'border-[var(--color-dag-node-chain)] bg-[color-mix(in_srgb,var(--color-dag-node-chain)_12%,var(--color-surface-base))]',
+      retriever:  'border-[var(--color-dag-node-retriever)] bg-[color-mix(in_srgb,var(--color-dag-node-retriever)_12%,var(--color-surface-base))]',
+      task:       'border-[var(--color-dag-node-task)] bg-[color-mix(in_srgb,var(--color-dag-node-task)_12%,var(--color-surface-base))]',
+      evaluator:  'border-[var(--color-dag-node-evaluator)] bg-[color-mix(in_srgb,var(--color-dag-node-evaluator)_12%,var(--color-surface-base))]',
+      workflow:   'border-[var(--color-dag-node-workflow)] bg-[color-mix(in_srgb,var(--color-dag-node-workflow)_12%,var(--color-surface-base))]',
+      rerank:     'border-[var(--color-dag-node-rerank)] bg-[color-mix(in_srgb,var(--color-dag-node-rerank)_12%,var(--color-surface-base))]',
+      guardrail:  'border-[var(--color-dag-node-guardrail)] bg-[color-mix(in_srgb,var(--color-dag-node-guardrail)_12%,var(--color-surface-base))]',
+      span:       'border-[var(--color-dag-node-default)] bg-[color-mix(in_srgb,var(--color-dag-node-default)_12%,var(--color-surface-base))]',
+      event:      'border-[var(--color-dag-node-event)] bg-[color-mix(in_srgb,var(--color-dag-node-event)_12%,var(--color-surface-base))]',
+      default:    'border-[var(--color-dag-node-default)] bg-[color-mix(in_srgb,var(--color-dag-node-default)_12%,var(--color-surface-base))]',
     };
 
+    // Text = base mixed 70/30 toward the primary text color, which flips light/dark,
+    // so text darkens in light mode and lightens in dark mode from the one base.
     const llmTextStyles: Record<string, string> = {
-      generation: 'text-[#388e3c] dark:text-[#81c784]',
-      embedding:  'text-[#1976d2] dark:text-[#90caf9]',
-      agent:      'text-[#7b1fa2] dark:text-[#ce93d8]',
-      tool:       'text-[#e65100] dark:text-[#ffcc80]',
-      chain:      'text-[#283593] dark:text-[#9fa8da]',
-      retriever:  'text-[#00838f] dark:text-[#80deea]',
-      task:       'text-[#00796b] dark:text-[#80cbc4]',
-      evaluator:  'text-[#c2185b] dark:text-[#f48fb1]',
-      workflow:   'text-[#4527a0] dark:text-[#b39ddb]',
-      rerank:     'text-[#0277bd] dark:text-[#81d4fa]',
-      guardrail:  'text-[#c62828] dark:text-[#ef9a9a]',
-      span:       'text-[#616161] dark:text-[#bdbdbd]',
-      event:      'text-[#f57f17] dark:text-[#ffe082]',
-      default:    'text-[#757575] dark:text-[#bdbdbd]',
+      generation: 'text-[color-mix(in_srgb,var(--color-dag-node-generation)_70%,var(--color-text-primary))]',
+      embedding:  'text-[color-mix(in_srgb,var(--color-dag-node-embedding)_70%,var(--color-text-primary))]',
+      agent:      'text-[color-mix(in_srgb,var(--color-dag-node-agent)_70%,var(--color-text-primary))]',
+      tool:       'text-[color-mix(in_srgb,var(--color-dag-node-tool)_70%,var(--color-text-primary))]',
+      chain:      'text-[color-mix(in_srgb,var(--color-dag-node-chain)_70%,var(--color-text-primary))]',
+      retriever:  'text-[color-mix(in_srgb,var(--color-dag-node-retriever)_70%,var(--color-text-primary))]',
+      task:       'text-[color-mix(in_srgb,var(--color-dag-node-task)_70%,var(--color-text-primary))]',
+      evaluator:  'text-[color-mix(in_srgb,var(--color-dag-node-evaluator)_70%,var(--color-text-primary))]',
+      workflow:   'text-[color-mix(in_srgb,var(--color-dag-node-workflow)_70%,var(--color-text-primary))]',
+      rerank:     'text-[color-mix(in_srgb,var(--color-dag-node-rerank)_70%,var(--color-text-primary))]',
+      guardrail:  'text-[color-mix(in_srgb,var(--color-dag-node-guardrail)_70%,var(--color-text-primary))]',
+      span:       'text-[color-mix(in_srgb,var(--color-dag-node-default)_70%,var(--color-text-primary))]',
+      event:      'text-[color-mix(in_srgb,var(--color-dag-node-event)_70%,var(--color-text-primary))]',
+      default:    'text-[color-mix(in_srgb,var(--color-dag-node-default)_70%,var(--color-text-primary))]',
     };
 
     const getObservationTypeClass = (type: string | null): string => {

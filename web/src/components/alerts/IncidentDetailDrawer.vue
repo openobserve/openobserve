@@ -215,8 +215,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div :class="'text-text-secondary'" class="text-sm font-medium">
                   Total Alerts
                 </div>
-                <div class="w-8 h-8 rounded-lg flex items-center justify-center" :class="store.state.theme === 'dark' ? 'bg-amber-500/10' : 'bg-amber-50'">
-                  <OIcon name="bolt" size="sm" :class="store.state.theme === 'dark' ? 'text-amber-400' : 'text-amber-600'" style="font-size: 20px;" />
+                <div class="w-8 h-8 rounded-lg flex items-center justify-center bg-badge-amber-soft-bg">
+                  <OIcon name="bolt" size="sm" class="text-badge-amber-soft-text" style="font-size: 20px;" />
                 </div>
               </div>
 
@@ -235,8 +235,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div :class="'text-text-secondary'" class="text-sm font-medium">
                   {{ t('alerts.incidents.uniqueAlerts') }}
                 </div>
-                <div class="w-8 h-8 rounded-lg flex items-center justify-center" :class="store.state.theme === 'dark' ? 'bg-blue-500/10' : 'bg-blue-50'">
-                  <OIcon name="notifications-active" size="sm" :class="store.state.theme === 'dark' ? 'text-blue-400' : 'text-blue-600'" style="font-size: 20px;" />
+                <div class="w-8 h-8 rounded-lg flex items-center justify-center bg-badge-blue-soft-bg">
+                  <OIcon name="notifications-active" size="sm" class="text-badge-blue-soft-text" style="font-size: 20px;" />
                 </div>
               </div>
 
@@ -255,8 +255,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div :class="'text-text-secondary'" class="text-sm font-medium">
                   Affected Services
                 </div>
-                <div class="w-8 h-8 rounded-lg flex items-center justify-center" :class="store.state.theme === 'dark' ? 'bg-purple-500/10' : 'bg-purple-50'">
-                  <OIcon name="dns" size="sm" :class="store.state.theme === 'dark' ? 'text-purple-400' : 'text-purple-600'" style="font-size: 20px;" />
+                <div class="w-8 h-8 rounded-lg flex items-center justify-center bg-badge-purple-soft-bg">
+                  <OIcon name="dns" size="sm" class="text-badge-purple-soft-text" style="font-size: 20px;" />
                 </div>
               </div>
 
@@ -275,8 +275,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div :class="'text-text-secondary'" class="text-sm font-medium">
                   Active Duration
                 </div>
-                <div class="w-8 h-8 rounded-lg flex items-center justify-center" :class="store.state.theme === 'dark' ? 'bg-green-500/10' : 'bg-green-50'">
-                  <OIcon name="schedule" size="sm" :class="store.state.theme === 'dark' ? 'text-green-400' : 'text-green-600'" style="font-size: 20px;" />
+                <div class="w-8 h-8 rounded-lg flex items-center justify-center bg-badge-success-soft-bg">
+                  <OIcon name="schedule" size="sm" class="text-badge-success-soft-text" style="font-size: 20px;" />
                 </div>
               </div>
 
@@ -297,8 +297,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div :class="'text-text-secondary'" class="text-sm font-medium">
                   Alert Frequency
                 </div>
-                <div class="w-8 h-8 rounded-lg flex items-center justify-center" :class="store.state.theme === 'dark' ? 'bg-rose-500/10' : 'bg-rose-50'">
-                  <OIcon name="show-chart" size="sm" :class="store.state.theme === 'dark' ? 'text-rose-400' : 'text-rose-600'" style="font-size: 20px;" />
+                <div class="w-8 h-8 rounded-lg flex items-center justify-center bg-badge-error-soft-bg">
+                  <OIcon name="show-chart" size="sm" class="text-badge-error-soft-text" style="font-size: 20px;" />
                 </div>
               </div>
 
