@@ -663,16 +663,19 @@ export default defineComponent({
     }
 
     // Host-forced language (e.g. workflow function nodes are JS-only) — lock the
-    // transType and seed the editor with ready-to-edit boilerplate. Only for a
-    // fresh function; an existing one keeps its saved language + code.
-    if (this.forcedLanguage && !this.beingUpdated) {
+    // transType to the forced language. The host HIDES the VRL/JS toggle, so the
+    // displayed + saved language must match forcedLanguage on BOTH the create and
+    // the edit path — otherwise editing a function whose saved transType differs
+    // would run/save the wrong language with no way to correct it.
+    if (this.forcedLanguage) {
       const tt = this.forcedLanguage === "javascript" ? "1" : "0";
       this.formData.transType = tt;
       // transType is form-owned (drives the editor language, the "*Function*"
       // label, and the info tooltip), so it must be written to the FORM — setting
       // formData alone leaves the display on VRL.
       (this as any).addFunctionForm?.setFieldValue?.("transType", tt);
-      if (this.defaultCode && !this.formData.function) {
+      // Seed boilerplate only for a brand-new function; never clobber saved code.
+      if (!this.beingUpdated && this.defaultCode && !this.formData.function) {
         this.formData.function = this.defaultCode;
       }
     }

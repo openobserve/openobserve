@@ -77,7 +77,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @update:query="workflowObj.testRun.input = $event"
           />
         </div>
-        <OText v-if="parseError" variant="meta" as="p" class="text-error">
+        <OText
+          v-if="parseError"
+          variant="meta"
+          as="p"
+          class="text-input-error-text"
+        >
           {{ t("workflow.test.invalidJson") }}
         </OText>
         <OText v-else variant="meta" as="p">

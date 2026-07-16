@@ -130,4 +130,30 @@ describe("WorkflowRunsPanel", () => {
     await flushPromises();
     expect(wrapper.text()).toContain("my flow");
   });
+
+  describe("fetchHistory error handling", () => {
+    it("stays silent on a 403 (no toast) and empties the list", async () => {
+      mockList.mockRejectedValueOnce({ response: { status: 403 } });
+      const w = mountPanel();
+      await flushPromises();
+      expect(mockToast).not.toHaveBeenCalled();
+      expect(w.findComponent(OTableStub as any).props("data")).toEqual([]);
+    });
+
+    it("toasts an error on a non-403 failure and empties the list", async () => {
+      mockList.mockRejectedValueOnce({ response: { status: 500 } });
+      const w = mountPanel();
+      await flushPromises();
+      expect(mockToast).toHaveBeenCalledTimes(1);
+      expect(mockToast.mock.calls[0][0]).toMatchObject({ variant: "error" });
+      expect(w.findComponent(OTableStub as any).props("data")).toEqual([]);
+    });
+
+    it("does not fetch when workflowId is missing", async () => {
+      mockList.mockClear();
+      mountPanel({ workflowId: "" });
+      await flushPromises();
+      expect(mockList).not.toHaveBeenCalled();
+    });
+  });
 });

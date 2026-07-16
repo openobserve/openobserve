@@ -716,6 +716,7 @@ export const presetNouns: Partial<Record<EmptyStatePresetName, string>> = {
   "no-patterns": "emptyState.nouns.patterns",
   "no-dashboards": "emptyState.nouns.dashboards",
   "no-pipelines": "emptyState.nouns.pipelines",
+  "no-workflows": "emptyState.nouns.workflows",
   "no-functions": "emptyState.nouns.functions",
   "no-streams": "emptyState.nouns.streams",
   "no-alerts": "emptyState.nouns.alerts",

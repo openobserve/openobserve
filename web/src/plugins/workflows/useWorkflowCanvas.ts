@@ -347,10 +347,15 @@ export const executeTestRun = async (opts: {
     });
     const errors = res.data?.errors || {};
     // Which nodes ran: from a replay, `fromNode` + everything downstream;
-    // otherwise the whole graph.
-    const ranNodeIds = opts.fromNode
-      ? [...reachableFrom(wf.edges || [], [opts.fromNode])]
-      : (wf.nodes || []).map((n: any) => n.id);
+    // otherwise everything reachable from the trigger. Nodes NOT reachable
+    // (unwired / disconnected) never executed, so they must not paint a ✓.
+    const triggerId = (wf.nodes || []).find(
+      (n: any) => n.data?.node_type === "workflow_trigger",
+    )?.id;
+    const startId = opts.fromNode || triggerId;
+    const ranNodeIds = startId
+      ? [...reachableFrom(wf.edges || [], [startId])]
+      : [];
     workflowObj.testRun.result = {
       errors,
       ranNodeIds,
@@ -358,6 +363,8 @@ export const executeTestRun = async (opts: {
     };
     return { ok: true };
   } catch (e: any) {
+    // A failed run must not leave the previous run's ✓/✗ badges on screen.
+    workflowObj.testRun.result = null;
     return { ok: false, error: e?.response?.data?.message };
   }
 };
@@ -391,7 +398,11 @@ export const loadWorkflowRun = async (opts: {
       : [];
     const errors: Record<string, any> = {};
     for (const e of errList) {
-      const msgs = Array.isArray(e.error) ? e.error : [e.error];
+      // Drop null/empty messages so a message-less error entry doesn't render
+      // the literal string "undefined"/"null" as an error line.
+      const msgs = (Array.isArray(e.error) ? e.error : [e.error]).filter(
+        Boolean,
+      );
       errors[e.node_id] = {
         error_count: msgs.length,
         errors: msgs.map((m: string) => [m]),
@@ -450,7 +461,11 @@ export const hydrateWorkflow = (wf: any) => {
     return { ...e, ...styled, id: e.id || styled.id };
   });
   workflowObj.currentSelectedWorkflow = { ...wf, nodes, edges };
-  workflowObj.workflowWithoutChange = JSON.parse(JSON.stringify(wf));
+  // Snapshot the NORMALIZED graph (VueFlow type + styled edges), not raw `wf`,
+  // so any cancel/restore or dirty-compare baseline matches what's on canvas.
+  workflowObj.workflowWithoutChange = JSON.parse(
+    JSON.stringify(workflowObj.currentSelectedWorkflow),
+  );
   workflowObj.isEditWorkflow = true;
 };
 
@@ -775,6 +790,13 @@ export default function useWorkflowCanvas() {
     workflowObj.dirtyFlag = false;
     workflowObj.nodesChange = false;
     workflowObj.edgesChange = false;
+    // The singleton is shared between the editor and the read-only Runs view;
+    // clear every transient flag so none leaks into the next open.
+    workflowObj.readOnly = false;
+    workflowObj.pendingEdge = null;
+    workflowObj.nameError = false;
+    workflowObj.nameErrorMessage = "";
+    workflowObj.deleteConfirm = { show: false, nodeId: "" };
     workflowObj.testRun = {
       show: false,
       input: "",

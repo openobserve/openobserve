@@ -32,10 +32,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :size="drawerSize"
     :show-close="true"
     :primary-button-label="
-      hideFooter || readonlyBody || bodyCreatingNew ? undefined : 'Save'
+      hideFooter || readonlyBody || bodyCreatingNew
+        ? undefined
+        : t('common.save')
     "
     :secondary-button-label="
-      hideFooter || readonlyBody || bodyCreatingNew ? undefined : 'Cancel'
+      hideFooter || readonlyBody || bodyCreatingNew
+        ? undefined
+        : t('common.cancel')
     "
     :neutral-button-label="
       !hideFooter &&

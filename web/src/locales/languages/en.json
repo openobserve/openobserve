@@ -312,6 +312,7 @@
       "patterns": "patterns",
       "dashboards": "dashboards",
       "pipelines": "pipelines",
+      "workflows": "workflows",
       "functions": "functions",
       "streams": "streams",
       "alerts": "alerts",
@@ -3508,6 +3509,8 @@
       "refresh": "Refresh Workflows",
       "create": "Create Workflow"
     },
+    "destinationOrWorkflowRequired": "Add at least one destination or workflow.",
+    "destinationRequiredShort": "At least one destination is required.",
     "searchDestinationType": "Search destination types...",
     "customDestination": "Custom Destination",
     "customDestinationDescription": "Configure a custom HTTP endpoint or email destination",

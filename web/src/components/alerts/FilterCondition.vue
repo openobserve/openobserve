@@ -162,10 +162,18 @@ const emits = defineEmits(["add", "remove", "input:update", "add-group"]);
 
 const filteredFields = ref<any[]>(props.streamFields as any[]);
 
+// User-created custom columns (via `allowCustomColumns`) persist separately from
+// props.streamFields, so re-filtering/searching doesn't drop them.
+const customColumns = ref<any[]>([]);
+const allColumns = () => [
+  ...(props.streamFields as any[]),
+  ...customColumns.value,
+];
+
 watch(
   () => props.streamFields,
-  (newFields) => {
-    filteredFields.value = newFields as any[];
+  () => {
+    filteredFields.value = allColumns();
   },
 );
 
@@ -243,11 +251,12 @@ const computedValueWidth = computed(() => {
 
 
 const filterColumns = (val: string) => {
+  const base = allColumns();
   if (val === "") {
-    filteredFields.value = [...props.streamFields as any[]];
+    filteredFields.value = base;
   } else {
     const value = val.toLowerCase();
-    filteredFields.value = (props.streamFields as any[]).filter(
+    filteredFields.value = base.filter(
       (column: any) => column.value.toLowerCase().indexOf(value) > -1
     );
   }
@@ -259,12 +268,11 @@ const filterColumns = (val: string) => {
 const onColumnCreate = (term: string) => {
   const value = String(term ?? "").trim();
   if (!value) return;
-  const exists = filteredFields.value.some((c: any) => c.value === value);
+  const exists = allColumns().some((c: any) => c.value === value);
   if (!exists) {
-    filteredFields.value = [
-      ...filteredFields.value,
-      { label: value, value, type: "custom" },
-    ];
+    const col = { label: value, value, type: "custom" };
+    customColumns.value = [...customColumns.value, col];
+    filteredFields.value = [...filteredFields.value, col];
   }
   props.condition.column = value;
   columnError.value = "";

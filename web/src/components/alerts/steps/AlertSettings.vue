@@ -826,8 +826,8 @@ export default defineComponent({
           return {
             valid: false,
             message: isEnterprise.value
-              ? "Add at least one destination or workflow."
-              : "At least one destination is required.",
+              ? t("alerts.destinationOrWorkflowRequired")
+              : t("alerts.destinationRequiredShort"),
             focusDestination: true,
           };
         }
@@ -972,8 +972,8 @@ export default defineComponent({
         return {
           valid: false,
           message: isEnterprise.value
-            ? "Add at least one destination or workflow."
-            : "At least one destination is required.",
+            ? t("alerts.destinationOrWorkflowRequired")
+            : t("alerts.destinationRequiredShort"),
           focusDestination: true,
         };
       }

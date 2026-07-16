@@ -27,7 +27,7 @@ import AlertTargetsSelect from "./AlertTargetsSelect.vue";
 
 const OSelectStub = {
   name: "OSelect",
-  props: ["modelValue", "options", "multiple", "error"],
+  props: ["modelValue", "options", "multiple", "error", "collapsibleGroups"],
   emits: ["update:modelValue"],
   template: `<div class="o-select" :data-error="String(error)" :data-multiple="String(multiple)">
     <span class="o-select-empty"><slot name="empty" /></span>
@@ -209,6 +209,58 @@ describe("AlertTargetsSelect", () => {
       expect(wrapper.emitted("update:destinations")?.[0]).toEqual([
         ["dest:weird"],
       ]);
+    });
+  });
+
+  // The component exists to stop the "shake": propsCombined forces
+  // destinations-first order, but the control keeps the user's CLICK order in an
+  // internal `model` and only re-syncs when the value SET actually changes — so a
+  // round-trip (emit → parent → props) must NOT reorder the selection.
+  describe("ordered model (anti-shake)", () => {
+    it("keeps the click order across a props round-trip (no reorder, no re-sync)", async () => {
+      const wrapper = createWrapper({
+        isEnterprise: true,
+        destinationOptions: ["slack"],
+        workflowOptions: [{ label: "Escalate", value: "wf-1" }],
+      });
+      // user picks the WORKFLOW first, then the destination
+      select(wrapper).vm.$emit("update:modelValue", ["wf:wf-1", "dest:slack"]);
+      await wrapper.vm.$nextTick();
+      expect(select(wrapper).props("modelValue")).toEqual([
+        "wf:wf-1",
+        "dest:slack",
+      ]);
+
+      // parent echoes the split fields back as props (destinations-first order)
+      await wrapper.setProps({ destinations: ["slack"], workflows: ["wf-1"] });
+      await wrapper.vm.$nextTick();
+
+      // same SET → the watch must NOT reassign → click order is preserved
+      expect(select(wrapper).props("modelValue")).toEqual([
+        "wf:wf-1",
+        "dest:slack",
+      ]);
+    });
+
+    it("DOES re-sync when the incoming set genuinely differs (external edit load)", async () => {
+      const wrapper = createWrapper({ isEnterprise: true });
+      await wrapper.setProps({ destinations: ["slack", "email"], workflows: [] });
+      await wrapper.vm.$nextTick();
+      expect(select(wrapper).props("modelValue")).toEqual([
+        "dest:slack",
+        "dest:email",
+      ]);
+    });
+  });
+
+  describe("collapsible groups gate", () => {
+    it("enables collapsible groups only in enterprise", () => {
+      expect(
+        select(createWrapper({ isEnterprise: true })).props("collapsibleGroups"),
+      ).toBe(true);
+      expect(
+        select(createWrapper({ isEnterprise: false })).props("collapsibleGroups"),
+      ).toBe(false);
     });
   });
 

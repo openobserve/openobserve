@@ -103,9 +103,19 @@ const form = useOForm<ExternalDestinationForm>({
   },
 });
 
-watch(createNewDestination, (v) => {
+// A destination name to auto-select once the post-create refetch lands.
+const pendingSelection = ref("");
+
+watch(createNewDestination, async (v) => {
   emit("expand", v);
-  if (!v) getDestinations(); // returning from create — a new one may exist
+  if (v) return;
+  // Returning from create (either cancelled or just created) — refetch once so a
+  // newly-created destination shows, then apply any pending selection.
+  await getDestinations();
+  if (pendingSelection.value) {
+    form.setFieldValue("selectedDestination", pendingSelection.value);
+    pendingSelection.value = "";
+  }
 });
 
 // Show the destination URL as a sub-label.
@@ -139,12 +149,11 @@ const getDestinations = async () => {
 
 onBeforeMount(getDestinations);
 
-const onDestinationCreated = async (name: string) => {
-  // Leave create mode, refresh so the new destination is in the options, then
-  // push it into the (persistent) form as the selection.
+const onDestinationCreated = (name: string) => {
+  // Leave create mode; the createNewDestination watch does the single refetch and
+  // then selects this destination (avoids a duplicate list call).
+  pendingSelection.value = name;
   createNewDestination.value = false;
-  await getDestinations();
-  form.setFieldValue("selectedDestination", name);
 };
 
 // Host bridge: validate through the schema and return the node payload, or null

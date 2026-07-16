@@ -25,12 +25,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   service/alerts/alert.rs `process_dest_template`):
     { "meta": { ...fixed alert fields... }, "data": [ { ...matched row... } ] }
 
-  Rendered as a Datadog-style collapsible JSON schema tree: keys with their type
-  inline, `*` marks always-present fields, nested `meta` / `data` are
-  expand/collapse. `meta` is a fixed schema; `data[]` columns are dynamic (from
-  the alert's query). Hovering a field shows its description (native title).
-  Types are annotations, not dummy values.
-
   submit() just carries the trigger_kind through (persisted in node.meta by
   WorkflowEditor); there are no editable fields.
 -->
@@ -158,7 +152,6 @@ const dataExample: { key: string; value: string; kind: "string" | "number" }[] =
 // The field key without the `meta.` prefix (shown in the tree).
 const metaKey = (v: TriggerOutputVar) => v.ref.replace(/^meta\./, "");
 
-// The inline type — an enum renders as `"a" | "b"` (Datadog style).
 const displayType = (v: TriggerOutputVar) =>
   v.enumValues
     ? v.enumValues.map((e) => `"${e}"`).join(" | ")
@@ -170,9 +163,16 @@ const submit = () => ({ trigger_kind: triggerKind });
 defineExpose({ submit });
 </script>
 
+<!--
+  Scoped block: styles the dynamically-rendered schema tree (syntax-highlighted
+  tokens + :hover / expand states) that Tailwind utilities can't reach on
+  generated spans. Colours reuse the existing base palette primitives
+  (--color-blue/cyan/teal/amber-*) — the primitives are fixed, so the .dark rules
+  pick a lighter shade for the dark surface. No --o2-* / hex literals.
+-->
 <style scoped>
 .schema-tree {
-  font-size: 12px;
+  font-size: 0.75rem;
   line-height: 1.9;
   /* background comes from the themed `bg-surface-subtle` class */
 }
@@ -185,8 +185,8 @@ defineExpose({ submit });
 .schema-note {
   white-space: normal;
   line-height: 1.5;
-  padding-top: 2px;
-  padding-bottom: 2px;
+  padding-top: 0.125rem;
+  padding-bottom: 0.125rem;
 }
 
 /* Interactive rows (expand toggles + hoverable leaves). */
@@ -197,7 +197,7 @@ defineExpose({ submit });
   border: none;
   background: transparent;
   text-align: left;
-  border-radius: 4px;
+  border-radius: 0.25rem;
   font: inherit;
 }
 button.schema-row {
@@ -207,43 +207,42 @@ button.schema-row {
   cursor: default;
 }
 .schema-row:hover {
-  background: var(--o2-color-surface-hover, rgba(79, 107, 237, 0.08));
+  background: var(--color-surface-subtle-hover);
 }
 
 .schema-chevron {
   flex-shrink: 0;
-  margin-right: 4px;
-  color: var(--o2-color-text-secondary, #8a94a6);
+  margin-right: 0.25rem;
+  color: var(--color-text-secondary);
   transition: transform 0.15s ease;
 }
 .schema-chevron--open {
   transform: rotate(90deg);
 }
 
-/* Tokens (Datadog-like syntax colours) — light theme. */
 .schema-key {
-  color: #2b6cb0;
+  color: var(--color-blue-600);
   font-weight: 600;
 }
 .schema-type {
-  color: #0b7285;
+  color: var(--color-cyan-700);
 }
 .schema-enum {
-  color: #b7791f;
+  color: var(--color-amber-700);
 }
 .schema-punct,
 .schema-muted {
-  color: var(--o2-text-secondary, #8a94a6);
+  color: var(--color-text-secondary);
 }
 
-/* Dark theme — lighter token colours so they read on the dark surface. */
+/* Dark surface — lighter shades of the same families read better. */
 .dark .schema-key {
-  color: #60a5fa;
+  color: var(--color-blue-400);
 }
 .dark .schema-type {
-  color: #2dd4bf;
+  color: var(--color-teal-400);
 }
 .dark .schema-enum {
-  color: #fbbf24;
+  color: var(--color-amber-400);
 }
 </style>

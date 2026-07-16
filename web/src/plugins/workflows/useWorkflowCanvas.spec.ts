@@ -21,7 +21,7 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 
 vi.mock("@/services/workflows", () => ({
-  default: { getWorkflowRun: vi.fn() },
+  default: { getWorkflowRun: vi.fn(), testWorkflow: vi.fn() },
 }));
 
 vi.mock("@/utils/zincutils", () => ({
@@ -41,9 +41,13 @@ import workflowService from "@/services/workflows";
 import useWorkflowCanvas, {
   workflowObj,
   loadWorkflowRun,
+  executeTestRun,
 } from "@/plugins/workflows/useWorkflowCanvas";
 
 const mockRun = workflowService.getWorkflowRun as unknown as ReturnType<
+  typeof vi.fn
+>;
+const mockTest = workflowService.testWorkflow as unknown as ReturnType<
   typeof vi.fn
 >;
 
@@ -153,5 +157,84 @@ describe("onEdgesChange — dirty flag only on structural changes", () => {
   it("DOES dirty when an edge is removed", () => {
     onEdgesChange([{ type: "remove", id: "e1" }]);
     expect(workflowObj.dirtyFlag).toBe(true);
+  });
+});
+
+// executeTestRun paints the ✓/✗/⊘ badges. The key invariant: only nodes that
+// ACTUALLY ran (reachable from the trigger, or from the replay node) may show a
+// ✓ — an unwired/disconnected node never executed and must stay badge-less. A
+// failed run must also not leave the previous run's badges on screen.
+describe("executeTestRun — ran-node scope + badge state", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    // trigger(t) -> function(f) -> destination(d); x is dropped on the canvas
+    // but NOT wired to anything.
+    workflowObj.currentSelectedWorkflow = {
+      id: "wf1",
+      name: "wf",
+      nodes: [
+        { id: "t", data: { node_type: "workflow_trigger" } },
+        { id: "f", data: { node_type: "function" } },
+        { id: "d", data: { node_type: "destination" } },
+        { id: "x", data: { node_type: "function" } },
+      ],
+      edges: [
+        { source: "t", target: "f" },
+        { source: "f", target: "d" },
+      ],
+    } as any;
+    workflowObj.testRun.result = null;
+  });
+
+  it("full run marks only nodes reachable from the trigger as ran (unwired node excluded)", async () => {
+    mockTest.mockResolvedValue({ data: { errors: {} } });
+    const r = await executeTestRun({ orgId: "o", inputs: [{ a: 1 }] });
+    expect(r.ok).toBe(true);
+    const res: any = workflowObj.testRun.result;
+    expect(res.ranNodeIds.sort()).toEqual(["d", "f", "t"]);
+    // the disconnected node never ran → no ✓ badge
+    expect(res.ranNodeIds).not.toContain("x");
+    expect(res.blockedNodeIds).toEqual([]);
+  });
+
+  it("replay from a mid-graph node marks that node + everything downstream", async () => {
+    mockTest.mockResolvedValue({ data: { errors: {} } });
+    await executeTestRun({ orgId: "o", inputs: [{ a: 1 }], fromNode: "f" });
+    const res: any = workflowObj.testRun.result;
+    expect(res.ranNodeIds.sort()).toEqual(["d", "f"]);
+    expect(res.ranNodeIds).not.toContain("t");
+  });
+
+  it("marks nodes downstream of an errored node as blocked (not passed)", async () => {
+    mockTest.mockResolvedValue({
+      data: { errors: { f: { error_count: 1, errors: [["boom"]] } } },
+    });
+    await executeTestRun({ orgId: "o", inputs: [{ a: 1 }] });
+    const res: any = workflowObj.testRun.result;
+    expect(res.blockedNodeIds).toContain("d");
+    expect(res.blockedNodeIds).not.toContain("f");
+  });
+
+  it("no trigger in the graph → nothing is marked as ran", async () => {
+    workflowObj.currentSelectedWorkflow.nodes = [
+      { id: "a", data: { node_type: "function" } },
+    ] as any;
+    workflowObj.currentSelectedWorkflow.edges = [] as any;
+    mockTest.mockResolvedValue({ data: { errors: {} } });
+    await executeTestRun({ orgId: "o", inputs: [{ a: 1 }] });
+    expect((workflowObj.testRun.result as any).ranNodeIds).toEqual([]);
+  });
+
+  it("a failed run clears the previous run's badges (result = null)", async () => {
+    // seed a prior successful result
+    mockTest.mockResolvedValueOnce({ data: { errors: {} } });
+    await executeTestRun({ orgId: "o", inputs: [{ a: 1 }] });
+    expect(workflowObj.testRun.result).not.toBeNull();
+    // now a run that throws
+    mockTest.mockRejectedValueOnce({ response: { data: { message: "down" } } });
+    const r = await executeTestRun({ orgId: "o", inputs: [{ a: 1 }] });
+    expect(r.ok).toBe(false);
+    expect(r.error).toBe("down");
+    expect(workflowObj.testRun.result).toBeNull();
   });
 });

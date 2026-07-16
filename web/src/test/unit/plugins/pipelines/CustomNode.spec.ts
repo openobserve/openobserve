@@ -27,6 +27,9 @@ vi.mock("@vue-flow/core", () => ({
     template: '<div class="handle" />',
     props: ["id", "type", "position"],
   },
+  // FlowNodeCard (rendered via CustomNode after the shared-flow refactor) reads
+  // Position.Top / Position.Bottom for its handle-side defaults.
+  Position: { Left: "left", Top: "top", Right: "right", Bottom: "bottom" },
 }));
 
 // Mock useDnD composable
