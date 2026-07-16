@@ -4,6 +4,8 @@ import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import store from "@/test/unit/helpers/store";
 
+import i18n from "@/locales";
+
 // ── Reactive mocks for useLLMStreamQuery ────────────────────────────────────
 const mockExecuteQuery = vi.fn();
 const mockCancelAll = vi.fn();
@@ -113,7 +115,7 @@ describe("RunRowExpansion", () => {
   function mountComponent(props = {}) {
     return mount(RunRowExpansion, {
       global: {
-        plugins: [store],
+        plugins: [i18n, store],
       },
       props: {
         runId: "run-001",
@@ -137,8 +139,8 @@ describe("RunRowExpansion", () => {
       wrapper = mountComponent();
       await flushPromises();
 
-      // Skeleton divs should be present while loading
-      const skelElements = wrapper.findAll(".skel");
+      // Skeleton divs should be present while loading (use animate-pulse class)
+      const skelElements = wrapper.findAll(".animate-pulse");
       expect(skelElements.length).toBeGreaterThan(0);
 
       // Resolve to allow unmount
@@ -167,7 +169,7 @@ describe("RunRowExpansion", () => {
 
       // Should show "no data" not the error
       expect(wrapper.text()).not.toContain("stream synthetics_results not found");
-      expect(wrapper.text()).toContain("No execution data found");
+      expect(wrapper.text()).toContain("No execution data found for this run.");
     });
   });
 
@@ -178,7 +180,7 @@ describe("RunRowExpansion", () => {
       wrapper = mountComponent();
       await flushPromises();
 
-      expect(wrapper.text()).toContain("No execution data found");
+      expect(wrapper.text()).toContain("No execution data found for this run.");
     });
 
     it("should show probe infrastructure error message when runStatus is error", async () => {

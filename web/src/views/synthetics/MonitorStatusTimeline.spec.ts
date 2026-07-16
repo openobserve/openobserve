@@ -15,13 +15,8 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
+import i18n from "@/locales";
 import MonitorStatusTimeline from "./MonitorStatusTimeline.vue";
-
-// ── Mocks ──────────────────────────────────────────────────────────────────
-
-vi.mock("vue-i18n", () => ({
-  useI18n: vi.fn(() => ({ t: (key: string) => key })),
-}));
 
 // ── Test data ──────────────────────────────────────────────────────────────
 
@@ -93,6 +88,7 @@ function makeWrapper(props: Record<string, unknown> = {}) {
   return mount(MonitorStatusTimeline, {
     props: { ...defaultProps, ...props },
     global: {
+      plugins: [i18n],
       stubs: {
         OIcon: { template: '<span class="oicon-stub" />', props: ["name", "size"] },
         OTooltip: {

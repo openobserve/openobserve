@@ -19,9 +19,8 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
+import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
-
-const $t = (key: string) => key;
 
 const {
   mockServiceGetLocations,
@@ -37,10 +36,6 @@ const {
   mockServiceUpdate: vi.fn().mockResolvedValue({}),
   mockServiceGet: vi.fn().mockResolvedValue({ data: {} }),
   mockRouterPush: vi.fn(),
-}));
-
-vi.mock("vue-i18n", () => ({
-  useI18n: vi.fn(() => ({ t: $t })),
 }));
 
 vi.mock("vue-router", () => ({
@@ -214,7 +209,7 @@ const baseStubs = {
 function mountPage() {
   return mount(CreateBrowserTest, {
     global: {
-      plugins: [store],
+      plugins: [i18n, store],
       stubs: baseStubs,
     },
   });

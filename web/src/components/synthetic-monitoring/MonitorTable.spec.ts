@@ -13,21 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-vi.mock("vue-i18n", () => ({
-  useI18n: vi.fn(() => ({ t: (key: string) => key })),
-}));
-
-vi.mock("vuex", () => ({
-  useStore: () => ({
-    state: {
-      timezone: "UTC",
-      selectedOrganization: { identifier: "org-1" },
-    },
-  }),
-}));
-
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
+import i18n from "@/locales";
 import MonitorTable from "./MonitorTable.vue";
 import { mockMonitorList } from "@/test/unit/mockData/synthetics";
 
@@ -154,6 +142,7 @@ function mountMonitorTable(props: Record<string, unknown> = {}) {
       ...props,
     },
     global: {
+      plugins: [i18n],
       stubs: {
         OTable: OTableStub,
         OButton: OButtonStub,

@@ -1,10 +1,11 @@
 // Copyright 2026 OpenObserve Inc.
 
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { mount, VueWrapper, flushPromises } from '@vue/test-utils'
-import { mockMonitorBrowser } from '@/test/unit/mockData/synthetics'
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 
-import CheckRUM from './CheckRUM.vue'
+import i18n from "@/locales";
+import { mockMonitorBrowser } from "@/test/unit/mockData/synthetics";
+import CheckRUM from "./CheckRUM.vue";
 
 const OSwitchStub = {
   props: ['modelValue', 'label', 'disabled'],
@@ -31,7 +32,7 @@ describe('CheckRUM', () => {
   function mountRUM(check = mockMonitorBrowser) {
     return mount(CheckRUM, {
       props: { check },
-      global: { stubs: { OSwitch: OSwitchStub } },
+      global: { plugins: [i18n], stubs: { OSwitch: OSwitchStub } },
     })
   }
 

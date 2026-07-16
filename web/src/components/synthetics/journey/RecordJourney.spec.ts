@@ -19,13 +19,15 @@ const BrowserJourneyStepStub = {
   template: '<div class="journey-step-stub" :data-step-action="step.action" :data-step-name="step.name" />',
 }
 
-import RecordJourney from './RecordJourney.vue'
+import i18n from "@/locales";
+import RecordJourney from "./RecordJourney.vue";
 import type { BrowserStep } from '@/types/synthetics'
 
 function mountRecord(startUrl = 'https://example.com') {
   return mount(RecordJourney, {
     props: { startUrl },
     global: {
+      plugins: [i18n],
       stubs: {
         OButton: OButtonStub,
         OIcon: OIconStub,
@@ -91,7 +93,7 @@ describe('RecordJourney', () => {
     it('should show "Waiting for actions" when no steps captured yet', () => {
       wrapper = mountRecord()
 
-      expect(wrapper.text()).toContain('Waiting for actions in the browser')
+      expect(wrapper.text()).toContain('Waiting for actions in the browser…')
     })
   })
 

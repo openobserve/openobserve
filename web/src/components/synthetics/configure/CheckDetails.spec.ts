@@ -2,14 +2,10 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
+import i18n from "@/locales";
 import CheckDetails from "./CheckDetails.vue";
 import { mockMonitorHttp } from "@/test/unit/mockData/synthetics";
 import type { BrowserCheck, SyntheticsFolder } from "@/types/synthetics";
-
-// ── i18n mock ──────────────────────────────────────────────────────────────
-vi.mock("vue-i18n", () => ({
-  useI18n: vi.fn(() => ({ t: (key: string) => key })),
-}));
 
 // ── O2 component stubs ─────────────────────────────────────────────────────
 const OInputStub = {
@@ -107,7 +103,7 @@ function mountCheckDetails(
       check: mockMonitorHttp,
       ...overrides,
     },
-    global: { stubs: STUBS },
+    global: { plugins: [i18n], stubs: STUBS },
   }) as VueWrapper;
 }
 
@@ -125,7 +121,7 @@ describe("CheckDetails", () => {
     });
 
     it("should render the title", () => {
-      expect(wrapper.text()).toContain("synthetics.checkDetails.title");
+      expect(wrapper.text()).toContain("Check Details");
     });
 
     it("should render the name input with check name value", () => {
@@ -462,7 +458,7 @@ describe("CheckDetails", () => {
       const urlWrapper = wrapper.find(
         '[data-test="synthetics-check-details-url-input"]',
       );
-      expect(urlWrapper.text()).toContain("synthetics.checkDetails.startingUrl");
+      expect(urlWrapper.text()).toContain("Starting URL");
     });
 
     it("should use custom target label when targetLabel is provided", () => {
@@ -473,7 +469,7 @@ describe("CheckDetails", () => {
       );
       expect(urlWrapper.text()).toContain("Target Host");
       expect(urlWrapper.text()).not.toContain(
-        "synthetics.checkDetails.startingUrl",
+        "Starting URL",
       );
     });
 
@@ -484,7 +480,7 @@ describe("CheckDetails", () => {
         '[data-test="synthetics-check-details-url-input"] input',
       );
       expect(urlInput.element.placeholder).toBe(
-        "synthetics.checkDetails.startingUrlPlaceholder",
+        "https://example.com",
       );
     });
 

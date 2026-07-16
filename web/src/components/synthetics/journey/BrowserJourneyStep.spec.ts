@@ -32,11 +32,12 @@ const OSpinnerStub = {
   template: '<div class="spinner-stub" />',
 }
 
-vi.mock('@/utils/clipboard', () => ({
+vi.mock("@/utils/clipboard", () => ({
   copyToClipboard: vi.fn(),
-}))
+}));
 
-import BrowserJourneyStep from './BrowserJourneyStep.vue'
+import i18n from "@/locales";
+import BrowserJourneyStep from "./BrowserJourneyStep.vue";
 import type { BrowserStep } from '@/types/synthetics'
 
 // ── Factory ────────────────────────────────────────────────────────────────
@@ -60,6 +61,7 @@ function mountStep(props: Record<string, unknown> = {}) {
       ...props,
     },
     global: {
+      plugins: [i18n],
       stubs: {
         OButton: OButtonStub,
         OIcon: OIconStub,

@@ -32,6 +32,14 @@ const route = useRoute()
 const store = useStore()
 const { t } = useI18n()
 
+// Computed literals to avoid `{{` template delimiter conflicts in Vue templates.
+// The i18n message "Supports {variables} like {baseUrl}." uses these params to
+// show literal "{{variables}}" and "{{baseUrl}}" as user-facing syntax examples.
+const variablesHintParams = computed(() => ({
+  variables: "{{variables}}",
+  baseUrl: "{{baseUrl}}",
+}))
+
 // Chrome UI element names — must stay in English across all locales
 // because they reference the actual Chrome browser interface.
 const CHROME_UI_LABELS = {
@@ -497,7 +505,7 @@ function onClearResults() {
               <OIcon name="link" size="sm" />
             </template>
           </OInput>
-          <small class="mt-1 block">{{ t('synthetics.createBrowserTest.variablesHint', { variables: '{{variables}}', baseUrl: '{{baseUrl}}' }) }}</small>
+          <small class="mt-1 block">{{ t('synthetics.createBrowserTest.variablesHint', variablesHintParams) }}</small>
         </div>
 
         <div class="mb-8">

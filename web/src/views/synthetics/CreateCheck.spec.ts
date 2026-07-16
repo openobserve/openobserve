@@ -15,12 +15,9 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
+import i18n from "@/locales";
 
 // ── Mocks (hoisted by Vitest) ──────────────────────────────────────────────
-
-vi.mock("vue-i18n", () => ({
-  useI18n: vi.fn(() => ({ t: (key: string) => key })),
-}));
 
 const mockPush = vi.fn();
 const mockRouteQuery: Record<string, string | string[] | undefined> = {};
@@ -69,6 +66,7 @@ const mockedService = syntheticsService as any;
 function makeWrapper() {
   return mount(CreateCheck, {
     global: {
+      plugins: [i18n],
       stubs: {
         CreateBrowserTestSkeleton: {
           template: '<div data-test="create-browser-test-skeleton" />',

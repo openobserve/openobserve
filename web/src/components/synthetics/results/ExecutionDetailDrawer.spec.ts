@@ -1,8 +1,10 @@
 // Copyright 2026 OpenObserve Inc.
 
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { mount, VueWrapper, flushPromises } from '@vue/test-utils'
-import ExecutionDetailDrawer from './ExecutionDetailDrawer.vue'
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
+
+import i18n from "@/locales";
+import ExecutionDetailDrawer from "./ExecutionDetailDrawer.vue";
 import type { RunLocationResult, RecordedStep, StepResult } from '@/composables/synthetics/syntheticResultsSchema'
 
 // ── Stubs ──────────────────────────────────────────────────────────────────
@@ -25,6 +27,11 @@ const TransitionStub = {
 
 const STUBS = {
   OIcon: OIconStub,
+  OButton: {
+    props: ['iconLeft', 'variant', 'size', 'disabled'],
+    emits: ['click'],
+    template: '<button v-bind="$attrs" @click="$emit(\'click\')"><i v-if="iconLeft" :data-icon="iconLeft" /></button>',
+  },
   Teleport: TeleportStub,
   Transition: TransitionStub,
 }
@@ -88,7 +95,7 @@ function mountDrawer(props: Record<string, unknown> = {}) {
       artifactUrlFn: (key: string) => `https://artifacts.example.com/${key}`,
       ...props,
     },
-    global: { stubs: STUBS },
+    global: { plugins: [i18n], stubs: STUBS },
   }) as VueWrapper
 }
 
