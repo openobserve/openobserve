@@ -242,7 +242,12 @@ import {
   ref,
   type Ref,
   defineAsyncComponent,
+  watch,
 } from "vue";
+import {
+  rangesFromServerError,
+  type SqlErrorRange,
+} from "@/utils/query/sqlDiagnostics";
 import { useQueryPlaceholder } from "@/components/logs/useQueryPlaceholder";
 import useSqlSuggestions from "@/composables/useSuggestions";
 import { useSqlEditorDiagnostics } from "@/composables/useSqlEditorDiagnostics";
@@ -298,12 +303,16 @@ const splitterModel = ref(250);
 const editorFocused = ref(false);
 const errorQueryEditorRef = ref<any>(null);
 
+// Server-error highlight ranges, forwarded to the filter editor by the composable.
+const sqlErrorRanges = ref<SqlErrorRange[]>([]);
+
 const { onFocus: _sqlOnFocus, onBlur: _sqlOnBlur, onQueryChange: _sqlOnQueryChange } =
   useSqlEditorDiagnostics({
     queryEditorRef: errorQueryEditorRef,
     sqlMode: computed(() => false),
     query: computed(() => errorTrackingState.data.editorValue ?? ""),
     streamName: computed(() => errorTrackingState.data.stream.errorStream),
+    externalErrors: sqlErrorRanges,
   });
 
 const onQueryEditorFocus = () => {
@@ -357,7 +366,24 @@ const {
   isLoadingKpis,
   fetchAll,
   fetchTrend,
+  lastQueryError,
 } = useErrorIssuesData();
+
+// Turn the last issues-search server error into editor squiggles (filter mode).
+watch(lastQueryError, async (err) => {
+  if (!err) {
+    sqlErrorRanges.value = [];
+    return;
+  }
+  sqlErrorRanges.value = await rangesFromServerError({
+    code: err.code,
+    message: err.message,
+    errorDetail: err.error_detail,
+    sqlMode: false,
+    query: errorTrackingState.data.editorValue,
+    streamName: errorTrackingState.data.stream.errorStream,
+  });
+});
 const store = useStore();
 const isLoading: Ref<true[]> = ref([]);
 const isMounted = ref(false);
