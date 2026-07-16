@@ -6770,6 +6770,7 @@ dependencies = [
  "o2_enterprise",
  "o2_openfga",
  "object_store",
+ "openobserve-search",
  "opentelemetry",
  "opentelemetry-proto",
  "parking_lot 0.12.5",
@@ -6850,6 +6851,19 @@ dependencies = [
  "tokio",
  "tonic",
  "wal",
+]
+
+[[package]]
+name = "openobserve-search"
+version = "0.1.0"
+dependencies = [
+ "arrow",
+ "arrow-schema",
+ "config",
+ "o2_enterprise",
+ "serde",
+ "serde_json",
+ "utoipa",
 ]
 
 [[package]]
