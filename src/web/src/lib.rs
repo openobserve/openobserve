@@ -23,4 +23,6 @@ use rust_embed_for_web::RustEmbed;
 
 #[derive(RustEmbed)]
 #[folder = "../../web/dist/"]
+#[gzip = false]
+#[br = false]
 pub struct WebAssets;
