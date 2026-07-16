@@ -80,6 +80,9 @@ use crate::{
         })),
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"description": "List recent LLM users from a trace stream: user_id, event count, token usage, cost.", "category": "traces"}))
     )
 )]
 pub async fn get_latest_users(

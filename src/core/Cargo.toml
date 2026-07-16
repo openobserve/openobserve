@@ -20,15 +20,17 @@ enterprise = [
     "search/enterprise",
 ]
 cloud = ["infra/cloud", "enterprise", "o2_enterprise/cloud"]
-vectorscan = ["o2_enterprise/vectorscan"]
+vectorscan = ["o2_enterprise/vectorscan", "search/vectorscan"]
 vortex = [
     "dep:vortex",
     "dep:vortex-datafusion",
     "config/vortex",
     "o2_enterprise?/vortex",
+    "search/vortex",
 ]
 
 [dependencies]
+openobserve-vrl.workspace = true
 search.workspace = true
 axum.workspace = true
 http.workspace = true

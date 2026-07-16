@@ -28,7 +28,7 @@ use hashbrown::HashSet;
 use infra::errors::Error;
 
 use crate::service::search::{
-    cluster::flight::{SearchContextBuilder, register_table},
+    datafusion::context::{SearchContextBuilder, register_table},
     sql::Sql,
 };
 
