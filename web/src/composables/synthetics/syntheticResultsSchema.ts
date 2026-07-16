@@ -461,9 +461,19 @@ ORDER BY ts`;
 }
 
 /** Most-recent runs for the Runs table. */
-export function buildRunsSql(monitorId: string, limit: number): string {
+export function buildRunsSql(
+  monitorId: string,
+  limit: number,
+  /** Which optional fields exist in the stream schema. `device`/`engine` are
+   * browser-only — on a deployment that has ingested only protocol results
+   * they're absent, and the search API rejects any query naming them. Absent
+   * fields are selected as '' literals so the row shape stays constant. */
+  flags: { hasDevice?: boolean; hasEngine?: boolean } = {},
+): string {
   const id = escapeSqlLiteral(monitorId);
-  return `SELECT ${F.timestamp} as ts, scheduled_ts, ${F.status} as status, ${F.duration} as duration, ${F.location} as location, ${F.device} as device, ${F.engine} as engine, trigger_type, ${F.error} as error, job_id, run_id, execution_id
+  const device = flags.hasDevice ? F.device : "''";
+  const engine = flags.hasEngine ? F.engine : "''";
+  return `SELECT ${F.timestamp} as ts, scheduled_ts, ${F.status} as status, ${F.duration} as duration, ${F.location} as location, ${device} as device, ${engine} as engine, trigger_type, ${F.error} as error, job_id, run_id, execution_id
 FROM ${TABLE}
 WHERE ${F.monitorId} = '${id}'
 ORDER BY ${F.timestamp} DESC
@@ -509,8 +519,10 @@ export function buildProtocolRunDetailSql(
   const id = escapeSqlLiteral(monitorId);
   const rid = escapeSqlLiteral(runId);
   const eid = escapeSqlLiteral(executionId);
+  // Older dispatcher/reaper error rows carry job_id but no execution_id;
+  // for protocol checks execution_id == job_id, so match either.
   return `SELECT * FROM ${TABLE}
-WHERE ${F.monitorId} = '${id}' AND run_id = '${rid}' AND execution_id = '${eid}'
+WHERE ${F.monitorId} = '${id}' AND run_id = '${rid}' AND (execution_id = '${eid}' OR job_id = '${eid}')
 LIMIT 1`;
 }
 

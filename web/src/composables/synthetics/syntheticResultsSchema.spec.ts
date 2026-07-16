@@ -70,11 +70,23 @@ describe("syntheticResultsSchema query builders", () => {
   });
 
   it("should apply the requested limit on the runs query", () => {
-    const sql = buildRunsSql("mon-1", 50);
+    const sql = buildRunsSql("mon-1", 50, { hasDevice: true, hasEngine: true });
     expect(sql).toContain("LIMIT 50");
     expect(sql).toContain(`${SYNTHETIC_FIELDS.location} as location`);
     expect(sql).toContain(`${SYNTHETIC_FIELDS.device} as device`);
     expect(sql).toContain(`${SYNTHETIC_FIELDS.error} as error`);
+  });
+
+  it("should select '' literals for device/engine when absent from the stream schema", () => {
+    // Protocol-only deployments have no browser fields — naming them
+    // would make the search API reject the whole query.
+    const sql = buildRunsSql("mon-1", 50);
+    expect(sql).toContain("'' as device");
+    expect(sql).toContain("'' as engine");
+    expect(sql).not.toContain(`${SYNTHETIC_FIELDS.device} as device`);
+    const sqlWithDevice = buildRunsSql("mon-1", 50, { hasDevice: true });
+    expect(sqlWithDevice).toContain(`${SYNTHETIC_FIELDS.device} as device`);
+    expect(sqlWithDevice).toContain("'' as engine");
   });
 
   it("should target the configured stream name", () => {

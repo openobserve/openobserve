@@ -74,6 +74,7 @@ export function useLLMStreamQuery() {
       const traceId = generateTraceContext().traceId;
       activeTraceIds.add(traceId);
       const accumulated: any[] = [];
+      const metadataHits: any[] = [];
 
       // Honour the SQL's own LIMIT as the request `size` so the
       // backend doesn't scan more rows than the panel actually wants.
@@ -105,8 +106,19 @@ export function useLLMStreamQuery() {
         },
         {
           data: (_payload: any, response: any) => {
+            // Hits arrive on `search_response_hits` events; the preceding
+            // `search_response_metadata` event can carry the same hits again
+            // (e.g. cached results). Accumulating from both duplicates every
+            // row — the dashboard SQL executor appends only on hits events.
+            // Metadata hits are kept separately as a fallback for responses
+            // that never emit a hits event.
             const hits: any[] = response.content?.results?.hits || [];
-            if (hits.length > 0) accumulated.push(...hits);
+            if (hits.length === 0) return;
+            if (response.type === "search_response_hits") {
+              accumulated.push(...hits);
+            } else {
+              metadataHits.push(...hits);
+            }
           },
           error: (response: any, _traceId: any) => {
             activeTraceIds.delete(traceId);
@@ -129,7 +141,7 @@ export function useLLMStreamQuery() {
           },
           complete: () => {
             activeTraceIds.delete(traceId);
-            resolve(accumulated);
+            resolve(accumulated.length > 0 ? accumulated : metadataHits);
           },
           reset: () => {},
         },

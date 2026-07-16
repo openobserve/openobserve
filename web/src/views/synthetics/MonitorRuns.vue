@@ -2511,8 +2511,11 @@ function openRun(row: { id: number }) {
   const idx = allRuns.value.findIndex((r) => r.id === row.id);
   if (idx >= 0 && runsHasLoadedOnce.value) {
     const realRun = synthetics.runs.value[idx];
-    if (realRun?.runId && realRun?.executionId) {
-      emit("open-run", realRun.runId, realRun.executionId);
+    // Dispatcher/reaper-written error rows carry no execution_id — fall back
+    // to job_id (== execution_id for protocol checks and reaped jobs).
+    const executionId = realRun?.executionId || realRun?.jobId;
+    if (realRun?.runId && executionId) {
+      emit("open-run", realRun.runId, executionId);
       return;
     }
   }

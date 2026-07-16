@@ -199,17 +199,25 @@ export function useSyntheticResults() {
     try {
       const interval = bucketInterval(endTime - startTime);
 
-      // Check stream schema to conditionally include the retried_runs
-      // clause. The "attempts" field may not exist on all instances.
+      // Check the stream schema to conditionally include optional fields.
+      // "attempts" and the browser-only "device"/"engine" fields only exist
+      // once a record carrying them has been ingested — the search API
+      // rejects queries naming absent fields.
       let hasAttemptsField = false;
+      let hasDeviceField = false;
+      let hasEngineField = false;
       try {
         const stream: any = await getStream(
           SYNTHETIC_RESULTS_STREAM, "logs", true,
         );
-        const schema: { name: string }[] = stream?.schema ?? [];
-        hasAttemptsField = schema.some((f) => f.name === "attempts");
+        const fields = new Set(
+          ((stream?.schema ?? []) as { name: string }[]).map((f) => f.name),
+        );
+        hasAttemptsField = fields.has("attempts");
+        hasDeviceField = fields.has("device");
+        hasEngineField = fields.has("engine");
       } catch {
-        // Schema not available — omit the attempts clause, which is safe.
+        // Schema not available — omit the optional fields, which is safe.
       }
 
       // Group 1: KPI + last-run — both feed KPI cards. Resolves
@@ -244,7 +252,10 @@ export function useSyntheticResults() {
       // Group 3: Runs list — feeds timeline, breakdown cards, table,
       // steps tab, and errors tab. Typically the slowest query.
       const runsPromise = executeQuery(
-        buildRunsSql(monitorId, 500), startTime, endTime, "logs",
+        buildRunsSql(monitorId, 500, {
+          hasDevice: hasDeviceField,
+          hasEngine: hasEngineField,
+        }), startTime, endTime, "logs",
       ).then((runsRows) => {
         runs.value = runsRows.map(mapRun);
       }).catch((e: unknown) => {
