@@ -80,8 +80,11 @@ impl SyntheticFrequency {
                     .map_err(|e| anyhow::anyhow!("invalid cron '{}': {e}", self.cron))?;
                 let tz = FixedOffset::east_opt(tz_offset_mins * 60)
                     .unwrap_or_else(|| FixedOffset::east_opt(0).unwrap());
+                let from = chrono::DateTime::from_timestamp_micros(from_us)
+                    .ok_or_else(|| anyhow::anyhow!("invalid from timestamp {from_us}"))?
+                    .with_timezone(&tz);
                 schedule
-                    .upcoming(tz)
+                    .after(&from)
                     .next()
                     .map(|t| t.timestamp_micros())
                     .ok_or_else(|| anyhow::anyhow!("cron '{}' has no future dates", self.cron))
