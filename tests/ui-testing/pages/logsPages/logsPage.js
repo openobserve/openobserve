@@ -2466,8 +2466,47 @@ export class LogsPage {
         return await this.page.locator(this.relative15MinButton).click({ force: true });
     }
 
+    /**
+     * Best-effort wait until the Run-query button is idle — not in its "Cancel query"
+     * in-flight variant and not disabled/busy. Lets the search toolbar (and any popover
+     * anchored to it — date picker, refresh-interval dropdown) settle before we interact,
+     * so a reflow can't shift the target mid-click. Resolves on timeout so callers still
+     * proceed.
+     */
+    async _waitForQueryButtonIdle(timeout = 30000) {
+        await this.page.waitForFunction((selector) => {
+            const el = document.querySelector(selector);
+            if (!el) return true;
+            const disabled = el.hasAttribute('disabled')
+                || el.getAttribute('aria-disabled') === 'true'
+                || el.getAttribute('aria-busy') === 'true';
+            const text = (el.textContent || '').trim();
+            const title = (el.getAttribute('title') || '').trim();
+            const isCancel = text.includes('Cancel') || title.toLowerCase().includes('cancel');
+            return !disabled && !isCancel;
+        }, this.queryButton, { timeout }).catch(() => {});
+    }
+
     async clickRelative6WeeksButton() {
-        return await this.page.locator(this.relative6WeeksButton).click({ force: true });
+        const btn = this.page.locator(this.relative6WeeksButton);
+        await btn.waitFor({ state: 'visible', timeout: 10000 });
+        // The date picker is a popover anchored to the toolbar; an in-flight auto-search
+        // reflows the toolbar and repositions the popover, so the preset can shift under
+        // the pointer and the click misses (range stays "Past 15 Minutes"). Let the
+        // toolbar settle first, then click (no force), and verify the trigger label
+        // actually updated — retry once if the Reka toggle dropped the click mid-animation.
+        await this._waitForQueryButtonIdle();
+        await btn.click();
+        const applied = await this.page
+            .locator(this.dateTimeButton)
+            .filter({ hasText: 'Past 6 Weeks' })
+            .first()
+            .waitFor({ state: 'visible', timeout: 3000 })
+            .then(() => true)
+            .catch(() => false);
+        if (!applied) {
+            await btn.click().catch(() => {});
+        }
     }
 
     // Deterministic wait helpers for date-picker popover buttons — replace
@@ -2590,7 +2629,27 @@ export class LogsPage {
     }
 
     async clickRefreshButton() {
-        return await this.page.locator(this.queryButton).click({ force: true });
+        // The Run-query button (logs-search-bar-refresh-btn) swaps to a "Cancel query"
+        // variant while a prior / auto search is in flight, and is briefly disabled or
+        // detached (v-if/v-else swap) during that transition. A plain force-click then
+        // either cancels the in-flight search or lands on a not-visible/detached node
+        // ("element is not visible" flake — seen on histogram/VRL tests). Wait for the
+        // run-mode variant to be visible AND idle (not Cancel, not disabled/aria-busy)
+        // before clicking so we deterministically click Run — no force needed.
+        const btn = this.page.locator(this.queryButton);
+        await btn.waitFor({ state: 'visible', timeout: 15000 });
+        await this.page.waitForFunction((selector) => {
+            const el = document.querySelector(selector);
+            if (!el) return false;
+            const disabled = el.hasAttribute('disabled')
+                || el.getAttribute('aria-disabled') === 'true'
+                || el.getAttribute('aria-busy') === 'true';
+            const text = (el.textContent || '').trim();
+            const title = (el.getAttribute('title') || '').trim();
+            const isCancel = text.includes('Cancel') || title.toLowerCase().includes('cancel');
+            return !disabled && !isCancel;
+        }, this.queryButton, { timeout: 30000 });
+        return await btn.click();
     }
 
     /**
@@ -4159,6 +4218,19 @@ export class LogsPage {
         await button.waitFor({ state: 'visible', timeout: 10000 });
         // Wait for button to become enabled
         await expect(button).toBeEnabled({ timeout: 10000 });
+        // The refresh-interval dropdown is a popover anchored to the toolbar; while an
+        // auto-search is in flight the toolbar reflows and the popover repositions, so
+        // the option never reaches Playwright's "stable" state and a plain click times
+        // out (~45s). Wait for the Run-query button to leave its in-flight (Cancel/busy)
+        // state so the toolbar — and thus the popover — settles before clicking.
+        await this.page.waitForFunction((selector) => {
+            const el = document.querySelector(selector);
+            if (!el) return true; // toolbar not found → nothing to reflow
+            const busy = el.getAttribute('aria-busy') === 'true';
+            const text = (el.textContent || '').trim();
+            const title = (el.getAttribute('title') || '').trim();
+            return !busy && !text.includes('Cancel') && !title.toLowerCase().includes('cancel');
+        }, this.queryButton, { timeout: 30000 }).catch(() => {});
         return await button.click();
     }
 
