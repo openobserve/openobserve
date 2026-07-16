@@ -766,8 +766,9 @@ fn location_allowed(loc: &str, allowed: &[String]) -> bool {
 
 impl Synthetic {
     /// Validates a create/update payload. `allowed_*` come from the deployment's
-    /// synthetics capabilities (env-configured locations, browsers, devices) —
-    /// pass empty slices to skip the corresponding membership check.
+    /// synthetics capabilities. Empty `allowed_browsers`/`allowed_devices` skip
+    /// the corresponding membership check; an empty `allowed_locations` REJECTS
+    /// (a check accepted against an empty location registry could never run).
     ///
     /// Returns the first problem found as `Err(message)`; messages are safe to
     /// return verbatim in a 400 response.
@@ -860,12 +861,21 @@ impl Synthetic {
         if self.locations.is_empty() {
             return Err("locations: at least one location is required".to_string());
         }
+        // An empty registry must reject, not skip the membership check: a
+        // synthetic accepted against no registered locations enqueues jobs
+        // into the legacy "aws" fallback pool that nothing ever leases —
+        // it can never run, and the user gets no error anywhere.
+        if allowed_locations.is_empty() {
+            return Err(
+                "locations: no locations are registered on this deployment — register at least one location before creating synthetics".to_string(),
+            );
+        }
         let mut seen_locations = std::collections::HashSet::new();
         for loc in &self.locations {
             if !seen_locations.insert(loc.as_str()) {
                 return Err(format!("locations: duplicate location '{loc}'"));
             }
-            if !allowed_locations.is_empty() && !location_allowed(loc, allowed_locations) {
+            if !location_allowed(loc, allowed_locations) {
                 return Err(format!(
                     "locations: unknown location '{loc}' (allowed: {})",
                     allowed_locations.join(", ")
@@ -992,6 +1002,28 @@ impl Synthetic {
                         cfg.method
                     ));
                 }
+                // Reject unknown assertion fields/operators at create time —
+                // the probe evaluates unknown assertions as failures, so a
+                // typo would only surface as every run failing.
+                const ASSERTION_FIELDS: &[&str] = &["status_code", "body", "response_time_ms"];
+                const ASSERTION_OPERATORS: &[&str] =
+                    &["eq", "ne", "lt", "gt", "contains", "not_contains"];
+                for (i, a) in cfg.assertions.iter().enumerate() {
+                    if !ASSERTION_FIELDS.contains(&a.field.as_str()) {
+                        return Err(format!(
+                            "config.assertions[{i}].field: unknown field '{}' (known: {})",
+                            a.field,
+                            ASSERTION_FIELDS.join(", ")
+                        ));
+                    }
+                    if !ASSERTION_OPERATORS.contains(&a.operator.as_str()) {
+                        return Err(format!(
+                            "config.assertions[{i}].operator: unknown operator '{}' (known: {})",
+                            a.operator,
+                            ASSERTION_OPERATORS.join(", ")
+                        ));
+                    }
+                }
                 Ok(())
             }
             SyntheticType::Tcp => serde_json::from_value::<TcpConfig>(self.config.clone())
@@ -1006,9 +1038,23 @@ impl Synthetic {
             SyntheticType::Dns => serde_json::from_value::<DnsConfig>(self.config.clone())
                 .map(|_| ())
                 .map_err(|e| format!("config: not a valid dns config: {e}")),
-            SyntheticType::Ssh => serde_json::from_value::<SshConfig>(self.config.clone())
-                .map(|_| ())
-                .map_err(|e| format!("config: not a valid ssh config: {e}")),
+            SyntheticType::Ssh => {
+                let cfg: SshConfig = serde_json::from_value(self.config.clone())
+                    .map_err(|e| format!("config: not a valid ssh config: {e}"))?;
+                if cfg.username.trim().is_empty() {
+                    return Err("config.username: must not be empty".to_string());
+                }
+                if !["password", "private_key"].contains(&cfg.auth.auth_type.as_str()) {
+                    return Err(format!(
+                        "config.auth.type: unknown auth type '{}' (known: password, private_key)",
+                        cfg.auth.auth_type
+                    ));
+                }
+                if cfg.auth.secret.trim().is_empty() {
+                    return Err("config.auth.secret: must not be empty".to_string());
+                }
+                Ok(())
+            }
         }
     }
 }
@@ -1411,6 +1457,75 @@ mod tests {
                 .validate(&locs, &brs, &devs, true)
                 .is_ok()
         );
+    }
+
+    #[test]
+    fn test_validate_empty_location_registry_rejected() {
+        // An empty registry must reject — jobs for such a check would land
+        // in the legacy "aws" fallback pool that nothing leases.
+        let (_, brs, devs) = allowed();
+        let err = valid_browser_synthetic()
+            .validate(&[], &brs, &devs, true)
+            .unwrap_err();
+        assert!(err.contains("no locations are registered"), "{err}");
+    }
+
+    #[test]
+    fn test_validate_http_assertion_field_and_operator() {
+        let (locs, brs, devs) = allowed();
+        let mut s = valid_browser_synthetic();
+        s.monitor_type = SyntheticType::Http;
+        s.target = "https://example.com/".to_string();
+        s.config = serde_json::json!({
+            "method": "GET",
+            "assertions": [{"field": "status", "operator": "eq", "value": 200}]
+        });
+        let err = s.validate(&locs, &brs, &devs, true).unwrap_err();
+        assert!(err.contains("unknown field 'status'"), "{err}");
+
+        s.config = serde_json::json!({
+            "method": "GET",
+            "assertions": [{"field": "status_code", "operator": "equals", "value": 200}]
+        });
+        let err = s.validate(&locs, &brs, &devs, true).unwrap_err();
+        assert!(err.contains("unknown operator 'equals'"), "{err}");
+
+        s.config = serde_json::json!({
+            "method": "GET",
+            "assertions": [{"field": "status_code", "operator": "eq", "value": 200}]
+        });
+        assert!(s.validate(&locs, &brs, &devs, true).is_ok());
+    }
+
+    #[test]
+    fn test_validate_ssh_config_fields() {
+        let (locs, brs, devs) = allowed();
+        let mut s = valid_browser_synthetic();
+        s.monitor_type = SyntheticType::Ssh;
+        s.target = "test.rebex.net:22".to_string();
+
+        s.config = serde_json::json!({
+            "username": "", "auth": {"type": "password", "secret": "x"}
+        });
+        let err = s.validate(&locs, &brs, &devs, true).unwrap_err();
+        assert!(err.contains("config.username"), "{err}");
+
+        s.config = serde_json::json!({
+            "username": "demo", "auth": {"type": "kerberos", "secret": "x"}
+        });
+        let err = s.validate(&locs, &brs, &devs, true).unwrap_err();
+        assert!(err.contains("unknown auth type 'kerberos'"), "{err}");
+
+        s.config = serde_json::json!({
+            "username": "demo", "auth": {"type": "password", "secret": ""}
+        });
+        let err = s.validate(&locs, &brs, &devs, true).unwrap_err();
+        assert!(err.contains("config.auth.secret"), "{err}");
+
+        s.config = serde_json::json!({
+            "username": "demo", "auth": {"type": "password", "secret": "password"}
+        });
+        assert!(s.validate(&locs, &brs, &devs, true).is_ok());
     }
 
     #[test]
