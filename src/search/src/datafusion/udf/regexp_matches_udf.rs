@@ -25,7 +25,7 @@ use datafusion::{
 };
 use regex::Regex;
 
-use crate::service::search::datafusion::udf::REGEX_MATCHES_UDF_NAME;
+use super::REGEX_MATCHES_UDF_NAME;
 
 /// Implementation of regexp_matches
 pub static REGEX_MATCHES_UDF: Lazy<ScalarUDF> =

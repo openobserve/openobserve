@@ -21,7 +21,8 @@ use datafusion::{
     logical_expr::{ColumnarValue, ScalarUDF, Volatility},
     prelude::create_udf,
 };
-pub use search::udf::MATCH_ALL_HASH_UDF_NAME;
+
+pub use crate::udf::MATCH_ALL_HASH_UDF_NAME;
 
 /// Implementation of match_all_hash
 pub static MATCH_ALL_HASH_UDF: Lazy<ScalarUDF> = Lazy::new(|| {

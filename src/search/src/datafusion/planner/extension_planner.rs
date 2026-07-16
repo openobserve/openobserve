@@ -25,7 +25,7 @@ use datafusion::{
     physical_planner::{DefaultPhysicalPlanner, ExtensionPlanner, PhysicalPlanner},
 };
 
-use crate::service::search::datafusion::plan::{
+use crate::datafusion::plan::{
     deduplication::DeduplicationLogicalNode, deduplication_exec::DeduplicationExec,
 };
 

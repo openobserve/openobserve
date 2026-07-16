@@ -11,23 +11,28 @@ enterprise = ["dep:o2_enterprise"]
 
 [dependencies]
 anyhow.workspace = true
+arrow.workspace = true
 arrow-schema.workspace = true
 async-trait.workspace = true
 chrono.workspace = true
 config.workspace = true
 datafusion.workspace = true
+futures.workspace = true
 hashbrown.workspace = true
 infra.workspace = true
+itertools.workspace = true
 log.workspace = true
+memchr.workspace = true
 o2_enterprise = { workspace = true, optional = true, default-features = false }
 proto.workspace = true
 regex.workspace = true
+regex-syntax.workspace = true
 serde.workspace = true
+serde_json.workspace = true
 sqlparser.workspace = true
 utoipa.workspace = true
 vector-enrichment.workspace = true
 vrl.workspace = true
 
 [dev-dependencies]
-arrow.workspace = true
-serde_json.workspace = true
+tokio.workspace = true
