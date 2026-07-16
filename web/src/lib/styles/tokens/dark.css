@@ -631,6 +631,10 @@
 .dark {
   --color-actions-column-shawdow: rgba(125, 125, 125, 0.694);
   --color-bg-gray: color-mix(in srgb, var(--color-theme-accent) 5%, rgb(42, 42, 42));
+  /* Form field label — dark steps (exact hex the .o-input-label rules used:
+     grey-200, and #c4c4c4 which has no palette equivalent). */
+  --color-input-label-text: var(--color-grey-200);
+  --color-input-label-text-disabled: #c4c4c4;
   /* Global scrollbar treatment — dark steps (values unchanged from the raw
      palette refs that styles/base-elements.css replaced). */
   --color-scrollbar-thumb:       var(--color-grey-700);

@@ -89,3 +89,234 @@
     }
   }
 }
+
+/* ── F4 — element typography / reset (from component.css, W1.b) ─────────────
+   Verbatim move. The two @layer base sub-blocks keep their layer; the
+   html/body/::placeholder rules stay unlayered exactly as they were —
+   re-layering decisions belong to W2.d, after visual verification. */
+html, body {
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+html {
+  overflow: hidden;
+}
+
+body {
+  background: var(--color-theme-body-bg-primary);
+  overflow: hidden;
+  color: var(--color-text-body);
+  font-family: var(--font-sans);
+  font-size: var(--text-compact);
+  font-weight: var(--font-normal);
+  line-height: var(--leading-base);
+}
+
+/*
+ * Element typography resets must live in `@layer base` so Tailwind utilities
+ * (which live in `@layer utilities`) can override them. Unlayered rules beat
+ * any layered rule regardless of specificity, so leaving these outside a layer
+ * would silently suppress utilities like `mb-4` / `text-base` applied to
+ * bare <p>/<h2>/… elements.
+ */
+@layer base {
+h1, h2, h3, h4, h5, h6 {
+  color: var(--color-text-heading);
+  margin: 0;
+}
+
+h1 {
+  font-size: var(--text-2xl);
+  font-weight: var(--font-semibold);
+  line-height: var(--leading-2xl);
+  letter-spacing: var(--tracking-tight);
+}
+
+h2 {
+  font-size: var(--text-xl);
+  font-weight: var(--font-medium);
+  line-height: var(--leading-xl);
+  letter-spacing: var(--tracking-normal);
+}
+
+h3 {
+  font-size: var(--text-lg);
+  font-weight: var(--font-medium);
+  line-height: var(--leading-lg);
+  letter-spacing: var(--tracking-normal);
+}
+
+h4 {
+  font-size: var(--text-base);
+  font-weight: var(--font-medium);
+  line-height: var(--leading-md);
+  letter-spacing: var(--tracking-normal);
+}
+
+h5 {
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+  line-height: var(--leading-base);
+  letter-spacing: var(--tracking-normal);
+}
+
+h6 {
+  font-size: var(--text-compact);
+  font-weight: var(--font-medium);
+  line-height: var(--leading-sm);
+  letter-spacing: var(--tracking-normal);
+}
+
+p {
+  color: var(--color-text-body);
+  font-size: var(--text-sm);
+  line-height: var(--leading-base);
+  margin: 0;
+}
+
+a {
+  color: var(--color-text-link);
+  text-decoration: none;
+}
+
+a:hover {
+  color: var(--color-text-link-hover);
+  text-decoration: underline;
+}
+
+small {
+  font-size: var(--text-xs);
+  color: var(--color-text-caption);
+}
+
+label:not(.o-input-label) {
+  font-size: var(--text-compact);
+  color: var(--color-text-label);
+  font-weight: var(--font-normal);
+}
+}
+
+@layer base {
+  code {
+    font-family: var(--font-mono);
+    font-size: var(--text-compact);
+    color: var(--color-text-code);
+    font-feature-settings: "tnum";
+    letter-spacing: -0.2px;
+  }
+
+  pre,
+  kbd,
+  samp,
+  .log-line {
+    font-family: var(--font-mono);
+    font-size: var(--text-compact);
+    line-height: 1.6;
+  }
+}
+
+::placeholder {
+  color: var(--color-text-placeholder);
+}
+
+/* ── F7 — interaction affordances (from component.css, W1.b) ────────────────
+   Verbatim move, deliberately UNLAYERED (as before): cursor affordances for
+   every button-ish element, disabled/draggable cursors, text-input carets,
+   and the destructive-icon hover tint keyed on [data-o2-variant] /
+   [data-destructive-icon]. These are app-wide behavioural affordances on
+   semantic attributes — the one CSS family that legitimately styles other
+   components' DOM from a global sheet. */
+button:not(:disabled):not([aria-disabled="true"]),
+a[href]:not([aria-disabled="true"]),
+[role="button"]:not([aria-disabled="true"]):not([disabled]),
+[role="tab"]:not([aria-disabled="true"]):not([disabled]),
+[role="menuitem"]:not([aria-disabled="true"]):not([disabled]),
+[role="option"]:not([aria-disabled="true"]):not([disabled]),
+[role="switch"]:not(:disabled):not([aria-disabled="true"]),
+[role="checkbox"]:not(:disabled):not([aria-disabled="true"]),
+[role="radio"]:not(:disabled):not([aria-disabled="true"]),
+label:has(input:not(:disabled)),
+summary,
+select:not(:disabled),
+input[type="checkbox"]:not(:disabled),
+input[type="radio"]:not(:disabled),
+input[type="file"]:not(:disabled),
+input[type="submit"]:not(:disabled),
+input[type="reset"]:not(:disabled),
+input[type="button"]:not(:disabled) {
+  cursor: pointer;
+}
+
+button:disabled,
+button[aria-disabled="true"],
+input:disabled,
+select:disabled,
+textarea:disabled,
+[disabled],
+[aria-disabled="true"],
+.is-disabled {
+  cursor: not-allowed !important;
+}
+
+[draggable="true"],
+.draggable,
+.drag-handle {
+  cursor: grab;
+}
+
+[draggable="true"]:active,
+.draggable:active,
+.drag-handle:active,
+.is-dragging,
+[data-dragging="true"] {
+  cursor: grabbing !important;
+}
+
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="number"],
+input[type="search"],
+input[type="url"],
+input[type="tel"],
+textarea {
+  cursor: text;
+}
+
+input[type="text"]:disabled,
+input[type="email"]:disabled,
+input[type="password"]:disabled,
+input[type="number"]:disabled,
+input[type="search"]:disabled,
+input[type="url"]:disabled,
+input[type="tel"]:disabled,
+textarea:disabled {
+  cursor: not-allowed;
+}
+
+[data-o2-variant="destructive"] [data-destructive-icon="true"],
+[data-o2-variant="outline-destructive"] [data-destructive-icon="true"],
+[data-o2-variant="ghost-destructive"] [data-destructive-icon="true"] {
+  color: inherit !important;
+}
+
+button:has([data-destructive-icon="true"]):hover,
+a:has([data-destructive-icon="true"]):hover,
+[role="button"]:has([data-destructive-icon="true"]):hover {
+  background-color: var(--color-error-100, #fee2e2) !important;
+}
+
+html.dark button:has([data-destructive-icon="true"]):hover,
+.dark button:has([data-destructive-icon="true"]):hover,
+html.dark a:has([data-destructive-icon="true"]):hover,
+.dark a:has([data-destructive-icon="true"]):hover,
+html.dark [role="button"]:has([data-destructive-icon="true"]):hover,
+.dark [role="button"]:has([data-destructive-icon="true"]):hover {
+  background-color: rgba(220, 38, 38, 0.18) !important;
+}
+
+html.dark [data-destructive-icon="true"]:hover,
+.dark [data-destructive-icon="true"]:hover {
+  background-color: rgba(220, 38, 38, 0.18) !important;
+}
