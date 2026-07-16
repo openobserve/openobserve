@@ -19,14 +19,12 @@ pub mod distributed_plan;
 pub mod exec;
 pub mod merge;
 pub mod optimizer;
-pub mod peak_memory_pool;
 pub mod plan;
-pub mod plan_metrics;
-pub mod planner;
 pub mod storage;
 pub mod table_provider;
-pub mod udaf;
 pub mod udf;
+
+pub use search::datafusion::{peak_memory_pool, plan_metrics, planner, udaf};
 
 #[derive(PartialEq, Debug)]
 pub enum MemoryPoolType {

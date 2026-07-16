@@ -68,7 +68,7 @@ use crate::service::search::{
     sql::Sql,
 };
 pub mod logical_optimizer;
-pub mod physical_optimizer;
+pub use search::datafusion::optimizer::physical_optimizer;
 
 pub fn generate_analyzer_rules(sql: &Sql) -> Vec<Arc<dyn AnalyzerRule + Send + Sync>> {
     vec![Arc::new(RemoveIndexFieldsRule::new(

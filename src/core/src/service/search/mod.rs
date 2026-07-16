@@ -73,8 +73,6 @@ pub mod datafusion;
 pub mod grpc;
 pub mod grpc_search;
 pub mod grpc_server;
-pub mod index;
-pub mod inspector;
 pub mod partition;
 mod searcher;
 pub mod sql;
@@ -85,6 +83,7 @@ pub mod tantivy;
 pub mod utils;
 pub mod work_group;
 
+pub use ::search::{index, inspector};
 pub use searcher::Searcher;
 
 /// The result of search in cluster
