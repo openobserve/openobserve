@@ -409,6 +409,17 @@ export const loadWorkflowRun = async (opts: {
       };
     }
 
+    const nodeInputs = payload.data?.node_map || {};
+
+    // GHOST NODES — the run references a node the workflow no longer has (it was
+    // edited/deleted after the run). Its badge has nowhere to render, so an error
+    // would silently vanish and the run would look cleaner than it was. Surface
+    // them so the Runs view can say the graph no longer matches this run.
+    const currentNodeIds = new Set((wf.nodes || []).map((n: any) => n.id));
+    const ghostNodeIds = [
+      ...new Set([...Object.keys(errors), ...Object.keys(nodeInputs)]),
+    ].filter((id) => !currentNodeIds.has(id));
+
     workflowObj.testRun.result = {
       errors,
       // Every node "ran": upstream shows ✓, errored ✗, downstream ⊘ — via the
@@ -416,10 +427,11 @@ export const loadWorkflowRun = async (opts: {
       ranNodeIds: (wf.nodes || []).map((n: any) => n.id),
       blockedNodeIds: downstreamOfErrorNodes(Object.keys(errors)),
       // Per-node input the drawer shows (read-only) for an errored node.
-      nodeInputs: payload.data?.node_map || {},
+      nodeInputs,
       fullInput: payload.data?.complete ?? null,
       mode: "history",
       runId: opts.runId,
+      ghostNodeIds,
     };
     return { ok: true };
   } catch (e: any) {

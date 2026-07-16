@@ -118,6 +118,67 @@ describe("loadWorkflowRun — history run response mapping", () => {
     expect(res.blockedNodeIds).toHaveLength(0);
   });
 
+  // A run can reference a node the workflow no longer has (edited/deleted since).
+  // Its badge has nowhere to render, so the error would silently vanish and the
+  // run would look cleaner than it was — the Runs view warns off `ghostNodeIds`.
+  describe("ghost nodes (workflow edited since the run)", () => {
+    it("flags run nodes that no longer exist in the graph", async () => {
+      mockRun.mockResolvedValue({
+        data: {
+          // n2 still exists; "deleted-node" was removed from the workflow
+          errors: {
+            data: [
+              { node_id: "n2", error: ["boom"] },
+              { node_id: "deleted-node", error: ["gone"] },
+            ],
+          },
+          data: { node_map: {} },
+        },
+      });
+      await loadWorkflowRun({ orgId: "o", workflowId: "wf1", runId: "r1" });
+      expect((workflowObj.testRun.result as any).ghostNodeIds).toEqual([
+        "deleted-node",
+      ]);
+    });
+
+    it("also flags a ghost referenced only by node_map (no error)", async () => {
+      mockRun.mockResolvedValue({
+        data: {
+          errors: { data: [] },
+          data: { node_map: { n1: [], "old-node": [] } },
+        },
+      });
+      await loadWorkflowRun({ orgId: "o", workflowId: "wf1", runId: "r2" });
+      expect((workflowObj.testRun.result as any).ghostNodeIds).toEqual([
+        "old-node",
+      ]);
+    });
+
+    it("is empty when the graph still matches the run", async () => {
+      mockRun.mockResolvedValue({
+        data: {
+          errors: { data: [{ node_id: "n2", error: ["boom"] }] },
+          data: { node_map: { n1: [], n3: [] } },
+        },
+      });
+      await loadWorkflowRun({ orgId: "o", workflowId: "wf1", runId: "r3" });
+      expect((workflowObj.testRun.result as any).ghostNodeIds).toEqual([]);
+    });
+
+    it("does not double-report a ghost referenced by BOTH errors and node_map", async () => {
+      mockRun.mockResolvedValue({
+        data: {
+          errors: { data: [{ node_id: "zombie", error: ["x"] }] },
+          data: { node_map: { zombie: [] } },
+        },
+      });
+      await loadWorkflowRun({ orgId: "o", workflowId: "wf1", runId: "r4" });
+      expect((workflowObj.testRun.result as any).ghostNodeIds).toEqual([
+        "zombie",
+      ]);
+    });
+  });
+
   it("returns ok:false with the backend message on failure", async () => {
     mockRun.mockRejectedValue({ response: { data: { message: "nope" } } });
     const r = await loadWorkflowRun({ orgId: "o", workflowId: "wf1", runId: "r4" });

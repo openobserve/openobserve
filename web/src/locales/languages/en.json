@@ -1798,7 +1798,8 @@
     "actions": "Actions",
     "runs": {
       "title": "Workflow Runs",
-      "edit": "Edit Workflow"
+      "edit": "Edit Workflow",
+      "staleGraphWarning": "This workflow has been edited since this run — {count} step(s) it executed no longer exist, so their status isn't shown here."
     },
     "history": {
       "button": "Runs",

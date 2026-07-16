@@ -132,6 +132,13 @@ const workflowName = computed(
 );
 const selectedRunId = ref<string>("");
 
+// Steps this run executed that no longer exist in the workflow (deleted/edited
+// since). Their badges can't render, so the canvas alone would under-report the
+// run — the banner tells the user the graph has moved on.
+const ghostNodeCount = computed(
+  () => (workflowObj.testRun.result as any)?.ghostNodeIds?.length ?? 0,
+);
+
 const goBack = () => {
   router.push({ name: "workflows", query: { org_identifier: orgId.value } });
 };
@@ -179,6 +186,17 @@ const onSelectRun = async (runId: string) => {
       variant: "error",
     });
     return;
+  }
+  // The workflow was edited after this run: some steps it executed no longer
+  // exist, so their badges (including errors) can't render and the run would
+  // look cleaner than it was. Flag it once, on load — no permanent chrome.
+  if (ghostNodeCount.value > 0) {
+    toast({
+      message: t("workflow.runs.staleGraphWarning", {
+        count: ghostNodeCount.value,
+      }),
+      variant: "warning",
+    });
   }
   selectedRunId.value = runId;
   router.replace({
