@@ -207,9 +207,9 @@
       "actionDesc": "Define a condition to monitor"
     },
     "noMonitors": {
-      "title": "Create your first monitor",
-      "description": "Synthetic monitors check your endpoints and browser flows on a schedule. Set one up to start monitoring.",
-      "action": "New monitor",
+      "title": "Create your first Check",
+      "description": "Synthetic Checks check your endpoints and browser flows on a schedule. Set one up to start monitoring.",
+      "action": "New check",
       "actionDesc": "Define a synthetic check to monitor"
     },
     "noIncidents": {
@@ -6796,7 +6796,7 @@
       "assertions": "Assertions",
       "stepsSuffix": "steps",
       "checksSuffix": "checks",
-      "noResults": "No monitors found.",
+      "noResults": "No checks found.",
       "folder": "Folder",
       "pause": "Pause",
       "enable": "Enable",
