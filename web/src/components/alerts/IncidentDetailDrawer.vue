@@ -1120,6 +1120,7 @@ import OTab from '@/lib/navigation/Tabs/OTab.vue'
 import { defineComponent, ref, watch, computed, PropType, nextTick, onMounted, onBeforeUnmount, onUnmounted } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
+import { useTheme } from "@/composables/useTheme";
 import { useRouter } from "vue-router";
 import { formatToReadable } from "@/utils/date";
 import incidentsService, {
@@ -1325,10 +1326,8 @@ export default defineComponent({
       }
     };
 
-    // Check if dark mode is active
-    const isDarkMode = computed(() => {
-      return store.state.theme === "dark";
-    });
+    // Dark mode via the single sanctioned JS seam
+    const { isDark: isDarkMode } = useTheme();
 
     // Computed properties for statistics
     const affectedServicesCount = computed(() => {
@@ -1771,7 +1770,7 @@ export default defineComponent({
             textStyle: {
               fontSize: 14,
               fontWeight: "normal",
-              color: store.state.theme === 'dark' ? '#B7B7B7' : '#72777B'
+              color: isDarkMode.value ? '#B7B7B7' : '#72777B'
             }
           }
         };
@@ -1838,10 +1837,10 @@ export default defineComponent({
           axisPointer: {
             type: 'shadow'
           },
-          backgroundColor: store.state.theme === 'dark' ? '#2B2C2D' : '#ffffff',
-          borderColor: store.state.theme === 'dark' ? '#444444' : '#E7EAEE',
+          backgroundColor: isDarkMode.value ? '#2B2C2D' : '#ffffff',
+          borderColor: isDarkMode.value ? '#444444' : '#E7EAEE',
           textStyle: {
-            color: store.state.theme === 'dark' ? '#DCDCDC' : '#232323'
+            color: isDarkMode.value ? '#DCDCDC' : '#232323'
           }
         },
         legend: {
@@ -1850,14 +1849,14 @@ export default defineComponent({
           bottom: 0,
           data: Array.from(alertNames),
           textStyle: {
-            color: store.state.theme === 'dark' ? '#DCDCDC' : '#232323'
+            color: isDarkMode.value ? '#DCDCDC' : '#232323'
           },
           pageButtonItemGap: 5,
           pageButtonGap: 20,
-          pageIconColor: store.state.theme === 'dark' ? '#DCDCDC' : '#232323',
-          pageIconInactiveColor: store.state.theme === 'dark' ? '#666666' : '#CCCCCC',
+          pageIconColor: isDarkMode.value ? '#DCDCDC' : '#232323',
+          pageIconInactiveColor: isDarkMode.value ? '#666666' : '#CCCCCC',
           pageTextStyle: {
-            color: store.state.theme === 'dark' ? '#DCDCDC' : '#232323'
+            color: isDarkMode.value ? '#DCDCDC' : '#232323'
           }
         },
         grid: {
@@ -1871,12 +1870,12 @@ export default defineComponent({
           type: 'category',
           data: sortedDates.map(formatDate),
           axisLabel: {
-            color: store.state.theme === 'dark' ? '#B7B7B7' : '#72777B',
+            color: isDarkMode.value ? '#B7B7B7' : '#72777B',
             rotate: sortedDates.length > 10 ? 45 : 0
           },
           axisLine: {
             lineStyle: {
-              color: store.state.theme === 'dark' ? '#444444' : '#E7EAEE'
+              color: isDarkMode.value ? '#444444' : '#E7EAEE'
             }
           }
         },
@@ -1884,19 +1883,19 @@ export default defineComponent({
           type: 'value',
           name: 'Alert Count',
           nameTextStyle: {
-            color: store.state.theme === 'dark' ? '#B7B7B7' : '#72777B'
+            color: isDarkMode.value ? '#B7B7B7' : '#72777B'
           },
           axisLabel: {
-            color: store.state.theme === 'dark' ? '#B7B7B7' : '#72777B'
+            color: isDarkMode.value ? '#B7B7B7' : '#72777B'
           },
           axisLine: {
             lineStyle: {
-              color: store.state.theme === 'dark' ? '#444444' : '#E7EAEE'
+              color: isDarkMode.value ? '#444444' : '#E7EAEE'
             }
           },
           splitLine: {
             lineStyle: {
-              color: store.state.theme === 'dark' ? '#3A3A3A' : '#F0F0F0'
+              color: isDarkMode.value ? '#3A3A3A' : '#F0F0F0'
             }
           }
         },
@@ -2875,8 +2874,8 @@ export default defineComponent({
   border-radius: 3px;
 }
 
-body.body--dark .incident-details-column::-webkit-scrollbar-thumb,
-body.body--dark .tabs-content-column .overflow-auto::-webkit-scrollbar-thumb {
+.dark .incident-details-column::-webkit-scrollbar-thumb,
+.dark .tabs-content-column .overflow-auto::-webkit-scrollbar-thumb {
   background: #475569;
 }
 </style>

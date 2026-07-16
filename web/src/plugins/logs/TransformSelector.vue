@@ -16,7 +16,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <OButtonGroup
-    :class="store.state.theme === 'dark' ? 'dark-theme' : ''"
     class="p-0 float-left mr-1 transform-selector element-box-shadow border border-button-outline-border"
   >
     <!-- Wrap toggle + dropdown together so divide-x only creates one separator (before save) -->
@@ -141,6 +140,7 @@ import { searchState } from "@/composables/useLogs/searchState";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 import { getImageURL } from "@/utils/zincutils";
 import { useStore } from "vuex";
+import { useTheme } from "@/composables/useTheme";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
 const props = withDefaults(defineProps<{
@@ -159,6 +159,7 @@ const { searchObj } = searchState();
 const { isActionsEnabled } = logsUtils();
 
 const store = useStore();
+  const { isDark } = useTheme();
 
 const functionModel = ref(false);
 
@@ -215,7 +216,7 @@ const iconRight = computed(() => {
   return (
     "img:" +
     getImageURL(
-      store.state.theme === "dark"
+      isDark.value
         ? "images/common/function_dark.svg"
         : "images/common/function.svg",
     )
@@ -240,12 +241,12 @@ const transformsLabel = computed(() => {
 });
 
 const transformIcon = computed(() => {
-  const isDark = store.state.theme === "dark";
+  
   if (!isActionsEnabled.value)
     return (
       "img:" +
       getImageURL(
-        isDark
+        isDark.value
           ? "images/common/function_dark.svg"
           : "images/common/function.svg",
       )
@@ -255,7 +256,7 @@ const transformIcon = computed(() => {
     return (
       "img:" +
       getImageURL(
-        isDark
+        isDark.value
           ? "images/common/function_dark.svg"
           : "images/common/function.svg",
       )
@@ -267,7 +268,7 @@ const transformIcon = computed(() => {
     return (
       "img:" +
       getImageURL(
-        isDark
+        isDark.value
           ? "images/common/transform_dark.svg"
           : "images/common/transform.svg",
       )

@@ -1301,12 +1301,12 @@ const unifiedChips = computed<DimensionChip[]>(() =>
   border-bottom: 1px solid var(--color-card-glass-border);
 }
 
-.light-theme {
+:root:not(.dark) {
   background-color: var(--color-surface-base);
   color: var(--color-text-primary);
 }
 
-.dark-theme {
+.dark {
   background-color: var(--color-surface-base);
   color: var(--color-text-primary);
 }

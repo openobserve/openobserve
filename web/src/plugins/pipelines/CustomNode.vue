@@ -1109,8 +1109,8 @@ function getIcon(data, ioType) {
 }
 
 /* Pipeline error tooltip styling - increased specificity to override global theme styles */
-.body--dark .pipeline-error-tooltip,
-.body--light .pipeline-error-tooltip,
+.dark .pipeline-error-tooltip,
+:root:not(.dark) .pipeline-error-tooltip,
 .pipeline-error-tooltip {
   background-color: #ef4444 !important;
   color: white !important;
@@ -1121,35 +1121,35 @@ function getIcon(data, ioType) {
   padding: 10px 14px !important;
 }
 
-.body--dark .pipeline-error-tooltip div,
-.body--light .pipeline-error-tooltip div,
+.dark .pipeline-error-tooltip div,
+:root:not(.dark) .pipeline-error-tooltip div,
 .pipeline-error-tooltip div {
   max-height: 300px;
   overflow-y: auto;
 }
 
-.body--dark .pipeline-error-tooltip div::-webkit-scrollbar,
-.body--light .pipeline-error-tooltip div::-webkit-scrollbar,
+.dark .pipeline-error-tooltip div::-webkit-scrollbar,
+:root:not(.dark) .pipeline-error-tooltip div::-webkit-scrollbar,
 .pipeline-error-tooltip div::-webkit-scrollbar {
   width: 6px;
 }
 
-.body--dark .pipeline-error-tooltip div::-webkit-scrollbar-track,
-.body--light .pipeline-error-tooltip div::-webkit-scrollbar-track,
+.dark .pipeline-error-tooltip div::-webkit-scrollbar-track,
+:root:not(.dark) .pipeline-error-tooltip div::-webkit-scrollbar-track,
 .pipeline-error-tooltip div::-webkit-scrollbar-track {
   background: rgba(255, 255, 255, 0.1);
   border-radius: 3px;
 }
 
-.body--dark .pipeline-error-tooltip div::-webkit-scrollbar-thumb,
-.body--light .pipeline-error-tooltip div::-webkit-scrollbar-thumb,
+.dark .pipeline-error-tooltip div::-webkit-scrollbar-thumb,
+:root:not(.dark) .pipeline-error-tooltip div::-webkit-scrollbar-thumb,
 .pipeline-error-tooltip div::-webkit-scrollbar-thumb {
   background: rgba(255, 255, 255, 0.3);
   border-radius: 3px;
 }
 
-.body--dark .pipeline-error-tooltip div::-webkit-scrollbar-thumb:hover,
-.body--light .pipeline-error-tooltip div::-webkit-scrollbar-thumb:hover,
+.dark .pipeline-error-tooltip div::-webkit-scrollbar-thumb:hover,
+:root:not(.dark) .pipeline-error-tooltip div::-webkit-scrollbar-thumb:hover,
 .pipeline-error-tooltip div::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.5);
 }

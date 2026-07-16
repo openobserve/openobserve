@@ -2562,79 +2562,79 @@ export default defineComponent({
 }
 
 /* Dark Mode Styles */
-body.body--dark .trace-details-toolbar-container {
+.dark .trace-details-toolbar-container {
   background: rgba(45, 55, 72, 0.5);
   border-bottom-color: #4a5568;
 }
 
-body.body--dark .trace-details-toolbar-container .llm-metrics-row {
+.dark .trace-details-toolbar-container .llm-metrics-row {
   border-top-color: #4a5568 !important;
 }
 
-body.body--dark .trace-details-toolbar-container .toolbar-chip {
+.dark .trace-details-toolbar-container .toolbar-chip {
   background: #1a202c;
   border-color: #4a5568;
   color: #e2e8f0;
 }
 
-body.body--dark .trace-details-toolbar-container .toolbar-chip .chip-label {
+.dark .trace-details-toolbar-container .toolbar-chip .chip-label {
   color: #a0aec0;
 }
 
-body.body--dark .trace-details-toolbar-container .toolbar-chip .chip-value {
+.dark .trace-details-toolbar-container .toolbar-chip .chip-value {
   color: #e2e8f0;
 }
 
-body.body--dark .trace-details-toolbar-container .toolbar-chip:hover {
+.dark .trace-details-toolbar-container .toolbar-chip:hover {
   background: #2d3748;
 }
 
-body.body--dark .trace-details-toolbar-container .llm-chip {
+.dark .trace-details-toolbar-container .llm-chip {
   background: #1a202c;
   border-color: #4a5568;
 }
 
-body.body--dark .trace-details-toolbar-container .llm-chip .chip-value {
+.dark .trace-details-toolbar-container .llm-chip .chip-value {
   color: #e2e8f0;
 }
 
-body.body--dark .trace-details-toolbar-container .llm-chip.model-chip {
+.dark .trace-details-toolbar-container .llm-chip.model-chip {
   border-left: 3px solid #ab47bc;
 }
 
-body.body--dark .trace-details-toolbar-container .llm-chip.model-chip .chip-value {
+.dark .trace-details-toolbar-container .llm-chip.model-chip .chip-value {
   color: #e9d8fd;
 }
 
-body.body--dark .trace-details-toolbar-container .llm-chip.token-chip.input-token-chip {
+.dark .trace-details-toolbar-container .llm-chip.token-chip.input-token-chip {
   border-left: 3px solid #42a5f5;
 }
 
-body.body--dark .trace-details-toolbar-container .llm-chip.token-chip.input-token-chip .OIcon,
-body.body--dark .trace-details-toolbar-container .llm-chip.token-chip.input-token-chip .chip-label,
-body.body--dark .trace-details-toolbar-container .llm-chip.token-chip.input-token-chip .chip-value {
+.dark .trace-details-toolbar-container .llm-chip.token-chip.input-token-chip .OIcon,
+.dark .trace-details-toolbar-container .llm-chip.token-chip.input-token-chip .chip-label,
+.dark .trace-details-toolbar-container .llm-chip.token-chip.input-token-chip .chip-value {
   color: #90cdf4;
 }
 
-body.body--dark .trace-details-toolbar-container .llm-chip.token-chip.output-token-chip {
+.dark .trace-details-toolbar-container .llm-chip.token-chip.output-token-chip {
   border-left: 3px solid #66bb6a;
 }
 
-body.body--dark .trace-details-toolbar-container .llm-chip.token-chip.output-token-chip .OIcon,
-body.body--dark .trace-details-toolbar-container .llm-chip.token-chip.output-token-chip .chip-label,
-body.body--dark .trace-details-toolbar-container .llm-chip.token-chip.output-token-chip .chip-value {
+.dark .trace-details-toolbar-container .llm-chip.token-chip.output-token-chip .OIcon,
+.dark .trace-details-toolbar-container .llm-chip.token-chip.output-token-chip .chip-label,
+.dark .trace-details-toolbar-container .llm-chip.token-chip.output-token-chip .chip-value {
   color: #9ae6b4;
 }
 
-body.body--dark .trace-details-toolbar-container .llm-chip.cost-chip {
+.dark .trace-details-toolbar-container .llm-chip.cost-chip {
   border-left: 3px solid #ef6c00;
 }
 
-body.body--dark .trace-details-toolbar-container .llm-chip.cost-chip .chip-value {
+.dark .trace-details-toolbar-container .llm-chip.cost-chip .chip-value {
   color: #fed7aa;
 }
 
-body.body--dark .trace-details-toolbar-container .provider-badge {
+.dark .trace-details-toolbar-container .provider-badge {
   background: linear-gradient(135deg, #2b6cb0 0%, #2c5282 100%);
 }
 
@@ -2763,25 +2763,25 @@ body.body--dark .trace-details-toolbar-container .provider-badge {
 
 <style>
 /* Dark theme support for glassmorphic tables */
-.body--dark .trace-detail-tab-table table {
+.dark .trace-detail-tab-table table {
   /* background: rgba(255, 255, 255, 0.05); */
   /* border: 0.125rem solid rgba(255, 255, 255, 0.3); */
 }
 
-.body--dark .trace-detail-tab-table th,
-.body--dark .trace-detail-tab-table td {
+.dark .trace-detail-tab-table th,
+.dark .trace-detail-tab-table td {
   border-bottom: 1px solid var(--color-table-row-divider);
   border-right: 1px solid var(--color-table-row-divider);
 }
 
 /* Light theme support for glassmorphic tables */
-.body--light .trace-detail-tab-table table {
+:root:not(.dark) .trace-detail-tab-table table {
   /* background: rgba(240, 240, 245, 0.8); */
   /* border: 0.125rem solid rgba(100, 100, 120, 0.5); */
 }
 
-.body--light .trace-detail-tab-table th,
-.body--light .trace-detail-tab-table td {
+:root:not(.dark) .trace-detail-tab-table th,
+:root:not(.dark) .trace-detail-tab-table td {
   border-bottom: 1px solid var(--color-table-row-divider);
   border-right: 1px solid var(--color-table-row-divider);
 }
@@ -2790,7 +2790,7 @@ body.body--dark .trace-details-toolbar-container .provider-badge {
   background-color: #f5f5f5 !important;
 }
 
-.body--dark .trace-detail-tab-table th {
+.dark .trace-detail-tab-table th {
   background-color: #424242 !important;
 }
 </style>

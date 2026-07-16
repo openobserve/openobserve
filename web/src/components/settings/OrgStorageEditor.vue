@@ -90,9 +90,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   { selected: selectedProvider === provider.value },
                   'bg-surface-base border-border-default hover:border-card-glass-border hover:shadow-[0_4px_12px_rgba(25,118,210,0.15)]'
                 ]"
-                :style="selectedProvider === provider.value && store.state.theme !== 'dark'
+                :style="selectedProvider === provider.value && !isDark
                   ? 'border-color: var(--color-card-glass-border); background: linear-gradient(135deg, #e3f2fd 0%, #ffffff 100%); box-shadow: 0 4px 16px rgba(25,118,210,0.2);'
-                  : selectedProvider === provider.value && store.state.theme === 'dark'
+                  : selectedProvider === provider.value && isDark
                   ? 'border-color: #5d9cec; background: linear-gradient(135deg, #1a3a52 0%, #1e1e1e 100%); box-shadow: 0 4px 16px rgba(93,156,236,0.25);'
                   : ''"
                 @click="selectedProvider = provider.value"
@@ -316,7 +316,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="outline"
               class="o2-secondary-button h-9 mr-2"
               :class="
-                store.state.theme === 'dark'
+                isDark
                   ? 'o2-secondary-button-dark'
                   : 'o2-secondary-button-light'
               "
@@ -329,7 +329,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="primary"
               class="no-border o2-primary-button h-9"
               :class="
-                store.state.theme === 'dark'
+                isDark
                   ? 'o2-primary-button-dark'
                   : 'o2-primary-button-light'
               "
@@ -346,7 +346,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="outline"
               class="o2-secondary-button h-9 mr-2"
               :class="
-                store.state.theme === 'dark'
+                isDark
                   ? 'o2-secondary-button-dark'
                   : 'o2-secondary-button-light'
               "
@@ -359,7 +359,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="outline"
               class="o2-secondary-button h-9"
               :class="
-                store.state.theme === 'dark'
+                isDark
                   ? 'o2-secondary-button-dark'
                   : 'o2-secondary-button-light'
               "
@@ -372,7 +372,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="primary"
               class="no-border ml-2 o2-primary-button h-9"
               :class="
-                store.state.theme === 'dark'
+                isDark
                   ? 'o2-primary-button-dark'
                   : 'o2-primary-button-light'
               "
@@ -394,6 +394,7 @@ import { ref, computed, onMounted, watch } from "vue";
 defineOptions({ name: "OrgStorageEditor" });
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
+import { useTheme } from "@/composables/useTheme";
 import config from "@/aws-exports";
 import orgStorageService from "@/services/org_storage";
 import { getImageURL } from "@/utils/zincutils";
@@ -420,6 +421,7 @@ const emit = defineEmits<{
 }>();
 
 const store = useStore();
+    const { isDark } = useTheme();
 const { t } = useI18n();
 
 const step = ref(1);

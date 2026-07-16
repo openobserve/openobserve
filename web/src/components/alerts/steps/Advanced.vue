@@ -17,7 +17,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     class="step-advanced w-full"
-    :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'"
   >
     <div
       class="step-content rounded-lg bg-surface-overlay border border-border-default"

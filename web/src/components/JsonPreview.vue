@@ -49,7 +49,6 @@
       <span
         class="pl-[0.625rem]"
         :data-test="`json-preview-key-${key}`"
-        :class="store.state.theme === 'dark' ? 'dark' : ''"
       >
         <span class="log-key">{{ key }}</span
         ><span class="log-separator">: </span

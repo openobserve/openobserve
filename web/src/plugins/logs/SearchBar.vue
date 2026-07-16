@@ -16,7 +16,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    :class="store.state.theme === 'dark' ? 'dark-theme' : ''"
     class="logs-search-bar-component"
     id="searchBarComponent"
   >
@@ -1847,6 +1846,7 @@ import {
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
+import { useTheme } from "@/composables/useTheme";
 import DateTime from "@/components/DateTime.vue";
 import ShareButton from "@/components/common/ShareButton.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -2185,6 +2185,7 @@ export default defineComponent({
     const router = useRouter();
     const { t } = useI18n();
     const store = useStore();
+    const { isDark } = useTheme();
     const { showErrorNotification } = useNotifications();
     const rowsPerPage = ref(10);
     const savedViewColumns = [
@@ -4802,7 +4803,7 @@ export default defineComponent({
       return (
         "img:" +
         getImageURL(
-          store.state.theme === "dark"
+          isDark.value
             ? "images/common/function_dark.svg"
             : "images/common/function.svg",
         )
@@ -4949,47 +4950,47 @@ export default defineComponent({
     const visualizeIcon = computed(() => {
       return searchObj.meta.logsVisualizeToggle === "visualize"
         ? getImageURL("images/common/visualize_icon_light.svg")
-        : store.state.theme == "dark"
+        : isDark.value
           ? getImageURL("images/common/visualize_icon_light.svg")
           : getImageURL("images/common/visualize_icon_dark.svg");
     });
     const histogramIcon = computed(() => {
-      return store.state.theme === "dark"
+      return isDark.value
         ? getImageURL("images/common/bar_chart_histogram_light.svg")
         : getImageURL("images/common/bar_chart_histogram.svg");
     });
     const sqlIcon = computed(() => {
-      return store.state.theme === "dark"
+      return isDark.value
         ? getImageURL("images/common/hugeicons_sql_light.svg")
         : getImageURL("images/common/hugeicons_sql.svg");
     });
     const quickModeIcon = computed(() => {
-      return store.state.theme === "dark"
+      return isDark.value
         ? getImageURL("images/common/quick_mode_light.svg")
         : getImageURL("images/common/quick_mode.svg");
     });
     const searchHistoryIcon = computed(() => {
-      return store.state.theme === "dark"
+      return isDark.value
         ? getImageURL("images/common/search_history_light.svg")
         : getImageURL("images/common/search_history.svg");
     });
     const downloadTableIcon = computed(() => {
-      return store.state.theme === "dark"
+      return isDark.value
         ? getImageURL("images/common/download_table_light.svg")
         : getImageURL("images/common/download_table.svg");
     });
     const customRangeIcon = computed(() => {
-      return store.state.theme === "dark"
+      return isDark.value
         ? getImageURL("images/common/custom_range_light.svg")
         : getImageURL("images/common/custom_range.svg");
     });
     const createScheduledSearchIcon = computed(() => {
-      return store.state.theme === "dark"
+      return isDark.value
         ? getImageURL("images/common/create_scheduled_search_light.svg")
         : getImageURL("images/common/create_scheduled_search.svg");
     });
     const listScheduledSearchIcon = computed(() => {
-      return store.state.theme === "dark"
+      return isDark.value
         ? getImageURL("images/common/list_scheduled_search_light.svg")
         : getImageURL("images/common/list_scheduled_search.svg");
     });

@@ -372,7 +372,7 @@ function formatDuration(ns: number): string {
 }
 
 /* ─── dark mode overrides ─────────────────────────────────────────────── */
-.thread-tools-thread--dark {
+.dark .thread-tools-thread {
   .thread-tool {
     background: rgba(76, 175, 80, 0.06);
     border-bottom-color: rgba(76, 175, 80, 0.2);

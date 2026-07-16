@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div
       data-test="llm-evaluation-node-section"
-      class="bg-surface-base"
+      :class="'bg-surface-base'"
     >
       <OForm id="llm-evaluation-form" :form="form">
         <div class="stream-routing-container w-full pt-3 pb-3 px-3 flex flex-col gap-4">

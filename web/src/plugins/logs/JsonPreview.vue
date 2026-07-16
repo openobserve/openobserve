@@ -168,7 +168,6 @@
         <span
           class="pl-1"
           :data-test="`log-expand-detail-key-${key}`"
-          :class="store.state.theme === 'dark' ? 'dark' : ''"
         >
           <span class="log-key">{{ key }}</span
           ><span class="log-separator">: </span
@@ -197,7 +196,7 @@
           zIndex: 9999,
         }"
         :class="
-          store.state.theme === 'dark'
+          isDark
             ? 'context-menu-dark'
             : 'context-menu-light'
         "
@@ -249,6 +248,7 @@ import {
 } from "vue";
 import { getImageURL, getUUID } from "@/utils/zincutils";
 import { useStore } from "vuex";
+import { useTheme } from "@/composables/useTheme";
 import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
 import { useI18n } from "vue-i18n";
@@ -348,6 +348,7 @@ export default {
   setup(props: any, { emit }: any) {
     const { t } = useI18n();
     const store = useStore();
+    const { isDark } = useTheme();
     const activeTab = ref("flattened");
 
     const streamSearchValue = ref<string>("");
@@ -805,20 +806,20 @@ export default {
     };
 
     const getBtnLogo = computed(() => {
-      return store.state.theme === "dark"
+      return isDark.value
         ? getImageURL("images/common/ai_icon_dark.svg")
         : getImageURL("images/common/ai_icon_gradient.svg");
     });
     const regexIcon = computed(() => {
       return getImageURL(
-        store.state.theme == "dark"
+        isDark.value
           ? "images/regex_pattern/regex_icon_dark.svg"
           : "images/regex_pattern/regex_icon_light.svg",
       );
     });
     const regexIconForContextMenu = computed(() => {
       return getImageURL(
-        store.state.theme == "dark"
+        isDark.value
           ? "images/regex_pattern/regex_icon_dark.svg"
           : "images/regex_pattern/regex_icon_light.svg",
       );

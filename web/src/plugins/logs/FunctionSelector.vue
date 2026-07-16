@@ -15,7 +15,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <OButtonGroup
-    :class="store.state.theme === 'dark' ? 'dark-theme' : ''"
     class="p-0 float-left mr-1 function-selector element-box-shadow border border-button-outline-border"
   >
     <div v-if="!hideToggle" class="flex items-center px-1">
@@ -99,6 +98,7 @@ import { useI18n } from "vue-i18n";
 import { searchState } from "@/composables/useLogs/searchState";
 import { getImageURL } from "@/utils/zincutils";
 import { useStore } from "vuex";
+import { useTheme } from "@/composables/useTheme";
 const props = withDefaults(defineProps<{
   functionOptions: { name: string; function: string }[];
   hideToggle?: boolean;
@@ -113,11 +113,12 @@ const { t } = useI18n();
 const { searchObj } = searchState();
 
 const store = useStore();
+  const { isDark } = useTheme();
 
 const functionToggleIcon = computed(() => {
   return (
     "img:" +
-    (store.state.theme == "dark"
+    (isDark.value
       ? getImageURL("images/common/function_dark.svg")
       : getImageURL("images/common/function.svg"))
   );
@@ -127,7 +128,7 @@ const iconRight = computed(() => {
   return (
     "img:" +
     getImageURL(
-      store.state.theme === "dark"
+      isDark.value
         ? "images/common/function_dark.svg"
         : "images/common/function.svg",
     )

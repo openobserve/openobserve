@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ t('search.syntaxGuideLabel') }}
       </OButton>
     </template>
-    <div :class="store.state.theme == 'dark' ? 'theme-dark' : 'theme-light'">
+    <div>
       <div v-if="!sqlmode">
         <div class="syntax-guide-title w-105">
           <div class="label text-sm font-bold">{{ t("search.syntaxGuideLabel") }}</div>

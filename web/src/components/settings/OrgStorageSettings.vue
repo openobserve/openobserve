@@ -42,7 +42,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-else-if="!isConfigured && isCloud"
       class="hero-page flex flex-col"
       :style="{ minHeight: 'calc(100vh - var(--navbar-height) - 100px)' }"
-      :class="store.state.theme === 'dark' ? 'hero-page--dark' : ''"
     >
       <div class="hero-page__body flex items-center justify-between flex-1 py-18 px-20" style="gap: 56px;">
         <!-- left -->
@@ -61,7 +60,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="storage-settings-configure-btn"
               variant="primary"
               class="no-border o2-primary-button hero-cta-btn h-11 px-7 font-semibold" style="font-size: 0.95rem;"
-              :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
               @click="navigateToCreate"
             >
               {{ t("storage_settings.configureStorage") }}
@@ -89,10 +87,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             v-for="feature in features"
             :key="feature.title"
-            class="feature-card flex items-start rounded-[16px] border border-[rgba(0,0,0,0.07)] bg-white transition-all duration-200" style="gap: 16px; padding: 20px 22px; box-shadow: 0 2px 12px rgba(0,0,0,0.05), 0 1px 3px rgba(0,0,0,0.04);"
-            :class="store.state.theme === 'dark' ? 'feature-card--dark bg-[rgba(255,255,255,0.05)] border-[rgba(255,255,255,0.08)] [box-shadow:0_2px_12px_rgba(0,0,0,0.3)]' : ''"
+            class="feature-card flex items-start rounded-[16px] border border-[rgba(0,0,0,0.07)] bg-white dark:bg-[rgba(255,255,255,0.05)] dark:border-[rgba(255,255,255,0.08)] dark:[box-shadow:0_2px_12px_rgba(0,0,0,0.3)] transition-all duration-200" style="gap: 16px; padding: 20px 22px; box-shadow: 0 2px 12px rgba(0,0,0,0.05), 0 1px 3px rgba(0,0,0,0.04);"
           >
-            <div class="feature-card__icon-box w-10 h-10 rounded-lg bg-[rgba(66,133,244,0.08)] flex items-center justify-center shrink-0" :class="store.state.theme === 'dark' ? 'feature-card__icon-box--dark bg-[rgba(66,133,244,0.15)]' : ''">
+            <div class="feature-card__icon-box w-10 h-10 rounded-lg bg-[rgba(66,133,244,0.08)] dark:bg-[rgba(66,133,244,0.15)] flex items-center justify-center shrink-0">
               <OIcon :name="feature.icon" size="md" class="feature-card__icon text-(--q-primary) opacity-85" />
             </div>
             <div class="feature-card__content pt-0.5 flex-1">
@@ -157,7 +154,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="p-3">
       <OCard
         class="storage-card rounded-xl bg-surface-base"
-        :class="store.state.theme === 'dark' ? 'storage-card--dark' : ''"
         style="max-width: 680px;"
       >
         <!-- Card header: logo + name + badge | update button -->
@@ -180,7 +176,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             variant="primary"
             size="sm"
             class="no-border o2-primary-button"
-            :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
             @click="navigateToEdit"
           >
             {{ t("storage_settings.updateStorage") }}

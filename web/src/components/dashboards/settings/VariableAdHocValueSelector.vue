@@ -1,6 +1,6 @@
 <template>
   <div class="flex flex-wrap items-center">
-    <!-- <div class="mb-2 title" :class="store.state.theme === 'dark' ? 'bg-gray-600' : 'bg-gray-300'" no-caps no-outline rounded>{{ variableItem?.name }}</div> -->
+    <!-- <div class="mb-2 title" class="bg-surface-subtle-hover" no-caps no-outline rounded>{{ variableItem?.name }}</div> -->
     <div
       class="flex flex-nowrap items-center mb-1 gap-x-1"
       v-for="(item, index) in adhocVariables"
@@ -37,7 +37,7 @@
         icon-left="close"
       >
       </OButton>
-      <!-- <div v-if="index != adhocVariables.length - 1" class="ml-2 and-border" :class="store.state.theme === 'dark' ? 'bg-gray-600' : 'bg-gray-300'">AND</div> -->
+      <!-- <div v-if="index != adhocVariables.length - 1" class="ml-2 and-border" class="bg-surface-subtle-hover">AND</div> -->
     </div>
     <OButton
       variant="ghost"

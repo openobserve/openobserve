@@ -65,7 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
       </div>
     </template>
-    <div :class="store.state.theme == 'dark' ? 'theme-dark' : 'theme-light'">
+    <div>
       <div v-if="!sqlmode">
         <div class="syntax-guide-title">
           <div class="label">{{ t("search.syntaxGuideLabel") }}</div>

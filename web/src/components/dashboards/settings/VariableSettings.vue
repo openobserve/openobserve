@@ -178,7 +178,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div style="height: 60vh">
             <VariablesDependenciesGraph
               :variablesList="dashboardVariablesList"
-              :class="store.state.theme == 'dark' ? 'dark-mode' : 'bg-white'"
+              :class="'bg-surface-base'"
               @closePopUp="
                 () => (showVariablesDependenciesGraphPopUp = false)
               "

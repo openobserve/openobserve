@@ -247,7 +247,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           overflow-wrap: break-word;
           z-index: 9999999;
         "
-        class="bg-surface-base"
+        :class="'bg-surface-base'"
         ref="annotationPopupRef"
       >
         <div

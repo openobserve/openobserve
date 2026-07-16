@@ -1353,7 +1353,7 @@ describe("PredefinedThemes", () => {
       expect(true).toBe(true);
     });
 
-    it("triggers applyThemeForMode when body class changes to body--dark", async () => {
+    it("triggers applyThemeForMode when html class changes to dark", async () => {
       const { applyThemeForMode } = await import("@/utils/themeManager");
       const wrapper = createWrapper();
       // Wait for onMounted to set up the observer
@@ -1363,7 +1363,7 @@ describe("PredefinedThemes", () => {
       vi.clearAllMocks();
 
       // Simulate the body class toggle (the MutationObserver watches this)
-      document.body.classList.add("body--dark");
+      document.documentElement.classList.add("dark");
       // MutationObserver fires asynchronously in a microtask
       await new Promise((resolve) => setTimeout(resolve, 0));
 
@@ -1371,7 +1371,7 @@ describe("PredefinedThemes", () => {
       expect(applyThemeForMode).toHaveBeenCalledWith("dark", expect.anything());
 
       // Cleanup
-      document.body.classList.remove("body--dark");
+      document.documentElement.classList.remove("dark");
       wrapper.unmount();
     });
 
@@ -1385,14 +1385,14 @@ describe("PredefinedThemes", () => {
       vi.clearAllMocks();
 
       // Trigger the MutationObserver
-      document.body.classList.add("body--dark");
+      document.documentElement.classList.add("dark");
       await new Promise((resolve) => setTimeout(resolve, 0));
 
       // With hasTempColors=true the observer returns early — no call
       expect(applyThemeForMode).not.toHaveBeenCalled();
 
       // Cleanup
-      document.body.classList.remove("body--dark");
+      document.documentElement.classList.remove("dark");
       wrapper.unmount();
     });
   });

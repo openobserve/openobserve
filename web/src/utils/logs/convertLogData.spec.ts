@@ -199,7 +199,7 @@ describe("convertLogData.ts", () => {
     });
 
     it("reads theme color from CSS custom property in light mode", () => {
-      document.body.classList.remove("body--dark");
+      document.documentElement.classList.remove("dark");
       const { options } = convertLogData([1], [10], {
         title: "",
         unparsed_x_data: [],
@@ -210,7 +210,7 @@ describe("convertLogData.ts", () => {
     });
 
     it("reads theme color from body CSS property in dark mode", () => {
-      document.body.classList.add("body--dark");
+      document.documentElement.classList.add("dark");
       Object.defineProperty(window, "getComputedStyle", {
         value: (el: Element) => ({
           getPropertyValue: (prop: string) => {
@@ -229,7 +229,7 @@ describe("convertLogData.ts", () => {
         itemStyle: null,
       });
       expect(options.series[0].itemStyle.color).toBe("#5A60A2");
-      document.body.classList.remove("body--dark");
+      document.documentElement.classList.remove("dark");
     });
 
     it("handles empty x and y arrays", () => {

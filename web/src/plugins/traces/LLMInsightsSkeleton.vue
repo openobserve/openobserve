@@ -16,10 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="pt-[0.625rem] flex flex-col gap-[0.625rem]"
-    :class="
-      store.state.theme === 'dark' ? 'dark-tile-content' : 'light-tile-content'
-    "
+    class="pt-[0.625rem] flex flex-col gap-[0.625rem] tile-content"
   >
     <!-- Toolbar: Stream/Agent toggle + picker. Only in the full-page skeleton
          when the real toolbar is hidden (initial !streamsLoaded). On a mid-session
@@ -38,10 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         v-for="n in 5"
         :key="n"
-        class="bg-(--tile-bg) border border-(--tile-border) text-(--text-primary) rounded-lg py-[0.625rem] px-[0.875rem] flex flex-col gap-2 h-32.5"
-        :class="
-          store.state.theme === 'dark' ? 'dark-tile-content' : 'light-tile-content'
-        "
+        class="bg-(--tile-bg) border border-(--tile-border) text-(--text-primary) rounded-lg py-[0.625rem] px-[0.875rem] flex flex-col gap-2 h-32.5 tile-content"
       >
         <SkeletonBox width="60%" height="12px" rounded-sm />
         <SkeletonBox width="55%" height="22px" rounded-sm />
@@ -63,10 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         v-for="n in 4"
         :key="n"
-        class="bg-(--tile-bg) border border-(--tile-border) text-(--text-primary) rounded-lg p-4 flex flex-col gap-[0.4rem]"
-        :class="
-          store.state.theme === 'dark' ? 'dark-tile-content' : 'light-tile-content'
-        "
+        class="bg-(--tile-bg) border border-(--tile-border) text-(--text-primary) rounded-lg p-4 flex flex-col gap-[0.4rem] tile-content"
       >
         <SkeletonBox width="120px" height="16px" rounded-sm />
         <SkeletonBox width="160px" height="10px" rounded-sm />
@@ -77,13 +68,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             preserveAspectRatio="none"
           >
             <path
-              class="panel-tile__area-fill [animation:llm-line-pulse_1.6s_ease-in-out_infinite]"
-              :class="store.state.theme === 'dark' ? 'fill-[rgba(255,255,255,0.08)]' : 'fill-[rgba(0,0,0,0.08)]'"
+              class="panel-tile__area-fill [animation:llm-line-pulse_1.6s_ease-in-out_infinite] fill-[rgba(0,0,0,0.08)] dark:fill-[rgba(255,255,255,0.08)]"
               d="M0,55 C20,42 35,52 55,46 C72,41 85,30 105,28 C125,26 140,42 160,38 C175,35 190,22 200,18 L200,80 L0,80 Z"
             />
             <path
-              class="panel-tile__line-stroke [animation:llm-line-pulse_1.6s_ease-in-out_infinite]"
-              :class="store.state.theme === 'dark' ? '[stroke:rgba(255,255,255,0.22)]' : '[stroke:rgba(0,0,0,0.18)]'"
+              class="panel-tile__line-stroke [animation:llm-line-pulse_1.6s_ease-in-out_infinite] [stroke:rgba(0,0,0,0.18)] dark:[stroke:rgba(255,255,255,0.22)]"
               d="M0,55 C20,42 35,52 55,46 C72,41 85,30 105,28 C125,26 140,42 160,38 C175,35 190,22 200,18"
               fill="none"
               stroke-width="2"
@@ -96,10 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Row 4: w-full recent errors table -->
     <div
       v-if="!kpiOnly"
-      class="bg-(--tile-bg) border border-(--tile-border) text-(--text-primary) rounded-lg p-4 flex flex-col gap-[0.4rem]"
-      :class="
-        store.state.theme === 'dark' ? 'dark-tile-content' : 'light-tile-content'
-      "
+      class="bg-(--tile-bg) border border-(--tile-border) text-(--text-primary) rounded-lg p-4 flex flex-col gap-[0.4rem] tile-content"
     >
       <SkeletonBox width="120px" height="16px" rounded-sm />
       <SkeletonBox width="160px" height="10px" rounded-sm />
@@ -138,8 +124,7 @@ const store = useStore();
    automatically — so the dark/light split no longer needs hardcoded hex.
    Both classes are kept (the template toggles them) but resolve to the same
    token-driven values in each theme. */
-.dark-tile-content,
-.light-tile-content {
+.tile-content {
   --tile-bg: var(--color-surface-base);
   --tile-border: var(--color-border-default);
   --text-primary: var(--color-text-heading);
@@ -165,7 +150,7 @@ const store = useStore();
   overflow: hidden;
 }
 
-.dark-tile-content .skeleton-box {
+.dark .tile-content .skeleton-box {
   background: linear-gradient(
     90deg,
     rgba(255, 255, 255, 0.04),
@@ -175,7 +160,7 @@ const store = useStore();
   background-size: 200% 100%;
 }
 
-.light-tile-content .skeleton-box {
+:root:not(.dark) .tile-content .skeleton-box {
   background: linear-gradient(
     90deg,
     rgba(0, 0, 0, 0.04),

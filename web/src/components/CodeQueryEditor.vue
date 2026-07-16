@@ -75,6 +75,7 @@ const loadMonaco = async () => {
 import { vrlLanguageDefinition } from "@/utils/query/vrlLanguageDefinition";
 
 import { useStore } from "vuex";
+import { useTheme } from "@/composables/useTheme";
 import { debounce } from "lodash-es";
 import searchState from "@/composables/useLogs/searchState";
 import { useNLQuery } from "@/composables/useNLQuery";
@@ -177,6 +178,7 @@ export default defineComponent({
   ],
   setup(props, { emit }) {
     const store = useStore();
+    const { isDark } = useTheme();
     const { t } = useI18n();
     const { showErrorNotification } = useNotifications();
     const editorRef: any = ref();
@@ -362,11 +364,11 @@ export default defineComponent({
     ];
 
     watch(
-      () => store.state.theme,
+      () => isDark.value,
       () => {
         if (!monaco) return;
         monaco.editor.setTheme(
-          store.state.theme == "dark" ? "myCustomDarkTheme" : "myCustomTheme",
+          isDark.value ? "myCustomDarkTheme" : "myCustomTheme",
         );
       },
     );
@@ -649,7 +651,7 @@ export default defineComponent({
       editorObj = monaco.editor.create(editorElement as HTMLElement, {
         value: props.query?.trim(),
         language: props.language,
-        theme: store.state.theme == "dark" ? "myCustomDarkTheme" : "myCustomTheme",
+        theme: isDark.value ? "myCustomDarkTheme" : "myCustomTheme",
         showFoldingControls: enableCodeFolding.value ? "always" : "never",
         folding: enableCodeFolding.value,
         wordWrap: "on",
@@ -877,11 +879,11 @@ export default defineComponent({
     );
 
     watch(
-      () => store.state.theme,
+      () => isDark.value,
       () => {
         if (!monaco) return;
         monaco.editor.setTheme(
-          store.state.theme == "dark" ? "myCustomDarkTheme" : "myCustomTheme",
+          isDark.value ? "myCustomDarkTheme" : "myCustomTheme",
         );
       },
     );
@@ -1171,7 +1173,7 @@ export default defineComponent({
 
     // Computed property for AI icon based on theme
     const aiIcon = computed(() => {
-      return store.state.theme === "dark"
+      return isDark.value
         ? getImageURL("images/common/ai_icon_dark.svg")
         : getImageURL("images/common/ai_icon_gradient.svg");
     });
@@ -1283,12 +1285,12 @@ export default defineComponent({
 }
 
 /* Light mode shadow - matches O2 AI Assistant with purple glow */
-.light-mode .streaming-preview-card {
+:root:not(.dark)  .streaming-preview-card {
   box-shadow: 0 0.25rem 1rem 0 rgba(139, 92, 246, 0.2);
 }
 
 /* Dark mode shadow - matches O2 AI Assistant with purple glow */
-.dark-mode .streaming-preview-card {
+.dark  .streaming-preview-card {
   box-shadow: 0 0.25rem 1rem 0 rgba(139, 92, 246, 0.3);
 }
 

@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="relative z-1">
             <img
               :src="
-                store.state.theme == 'dark'
+                isDark
                   ? getImageURL('images/common/openobserve_latest_dark_2.svg')
                   : getImageURL('images/common/openobserve_latest_light_2.svg')
               "
@@ -324,6 +324,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { defineComponent, ref, onMounted } from "vue";
 import { useStore } from "vuex";
+import { useTheme } from "@/composables/useTheme";
 import { getImageURL } from "../utils/zincutils";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
@@ -349,6 +350,7 @@ export default defineComponent({
   },
   setup() {
     const store = useStore();
+    const { isDark } = useTheme();
     const router = useRouter();
     const pageData = ref("Page Data");
     const { t } = useI18n();
@@ -429,6 +431,7 @@ export default defineComponent({
     };
 
     return {
+      isDark,
       t,
       store,
       config,

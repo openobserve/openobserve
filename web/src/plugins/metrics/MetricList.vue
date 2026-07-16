@@ -17,7 +17,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     class="flex flex-col w-full index-menu"
-    :class="store.state.theme == 'dark' ? 'theme-dark' : 'theme-light'"
   >
     <OSelect
       data-test="log-search-index-list-select-stream"

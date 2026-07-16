@@ -121,6 +121,8 @@
     --color-syntax-deletion-bg: #67060c;
     /* AI idle washes are denser in dark for legibility */
     --color-gradient-ai-subtle: linear-gradient(135deg, rgba(139,92,246,0.5) 0%, rgba(236,72,153,0.5) 100%);
+    --color-chat-bubble-user: linear-gradient(135deg, #1e2235 0%, #252a3d 100%);
+    --color-chat-bubble-ai:   linear-gradient(135deg, #2a2d47 0%, #1e213a 100%);
 
     /* --- Surfaces (mapped — elevation order preserved from light mode) --- */
     --color-surface-base:         var(--d-base);    /* content card + table canvas (lifted) */

@@ -1154,25 +1154,25 @@ watch(
 }
 
 /* Dark mode support */
-body.body--dark .analysis-content {
+.dark .analysis-content {
   background: #2a2a2a !important;
 }
 
-body.body--dark .dimension-sidebar {
+.dark .dimension-sidebar {
   background: #202223 !important;
 }
 
-body.body--dark .dimension-list-item {
+.dark .dimension-list-item {
   border-bottom-color: rgba(255, 255, 255, 0.1);
 }
 
-body.body--dark .dimension-list-item:hover {
+.dark .dimension-list-item:hover {
   background-color: rgba(255, 255, 255, 0.05);
 }
 
 /* Time range chips: dark mode text adjustment */
-body.body--dark .time-range-chip.baseline-chip,
-body.body--dark .time-range-chip.selected-chip {
+.dark .time-range-chip.baseline-chip,
+.dark .time-range-chip.selected-chip {
   color: color-mix(in srgb, var(--chip-color) 80%, #fff) !important;
 }
 </style>

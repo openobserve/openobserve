@@ -1,7 +1,7 @@
 <template>
   <div
     style="width: 60vw; height: calc(100vh - 59px)"
-    class="bg-surface-base"
+    :class="'bg-surface-base'"
   >
     <div
       class="flex items-center flex-nowrap justify-between px-4 py-2"

@@ -298,6 +298,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts" setup>
 import { ref, onMounted, watch, nextTick } from "vue";
 import { useStore } from "vuex";
+import { useTheme } from "@/composables/useTheme";
 import { formatToDateOnly } from "@/utils/date";
 import incidentsService from "@/services/incidents";
 import DOMPurify from "dompurify";
@@ -318,6 +319,7 @@ interface Props {
 const props = defineProps<Props>();
 
 const store = useStore();
+const { isDark } = useTheme();
 
 const events = ref<any[]>([]);
 const loading = ref(false);
@@ -476,11 +478,10 @@ const getEventBadgeColor = (event: any): string => {
 // theme-conditional (denser bg/border + white text in dark) via color-mix, so
 // the token stays the single color source. (Theme read migrates in the D19/D20 sweep.)
 const badgeStyle = (c: string) => {
-  const isDark = store.state.theme === "dark";
   return {
-    backgroundColor: `color-mix(in srgb, ${c} ${isDark ? "19%" : "8%"}, transparent)`,
-    border: `1px solid color-mix(in srgb, ${c} ${isDark ? "31%" : "19%"}, transparent)`,
-    color: isDark ? "var(--color-grey-0)" : c,
+    backgroundColor: `color-mix(in srgb, ${c} ${isDark.value ? "19%" : "8%"}, transparent)`,
+    border: `1px solid color-mix(in srgb, ${c} ${isDark.value ? "31%" : "19%"}, transparent)`,
+    color: isDark.value ? "var(--color-grey-0)" : c,
   };
 };
 
@@ -520,8 +521,7 @@ const getSeverityColor = (severity: string): string => {
 const getInlineEventText = (event: any): string => {
   const data = event.data;
   const eventColor = getEventBadgeColor(event);
-  const isDark = store.state.theme === 'dark';
-  const opacity = isDark ? '50' : '40';
+  const opacity = isDark.value ? '50' : '40';
   // Escape user-controlled strings before embedding in HTML (XSS prevention)
   const esc = (s: string) => String(s)
     .replace(/&/g, '&amp;')
@@ -530,7 +530,7 @@ const getInlineEventText = (event: any): string => {
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
   const bold = (text: string) => `<span style="font-weight: 600; color: ${eventColor};">${esc(text)}</span>`;
-  const severityBadge = (severity: string) => `<span style="display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; background-color: color-mix(in srgb, ${getSeverityColor(severity)} ${isDark ? '31%' : '25%'}, transparent); color: ${isDark ? 'var(--color-grey-0)' : getSeverityColor(severity)}; border: 1px solid color-mix(in srgb, ${getSeverityColor(severity)} ${isDark ? '38%' : '25%'}, transparent);">${esc(severity)}</span>`;
+  const severityBadge = (severity: string) => `<span style="display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; background-color: color-mix(in srgb, ${getSeverityColor(severity)} ${isDark.value ? '31%' : '25%'}, transparent); color: ${isDark.value ? 'var(--color-grey-0)' : getSeverityColor(severity)}; border: 1px solid color-mix(in srgb, ${getSeverityColor(severity)} ${isDark.value ? '38%' : '25%'}, transparent);">${esc(severity)}</span>`;
   const isSystemEvent = getUserId(event) === 'System';
 
   switch (event.type) {

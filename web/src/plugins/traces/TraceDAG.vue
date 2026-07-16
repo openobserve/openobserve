@@ -523,7 +523,7 @@ export default defineComponent({
 </script>
 
 <style>
-.body--dark .trace-dag-flow .vue-flow__background {
+.dark .trace-dag-flow .vue-flow__background {
   background-color: #1e1e1e !important;
 }
 

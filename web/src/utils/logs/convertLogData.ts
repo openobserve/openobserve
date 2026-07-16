@@ -103,7 +103,7 @@ export const convertLogData = (
           ? params.itemStyle
           : {
               color: (() => {
-                const isDarkMode = document.body.classList.contains('body--dark');
+                const isDarkMode = document.documentElement.classList.contains('dark');
                 if (isDarkMode) {
                   return getComputedStyle(document.body)
                     .getPropertyValue("--color-theme-accent")

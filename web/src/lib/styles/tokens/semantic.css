@@ -321,6 +321,9 @@
   --color-brand-email-hover:  #0056b3;
   --color-promo-webinar-link:       #1e3a8a;
   --color-promo-webinar-link-hover: #1e40af;
+  /* AI-chat message bubbles — subtle theme-aware gradient tints (dark in dark.css). */
+  --color-chat-bubble-user: linear-gradient(135deg, #f0f4ff 0%, #e8f0fe 100%);
+  --color-chat-bubble-ai:   linear-gradient(135deg, #f8f9ff 0%, #e8edff 100%);
   /* Destination-preview brand replicas (Slack/Teams/Email message mockups) —
      FIXED, theme-independent (must look like the real product in any app theme). */
   --color-brand-msg-text: #4a5568;

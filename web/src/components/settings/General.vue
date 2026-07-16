@@ -512,6 +512,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, defineComponent, onActivated, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
+import { useTheme } from "@/composables/useTheme";
 import { useRouter } from "vue-router";
 import organizations from "@/services/organizations";
 import usersService from "@/services/users";
@@ -571,6 +572,7 @@ export default defineComponent({
     const { t } = useI18n();
 
     const store = useStore();
+    const { isDark } = useTheme();
     const router: any = useRouter();
 
     // Schema-driven validation replaces the manual scrapeIntervalError /
@@ -663,7 +665,7 @@ export default defineComponent({
 
       // Apply the theme colors if they changed
       if (shouldApply) {
-        const currentMode = store.state.theme === "dark" ? "dark" : "light";
+        const currentMode = isDark.value ? "dark" : "light";
         const color = currentMode === "light" ? newLightColor : newDarkColor;
         const isDefault =
           color === DEFAULT_LIGHT_COLOR || color === DEFAULT_DARK_COLOR;
@@ -814,7 +816,7 @@ export default defineComponent({
         );
 
         // Apply the current mode's theme
-        const currentMode = store.state.theme === "dark" ? "dark" : "light";
+        const currentMode = isDark.value ? "dark" : "light";
         const color =
           currentMode === "light"
             ? customLightColor.value
@@ -1057,7 +1059,7 @@ export default defineComponent({
       // Apply the theme immediately for current mode.
       // isDefault=false so the default theme's (O2 Signature) actual colors are
       // applied rather than reverting to the base stylesheet palette.
-      const currentMode = store.state.theme === "dark" ? "dark" : "light";
+      const currentMode = isDark.value ? "dark" : "light";
       const color =
         currentMode === "light" ? DEFAULT_LIGHT_COLOR : DEFAULT_DARK_COLOR;
       applyThemeColors(color, currentMode, false);
@@ -1175,7 +1177,7 @@ export default defineComponent({
 
         // Re-apply the correct (saved) colors for the current mode so the rest
         // of the app doesn't remain stuck with the preview's CSS variables.
-        const currentMode = store.state.theme === "dark" ? "dark" : "light";
+        const currentMode = isDark.value ? "dark" : "light";
         const defaultLight = store.state.defaultThemeColors?.light || "#3F7994";
         const defaultDark = store.state.defaultThemeColors?.dark || "#5B9FBE";
 
@@ -1262,15 +1264,15 @@ export default defineComponent({
 
 <style>
 /* The theme chips' dark background/border are set via `dark:*` utilities,
-   which don't apply in this app (dark mode is toggled by `body.body--dark`,
+   which don't apply in this app (dark mode is toggled by `.dark`,
    not the OS media query Tailwind's `dark:` variant targets). Restore them
    with class-based rules so the chips keep their fill + border in dark mode. */
-.body--dark [data-test="theme-light-chip"],
-.body--dark [data-test="theme-dark-chip"] {
+.dark [data-test="theme-light-chip"],
+.dark [data-test="theme-dark-chip"] {
   background: rgba(255, 255, 255, 0.05);
   border-color: rgba(255, 255, 255, 0.15);
 }
-.body--dark [data-test="reset-theme-colors-btn"] {
+.dark [data-test="reset-theme-colors-btn"] {
   border-color: rgba(255, 255, 255, 0.25);
 }
 </style>

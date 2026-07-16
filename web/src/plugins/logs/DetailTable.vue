@@ -124,7 +124,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             pagination="none"
             :default-columns="false"
             class="o2-table o2-row-md o2-schema-table log-detail-source-table w-full border border-solid border-card-glass-border"
-            :class="store.state.theme === 'dark' && 'dark'"
           >
             <template #cell-field="{ row, value }">
               <div
@@ -426,6 +425,7 @@ import { defineComponent, ref, reactive, onBeforeMount, computed, watch } from "
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
+import { useTheme } from "@/composables/useTheme";
 import { getImageURL } from "../../utils/zincutils";
 import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
@@ -546,6 +546,7 @@ export default defineComponent({
     const rowData: any = ref({});
     const router = useRouter();
     const store = useStore();
+    const { isDark } = useTheme();
     const tableDropdownOpenMap = reactive<Record<string, boolean>>({});
     const tab = ref(props.initialTab || "json");
     const selectedRelativeValue = ref<number>(10);
@@ -800,14 +801,14 @@ export default defineComponent({
     };
 
     const getBtnLogo = computed(() => {
-      return store.state.theme === "dark"
+      return isDark.value
         ? getImageURL("images/common/ai_icon_dark.svg")
         : getImageURL("images/common/ai_icon_gradient.svg");
     });
 
     const regexIcon = computed(() => {
       return getImageURL(
-        store.state.theme == "dark"
+        isDark.value
           ? "images/regex_pattern/regex_icon_dark.svg"
           : "images/regex_pattern/regex_icon_light.svg",
       );

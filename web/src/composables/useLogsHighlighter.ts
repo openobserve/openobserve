@@ -26,13 +26,15 @@ import { getThemeColors } from "@/utils/logs/keyValueParser";
 import { escapeHtml } from "@/utils/html";
 import { computed, ref, watch, onBeforeUnmount, getCurrentInstance } from "vue";
 import { useStore } from "vuex";
+import { useTheme } from "@/composables/useTheme";
 import { searchState } from "@/composables/useLogs/searchState";
 
 export function useLogsHighlighter() {
   const processedResults = ref({});
 
   const store = useStore();
-  const currentColors = ref(getThemeColors(store.state.theme === "dark"));
+  const { isDark } = useTheme();
+  const currentColors = ref(getThemeColors(isDark.value));
   const { searchObj } = searchState();
 
   // Track active processing to prevent memory leaks
@@ -60,7 +62,7 @@ export function useLogsHighlighter() {
   }
 
   watch(
-    () => store.state.theme,
+    () => isDark.value,
     (newTheme) => {
       currentColors.value = getThemeColors(newTheme === "dark");
     },

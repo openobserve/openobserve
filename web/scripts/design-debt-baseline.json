@@ -1,26 +1,22 @@
 {
   "totals": {
-    "themeTernary": 151,
-    "darkMechanism": 310,
-    "rawPalette": 57,
+    "rawPalette": 53,
     "arbPx": 174,
     "arbRadius": 25,
     "unscopedStyle": 204,
     "arbZ": 48,
-    "styleBlockHex": 556,
+    "styleBlockHex": 480,
     "stylePxUnit": 1015,
+    "darkMechanism": 51,
     "inlineHexStyle": 21,
+    "themeTernary": 24,
     "tsHex": 471,
     "inlineHexBind": 6,
     "bareRounded": 10,
-    "hexClass": 40,
+    "hexClass": 32,
     "arbTextSize": 3
   },
   "files": {
-    "App.vue": {
-      "themeTernary": 1,
-      "darkMechanism": 1
-    },
     "components/actionScripts/EditScript.vue": {
       "rawPalette": 5
     },
@@ -42,9 +38,7 @@
       "arbPx": 3
     },
     "components/ai_toolsets/AddAiToolset.vue": {
-      "rawPalette": 4,
-      "themeTernary": 1,
-      "darkMechanism": 1
+      "rawPalette": 4
     },
     "components/alerts/AddAlert.vue": {
       "unscopedStyle": 1,
@@ -98,9 +92,7 @@
     },
     "components/alerts/IncidentDetailDrawer.vue": {
       "rawPalette": 10,
-      "themeTernary": 15,
       "unscopedStyle": 1,
-      "darkMechanism": 18,
       "styleBlockHex": 2,
       "stylePxUnit": 2
     },
@@ -111,14 +103,12 @@
       "inlineHexStyle": 5,
       "themeTernary": 1,
       "unscopedStyle": 1,
-      "darkMechanism": 7,
+      "darkMechanism": 2,
       "styleBlockHex": 16,
       "stylePxUnit": 10
     },
     "components/alerts/IncidentTimeline.vue": {
-      "themeTernary": 2,
       "unscopedStyle": 1,
-      "darkMechanism": 4,
       "stylePxUnit": 2
     },
     "components/alerts/PrebuiltDestinationSelector.vue": {
@@ -137,26 +127,10 @@
       "stylePxUnit": 3
     },
     "components/alerts/steps/Advanced.vue": {
-      "themeTernary": 1,
-      "arbPx": 1,
-      "darkMechanism": 1
-    },
-    "components/alerts/steps/AlertSettings.vue": {
-      "themeTernary": 1,
-      "darkMechanism": 1
-    },
-    "components/alerts/steps/CompareWithPast.vue": {
-      "themeTernary": 1,
-      "darkMechanism": 1
-    },
-    "components/alerts/steps/Deduplication.vue": {
-      "themeTernary": 1,
-      "darkMechanism": 1
+      "arbPx": 1
     },
     "components/alerts/steps/QueryConfig.vue": {
-      "themeTernary": 1,
       "unscopedStyle": 1,
-      "darkMechanism": 1,
       "styleBlockHex": 1,
       "stylePxUnit": 8
     },
@@ -182,9 +156,7 @@
       "arbPx": 2
     },
     "components/CodeQueryEditor.vue": {
-      "themeTernary": 4,
       "unscopedStyle": 1,
-      "darkMechanism": 6,
       "styleBlockHex": 8,
       "stylePxUnit": 5
     },
@@ -227,9 +199,7 @@
       "stylePxUnit": 7
     },
     "components/cross-linking/CrossLinkUserGuide.vue": {
-      "themeTernary": 1,
-      "unscopedStyle": 1,
-      "darkMechanism": 1
+      "unscopedStyle": 1
     },
     "components/CustomDateTimePicker.vue": {
       "arbPx": 2,
@@ -353,15 +323,8 @@
       "arbPx": 1
     },
     "components/dashboards/settings/VariableAdHocValueSelector.vue": {
-      "rawPalette": 4,
-      "themeTernary": 2,
       "bareRounded": 1,
-      "unscopedStyle": 1,
-      "darkMechanism": 2
-    },
-    "components/dashboards/settings/VariableSettings.vue": {
-      "themeTernary": 1,
-      "darkMechanism": 1
+      "unscopedStyle": 1
     },
     "components/DatabaseDeprecationBanner.vue": {
       "themeTernary": 1,
@@ -412,18 +375,12 @@
       "unscopedStyle": 1,
       "stylePxUnit": 4
     },
-    "components/Header.vue": {
-      "themeTernary": 3,
-      "darkMechanism": 3
-    },
     "components/iam/quota/Quota.vue": {
       "hexClass": 6,
       "inlineHexStyle": 1,
       "inlineHexBind": 1,
-      "themeTernary": 6,
       "unscopedStyle": 1,
-      "arbZ": 2,
-      "darkMechanism": 12
+      "arbZ": 2
     },
     "components/iam/roles/PermissionsTable.vue": {
       "unscopedStyle": 1,
@@ -492,10 +449,6 @@
       "styleBlockHex": 38,
       "stylePxUnit": 86
     },
-    "components/JsonPreview.vue": {
-      "themeTernary": 1,
-      "darkMechanism": 1
-    },
     "components/logs/LogsHighLighting.vue": {
       "themeTernary": 1,
       "unscopedStyle": 1,
@@ -516,12 +469,9 @@
       "stylePxUnit": 4
     },
     "components/O2AIChat.vue": {
-      "hexClass": 8,
-      "themeTernary": 14,
       "unscopedStyle": 1,
       "arbZ": 2,
-      "darkMechanism": 42,
-      "styleBlockHex": 131,
+      "styleBlockHex": 55,
       "stylePxUnit": 216
     },
     "components/O2AIConfirmDialog.vue": {
@@ -569,7 +519,7 @@
     },
     "components/PredefinedThemes.vue": {
       "themeTernary": 1,
-      "darkMechanism": 2
+      "darkMechanism": 1
     },
     "components/promql/components/OperationsList.vue": {
       "rawPalette": 1,
@@ -589,9 +539,7 @@
       "stylePxUnit": 1
     },
     "components/reports/CreateReport.vue": {
-      "rawPalette": 7,
-      "themeTernary": 1,
-      "darkMechanism": 1
+      "rawPalette": 7
     },
     "components/RichTextInput.vue": {
       "unscopedStyle": 1,
@@ -611,9 +559,7 @@
       "unscopedStyle": 1
     },
     "components/rum/EventDetailDrawerContent.vue": {
-      "themeTernary": 1,
-      "unscopedStyle": 1,
-      "darkMechanism": 1
+      "unscopedStyle": 1
     },
     "components/rum/PlayerEventsSidebar.vue": {
       "unscopedStyle": 1
@@ -646,15 +592,13 @@
       "darkMechanism": 1
     },
     "components/settings/General.vue": {
-      "themeTernary": 7,
-      "unscopedStyle": 1,
-      "darkMechanism": 11,
-      "styleBlockHex": 3
-    },
-    "components/settings/License.vue": {
       "themeTernary": 3,
       "unscopedStyle": 1,
       "darkMechanism": 3,
+      "styleBlockHex": 3
+    },
+    "components/settings/License.vue": {
+      "unscopedStyle": 1,
       "styleBlockHex": 2,
       "stylePxUnit": 1
     },
@@ -676,15 +620,11 @@
     "components/settings/OrgStorageEditor.vue": {
       "inlineHexStyle": 1,
       "inlineHexBind": 1,
-      "themeTernary": 6,
-      "arbZ": 1,
-      "darkMechanism": 7
+      "arbZ": 1
     },
     "components/settings/OrgStorageSettings.vue": {
-      "themeTernary": 6,
       "arbRadius": 1,
       "arbPx": 7,
-      "darkMechanism": 6,
       "styleBlockHex": 1,
       "stylePxUnit": 2
     },
@@ -714,10 +654,10 @@
       "unscopedStyle": 1
     },
     "components/TenstackTable.vue": {
-      "themeTernary": 2,
+      "themeTernary": 1,
       "unscopedStyle": 2,
       "arbPx": 4,
-      "darkMechanism": 2,
+      "darkMechanism": 1,
       "stylePxUnit": 1
     },
     "components/ThemeSwitcher.vue": {
@@ -742,17 +682,11 @@
     "composables/dashboard/usePanelFields.ts": {
       "tsHex": 12
     },
-    "composables/useAiIcon.ts": {
-      "darkMechanism": 1
-    },
     "composables/useAlertForm.ts": {
       "tsHex": 1
     },
     "composables/useLatencyInsightsDashboard.ts": {
       "tsHex": 4
-    },
-    "composables/useLogsHighlighter.ts": {
-      "darkMechanism": 1
     },
     "composables/useMetricsCorrelationDashboard.ts": {
       "tsHex": 2
@@ -853,10 +787,8 @@
       "stylePxUnit": 1
     },
     "layouts/MainLayout.vue": {
-      "themeTernary": 3,
       "bareRounded": 1,
-      "unscopedStyle": 1,
-      "darkMechanism": 3
+      "unscopedStyle": 1
     },
     "lib/core/Badge/OBadge.vue": {
       "bareRounded": 1
@@ -967,7 +899,6 @@
     },
     "lib/core/Navbar/ONavbar.vue": {
       "unscopedStyle": 1,
-      "darkMechanism": 1,
       "styleBlockHex": 1,
       "stylePxUnit": 2
     },
@@ -1068,25 +999,11 @@
       "rawPalette": 1
     },
     "plugins/logs/DetailTable.vue": {
-      "themeTernary": 3,
-      "unscopedStyle": 1,
-      "darkMechanism": 3
-    },
-    "plugins/logs/FunctionSelector.vue": {
-      "themeTernary": 3,
-      "darkMechanism": 3
+      "unscopedStyle": 1
     },
     "plugins/logs/Index.vue": {
       "unscopedStyle": 1,
       "stylePxUnit": 2
-    },
-    "plugins/logs/IndexList.vue": {
-      "themeTernary": 1,
-      "darkMechanism": 1
-    },
-    "plugins/logs/JsonPreview.vue": {
-      "themeTernary": 5,
-      "darkMechanism": 5
     },
     "plugins/logs/patterns/PatternCard.vue": {
       "unscopedStyle": 1
@@ -1096,7 +1013,6 @@
     },
     "plugins/logs/patterns/PatternList.vue": {
       "unscopedStyle": 1,
-      "darkMechanism": 1,
       "styleBlockHex": 2,
       "stylePxUnit": 1
     },
@@ -1105,52 +1021,26 @@
       "stylePxUnit": 2
     },
     "plugins/logs/SearchBar.vue": {
-      "themeTernary": 11,
       "unscopedStyle": 1,
       "arbPx": 3,
-      "arbZ": 4,
-      "darkMechanism": 11
-    },
-    "plugins/logs/SearchJobInspector.vue": {
-      "themeTernary": 2,
-      "darkMechanism": 2
-    },
-    "plugins/logs/SearchResult.vue": {
-      "themeTernary": 3,
-      "darkMechanism": 3
-    },
-    "plugins/logs/SyntaxGuide.vue": {
-      "themeTernary": 1,
-      "darkMechanism": 1
+      "arbZ": 4
     },
     "plugins/logs/TenstackTable.vue": {
-      "themeTernary": 1,
       "unscopedStyle": 2,
       "arbPx": 1,
-      "darkMechanism": 1,
       "styleBlockHex": 4,
       "stylePxUnit": 2
     },
-    "plugins/logs/TransformSelector.vue": {
-      "themeTernary": 3,
-      "darkMechanism": 4
-    },
     "plugins/metrics/MetricLegends.vue": {
-      "themeTernary": 1,
-      "unscopedStyle": 1,
-      "darkMechanism": 1
+      "unscopedStyle": 1
     },
     "plugins/metrics/MetricList.vue": {
-      "themeTernary": 1,
       "unscopedStyle": 1,
-      "arbZ": 1,
-      "darkMechanism": 1
+      "arbZ": 1
     },
     "plugins/metrics/SyntaxGuideMetrics.vue": {
-      "themeTernary": 1,
       "unscopedStyle": 1,
-      "arbPx": 16,
-      "darkMechanism": 1
+      "arbPx": 16
     },
     "plugins/pipelines/CustomNode.vue": {
       "inlineHexStyle": 1,
@@ -1158,7 +1048,6 @@
       "unscopedStyle": 1,
       "arbPx": 13,
       "arbZ": 7,
-      "darkMechanism": 12,
       "styleBlockHex": 18,
       "stylePxUnit": 22
     },
@@ -1171,7 +1060,6 @@
     },
     "plugins/traces/components/TraceErrorTab.vue": {
       "unscopedStyle": 1,
-      "darkMechanism": 14,
       "styleBlockHex": 28,
       "stylePxUnit": 1
     },
@@ -1200,9 +1088,7 @@
       "stylePxUnit": 23
     },
     "plugins/traces/LLMInsightsSkeleton.vue": {
-      "themeTernary": 6,
       "unscopedStyle": 1,
-      "darkMechanism": 6,
       "styleBlockHex": 7
     },
     "plugins/traces/LLMSchemaPanel.vue": {
@@ -1213,7 +1099,6 @@
     },
     "plugins/traces/metrics/TracesAnalysisDashboard.vue": {
       "unscopedStyle": 1,
-      "darkMechanism": 6,
       "styleBlockHex": 6,
       "stylePxUnit": 1
     },
@@ -1235,7 +1120,6 @@
     "plugins/traces/ServiceGraphNodeSidePanel.vue": {
       "hexClass": 1,
       "unscopedStyle": 1,
-      "darkMechanism": 8,
       "styleBlockHex": 22,
       "stylePxUnit": 3
     },
@@ -1257,10 +1141,6 @@
       "inlineHexStyle": 1,
       "inlineHexBind": 1
     },
-    "plugins/traces/SyntaxGuide.vue": {
-      "themeTernary": 1,
-      "darkMechanism": 1
-    },
     "plugins/traces/ThreadToolCalls.vue": {
       "themeTernary": 1,
       "darkMechanism": 2,
@@ -1269,31 +1149,26 @@
     },
     "plugins/traces/ThreadView.vue": {
       "hexClass": 17,
-      "themeTernary": 1,
       "arbRadius": 1,
       "unscopedStyle": 1,
       "arbPx": 6,
       "arbZ": 1,
-      "darkMechanism": 2,
       "styleBlockHex": 34,
       "stylePxUnit": 9
     },
     "plugins/traces/TraceDAG.vue": {
       "unscopedStyle": 1,
-      "darkMechanism": 1,
       "styleBlockHex": 1
     },
     "plugins/traces/TraceDetails.vue": {
       "arbRadius": 1,
       "unscopedStyle": 2,
       "arbPx": 6,
-      "darkMechanism": 3,
       "stylePxUnit": 2
     },
     "plugins/traces/TraceDetailsSidebar.vue": {
       "inlineHexStyle": 1,
       "unscopedStyle": 3,
-      "darkMechanism": 28,
       "styleBlockHex": 61,
       "stylePxUnit": 71
     },
@@ -1375,7 +1250,7 @@
     },
     "utils/logs/convertLogData.ts": {
       "tsHex": 40,
-      "darkMechanism": 2
+      "darkMechanism": 1
     },
     "utils/logs/keyValueParser.ts": {
       "tsHex": 26
@@ -1394,7 +1269,7 @@
     },
     "utils/theme.ts": {
       "tsHex": 23,
-      "darkMechanism": 3
+      "darkMechanism": 2
     },
     "utils/themeManager.ts": {
       "darkMechanism": 1
@@ -1411,10 +1286,6 @@
     "utils/traces/treeVisualizationEngine.ts": {
       "tsHex": 22
     },
-    "views/About.vue": {
-      "themeTernary": 1,
-      "darkMechanism": 1
-    },
     "views/AwsMarketplaceSetup.vue": {
       "themeTernary": 1,
       "darkMechanism": 1
@@ -1426,10 +1297,6 @@
     "views/CorrelationDemo.vue": {
       "unscopedStyle": 1,
       "stylePxUnit": 2
-    },
-    "views/Dashboards/addPanel/AddPanel.vue": {
-      "themeTernary": 1,
-      "darkMechanism": 1
     },
     "views/Dashboards/DashboardSettings.vue": {
       "unscopedStyle": 1

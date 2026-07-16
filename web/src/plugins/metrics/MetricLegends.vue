@@ -11,7 +11,7 @@
         <span>{{ t("search.legendLabel") }}</span>
       </OButton>
     </template>
-    <div :class="store.state.theme == 'dark' ? 'theme-dark' : 'theme-light'" class="px-2 pt-1.5 pb-1">
+    <div class="px-2 pt-1.5 pb-1">
       <div class="metric-legends-title">
         <div class="label">{{ t("search.legendLabel") }}</div>
       </div>

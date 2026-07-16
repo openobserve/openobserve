@@ -288,6 +288,7 @@ const emit = defineEmits<{
 }>();
 
 import { useStore } from "vuex";
+import { useTheme } from "@/composables/useTheme";
 import {
   getModel,
   getCost,
@@ -305,7 +306,7 @@ import { renderMarkdown } from "./markdown";
 
 const store = useStore();
 
-const isDark = computed(() => store.state.theme === "dark");
+const { isDark } = useTheme();
 
 interface ThreadHead {
   systemPrompt: string;
@@ -536,67 +537,67 @@ function formatTime(ns: number): string {
 }
 
 /* ─── dark mode overrides — all descendant selectors, cannot inline ───── */
-.thread-view--dark .thread-bubble--user {
+.dark .thread-view .thread-bubble--user {
   background: linear-gradient(135deg, #2a2d47 0%, #1e213a 100%);
   border-color: #3a3d5c;
   color: #e2e8f0;
   box-shadow: 0 1px 2px rgba(255, 255, 255, 0.08);
 }
 
-.thread-view--dark .thread-bubble--assistant {
+.dark .thread-view .thread-bubble--assistant {
   background: #1a1a1a;
   border-color: #333333;
   color: #e2e2e2;
   box-shadow: 0 1px 2px rgba(255, 255, 255, 0.08);
 }
 
-.thread-view--dark .thread-user-avatar {
+.dark .thread-view .thread-user-avatar {
   background: linear-gradient(135deg, #4c63d2 0%, #5a67d8 100%);
   color: #ffffff;
 }
 
-.thread-view--dark .thread-turn__avatar {
+.dark .thread-view .thread-turn__avatar {
   background: rgba(139, 92, 246, 0.16);
   color: #c4b5fd;
   border-color: rgba(139, 92, 246, 0.4);
   box-shadow: 0 0 0 4px var(--color-surface-base);
 }
 
-.thread-view--dark .thread-metric {
+.dark .thread-view .thread-metric {
   background: rgba(255, 255, 255, 0.04);
   border-color: rgba(255, 255, 255, 0.08);
 }
 
-.thread-view--dark .thread-metric--model {
+.dark .thread-view .thread-metric--model {
   color: #c4b5fd;
   background: rgba(139, 92, 246, 0.12);
   border-color: rgba(139, 92, 246, 0.3);
 }
 
-.thread-view--dark .thread-metric--error {
+.dark .thread-view .thread-metric--error {
   color: #f87171;
   background: rgba(248, 113, 113, 0.12);
   border-color: rgba(248, 113, 113, 0.3);
 }
 
-.thread-view--dark .thread-turn__footer {
+.dark .thread-view .thread-turn__footer {
   border-top-color: rgba(255, 255, 255, 0.08);
 }
 
-.thread-view--dark .thread-turn__view-span:hover {
+.dark .thread-view .thread-turn__view-span:hover {
   background: rgba(96, 165, 250, 0.12);
   border-color: rgba(96, 165, 250, 0.3);
 }
 
-.thread-view--dark .thread-system {
+.dark .thread-view .thread-system {
   border-left-color: #a78bfa;
 }
 
-.thread-view--dark .thread-system__head:hover {
+.dark .thread-view .thread-system__head:hover {
   background: rgba(139, 92, 246, 0.08);
 }
 
-.thread-view--dark .thread-system__badge {
+.dark .thread-view .thread-system__badge {
   background: rgba(139, 92, 246, 0.18);
   color: #c4b5fd;
 }

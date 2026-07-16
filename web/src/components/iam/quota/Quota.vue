@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="quota-page text-left h-full flex flex-col"
     :class="
-      store.state.theme === 'dark' ? 'dark-theme-page' : 'light-theme-page'
+      isDark ? 'dark-theme-page' : 'light-theme-page'
     "
   >
     <!-- Standard page header: title + icon + subtitle, matching the other IAM pages. -->
@@ -157,19 +157,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
         <template #bottom />
         <template v-for="col in apiLimitCrudColumnIds" :key="col" #[`cell-${col}`]="{ row, value }">
-          <div v-if="editTable" :style="{ backgroundColor: editTable ? (store.state.theme === 'dark' ? '#212121' : '#f1f1ee') : 'transparent' }">
+          <div v-if="editTable" :style="{ backgroundColor: editTable ? (isDark ? '#212121' : '#f1f1ee') : 'transparent' }">
             <div
               v-if="value != '-'"
               contenteditable="true"
               debounce="500"
               :class="{
                 'editable-cell': editTable,
-                'px-2.5 py-0': editTable && store.state.theme !== 'dark',
-                'bg-[#f1f1ee]': editTable && store.state.theme !== 'dark',
-                'px-2.5': editTable && store.state.theme === 'dark',
+                'px-2.5 py-0': editTable && !isDark,
+                'bg-[#f1f1ee]': editTable && !isDark,
+                'px-2.5': editTable && isDark,
                 'edited-input': isEdited(row.module_name, col),
-                'bg-[#bfc3f4] text-black font-medium': isEdited(row.module_name, col) && store.state.theme !== 'dark',
-                'bg-[#f6f6f6] text-black font-medium [padding:0px!important]': isEdited(row.module_name, col) && store.state.theme === 'dark',
+                'bg-[#bfc3f4] text-black font-medium': isEdited(row.module_name, col) && !isDark,
+                'bg-[#f6f6f6] text-black font-medium [padding:0px!important]': isEdited(row.module_name, col) && isDark,
               }"
               @input="(event: any) => handleInputChange('', row.module_name, value, col, event.target.innerText)"
               @keypress="restrictToNumbers"
@@ -252,12 +252,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     debounce="500"
                     :class="{
                       'editable-cell': true,
-                      'px-2.5 py-0': store.state.theme !== 'dark',
-                      'bg-[#f1f1ee]': store.state.theme !== 'dark',
-                      'px-2.5': store.state.theme === 'dark',
+                      'px-2.5 py-0': !isDark,
+                      'bg-[#f1f1ee]': !isDark,
+                      'px-2.5': isDark,
                       'edited-input': isEdited(moduleRow.module_name, col),
-                      'bg-[#bfc3f4] text-black font-medium': isEdited(moduleRow.module_name, col) && store.state.theme !== 'dark',
-                      'bg-[#f6f6f6] text-black font-medium [padding:0px!important]': isEdited(moduleRow.module_name, col) && store.state.theme === 'dark',
+                      'bg-[#bfc3f4] text-black font-medium': isEdited(moduleRow.module_name, col) && !isDark,
+                      'bg-[#f6f6f6] text-black font-medium [padding:0px!important]': isEdited(moduleRow.module_name, col) && isDark,
                     }"
                     @input="(event: any) => handleInputChange(row.role_name, moduleRow.module_name, moduleRow[col], col, event.target.innerText)"
                     @keypress="restrictToNumbers"
@@ -403,6 +403,7 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { COL } from "@/lib/core/Table/OTable.types";
 import { useStore } from "vuex";
+import { useTheme } from "@/composables/useTheme";
 import organizationsService from "@/services/organizations";
 import AppTabs from "@/components/common/AppTabs.vue";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
@@ -438,6 +439,7 @@ export default defineComponent({
     const { t } = useI18n();
     const selectedOrganization = ref<any>(null);
     const store = useStore();
+    const { isDark } = useTheme();
     const organizations = ref<any[]>([]);
     const isOrgLoading = ref<boolean>(false);
     const resultTotal = ref<number>(0);
@@ -1534,6 +1536,7 @@ export default defineComponent({
     };
 
     return {
+      isDark,
       t,
       selectedOrganization,
       organizations,

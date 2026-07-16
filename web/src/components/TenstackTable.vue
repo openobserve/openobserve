@@ -995,7 +995,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             ]
                           "
                           :key="`${cell.column.id}_${calculateActualIndex(virtualRow.index)}`"
-                          :class="store.state.theme === 'dark' ? 'dark' : ''"
                           v-html="
                             processedResults[
                               `${cell.column.id}_${calculateActualIndex(virtualRow.index)}`

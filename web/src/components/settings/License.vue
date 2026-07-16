@@ -261,10 +261,10 @@
       </div>
 
       <div class="col-span-1 self-start">
-        <OCard class="futuristic-card border border-solid" :class="store.state.theme === 'dark' ? 'bg-[linear-gradient(135deg,rgba(99,102,241,0.08)_0%,rgba(168,85,247,0.08)_100%)] border-[rgba(99,102,241,0.25)]' : 'border-card-glass-border'">
+        <OCard class="futuristic-card border border-solid border-card-glass-border dark:bg-[linear-gradient(135deg,rgba(99,102,241,0.08)_0%,rgba(168,85,247,0.08)_100%)] dark:border-[rgba(99,102,241,0.25)]">
           <OCardSection class="p-3">
             <div>
-              <div :class="store.state.theme === 'dark' ? 'bg-[radial-gradient(ellipse_at_center,rgba(99,102,241,0.15)_0%,transparent_70%)]' : ''"></div>
+              <div class="dark:bg-[radial-gradient(ellipse_at_center,rgba(99,102,241,0.15)_0%,transparent_70%)]"></div>
               <div class="text-xl font-semibold relative z-10">
                 {{ t("about.usage_information") }}
               </div>
@@ -272,7 +272,7 @@
 
             <div class="flex flex-col gap-2 mt-3">
               <!-- Summary Message -->
-              <div class="ingestion-summary-compact border border-solid rounded-lg py-3 px-3.5 [backdrop-filter:blur(10px)] relative overflow-hidden" :class="store.state.theme === 'dark' ? 'bg-[linear-gradient(135deg,rgba(99,102,241,0.1)_0%,rgba(168,85,247,0.1)_100%)] border-[rgba(99,102,241,0.3)]' : 'border-[rgba(99,102,241,0.2)]'">
+              <div class="ingestion-summary-compact border border-solid rounded-lg py-3 px-3.5 [backdrop-filter:blur(10px)] relative overflow-hidden border-[rgba(99,102,241,0.2)] dark:bg-[linear-gradient(135deg,rgba(99,102,241,0.1)_0%,rgba(168,85,247,0.1)_100%)] dark:border-[rgba(99,102,241,0.3)]">
                 <div class="summary-text-compact text-sm leading-[1.6] text-inherit text-compact">
                   <!-- Line 1: License Info -->
                   <div class="flex items-center gap-2 mb-2">

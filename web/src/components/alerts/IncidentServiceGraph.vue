@@ -656,10 +656,10 @@ export default defineComponent({
    us a white card with invisible (same-color) text. */
 
 /* Dark-mode overrides — using both signals so it works regardless of which
-   class is currently toggled (theme.ts toggles both `body.body--dark` and
+   class is currently toggled (theme.ts toggles both `.dark` and
    `html.dark`). Vue scoped CSS scopes only the rightmost selector. */
 html.dark .graph-legend,
-body.body--dark .graph-legend {
+.dark .graph-legend {
   color: #e5e7eb;
   background-color: #1f2937;
   border-color: rgba(255, 255, 255, 0.12);
@@ -669,7 +669,7 @@ body.body--dark .graph-legend {
 }
 
 html.dark .graph-legend__divider,
-body.body--dark .graph-legend__divider {
+.dark .graph-legend__divider {
   background-color: rgba(255, 255, 255, 0.15);
 }
 
@@ -682,7 +682,7 @@ body.body--dark .graph-legend__divider {
 }
 
 /* Dark mode for incident-service-graph container */
-.body--dark .incident-service-graph {
+.dark .incident-service-graph {
   background: linear-gradient(135deg, #1f2937 0%, #111827 100%);
   border: 1px solid #374151;
   box-shadow:
@@ -691,7 +691,7 @@ body.body--dark .graph-legend__divider {
     inset 0 0 0 1px rgba(75, 85, 99, 0.3);
 }
 
-.body--dark .incident-service-graph:hover {
+.dark .incident-service-graph:hover {
   box-shadow:
     0 4px 6px -1px rgba(0, 0, 0, 0.4),
     0 2px 4px -1px rgba(0, 0, 0, 0.3),

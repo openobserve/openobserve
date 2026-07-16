@@ -2431,22 +2431,22 @@ export default defineComponent({
   color: #f97316;
 }
 
-.body--light .health-badge.healthy {
+:root:not(.dark) .health-badge.healthy {
   background: rgba(16, 185, 129, 0.08);
   color: #059669;
 }
 
-.body--light .health-badge.degraded {
+:root:not(.dark) .health-badge.degraded {
   background: rgba(251, 191, 36, 0.08);
   color: #d97706;
 }
 
-.body--light .health-badge.critical {
+:root:not(.dark) .health-badge.critical {
   background: rgba(239, 68, 68, 0.08);
   color: #dc2626;
 }
 
-.body--light .health-badge.warning {
+:root:not(.dark) .health-badge.warning {
   background: rgba(249, 115, 22, 0.08);
   color: #ea580c;
 }
@@ -2468,19 +2468,19 @@ export default defineComponent({
   background: #2d3548;
 }
 
-.body--light .panel-content {
+:root:not(.dark) .panel-content {
   background: #ffffff;
 }
 
-.body--light .panel-content::-webkit-scrollbar-track {
+:root:not(.dark) .panel-content::-webkit-scrollbar-track {
   background: #f8f9fa;
 }
 
-.body--light .panel-content::-webkit-scrollbar-thumb {
+:root:not(.dark) .panel-content::-webkit-scrollbar-thumb {
   background: var(--color-border-default);
 }
 
-.body--light .panel-content::-webkit-scrollbar-thumb:hover {
+:root:not(.dark) .panel-content::-webkit-scrollbar-thumb:hover {
   background: #d0d0d0;
 }
 

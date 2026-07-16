@@ -48,7 +48,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       data-test="syntax-guide-menu"
       class="syntax-guide-menu"
-      :class="store.state.theme == 'dark' ? 'theme-dark' : 'theme-light'"
     >
       <div v-if="!sqlmode">
         <div class="syntax-guide-title">

@@ -1652,7 +1652,7 @@ label:not(.o-input-label) {
 }
 
 html.dark .ai-hover-btn,
-body.body--dark .ai-hover-btn {
+.dark .ai-hover-btn {
   background: linear-gradient(
     135deg,
     rgba(139, 92, 246, 0.5) 0%,
@@ -1669,7 +1669,7 @@ body.body--dark .ai-hover-btn {
 }
 
 html.dark .ai-hover-btn:hover,
-body.body--dark .ai-hover-btn:hover {
+.dark .ai-hover-btn:hover {
   background: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%) !important;
   box-shadow: 0 0.25rem 0.75rem 0 rgba(139, 92, 246, 0.35);
   color: white !important;
@@ -1684,7 +1684,7 @@ body.body--dark .ai-hover-btn:hover {
 }
 
 html.dark .ai-btn-active,
-body.body--dark .ai-btn-active {
+.dark .ai-btn-active {
   background: linear-gradient(
     135deg,
     rgba(139, 92, 246, 0.5) 0%,
@@ -1713,7 +1713,7 @@ body.body--dark .ai-btn-active {
 }
 
 html.dark .o2-ai-context-btn,
-body.body--dark .o2-ai-context-btn {
+.dark .o2-ai-context-btn {
   background: linear-gradient(
     135deg,
     rgba(139, 92, 246, 0.5) 0%,
@@ -1728,7 +1728,7 @@ body.body--dark .o2-ai-context-btn {
 }
 
 html.dark .o2-ai-context-btn:hover,
-body.body--dark .o2-ai-context-btn:hover {
+.dark .o2-ai-context-btn:hover {
   background: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%) !important;
   box-shadow: 0 0.25rem 0.75rem 0 rgba(139, 92, 246, 0.35) !important;
 }
@@ -1745,7 +1745,7 @@ body.body--dark .o2-ai-context-btn:hover {
 }
 
 html.dark .ai-floating-button,
-body.body--dark .ai-floating-button {
+.dark .ai-floating-button {
   background: linear-gradient(
     135deg,
     rgba(139, 92, 246, 0.5) 0%,
@@ -1760,7 +1760,7 @@ body.body--dark .ai-floating-button {
 }
 
 html.dark .ai-floating-button:hover,
-body.body--dark .ai-floating-button:hover {
+.dark .ai-floating-button:hover {
   background: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%) !important;
   box-shadow: 0 0.25rem 0.75rem 0 rgba(139, 92, 246, 0.35) !important;
 }
@@ -1777,7 +1777,7 @@ body.body--dark .ai-floating-button:hover {
 }
 
 html.dark .ai-icon-button,
-body.body--dark .ai-icon-button {
+.dark .ai-icon-button {
   background: linear-gradient(
     135deg,
     rgba(139, 92, 246, 0.5) 0%,
@@ -1793,7 +1793,7 @@ body.body--dark .ai-icon-button {
 }
 
 html.dark .ai-icon-button:hover,
-body.body--dark .ai-icon-button:hover {
+.dark .ai-icon-button:hover {
   background: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%) !important;
   box-shadow: 0 0.25rem 0.75rem 0 rgba(139, 92, 246, 0.35) !important;
 }
@@ -1806,7 +1806,7 @@ body.body--dark .ai-icon-button:hover {
 }
 
 html.dark .o-input-label,
-body.body--dark .o-input-label {
+.dark .o-input-label {
   color: #e5e5e5;
 }
 
@@ -1816,7 +1816,7 @@ body.body--dark .o-input-label {
 }
 
 html.dark .o-input-label--disabled,
-body.body--dark .o-input-label--disabled {
+.dark .o-input-label--disabled {
   color: #c4c4c4 !important;
   font-weight: 400 !important;
 }
@@ -1902,16 +1902,16 @@ a:has([data-destructive-icon="true"]):hover,
 }
 
 html.dark button:has([data-destructive-icon="true"]):hover,
-body.body--dark button:has([data-destructive-icon="true"]):hover,
+.dark button:has([data-destructive-icon="true"]):hover,
 html.dark a:has([data-destructive-icon="true"]):hover,
-body.body--dark a:has([data-destructive-icon="true"]):hover,
+.dark a:has([data-destructive-icon="true"]):hover,
 html.dark [role="button"]:has([data-destructive-icon="true"]):hover,
-body.body--dark [role="button"]:has([data-destructive-icon="true"]):hover {
+.dark [role="button"]:has([data-destructive-icon="true"]):hover {
   background-color: rgba(220, 38, 38, 0.18) !important;
 }
 
 html.dark [data-destructive-icon="true"]:hover,
-body.body--dark [data-destructive-icon="true"]:hover {
+.dark [data-destructive-icon="true"]:hover {
   background-color: rgba(220, 38, 38, 0.18) !important;
 }
 
@@ -2266,7 +2266,7 @@ body.body--dark [data-destructive-icon="true"]:hover {
   color: var(--rca-text-secondary);
 }
 
-body.body--dark .rca-report-content {
+.dark .rca-report-content {
   --rca-bg-primary: #1f2937;
   --rca-bg-secondary: #1e293b;
   --rca-bg-code: #1f2937;
@@ -2718,7 +2718,7 @@ body.body--dark .rca-report-content {
     }
   }
 
-  .body--dark {
+  .dark {
     .btn-function {
       filter: brightness(100);
     }
@@ -2873,7 +2873,7 @@ body.body--dark .rca-report-content {
     }
   }
 
-  &.theme-dark {
+  .dark & {
     .field_list {
       &:hover {
         .field_overlay {
@@ -2896,7 +2896,7 @@ body.body--dark .rca-report-content {
     }
   }
 
-  &.theme-light {
+  :root:not(.dark) & {
     .field_list {
       &:hover {
         .field_overlay {
@@ -2960,7 +2960,7 @@ body.body--dark .rca-report-content {
   --hsk-bar:     var(--color-grey-100);
   --hsk-shimmer: rgba(255, 255, 255, 0.65);
 
-  .body--dark & {
+  .dark & {
     --hsk-bar:     var(--color-grey-700);
     --hsk-shimmer: rgba(255, 255, 255, 0.06);
   }
@@ -3101,7 +3101,7 @@ body.body--dark .rca-report-content {
   overflow: hidden !important;
 }
 
-.dark-theme {
+.dark {
   .pagination__content {
     input {
       border: 1px solid rgba(255, 255, 255, 0.28) !important;
@@ -3640,7 +3640,7 @@ button.date-time-button {
   font-size: 12px;
   outline: none;
 
-  .body--light & {
+  :root:not(.dark) & {
     background: #fff;
     border-color: rgba(0, 0, 0, 0.12);
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
@@ -3710,7 +3710,7 @@ button.date-time-button {
       background: rgba(25, 118, 210, 0.12);
       color: #1976D2;
 
-      .body--dark & {
+      .dark & {
         color: #64B5F6;
         background: rgba(100, 181, 246, 0.15);
       }
@@ -3724,7 +3724,7 @@ button.date-time-button {
       background: rgba(198, 40, 40, 0.08);
       color: #c62828;
 
-      .body--dark & {
+      .dark & {
         color: #EF9A9A;
         background: rgba(239, 154, 154, 0.12);
       }
@@ -3813,7 +3813,7 @@ button.date-time-button {
   border: 0.0625rem solid var(--color-card-glass-border) !important;
 }
 
-.dark-theme .syntax-guide-in-toolbar {
+.dark .syntax-guide-in-toolbar {
   border: 0.0625rem solid var(--color-card-glass-border) !important;
 }
 
@@ -3992,7 +3992,7 @@ button.date-time-button {
   }
 }
 
-.dark-theme .toolbar-toggle-container {
+.dark .toolbar-toggle-container {
   border: 0.0625rem solid var(--color-card-glass-border);
 }
 
@@ -4018,7 +4018,7 @@ button.date-time-button {
 
 /* --- transform-selector.scss --- */
 
-.dark-theme {
+.dark {
   .transform-icon,
   .function-icon {
     img {

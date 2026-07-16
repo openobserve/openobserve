@@ -17,7 +17,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     class="flex flex-col logs-index-menu pr-[0.375rem]! h-full bg-surface-panel!"
-    :class="store.state.theme == 'dark' ? 'theme-dark' : 'theme-light'"
   >
     <div
       class="flex items-center gap-1"

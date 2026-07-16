@@ -120,7 +120,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
             class="shrink-0 cursor-pointer"
             :class="
-              store.state.theme == 'dark'
+              isDark
                 ? 'histogram-unavailable-text'
                 : 'histogram-unavailable-text-light'
             "
@@ -668,6 +668,7 @@ import {
 } from "vue";
 import { copyToClipboard } from "@/utils/clipboard";
 import { useStore } from "vuex";
+import { useTheme } from "@/composables/useTheme";
 import { useI18n } from "vue-i18n";
 
 import { byString } from "../../utils/json";
@@ -968,6 +969,7 @@ export default defineComponent({
     // https://stackoverflow.com/questions/6491463/accessing-nested-javascript-objects-and-arrays-by-string-path
     const { t } = useI18n();
     const store = useStore();
+    const { isDark } = useTheme();
     const searchListContainer = ref<HTMLElement | null>(null);
 
     // Responsive: observe the outer container (reacts to splitter + window resize)
@@ -1165,7 +1167,7 @@ export default defineComponent({
 
     // Watch for theme color changes in localStorage
     const handleThemeColorChange = () => {
-      const currentMode = store.state.theme === "dark" ? "dark" : "light";
+      const currentMode = isDark.value ? "dark" : "light";
       const appliedThemeName = localStorage.getItem(
         THEME_STORAGE_KEYS[currentMode].appliedName,
       );
@@ -1183,7 +1185,7 @@ export default defineComponent({
 
     // Re-render stacked chart with correct palette when dark/light mode switches
     watch(
-      () => store.state.theme,
+      () => isDark.value,
       () => reDrawChart(),
     );
 
@@ -1360,7 +1362,7 @@ export default defineComponent({
             xData,
             breakdownSeries,
             { ...chartParams, breakdownField: breakdownField ?? null },
-            store.state.theme === "dark",
+            isDark.value,
           );
         } else {
           plotChart.value = convertLogData(xData, yData, chartParams);
@@ -1925,6 +1927,7 @@ export default defineComponent({
     });
 
     return {
+      isDark,
       t,
       store,
       config,

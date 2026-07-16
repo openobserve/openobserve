@@ -2969,12 +2969,12 @@ html:has(.trace-details) {
 }
 
 /* Dark mode support */
-body.body--dark .unified-search-group {
+.dark .unified-search-group {
   background-color: var(--color-surface-base);
 }
 
-body.body--dark .unified-search-group:hover,
-body.body--dark .unified-search-group:focus-within {
+.dark .unified-search-group:hover,
+.dark .unified-search-group:focus-within {
   border-color: var(--color-theme-accent);
 }
 

@@ -115,13 +115,10 @@ export const applyThemeColors = (themeColor: string, mode: "light" | "dark", isD
   const darkModeActive = mode === "dark";
 
   // Toggle .dark class on <html> for the O2 component library (Tailwind dark variant)
+  // `.dark` on <html> is the SINGLE dark-mode signal (O2_TOKEN_MIGRATION_PLAN §3.R).
+  // The legacy `body.body--dark` / `body.body--light` compat classes were removed once
+  // all selectors migrated to `.dark` and JS reads to useTheme()/documentElement.
   document.documentElement.classList.toggle('dark', darkModeActive);
-
-  // Toggle the legacy `body.body--dark` / `body.body--light` compat classes so existing
-  // selectors (~200 across SCSS/Vue) and `document.body.classList.contains('body--dark')`
-  // JS checks continue to work.
-  document.body.classList.toggle('body--dark', darkModeActive);
-  document.body.classList.toggle('body--light', !darkModeActive);
 
   // Sync O2 library tokens with the custom theme color.
   // When using the default theme, clear any previously-set inline primary palette so

@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="step-query-config w-full min-w-0 h-full overflow-auto mx-auto" :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'">
+  <div class="step-query-config w-full min-w-0 h-full overflow-auto mx-auto">
     <div class="step-content rounded-lg min-h-full w-full min-w-0 overflow-hidden box-border bg-surface-overlay border border-border-default">
       <!-- Section header -->
       <div class="section-header flex items-center gap-0 py-2.5 px-3 border-b border-border-default">

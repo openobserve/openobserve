@@ -457,7 +457,6 @@ class="mr-1" />
                     ]
                   "
                   :key="`${cell.column.id}_${calculateActualIndex(virtualRow.index)}`"
-                  :class="store.state.theme === 'dark' ? 'dark' : ''"
                   v-html="
                     processedResults[
                       `${cell.column.id}_${calculateActualIndex(virtualRow.index)}`

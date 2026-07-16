@@ -494,7 +494,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :key="key"
               class="ml-4"
             >
-              <span :class="store.state.theme === 'dark' ? 'dark' : ''">
+              <span>
                 <LogsHighLighting
                   :data="{ [key]: rawEvent[key] }"
                   :show-braces="false"

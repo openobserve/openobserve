@@ -346,7 +346,7 @@ onMounted(() => {
           store.state.tempThemeColors?.dark;
         if (hasTempColors) return;
 
-        const bodyMode = document.body.classList.contains("body--dark")
+        const bodyMode = document.documentElement.classList.contains("dark")
           ? "dark"
           : "light";
         applyThemeForMode(bodyMode, store);
@@ -354,7 +354,7 @@ onMounted(() => {
     });
   });
 
-  observer.observe(document.body, {
+  observer.observe(document.documentElement, {
     attributes: true,
     attributeFilter: ["class"],
   });

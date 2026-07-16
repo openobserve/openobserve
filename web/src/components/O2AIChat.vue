@@ -2,14 +2,11 @@
   <div
     class="chat-container w-full h-full flex flex-col overflow-hidden rounded-md text-[var(--color-button-primary-foreground)] bg-card-glass-solid [box-shadow:0_0_5px_1px_var(--color-hover-shadow)]"
     :class="[
-      { 'chat-open': isOpen },
-      store.state.theme == 'dark' ? 'dark-mode' : 'light-mode',
-    ]"
+      { 'chat-open': isOpen },    ]"
   >
     <div
       v-if="isOpen"
       class="chat-content-wrapper flex flex-col h-full bg-transparent"
-      :class="store.state.theme == 'dark' ? 'dark-mode' : 'light-mode'"
     >
       <div
         class="chat-header"
@@ -246,7 +243,6 @@
 
       <div
         class="chat-content"
-        :class="store.state.theme == 'dark' ? 'dark-mode' : 'light-mode'"
       >
         <div
           class="messages-container"
@@ -303,9 +299,6 @@
               <div
                 class="message-blocks"
                 style="background-color: transparent"
-                :class="
-                  store.state.theme == 'dark' ? 'dark-mode' : 'light-mode'
-                "
               >
                 <!-- Loading indicator inside message box for empty assistant messages -->
                 <div v-if="message.role === 'assistant' && (!message.contentBlocks || message.contentBlocks.length === 0) && (!message.content || message.content.trim() === '') && isLoading" class="inline-loading flex items-center gap-2.5 py-2 text-text-secondary text-sm">
@@ -321,9 +314,7 @@
                   <div
                     v-if="block.type === 'tool_call'"
                     class="tool-call-item"
-                    :class="[
-                      store.state.theme == 'dark' ? 'dark-mode' : 'light-mode',
-                      { 'has-details': hasToolCallDetails(block) },
+                    :class="[                      { 'has-details': hasToolCallDetails(block) },
                       {
                         error:
                           block.success === false && !block.pendingConfirmation,
@@ -828,9 +819,7 @@
                   <div
                     v-else-if="block.type === 'log_entry'"
                     class="log-entry-item"
-                    :class="[
-                      store.state.theme == 'dark' ? 'dark-mode' : 'light-mode',
-                    ]"
+                    :class="[                    ]"
                     @click="toggleLogEntryExpanded(index, blockIndex)"
                   >
                     <div class="log-entry-header">
@@ -875,9 +864,6 @@
                   <div
                     v-else-if="block.type === 'error'"
                     class="stream-error-block"
-                    :class="
-                      store.state.theme == 'dark' ? 'dark-mode' : 'light-mode'
-                    "
                   >
                     <div class="stream-error-header">
                       <OIcon name="warning" size="sm" />
@@ -904,9 +890,6 @@
                       block.type === 'navigation' && block.navigationAction
                     "
                     class="navigation-block"
-                    :class="
-                      store.state.theme == 'dark' ? 'dark-mode' : 'light-mode'
-                    "
                   >
                     <OButton
                       variant="primary"
@@ -1084,7 +1067,6 @@
             v-show="block.type === 'tool_call'"
             :key="'pending-tc-' + pIdx"
             class="tool-call-indicator completed"
-            :class="store.state.theme == 'dark' ? 'dark-mode' : 'light-mode'"
           >
             <div class="tool-call-content">
               <OIcon
@@ -1100,7 +1082,6 @@
           <div
             v-if="activeToolCall"
             class="tool-call-indicator"
-            :class="store.state.theme == 'dark' ? 'dark-mode' : 'light-mode'"
           >
             <div class="tool-call-content">
               <OSpinner variant="dots" size="xs" />
@@ -1163,7 +1144,6 @@
           <div
             v-if="isLoading && !activeToolCall"
             class="tool-call-indicator"
-            :class="store.state.theme == 'dark' ? 'dark-mode' : 'light-mode'"
           >
             <div class="tool-call-content">
               <OSpinner variant="dots" size="xs" />
@@ -1179,7 +1159,7 @@
           <OButton
             variant="ghost"
             size="icon-sm"
-            class="scroll-to-bottom-btn transition-all duration-300 [animation:fadeInUp_0.3s_ease] pointer-events-auto [backdrop-filter:blur(8px)] shadow-[0_2px_8px_rgba(0,0,0,0.2)] border-2! border-[#2563eb]! text-[#2563eb]! bg-[rgba(255,255,255,0.95)]! dark:border-[#8b5cf6]! dark:text-[#8b5cf6]! dark:bg-[rgba(30,30,30,0.9)]! hover:scale-110 hover:shadow-[0_4px_12px_rgba(0,0,0,0.3)] hover:border-[#1d4ed8]! hover:text-[#1d4ed8]! hover:bg-white! dark:hover:border-[#5a6fd8]! dark:hover:text-[#5a6fd8]! dark:hover:bg-[rgba(40,40,40,0.95)]! active:scale-100"
+            class="scroll-to-bottom-btn transition-all duration-300 [animation:fadeInUp_0.3s_ease] pointer-events-auto [backdrop-filter:blur(8px)] shadow-[0_2px_8px_rgba(0,0,0,0.2)] border-2! border-text-link! text-text-link! bg-surface-base! dark:border-ai-accent! dark:text-ai-accent! dark:bg-surface-base! hover:scale-110 hover:shadow-[0_4px_12px_rgba(0,0,0,0.3)] hover:border-text-link! hover:text-text-link! hover:bg-surface-base! dark:hover:border-ai-accent! dark:hover:text-ai-accent! dark:hover:bg-surface-base! active:scale-100"
             @click="scrollToBottomSmooth"
           >
             <OIcon name="arrow-downward" size="sm" />
@@ -1192,7 +1172,6 @@
       <div
         v-if="(isLoading || activeToolCall) && showScrollToBottom"
         class="fixed-analyzing-indicator"
-        :class="store.state.theme == 'dark' ? 'dark-mode' : 'light-mode'"
       >
         <!-- Show tool call if active -->
         <div v-if="activeToolCall" class="analyzing-content">
@@ -1229,7 +1208,6 @@
         <div
           v-if="!pendingConfirmation"
           class="unified-input-box"
-          :class="store.state.theme == 'dark' ? 'dark-mode' : 'light-mode'"
           @dragover="handleDragOver"
           @drop="handleDrop"
           @paste="handlePaste"
@@ -1344,7 +1322,7 @@
                 @click="cancelCurrentRequest"
                 variant="ghost"
                 size="icon-xs-circle"
-                class="stop-button bg-[linear-gradient(135deg,#f56565_0%,#e53e3e_100%)]! [transition:all_0.3s_ease]! shadow-[0_4px_15px_0_rgba(245,101,101,0.3)]!"
+                class="stop-button bg-[image:var(--color-gradient-danger)]! [transition:all_0.3s_ease]! shadow-[0_4px_15px_0_rgba(245,101,101,0.3)]!"
               >
                 <OIcon name="stop" size="sm" />
               </OButton>
@@ -1376,6 +1354,7 @@ import { marked } from "marked";
 import { MarkedOptions } from "marked";
 import DOMPurify from "dompurify";
 import { useStore } from "vuex";
+import { useTheme } from "@/composables/useTheme";
 import useAiChat from "@/composables/useAiChat";
 import { getImageURL, getUUIDv7 } from "@/utils/zincutils";
 import { chartColor } from "@/utils/chartTheme";
@@ -1517,6 +1496,7 @@ export default defineComponent({
     const currentSessionId = ref<string | null>(null); // UUID v7 for tracking all API calls in this chat session
     const lastTraceId = ref<string | null>(null); // OTEL trace_id from last workflow for feedback correlation
     const store = useStore();
+    const { isDark } = useTheme();
     const { t } = useI18n();
     const isMac = navigator.platform.toUpperCase().indexOf("MAC") >= 0;
     const chatUpdated = computed(() => store.state.chatUpdated);
@@ -5655,7 +5635,7 @@ export default defineComponent({
       }
     };
     const o2AiTitleLogo = computed(() => {
-      return store.state.theme == "dark"
+      return isDark.value
         ? getImageURL("images/common/o2_ai_logo_dark.svg")
         : getImageURL("images/common/o2_ai_logo.svg");
     });
@@ -5945,14 +5925,14 @@ export default defineComponent({
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
 }
 
-.chat-container .fixed-analyzing-indicator.light-mode {
-  background: linear-gradient(135deg, #f0f4ff 0%, #e8f0fe 100%);
-  border: 1px solid #d0d8e8;
+:root:not(.dark) .chat-container .fixed-analyzing-indicator {
+  background: var(--color-chat-bubble-user);
+  border: 1px solid var(--color-border-default);
 }
 
-.chat-container .fixed-analyzing-indicator.dark-mode {
-  background: linear-gradient(135deg, #1e2235 0%, #252a3d 100%);
-  border: 1px solid #3a3f55;
+.dark .chat-container .fixed-analyzing-indicator {
+  background: var(--color-chat-bubble-user);
+  border: 1px solid var(--color-border-default);
 }
 
 .chat-container .fixed-analyzing-indicator .analyzing-content {
@@ -6213,7 +6193,7 @@ export default defineComponent({
 .chat-container .message .text-block table th,
 .chat-container .message .text-block table td {
   padding: 8px 12px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--color-border-default);
   word-wrap: break-word;
   overflow-wrap: break-word;
   text-overflow: ellipsis;
@@ -6271,7 +6251,7 @@ export default defineComponent({
 }
 
 .dark .code-type-label {
-  color: #e2e2e2;
+  color: var(--color-text-secondary);
 }
 
 .chat-container .message .generated-code-block {
@@ -6291,13 +6271,13 @@ export default defineComponent({
 
 .dark .generated-code-block code {
   background-color: var(--color-surface-base);
-  border: 0.5px solid #e1e1e124;
+  border: 0.5px solid var(--color-border-subtle);
   border-top: none;
 }
 
 .generated-code-block code {
-  background-color: #ffffff;
-  border: 0.5px solid #00000024;
+  background-color: var(--color-surface-base);
+  border: 0.5px solid var(--color-border-subtle);
   border-top: none;
   color: black;
 }
@@ -6308,17 +6288,17 @@ export default defineComponent({
 }
 
 .chat-container .message.user {
-  background: linear-gradient(135deg, #f8f9ff 0%, #e8edff 100%);
-  border: 1px solid #e0e6ff;
+  background: var(--color-chat-bubble-ai);
+  border: 1px solid var(--color-border-default);
   border-radius: 12px;
-  color: #2c3e50;
+  color: var(--color-text-body);
   margin-left: 40px;
   width: calc(100% - 40px);
 }
 
 .chat-container .message.assistant {
-  background: #ffffff;
-  border: 1px solid #e5e7eb;
+  background: var(--color-surface-base);
+  border: 1px solid var(--color-border-default);
   border-radius: 12px;
   color: var(--color-button-primary-foreground);
   margin-left: 0;
@@ -6326,19 +6306,19 @@ export default defineComponent({
 }
 
 .dark .chat-container .message.user {
-  background: linear-gradient(135deg, #2a2d47 0%, #1e213a 100%);
-  border: 1px solid #3a3d5c;
+  background: var(--color-chat-bubble-ai);
+  border: 1px solid var(--color-border-default);
   border-radius: 12px;
-  color: #e2e8f0;
+  color: var(--color-text-secondary);
   margin-left: 40px;
   width: calc(100% - 40px);
 }
 
 .dark .chat-container .message.assistant {
-  background: #1a1a1a;
-  border: 1px solid #333333;
+  background: var(--color-surface-base);
+  border: 1px solid var(--color-border-default);
   border-radius: 12px;
-  color: #e2e2e2;
+  color: var(--color-text-secondary);
   margin-left: 0;
   width: 100%;
 }
@@ -6365,7 +6345,7 @@ export default defineComponent({
 
 
 .send-button:hover:not(.disabled):not([disabled]):not(:disabled) {
-  background: linear-gradient(135deg, #7c3aed 0%, #db2777 100%) !important;
+  background: var(--color-gradient-ai) !important;
   box-shadow: 0 6px 20px 0 rgba(139, 92, 246, 0.4) !important;
   transform: translateY(-1px) !important;
 }
@@ -6377,7 +6357,7 @@ export default defineComponent({
 
 
 .stop-button:hover {
-  background: linear-gradient(135deg, #e53e3e 0%, #c53030 100%) !important;
+  background: var(--color-gradient-danger-hover) !important;
   box-shadow: 0 6px 20px 0 rgba(245, 101, 101, 0.4) !important;
   transform: translateY(-1px) !important;
 }
@@ -6393,7 +6373,7 @@ export default defineComponent({
 }
 
 .image-remove-btn:hover {
-  background-color: #dc2626 !important;
+  background-color: var(--color-status-negative) !important;
 }
 
 .message-images .message-image-item img:hover {
@@ -6403,11 +6383,11 @@ export default defineComponent({
 
 
 .code-block-header {
-  background-color: #ecf0f5;
+  background-color: var(--color-surface-subtle);
 }
 
 .dark .code-block-header {
-  background-color: #3b3b3b;
+  background-color: var(--color-surface-subtle);
   border: 1px 1px 0px 1px solid var(--color-input-border);
 }
 
@@ -6447,14 +6427,14 @@ export default defineComponent({
   animation: fadeIn 0.3s ease;
 }
 
-.tool-call-indicator.light-mode {
-  background: linear-gradient(135deg, #f0f4ff 0%, #e8f0fe 100%);
-  border: 1px solid #d0d8e8;
+:root:not(.dark) .tool-call-indicator {
+  background: var(--color-chat-bubble-user);
+  border: 1px solid var(--color-border-default);
 }
 
-.tool-call-indicator.dark-mode {
-  background: linear-gradient(135deg, #1e2235 0%, #252a3d 100%);
-  border: 1px solid #3a3f55;
+.dark .tool-call-indicator {
+  background: var(--color-chat-bubble-user);
+  border: 1px solid var(--color-border-default);
 }
 
 /* Completed step shown live during streaming — more compact and subdued
@@ -6492,11 +6472,11 @@ export default defineComponent({
 }
 
 .tool-call-indicator .tool-call-status {
-  color: #6b7280;
+  color: var(--color-text-secondary);
 }
 
 .dark .tool-call-indicator .tool-call-status {
-  color: #9ca3af;
+  color: var(--color-text-caption);
 }
 
 .tool-call-indicator .tool-call-message {
@@ -6505,11 +6485,11 @@ export default defineComponent({
 }
 
 .tool-call-indicator .tool-call-message {
-  color: #4a5568;
+  color: var(--color-text-secondary);
 }
 
 .dark .tool-call-indicator .tool-call-message {
-  color: #e2e8f0;
+  color: var(--color-text-secondary);
 }
 
 .tool-call-indicator .tool-call-context {
@@ -6536,15 +6516,15 @@ export default defineComponent({
 }
 
 .tool-call-indicator .context-query {
-  background: #ffffff;
-  color: #2d3748;
-  border: 1px solid #e2e8f0;
+  background: var(--color-surface-base);
+  color: var(--color-text-body);
+  border: 1px solid var(--color-border-default);
 }
 
 .dark .tool-call-indicator .context-query {
-  background: #1a1a1a;
-  color: #a0aec0;
-  border: 1px solid #333;
+  background: var(--color-surface-base);
+  color: var(--color-text-secondary);
+  border: 1px solid var(--color-border-default);
 }
 
 .tool-call-indicator .context-tag {
@@ -6558,12 +6538,12 @@ export default defineComponent({
 
 .tool-call-indicator .context-tag {
   background: rgba(139, 92, 246, 0.1);
-  color: #8b5cf6;
+  color: var(--color-ai-accent);
 }
 
 .dark .tool-call-indicator .context-tag {
   background: rgba(139, 92, 246, 0.2);
-  color: #a0aec0;
+  color: var(--color-text-secondary);
 }
 
 @keyframes fadeIn {
@@ -6591,53 +6571,53 @@ export default defineComponent({
   cursor: pointer;
 }
 
-.tool-call-item.has-details:hover.light-mode {
+:root:not(.dark) .tool-call-item.has-details:hover {
   background: rgba(76, 175, 80, 0.12);
 }
 
-.tool-call-item.has-details:hover.dark-mode {
+.dark .tool-call-item.has-details:hover {
   background: rgba(76, 175, 80, 0.18);
 }
 
-.tool-call-item.light-mode {
+:root:not(.dark) .tool-call-item {
   background: rgba(76, 175, 80, 0.08);
-  color: #4a5568;
+  color: var(--color-text-secondary);
 }
 
-.tool-call-item.dark-mode {
+.dark .tool-call-item {
   background: rgba(76, 175, 80, 0.12);
-  color: #a0aec0;
+  color: var(--color-text-secondary);
 }
 
-.tool-call-item.error.light-mode {
+:root:not(.dark) .tool-call-item.error {
   background: rgba(244, 67, 54, 0.08);
 }
 
-.tool-call-item.error.dark-mode {
+.dark .tool-call-item.error {
   background: rgba(244, 67, 54, 0.12);
 }
 
-.tool-call-item.error.has-details:hover.light-mode {
+:root:not(.dark) .tool-call-item.error.has-details:hover {
   background: rgba(244, 67, 54, 0.15);
 }
 
-.tool-call-item.error.has-details:hover.dark-mode {
+.dark .tool-call-item.error.has-details:hover {
   background: rgba(244, 67, 54, 0.22);
 }
 
-.tool-call-item.timeout.light-mode {
+:root:not(.dark) .tool-call-item.timeout {
   background: rgba(255, 152, 0, 0.08);
 }
 
-.tool-call-item.timeout.dark-mode {
+.dark .tool-call-item.timeout {
   background: rgba(255, 152, 0, 0.12);
 }
 
-.tool-call-item.timeout.has-details:hover.light-mode {
+:root:not(.dark) .tool-call-item.timeout.has-details:hover {
   background: rgba(255, 152, 0, 0.15);
 }
 
-.tool-call-item.timeout.has-details:hover.dark-mode {
+.dark .tool-call-item.timeout.has-details:hover {
   background: rgba(255, 152, 0, 0.22);
 }
 
@@ -6645,12 +6625,12 @@ export default defineComponent({
   cursor: default;
 }
 
-.tool-call-item.pending-confirmation.light-mode {
+:root:not(.dark) .tool-call-item.pending-confirmation {
   background: rgba(255, 193, 7, 0.12);
   border: 1px solid rgba(255, 193, 7, 0.3);
 }
 
-.tool-call-item.pending-confirmation.dark-mode {
+.dark .tool-call-item.pending-confirmation {
   background: rgba(255, 193, 7, 0.15);
   border: 1px solid rgba(255, 193, 7, 0.25);
 }
@@ -6659,12 +6639,12 @@ export default defineComponent({
   cursor: default;
 }
 
-.tool-call-item.pending-navigation.light-mode {
+:root:not(.dark) .tool-call-item.pending-navigation {
   background: rgba(25, 118, 210, 0.08);
   border: 1px solid rgba(25, 118, 210, 0.3);
 }
 
-.tool-call-item.pending-navigation.dark-mode {
+.dark .tool-call-item.pending-navigation {
   background: rgba(66, 165, 245, 0.12);
   border: 1px solid rgba(66, 165, 245, 0.25);
 }
@@ -6682,8 +6662,8 @@ export default defineComponent({
 }
 
 .tool-call-item .tool-confirmation-inline .confirmation-content {
-  background: #fffbeb;
-  border: 1px solid #fde68a;
+  background: var(--color-status-warning-bg);
+  border: 1px solid var(--color-border-default);
 }
 
 .dark .tool-call-item .tool-confirmation-inline .confirmation-content {
@@ -6737,11 +6717,11 @@ export default defineComponent({
   margin: 4px 0;
 }
 
-.tool-call-item .navigation-block.light-mode {
+:root:not(.dark) .tool-call-item .navigation-block {
   background: rgba(66, 165, 245, 0.08);
 }
 
-.tool-call-item .navigation-block.dark-mode {
+.dark .tool-call-item .navigation-block {
   background: rgba(66, 165, 245, 0.12);
 }
 
@@ -6818,24 +6798,24 @@ export default defineComponent({
   cursor: pointer;
 }
 
-.log-entry-item.light-mode {
+:root:not(.dark) .log-entry-item {
   background: rgba(33, 150, 243, 0.08);
-  color: #4a5568;
+  color: var(--color-text-secondary);
 }
 
-.log-entry-item.dark-mode {
-  background: #252a31;
-  border: 1px solid #3a4149;
-  color: #e2e8f0;
+.dark .log-entry-item {
+  background: var(--color-surface-panel);
+  border: 1px solid var(--color-border-default);
+  color: var(--color-text-secondary);
 }
 
-.log-entry-item:hover.light-mode {
+:root:not(.dark) .log-entry-item:hover {
   background: rgba(33, 150, 243, 0.12);
 }
 
-.log-entry-item:hover.dark-mode {
-  background: #20242e;
-  border-color: #4a5568;
+.dark .log-entry-item:hover {
+  background: var(--color-surface-panel);
+  border-color: var(--color-text-secondary);
 }
 
 .log-entry-item .log-entry-header {
@@ -6870,14 +6850,14 @@ export default defineComponent({
 }
 
 .log-entry-item .log-entry-content {
-  background: #ffffff;
-  border-color: #e4e7ec;
+  background: var(--color-surface-base);
+  border-color: var(--color-border-default);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
 }
 
 .dark .log-entry-item .log-entry-content {
-  background: #1e293b;
-  border-color: #475569;
+  background: var(--color-surface-panel);
+  border-color: var(--color-border-default);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
 }
 
@@ -6920,13 +6900,13 @@ export default defineComponent({
 }
 
 .log-entry-item .log-entry-content .log-entry-code {
-  background: #f8fafc;
-  color: #1a202c;
+  background: var(--color-surface-base);
+  color: var(--color-text-heading);
 }
 
 .dark .log-entry-item .log-entry-content .log-entry-code {
-  background: #0d1017;
-  color: #e2e8f0;
+  background: var(--color-syntax-bg);
+  color: var(--color-text-secondary);
 }
 
 .log-entry-item .log-entry-content .log-entry-code .json-key {
@@ -7008,7 +6988,7 @@ export default defineComponent({
 }
 
 .tool-call-item .hit-error {
-  color: #f44336;
+  color: var(--color-status-negative);
 }
 
 .tool-call-item .tool-response-meta {
@@ -7020,7 +7000,7 @@ export default defineComponent({
 
 .tool-call-item .tool-call-error {
   font-size: 11px;
-  color: #f44336;
+  color: var(--color-status-negative);
   font-style: italic;
   max-width: 250px;
   overflow: hidden;
@@ -7041,16 +7021,16 @@ export default defineComponent({
 
 .tool-call-item .tool-call-query {
   background: rgba(0, 0, 0, 0.05);
-  color: #666;
+  color: var(--color-text-secondary);
 }
 
 .dark .tool-call-item .tool-call-query {
   background: rgba(255, 255, 255, 0.08);
-  color: #888;
+  color: var(--color-text-caption);
 }
 
 .tool-call-item .tool-error-message {
-  color: #f44336;
+  color: var(--color-status-negative);
 }
 
 .tool-call-item .tool-suggestion {
@@ -7063,19 +7043,19 @@ export default defineComponent({
   flex-direction: column;
   padding: 10px 12px;
   border-radius: 6px;
-  border-left: 3px solid #f44336;
+  border-left: 3px solid var(--color-border-default);
   margin-bottom: 8px;
   font-size: 13px;
 }
 
-.stream-error-block.light-mode {
+:root:not(.dark) .stream-error-block {
   background: rgba(244, 67, 54, 0.06);
-  color: #4a5568;
+  color: var(--color-text-secondary);
 }
 
-.stream-error-block.dark-mode {
+.dark .stream-error-block {
   background: rgba(244, 67, 54, 0.1);
-  color: #a0aec0;
+  color: var(--color-text-secondary);
 }
 
 .stream-error-block .stream-error-header {
@@ -7086,7 +7066,7 @@ export default defineComponent({
 
 .stream-error-block .stream-error-message {
   font-weight: 500;
-  color: #f44336;
+  color: var(--color-status-negative);
 }
 
 .stream-error-block .stream-error-suggestion {

@@ -303,7 +303,7 @@ const jumpTargetSublabel = computed(() => {
   animation: pattern-skel-shimmer 1.5s ease-in-out infinite;
 }
 
-.body--dark .pattern-skel-pill {
+.dark .pattern-skel-pill {
   background: linear-gradient(
     90deg,
     var(--color-grey-600) 0%,

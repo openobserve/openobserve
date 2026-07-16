@@ -564,59 +564,59 @@ function copyStackTrace(stacktrace: string) {
 </script>
 
 <style>
-body.body--dark .stacktrace-content .stack-file {
+.dark .stacktrace-content .stack-file {
   color: #9cdcfe;
 }
 
-body.body--dark .stacktrace-content .stack-path {
+.dark .stacktrace-content .stack-path {
   color: #ce9178;
 }
 
-body.body--dark .stacktrace-content .stack-lineno {
+.dark .stacktrace-content .stack-lineno {
   color: #b5cea8;
 }
 
-body.body--dark .stacktrace-content .stack-function {
+.dark .stacktrace-content .stack-function {
   color: #dcdcaa;
 }
 
-body.body--dark .stacktrace-content .stack-keyword {
+.dark .stacktrace-content .stack-keyword {
   color: #c586c0;
 }
 
-body.body--dark .stacktrace-content .stack-exception {
+.dark .stacktrace-content .stack-exception {
   color: #f48771;
 }
 
-body.body--dark .stacktrace-content .stack-traceback {
+.dark .stacktrace-content .stack-traceback {
   color: #808080;
 }
 
-body.body--dark .stacktrace-content .stack-traceback-header {
+.dark .stacktrace-content .stack-traceback-header {
   color: #808080;
 }
 
-body.body--dark .stacktrace-content .stack-during {
+.dark .stacktrace-content .stack-during {
   color: #808080;
 }
 
-body.body--dark .stacktrace-content .stack-code {
+.dark .stacktrace-content .stack-code {
   color: #d4d4d4;
 }
 
-body.body--dark .stacktrace-content .stack-call {
+.dark .stacktrace-content .stack-call {
   color: #4ec9b0;
 }
 
-body.body--dark .stacktrace-content .stack-ellipsis {
+.dark .stacktrace-content .stack-ellipsis {
   color: #808080;
 }
 
-body.body--dark .stacktrace-content .stack-error-msg {
+.dark .stacktrace-content .stack-error-msg {
   color: #d4d4d4;
 }
 
-body.body--dark .stacktrace-content .stack-raise {
+.dark .stacktrace-content .stack-raise {
   color: #f48771;
 }
 

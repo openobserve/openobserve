@@ -82,7 +82,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- White content card — rounded, soft shadow (light) / border (dark). All pages render inside this. -->
           <div
             class="flex-1 flex flex-col min-h-0 bg-surface-base rounded-xl overflow-hidden shadow-[0_1px_3px_rgba(16,40,55,0.06),0_6px_20px_rgba(16,40,55,0.08)]"
-            :class="store.state.theme === 'dark' ? 'border border-border-default' : ''"
+            :class="isDark ? 'border border-border-default' : ''"
           >
             <div
               v-if="isLoading"
@@ -101,7 +101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-show="store.state.isAiChatEnabled && isLoading"
           class="o2-sidebar o2-sidebar-right overflow-y-auto sticky top-[var(--navbar-height,2.25rem)] self-start shrink-0"
           :class="[
-            store.state.theme == 'dark'
+            isDark
               ? 'dark-mode-chat-container'
               : 'light-mode-chat-container',
             { 'o2-sidebar--expanded': store.state.isAiChatExpanded },
@@ -175,6 +175,7 @@ import {
   onBeforeMount,
 } from "vue";
 import { useStore } from "vuex";
+import { useTheme } from "@/composables/useTheme";
 import { useRouter, RouterView } from "vue-router";
 import config from "../aws-exports";
 
@@ -293,6 +294,7 @@ export default defineComponent({
   },
   setup() {
     const store: any = useStore();
+    const { isDark } = useTheme();
     const router: any = useRouter();
     const { t } = useI18n();
     const miniMode = ref(false);
@@ -1124,7 +1126,7 @@ export default defineComponent({
     };
 
     const getBtnLogo = computed(() => {
-      if (store.state.theme === "dark") {
+      if (isDark.value) {
         return getImageURL("images/common/ai_icon_dark.svg");
       }
 
@@ -1202,6 +1204,7 @@ export default defineComponent({
     useShortcuts([{ id: "aiChatToggle", handler: () => toggleAIChat() }]);
 
     return {
+      isDark,
       t,
       router,
       store,

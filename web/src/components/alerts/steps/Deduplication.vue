@@ -17,7 +17,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     class="step-deduplication w-full h-full overflow-auto mx-auto"
-    :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'"
   >
     <div
       class="step-content rounded-lg min-h-full bg-surface-overlay border border-border-default"

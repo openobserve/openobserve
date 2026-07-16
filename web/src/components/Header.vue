@@ -51,7 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Dark mode: Show dark logo, fallback to light logo -->
         <img
           v-if="
-            store.state.theme === 'dark' &&
+            isDark &&
             store.state.zoConfig.hasOwnProperty('custom_logo_dark_img') &&
             store.state.zoConfig?.custom_logo_dark_img != null
           "
@@ -63,7 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Light mode: Show light logo, fallback to dark logo -->
         <img
           v-else-if="
-            store.state.theme === 'light' &&
+            !isDark &&
             store.state.zoConfig.hasOwnProperty('custom_logo_img') &&
             store.state.zoConfig?.custom_logo_img != null
           "
@@ -102,7 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="openobserve-logo cursor-pointer h-8 max-w-37.5 block transition-opacity duration-200 hover:opacity-80"
             :src="
               getImageURL(
-                store.state.theme === 'dark'
+                isDark
                   ? 'images/common/openobserve_latest_dark_2.svg'
                   : 'images/common/openobserve_latest_light_2.svg',
               )
@@ -121,7 +121,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="openobserve-logo cursor-pointer h-8 max-w-37.5 block transition-opacity duration-200 hover:opacity-80"
           :src="
             getImageURL(
-              store.state.theme === 'dark'
+              isDark
                 ? 'images/common/openobserve_latest_dark_2.svg'
                 : 'images/common/openobserve_latest_light_2.svg',
             )
@@ -437,6 +437,7 @@ size="xs" class="warning" />{{
 import { defineComponent, PropType, computed, ref, watch, nextTick } from "vue";
 import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
+import { useTheme } from "@/composables/useTheme";
 import ThemeSwitcher from "./ThemeSwitcher.vue";
 import EnterpriseUpgradeDialog from "./EnterpriseUpgradeDialog.vue";
 import OrganizationSelector from "./OrganizationSelector.vue";
@@ -550,6 +551,7 @@ export default defineComponent({
   setup(props, { emit }) {
     const { t } = useI18n();
     const router = useRouter();
+    const { isDark } = useTheme();
 
     const homeUrl = computed(() => {
       if (!router) return "/";
@@ -662,6 +664,7 @@ export default defineComponent({
     };
 
     return {
+      isDark,
       t,
       getImageURL,
       enterpriseButtonText,

@@ -171,8 +171,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   style="background: rgba(242, 220, 245, 0.25); border-color: rgba(242, 220, 245, 0.45);"
                 >
                   <svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M7 8h10M7 12h10M7 16h6" :stroke="store.state.theme === 'dark' ? '#E9D5FD' : '#A855F7'" stroke-width="2" stroke-linecap="round"/>
-                    <rect x="3" y="4" width="18" height="16" rx="2" :stroke="store.state.theme === 'dark' ? '#E9D5FD' : '#A855F7'" stroke-width="2"/>
+                    <path d="M7 8h10M7 12h10M7 16h6" :stroke="isDark ? '#E9D5FD' : '#A855F7'" stroke-width="2" stroke-linecap="round"/>
+                    <rect x="3" y="4" width="18" height="16" rx="2" :stroke="isDark ? '#E9D5FD' : '#A855F7'" stroke-width="2"/>
                   </svg>
                 </div>
               </div>
@@ -325,6 +325,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, ref, onMounted, computed, watch } from "vue";
 import { useRouter, useRoute } from "vue-router";
 import { useStore } from "vuex";
+import { useTheme } from "@/composables/useTheme";
 import searchService from "@/services/search";
 import { chartColor } from "@/utils/chartTheme";
 import NoData from "@/components/shared/grid/NoData.vue";
@@ -393,6 +394,7 @@ export default defineComponent({
     const router = useRouter();
     const route = useRoute();
     const store = useStore();
+    const { isDark } = useTheme();
 
     const loading = ref(false);
     const errorMessage = ref("");
@@ -677,6 +679,7 @@ export default defineComponent({
     });
 
     return {
+      isDark,
       loading,
       errorMessage,
       profileData,

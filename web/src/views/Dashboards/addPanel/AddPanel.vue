@@ -171,7 +171,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="isAddVariableOpen"
       class="add-variable-drawer-overlay fixed top-0 left-0 right-0 bottom-0 z-6000 flex justify-end"
       style="background-color: rgba(0, 0, 0, 0.5)"
-      :class="store.state.theme === 'dark' ? 'theme-dark' : 'theme-light'"
       @click.self="handleCloseAddVariable"
     >
       <div class="add-variable-drawer-panel px-6 pt-4 w-225 h-screen shadow-[-2px_0_8px_rgba(0,0,0,0.15)] overflow-hidden rounded-none! bg-surface-base">
