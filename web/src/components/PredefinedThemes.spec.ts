@@ -49,6 +49,10 @@ vi.mock("@/composables/usePredefinedThemes", () => ({
 // Mock theme utility
 vi.mock("@/utils/theme", () => ({
   applyThemeColors: vi.fn(),
+  // Pass-through: run the mode switch synchronously (no view transition in tests)
+  switchThemeMode: vi.fn((_mode: string, applyChanges: () => void) =>
+    applyChanges(),
+  ),
   hexToRgba: vi.fn((hex: string, opacity: number) => {
     return `rgba(0, 0, 0, ${opacity / 10})`;
   }),

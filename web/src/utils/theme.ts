@@ -16,6 +16,107 @@
 import { invalidateChartTheme } from "@/utils/chartTheme";
 
 /**
+ * Run a light↔dark mode switch inside a View Transition so the whole page
+ * cross-fades as one frame. Without this, elements that carry their own CSS
+ * color transitions (inputs, selects, buttons) animate to the new theme a beat
+ * after everything else snaps, which reads as a flash.
+ *
+ * Every DOM write of the switch (the `.dark` class toggle, store dispatch,
+ * applyThemeColors) must happen inside `applyChanges` so the transition
+ * captures them together.
+ *
+ * Applies instantly (no fade) when:
+ * - the requested mode is already active — callers sync each other, and a
+ *   second startViewTransition would cancel the fade already running;
+ * - the View Transitions API is unavailable;
+ * - the user prefers reduced motion.
+ *
+ * REVERT: to drop the cross-fade entirely, reduce the body of this function
+ * to just `applyChanges();`.
+ */
+export const switchThemeMode = (
+  mode: "light" | "dark",
+  applyChanges: () => void,
+  origin?: { x: number; y: number },
+): void => {
+  const root = document.documentElement;
+  const alreadyApplied = root.classList.contains("dark") === (mode === "dark");
+  const doc = document as Document & {
+    startViewTransition?: (callback: () => void) => {
+      ready: Promise<void>;
+      finished: Promise<void>;
+    };
+  };
+
+  if (alreadyApplied) {
+    applyChanges();
+    return;
+  }
+
+  // Freeze per-element CSS transitions (inputs, buttons carry their own
+  // `transition-colors`) while the switch is in flight, so every element snaps
+  // to its final color inside the cross-fade instead of animating a beat
+  // behind the rest of the page. The matching CSS lives in styles/tailwind.css.
+  const freeze = () => root.classList.add("theme-switching");
+  const unfreeze = () => root.classList.remove("theme-switching");
+
+  if (
+    typeof doc.startViewTransition !== "function" ||
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches
+  ) {
+    freeze();
+    applyChanges();
+    // Two frames: let the new colors paint before transitions re-enable.
+    requestAnimationFrame(() => requestAnimationFrame(unfreeze));
+    return;
+  }
+
+  // With a click origin (the navbar toggle), the new theme expands as a circle
+  // from that point instead of the whole-page cross-fade. `theme-reveal` on
+  // <html> disables the built-in fade so the circle edge stays crisp.
+  if (origin) root.classList.add("theme-reveal");
+
+  const transition = doc.startViewTransition(() => {
+    freeze();
+    applyChanges();
+  });
+
+  if (origin) {
+    const { x, y } = origin;
+    // Radius to the farthest viewport corner so the circle always covers the page.
+    const radius = Math.hypot(
+      Math.max(x, window.innerWidth - x),
+      Math.max(y, window.innerHeight - y),
+    );
+    transition.ready.then(
+      () => {
+        root.animate(
+          {
+            clipPath: [
+              `circle(0px at ${x}px ${y}px)`,
+              `circle(${radius}px at ${x}px ${y}px)`,
+            ],
+          },
+          {
+            duration: 450,
+            easing: "ease-out",
+            pseudoElement: "::view-transition-new(root)",
+          },
+        );
+      },
+      // A skipped transition rejects `ready` — nothing to animate then.
+      () => {},
+    );
+  }
+
+  const cleanup = () => {
+    unfreeze();
+    root.classList.remove("theme-reveal");
+  };
+  transition.finished.then(cleanup, cleanup);
+};
+
+/**
  * Helper function to convert hex color to rgba
  * @param hex - Hex color code (e.g., "#3F7994")
  * @param opacity - Opacity value (1-10 scale, where 10 = fully opaque)

@@ -522,7 +522,7 @@ import configService from "@/services/config";
 import DOMPurify from "dompurify";
 import GroupHeader from "../common/GroupHeader.vue";
 import store from "@/test/unit/helpers/store";
-import { applyThemeColors } from "@/utils/theme";
+import { applyThemeColors, switchThemeMode } from "@/utils/theme";
 import { useLocalOrganization } from "@/utils/zincutils";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
@@ -1077,12 +1077,6 @@ export default defineComponent({
      * @param mode - 'light' or 'dark' theme mode to switch to
      */
     const toggleThemeMode = (mode: "light" | "dark") => {
-      // Update theme mode in store
-      store.dispatch("appTheme", mode);
-
-      // Update dark mode — this is critical for proper theme application
-      document.documentElement.classList.toggle("dark", mode === "dark");
-
       // Persist theme preference to localStorage
       localStorage.setItem("theme", mode);
 
@@ -1090,9 +1084,19 @@ export default defineComponent({
       const color =
         mode === "light" ? customLightColor.value : customDarkColor.value;
 
-      // Apply the theme color for the new mode. isDefault=false so the resolved
-      // color (including the O2 Signature default) is always applied directly.
-      applyThemeColors(color, mode, false);
+      // All DOM writes of the switch run inside switchThemeMode so the mode
+      // flip cross-fades as one frame.
+      switchThemeMode(mode, () => {
+        // Update theme mode in store
+        store.dispatch("appTheme", mode);
+
+        // Update dark mode — this is critical for proper theme application
+        document.documentElement.classList.toggle("dark", mode === "dark");
+
+        // Apply the theme color for the new mode. isDefault=false so the resolved
+        // color (including the O2 Signature default) is always applied directly.
+        applyThemeColors(color, mode, false);
+      });
     };
 
     const cancelLogoText = () => {

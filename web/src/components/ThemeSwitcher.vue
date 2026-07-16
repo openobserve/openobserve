@@ -16,7 +16,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <OButton variant="ghost" size="icon-panel" data-test="navbar-theme-toggle-btn" @click="toggleDarkMode">
-    <OIcon :name="darkMode ? 'dark-mode' : 'light-mode'" size="sm" class="size-5!" />
+    <Transition name="theme-icon" mode="out-in">
+      <OIcon :key="darkMode ? 'dark' : 'light'" :name="darkMode ? 'dark-mode' : 'light-mode'" size="sm" class="size-5!" />
+    </Transition>
     <OTooltip side="top" align="center" :content="tooltipText" />
   </OButton>
 </template>
@@ -28,6 +30,7 @@ import { useI18n } from "vue-i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import { switchThemeMode } from "@/utils/theme";
 
 export default defineComponent({
   components: { OButton, OIcon, OTooltip },
@@ -59,8 +62,13 @@ export default defineComponent({
       return `${t("common.switchTo")} ${mode}`;
     });
 
+    // Click origin of the toggle button, consumed by the next setTheme call so
+    // the circular reveal expands from the button (absent for mount/store syncs).
+    let pendingOrigin: { x: number; y: number } | null = null;
+
     watch(darkMode, () => {
-      setTheme(darkMode.value ? "dark" : "light");
+      setTheme(darkMode.value ? "dark" : "light", pendingOrigin ?? undefined);
+      pendingOrigin = null;
     });
 
     // Watch store.state.theme for external changes
@@ -75,19 +83,36 @@ export default defineComponent({
       }
     );
 
-    const setTheme = (theme: any) => {
+    const setTheme = (theme: any, origin?: { x: number; y: number }) => {
       try {
         localStorage.setItem("theme", theme);
       } catch (error) {
         // Handle localStorage not available
         console.warn("localStorage not available for theme storage:", error);
       }
-      // Toggle .dark on <html> for the O2 component library (Tailwind dark variant)
-      document.documentElement.classList.toggle('dark', theme === 'dark');
-      store.dispatch("appTheme", theme);
+      // Toggle .dark on <html> for the O2 component library (Tailwind dark variant).
+      // Wrapped in switchThemeMode so the mode flip animates as one frame —
+      // circular reveal from `origin` when given, whole-page cross-fade otherwise.
+      switchThemeMode(theme === 'dark' ? 'dark' : 'light', () => {
+        document.documentElement.classList.toggle('dark', theme === 'dark');
+        store.dispatch("appTheme", theme);
+      }, origin);
     };
 
-    const toggleDarkMode = () => {
+    const toggleDarkMode = (event?: MouseEvent) => {
+      const el =
+        event?.currentTarget instanceof HTMLElement
+          ? event.currentTarget
+          : event?.target instanceof HTMLElement
+            ? event.target
+            : null;
+      if (el) {
+        const rect = el.getBoundingClientRect();
+        pendingOrigin = {
+          x: rect.left + rect.width / 2,
+          y: rect.top + rect.height / 2,
+        };
+      }
       darkMode.value = !darkMode.value;
     };
 

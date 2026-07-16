@@ -171,7 +171,7 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import OColor from "@/lib/forms/Color/OColor.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import { useStore } from "vuex";
-import { applyThemeColors } from "@/utils/theme";
+import { applyThemeColors, switchThemeMode } from "@/utils/theme";
 import { applyThemeForMode, applyCurrentTheme } from "@/utils/themeManager";
 import {
   PREDEFINED_THEMES,
@@ -269,11 +269,13 @@ watch(dialogOpen, (val) => {
 watch(activeTab, (newTab) => {
   const newTheme = newTab === "dark" ? "dark" : "light";
   if (store.state.theme !== newTheme) {
-    // Update theme in store and localStorage
-    store.dispatch("appTheme", newTheme);
     localStorage.setItem("theme", newTheme);
-    // Toggle .dark on <html> for the O2 component library (Tailwind dark variant)
-    document.documentElement.classList.toggle("dark", newTheme === "dark");
+    // Update store and toggle .dark on <html> (Tailwind dark variant) inside
+    // switchThemeMode so the mode flip cross-fades as one frame.
+    switchThemeMode(newTheme, () => {
+      store.dispatch("appTheme", newTheme);
+      document.documentElement.classList.toggle("dark", newTheme === "dark");
+    });
   }
 });
 

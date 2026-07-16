@@ -45,6 +45,76 @@
 }
 
 /*
+ * Light↔dark mode switch cross-fade (View Transitions API, started by
+ * switchThemeMode in utils/theme.ts). Explicit duration so the fade is
+ * perceptible across browsers (default is a barely-visible 0.25s).
+ * REVERT: delete this block + reduce switchThemeMode to `applyChanges()`.
+ */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 0.35s;
+  animation-timing-function: ease-in-out;
+}
+
+/*
+ * While a theme switch is in flight, suppress per-element color transitions
+ * (inputs, buttons, table action icons carry their own `transition-colors`)
+ * so nothing animates a beat behind the page cross-fade. The class is added
+ * and removed by switchThemeMode in utils/theme.ts.
+ */
+html.theme-switching *,
+html.theme-switching *::before,
+html.theme-switching *::after {
+  transition: none !important;
+}
+
+/*
+ * Circular reveal — used when the switch has a click origin (navbar theme
+ * toggle): the new theme expands as a circle from the button, driven by a
+ * clip-path animation in switchThemeMode. The built-in cross-fade must be
+ * disabled for it (old stays fully opaque underneath, new is clipped on top)
+ * or the circle edge washes out. `theme-reveal` is set on <html> only for
+ * origin-based switches; the others keep the plain fade above.
+ */
+html.theme-reveal::view-transition-image-pair(root) {
+  isolation: auto;
+}
+html.theme-reveal::view-transition-old(root),
+html.theme-reveal::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+
+/*
+ * Navbar theme-toggle icon swap (sun ↔ moon): rotate + scale out-in. Driven by
+ * the <Transition name="theme-icon"> wrapper in ThemeSwitcher.vue. Uses CSS
+ * animations rather than transitions so the `theme-switching` freeze above
+ * doesn't suppress it — it plays live inside the expanding reveal circle.
+ */
+.theme-icon-enter-active {
+  animation: theme-icon-in 0.3s ease-out;
+}
+.theme-icon-leave-active {
+  animation: theme-icon-out 0.15s ease-in forwards;
+}
+@keyframes theme-icon-in {
+  from {
+    transform: rotate(-90deg) scale(0.6);
+    opacity: 0;
+  }
+  to {
+    transform: rotate(0deg) scale(1);
+    opacity: 1;
+  }
+}
+@keyframes theme-icon-out {
+  to {
+    transform: rotate(90deg) scale(0.6);
+    opacity: 0;
+  }
+}
+
+/*
  * When reka-ui opens a modal dialog it sets `body { pointer-events: none }`
  * and re-enables events only on the DialogContent DismissableLayer node.
  * Any portaled floating element (dropdown, select, combobox, date-picker …)
