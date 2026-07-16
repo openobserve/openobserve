@@ -58,17 +58,13 @@ test.describe("Monaco Editor Query Pre-fill Tests", () => {
     // Step 3: Wait for page and Monaco editor to load (critical for lazy loading)
     await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
 
-    // Wait for Monaco editor to be visible (it's lazy loaded)
-    await pm.logsPage.waitForQueryEditorVisible();
-
-    // Additional wait for Monaco to initialize and pre-fill
-    await page.waitForTimeout(2000);
-
-    testLogger.info('Monaco editor visible, checking content');
+    // Wait for Monaco editor to be visible AND finish pre-filling from the URL query
+    // param. It's lazy loaded, so the host can be visible before the model content is
+    // set — poll the model value rather than waiting a fixed 2s.
+    testLogger.info('Waiting for Monaco editor content');
 
     // Step 4: Verify Monaco editor contains the query
-    // Use the getQueryEditorText method from logsPage
-    const editorContent = await pm.logsPage.getQueryEditorText();
+    const editorContent = await pm.logsPage.waitForQueryEditorContent('SELECT');
     testLogger.info('Editor content retrieved', { content: editorContent });
 
     // Verify the query is pre-filled (normalize whitespace for comparison)
@@ -101,11 +97,15 @@ test.describe("Monaco Editor Query Pre-fill Tests", () => {
     // Step 4: Enter a specific SQL query
     const testQuery = `SELECT * FROM "${TEST_STREAM}" WHERE code = 200 LIMIT 50`;
     await pm.logsPage.clearAndFillQueryEditor(testQuery);
-    await page.waitForTimeout(1000);
+    await pm.logsPage.waitForQueryEditorContent('WHERE');
 
-    // Step 5: Click refresh to execute
-    await pm.logsPage.clickRefresh();
-    await page.waitForTimeout(3000);
+    // Step 5: Execute WITHOUT cancelling the in-flight auto-search. A bare refresh click
+    // cancels it (button is in "Cancel query" mode), so the query never commits to the URL
+    // and the generated short URL lacks it — the redirect then lands on an empty editor.
+    // runQueryAndWaitForResults waits for the Cancel state to clear before clicking.
+    await pm.logsPage.runQueryAndWaitForResults();
+    // Ensure the query is committed to the URL before sharing so the short URL captures it.
+    await pm.logsPage.waitForUrlParam('sql_mode', 'true');
 
     // Step 6: Click share link and get URL
     const sharedUrl = await pm.logsPage.clickShareLinkAndGetUrl();
@@ -116,12 +116,12 @@ test.describe("Monaco Editor Query Pre-fill Tests", () => {
     await pm.logsPage.waitForRedirectComplete();
     await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
 
-    // Step 8: Wait for Monaco to load and pre-fill
-    await pm.logsPage.waitForQueryEditorVisible();
-    await page.waitForTimeout(2000);
-
-    // Step 9: Verify Monaco editor contains the query
-    const editorContent = await pm.logsPage.getQueryEditorText();
+    // Step 8: Wait for Monaco to load AND finish pre-filling from the restored short-URL
+    // state. The editor host becomes visible before the query re-hydrates, so poll the
+    // model content instead of a fixed wait (root cause of the CI flake: getQueryEditorText()
+    // returned "" while the editor was still empty), self-healing with one reload if the
+    // lazy editor mounts empty after the short-URL resolution hop.
+    const editorContent = await pm.logsPage.waitForRedirectedQueryEditorContent('SELECT');
     testLogger.info('Editor content after redirect', { content: editorContent });
 
     // Verify the query structure is preserved
@@ -303,11 +303,13 @@ test.describe("Monaco Editor Query Pre-fill Tests", () => {
     // Step 5: Enter a query
     const testQuery = `SELECT * FROM "${TEST_STREAM}" LIMIT 100`;
     await pm.logsPage.clearAndFillQueryEditor(testQuery);
-    await page.waitForTimeout(1000);
+    await pm.logsPage.waitForQueryEditorContent('LIMIT');
 
-    // Step 6: Execute query
-    await pm.logsPage.clickRefresh();
-    await page.waitForTimeout(3000);
+    // Step 6: Execute WITHOUT cancelling the in-flight auto-search (a bare refresh click
+    // cancels it, so the query never commits to the URL / short URL). runQueryAndWaitForResults
+    // waits for the Cancel state to clear before clicking.
+    await pm.logsPage.runQueryAndWaitForResults();
+    await pm.logsPage.waitForUrlParam('sql_mode', 'true');
 
     // Step 7: Capture state before sharing
     const originalState = await pm.logsPage.captureCurrentState();
@@ -322,12 +324,12 @@ test.describe("Monaco Editor Query Pre-fill Tests", () => {
     await pm.logsPage.waitForRedirectComplete();
     await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
 
-    // Step 9: Wait for Monaco to load
-    await pm.logsPage.waitForQueryEditorVisible();
-    await page.waitForTimeout(2000);
+    // Step 9: Wait for Monaco to load AND finish pre-filling from the restored state
+    // (host visible before content hydrates — poll the model value, self-healing with one
+    // reload if the lazy editor mounts empty after the short-URL hop).
+    const editorContent = await pm.logsPage.waitForRedirectedQueryEditorContent('SELECT');
 
     // Step 10: Verify both query and time range are preserved
-    const editorContent = await pm.logsPage.getQueryEditorText();
     expect(editorContent).toContain('SELECT');
     expect(editorContent).toContain(TEST_STREAM);
 
