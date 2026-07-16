@@ -6477,6 +6477,7 @@
     },
     "newCheck": {
       "button": "New Check",
+      "loadEditFailed": "Failed to load the check for editing — the form shows defaults, do not save",
       "browser": "Browser Test",
       "http": "HTTP / API",
       "tcp": "TCP Port",

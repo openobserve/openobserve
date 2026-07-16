@@ -286,7 +286,9 @@ function mapFrequencyToSchedule(freq: any, start?: number): BrowserCheck['schedu
   // Map API frequency type back to schedule unit (seconds → minutes for display)
   const unit = freq.type === 'seconds' ? 'minutes' : (freq.type ?? 'minutes')
 
-  const timezone = freq.timezone
+  // timezone is optional on the wire (API-created checks omit it) — a bare
+  // .toLowerCase() here threw and silently blanked the whole edit form.
+  const timezone = (freq.timezone ?? '')
       .toLowerCase()
       .startsWith("browser time")
       ? Intl.DateTimeFormat().resolvedOptions().timeZone

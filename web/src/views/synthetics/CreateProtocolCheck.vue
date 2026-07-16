@@ -133,7 +133,10 @@ async function loadForEdit(id: string) {
     const res = await syntheticsService.get(org, id)
     check.value = mapResponseToProtocolCheck(res.data as Record<string, unknown>)
   } catch (err) {
+    // Surface it — a silent catch here leaves a blank form that saves a
+    // fresh check over the existing one.
     console.error('[synthetics] failed to load check for edit', err)
+    toast({ variant: 'error', message: t('synthetics.newCheck.loadEditFailed') })
   } finally {
     isLoadingEdit.value = false
   }
