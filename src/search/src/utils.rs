@@ -27,8 +27,8 @@ pub use runtime::{
 
 pub fn get_ts_col_order_by(
     parsed_sql: &Sql,
-    ts_col: &str,
-    is_aggregate: bool,
+    _ts_col: &str,
+    _is_aggregate: bool,
 ) -> Option<(String, bool)> {
     let mut is_descending = true;
     let order_by = &parsed_sql.order_by;
@@ -37,18 +37,18 @@ pub fn get_ts_col_order_by(
         {
             let mut result = String::new();
             for (original, alias) in &parsed_sql.aliases {
-                if original == ts_col || original.contains("histogram") {
+                if original == _ts_col || original.contains("histogram") {
                     result = alias.clone();
                 }
             }
-            if !is_aggregate
+            if !_is_aggregate
                 && (parsed_sql
                     .columns
                     .iter()
-                    .any(|(_, value)| value.contains(&ts_col.to_owned()))
-                    || parsed_sql.order_by.iter().any(|value| value.0 == ts_col))
+                    .any(|(_, value)| value.contains(&_ts_col.to_owned()))
+                    || parsed_sql.order_by.iter().any(|value| value.0 == _ts_col))
             {
-                result = ts_col.to_string();
+                result = _ts_col.to_string();
             }
             result
         }

@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::str::FromStr;
+
 pub mod distributed_plan;
 pub mod optimizer;
 pub mod peak_memory_pool;
@@ -80,4 +82,3 @@ mod tests {
         assert!("pool".parse::<MemoryPoolType>().is_err());
     }
 }
-use std::str::FromStr;
