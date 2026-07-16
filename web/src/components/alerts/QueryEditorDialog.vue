@@ -40,17 +40,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Stream Type + Stream Name -->
           <div class="flex items-center gap-2">
-            <div v-if="streamType" class="inline-flex flex-row items-center gap-[5px] py-[3px] px-2.5 rounded-md" :class="store.state.theme === 'dark' ? 'bg-[rgba(59,130,246,0.12)] border border-[rgba(59,130,246,0.3)]' : 'bg-[rgba(59,130,246,0.08)] border border-[rgba(59,130,246,0.25)]'">
+            <div v-if="streamType" class="inline-flex flex-row items-center gap-[5px] py-[3px] px-2.5 rounded-md bg-[color-mix(in_srgb,var(--color-info)_10%,transparent)] border border-[color-mix(in_srgb,var(--color-info)_28%,transparent)]">
               <span class="text-2xs font-semibold text-text-label">Stream Type</span>
               <span class="text-2xs opacity-30 text-text-label">:</span>
               <span class="text-xs font-bold text-text-link">{{ streamType }}</span>
             </div>
             <span v-if="streamType && streamName" class="opacity-20 select-none">|</span>
-            <div class="inline-flex flex-row items-center gap-[5px] py-[3px] px-2.5 rounded-md" :class="store.state.theme === 'dark' ? 'bg-[rgba(139,92,246,0.12)] border border-[rgba(139,92,246,0.3)]' : 'bg-[rgba(139,92,246,0.08)] border border-[rgba(139,92,246,0.25)]'">
+            <div class="inline-flex flex-row items-center gap-[5px] py-[3px] px-2.5 rounded-md bg-[color-mix(in_srgb,var(--color-sql-accent)_10%,transparent)] border border-[color-mix(in_srgb,var(--color-sql-accent)_28%,transparent)]">
               <span class="text-2xs font-semibold text-text-label">Stream Name</span>
               <span class="text-2xs opacity-30 text-text-label">:</span>
-              <span v-if="streamName" class="text-xs font-bold" :class="store.state.theme === 'dark' ? 'text-[#a78bfa]' : 'text-[#7c3aed]'">{{ streamName }}</span>
-              <span v-else class="text-xs font-bold opacity-40 italic" :class="store.state.theme === 'dark' ? 'text-[#a78bfa]' : 'text-[#7c3aed]'">none</span>
+              <span v-if="streamName" class="text-xs font-bold text-sql-accent">{{ streamName }}</span>
+              <span v-else class="text-xs font-bold opacity-40 italic text-sql-accent">none</span>
             </div>
           </div>
         </div>
@@ -336,7 +336,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <!-- No results after run -->
                   <div v-else-if="outputEvents == '' && !runQueryLoading" class="flex flex-col justify-center items-center h-full bg-card-glass-bg">
                     <div class="flex flex-col items-center gap-2">
-                      <OIcon name="warning" size="xl" class="text-orange-400 opacity-60" />
+                      <OIcon name="warning" size="xl" class="text-warning opacity-60" />
                     </div>
                   </div>
                   <!-- Loading -->
@@ -377,8 +377,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                   <!-- Running indicator -->
                   <div v-if="runFnQueryLoading" class="flex items-center gap-1">
-                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 [animation:pulse_1.5s_ease-in-out_infinite]" />
-                    <span class="text-[10px] font-semibold text-emerald-400">Running</span>
+                    <span class="w-1.5 h-1.5 rounded-full bg-status-positive [animation:pulse_1.5s_ease-in-out_infinite]" />
+                    <span class="text-[10px] font-semibold text-status-positive">Running</span>
                   </div>
                 </div>
 
@@ -394,7 +394,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <!-- No results -->
                   <div v-else-if="outputFnEvents == '' && !runFnQueryLoading && tempTestFunction" class="flex flex-col justify-center items-center h-full bg-card-glass-bg">
                     <div class="flex flex-col items-center gap-2">
-                      <OIcon name="warning" size="xl" class="text-orange-400 opacity-60" />
+                      <OIcon name="warning" size="xl" class="text-warning opacity-60" />
                     </div>
                   </div>
                   <!-- Loading -->
@@ -556,7 +556,7 @@ const sqlStatusBarClasses = computed(() => {
   const map: Record<string, string> = {
     'sql-status-bar--hint':    neutralBg,
     'sql-status-bar--idle':    neutralBg,
-    'sql-status-bar--loading': 'bg-[rgba(139,92,246,0.06)] text-[#8b5cf6]',
+    'sql-status-bar--loading': 'bg-[color-mix(in_srgb,var(--color-sql-accent)_6%,transparent)] text-sql-accent',
     'sql-status-bar--error':   'bg-status-error-bg text-status-error-text cursor-pointer',
     'sql-status-bar--empty':   'bg-status-warning-bg text-status-warning-text',
     'sql-status-bar--success': 'bg-status-success-bg text-status-positive',

@@ -250,6 +250,18 @@
   --color-field-type-timestamp-text: oklch(54.6% 0.245 262.881);
   --color-focus-ring: #282D5D;
   --color-gray: #818594;
+  /* AI-assistant identity accents (welcome hero + prompt chips). Same values in
+     both themes — translucent bgs sit fine on light and dark surfaces. */
+  --color-ai-accent: #7B61FF;
+  /* SQL / query-editor violet accent (stream-name label, sql status bar). Theme-aware:
+     lighter in dark for legibility. */
+  --color-sql-accent: #7C3AED;
+  --color-lang-sql-text: #7B61FF;
+  --color-lang-sql-bg: rgba(123, 97, 255, 0.10);
+  --color-lang-vrl-text: #F59E0B;
+  --color-lang-vrl-bg: rgba(245, 158, 11, 0.12);
+  --color-lang-promql-text: #10B981;
+  --color-lang-promql-bg: rgba(16, 185, 129, 0.12);
   --color-hover-gray: color-mix(in srgb, var(--color-theme-accent) 2%, rgb(244, 244, 244));
   --color-hover-shadow: #dddddd;
   --color-icon-color: #808080;

@@ -4,6 +4,7 @@ import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import { useGreeting } from "./useGreeting";
 import { getImageURL } from "@/utils/zincutils";
+import { useTheme } from "@/composables/useTheme";
 
 const store = useStore();
 const { t } = useI18n();
@@ -13,8 +14,9 @@ const role = computed<string>(() => store.state.currentuser?.role ?? "");
 
 const { greeting } = useGreeting(() => email.value);
 
+const { isDark } = useTheme();
 const logoSrc = computed(() =>
-  store.state.theme === "dark"
+  isDark.value
     ? getImageURL("images/common/o2_ai_logo_dark.svg")
     : getImageURL("images/common/o2_ai_logo.svg"),
 );
@@ -42,14 +44,14 @@ const logoSrc = computed(() =>
         t("aiAssistant.welcome.taglineHighlight")
       }}</span
       >{{ t("aiAssistant.welcome.taglineTail") }}
-      <span class="welcome-hero__code welcome-hero__code--sql font-[var(--font-mono,ui-monospace,SFMono-Regular,Menlo,monospace)] text-xs font-semibold py-[1px] px-1.5 rounded-sm tracking-[0.01em] text-[#7b61ff] bg-[rgba(123,97,255,0.1)]">{{
+      <span class="welcome-hero__code welcome-hero__code--sql font-[var(--font-mono,ui-monospace,SFMono-Regular,Menlo,monospace)] text-xs font-semibold py-[1px] px-1.5 rounded-sm tracking-[0.01em] text-lang-sql-text bg-lang-sql-bg">{{
         t("aiAssistant.welcome.taglineSql")
       }}</span>,
-      <span class="welcome-hero__code welcome-hero__code--vrl font-[var(--font-mono,ui-monospace,SFMono-Regular,Menlo,monospace)] text-xs font-semibold py-[1px] px-1.5 rounded-sm tracking-[0.01em] text-[#f59e0b] bg-[rgba(245,158,11,0.12)]">{{
+      <span class="welcome-hero__code welcome-hero__code--vrl font-[var(--font-mono,ui-monospace,SFMono-Regular,Menlo,monospace)] text-xs font-semibold py-[1px] px-1.5 rounded-sm tracking-[0.01em] text-lang-vrl-text bg-lang-vrl-bg">{{
         t("aiAssistant.welcome.taglineVrl")
       }}</span>
       and
-      <span class="welcome-hero__code welcome-hero__code--promql font-[var(--font-mono,ui-monospace,SFMono-Regular,Menlo,monospace)] text-xs font-semibold py-[1px] px-1.5 rounded-sm tracking-[0.01em] text-[#10b981] bg-[rgba(16,185,129,0.12)]">{{
+      <span class="welcome-hero__code welcome-hero__code--promql font-[var(--font-mono,ui-monospace,SFMono-Regular,Menlo,monospace)] text-xs font-semibold py-[1px] px-1.5 rounded-sm tracking-[0.01em] text-lang-promql-text bg-lang-promql-bg">{{
         t("aiAssistant.welcome.taglinePromql")
       }}</span>
       — {{ t("aiAssistant.welcome.taglineAnd") }}

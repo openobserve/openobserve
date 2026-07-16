@@ -755,7 +755,8 @@ const historyTableColumns = computed(() =>
 
 const getRowClass = (row: any) => {
   if (row?._flappingGroup) {
-    return store.state.theme === "dark" ? "!bg-[#1e1a2e]" : "!bg-[#f5f3ff]";
+    // Violet-tinted highlight for flapping-group rows; token carries the theme.
+    return "!bg-[color-mix(in_srgb,var(--color-sql-accent)_8%,var(--color-surface-base))]";
   }
   if (row?._child) {
     return "!bg-surface-subtle";

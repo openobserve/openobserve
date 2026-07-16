@@ -5,7 +5,7 @@
         class="appLogo"
         style="width: 250px; height: auto"
         :src="
-          store.state.theme == 'dark'
+          isDark
             ? getImageURL('images/common/openobserve_latest_dark_2.svg')
             : getImageURL('images/common/openobserve_latest_light_2.svg')
         "
@@ -36,7 +36,7 @@
     <div class="mb-3 mt-4 text-center">
       <a
         data-test="sso-login-internal-link"
-        class="cursor-pointer hover:text-[#595959]"
+        class="cursor-pointer hover:text-text-secondary"
         style="text-decoration: underline"
         @click="showLoginInput = !showLoginInput"
         >Sign in with an internal user</a
@@ -84,12 +84,12 @@
 <script setup lang="ts">
 import { ref } from "vue";
 import { getImageURL } from "@/utils/zincutils";
-import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
+import { useTheme } from "@/composables/useTheme";
 import OButton from '@/lib/core/Button/OButton.vue';
 import OInput from '@/lib/forms/Input/OInput.vue';
 
-const store = useStore();
+const { isDark } = useTheme();
 
 const { t } = useI18n();
 

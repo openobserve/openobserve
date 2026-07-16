@@ -63,8 +63,8 @@ export default defineComponent({
 
     const bannerClass = computed(() => {
       return isSevere.value
-        ? 'border border-[#f87171] [background:linear-gradient(to_right,transparent_60%,#fff5f5_70%,#fecdd3_100%)] dark:border-[#dc2626] dark:[background:linear-gradient(to_right,transparent_60%,#2d1f1f_70%,#3d2020_100%)]'
-        : 'border border-[#f0c674] [background:linear-gradient(to_right,transparent_60%,#fffbf0_70%,#fff3cd_100%)] dark:border-[#a08530] dark:[background:linear-gradient(to_right,transparent_60%,#2d2a1f_70%,#3d3520_100%)]';
+        ? 'border border-usage-banner-error-border [background:var(--color-usage-banner-error-bg)]'
+        : 'border border-usage-banner-warning-border [background:var(--color-usage-banner-warning-bg)]';
     });
 
     return {

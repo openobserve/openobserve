@@ -697,6 +697,14 @@
   --color-banner-error-soft-border: var(--color-error-300);
   --color-banner-error-soft-text:   var(--color-error-700);
 
+  /* usage-report severity banners (enterprise billings) — right-fade gradient bg +
+     border. Light values here / dark overrides in dark.css, so the token carries
+     the theme automatically (no dark: variant needed at the call site). */
+  --color-usage-banner-error-border:   #f87171;
+  --color-usage-banner-error-bg:       linear-gradient(to right, transparent 60%, #fff5f5 70%, #fecdd3 100%);
+  --color-usage-banner-warning-border: #f0c674;
+  --color-usage-banner-warning-bg:     linear-gradient(to right, transparent 60%, #fffbf0 70%, #fff3cd 100%);
+
   /* ── Note Container (pipeline guideline cards) ─────────── */
   --color-note-bg:               var(--color-note-light-bg);
   --color-note-border:           var(--color-note-light-border);
@@ -4246,6 +4254,8 @@ button.date-time-button {
   --color-banner-default-bg: var(--color-banner-default-bg);
   --color-banner-default-text: var(--color-banner-default-text);
   --color-banner-error-bg: var(--color-banner-error-bg);
+  --color-usage-banner-error-border: var(--color-usage-banner-error-border);
+  --color-usage-banner-warning-border: var(--color-usage-banner-warning-border);
   --color-banner-error-soft-bg: var(--color-banner-error-soft-bg);
   --color-banner-error-soft-border: var(--color-banner-error-soft-border);
   --color-banner-error-soft-text: var(--color-banner-error-soft-text);
@@ -4259,6 +4269,8 @@ button.date-time-button {
   --color-banner-warning-bg: var(--color-banner-warning-bg);
   --color-banner-warning-border: var(--color-banner-warning-border);
   --color-banner-warning-text: var(--color-banner-warning-text);
+  --color-ai-accent: var(--color-ai-accent);
+  --color-sql-accent: var(--color-sql-accent);
   --color-bg-gray: var(--color-bg-gray);
   --color-cancel-query-bg: var(--color-cancel-query-bg);
   --color-card-glass-bg: var(--color-card-glass-bg);
@@ -4276,6 +4288,12 @@ button.date-time-button {
   --color-indigo-700: var(--color-indigo-700);
   --color-info: var(--color-info);
   --color-json-key: var(--color-json-key);
+  --color-lang-promql-bg: var(--color-lang-promql-bg);
+  --color-lang-promql-text: var(--color-lang-promql-text);
+  --color-lang-sql-bg: var(--color-lang-sql-bg);
+  --color-lang-sql-text: var(--color-lang-sql-text);
+  --color-lang-vrl-bg: var(--color-lang-vrl-bg);
+  --color-lang-vrl-text: var(--color-lang-vrl-text);
   --color-latency-p95: var(--color-latency-p95);
   --color-log-table-row-bg: var(--color-log-table-row-bg);
   --color-log-table-row-border: var(--color-log-table-row-border);

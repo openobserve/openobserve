@@ -50,7 +50,7 @@
           :disabled="!aiInputText.trim() || props.disableAi"
           :data-test="`${dataTestPrefix}-ai-send-btn`"
           @click="handleAIGenerate"
-          class="bg-[linear-gradient(135deg,#8B5CF6_0%,#EC4899_100%)]! text-text-inverse! transition-all! duration-200! min-w-7! min-h-7! w-7! h-7! enabled:hover:-translate-y-px enabled:hover:shadow-[0_0.25rem_0.75rem_0_rgba(139,92,246,0.4)]! enabled:active:translate-y-0 disabled:opacity-40! disabled:bg-[#ccc]!"
+          class="bg-[linear-gradient(135deg,#8B5CF6_0%,#EC4899_100%)]! text-text-inverse! transition-all! duration-200! min-w-7! min-h-7! w-7! h-7! enabled:hover:-translate-y-px enabled:hover:shadow-[0_0.25rem_0.75rem_0_rgba(139,92,246,0.4)]! enabled:active:translate-y-0 disabled:opacity-40! disabled:bg-surface-subtle!"
         >
           <OTooltip v-if="props.disableAi && props.disableAiReason" :content="props.disableAiReason" />
           <OTooltip v-else-if="!aiInputText.trim()" :content="props.aiTooltip || t('search.enterPrompt')" />

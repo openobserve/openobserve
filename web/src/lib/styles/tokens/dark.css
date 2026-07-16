@@ -89,6 +89,7 @@
     --color-text-code:        var(--d-text-2);           /* inline code, monospace */
     --color-text-inverse:     var(--color-grey-900);     /* text on light/colored bg */
     --color-accent:           var(--color-primary-400);  /* brand accent — lighter shade for dark surfaces */
+    --color-sql-accent:       #A78BFA;                    /* SQL/query violet — lighter for dark surfaces */
 
     /* --- Surfaces (mapped — elevation order preserved from light mode) --- */
     --color-surface-base:         var(--d-base);    /* content card + table canvas (lifted) */
@@ -465,6 +466,12 @@
     --color-banner-error-soft-bg:     color-mix(in srgb, var(--color-error-700) 20%, transparent);
     --color-banner-error-soft-border: var(--color-error-700);
     --color-banner-error-soft-text:   var(--color-error-100);
+
+    /* usage-report severity banners (dark) */
+    --color-usage-banner-error-border:   #dc2626;
+    --color-usage-banner-error-bg:       linear-gradient(to right, transparent 60%, #2d1f1f 70%, #3d2020 100%);
+    --color-usage-banner-warning-border: #a08530;
+    --color-usage-banner-warning-bg:     linear-gradient(to right, transparent 60%, #2d2a1f 70%, #3d3520 100%);
 
     /* Note Container */
     --color-note-bg:               color-mix(in srgb, var(--color-warning-900) 15%, transparent);

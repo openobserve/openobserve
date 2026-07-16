@@ -413,7 +413,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
 
                   <!-- Show Full Activity Button -->
-                  <div class="border-t border-gray-200 dark:border-gray-700 p-2 flex justify-end">
+                  <div class="border-t border-border-default p-2 flex justify-end">
                     <OButton
                       variant="ghost-primary"
                       size="sm"
@@ -962,11 +962,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div v-else-if="correlationError || !hasCorrelatedData || !hasAnyStreams" class="flex flex-1 flex-col items-center justify-center gap-2 h-full">
             <OIcon
               :name="correlationError ? (correlationError.includes('disambiguation fields') ? 'warning' : 'error-outline') : 'info-outline'"
-              :class="['w-16 h-16', correlationError ? (correlationError.includes('disambiguation fields') ? 'text-warning' : 'text-status-negative') : 'text-gray-400']" />
+              :class="['w-16 h-16', correlationError ? (correlationError.includes('disambiguation fields') ? 'text-warning' : 'text-status-negative') : 'text-text-muted']" />
             <div class="text-xl font-semibold mt-3">
               {{ correlationError || 'No correlated logs found' }}
             </div>
-            <div v-if="correlationError && correlationError.includes('disambiguation fields')" class="text-sm text-gray-400 mt-2" style="max-width: 500px; text-align: center;">
+            <div v-if="correlationError && correlationError.includes('disambiguation fields')" class="text-sm text-text-secondary mt-2 max-w-125 text-center">
               The service discovery configuration (disambiguation fields) was changed after this incident was created.
             </div>
             <OButton
@@ -1011,11 +1011,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div v-else-if="correlationError || !hasCorrelatedData || !hasAnyStreams" class="flex flex-1 flex-col items-center justify-center gap-2 h-full">
             <OIcon
               :name="correlationError ? (correlationError.includes('disambiguation fields') ? 'warning' : 'error-outline') : 'info-outline'"
-              :class="['w-16 h-16', correlationError ? (correlationError.includes('disambiguation fields') ? 'text-warning' : 'text-status-negative') : 'text-gray-400']" />
+              :class="['w-16 h-16', correlationError ? (correlationError.includes('disambiguation fields') ? 'text-warning' : 'text-status-negative') : 'text-text-muted']" />
             <div class="text-xl font-semibold mt-3">
               {{ correlationError || 'No correlated metrics found' }}
             </div>
-            <div v-if="correlationError && correlationError.includes('disambiguation fields')" class="text-sm text-gray-400 mt-2" style="max-width: 500px; text-align: center;">
+            <div v-if="correlationError && correlationError.includes('disambiguation fields')" class="text-sm text-text-secondary mt-2 max-w-125 text-center">
               The service discovery configuration (disambiguation fields) was changed after this incident was created.
             </div>
             <OButton
@@ -1069,11 +1069,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div v-else-if="correlationError || !hasCorrelatedData || !hasAnyStreams" class="flex flex-1 flex-col items-center justify-center gap-2 h-full">
             <OIcon
               :name="correlationError ? (correlationError.includes('disambiguation fields') ? 'warning' : 'error-outline') : 'info-outline'"
-              :class="['w-16 h-16', correlationError ? (correlationError.includes('disambiguation fields') ? 'text-warning' : 'text-status-negative') : 'text-gray-400']" />
+              :class="['w-16 h-16', correlationError ? (correlationError.includes('disambiguation fields') ? 'text-warning' : 'text-status-negative') : 'text-text-muted']" />
             <div class="text-xl font-semibold mt-3">
               {{ correlationError || 'No correlated traces found' }}
             </div>
-            <div v-if="correlationError && correlationError.includes('disambiguation fields')" class="text-sm text-gray-400 mt-2" style="max-width: 500px; text-align: center;">
+            <div v-if="correlationError && correlationError.includes('disambiguation fields')" class="text-sm text-text-secondary mt-2 max-w-125 text-center">
               The service discovery configuration (disambiguation fields) was changed after this incident was created.
             </div>
             <OButton

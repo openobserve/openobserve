@@ -56,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               : 'width: 250px;'
           "
           :src="
-            store.state.theme == 'dark'
+            isDark
               ? getImageURL('images/common/openobserve_latest_dark_2.svg')
               : getImageURL('images/common/openobserve_latest_light_2.svg')
           "
@@ -72,7 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               : 'width: 250px;'
           "
           :src="
-            store.state.theme == 'dark'
+            isDark
               ? getImageURL('images/common/openobserve_latest_dark_2.svg')
               : getImageURL('images/common/openobserve_latest_light_2.svg')
           "
@@ -114,7 +114,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <div v-if="showSSO && showInternalLogin" class="py-3 text-center">
           <a
-            class="cursor-pointer py-3 hover:text-[#595959]"
+            class="cursor-pointer py-3 hover:text-text-secondary"
             style="text-decoration: underline"
             data-test="login-as-internal-user"
             @click="loginAsInternalUser = !loginAsInternalUser"
@@ -182,6 +182,7 @@ import {
 } from "@/utils/zincutils";
 import { redirectUser } from "@/utils/common";
 import { computed } from "vue";
+import { useTheme } from "@/composables/useTheme";
 import config from "@/aws-exports";
 import OButton from '@/lib/core/Button/OButton.vue';
 import OInput from '@/lib/forms/Input/OInput.vue';
@@ -196,6 +197,7 @@ export default defineComponent({
   setup() {
     const store = useStore();
     const router = useRouter();
+    const { isDark } = useTheme();
     const { t } = useI18n();
     const name = ref("");
     const password = ref("");
@@ -439,6 +441,7 @@ export default defineComponent({
       loginWithSSo,
       config,
       autoRedirectDexLogin,
+      isDark,
     };
   },
   methods: {
