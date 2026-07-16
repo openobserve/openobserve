@@ -499,6 +499,7 @@
     --color-banner-error-soft-text:   var(--color-error-100);
 
     /* usage-report severity banners (dark) */
+    --color-usage-banner-success-bg: linear-gradient(to right, transparent 60%, #24262F 70%, #2C3934 100%);
     --color-usage-banner-error-border:   #dc2626;
     --color-usage-banner-error-bg:       linear-gradient(to right, transparent 60%, #2d1f1f 70%, #3d2020 100%);
     --color-usage-banner-warning-border: #a08530;

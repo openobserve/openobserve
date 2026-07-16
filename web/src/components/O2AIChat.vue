@@ -7111,192 +7111,23 @@ export default defineComponent({
   display: block;
   overflow-x: auto;
   padding: 0.5em;
-  color: #24292e;
-  background: #ffffff;
+  color: var(--color-syntax-text);
+  background: var(--color-syntax-bg);
 }
-
-.hljs-doctag,
-.hljs-keyword,
-.hljs-meta .hljs-keyword,
-.hljs-template-tag,
-.hljs-template-variable,
-.hljs-type,
-.hljs-variable.language_ {
-  color: #d73a49;
-}
-
-.hljs-title,
-.hljs-title.class_,
-.hljs-title.class_.inherited__,
-.hljs-title.function_ {
-  color: #6f42c1;
-}
-
-.hljs-attr,
-.hljs-attribute,
-.hljs-literal,
-.hljs-meta,
-.hljs-number,
-.hljs-operator,
-.hljs-variable,
-.hljs-selector-attr,
-.hljs-selector-class,
-.hljs-selector-id {
-  color: #005cc5;
-}
-
-.hljs-regexp,
-.hljs-string,
-.hljs-meta .hljs-string {
-  color: #032f62;
-}
-
-.hljs-built_in,
-.hljs-symbol {
-  color: #e36209;
-}
-
-.hljs-comment,
-.hljs-code,
-.hljs-formula {
-  color: #6a737d;
-}
-
-.hljs-name,
-.hljs-quote,
-.hljs-selector-tag,
-.hljs-selector-pseudo {
-  color: #22863a;
-}
-
-.hljs-subst {
-  color: #24292e;
-}
-
-.hljs-section {
-  color: #005cc5;
-  font-weight: bold;
-}
-
-.hljs-bullet {
-  color: #735c0f;
-}
-
-.hljs-emphasis {
-  color: #24292e;
-  font-style: italic;
-}
-
-.hljs-strong {
-  color: #24292e;
-  font-weight: bold;
-}
-
-.hljs-addition {
-  color: #22863a;
-  background-color: #f0fff4;
-}
-
-.hljs-deletion {
-  color: #b31d28;
-  background-color: #ffeef0;
-}
-
-/* =============================================
-   Syntax highlighting — dark mode
-   ============================================= */
-.dark .hljs {
-  display: block;
-  overflow-x: auto;
-  padding: 0.5em;
-  color: #c9d1d9;
-  background: #0d1117;
-}
-
-.dark .hljs-doctag,
-.dark .hljs-keyword,
-.dark .hljs-meta .hljs-keyword,
-.dark .hljs-template-tag,
-.dark .hljs-template-variable,
-.dark .hljs-type,
-.dark .hljs-variable.language_ {
-  color: #ff7b72;
-}
-
-.dark .hljs-title,
-.dark .hljs-title.class_,
-.dark .hljs-title.class_.inherited__,
-.dark .hljs-title.function_ {
-  color: #d2a8ff;
-}
-
-.dark .hljs-attr,
-.dark .hljs-attribute,
-.dark .hljs-literal,
-.dark .hljs-meta,
-.dark .hljs-number,
-.dark .hljs-operator,
-.dark .hljs-variable,
-.dark .hljs-selector-attr,
-.dark .hljs-selector-class,
-.dark .hljs-selector-id {
-  color: #79c0ff;
-}
-
-.dark .hljs-regexp,
-.dark .hljs-string,
-.dark .hljs-meta .hljs-string {
-  color: #a5d6ff;
-}
-
-.dark .hljs-built_in,
-.dark .hljs-symbol {
-  color: #ffa657;
-}
-
-.dark .hljs-comment,
-.dark .hljs-code,
-.dark .hljs-formula {
-  color: #8b949e;
-}
-
-.dark .hljs-name,
-.dark .hljs-quote,
-.dark .hljs-selector-tag,
-.dark .hljs-selector-pseudo {
-  color: #7ee787;
-}
-
-.dark .hljs-subst {
-  color: #c9d1d9;
-}
-
-.dark .hljs-section {
-  color: #1f6feb;
-  font-weight: bold;
-}
-
-.dark .hljs-bullet {
-  color: #f2cc60;
-}
-
-.dark .hljs-emphasis {
-  color: #c9d1d9;
-  font-style: italic;
-}
-
-.dark .hljs-strong {
-  color: #c9d1d9;
-  font-weight: bold;
-}
-
-.dark .hljs-addition {
-  color: #aff5b4;
-  background-color: #033a16;
-}
-
-.dark .hljs-deletion {
-  color: #ffdcd7;
-  background-color: #67060c;
-}
+.hljs-doctag, .hljs-keyword, .hljs-meta .hljs-keyword, .hljs-template-tag,
+.hljs-template-variable, .hljs-type, .hljs-variable.language_ { color: var(--color-syntax-keyword); }
+.hljs-title, .hljs-title.class_, .hljs-title.class_.inherited__, .hljs-title.function_ { color: var(--color-syntax-function); }
+.hljs-attr, .hljs-attribute, .hljs-literal, .hljs-meta, .hljs-number, .hljs-operator,
+.hljs-variable, .hljs-selector-attr, .hljs-selector-class, .hljs-selector-id { color: var(--color-syntax-number); }
+.hljs-regexp, .hljs-string, .hljs-meta .hljs-string { color: var(--color-syntax-string); }
+.hljs-built_in, .hljs-symbol { color: var(--color-syntax-builtin); }
+.hljs-comment, .hljs-code, .hljs-formula { color: var(--color-syntax-comment); }
+.hljs-name, .hljs-quote, .hljs-selector-tag, .hljs-selector-pseudo { color: var(--color-syntax-tag); }
+.hljs-subst { color: var(--color-syntax-text); }
+.hljs-section { color: var(--color-syntax-number); font-weight: bold; }
+.hljs-bullet { color: var(--color-syntax-bullet); }
+.hljs-emphasis { color: var(--color-syntax-text); font-style: italic; }
+.hljs-strong { color: var(--color-syntax-text); font-weight: bold; }
+.hljs-addition { color: var(--color-syntax-addition-fg); background-color: var(--color-syntax-addition-bg); }
+.hljs-deletion { color: var(--color-syntax-deletion-fg); background-color: var(--color-syntax-deletion-bg); }
 </style>

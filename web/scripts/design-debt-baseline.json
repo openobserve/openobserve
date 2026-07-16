@@ -8,13 +8,13 @@
     "arbRadius": 25,
     "unscopedStyle": 204,
     "arbZ": 48,
-    "styleBlockHex": 597,
+    "styleBlockHex": 556,
     "stylePxUnit": 1015,
-    "hexClass": 129,
     "inlineHexStyle": 21,
     "tsHex": 471,
     "inlineHexBind": 6,
-    "bareRounded": 10
+    "bareRounded": 10,
+    "hexClass": 40
   },
   "files": {
     "App.vue": {
@@ -89,10 +89,8 @@
       "darkMechanism": 1
     },
     "components/alerts/DestinationPreview.vue": {
-      "hexClass": 89,
       "arbTextSize": 9,
       "unscopedStyle": 1,
-      "styleBlockHex": 5,
       "stylePxUnit": 1
     },
     "components/alerts/DestinationTestResult.vue": {
@@ -582,7 +580,7 @@
       "unscopedStyle": 1,
       "arbZ": 2,
       "darkMechanism": 42,
-      "styleBlockHex": 167,
+      "styleBlockHex": 131,
       "stylePxUnit": 216
     },
     "components/O2AIConfirmDialog.vue": {

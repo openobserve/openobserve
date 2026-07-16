@@ -315,6 +315,30 @@
   --color-brand-email-hover:  #0056b3;
   --color-promo-webinar-link:       #1e3a8a;
   --color-promo-webinar-link-hover: #1e40af;
+  /* Destination-preview brand replicas (Slack/Teams/Email message mockups) —
+     FIXED, theme-independent (must look like the real product in any app theme). */
+  --color-brand-msg-text: #4a5568;
+  --color-brand-msg-meta: #6c757d;
+  --color-brand-msg-border: #e9ecef;
+  --color-brand-teams-bg: #f3f2f1;
+  --color-brand-teams-text: #605e5c;
+  --color-brand-msg-text-strong: #495057;
+  --color-brand-teams-ink: #323130;
+  --color-brand-slack-text: #1d1c1d;
+  --color-brand-slack-meta: #616061;
+  --color-brand-msg-divider: #ddd;
+  --color-brand-slack-green: #06ac38;
+  --color-brand-msg-bg: #f8f9fa;
+  --color-brand-msg-error: #d63638;
+  --color-brand-email-ink: #172b4d;
+  --color-brand-msg-text-dark: #2d3748;
+  --color-brand-email-warning: #ffab00;
+  --color-brand-msg-border-2: #e1e5e9;
+  --color-brand-email-accent: #d13212;
+  --color-brand-slack-avatar: #81b5a1;
+  --color-brand-slack-aubergine: #4a154b;
+  --color-brand-slack-link: #1264a3;
+  --color-brand-email-ink-deep: #0f1c2e;
   --color-hover-gray: color-mix(in srgb, var(--color-theme-accent) 2%, rgb(244, 244, 244));
   --color-hover-shadow: #dddddd;
   --color-icon-color: #808080;

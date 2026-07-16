@@ -700,6 +700,7 @@
   /* usage-report severity banners (enterprise billings) — right-fade gradient bg +
      border. Light values here / dark overrides in dark.css, so the token carries
      the theme automatically (no dark: variant needed at the call site). */
+  --color-usage-banner-success-bg: linear-gradient(to right, transparent 60%, #f7f7ff 70%, #cdf7e4 100%);
   --color-usage-banner-error-border:   #f87171;
   --color-usage-banner-error-bg:       linear-gradient(to right, transparent 60%, #fff5f5 70%, #fecdd3 100%);
   --color-usage-banner-warning-border: #f0c674;
