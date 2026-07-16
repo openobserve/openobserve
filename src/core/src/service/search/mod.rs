@@ -70,7 +70,7 @@ pub mod cardinality;
 pub mod cluster;
 pub mod datafusion;
 pub mod grpc;
-pub mod grpc_search;
+pub use ::search::grpc_search;
 pub mod grpc_server;
 pub mod partition;
 mod searcher;

@@ -52,6 +52,7 @@ thiserror.workspace = true
 tokio.workspace = true
 tokio-stream.workspace = true
 tonic.workspace = true
+tracing.workspace = true
 utoipa.workspace = true
 vector-enrichment.workspace = true
 vrl.workspace = true

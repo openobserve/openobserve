@@ -27,7 +27,9 @@ use infra::{
 use rand::{SeedableRng, rngs::StdRng, seq::IndexedRandom};
 use tracing::{Instrument, info_span};
 
-use crate::service::search::server_internal_error;
+fn server_internal_error(error: impl ToString) -> Error {
+    Error::ErrorCode(ErrorCodes::ServerInternalError(error.to_string()))
+}
 
 #[tracing::instrument(name = "service:search:grpc_search", skip_all)]
 pub async fn grpc_search(
