@@ -82,8 +82,20 @@ pub async fn ingest(
     let stream_type = StreamType::Logs;
 
     // check stream
+    // For the bulk API, when `skip_formatting_stream_name` is enabled, the stream
+    // name must be preserved as-is even for new streams. Other ingestion paths still
+    // format new streams (via `get_formatted_stream_name`) when the flag is set.
+    let is_bulk = matches!(
+        in_req,
+        IngestionRequest::JsonValues(IngestionValueType::Bulk, _)
+    );
     let stream_name = if cfg.common.skip_formatting_stream_name {
-        get_formatted_stream_name(StreamParams::new(org_id, in_stream_name, stream_type)).await?
+        if is_bulk {
+            in_stream_name.to_string()
+        } else {
+            get_formatted_stream_name(StreamParams::new(org_id, in_stream_name, stream_type))
+                .await?
+        }
     } else {
         format_stream_name(in_stream_name.to_string())
     };
