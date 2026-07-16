@@ -158,55 +158,23 @@ pub fn compile_js_function(func: &str, _org_id: &str) -> Result<JSRuntimeConfig,
                     const {} = {};
                     try {{
                         {}
-                        return JSON.stringify({{ success: true }});
                     }} catch(e) {{
-                        return JSON.stringify({{
-                            success: false,
-                            error: e.name + ': ' + e.message,
-                            line: e.lineNumber || 'unknown',
-                            column: e.columnNumber || 'unknown'
-                        }});
                     }}
+                    // the syntax errors will be caught separately, but because we are
+                    // assigning the var_name as empty object, user's code will likely throw exception
+                    // through no fault of their own. So we ignore that.
+                    return JSON.stringify({{ success: true }});
                 }})();
                 "#,
                 var_name, test_value, func_for_compilation
             );
 
-            let result: String = ctx
+            // error here would mean there was some syntax error, which should be propagated
+            let _: String = ctx
                 .eval(test_code)
-                .map_err(|e| std::io::Error::other(format!("JS compilation failed: {}", e)))?;
-
-            // Parse the result to check if there was an error
-            let result_obj: serde_json::Value = serde_json::from_str(&result)
-                .map_err(|e| std::io::Error::other(format!("Failed to parse result: {}", e)))?;
-
-            if let Some(success) = result_obj.get("success").and_then(|v| v.as_bool())
-                && !success
-            {
-                let error_msg = result_obj
-                    .get("error")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("Unknown error");
-                let line = result_obj
-                    .get("line")
-                    .and_then(|v| v.as_str())
-                    .filter(|s| *s != "unknown");
-                let column = result_obj
-                    .get("column")
-                    .and_then(|v| v.as_str())
-                    .filter(|s| *s != "unknown");
-
-                // Only append line/column if we have valid values
-                let full_error = match (line, column) {
-                    (Some(l), Some(c)) => format!("{} (line: {}, column: {})", error_msg, l, c),
-                    (Some(l), None) => format!("{} (line: {})", error_msg, l),
-                    (None, Some(c)) => format!("{} (column: {})", error_msg, c),
-                    (None, None) => error_msg.to_string(),
-                };
-
-                return Err(std::io::Error::other(full_error));
-            }
-
+                .map_err(|e| {
+                    std::io::Error::other(format!("JS compilation failed: {}", e))
+                })?;
             // Extract parameter names (simple heuristic)
             // TODO: Parse function signature properly
             let params = vec!["row".to_string()];
