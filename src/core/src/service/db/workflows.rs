@@ -1,4 +1,7 @@
-use std::sync::Arc;
+use std::{
+    collections::HashMap,
+    sync::{Arc, LazyLock},
+};
 
 use config::get_config;
 use infra::{
@@ -6,6 +9,7 @@ use infra::{
     db::Event,
     table::workflows::{Workflow, WorkflowRunErrors},
 };
+use tokio::sync::RwLock;
 
 use crate::{
     common::{
@@ -21,6 +25,33 @@ use crate::{
 const CHECK_INTERVAL_MIN: u64 = 30;
 pub const WORKFLOWS_PREFIX: &str = "/workflows/";
 pub const WORKFLOW_TRIGGER_PREFIX: &str = "/workflow_trigger/";
+
+static CACHE: LazyLock<RwLock<HashMap<String, Workflow>>> =
+    LazyLock::new(|| RwLock::new(HashMap::new()));
+
+pub async fn get_workflow(
+    org_id: &str,
+    workflow_id: &str,
+) -> Result<Option<Workflow>, anyhow::Error> {
+    let lock = CACHE.read().await;
+    let temp = lock.get(workflow_id);
+
+    if let Some(w) = temp {
+        if w.org_id == org_id {
+            return Ok(Some(w.clone()));
+        }
+    }
+    drop(lock);
+
+    let ret = infra::table::workflows::get_by_org_wid(org_id, workflow_id).await?;
+
+    if let Some(w) = ret.as_ref() {
+        let mut lock = CACHE.write().await;
+        lock.insert(workflow_id.to_string(), w.clone());
+        drop(lock);
+    }
+    Ok(ret)
+}
 
 pub async fn save_workflow(workflow: Workflow) -> Result<(), anyhow::Error> {
     infra::table::workflows::save_workflow(workflow.clone()).await?;
@@ -287,19 +318,22 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                     log::error!("watch_workflow : invalid json value for put");
                     continue;
                 };
-                let org = entry.org_id.clone();
 
-                // TODO: YJDoc2 check if caching should be handled
+                let mut lock = CACHE.write().await;
+                lock.remove(&entry.id);
+                drop(lock);
             }
             Event::Delete(ev) => {
                 let item_key = ev.key.strip_prefix(prefix).unwrap();
                 let splits: Vec<_> = item_key.split("/").collect();
-                if splits.len() != 2 {
+                if splits.len() != 1 {
                     log::error!("watch_workflows : invalid key {item_key} for delete");
                     continue;
                 }
-                let id = splits[1];
-                // TODO: YJDoc2 check if caching should be handled
+                let id = splits[0];
+                let mut lock = CACHE.write().await;
+                lock.remove(id);
+                drop(lock);
             }
             Event::Empty => {}
         }
@@ -334,7 +368,7 @@ pub async fn watch_workflow_triggers() -> Result<(), anyhow::Error> {
                 };
                 handle_workflow_trigger(entry).await;
             }
-            e => {}
+            _ => {}
         }
     }
 }

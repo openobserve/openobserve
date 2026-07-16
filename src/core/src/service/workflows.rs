@@ -330,8 +330,8 @@ pub async fn list_workflows(
 }
 
 pub async fn get_workflow_by_id(org_id: &str, id: &str) -> Result<Option<Workflow>, anyhow::Error> {
-    let res = workflows::get_by_org_wid(org_id, id).await?;
-    Ok(res)
+    let ret = db::workflows::get_workflow(org_id, id).await?;
+    Ok(ret)
 }
 
 fn is_permitted(workflow_id: &str, org_id: &str, permitted: Option<&Vec<String>>) -> bool {
@@ -367,7 +367,7 @@ pub async fn test_workflow(
     inputs: Vec<serde_json::Value>,
     from_node: Option<String>,
 ) -> Result<WorkflowResult, anyhow::Error> {
-    let workflow = workflows::get_by_org_wid(org_id, id)
+    let workflow = get_workflow_by_id(org_id, id)
         .await?
         .ok_or(anyhow::anyhow!("workflow with given id not found"))?;
     let executable = ExecutablePipeline::new_from_workflow(&workflow).await?;
@@ -384,7 +384,7 @@ async fn execute_workflow(
     run_id: &str,
     inputs: Vec<serde_json::Value>,
 ) -> Result<WorkflowExecutionStatus, anyhow::Error> {
-    let workflow = workflows::get_by_org_wid(org_id, id)
+    let workflow = get_workflow_by_id(org_id, id)
         .await?
         .ok_or(anyhow::anyhow!("workflow with given id not found"))?;
 
