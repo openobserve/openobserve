@@ -306,7 +306,6 @@ import Folder from "~icons/material-symbols/folder";
 import FolderOutline from "~icons/material-symbols/folder-outline";
 import Widgets from "~icons/material-symbols/widgets-outline";
 import Lan from "~icons/material-symbols/lan-outline";
-import AutoAwesome from "~icons/material-symbols/auto-awesome-outline";
 import CheckCircleOutline from "~icons/material-symbols/check-circle-outline";
 import TrendingUpFilled from "~icons/material-symbols/trending-up";
 import ErrorOutlineFilled from "~icons/material-symbols/error-outline";
