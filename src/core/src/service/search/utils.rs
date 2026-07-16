@@ -19,6 +19,7 @@ use std::{
     sync::{Arc, atomic::Ordering},
 };
 
+use ::search::CAPPED_RESULTS_MSG;
 use config::meta::search::{PARTIAL_ERROR_RESPONSE_MESSAGE, ScanStats};
 use datafusion::physical_plan::{ExecutionPlan, ExecutionPlanVisitor};
 use infra::runtime::DATAFUSION_RUNTIME;
@@ -26,7 +27,7 @@ use sqlparser::ast::{BinaryOperator, Expr};
 use tokio::sync::Mutex;
 
 use super::datafusion::distributed_plan::remote_scan_exec::RemoteScanExec;
-use crate::{common::meta::search::CAPPED_RESULTS_MSG, service::search::sql::Sql};
+use crate::service::search::sql::Sql;
 
 type Cleanup = Pin<Box<dyn Future<Output = ()> + Send>>;
 

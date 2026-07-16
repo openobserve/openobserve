@@ -5,7 +5,7 @@
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// This program is distributed in the hope that it will be useful
+// This program is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU Affero General Public License for more details.
@@ -13,14 +13,4 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-pub mod bytes_cache;
-pub mod file_data;
-pub mod file_downloader;
-pub mod meta;
-pub mod stats;
-pub mod storage;
-
-pub async fn init() -> Result<(), anyhow::Error> {
-    file_data::init().await?;
-    Ok(())
-}
+pub mod registry;
