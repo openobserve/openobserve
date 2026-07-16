@@ -1880,10 +1880,23 @@ export default defineComponent({
     };
     const onLogGroupByChange = () => {
       if (!fv("query_condition.aggregation")) return;
-      writeAggregation((agg) => {
-        agg.group_by = [...((fv("logGroupBy") as string[]) ?? [])];
+      // OFormSelect fires this consumer `@update:model-value` BEFORE its own
+      // internal `field.handleChange` commits the picked value into
+      // logGroupBy[index] — the two update:model-value listeners run in
+      // registration order, and the consumer's is registered first. Reading
+      // logGroupBy synchronously here therefore copies the STALE array into
+      // aggregation.group_by, dropping the column the user just picked (it
+      // persisted as [""]; pre-migration avoided this with a direct v-model into
+      // group_by[index]). Defer to nextTick so the copy reads the committed
+      // logGroupBy — logGroupBy is a stripped _meta field, so group_by is the
+      // only thing that survives to the payload and it MUST hold the real value.
+      nextTick(() => {
+        if (!fv("query_condition.aggregation")) return;
+        writeAggregation((agg) => {
+          agg.group_by = [...((fv("logGroupBy") as string[]) ?? [])];
+        });
+        emitAggregationUpdate();
       });
-      emitAggregationUpdate();
     };
 
     // When condition operator changes. The value is already written by the name=
@@ -1922,9 +1935,16 @@ export default defineComponent({
     // the write-through copy that feeds SQL-gen.
     const syncMetricGroupByToProps = () => {
       // group_by is form-owned via the name= bindings; just refresh the preview.
-      if (fv("query_condition.aggregation")) {
-        emitAggregationUpdate();
-      }
+      // Deferred to nextTick for the same reason as onLogGroupByChange: this
+      // consumer @update:model-value runs BEFORE OFormSelect's internal
+      // field.handleChange commits group_by[index], so emitting synchronously
+      // would push a stale aggregation up to the parent's setF and clobber the
+      // just-picked value. nextTick reads the committed group_by.
+      nextTick(() => {
+        if (fv("query_condition.aggregation")) {
+          emitAggregationUpdate();
+        }
+      });
     };
 
     // Add group by column

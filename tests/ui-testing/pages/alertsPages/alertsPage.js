@@ -1094,10 +1094,11 @@ export class AlertsPage {
         // Post-migration the alert form validates via useOForm (revalidateLogic):
         // an empty name surfaces an INLINE schema error on the name OFormInput
         // (data-test="add-alert-name-input" → auto-derived `-error` element), not a
-        // toast. Message is `alerts.nameRequired` ("Name is required").
+        // toast. Message is `alerts.nameRequired` = "Alert name is required." — the
+        // same copy the old toast used; only the delivery (toast → inline) changed.
         const nameError = this.page.locator('[data-test="add-alert-name-input-error"]').first();
         await expect(nameError).toBeVisible({ timeout: 10000 });
-        await expect(nameError).toContainText('Name is required');
+        await expect(nameError).toContainText('Alert name is required');
         testLogger.info('Invalid alert name validation working');
 
         // Close with robust handling for dialog backdrops
