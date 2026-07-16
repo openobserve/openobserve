@@ -23,6 +23,7 @@ import {
   buildKpiSql,
   buildLastRunSql,
   buildRunsSql,
+  buildRunsWithStepsSql,
   buildRunDetailSql,
   buildProtocolRunDetailSql,
   mapHistogram,
@@ -38,7 +39,6 @@ import {
   type SyntheticRun,
   type SyntheticRunDetail,
 } from "@/composables/synthetics/syntheticResultsSchema";
-import syntheticsService from "@/services/synthetics";
 import useStreams from "@/composables/useStreams";
 
 const EMPTY_KPI: SyntheticKpi = {
@@ -135,49 +135,41 @@ export function useSyntheticResults() {
     return durations[Math.max(0, Math.min(idx, durations.length - 1))];
   });
 
-  // ── Steps: fetch via REST /runs API ────────────────────────────────────
+  // ── Steps: fetch via synthetics_results log stream ─────────────────────
   //
   // Step-level fields (recorded_steps, last_attempt_steps, retry_history)
-  // live on the REST run objects, not in the log stream. The log-stream
-  // search API rejects queries that select fields absent from the stream
-  // schema, so buildRunsWithStepsSql silently fails. We fetch runs via
-  // the REST endpoint and map each run into the shape aggregateStepStats
-  // expects.
+  // are queried directly from the synthetics_results log stream, the same
+  // way buildRunDetailSql does for per-run detail views. This avoids the
+  // REST /runs endpoint's 200-row page limit and fetches all runs in the
+  // time window in a single streaming query.
+  //
+  // The retry_history column is conditionally included — it may not exist
+  // on instances where the probe hasn't written it yet.
   async function fetchAndAggregateSteps(
     monitorId: string,
     startTime: number,
     endTime: number,
   ): Promise<StepStatsResult> {
-    const org = store.state.selectedOrganization?.identifier as string;
-    if (!org) return emptyStepStats();
-
     try {
-      const resp = await syntheticsService.getRuns(org, monitorId, {
-        start_time: Math.floor(startTime),
-        end_time: Math.floor(endTime),
-        page: 0,
-        page_size: 250,
-      });
-      const runs: any[] = (resp.data as any)?.runs ?? [];
-      if (runs.length === 0) return emptyStepStats();
+      let hasRetryHistory = false;
+      try {
+        const stream: any = await getStream(
+          SYNTHETIC_RESULTS_STREAM, "logs", true,
+        );
+        const schema: { name: string }[] = stream?.schema ?? [];
+        hasRetryHistory = schema.some((f) => f.name === "retry_history");
+      } catch {
+        // Schema not available — omit retry_history, which is safe.
+      }
 
-      const hits: Record<string, unknown>[] = runs.map((r: any) => ({
-        ts: r.scheduled_ts ?? 0,
-        status: r.status ?? "unknown",
-        duration: r.completed_at && r.scheduled_ts
-          ? r.completed_at - r.scheduled_ts
-          : 0,
-        engine: r.browser_engine ?? r.engine ?? "",
-        location: r.location ?? "",
-        device: r.device ?? "",
-        error: r.error ?? "",
-        run_id: r.id ?? "",
-        execution_id: r.execution_id ?? r.id ?? "",
-        attempts: r.attempts ?? 1,
-        recorded_steps: r.recorded_steps ?? [],
-        last_attempt_steps: r.last_attempt_steps ?? [],
-        retry_history: r.retry_history ?? [],
-      }));
+      const STEP_RUNS_LIMIT = 5000;
+      const hits: Record<string, unknown>[] = await executeQuery(
+        buildRunsWithStepsSql(monitorId, STEP_RUNS_LIMIT, hasRetryHistory),
+        startTime,
+        endTime,
+        "logs",
+      );
+      if (!hits.length) return emptyStepStats();
 
       return aggregateStepStats(hits, startTime, endTime);
     } catch {

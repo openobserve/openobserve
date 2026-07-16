@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
   Two tabs (OTabs):
     - Overview: KPI cards, charts, breakdown cards, filter bar, runs table
-    - Steps: Cross-run step analysis with expandable rows
+    - Steps: Step analysis table with expandable rows
     - Errors: Error pattern grouping
 
   Runs table features:
@@ -773,18 +773,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             class="mx-auto px-2 py-2 flex flex-col gap-2"
           >
-            <!-- Header -->
-            <div class="flex items-center gap-2.5">
-              <span class="font-bold text-sm text-text-heading">
-                {{ t("synthetics.results.steps.title") }}
-              </span>
-              <span class="text-xs text-text-secondary">
-                {{ t("synthetics.results.steps.title") }} &middot;
-                {{ stepGroupsData.length }} steps
-              </span>
-              <span class="flex-1" />
-            </div>
-
             <!-- Loading skeleton -->
             <template v-if="stepsLoading || !stepsHasLoadedOnce">
               <div class="grid grid-cols-2 gap-2">
@@ -830,308 +818,100 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- Real content -->
             <template v-else>
-              <!-- Panels 1 & 2: Bar charts side by side -->
-              <div class="grid grid-cols-2 gap-2">
-                <!-- Panel 1: Failed Steps Bar Chart -->
-                <div
-                  v-if="stepFailures.length > 0"
-                  class="card-container rounded-lg flex flex-col bg-surface-base border border-border-default overflow-hidden"
-                >
-                  <div class="flex items-center gap-2 px-2 pt-[0.625rem] pb-[0.5rem]">
-                    <span class="font-bold text-sm text-text-heading">
-                      {{ t("synthetics.results.steps.failedSteps") }}
-                    </span>
-                    <span class="flex-1" />
-                    <span class="text-xs text-text-secondary">
-                      {{ t("synthetics.results.steps.failedStepsDescription") }}
-                    </span>
-                  </div>
-                  <div class="border-t border-border-default" />
-                  <div class="min-h-[160px] p-0">
-                    <ChartRenderer
-                      :data="{ options: failedStepsChartOption }"
-                      height="160px"
-                    />
-                  </div>
-                </div>
-                <div
-                  v-else
-                  class="card-container rounded-lg flex items-center justify-center py-8 bg-surface-base border border-border-default"
-                >
-                  <OBadge variant="success" size="md">
-                    {{ t("synthetics.results.steps.noFailures") }}
-                  </OBadge>
-                </div>
-
-                <!-- Panel 2: Slowest Steps Bar Chart -->
-                <div
-                  v-if="stepDurations.length > 0"
-                  class="card-container rounded-lg flex flex-col bg-surface-base border border-border-default overflow-hidden"
-                >
-                  <div class="flex items-center gap-2 px-2 pt-[0.625rem] pb-[0.5rem]">
-                    <span class="font-bold text-sm text-text-heading">
-                      {{ t("synthetics.results.steps.slowestSteps") }}
-                    </span>
-                    <span class="flex-1" />
-                    <span class="text-xs text-text-secondary">
-                      {{ t("synthetics.results.steps.slowestStepsDescription") }}
-                    </span>
-                  </div>
-                  <div class="border-t border-border-default" />
-                  <div class="min-h-[160px] p-0">
-                    <ChartRenderer
-                      :data="{ options: slowestStepsChartOption }"
-                      height="160px"
-                    />
-                  </div>
-                </div>
-                <div
-                  v-else
-                  class="card-container rounded-lg flex items-center justify-center py-8 bg-surface-base border border-border-default"
-                >
-                  <span class="text-sm text-text-secondary">No step duration data</span>
-                </div>
-              </div>
-
-              <!-- Panel 3: Steps Analysis Table -->
+              <!-- Steps Analysis Table -->
               <OCard class="p-0">
-                <div
-                  class="grid grid-cols-[1fr_90px_90px_90px_90px_1fr_1fr_32px] gap-2.5 px-4 py-2 bg-surface-subtle border-b border-border-default text-[11px] font-semibold text-text-secondary uppercase tracking-wide"
+                <OTable
+                  :data="stepTableRows"
+                  :columns="stepTableColumns"
+                  row-key="id"
+                  :pagination="'none'"
+                  :sorting="'none'"
+                  :show-global-filter="false"
+                  :show-header="true"
+                  :dense="true"
+                  :bordered="true"
+                  :fill-height="false"
                 >
-                  <span>{{ t("synthetics.results.steps.stepName") }}</span>
-                  <span>{{ t("synthetics.results.steps.failRate") }}</span>
-                  <span>{{ t("synthetics.results.steps.flakyRate") }}</span>
-                  <span>{{ t("synthetics.results.steps.avgDuration") }}</span>
-                  <span>{{ t("synthetics.results.steps.trend") }}</span>
-                  <span>{{ t("synthetics.results.steps.browser") }}</span>
-                  <span>{{ t("synthetics.results.steps.location") }}</span>
-                  <span />
-                </div>
-                <div v-for="g in stepGroupsDisplay" :key="g._key">
-                  <div>
-                    <div
-                      class="grid grid-cols-[1fr_90px_90px_90px_90px_1fr_1fr_32px] gap-2.5 px-4 py-2.5 border-b border-border-default items-center cursor-pointer hover:bg-surface-subtle"
-                      @click="toggleStepGroup(g._key)"
-                    >
-                      <div class="min-w-0">
-                        <div class="font-semibold text-xs text-text-heading truncate">
-                          {{ g.name }}
-                        </div>
-                        <div v-if="g.sub" class="text-[11px] text-text-secondary font-mono truncate">
-                          {{ g.sub }}
-                        </div>
+                  <!-- cell-name: Step name -->
+                  <template #cell-name="{ row }">
+                    <div class="min-w-0">
+                      <div class="font-semibold text-xs text-[var(--color-text-heading)] truncate">
+                        {{ row.name }}
                       </div>
-                      <div class="flex flex-col gap-1">
-                        <span class="font-mono tabular-nums font-bold text-xs" :style="{ color: g.failColor }">
-                          {{ g.failRateDisplay }}
-                        </span>
-                        <div class="h-[5px] rounded-full bg-text-disabled/25! overflow-hidden">
-                          <div class="h-full rounded-full" :style="{ width: g.failRateBarPct, background: g.failBarColor }" />
-                        </div>
+                    </div>
+                  </template>
+
+                  <!-- cell-failRate: Colored percentage + bar -->
+                  <template #cell-failRate="{ row }">
+                    <div class="flex flex-col gap-1">
+                      <span class="font-mono tabular-nums font-bold text-xs" :style="{ color: row.failColor }">
+                        {{ row.failRatePct }}%&ensp;<span class="font-normal text-[var(--color-text-muted)]">{{ row.failCount }}</span>
+                      </span>
+                      <div class="h-[5px] rounded-full bg-[var(--color-text-disabled)]/25! overflow-hidden">
+                        <div class="h-full rounded-full" :style="{ width: row.failRateBarPct, background: row.failBarColor }" />
                       </div>
-                      <div>
-                        <span class="font-mono tabular-nums text-xs" :style="{ color: g.flakyColor }">
-                          {{ g.flakyRateDisplay }}
-                        </span>
+                    </div>
+                  </template>
+
+                  <!-- cell-flakyRate: Colored percentage -->
+                  <template #cell-flakyRate="{ row }">
+                    <span class="font-mono tabular-nums text-xs" :style="{ color: row.flakyColor }">
+                      {{ row.flakyRatePct }}%&ensp;<span class="font-normal text-[var(--color-text-muted)]">{{ row.flakyCount }}</span>
+                    </span>
+                  </template>
+
+                  <!-- cell-avgDuration: Duration + bar -->
+                  <template #cell-avgDuration="{ row }">
+                    <div class="flex flex-col gap-1">
+                      <span class="font-mono tabular-nums text-xs text-[var(--color-text-body)]">{{ row.avgDuration }}</span>
+                      <div class="h-[5px] rounded-full bg-[var(--color-text-disabled)]/25! overflow-hidden">
+                        <div class="h-full rounded-full bg-[var(--color-primary-400)]" :style="{ width: row.durationBarPct }" />
                       </div>
-                      <div class="flex flex-col gap-1">
-                        <span class="font-mono tabular-nums text-xs text-text-body">{{ g.avgDuration }}</span>
-                        <div class="h-[5px] rounded-full bg-text-disabled/25! overflow-hidden">
-                          <div class="h-full rounded-full bg-primary-400" :style="{ width: g.durationBarPct }" />
-                        </div>
+                    </div>
+                  </template>
+
+                  <!-- cell-p95Duration: Duration + bar -->
+                  <template #cell-p95Duration="{ row }">
+                    <div class="flex flex-col gap-1">
+                      <span class="font-mono tabular-nums text-xs text-[var(--color-text-body)]">{{ row.p95Duration }}</span>
+                      <div class="h-[5px] rounded-full bg-[var(--color-text-disabled)]/25! overflow-hidden">
+                        <div class="h-full rounded-full bg-[var(--color-primary-400)]" :style="{ width: row.p95DurationBarPct }" />
                       </div>
-                      <svg viewBox="0 0 90 24" class="w-[90px] h-6 block">
-                        <polyline
-                          :points="g.trendPts"
-                          fill="none"
-                          :stroke="g.trendColor"
-                          stroke-width="1.5"
-                          vector-effect="non-scaling-stroke"
-                        />
-                      </svg>
-                      <div class="flex gap-1.5 flex-wrap">
-                        <OBadge
-                          v-for="bc in g.browserChips"
-                          :key="bc.label"
-                          size="sm"
-                          :style="{ background: bc.bg, color: bc.color }"
-                        >
-                          {{ bc.label }}
-                        </OBadge>
+                    </div>
+                  </template>
+
+                  <!-- cell-maxDuration: Duration + bar -->
+                  <template #cell-maxDuration="{ row }">
+                    <div class="flex flex-col gap-1">
+                      <span class="font-mono tabular-nums text-xs text-[var(--color-text-body)]">{{ row.maxDuration }}</span>
+                      <div class="h-[5px] rounded-full bg-[var(--color-text-disabled)]/25! overflow-hidden">
+                        <div class="h-full rounded-full bg-[var(--color-primary-400)]" :style="{ width: row.maxDurationBarPct }" />
                       </div>
-                      <div class="flex gap-1.5 flex-wrap">
-                        <OBadge
-                          v-for="lc in g.locationChips"
-                          :key="lc.label"
-                          size="sm"
-                          :style="{ background: lc.bg, color: lc.color }"
-                        >
-                          {{ lc.label }}
-                        </OBadge>
-                      </div>
-                      <OIcon
-                        name="expand_more"
-                        size="sm"
-                        class="text-text-secondary transition-transform duration-150"
-                        :class="{ 'rotate-180': g.expanded }"
+                    </div>
+                  </template>
+
+                  <!-- cell-trend: Sparkline SVG -->
+                  <template #cell-trend="{ row }">
+                    <svg viewBox="0 0 90 24" class="w-[90px] h-6 block">
+                      <polyline
+                        :points="row.trendPts"
+                        fill="none"
+                        :stroke="row.trendColor"
+                        stroke-width="1.5"
+                        vector-effect="non-scaling-stroke"
                       />
+                    </svg>
+                  </template>
+
+                  <!-- Empty -->
+                  <template #empty>
+                    <div class="flex items-center justify-center py-12 text-sm text-[var(--color-text-secondary)]">
+                      No step data for the selected time range
                     </div>
-                    <div
-                      v-if="g.expanded"
-                      class="grid grid-cols-2 gap-4 px-4 py-3 bg-surface-subtle border-b border-border-default"
-                    >
-                      <div>
-                        <div class="text-[10px] font-bold text-text-secondary uppercase tracking-wide mb-1.5">
-                          {{ t("synthetics.results.steps.byBrowser") }}
-                        </div>
-                        <div v-for="br in g.browserRows" :key="br.name" class="flex items-center gap-2.5 py-1">
-                          <span class="w-[70px] text-xs text-text-body">{{ br.name }}</span>
-                          <div class="flex-1 h-1.5 rounded-full bg-text-disabled/25! overflow-hidden">
-                            <div class="h-full rounded-full" :style="{ width: br.pct, background: br.barColor }" />
-                          </div>
-                          <span class="font-mono tabular-nums text-xs text-text-secondary w-10 text-right">{{ br.pct }}</span>
-                        </div>
-                      </div>
-                      <div>
-                        <div class="text-[10px] font-bold text-text-secondary uppercase tracking-wide mb-1.5">
-                          {{ t("synthetics.results.steps.byLocation") }}
-                        </div>
-                        <div v-for="lr in g.locationRows" :key="lr.name" class="flex items-center gap-2.5 py-1">
-                          <span class="w-[90px] text-xs text-text-body">{{ lr.name }}</span>
-                          <div class="flex-1 h-1.5 rounded-full bg-text-disabled/25! overflow-hidden">
-                            <div class="h-full rounded-full" :style="{ width: lr.pct, background: lr.barColor }" />
-                          </div>
-                          <span class="font-mono tabular-nums text-xs text-text-secondary w-10 text-right">{{ lr.pct }}</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                <div
-                  v-if="stepGroupsDisplay.length === 0"
-                  class="flex items-center justify-center py-12 text-sm text-text-secondary"
-                >
-                  No step data for the selected time range
-                </div>
+                  </template>
+                </OTable>
               </OCard>
 
-              <!-- Panels 4 & 5: Recent Failures + Flakiest Steps side by side -->
-              <div class="grid grid-cols-2 gap-2">
-                <!-- Panel 4: Recent Step Failures -->
-                <div
-                  class="card-container rounded-lg flex flex-col bg-surface-base border border-border-default overflow-hidden"
-                >
-                  <div class="flex items-center gap-2 px-2 pt-[0.625rem] pb-[0.5rem]">
-                    <span class="font-bold text-sm text-text-heading">
-                      {{ t("synthetics.results.steps.recentFailures") }}
-                    </span>
-                    <span class="flex-1" />
-                    <span class="text-xs text-text-secondary">
-                      {{ t("synthetics.results.steps.recentFailuresDescription") }}
-                    </span>
-                  </div>
-                  <div class="border-t border-border-default" />
-                  <div v-if="failureInstances.length > 0" class="max-h-[320px] overflow-y-auto">
-                    <div
-                      v-for="fi in failureInstances"
-                      :key="`${fi.runId}-${fi.stepName}`"
-                      class="flex items-center gap-2 px-3 py-2 border-b border-border-default last:border-b-0 hover:bg-surface-subtle"
-                    >
-                      <span class="text-xs text-text-secondary whitespace-nowrap w-[58px]">
-                        {{ relativeFromNow(fi.timestamp * 1000) }}
-                      </span>
-                      <span class="font-semibold text-xs text-text-heading truncate flex-1 min-w-0">
-                        {{ fi.stepName }}
-                      </span>
-                      <OBadge :variant="fi.isFlaky ? 'warning' : 'error'" size="sm" class="shrink-0">
-                        {{ fi.isFlaky ? t("synthetics.results.steps.flaky") : t("synthetics.results.failed") }}
-                      </OBadge>
-                      <span class="text-xs text-text-secondary shrink-0">{{ fi.browser }}</span>
-                      <span class="text-xs text-text-secondary shrink-0">{{ fi.location }}</span>
-                      <span class="text-xs text-text-muted font-mono truncate max-w-[140px]" :title="fi.error">
-                        {{ fi.error || "—" }}
-                      </span>
-                      <OIcon name="open_in_new" size="xs" class="text-text-secondary cursor-pointer shrink-0" />
-                    </div>
-                  </div>
-                  <div v-else class="flex items-center justify-center py-8 text-sm text-text-secondary">
-                    {{ t("synthetics.results.steps.noRecentFailures") }}
-                  </div>
-                </div>
-
-                <!-- Panel 5: Flakiest Steps -->
-                <div
-                  class="card-container rounded-lg flex flex-col bg-surface-base border border-border-default overflow-hidden"
-                >
-                  <div class="flex items-center gap-2 px-2 pt-[0.625rem] pb-[0.5rem]">
-                    <span class="font-bold text-sm text-text-heading">
-                      {{ t("synthetics.results.steps.flakiestSteps") }}
-                    </span>
-                    <span class="flex-1" />
-                    <span class="text-xs text-text-secondary">
-                      {{ t("synthetics.results.steps.flakiestStepsDescription") }}
-                    </span>
-                  </div>
-                  <div class="border-t border-border-default" />
-                  <div v-if="flakyStepsDisplay.length > 0" class="max-h-[320px] overflow-y-auto">
-                    <div
-                      v-for="fs in flakyStepsDisplay"
-                      :key="fs.stepName"
-                      class="flex items-center gap-3 px-3 py-2 border-b border-border-default last:border-b-0 hover:bg-surface-subtle"
-                    >
-                      <span class="font-semibold text-xs text-text-heading flex-1 min-w-0 truncate">
-                        {{ fs.stepName }}
-                      </span>
-                      <span class="font-bold text-sm text-status-warning-text tabular-nums w-[36px] text-right">
-                        {{ fs.flakyCount }}
-                      </span>
-                      <span class="text-xs text-text-secondary tabular-nums w-[44px] text-right">
-                        {{ fs.flakyRateDisplay }}
-                      </span>
-                      <span class="text-xs text-text-muted tabular-nums w-[44px] text-right">
-                        {{ fs.failRateDisplay }}
-                      </span>
-                      <svg viewBox="0 0 60 16" class="w-[60px] h-4 block shrink-0">
-                        <polyline
-                          :points="fs.trendPts"
-                          fill="none"
-                          :stroke="fs.trendColor"
-                          stroke-width="1.2"
-                          vector-effect="non-scaling-stroke"
-                        />
-                      </svg>
-                    </div>
-                  </div>
-                  <div v-else class="flex items-center justify-center py-8">
-                    <OBadge variant="success" size="md">
-                      {{ t("synthetics.results.steps.noFlakySteps") }}
-                    </OBadge>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Panel 6: Step Duration Trend Chart -->
-              <div
-                v-if="trendBuckets.length > 0"
-                class="card-container rounded-lg flex flex-col bg-surface-base border border-border-default overflow-hidden"
-              >
-                <div class="flex items-center gap-2 px-2 pt-[0.625rem] pb-[0.5rem]">
-                  <span class="font-bold text-sm text-text-heading">
-                    {{ t("synthetics.results.steps.stepDurationTrend") }}
-                  </span>
-                  <span class="flex-1" />
-                  <span class="text-xs text-text-secondary">
-                    {{ t("synthetics.results.steps.stepDurationTrendDescription") }}
-                  </span>
-                </div>
-                <div class="border-t border-border-default" />
-                <div class="min-h-[200px] p-0">
-                  <ChartRenderer
-                    :data="{ options: stepDurationTrendOption }"
-                    height="200px"
-                  />
-                </div>
-              </div>
             </template>
           </div>
         </OTabPanel>
@@ -1343,7 +1123,6 @@ const failedStepFilter = ref("all");
 const locatorFilter = ref("");
 const actionFilter = ref("all");
 const errorFilter = ref<string | null>(null);
-const expandedRows = ref<Record<string, boolean>>({});
 
 // ── Smart empty state helpers ──────────────────────────────────────────
 const hasActiveFilters = computed(
@@ -2047,12 +1826,7 @@ const runColumns: OTableColumnDef[] = [
 ];
 
 // ── Steps: real data from composable ────────────────────────────────────
-const stepFailures = computed(() => synthetics.stepStats.value.stepFailures);
-const stepDurations = computed(() => synthetics.stepStats.value.stepDurations);
 const stepGroupsData = computed(() => synthetics.stepStats.value.stepGroups);
-const flakyStepsData = computed(() => synthetics.stepStats.value.flakySteps);
-const failureInstances = computed(() => synthetics.stepStats.value.failureInstances);
-const trendBuckets = computed(() => synthetics.stepStats.value.trendBuckets);
 
 // ── Display helpers for step analysis ────────────────────────────────────
 
@@ -2070,13 +1844,6 @@ function barColorForRate(pct: number): string {
       ? "var(--color-warning-500)"
       : "var(--color-status-success-text)";
 }
-function chipColorForRate(pct: number) {
-  return pct >= 15
-    ? { bg: "var(--color-error-50)", color: "var(--color-status-error-text)" }
-    : pct >= 5
-      ? { bg: "var(--color-warning-50)", color: "var(--color-warning-700)" }
-      : { bg: "var(--color-success-50)", color: "var(--color-success-700)" };
-}
 function sparklinePts(rates: number[], width: number, height: number): string {
   if (rates.length < 2) {
     const y = height - Math.max(2, 2);
@@ -2091,249 +1858,86 @@ function sparklinePts(rates: number[], width: number, height: number): string {
   }
   return pts.join(" ");
 }
-function engineShortLabel(engine: string): string {
-  const m: Record<string, string> = {
-    chromium: "CR",
-    firefox: "FF",
-    webkit: "WK",
-  };
-  return m[engine.toLowerCase()] ?? engine.slice(0, 2).toUpperCase();
-}
 
-// ── Panel 1 + 2: Bar chart options ───────────────────────────────────────
+// ── Steps Analysis Table ──────────────────────────────────────────────────
 
-const failedStepsChartOption = computed(() => {
-  const errorColor = cssVar("--color-status-error-text", "#dc2626");
-  const axisColor = cssVar("--color-text-caption", "#6c707e");
-  const splitColor = cssVar("--color-border-default", "#e2e8f0");
-  const data = stepFailures.value
-    .slice(0, 15)
-    .map((s) => ({ name: s.stepName, value: s.failCount }))
-    .reverse();
-
-  return {
-    backgroundColor: "transparent",
-    grid: { left: 8, right: 40, top: 4, bottom: 4, containLabel: true },
-    tooltip: { trigger: "axis" as const },
-    xAxis: {
-      type: "value" as const,
-      axisLabel: { color: axisColor, fontSize: 10 },
-      splitLine: { lineStyle: { color: splitColor, type: "dashed" as const } },
-    },
-    yAxis: {
-      type: "category" as const,
-      data: data.map((d) => d.name),
-      axisLabel: { color: axisColor, fontSize: 10, width: 120, overflow: "truncate" },
-      axisLine: { lineStyle: { color: splitColor } },
-    },
-    series: [
-      {
-        type: "bar" as const,
-        data: data.map((d) => ({
-          value: d.value,
-          itemStyle: { color: errorColor, borderRadius: [0, 2, 2, 0] },
-        })),
-        barMaxWidth: 16,
-      },
-    ],
-  };
-});
-
-const slowestStepsChartOption = computed(() => {
-  const primaryColor = cssVar("--color-primary-600", "#3b82f6");
-  const axisColor = cssVar("--color-text-caption", "#6c707e");
-  const splitColor = cssVar("--color-border-default", "#e2e8f0");
-  const data = stepDurations.value
-    .slice(0, 15)
-    .map((s) => ({ name: s.stepName, value: s.avgDurationMs }))
-    .reverse();
-
-  return {
-    backgroundColor: "transparent",
-    grid: { left: 8, right: 44, top: 4, bottom: 4, containLabel: true },
-    tooltip: {
-      trigger: "axis" as const,
-      valueFormatter: (val: number) => fmtDur(val),
-    },
-    xAxis: {
-      type: "value" as const,
-      axisLabel: { color: axisColor, fontSize: 10 },
-      splitLine: { lineStyle: { color: splitColor, type: "dashed" as const } },
-    },
-    yAxis: {
-      type: "category" as const,
-      data: data.map((d) => d.name),
-      axisLabel: { color: axisColor, fontSize: 10, width: 120, overflow: "truncate" },
-      axisLine: { lineStyle: { color: splitColor } },
-    },
-    series: [
-      {
-        type: "bar" as const,
-        data: data.map((d) => ({
-          value: d.value,
-          itemStyle: { color: primaryColor, borderRadius: [0, 2, 2, 0] },
-        })),
-        barMaxWidth: 16,
-      },
-    ],
-  };
-});
-
-// ── Panel 3: Steps Analysis Table display rows ───────────────────────────
-
-interface StepGroupDisplayRow {
-  _key: string;
+interface StepTableRow {
+  id: string;
   name: string;
   sub: string | null;
-  failRateDisplay: string;
-  flakyRateDisplay: string;
+  failRatePct: number;
+  failCount: number;
   failColor: string;
-  flakyColor: string;
   failRateBarPct: string;
   failBarColor: string;
+  flakyRatePct: number;
+  flakyCount: number;
+  flakyColor: string;
   avgDuration: string;
+  avgDurationMs: number;
   durationBarPct: string;
+  maxDuration: string;
+  maxDurationMs: number;
+  maxDurationBarPct: string;
+  p95Duration: string;
+  p95DurationMs: number;
+  p95DurationBarPct: string;
   trendPts: string;
   trendColor: string;
-  browserChips: { label: string; bg: string; color: string }[];
-  locationChips: { label: string; bg: string; color: string }[];
-  browserRows: { name: string; pct: string; barColor: string }[];
-  locationRows: { name: string; pct: string; barColor: string }[];
-  expanded: boolean;
 }
 
-const stepGroupsDisplay = computed<StepGroupDisplayRow[]>(() => {
+const stepTableRows = computed<StepTableRow[]>(() => {
   const groups = stepGroupsData.value;
   if (groups.length === 0) return [];
 
   const maxFailRate = Math.max(...groups.map((g) => g.failRate), 0.01);
-  const maxDuration = Math.max(...groups.map((g) => g.avgDurationMs), 1);
+  const maxAvgDuration = Math.max(...groups.map((g) => g.avgDurationMs), 1);
+  const maxMaxDuration = Math.max(...groups.map((g) => g.maxDurationMs), 1);
+  const maxP95Duration = Math.max(...groups.map((g) => g.p95DurationMs), 1);
 
-  return groups.map((g, i) => {
+  return groups.map((g) => {
     const failPct = Math.round(g.failRate * 100);
     const failBarWidth = Math.round((g.failRate / maxFailRate) * 100);
+    const flakyPct = Math.round(g.flakyRate * 10) / 10;
 
     return {
-      _key: `step-${i}`,
+      id: g.key,
       name: g.name,
       sub: g.sub,
-      failRateDisplay: failPct + "%",
-      flakyRateDisplay: g.flakyRate.toFixed(1) + "%",
+      failRatePct: failPct,
+      failCount: g.failCount,
       failColor: colorForRate(failPct),
-      flakyColor: g.flakyRate >= 5 ? "var(--color-status-warning-text)" : "var(--color-text-secondary)",
       failRateBarPct: failBarWidth + "%",
       failBarColor: barColorForRate(failPct),
+      flakyRatePct: flakyPct,
+      flakyCount: g.flakyCount,
+      flakyColor: g.flakyRate >= 5 ? "var(--color-status-warning-text)" : "var(--color-text-secondary)",
       avgDuration: fmtDur(g.avgDurationMs),
-      durationBarPct: Math.round((g.avgDurationMs / maxDuration) * 100) + "%",
+      avgDurationMs: g.avgDurationMs,
+      durationBarPct: Math.round((g.avgDurationMs / maxAvgDuration) * 100) + "%",
+      maxDuration: fmtDur(g.maxDurationMs),
+      maxDurationMs: g.maxDurationMs,
+      maxDurationBarPct: Math.round((g.maxDurationMs / maxMaxDuration) * 100) + "%",
+      p95Duration: fmtDur(g.p95DurationMs),
+      p95DurationMs: g.p95DurationMs,
+      p95DurationBarPct: Math.round((g.p95DurationMs / maxP95Duration) * 100) + "%",
       trendPts: sparklinePts(g.recentRates, 90, 24),
       trendColor: g.failRate >= 0.1
         ? "var(--color-status-error-text)"
         : "var(--color-primary-500)",
-      browserChips: g.browserStats.map((bs) => {
-        const failPct = bs.total > 0 ? Math.round((bs.failures / bs.total) * 100) : 0;
-        const c = chipColorForRate(failPct);
-        return {
-          label: engineShortLabel(bs.name) + " " + failPct + "%",
-          bg: c.bg,
-          color: c.color,
-        };
-      }),
-      locationChips: g.locationStats.map((ls) => {
-        const failPct = ls.total > 0 ? Math.round((ls.failures / ls.total) * 100) : 0;
-        const c = chipColorForRate(failPct);
-        return { label: ls.name + " " + failPct + "%", bg: c.bg, color: c.color };
-      }),
-      browserRows: g.browserStats.map((bs) => {
-        const pct = bs.total > 0 ? Math.round((bs.failures / bs.total) * 100) : 0;
-        return { name: bs.name, pct: pct + "%", barColor: barColorForRate(pct) };
-      }),
-      locationRows: g.locationStats.map((ls) => {
-        const pct = ls.total > 0 ? Math.round((ls.failures / ls.total) * 100) : 0;
-        return { name: ls.name, pct: pct + "%", barColor: barColorForRate(pct) };
-      }),
-      expanded: !!expandedRows.value[`step-${i}`],
     };
   });
 });
 
-// ── Panel 5: Flakiest Steps display rows ─────────────────────────────────
-
-const flakyStepsDisplay = computed(() => {
-  return flakyStepsData.value.map((fs) => ({
-    ...fs,
-    flakyRateDisplay: fs.flakyRate.toFixed(1) + "%",
-    failRateDisplay: fs.failRate.toFixed(1) + "%",
-    trendPts: sparklinePts(fs.recentFlakyRates, 60, 16),
-    trendColor: fs.flakyRate >= 10
-      ? "var(--color-status-warning-text)"
-      : "var(--color-primary-500)",
-  }));
-});
-
-// ── Panel 6: Step Duration Trend chart option ────────────────────────────
-
-const STEP_TREND_COLORS = [
-  cssVar("--color-primary-600", "#3b82f6"),
-  cssVar("--color-status-error-text", "#ef4444"),
-  cssVar("--color-status-success-text", "#22c55e"),
-  cssVar("--color-status-warning-text", "#f59e0b"),
-  cssVar("--color-primary-400", "#8b5cf6"),
-  cssVar("--color-primary-300", "#06b6d4"),
-  cssVar("--color-error-400", "#ec4899"),
-  cssVar("--color-error-300", "#f97316"),
-  cssVar("--color-text-muted", "#94a3b8"),
+const stepTableColumns: OTableColumnDef<StepTableRow>[] = [
+  { id: "name", header: "Step Name", meta: { isName: true } },
+  { id: "failRate", header: "Fail Rate", size: 110, meta: { align: "right" } },
+  { id: "flakyRate", header: "Flaky Rate", size: 100, meta: { align: "right" } },
+  { id: "avgDuration", header: "Avg Duration", size: 100, meta: { align: "right" } },
+  { id: "p95Duration", header: "p95 Duration", size: 96, meta: { align: "right" } },
+  { id: "maxDuration", header: "Max Duration", size: 100, meta: { align: "right" } },
+  { id: "trend", header: "Trend", size: 100 },
 ];
-
-const stepDurationTrendOption = computed(() => {
-  const axisColor = cssVar("--color-text-caption", "#525252");
-  const splitColor = cssVar("--color-border-default", "#e5e5e5");
-  const buckets = trendBuckets.value;
-  if (buckets.length === 0) return {};
-
-  const seriesNames = [...new Set(buckets.map((b) => b.stepName))];
-  const series = seriesNames.map((name, idx) => {
-    const data = buckets
-      .filter((b) => b.stepName === name)
-      .map((b) => [b.tsMs, b.avgDurationMs] as [number, number]);
-    return {
-      name,
-      type: "line" as const,
-      smooth: true,
-      showSymbol: false,
-      data,
-      lineStyle: {
-        color: STEP_TREND_COLORS[idx % STEP_TREND_COLORS.length],
-        width: 1.5,
-      },
-      connectNulls: true,
-    };
-  });
-
-  return {
-    backgroundColor: "transparent",
-    grid: { left: 44, right: 16, top: 16, bottom: 28 },
-    tooltip: {
-      trigger: "axis" as const,
-      valueFormatter: (val: number) => fmtDur(val),
-    },
-    legend: {
-      bottom: 0,
-      textStyle: { color: axisColor, fontSize: 10 },
-      data: seriesNames,
-    },
-    xAxis: {
-      type: "time" as const,
-      axisLabel: { color: axisColor, fontSize: 10 },
-      axisLine: { lineStyle: { color: splitColor } },
-    },
-    yAxis: {
-      type: "value" as const,
-      axisLabel: { color: axisColor, fontSize: 10, formatter: (v: number) => fmtDur(v) },
-      splitLine: { lineStyle: { color: splitColor, type: "dashed" as const } },
-    },
-    series,
-  };
-});
 
 // ── Chart options ────────────────────────────────────────────────────────
 function cssVar(name: string, fallback: string): string {
@@ -2520,13 +2124,6 @@ function openRun(row: { id: number }) {
     }
   }
   emit("open-run", String(row.id), "");
-}
-
-function toggleStepGroup(key: string) {
-  expandedRows.value = {
-    ...expandedRows.value,
-    [key]: !expandedRows.value[key],
-  };
 }
 
 // ── Public API — parent drives all (re)loads ─────────────────────────────

@@ -34,12 +34,6 @@ vi.mock("@/composables/useStreams", () => ({
   }),
 }));
 
-vi.mock("@/services/synthetics", () => ({
-  default: {
-    getRuns: vi.fn().mockResolvedValue({ data: { runs: [] } }),
-  },
-}));
-
 import useSyntheticResults from "./useSyntheticResults";
 
 describe("useSyntheticResults", () => {
@@ -82,11 +76,12 @@ describe("useSyntheticResults", () => {
     expect(hasLoadedOnce.value).toBe(true);
   });
 
-  it("should issue four scoped queries against the logs page type", async () => {
+  it("should issue five scoped queries against the logs page type", async () => {
     executeQuery.mockResolvedValue([]);
     const { fetchAll } = useSyntheticResults();
     await fetchAll("mon-1", 1, 100);
-    expect(executeQuery).toHaveBeenCalledTimes(4);
+    // KPI, last-run, histogram, runs, steps (via stream)
+    expect(executeQuery).toHaveBeenCalledTimes(5);
     for (const call of executeQuery.mock.calls) {
       expect(call[3]).toBe("logs");
     }

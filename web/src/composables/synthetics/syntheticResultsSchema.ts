@@ -272,6 +272,7 @@ export interface StepGroup {
   totalExecutions: number;
   avgDurationMs: number;
   maxDurationMs: number;
+  p95DurationMs: number;
   recentRates: number[];
   browserStats: StepDimensionStat[];
   locationStats: StepDimensionStat[];
@@ -502,10 +503,19 @@ ORDER BY ${F.timestamp} DESC
 LIMIT ${limit}`;
 }
 
-/** Runs query that includes the JSON step fields needed for client-side aggregation. */
-export function buildRunsWithStepsSql(monitorId: string, limit: number): string {
+/** Runs query that includes the JSON step fields needed for client-side aggregation.
+ *
+ * @param hasRetryHistoryField — when `false`, the `retry_history` column is
+ *   omitted from the SELECT list to avoid a schema-mismatch error on
+ *   instances where the probe hasn't written this field yet. */
+export function buildRunsWithStepsSql(
+  monitorId: string,
+  limit: number,
+  hasRetryHistoryField = true,
+): string {
   const id = escapeSqlLiteral(monitorId);
-  return `SELECT ${F.timestamp} as ts, scheduled_ts, ${F.status} as status, ${F.duration} as duration, ${F.location} as location, ${F.device} as device, ${F.engine} as engine, trigger_type, ${F.error} as error, job_id, run_id, execution_id, attempts, last_attempt_steps, recorded_steps, retry_history
+  const retryHistoryCol = hasRetryHistoryField ? ", retry_history" : "";
+  return `SELECT ${F.timestamp} as ts, scheduled_ts, ${F.status} as status, ${F.duration} as duration, ${F.location} as location, ${F.device} as device, ${F.engine} as engine, trigger_type, ${F.error} as error, job_id, run_id, execution_id, attempts, last_attempt_steps, recorded_steps${retryHistoryCol}
 FROM ${TABLE}
 WHERE ${F.monitorId} = '${id}'
 ORDER BY ${F.timestamp} DESC
@@ -796,6 +806,7 @@ interface InternalStepAccumulator {
   flakyCount: number;
   durationSum: number;
   durationMax: number;
+  durationValues: number[];
   recentRunStatuses: ("pass" | "fail" | "flaky")[];
   browserMap: Map<string, { total: number; failures: number; flaky: number }>;
   locationMap: Map<string, { total: number; failures: number; flaky: number }>;
@@ -896,6 +907,7 @@ export function aggregateStepStats(
           flakyCount: 0,
           durationSum: 0,
           durationMax: 0,
+          durationValues: [],
           recentRunStatuses: [],
           browserMap: new Map(),
           locationMap: new Map(),
@@ -908,6 +920,7 @@ export function aggregateStepStats(
       if (isFlaky) acc.flakyCount++;
       acc.durationSum += stepDuration;
       if (stepDuration > acc.durationMax) acc.durationMax = stepDuration;
+      acc.durationValues.push(stepDuration);
 
       // Browser dimension
       let bStats = acc.browserMap.get(engine);
@@ -971,6 +984,7 @@ export function aggregateStepStats(
           flakyCount: 0,
           durationSum: 0,
           durationMax: 0,
+          durationValues: [],
           recentRunStatuses: [],
           browserMap: new Map(),
           locationMap: new Map(),
@@ -1041,6 +1055,13 @@ export function aggregateStepStats(
       ? acc.failures / acc.totalExecutions
       : 0;
 
+    // p95: sort all collected durations and take the 95th-percentile value
+    const p95DurationMs = acc.durationValues.length > 0
+      ? acc.durationValues.slice().sort((a, b) => a - b)[
+          Math.ceil(acc.durationValues.length * 0.95) - 1
+        ] ?? 0
+      : 0;
+
     const recentRates = acc.recentRunStatuses.map((s) =>
       s === "fail" || s === "flaky" ? 1 : 0,
     );
@@ -1056,6 +1077,7 @@ export function aggregateStepStats(
       totalExecutions: acc.totalExecutions,
       avgDurationMs,
       maxDurationMs: acc.durationMax,
+      p95DurationMs,
       recentRates,
       browserStats: Array.from(acc.browserMap.entries()).map(([n, s]) => ({
         name: n,
