@@ -13,6 +13,7 @@ pub struct Model {
     pub run_id: String,
     pub ran_at: i64,
     pub data: String,
+    pub input_data: Option<String>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

@@ -368,18 +368,18 @@ pub async fn get_workflow_errors(
         }
     };
 
-    let data = match crate::service::workflows::get_inputs_file_data(&errors).await {
+    let data = match crate::service::workflows::get_error_input_data(&errors).await {
         Ok(v) => v,
         Err(e) => {
-            log::error!("error getting input file data for {org_id}/{workflow_id}/{run_id}");
+            log::error!("error getting input data for {org_id}/{workflow_id}/{run_id}");
             return MetaHttpResponse::internal_error(e);
         }
     };
 
-    let data: InputMap = match serde_json::from_slice(&data) {
+    let data: InputMap = match serde_json::from_str(&data) {
         Ok(v) => v,
         Err(e) => {
-            log::error!("error deserializing input file data for {org_id}/{workflow_id}/{run_id}");
+            log::error!("error deserializing input data for {org_id}/{workflow_id}/{run_id}");
             return MetaHttpResponse::internal_error(e);
         }
     };

@@ -2669,6 +2669,7 @@ mod tests {
             inv_id: "test".to_string(),
             print_event: false,
             leaf_dest_stream: None,
+            return_value_for_error: false,
         };
         let (input_tx, input_rx) = tokio::sync::mpsc::channel(1);
         let (child_tx, mut child_rx) = tokio::sync::mpsc::channel(1);

@@ -19,9 +19,9 @@ use config::{
 };
 use proto::cluster_rpc::{
     CancelQueryRequest, CancelQueryResponse, DeleteResultRequest, DeleteResultResponse,
-    GetFileRequest, GetFileResponse, GetLicenseUsageRequest, GetLicenseUsageResponse,
-    GetResultRequest, GetResultResponse, GetSourcemapFileRequest, GetSourcemapFileResponse,
-    GetTableRequest, GetTableResponse, QueryStatusRequest, QueryStatusResponse,
+    GetLicenseUsageRequest, GetLicenseUsageResponse, GetResultRequest, GetResultResponse,
+    GetSourcemapFileRequest, GetSourcemapFileResponse, GetTableRequest, GetTableResponse,
+    GetWorkflowInputsRequest, GetWorkflowInputsResponse, QueryStatusRequest, QueryStatusResponse,
     SearchPartitionRequest, SearchPartitionResponse, SearchRequest, SearchResponse,
     search_server::Search,
 };
@@ -422,20 +422,49 @@ impl Search for Searcher {
         Err(Status::unimplemented("Not Supported"))
     }
 
-    async fn get_file(
+    async fn get_workflow_inputs(
         &self,
-        req: Request<GetFileRequest>,
-    ) -> Result<Response<GetFileResponse>, Status> {
+        req: Request<GetWorkflowInputsRequest>,
+    ) -> Result<Response<GetWorkflowInputsResponse>, Status> {
         let req = req.into_inner();
-        log::info!("got get request for file at {}", req.path);
 
-        let res = infra::storage::get_bytes("", &req.path)
-            .await
-            .map_err(|e| {
-                Status::internal(format!("failed to get file at path {}: {e}", req.path))
-            })?;
-        Ok(Response::new(GetFileResponse {
-            file_data: res.to_vec(),
-        }))
+        let org_id = req.org_id;
+        let w_id = req.workflow_id;
+        let r_id = req.run_id;
+        let is_errors = req.is_error_data;
+
+        log::info!(
+            "got get request for inputs data for {org_id}/{w_id}/{r_id} error data {is_errors}"
+        );
+
+        let data = if is_errors {
+            let err = crate::service::workflows::get_workflow_errors(&org_id, &w_id, &r_id)
+                .await
+                .map_err(|e| {
+                    log::error!("error getting workflow errors for {org_id}/{w_id}/{r_id} : {e}");
+                    Status::internal(format!("error getting workflow error : {e}"))
+                })?;
+            match err {
+                Some(v) => {
+                    if let Some(v) = v.input_data {
+                        v
+                    } else {
+                        log::error!(
+                            "workflow errors input data for {org_id}/{w_id}/{r_id} not present in the cluster"
+                        );
+                        return Err(Status::internal(format!("workflow error data not stored")));
+                    }
+                }
+                None => {
+                    log::error!("workflow errors for {org_id}/{w_id}/{r_id} not found");
+                    return Err(Status::internal(format!("workflow error not found")));
+                }
+            }
+        } else {
+            // TODO YJDoc2 fix this
+            todo!();
+        };
+
+        Ok(Response::new(GetWorkflowInputsResponse { data }))
     }
 }

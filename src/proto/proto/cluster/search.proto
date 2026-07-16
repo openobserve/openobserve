@@ -25,7 +25,7 @@ service Search {
     rpc ReleaseQuery(ReleaseQueryRequest) returns (ReleaseQueryResponse) {}
     rpc GetLicenseUsageInfo(GetLicenseUsageRequest) returns (GetLicenseUsageResponse) {}
     // generic get file call
-    rpc GetFile(GetFileRequest) returns (GetFileResponse) {}
+    rpc GetWorkflowInputs(GetWorkflowInputsRequest) returns (GetWorkflowInputsResponse) {}
 }
 
 message QueryStatusRequest {}
@@ -216,10 +216,13 @@ message GetLicenseUsageResponse {
 
 }
 
-message GetFileRequest {
-    string            path = 3;
+message GetWorkflowInputsRequest {
+    string  org_id = 1;
+    string  workflow_id = 2;
+    string  run_id = 3;
+    bool    is_error_data = 4;            
 }
 
-message GetFileResponse {
-    bytes   file_data = 1;
+message GetWorkflowInputsResponse {
+    string   data = 1;
 }

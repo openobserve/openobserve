@@ -72,6 +72,7 @@ fn create_workflow_errors_table_statement() -> TableCreateStatement {
                 .not_null(),
         )
         .col(ColumnDef::new(WorkflowErrors::Data).string().not_null())
+        .col(ColumnDef::new(WorkflowErrors::InputData).string().null())
         .to_owned()
 }
 
@@ -85,6 +86,7 @@ enum WorkflowErrors {
     RanAt,
     Data,
     Cluster,
+    InputData,
 }
 
 #[cfg(test)]
@@ -98,13 +100,14 @@ mod tests {
         collapsed_eq!(
             &create_workflow_errors_table_statement().to_string(PostgresQueryBuilder),
             r#"CREATE TABLE IF NOT EXISTS "workflow_errors" ( 
-            "id" PRIMARY KEY,
+            "id" serial PRIMARY KEY,
             "cluster" varchar(100) NOT NULL,
             "org_id" varchar(256) NOT NULL,
             "workflow_id" varchar(100) NOT NULL,
             "run_id" varchar(100) NOT NULL,
             "ran_at" bigint NOT NULL,
-            "data" varchar NOT NULL 
+            "data" varchar NOT NULL,
+            "input_data" varchar NULL
             )"#
         );
     }
@@ -114,13 +117,14 @@ mod tests {
         collapsed_eq!(
             &create_workflow_errors_table_statement().to_string(SqliteQueryBuilder),
             r#"CREATE TABLE IF NOT EXISTS "workflow_errors" ( 
-            "id" PRIMARY KEY AUTOINCREMENT,
+            "id" integer PRIMARY KEY AUTOINCREMENT,
             "cluster" varchar(100) NOT NULL,
             "org_id" varchar(256) NOT NULL,
             "workflow_id" varchar(100) NOT NULL,
             "run_id" varchar(100) NOT NULL,
             "ran_at" bigint NOT NULL,
-            "data" varchar NOT NULL 
+            "data" varchar NOT NULL,
+            "input_data" varchar NULL
             )"#
         );
     }

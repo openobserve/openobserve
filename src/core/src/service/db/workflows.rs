@@ -14,7 +14,7 @@ use crate::{
     },
     service::{
         db,
-        workflows::{WorkflowTrigger, get_inputs_file_path, handle_workflow_trigger},
+        workflows::{WorkflowTrigger, handle_workflow_trigger},
     },
 };
 
@@ -136,12 +136,14 @@ pub async fn delete_workflow(org_id: &str, id: &str) -> Result<(), anyhow::Error
     Ok(())
 }
 
-pub async fn save_workflow_errors(errors: WorkflowRunErrors) -> Result<(), anyhow::Error> {
+pub async fn save_workflow_errors(mut errors: WorkflowRunErrors) -> Result<(), anyhow::Error> {
     infra::table::workflows::save_workflow_errors(errors.clone()).await?;
 
     let org_id = errors.org_id.clone();
     let wid = errors.workflow_id.clone();
     let run_id = errors.run_id.clone();
+    // we reset the input data here so we don't need to sent it via nats
+    errors.input_data = None;
     // no need for cluster sync for errors
 
     #[cfg(feature = "enterprise")]
@@ -166,10 +168,10 @@ pub async fn save_workflow_errors(errors: WorkflowRunErrors) -> Result<(), anyho
     Ok(())
 }
 
-pub async fn update_error_input_file_cluster(
+pub async fn update_error_input_file_cluster_data(
     errors: WorkflowRunErrors,
 ) -> Result<(), anyhow::Error> {
-    infra::table::workflows::update_error_input_file_cluster(errors).await?;
+    infra::table::workflows::update_error_input_file_cluster_data(errors).await?;
     Ok(())
 }
 
@@ -194,25 +196,10 @@ pub async fn clean() {
                     continue;
                 }
             };
-        let mut files = Vec::with_capacity(error_entries.len());
         log::info!(
-            "cleaning {} old files for workflow input : {files:?}",
-            files.len()
+            "cleaned {} old entries for workflow errors ",
+            error_entries.len()
         );
-
-        let file_paths: Vec<_> = error_entries
-            .into_iter()
-            .map(|error| get_inputs_file_path(&error.org_id, &error.workflow_id, &error.run_id))
-            .collect();
-        for path in &file_paths {
-            files.push(("", path.as_str()));
-        }
-
-        if let Err(e) = infra::storage::del(files).await {
-            log::error!("error deleting error input files : {e}");
-        } else {
-            log::info!("successfully cleaned up old workflow error files");
-        }
     }
 }
 

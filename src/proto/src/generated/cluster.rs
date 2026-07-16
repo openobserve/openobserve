@@ -1239,14 +1239,20 @@ pub struct GetLicenseUsageResponse {
     pub ingestion_history: ::prost::alloc::vec::Vec<UsageResult>,
 }
 #[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
-pub struct GetFileRequest {
+pub struct GetWorkflowInputsRequest {
+    #[prost(string, tag = "1")]
+    pub org_id: ::prost::alloc::string::String,
+    #[prost(string, tag = "2")]
+    pub workflow_id: ::prost::alloc::string::String,
     #[prost(string, tag = "3")]
-    pub path: ::prost::alloc::string::String,
+    pub run_id: ::prost::alloc::string::String,
+    #[prost(bool, tag = "4")]
+    pub is_error_data: bool,
 }
 #[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
-pub struct GetFileResponse {
-    #[prost(bytes = "vec", tag = "1")]
-    pub file_data: ::prost::alloc::vec::Vec<u8>,
+pub struct GetWorkflowInputsResponse {
+    #[prost(string, tag = "1")]
+    pub data: ::prost::alloc::string::String,
 }
 /// Generated client implementations.
 pub mod search_client {
@@ -1660,11 +1666,11 @@ pub mod search_client {
             self.inner.unary(req, path, codec).await
         }
         /// generic get file call
-        pub async fn get_file(
+        pub async fn get_workflow_inputs(
             &mut self,
-            request: impl tonic::IntoRequest<super::GetFileRequest>,
+            request: impl tonic::IntoRequest<super::GetWorkflowInputsRequest>,
         ) -> std::result::Result<
-            tonic::Response<super::GetFileResponse>,
+            tonic::Response<super::GetWorkflowInputsResponse>,
             tonic::Status,
         > {
             self.inner
@@ -1676,9 +1682,12 @@ pub mod search_client {
                     )
                 })?;
             let codec = tonic_prost::ProstCodec::default();
-            let path = http::uri::PathAndQuery::from_static("/cluster.Search/GetFile");
+            let path = http::uri::PathAndQuery::from_static(
+                "/cluster.Search/GetWorkflowInputs",
+            );
             let mut req = request.into_request();
-            req.extensions_mut().insert(GrpcMethod::new("cluster.Search", "GetFile"));
+            req.extensions_mut()
+                .insert(GrpcMethod::new("cluster.Search", "GetWorkflowInputs"));
             self.inner.unary(req, path, codec).await
         }
     }
@@ -1790,10 +1799,13 @@ pub mod search_server {
             tonic::Status,
         >;
         /// generic get file call
-        async fn get_file(
+        async fn get_workflow_inputs(
             &self,
-            request: tonic::Request<super::GetFileRequest>,
-        ) -> std::result::Result<tonic::Response<super::GetFileResponse>, tonic::Status>;
+            request: tonic::Request<super::GetWorkflowInputsRequest>,
+        ) -> std::result::Result<
+            tonic::Response<super::GetWorkflowInputsResponse>,
+            tonic::Status,
+        >;
     }
     #[derive(Debug)]
     pub struct SearchServer<T> {
@@ -2489,23 +2501,25 @@ pub mod search_server {
                     };
                     Box::pin(fut)
                 }
-                "/cluster.Search/GetFile" => {
+                "/cluster.Search/GetWorkflowInputs" => {
                     #[allow(non_camel_case_types)]
-                    struct GetFileSvc<T: Search>(pub Arc<T>);
-                    impl<T: Search> tonic::server::UnaryService<super::GetFileRequest>
-                    for GetFileSvc<T> {
-                        type Response = super::GetFileResponse;
+                    struct GetWorkflowInputsSvc<T: Search>(pub Arc<T>);
+                    impl<
+                        T: Search,
+                    > tonic::server::UnaryService<super::GetWorkflowInputsRequest>
+                    for GetWorkflowInputsSvc<T> {
+                        type Response = super::GetWorkflowInputsResponse;
                         type Future = BoxFuture<
                             tonic::Response<Self::Response>,
                             tonic::Status,
                         >;
                         fn call(
                             &mut self,
-                            request: tonic::Request<super::GetFileRequest>,
+                            request: tonic::Request<super::GetWorkflowInputsRequest>,
                         ) -> Self::Future {
                             let inner = Arc::clone(&self.0);
                             let fut = async move {
-                                <T as Search>::get_file(&inner, request).await
+                                <T as Search>::get_workflow_inputs(&inner, request).await
                             };
                             Box::pin(fut)
                         }
@@ -2516,7 +2530,7 @@ pub mod search_server {
                     let max_encoding_message_size = self.max_encoding_message_size;
                     let inner = self.inner.clone();
                     let fut = async move {
-                        let method = GetFileSvc(inner);
+                        let method = GetWorkflowInputsSvc(inner);
                         let codec = tonic_prost::ProstCodec::default();
                         let mut grpc = tonic::server::Grpc::new(codec)
                             .apply_compression_config(

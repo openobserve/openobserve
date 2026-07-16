@@ -62,10 +62,6 @@ enum WorkflowExecutionStatus {
     Errored,
 }
 
-pub fn get_inputs_file_path(org_id: &str, workflow_id: &str, run_id: &str) -> String {
-    format!("files/{org_id}/workflow_inputs/{workflow_id}-{run_id}.json")
-}
-
 pub fn get_trigger_data_file_path(org_id: &str, workflow_id: &str) -> String {
     let ider = config::ider::generate_file_name();
     format!("files/{org_id}/workflow_data/{workflow_id}-{ider}.json")
@@ -75,29 +71,17 @@ pub fn get_trigger_data_file_path(org_id: &str, workflow_id: &str) -> String {
 // if something fails in this attempt which is a temporary failure
 // when that sourcemap is fetched again, this will be retried
 #[cfg(feature = "enterprise")]
-async fn store_file_locally(mut errors: WorkflowRunErrors, file_data: bytes::Bytes) {
-    let path = get_inputs_file_path(&errors.org_id, &errors.workflow_id, &errors.run_id);
-    log::info!(
-        "storing workflow inputs file for org_id {} path {path} in local cluster",
-        errors.org_id,
-    );
-    if let Err(e) = infra::storage::put("", &path, file_data).await {
-        log::error!(
-            "error storing workflow inputs file for org_id {} at path {path} in local cluster : {e}",
-            errors.org_id,
-        );
-        return;
-    }
-    let org = errors.org_id.clone();
+async fn store_inputs_error_locally(mut errors: WorkflowRunErrors, data: String) {
+    let info_str = format!("{}/{}/{}", errors.org_id, errors.workflow_id, errors.run_id);
+    log::info!("storing workflow error inputs data for {info_str} in local cluster",);
     errors.cluster = config::get_cluster_name();
-    if let Err(e) = db::workflows::update_error_input_file_cluster(errors).await {
+    errors.input_data = Some(data);
+    if let Err(e) = db::workflows::update_error_input_file_cluster_data(errors).await {
         log::error!(
-            "error updating db to set local cluster in workflow inputs for file {org} path {path} : {e}"
+            "error updating db to set local cluster in workflow error inputs for {info_str} : {e}",
         );
     }
-    log::info!(
-        "stored workflow inputs file for org_id {org} path {path} in local cluster successfully"
-    );
+    log::info!("stored workflow errors inputs data for {info_str} in local cluster successfully");
 }
 
 // TODO YJDoc2: reuse in the get_inputs_file_data fn below
@@ -108,56 +92,57 @@ async fn get_file_data(source_cluster: &str, path: &str) -> Result<bytes::Bytes,
         return Ok(bytes);
     }
 
+    // TODO YJDoc2: fix this
     #[cfg(feature = "enterprise")]
-    if get_o2_config().super_cluster.enabled {
-        use o2_enterprise::enterprise::super_cluster::search::get_cluster_node_by_name;
+    // if get_o2_config().super_cluster.enabled {
+    //     use o2_enterprise::enterprise::super_cluster::search::get_cluster_node_by_name;
 
-        let trace_id = config::ider::generate_trace_id();
-        let node = get_cluster_node_by_name(source_cluster).await?;
-        let file_path = path.to_string();
+    //     let trace_id = config::ider::generate_trace_id();
+    //     let node = get_cluster_node_by_name(source_cluster).await?;
+    //     let file_path = path.to_string();
 
-        let cluster = source_cluster.to_string();
+    //     let cluster = source_cluster.to_string();
 
-        log::info!("getting file at path {file_path} from cluster {cluster}");
+    //     log::info!("getting file at path {file_path} from cluster {cluster}");
 
-        let task = tokio::task::spawn(async move {
-            use infra::client::grpc::make_grpc_search_client;
+    //     let task = tokio::task::spawn(async move {
+    //         use infra::client::grpc::make_grpc_search_client;
 
-            let mut request = tonic::Request::new(proto::cluster_rpc::GetFileRequest {
-                path: file_path.clone(),
-            });
-            let mut client = make_grpc_search_client(&trace_id, &mut request, &node, 0).await?;
-            match client.get_file(request).await {
-                Ok(res) => {
-                    let response = res.into_inner();
-                    Ok(response.file_data)
-                }
-                Err(err) => {
-                    log::error!(
-                        "[trace_id: {trace_id}] error getting file from cluster {cluster} node {} for path {file_path} : {err:?}",
-                        node.get_grpc_addr(),
-                    );
-                    let err = infra::errors::ErrorCodes::from_json(err.message())?;
-                    Err(anyhow::anyhow!(
-                        "error getting file from other cluster {cluster} : {err}",
-                    ))
-                }
-            }
-        });
-        let response = task
-            .await
-            .map_err(|e| anyhow::anyhow!("internal error : {e}"))?;
-        match response {
-            Ok(v) => {
-                log::info!(
-                    "successfully received file at path {path} from cluster {source_cluster}",
-                );
-                let bytes = bytes::Bytes::from(v);
-                return Ok(bytes);
-            }
-            Err(e) => return Err(e),
-        }
-    }
+    //         let mut request = tonic::Request::new(proto::cluster_rpc::GetWorkflowInputsRequest {
+    //             path: file_path.clone(),
+    //         });
+    //         let mut client = make_grpc_search_client(&trace_id, &mut request, &node, 0).await?;
+    //         match client.get_file(request).await {
+    //             Ok(res) => {
+    //                 let response = res.into_inner();
+    //                 Ok(response.file_data)
+    //             }
+    //             Err(err) => {
+    //                 log::error!(
+    //                     "[trace_id: {trace_id}] error getting file from cluster {cluster} node {}
+    // for path {file_path} : {err:?}",                     node.get_grpc_addr(),
+    //                 );
+    //                 let err = infra::errors::ErrorCodes::from_json(err.message())?;
+    //                 Err(anyhow::anyhow!(
+    //                     "error getting file from other cluster {cluster} : {err}",
+    //                 ))
+    //             }
+    //         }
+    //     });
+    //     let response = task
+    //         .await
+    //         .map_err(|e| anyhow::anyhow!("internal error : {e}"))?;
+    //     match response {
+    //         Ok(v) => {
+    //             log::info!(
+    //                 "successfully received file at path {path} from cluster {source_cluster}",
+    //             );
+    //             let bytes = bytes::Bytes::from(v);
+    //             return Ok(bytes);
+    //         }
+    //         Err(e) => return Err(e),
+    //     }
+    // }
 
     // if super cluster is not enabled AND cluster name is not same
     // then we cannot do anything, so this is the default fallback to error
@@ -166,14 +151,16 @@ async fn get_file_data(source_cluster: &str, path: &str) -> Result<bytes::Bytes,
     ))
 }
 
-pub async fn get_inputs_file_data(
-    errors: &WorkflowRunErrors,
-) -> Result<bytes::Bytes, anyhow::Error> {
-    let path = get_inputs_file_path(&errors.org_id, &errors.workflow_id, &errors.run_id);
+pub async fn get_error_input_data(errors: &WorkflowRunErrors) -> Result<String, anyhow::Error> {
     if errors.cluster == config::get_cluster_name() {
-        let get_res = infra::storage::get("", &path).await?;
-        let bytes = get_res.bytes().await?;
-        return Ok(bytes);
+        match &errors.input_data {
+            None => {
+                return Err(anyhow::anyhow!(
+                    "error data supposed to be stored in same cluster, but missing in db"
+                ));
+            }
+            Some(v) => return Ok(v.clone()),
+        }
     }
 
     // super cluster
@@ -183,30 +170,34 @@ pub async fn get_inputs_file_data(
 
         let trace_id = config::ider::generate_trace_id();
         let node = get_cluster_node_by_name(&errors.cluster).await?;
-        let file_path = path.clone();
         let org = errors.org_id.clone();
+        let wid = errors.workflow_id.clone();
+        let rid = errors.run_id.clone();
 
+        let info_str = format!("{}/{}/{}", errors.org_id, errors.workflow_id, errors.run_id);
         let cluster = errors.cluster.to_string();
 
-        log::info!(
-            "getting workflow inputs file for org_id {org} path {path} from cluster {cluster}"
-        );
+        log::info!("getting workflow errors inputs file for {info_str} from cluster {cluster}");
 
         let task = tokio::task::spawn(async move {
             use infra::client::grpc::make_grpc_search_client;
 
-            let mut request = tonic::Request::new(proto::cluster_rpc::GetFileRequest {
-                path: file_path.clone(),
+            let info_str = format!("{org}/{wid}/{rid}");
+            let mut request = tonic::Request::new(proto::cluster_rpc::GetWorkflowInputsRequest {
+                org_id: org,
+                workflow_id: wid,
+                run_id: rid,
+                is_error_data: true,
             });
             let mut client = make_grpc_search_client(&trace_id, &mut request, &node, 0).await?;
-            match client.get_file(request).await {
+            match client.get_workflow_inputs(request).await {
                 Ok(res) => {
                     let response = res.into_inner();
-                    Ok(response.file_data)
+                    Ok(response.data)
                 }
                 Err(err) => {
                     log::error!(
-                        "[trace_id: {trace_id}] error getting workflow inputs file from cluster {cluster} node {} for org_id {org} path {file_path} : {err:?}",
+                        "[trace_id: {trace_id}] error getting workflow errors inputs data from cluster {cluster} node {} for {info_str} : {err:?}",
                         node.get_grpc_addr(),
                     );
                     let err = infra::errors::ErrorCodes::from_json(err.message())?;
@@ -222,15 +213,13 @@ pub async fn get_inputs_file_data(
         match response {
             Ok(v) => {
                 log::info!(
-                    "successfully received workflow inputs file file org_id {} path {path} from cluster {}",
-                    errors.org_id,
+                    "successfully received workflow error inputs data for {info_str} from cluster {}",
                     errors.cluster
                 );
-                let bytes = bytes::Bytes::from(v);
                 let errors_copy = errors.clone();
-                let bytes_copy = bytes.clone();
-                tokio::spawn(async { store_file_locally(errors_copy, bytes_copy).await });
-                return Ok(bytes);
+                let data_copy = v.clone();
+                tokio::spawn(async { store_inputs_error_locally(errors_copy, data_copy).await });
+                return Ok(v);
             }
             Err(e) => return Err(e),
         }
@@ -437,6 +426,11 @@ async fn execute_workflow(
     }
 
     if !workflow_errors.is_empty() {
+        let ip_map = InputMap {
+            complete: input_copy,
+            node_map: errored_input_map,
+        };
+
         let errors = WorkflowRunErrors {
             org_id: org_id.to_string(),
             cluster: config::get_cluster_name(),
@@ -445,6 +439,7 @@ async fn execute_workflow(
             run_id: run_id.to_string(),
             ran_at: now,
             data: workflow_errors,
+            input_data: Some(serde_json::to_string(&ip_map).unwrap()),
         };
         // workflow has already run, so not much point in returning error because
         // we couldn't save the errors to db, log and ignore
@@ -453,15 +448,6 @@ async fn execute_workflow(
                 "[Workflows] : error saving workflow run errors for run id {run_id} for workflow {org_id}/{id} in db : {e}"
             );
         }
-
-        let ip_map = InputMap {
-            complete: input_copy,
-            node_map: errored_input_map,
-        };
-
-        let bytes = serde_json::to_vec(&ip_map)?;
-        let path = get_inputs_file_path(org_id, id, run_id);
-        infra::storage::put("", &path, bytes.into()).await?;
         return Ok(WorkflowExecutionStatus::Errored);
     }
 
@@ -501,7 +487,7 @@ pub async fn retry_run(
         }
     };
 
-    let bytes = match get_inputs_file_data(&errors).await {
+    let data_str = match get_error_input_data(&errors).await {
         Ok(v) => v,
         Err(e) => {
             log::error!(
@@ -511,9 +497,9 @@ pub async fn retry_run(
         }
     };
 
-    let mut ip_map: InputMap = serde_json::from_slice(&bytes).map_err(|e| {
+    let mut ip_map: InputMap = serde_json::from_str(&data_str).map_err(|e| {
         log::error!(
-            "error deserializing input file for workflow {org_id}/{wid} run id {run_id} : {e}"
+            "error deserializing input data for workflow {org_id}/{wid} run id {run_id} : {e}"
         );
         anyhow::anyhow!("error deserializing inputs : {e}")
     })?;

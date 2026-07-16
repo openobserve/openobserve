@@ -52,6 +52,7 @@ pub struct WorkflowRunErrors {
     pub run_id: String,
     pub ran_at: i64,
     pub data: Vec<WorkflowError>,
+    pub input_data: Option<String>,
 }
 
 impl TryFrom<workflows::Model> for Workflow {
@@ -84,6 +85,7 @@ impl TryFrom<workflow_errors::Model> for WorkflowRunErrors {
             run_id: value.run_id,
             ran_at: value.ran_at,
             data: serde_json::from_str(&value.data)?,
+            input_data: value.input_data,
         };
         Ok(ret)
     }
@@ -215,13 +217,14 @@ pub async fn save_workflow_errors(errors: WorkflowRunErrors) -> Result<(), anyho
         run_id: Set(errors.run_id),
         ran_at: Set(errors.ran_at),
         data: Set(serde_json::to_string(&errors.data)?),
+        input_data: Set(errors.input_data),
         ..Default::default()
     };
     workflow_errors::Entity::insert(model).exec(client).await?;
     Ok(())
 }
 
-pub async fn update_error_input_file_cluster(
+pub async fn update_error_input_file_cluster_data(
     errors: WorkflowRunErrors,
 ) -> Result<(), anyhow::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
@@ -234,6 +237,10 @@ pub async fn update_error_input_file_cluster(
         .col_expr(
             workflow_errors::Column::Cluster,
             Expr::value(errors.cluster),
+        )
+        .col_expr(
+            workflow_errors::Column::InputData,
+            Expr::value(errors.input_data),
         )
         .exec(client)
         .await?;
