@@ -15,197 +15,197 @@ limitations under the License.
 
 <template>
   <div data-test="prebuilt-destination-form" class="prebuilt-destination-form">
-    <!-- OWNER of this embedded <OForm> (Rule ③): the credential fields are
-         config-driven per destinationType, validated by the dynamically-built
-         schema. The parent submits this form by its id (`form-id` bridge, R4). -->
-    <OForm :form="form" id="prebuilt-destination-form">
-      <!-- Slack Fields -->
-      <template v-if="destinationType === 'slack'">
-        <div class="w-1/2 py-1">
-          <OFormInput
-            name="webhookUrl"
-            data-test="slack-webhook-url-input"
-            label="Slack Webhook URL"
-            required
-            helpText="Get your webhook URL from Slack App settings"
-            tabindex="0"
-          />
-        </div>
-        <div class="w-1/2 py-1">
-          <OFormInput
-            name="channel"
-            data-test="slack-channel-input"
-            label="Channel (optional)"
-            helpText="e.g., #alerts"
-            tabindex="0"
-          />
-        </div>
-      </template>
+    <!-- Presentational DESCENDANT (Rule ③): this component renders NO <OForm> of
+         its own. The per-type credential inputs are OForm* controls named
+         `credentials.<key>`, so they inject the PARENT AddDestination form
+         (FORM_CONTEXT_KEY) and become part of the ONE form — Enter/Save submit
+         that single form and its schema (AddDestination.schema.ts) validates
+         these credentials via `makePrebuiltDestinationSchema`. No nested <form>. -->
+    <!-- Slack Fields -->
+    <template v-if="destinationType === 'slack'">
+      <div class="w-1/2 py-1">
+        <OFormInput
+          name="credentials.webhookUrl"
+          data-test="slack-webhook-url-input"
+          label="Slack Webhook URL"
+          required
+          helpText="Get your webhook URL from Slack App settings"
+          tabindex="0"
+        />
+      </div>
+      <div class="w-1/2 py-1">
+        <OFormInput
+          name="credentials.channel"
+          data-test="slack-channel-input"
+          label="Channel (optional)"
+          helpText="e.g., #alerts"
+          tabindex="0"
+        />
+      </div>
+    </template>
 
-      <!-- Discord Fields -->
-      <template v-if="destinationType === 'discord'">
-        <div class="w-1/2 py-1">
-          <OFormInput
-            name="webhookUrl"
-            data-test="discord-webhook-url-input"
-            label="Discord Webhook URL"
-            required
-            helpText="Get your webhook URL from Discord channel settings"
-            tabindex="0"
-          />
-        </div>
-        <div class="w-1/2 py-1">
-          <OFormInput
-            name="username"
-            data-test="discord-username-input"
-            label="Bot Username (optional)"
-            helpText="Custom username for the webhook bot"
-            tabindex="0"
-          />
-        </div>
-      </template>
+    <!-- Discord Fields -->
+    <template v-if="destinationType === 'discord'">
+      <div class="w-1/2 py-1">
+        <OFormInput
+          name="credentials.webhookUrl"
+          data-test="discord-webhook-url-input"
+          label="Discord Webhook URL"
+          required
+          helpText="Get your webhook URL from Discord channel settings"
+          tabindex="0"
+        />
+      </div>
+      <div class="w-1/2 py-1">
+        <OFormInput
+          name="credentials.username"
+          data-test="discord-username-input"
+          label="Bot Username (optional)"
+          helpText="Custom username for the webhook bot"
+          tabindex="0"
+        />
+      </div>
+    </template>
 
-      <!-- MS Teams Fields -->
-      <template v-if="destinationType === 'msteams'">
-        <div class="w-1/2 py-1">
-          <OFormInput
-            name="webhookUrl"
-            data-test="msteams-webhook-url-input"
-            label="Microsoft Teams Webhook URL"
-            required
-            helpText="Get your webhook URL from Teams channel connectors"
-            tabindex="0"
-          />
-        </div>
-      </template>
+    <!-- MS Teams Fields -->
+    <template v-if="destinationType === 'msteams'">
+      <div class="w-1/2 py-1">
+        <OFormInput
+          name="credentials.webhookUrl"
+          data-test="msteams-webhook-url-input"
+          label="Microsoft Teams Webhook URL"
+          required
+          helpText="Get your webhook URL from Teams channel connectors"
+          tabindex="0"
+        />
+      </div>
+    </template>
 
-      <!-- PagerDuty Fields -->
-      <template v-if="destinationType === 'pagerduty'">
-        <div class="w-1/2 py-1">
-          <OFormInput
-            name="integrationKey"
-            data-test="pagerduty-integration-key-input"
-            label="Integration Key"
-            required
-            type="password"
-            helpText="Get your integration key from PagerDuty service settings"
-            tabindex="0"
-          />
-        </div>
-        <div class="w-1/2 py-1">
-          <OFormSelect
-            name="severity"
-            data-test="pagerduty-severity-select"
-            :options="severityOptions"
-            label="Default Severity"
-            required
-            labelKey="label"
-            valueKey="value"
-            helpText="Select the default severity for PagerDuty incidents"
-            tabindex="0"
-          />
-        </div>
-      </template>
+    <!-- PagerDuty Fields -->
+    <template v-if="destinationType === 'pagerduty'">
+      <div class="w-1/2 py-1">
+        <OFormInput
+          name="credentials.integrationKey"
+          data-test="pagerduty-integration-key-input"
+          label="Integration Key"
+          required
+          type="password"
+          helpText="Get your integration key from PagerDuty service settings"
+          tabindex="0"
+        />
+      </div>
+      <div class="w-1/2 py-1">
+        <OFormSelect
+          name="credentials.severity"
+          data-test="pagerduty-severity-select"
+          :options="severityOptions"
+          label="Default Severity"
+          required
+          labelKey="label"
+          valueKey="value"
+          helpText="Select the default severity for PagerDuty incidents"
+          tabindex="0"
+        />
+      </div>
+    </template>
 
-      <!-- ServiceNow Fields -->
-      <template v-if="destinationType === 'servicenow'">
-        <div class="w-1/2 py-1">
-          <OFormInput
-            name="instanceUrl"
-            data-test="servicenow-instance-url-input"
-            label="ServiceNow Instance URL"
-            required
-            helpText="https://your-instance.service-now.com/api/now/table/incident"
-            tabindex="0"
-          />
-        </div>
-        <div class="w-1/2 py-1">
-          <OFormInput
-            name="username"
-            data-test="servicenow-username-input"
-            label="Username"
-            required
-            helpText="ServiceNow username with incident creation permissions"
-            tabindex="0"
-          />
-        </div>
-        <div class="w-1/2 py-1">
-          <OFormInput
-            name="password"
-            data-test="servicenow-password-input"
-            label="Password"
-            required
-            type="password"
-            helpText="ServiceNow password or API token"
-            tabindex="0"
-          />
-        </div>
-        <div class="w-1/2 py-1">
-          <OFormInput
-            name="assignmentGroup"
-            data-test="servicenow-assignment-group-input"
-            label="Assignment Group (optional)"
-            helpText="Group to assign incidents to (e.g., IT Operations)"
-            tabindex="0"
-          />
-        </div>
-      </template>
+    <!-- ServiceNow Fields -->
+    <template v-if="destinationType === 'servicenow'">
+      <div class="w-1/2 py-1">
+        <OFormInput
+          name="credentials.instanceUrl"
+          data-test="servicenow-instance-url-input"
+          label="ServiceNow Instance URL"
+          required
+          helpText="https://your-instance.service-now.com/api/now/table/incident"
+          tabindex="0"
+        />
+      </div>
+      <div class="w-1/2 py-1">
+        <OFormInput
+          name="credentials.username"
+          data-test="servicenow-username-input"
+          label="Username"
+          required
+          helpText="ServiceNow username with incident creation permissions"
+          tabindex="0"
+        />
+      </div>
+      <div class="w-1/2 py-1">
+        <OFormInput
+          name="credentials.password"
+          data-test="servicenow-password-input"
+          label="Password"
+          required
+          type="password"
+          helpText="ServiceNow password or API token"
+          tabindex="0"
+        />
+      </div>
+      <div class="w-1/2 py-1">
+        <OFormInput
+          name="credentials.assignmentGroup"
+          data-test="servicenow-assignment-group-input"
+          label="Assignment Group (optional)"
+          helpText="Group to assign incidents to (e.g., IT Operations)"
+          tabindex="0"
+        />
+      </div>
+    </template>
 
-      <!-- Email Fields -->
-      <template v-if="destinationType === 'email'">
-        <div class="w-1/2 py-1">
-          <OFormInput
-            name="recipients"
-            data-test="email-recipients-input"
-            label="Recipient Email Addresses"
-            required
-            helpText="Comma-separated email addresses"
-            tabindex="0"
-          />
-        </div>
-        <!-- CC and Subject fields hidden - not supported by backend Email struct -->
-      </template>
+    <!-- Email Fields -->
+    <template v-if="destinationType === 'email'">
+      <div class="w-1/2 py-1">
+        <OFormInput
+          name="credentials.recipients"
+          data-test="email-recipients-input"
+          label="Recipient Email Addresses"
+          required
+          helpText="Comma-separated email addresses"
+          tabindex="0"
+        />
+      </div>
+      <!-- CC and Subject fields hidden - not supported by backend Email struct -->
+    </template>
 
-      <!-- Opsgenie Fields -->
-      <template v-if="destinationType === 'opsgenie'">
-        <div class="w-1/2 py-1">
-          <OFormInput
-            name="apiKey"
-            data-test="opsgenie-api-key-input"
-            label="Opsgenie API Key"
-            required
-            type="password"
-            helpText="Get your API key from Opsgenie integration settings"
-            tabindex="0"
-          />
-        </div>
-        <div class="w-1/2 py-1">
-          <OFormSelect
-            name="priority"
-            data-test="opsgenie-priority-select"
-            :options="priorityOptions"
-            label="Default Priority"
-            labelKey="label"
-            valueKey="value"
-            helpText="Select the default priority for Opsgenie alerts"
-            tabindex="0"
-          />
-        </div>
-        <div class="w-full py-1">
-          <OFormSwitch
-            name="euRegion"
-            data-test="opsgenie-eu-region-toggle"
-            label="EU Region"
-          />
-          <span class="text-xs text-gray-400">
-            Enable for EU-based Opsgenie instances
-          </span>
-        </div>
-      </template>
-    </OForm>
+    <!-- Opsgenie Fields -->
+    <template v-if="destinationType === 'opsgenie'">
+      <div class="w-1/2 py-1">
+        <OFormInput
+          name="credentials.apiKey"
+          data-test="opsgenie-api-key-input"
+          label="Opsgenie API Key"
+          required
+          type="password"
+          helpText="Get your API key from Opsgenie integration settings"
+          tabindex="0"
+        />
+      </div>
+      <div class="w-1/2 py-1">
+        <OFormSelect
+          name="credentials.priority"
+          data-test="opsgenie-priority-select"
+          :options="priorityOptions"
+          label="Default Priority"
+          labelKey="label"
+          valueKey="value"
+          helpText="Select the default priority for Opsgenie alerts"
+          tabindex="0"
+        />
+      </div>
+      <div class="w-full py-1">
+        <OFormSwitch
+          name="credentials.euRegion"
+          data-test="opsgenie-eu-region-toggle"
+          label="EU Region"
+        />
+        <span class="text-xs text-gray-400">
+          Enable for EU-based Opsgenie instances
+        </span>
+      </div>
+    </template>
 
-    <!-- Test and Preview Actions (kept OUTSIDE <OForm>; they are plain
-         event-emitting buttons, not form fields). -->
+    <!-- Test and Preview Actions (plain event-emitting buttons, not form fields). -->
     <div v-if="!hideActions" class="w-full py-3">
       <div class="flex items-center gap-2">
         <OButton
@@ -233,69 +233,33 @@ limitations under the License.
 </template>
 
 <script lang="ts" setup>
-import { watch } from 'vue';
-import type { PropType } from 'vue';
 import OButton from '@/lib/core/Button/OButton.vue';
-import OForm from '@/lib/forms/Form/OForm.vue';
 import OFormInput from '@/lib/forms/Input/OFormInput.vue';
 import OFormSelect from '@/lib/forms/Select/OFormSelect.vue';
 import OFormSwitch from '@/lib/forms/Switch/OFormSwitch.vue';
-import { useI18n } from 'vue-i18n';
-import { useOForm } from '@/lib/forms/Form/useOForm';
-import {
-  makePrebuiltDestinationSchema,
-  prebuiltDestinationDefaults,
-} from './PrebuiltDestinationForm.schema';
 
-const props = defineProps({
+// Presentational only: renders the active type's credential OForm* fields into
+// the parent AddDestination form (they carry `name="credentials.<key>"` and
+// inject the parent's FORM_CONTEXT_KEY). Requiredness + validators live in the
+// parent schema (AddDestination.schema → makePrebuiltDestinationSchema), so this
+// component owns no form, no schema, and no v-model — the single source of truth
+// is the parent form's `credentials` sub-object.
+defineProps({
   destinationType: {
     type: String,
-    required: true
-  },
-  modelValue: {
-    type: Object as PropType<Record<string, any>>,
-    default: () => ({})
+    required: true,
   },
   isTesting: {
     type: Boolean,
-    default: false
+    default: false,
   },
   hideActions: {
     type: Boolean,
-    default: false
-  }
-});
-
-const emit = defineEmits(['update:modelValue', 'preview', 'test', 'submit']);
-
-const { t } = useI18n();
-
-// OWNER pattern (Rule ③): create the form here so the credential fields are
-// name=-owned by the single TanStack form. The schema + defaults are built for
-// the ACTIVE type from the shared getPrebuiltConfig() config (single source of
-// truth). The parent remounts this component on type change (:key), so setup()
-// re-runs with a fresh schema for the new type.
-const form = useOForm<Record<string, unknown>>({
-  defaultValues: prebuiltDestinationDefaults(
-    props.destinationType,
-    props.modelValue,
-  ),
-  schema: makePrebuiltDestinationSchema(t, props.destinationType),
-  // Fires only once the credential schema passes → tell the parent to save.
-  onSubmit: (value) => {
-    emit('submit', value);
+    default: false,
   },
 });
 
-// Egress to the parent (Rule ③): keep the parent's v-model (`prebuiltCredentials`)
-// in sync by watching the form store — NEVER form.store.subscribe. Used by the
-// parent's Preview/Test buttons.
-const values = form.useStore((s: any) => s.values);
-watch(
-  values,
-  (v) => emit('update:modelValue', { ...(v as Record<string, unknown>) }),
-  { deep: true },
-);
+defineEmits(['preview', 'test']);
 
 // PagerDuty severity options
 const severityOptions = [

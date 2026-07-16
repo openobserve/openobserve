@@ -135,12 +135,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <PrebuiltDestinationForm
               v-if="dtVal && dtVal !== 'custom'"
-              :key="`${dtVal}-${isUpdatingDestination}`"
-              v-model="prebuiltCredentials"
               :destination-type="dtVal"
               :hide-actions="true"
               data-test="prebuilt-form"
-              @submit="handlePrebuiltSave"
             />
             <div v-else-if="isUpdatingDestination" class="p-3 text-center">
               <OSpinner size="md" data-test="add-destination-loading-indicator" />
@@ -496,14 +493,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="$emit('cancel:hideform')"
             >{{ t("alerts.cancel") }}</OButton
           >
-          <!-- R4: Enter + this Save both submit a real form by id. Custom/pipeline
-               → this parent form; prebuilt → the nested child credential form. -->
+          <!-- R4: Enter + this Save both submit the ONE form by id (custom,
+               pipeline AND prebuilt all live in add-destination-form now — no
+               nested form to route to). @click is additive to the native submit
+               — it restores the pre-migration landing-state toast (see
+               onSaveClick) without disturbing the form-id submit. -->
           <OButton
             data-test="add-destination-submit-btn"
             variant="primary"
             size="sm-action"
             type="submit"
-            :form="saveTargetFormId"
+            form="add-destination-form"
+            @click="onSaveClick"
             >{{ t("alerts.save") }}</OButton
           >
         </div>
@@ -552,6 +553,7 @@ import { useReo } from "@/services/reodotdev_analytics";
 import { usePrebuiltDestinations } from "@/composables/usePrebuiltDestinations";
 import { isPrebuiltType, detectPrebuiltTypeFromUrl } from "@/utils/prebuilt-templates";
 import PrebuiltDestinationForm from "./PrebuiltDestinationForm.vue";
+import { prebuiltDestinationDefaults } from "./PrebuiltDestinationForm.schema";
 import PrebuiltDestinationSelector from "./PrebuiltDestinationSelector.vue";
 import DestinationTestResult from "./DestinationTestResult.vue";
 import DestinationPreview from "./DestinationPreview.vue";
@@ -587,14 +589,23 @@ const { track } = useReo();
 
 // ── OWNER pattern (Rule ③): create the single form here so its state drives the
 // discriminated rendering (form.useStore) and the non-<input> discriminators
-// (card grid + tabs) bridge in via setFieldValue. The @submit save handler is
-// baked into useOForm (custom/pipeline path). Prebuilt destinations save through
-// the nested child form's @submit → handlePrebuiltSave.
+// (card grid + tabs) bridge in via setFieldValue. There is ONE form for custom,
+// pipeline AND prebuilt destinations (credentials are form-owned `credentials.*`
+// fields now, not a nested child form) — `saveDestination` dispatches by type.
 const form = useOForm({
   defaultValues: addDestinationDefaults(),
   schema: makeAddDestinationSchema(t, props.isAlerts),
-  onSubmit: (value) => saveCustomDestination(value as AddDestinationForm),
+  onSubmit: (value) => saveDestination(value as AddDestinationForm),
 });
+
+// Single submit entry-point. Prebuilt types save via handlePrebuiltSave (which
+// reads the form-owned `credentials.*`); custom/pipeline via saveCustomDestination.
+// Returned so OForm awaits the real save → the footer Save spinner spans it.
+function saveDestination(value: AddDestinationForm) {
+  return isPrebuiltDestination.value
+    ? handlePrebuiltSave(value)
+    : saveCustomDestination(value);
+}
 
 // Reactive reads of the form-owned discriminators + the api-headers array.
 const dtVal = form.useStore((s: any) => s.values.destination_type as string);
@@ -622,18 +633,33 @@ const {
   detectPrebuiltType,
 } = usePrebuiltDestinations();
 
-// Prebuilt destinations state (credentials owned by the child form; mirrored
-// here via v-model for the Preview/Test buttons).
-const prebuiltCredentials = ref<Record<string, any>>({});
+// Prebuilt credentials are a form-owned sub-object (`credentials.*`) now — read
+// them reactively from the ONE form for the Preview/Test buttons (no mirror ref).
+const prebuiltCredentials = form.useStore(
+  (s: any) => (s.values.credentials ?? {}) as Record<string, any>,
+);
 const destinationSearchQuery = ref("");
 const showPreviewModal = ref(false);
 const previewContent = ref("");
 
-// The form the footer Save button submits: the child credential form for
-// prebuilt types, otherwise this parent form (R4 form-id bridge).
-const saveTargetFormId = computed(() =>
-  isPrebuiltDestination.value ? "prebuilt-destination-form" : "add-destination-form",
-);
+// Landing-state feedback (pre-migration parity). The Save button natively
+// submits the parent form; in the alerts create flow with no destination-type
+// card chosen yet, `destination_type` is empty so the schema rejects on
+// name/url — but those fields aren't mounted until a card is picked, so the
+// errors have nowhere to render and the click looks dead. Pre-migration
+// saveDestination always toasted "Please fill required fields" here; restore it.
+// Once a card IS picked the fields mount and show inline errors, so this only
+// needs to cover the no-type-selected state (and it runs alongside, not instead
+// of, the native submit — the R4 form-id routing is untouched).
+const onSaveClick = () => {
+  if (props.isAlerts && !props.destination && !dtVal.value) {
+    toast({
+      variant: "error",
+      message: "Please fill required fields",
+      timeout: 1500,
+    });
+  }
+};
 
 // Bridge helpers for the non-<input> discriminators.
 const setDestinationType = (v: string) =>
@@ -836,6 +862,12 @@ const setupDestinationData = () => {
       emails: (props.destination?.emails || []).join(", "),
       type: props.destination.type || "http",
       action_id: props.destination.action_id || "",
+      // Prebuilt credentials ride into the SAME single reset (form-owned now,
+      // not a separate mirror), typed to the active type's fields. Custom → {}.
+      credentials:
+        destType && destType !== "custom"
+          ? prebuiltDestinationDefaults(destType, extractPrebuiltCredentials(destType))
+          : {},
     };
 
     // Only CUSTOM headers reach the UI array; system/prebuilt ones stay implicit.
@@ -858,113 +890,95 @@ const setupDestinationData = () => {
       record.output_format = props.destination.output_format;
     }
 
+    // ONE reset seeds every field INCLUDING credentials (built above via
+    // extractPrebuiltCredentials + prebuiltDestinationDefaults). Template name is
+    // stored/displayed as-is (e.g. "prebuilt_slack") — the dropdown's first
+    // option carries that value, so edit mode matches automatically.
     form.reset(record);
-
-    // Continue with credential restoration if we have a destination_type
-    // (writes prebuiltCredentials — NOT the form, so it stays after the reset).
-    if (destType && destType !== "custom") {
-      const typeId = destType;
-
-      // Restore prebuilt credentials from metadata and destination fields
-      const credentials: Record<string, any> = {};
-
-      // Step 1: Parse metadata and remove credential_ prefix
-      if (props.destination.metadata) {
-        try {
-          const metadata =
-            typeof props.destination.metadata === "string"
-              ? JSON.parse(props.destination.metadata)
-              : props.destination.metadata;
-
-          // Extract credential fields (remove credential_ prefix)
-          Object.entries(metadata).forEach(([key, value]) => {
-            if (key.startsWith("credential_")) {
-              const credentialKey = key.replace("credential_", "");
-              credentials[credentialKey] = value;
-            } else if (key === "routing_key") {
-              // PagerDuty stores the integration key as the bare `routing_key`
-              // metadata variable (substituted into the request body).
-              credentials.integrationKey = value;
-            }
-          });
-        } catch (e) {
-          console.error("Failed to parse destination metadata:", e);
-        }
-      }
-
-      // Step 2: Restore sensitive fields from destination properties
-      // webhookUrl is stored in the url field for webhook-based destinations
-      if (props.destination.url) {
-        credentials.webhookUrl = props.destination.url;
-      }
-
-      // For ServiceNow, instanceUrl is the base URL
-      if (typeId === "servicenow" && props.destination.url) {
-        credentials.instanceUrl = props.destination.url;
-      }
-
-      // For email destinations, recipients are in emails field
-      if (typeId === "email" && props.destination.emails) {
-        credentials.recipients = Array.isArray(props.destination.emails)
-          ? props.destination.emails.join(", ")
-          : props.destination.emails;
-      }
-
-      // For PagerDuty, integrationKey is restored from the routing_key metadata
-      // above. Fall back to the legacy X-Routing-Key header for destinations
-      // saved before the key was moved into the request body.
-      if (
-        typeId === "pagerduty" &&
-        !credentials.integrationKey &&
-        props.destination.headers?.["X-Routing-Key"]
-      ) {
-        credentials.integrationKey = props.destination.headers["X-Routing-Key"];
-      }
-
-      // For Opsgenie, apiKey is in Authorization header
-      if (
-        typeId === "opsgenie" &&
-        props.destination.headers?.["Authorization"]
-      ) {
-        const authHeader = props.destination.headers["Authorization"];
-        if (authHeader.startsWith("GenieKey ")) {
-          credentials.apiKey = authHeader.replace("GenieKey ", "");
-        }
-      }
-
-      // For ServiceNow, username:password are in Basic auth Authorization header
-      if (
-        typeId === "servicenow" &&
-        props.destination.headers?.["Authorization"]
-      ) {
-        const authHeader = props.destination.headers["Authorization"];
-        if (authHeader.startsWith("Basic ")) {
-          try {
-            const decoded = atob(authHeader.replace("Basic ", ""));
-            const colonIndex = decoded.indexOf(":");
-            if (colonIndex > 0) {
-              credentials.username = decoded.substring(0, colonIndex);
-              credentials.password = decoded.substring(colonIndex + 1);
-            }
-          } catch {
-            // Can't decode — leave credential fields blank
-          }
-        }
-      }
-
-      // Note: Non-sensitive fields (severity, priority, assignmentGroup, ccRecipients, subject, username, etc.)
-      // are automatically restored from metadata via Step 1 (credential_ prefix removal)
-      // Sensitive fields containing "password", "key", or "token" are NOT saved to metadata for security
-
-      prebuiltCredentials.value = credentials;
-
-      // Template name is stored and displayed as-is (e.g. "prebuilt_slack").
-      // The dropdown's first option has that value, so edit mode matches automatically.
-    }
-
-    // (apiHeaders + output_format are seeded by the single form.reset(record)
-    // above — no trailing per-field writes.)
   }
+};
+
+// Rebuild the credential sub-object for an existing prebuilt destination from its
+// persisted shape (metadata `credential_*` vars, url/emails, and the auth headers
+// where sensitive values live). Pure over props.destination — used to seed the
+// single form.reset(record) in edit mode. Mirrors the pre-migration restoration.
+const extractPrebuiltCredentials = (typeId: string): Record<string, any> => {
+  const credentials: Record<string, any> = {};
+  if (!props.destination) return credentials;
+
+  // Step 1: Parse metadata and remove the credential_ prefix. `metadata` is not
+  // on the DestinationPayload type but is present on saved records at runtime.
+  const rawMetadata = (props.destination as any).metadata;
+  if (rawMetadata) {
+    try {
+      const metadata =
+        typeof rawMetadata === "string" ? JSON.parse(rawMetadata) : rawMetadata;
+      Object.entries(metadata).forEach(([key, value]) => {
+        if (key.startsWith("credential_")) {
+          credentials[key.replace("credential_", "")] = value;
+        } else if (key === "routing_key") {
+          // PagerDuty stores the integration key as the bare `routing_key`
+          // metadata variable (substituted into the request body).
+          credentials.integrationKey = value;
+        }
+      });
+    } catch (e) {
+      console.error("Failed to parse destination metadata:", e);
+    }
+  }
+
+  // Step 2: Restore sensitive fields from destination properties.
+  // webhookUrl is stored in the url field for webhook-based destinations.
+  if (props.destination.url) {
+    credentials.webhookUrl = props.destination.url;
+  }
+  // For ServiceNow, instanceUrl is the base URL.
+  if (typeId === "servicenow" && props.destination.url) {
+    credentials.instanceUrl = props.destination.url;
+  }
+  // For email destinations, recipients are in the emails field.
+  if (typeId === "email" && props.destination.emails) {
+    credentials.recipients = Array.isArray(props.destination.emails)
+      ? props.destination.emails.join(", ")
+      : props.destination.emails;
+  }
+  // PagerDuty: integrationKey from routing_key metadata above; fall back to the
+  // legacy X-Routing-Key header for destinations saved before the key moved into
+  // the request body.
+  if (
+    typeId === "pagerduty" &&
+    !credentials.integrationKey &&
+    props.destination.headers?.["X-Routing-Key"]
+  ) {
+    credentials.integrationKey = props.destination.headers["X-Routing-Key"];
+  }
+  // Opsgenie: apiKey is in the Authorization header.
+  if (typeId === "opsgenie" && props.destination.headers?.["Authorization"]) {
+    const authHeader = props.destination.headers["Authorization"];
+    if (authHeader.startsWith("GenieKey ")) {
+      credentials.apiKey = authHeader.replace("GenieKey ", "");
+    }
+  }
+  // ServiceNow: username:password are in the Basic auth Authorization header.
+  if (typeId === "servicenow" && props.destination.headers?.["Authorization"]) {
+    const authHeader = props.destination.headers["Authorization"];
+    if (authHeader.startsWith("Basic ")) {
+      try {
+        const decoded = atob(authHeader.replace("Basic ", ""));
+        const colonIndex = decoded.indexOf(":");
+        if (colonIndex > 0) {
+          credentials.username = decoded.substring(0, colonIndex);
+          credentials.password = decoded.substring(colonIndex + 1);
+        }
+      } catch {
+        // Can't decode — leave credential fields blank.
+      }
+    }
+  }
+  // Non-sensitive fields (severity, priority, assignmentGroup, username, …) are
+  // restored from metadata via Step 1. Sensitive fields containing "password",
+  // "key", or "token" are NOT persisted to metadata for security.
+  return credentials;
 };
 
 const getFormattedTemplates = computed(() =>
@@ -1054,15 +1068,16 @@ const getActionOptions = async () => {
 const selectDestinationType = (type: string) => {
   form.setFieldValue("destination_type", type);
 
-  // Reset credential state when switching types
-  prebuiltCredentials.value = {};
-
   if (type === "custom") {
-    // Switch to custom mode
+    // Switch to custom mode — clear any prebuilt credentials.
+    form.setFieldValue("credentials", {});
     form.setFieldValue("type", "http");
     form.setFieldValue("url", "");
     form.setFieldValue("template", "");
   } else {
+    // Seed a fresh, per-type credential sub-object (defaults for that type) so
+    // switching types never carries stale credential keys into the save.
+    form.setFieldValue("credentials", prebuiltDestinationDefaults(type, {}));
     form.setFieldValue("type", type === "email" ? "email" : "http");
     form.setFieldValue("template", templateNameFor(type));
   }
@@ -1102,14 +1117,20 @@ const showPreview = async () => {
   }
 };
 
-// Save a prebuilt destination — triggered by the CHILD credential form's @submit
-// (which fires only once the credential schema passes). name/template/apiHeaders/
-// skip_tls_verify are read from THIS parent form (the single source of truth);
-// `credentials` are the child's validated values. Mirrors the old save() prebuilt
-// branch exactly.
-async function handlePrebuiltSave(credentials: Record<string, any>) {
+// Save a prebuilt destination — invoked by saveDestination when the ONE form's
+// schema passes (the schema now validates the credentials too, so this fires only
+// on valid input). name/template/apiHeaders/skip_tls_verify AND `credentials` all
+// come from the single validated `value`. Mirrors the old save() prebuilt branch.
+async function handlePrebuiltSave(value: AddDestinationForm) {
   try {
-    const vals = form.state.values as any;
+    const vals = value as any;
+    // Scope credentials to the ACTIVE type's fields (dropping any keys left over
+    // from a previous type selection) and coerce them exactly as the schema does
+    // — identical to what the pre-migration child credential form emitted.
+    const credentials = prebuiltDestinationDefaults(
+      value.destination_type,
+      (value.credentials ?? {}) as Record<string, unknown>,
+    );
     // Build custom headers object from the api-headers array-field
     const customHeaders: Headers = {};
     (vals.apiHeaders || []).forEach((header: any) => {
@@ -1148,18 +1169,13 @@ async function handlePrebuiltSave(credentials: Record<string, any>) {
   }
 }
 
-// @submit handler for the custom/pipeline path. OForm calls this only once the
-// schema (incl. the type-keyed superRefine) passes — the schema, not a manual
-// guard, gates the save. `value` is the validated payload source of truth; the
-// payload is built with explicit keys so no schema-only/inactive-branch field
-// leaks into the request. Mirrors the old save() custom branch exactly.
+// The custom/pipeline save path (dispatched from saveDestination for non-prebuilt
+// types). OForm calls the submit only once the schema (incl. the type-keyed
+// superRefine) passes — the schema, not a manual guard, gates the save. `value`
+// is the validated payload source of truth; the payload is built with explicit
+// keys so no schema-only field (e.g. `credentials`) leaks into the request.
+// Mirrors the old save() custom branch exactly.
 function saveCustomDestination(value: AddDestinationForm) {
-  // Prebuilt destinations save via the child credential form (handlePrebuiltSave).
-  // If the parent form is somehow submitted while a prebuilt type is active
-  // (e.g. Enter in a parent-side field), do nothing — the pre-migration form
-  // applied no validation and no save to those fields (parity, OPEN DECISION 3).
-  if (isPrebuiltDestination.value) return;
-
   const dismiss = toast({
     variant: "loading",
     message: "Please wait...",

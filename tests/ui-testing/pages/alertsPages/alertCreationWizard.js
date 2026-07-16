@@ -140,7 +140,7 @@ export class AlertCreationWizard {
 
         await expect(this.page.locator(this.locators.operatorSelect).first()).toBeVisible({ timeout: 5000 });
         await this.page.locator(this.locators.operatorSelect).first().click();
-        await this.page.getByText('Contains', { exact: true }).click();
+        await this.page.getByRole('option', { name: 'Contains', exact: true }).click();
 
         await this.page.locator(this.locators.conditionValueInput).first().locator('input').fill(value);
 
@@ -428,13 +428,16 @@ export class AlertCreationWizard {
         await thresholdInput.fill('1');
         testLogger.info('Set threshold value: 1');
 
-        // Period
-        const periodInput = this.page.locator('.period-input-container input[type="number"]');
-        await this.page.waitForTimeout(500);
-        if (await periodInput.isVisible({ timeout: 3000 })) {
-            await periodInput.fill('15');
-            testLogger.info('Set period: 15 minutes');
-        }
+        // Period — migrated to an OFormInput (data-test="alert-settings-period-input").
+        // The native input carries the auto-derived `-field` suffix; the old
+        // `.period-input-container` wrapper no longer exists. Fill it hard (not a
+        // soft isVisible-guard) so the alert saves with period=15 — otherwise it
+        // silently falls back to the default (10) and the "15 Mins" list cell never
+        // renders.
+        const periodInput = this.page.locator('[data-test="alert-settings-period-input-field"]').first();
+        await periodInput.waitFor({ state: 'visible', timeout: 5000 });
+        await periodInput.fill('15');
+        testLogger.info('Set period: 15 minutes');
 
         // Destination selection using v3 data-test locator
         const destinationDropdown = this.page.locator('[data-test="alert-destinations-select"]');
@@ -549,8 +552,8 @@ export class AlertCreationWizard {
         await expect(operatorSelect1).toBeVisible({ timeout: 5000 });
         await operatorSelect1.click();
         await this.page.waitForTimeout(500);
-        await expect(this.page.getByText('Contains', { exact: true })).toBeVisible({ timeout: 5000 });
-        await this.page.getByText('Contains', { exact: true }).click();
+        await expect(this.page.getByRole('option', { name: 'Contains', exact: true })).toBeVisible({ timeout: 5000 });
+        await this.page.getByRole('option', { name: 'Contains', exact: true }).click();
         await this.page.waitForTimeout(500);
 
         // Use 'test' as value - matches the log field from ingested validation data
@@ -785,7 +788,7 @@ export class AlertCreationWizard {
         await thresholdInput.fill('1');
         testLogger.info('Set threshold value: 1');
 
-        const periodInput = this.page.locator('.period-input-container input[type="number"]');
+        const periodInput = this.page.locator('[data-test="alert-settings-period-input-field"]').first();
         await this.page.waitForTimeout(500);
         if (await periodInput.isVisible({ timeout: 3000 })) {
             await periodInput.fill('15');
@@ -930,8 +933,8 @@ export class AlertCreationWizard {
         const operatorSelect1 = this.page.locator(this.locators.operatorSelect).first();
         await operatorSelect1.click();
         await this.page.waitForTimeout(500);
-        await expect(this.page.getByText('Contains', { exact: true })).toBeVisible({ timeout: 5000 });
-        await this.page.getByText('Contains', { exact: true }).click();
+        await expect(this.page.getByRole('option', { name: 'Contains', exact: true })).toBeVisible({ timeout: 5000 });
+        await this.page.getByRole('option', { name: 'Contains', exact: true }).click();
         await this.page.waitForTimeout(500);
 
         const valueInput1 = this.page.locator(this.locators.conditionValueInput).first().locator('input');
@@ -1275,7 +1278,7 @@ export class AlertCreationWizard {
         testLogger.info('Set threshold value: 1');
 
         // Set shortest period (1 minute) for faster testing
-        const periodInput = this.page.locator('.period-input-container input[type="number"]');
+        const periodInput = this.page.locator('[data-test="alert-settings-period-input-field"]').first();
         await this.page.waitForTimeout(500);
         if (await periodInput.isVisible({ timeout: 5000 })) {
             await periodInput.fill('1');
@@ -1436,7 +1439,7 @@ export class AlertCreationWizard {
 
         // Select operator
         await this.page.locator(this.locators.operatorSelect).first().click();
-        await this.page.getByText('Contains', { exact: true }).click();
+        await this.page.getByRole('option', { name: 'Contains', exact: true }).click();
         await this.page.waitForTimeout(300);
 
         // Fill condition value
@@ -1529,7 +1532,7 @@ export class AlertCreationWizard {
         // trigger condition section exists below the Having groups section.
 
         // Period
-        const periodInput = this.page.locator('.period-input-container input[type="number"]');
+        const periodInput = this.page.locator('[data-test="alert-settings-period-input-field"]').first();
         if (await periodInput.isVisible({ timeout: 3000 })) {
             await periodInput.fill('15');
         }
@@ -1742,7 +1745,7 @@ export class AlertCreationWizard {
         // No separate threshold section — just period and destination
 
         // Set period
-        const periodInput = this.page.locator('.period-input-container input[type="number"]');
+        const periodInput = this.page.locator('[data-test="alert-settings-period-input-field"]').first();
         await this.page.waitForTimeout(500);
         if (await periodInput.isVisible({ timeout: 3000 })) {
             await periodInput.fill('15');

@@ -282,6 +282,19 @@
     label.value = newGroup.logicalOperator?.toLowerCase() || 'and';
   });
 
+  // Bare-mode consumers (e.g. pipeline's NodeForm/Condition.vue) edit props.group's
+  // leaf conditions IN PLACE via v-model. That never changes props.group's
+  // reference, so the intentionally non-deep sync watch above does not fire and
+  // `groups` (the working clone) goes STALE — missing the typed column/operator/
+  // value. The structural handlers below run only on explicit button clicks
+  // (add / remove / toggle / reorder), so refreshing the clone from the live prop
+  // at that point is cheap and captures those in-place edits BEFORE we mutate and
+  // emit. Without it, emitting the stale clone makes the ancestor replace the whole
+  // group and wipe the user's typed values on every structural change.
+  const syncWorkingCopyFromProp = () => {
+    groups.value = cloneDeep(props.group);
+  };
+
   const tabOptions = computed(() => [
     {
       label: "OR",
@@ -319,6 +332,8 @@
   // re-syncs `props.group` → the clone via the watch below. Mutating the readonly
   // prop directly silently fails ("target is readonly") so add/remove did nothing.
   const addCondition = (groupId: string) => {
+    // Capture any in-place bare-mode leaf edits before mutating + emitting.
+    syncWorkingCopyFromProp();
     // V2: Create condition with filterType and logicalOperator
     const newCondition = {
       filterType: 'condition',
@@ -334,6 +349,8 @@
   };
 
   const addGroup = (groupId: string) => {
+    // Capture any in-place bare-mode leaf edits before mutating + emitting.
+    syncWorkingCopyFromProp();
     // V2: Create group with filterType, logicalOperator, and conditions array
     const newGroup = {
       filterType: 'group',
@@ -357,6 +374,8 @@
 
   // Toggle AND/OR
   const toggleLabel = (newLabel?: string) => {
+    // Capture any in-place bare-mode leaf edits before mutating + emitting.
+    syncWorkingCopyFromProp();
     // V2: Use logicalOperator instead of label
     // If newLabel is provided, use it; otherwise toggle
     if (newLabel) {
@@ -369,6 +388,8 @@
   };
 
   const removeCondition = (id: string) => {
+    // Capture any in-place bare-mode leaf edits before reading/mutating + emitting.
+    syncWorkingCopyFromProp();
     // V2: Use conditions array instead of items
     // First, check what will happen after removing this condition
     const itemsAfterRemoval = groups.value.conditions.filter((item: any) => item.id !== id);
@@ -398,6 +419,9 @@
   };
 
   const performRemoveCondition = (id: string) => {
+    // Capture any in-place bare-mode leaf edits before mutating + emitting (this
+    // may run deferred from the confirm-dialog okCallback).
+    syncWorkingCopyFromProp();
     // V2: Use conditions array instead of items
     groups.value.conditions = groups.value.conditions.filter((item: any) => item.id !== id);
 
@@ -418,6 +442,8 @@
   };
 
   const reorderItems = () => {
+    // Capture any in-place bare-mode leaf edits before mutating + emitting.
+    syncWorkingCopyFromProp();
     // V2: Use conditions array instead of items
     // Separate conditions and groups
     const conditions = groups.value.conditions.filter((item: any) => !isGroup(item));

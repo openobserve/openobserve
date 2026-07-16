@@ -73,7 +73,6 @@ vi.mock("@/composables/usePrebuiltDestinations", async () => {
 });
 
 import AddDestination from "@/components/alerts/AddDestination.vue";
-import PrebuiltDestinationForm from "@/components/alerts/PrebuiltDestinationForm.vue";
 import destinationService from "@/services/alert_destination";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
@@ -366,52 +365,143 @@ describe("AddDestination - apiHeaders field array (Rule ①)", () => {
   });
 });
 
-describe("AddDestination - prebuilt coupling", () => {
+// Prebuilt destinations now live in the SAME single <OForm> (no nested child
+// form): the credential inputs are `credentials.*` fields on the parent form, the
+// parent schema validates them, and Enter/Save submit the ONE form. These tests
+// drive that end-to-end path (the previously-untested submit wiring).
+describe("AddDestination - prebuilt (single form, no nested <form>)", () => {
+  const VALID_SLACK = "https://hooks.slack.com/services/T000/B000/xxxxxxxx";
+
   beforeEach(() => {
     vi.clearAllMocks();
     hoisted.mockCreatePrebuilt.mockResolvedValue(undefined);
     hoisted.mockUpdatePrebuilt.mockResolvedValue(undefined);
   });
 
-  it("renders the child credential form for a prebuilt type", async () => {
+  // Put the ONE form into a prebuilt (slack) branch with valid credentials.
+  async function toValidSlack(w: any, name = "my-slack") {
+    const form = getForm(w);
+    form.setFieldValue("destination_type", "slack");
+    form.setFieldValue("type", "http");
+    form.setFieldValue("name", name);
+    form.setFieldValue("skip_tls_verify", true);
+    form.setFieldValue("credentials", { webhookUrl: VALID_SLACK, channel: "" });
+    await nextTick();
+    return form;
+  }
+
+  it("renders the credential fields inside the ONE form (no nested form)", async () => {
     wrapper = mountComp({ isAlerts: true });
     getForm(wrapper).setFieldValue("destination_type", "slack");
     await nextTick();
     expect(wrapper.find('[data-test="prebuilt-form"]').exists()).toBe(true);
+    // The credential input renders (it injected the parent form context).
+    expect(wrapper.find('[data-test="slack-webhook-url-input"]').exists()).toBe(
+      true,
+    );
+    // Exactly ONE <form> element — the nested prebuilt form is gone.
+    expect(wrapper.findAll("form").length).toBe(1);
   });
 
-  it("Save targets the child credential form id for prebuilt types", async () => {
+  it("Save targets the ONE parent form for prebuilt types too", async () => {
     wrapper = mountComp({ isAlerts: true });
     getForm(wrapper).setFieldValue("destination_type", "slack");
     await nextTick();
     const save = wrapper.find('[data-test="add-destination-submit-btn"]');
-    expect(save.attributes("form")).toBe("prebuilt-destination-form");
+    expect(save.attributes("form")).toBe("add-destination-form");
   });
 
-  it("child @submit drives the composable create with parent-owned fields", async () => {
+  it("blocks the save when a required credential is empty (schema gates it)", async () => {
     wrapper = mountComp({ isAlerts: true });
     const form = getForm(wrapper);
     form.setFieldValue("destination_type", "slack");
     form.setFieldValue("name", "my-slack");
-    form.setFieldValue("skip_tls_verify", true);
+    form.setFieldValue("credentials", { webhookUrl: "", channel: "" });
     await nextTick();
 
-    // The real child validated its credentials and emitted the values.
-    wrapper
-      .findComponent(PrebuiltDestinationForm)
-      .vm.$emit("submit", { webhookUrl: "https://hooks.slack.com/x" });
+    await form.handleSubmit();
     await flushPromises();
 
+    expect(form.state.isValid).toBe(false);
+    expect(hoisted.mockCreatePrebuilt).not.toHaveBeenCalled();
+  });
+
+  it("saves via createDestination when credentials + name are valid", async () => {
+    wrapper = mountComp({ isAlerts: true });
+    const form = await toValidSlack(wrapper);
+
+    await form.handleSubmit();
+    await flushPromises();
+
+    expect(form.state.isValid).toBe(true);
     expect(hoisted.mockCreatePrebuilt).toHaveBeenCalledTimes(1);
     expect(hoisted.mockCreatePrebuilt).toHaveBeenCalledWith(
       "slack",
       "my-slack",
-      { webhookUrl: "https://hooks.slack.com/x" },
+      { webhookUrl: VALID_SLACK, channel: "" },
       {},
       true,
       undefined,
     );
     expect(wrapper.emitted("get:destinations")).toBeTruthy();
     expect(wrapper.emitted("cancel:hideform")).toBeTruthy();
+  });
+
+  it("EDIT mode: prefills credentials from a saved prebuilt destination and updates it", async () => {
+    const existingSlack: any = {
+      name: "old-slack",
+      url: VALID_SLACK,
+      type: "http",
+      method: "post",
+      template: "prebuilt_slack",
+      skip_tls_verify: false,
+      headers: {},
+      // prebuilt_type drives type resolution (Priority 1); credential_* metadata
+      // + the url are restored by extractPrebuiltCredentials.
+      metadata: { prebuilt_type: "slack", credential_channel: "#ops" },
+    };
+    wrapper = mountComp({ isAlerts: true, destination: existingSlack });
+    await flushPromises();
+    const form = getForm(wrapper);
+
+    // Prefill landed in the ONE form's credentials sub-object.
+    expect(form.state.values.destination_type).toBe("slack");
+    expect(form.state.values.credentials.webhookUrl).toBe(VALID_SLACK);
+    expect(form.state.values.credentials.channel).toBe("#ops");
+
+    await form.handleSubmit();
+    await flushPromises();
+
+    expect(form.state.isValid).toBe(true);
+    expect(hoisted.mockUpdatePrebuilt).toHaveBeenCalledTimes(1);
+    expect(hoisted.mockUpdatePrebuilt).toHaveBeenCalledWith(
+      "slack",
+      "old-slack", // original name
+      "old-slack", // (possibly new) name
+      { webhookUrl: VALID_SLACK, channel: "#ops" },
+      {},
+      false,
+      "prebuilt_slack",
+    );
+    expect(hoisted.mockCreatePrebuilt).not.toHaveBeenCalled();
+  });
+
+  // The DOM wiring that makes Enter-in-any-field AND the footer Save submit the
+  // ONE form: the single credential-bearing <form> carries the OForm id, the Save
+  // button is type=submit associated to that same id, and there is no second form
+  // to steal the submit. (The submit→save behavior itself is proven deterministically
+  // by the handleSubmit test above; dispatching the native submit event is
+  // fire-and-forget/flaky per the playbook, so we assert the association instead.)
+  it("Enter/Save wiring: one <form id=add-destination-form> + a submit button bound to it", async () => {
+    wrapper = mountComp({ isAlerts: true });
+    await toValidSlack(wrapper);
+
+    const forms = wrapper.findAll("form");
+    expect(forms.length).toBe(1);
+    expect(forms[0].attributes("id")).toBe("add-destination-form");
+
+    const save = wrapper.find('[data-test="add-destination-submit-btn"]');
+    expect(save.attributes("type")).toBe("submit");
+    expect(save.attributes("form")).toBe("add-destination-form");
   });
 });

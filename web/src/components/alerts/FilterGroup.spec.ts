@@ -294,7 +294,7 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
       expect(wrapper.emitted('add-condition')?.[0][0]).toEqual(wrapper.vm.groups);
     });
 
-    it('should add multiple conditions correctly', () => {
+    it('should add multiple conditions correctly', async () => {
       const wrapper = mount(FilterGroup, {
         props: defaultProps,
         global: {
@@ -310,9 +310,59 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
 
       const initialLength = wrapper.vm.groups.conditions.length;
       wrapper.vm.addCondition('test-group');
+      // Structural ops chain THROUGH the parent: each emitted group is written
+      // back to `group` before the next op, which re-syncs the working clone.
+      // The handler refreshes the clone from the live prop so bare-mode in-place
+      // leaf edits aren't lost — so a second add without that write-back would
+      // (correctly) start from the un-updated prop. Simulate the write-back here.
+      await wrapper.setProps({ group: wrapper.emitted('add-condition')![0][0] });
       wrapper.vm.addCondition('test-group');
 
       expect(wrapper.vm.groups.conditions).toHaveLength(initialLength + 2);
+    });
+
+    // Regression: bare-mode consumers (pipeline NodeForm/Condition.vue) edit the
+    // leaf conditions of `group` IN PLACE via v-model. A structural op must emit
+    // those in-place edits, not the stale working clone — otherwise the ancestor
+    // writes the stale clone back and wipes the user's typed values (which made
+    // the pipeline condition-node fail to save).
+    it('preserves in-place bare-mode leaf edits when a structural op emits', () => {
+      const group = {
+        groupId: 'g-1',
+        filterType: 'group',
+        logicalOperator: 'AND',
+        conditions: [
+          {
+            id: 'c-1',
+            filterType: 'condition',
+            column: '',
+            operator: '=',
+            value: '',
+            logicalOperator: 'AND',
+          },
+        ],
+      };
+      const wrapper = mount(FilterGroup, {
+        props: { ...defaultProps, group },
+        global: {
+          plugins: [mockI18n],
+          provide: { store: mockStore },
+          stubs: { FilterCondition: true },
+        },
+      });
+
+      // Simulate bare-mode v-model editing the leaf IN PLACE (no new reference,
+      // so the non-deep sync watch does not fire — the clone would go stale).
+      group.conditions[0].column = 'kubernetes_container_name';
+      group.conditions[0].value = 'prometheus';
+
+      // A structural op (add) must carry the in-place edits into its payload.
+      wrapper.vm.addCondition('g-1');
+
+      const emitted = wrapper.emitted('add-condition')![0][0] as any;
+      expect(emitted.conditions[0].column).toBe('kubernetes_container_name');
+      expect(emitted.conditions[0].value).toBe('prometheus');
+      expect(emitted.conditions).toHaveLength(2);
     });
   });
 

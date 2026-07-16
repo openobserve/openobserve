@@ -17,21 +17,29 @@
 //     Both are bridged into the form via `setFieldValue` from their own handlers
 //     (the sanctioned Rule-② bridge) so `superRefine` can branch on them.
 //
-// OPEN DECISION 3 (prebuilt parent-side name/template/skip_tls_verify): the
-// prebuilt path's name/template/skip_tls_verify/apiHeaders live INSIDE the
-// parent's <OForm> tree and are form-owned OForm* here (option A). To preserve
-// BEFORE parity (the pre-migration form applied NO validation to prebuilt-side
-// name/template — the prebuilt save was gated ONLY by the child credential
-// form), the `name` required rule is scoped to NON-prebuilt paths in
-// `superRefine`. In prebuilt mode the parent form is never the submit target
-// (Save/Enter submit the child credential form by id), so these object-level
-// `.optional()` fields carry no new validation.
+// SINGLE-FORM design (prebuilt + custom share ONE <OForm id="add-destination-form">):
+// there is NO nested child credential form any more. The per-type credential
+// fields render (via PrebuiltDestinationForm, now a presentational descendant)
+// as OForm* controls named `credentials.<key>` inside THIS form, so Enter/Save
+// submit the one form from anywhere and the schema validates everything together.
+// The prebuilt credential rules are composed in `superRefine` from the SAME
+// `getPrebuiltConfig().credentialFields` single source of truth (via
+// `makePrebuiltDestinationSchema`), re-homed under the `credentials.*` path.
+//
+// Rule-④ parity: the custom-only rules (url/method/email/action/output_format/
+// template) are scoped to NON-prebuilt paths — a prebuilt destination keeps the
+// default `type:"http"` (or `"email"` for the prebuilt email type), so without
+// that scoping the `type==="http"` url/method rule (and the `type==="email"`
+// emails rule) would fire on fields the prebuilt UI never renders and wrongly
+// block the save. The prebuilt-side `name` stays UN-required (the pre-migration
+// prebuilt save applied no name/template validation) — unchanged from before.
 //
 // Validation TIMING is owned by OForm (submit-then-change via revalidateLogic);
 // this file only describes WHAT is valid.
 
 import { z } from "zod";
 import { isValidResourceName } from "@/utils/zincutils";
+import { makePrebuiltDestinationSchema } from "./PrebuiltDestinationForm.schema";
 
 // Mirrors the old `save()` name gate:
 //   !name ? nameRequired : (!isValidResourceName(name) ? charsMsg : "")
@@ -49,7 +57,7 @@ export const headerRowSchema = z.object({
 });
 
 export const makeAddDestinationSchema = (
-  t: (_key: string) => string,
+  t: (_key: string, _named?: Record<string, unknown>) => string,
   isAlerts: boolean,
 ) =>
   z
@@ -70,6 +78,10 @@ export const makeAddDestinationSchema = (
 
       // ── Form-owned dynamic api-headers rows ──────────────────────────────
       apiHeaders: z.array(headerRowSchema).default([]),
+
+      // ── Prebuilt credentials (per-type record; validated in superRefine from
+      //    the active type's credentialFields). Empty for custom/pipeline. ────
+      credentials: z.record(z.string(), z.unknown()).default({}),
     })
     .superRefine((val, ctx) => {
       const trimmed = (s: unknown) => String(s ?? "").trim();
@@ -103,8 +115,10 @@ export const makeAddDestinationSchema = (
         });
       }
 
-      // url + method: required for HTTP destinations (custom + pipeline).
-      if (val.type === "http") {
+      // url + method: required for HTTP destinations (custom + pipeline). NOT
+      // for prebuilt — those keep the default type:"http" but render no url/
+      // method inputs (their endpoint comes from the credential template).
+      if (!isPrebuilt && val.type === "http") {
         if (!trimmed(val.url)) {
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
@@ -130,8 +144,10 @@ export const makeAddDestinationSchema = (
         });
       }
 
-      // emails: required + valid list for email destinations.
-      if (val.type === "email") {
+      // emails: required + valid list for the CUSTOM email type. NOT for the
+      // prebuilt email type — it collects recipients via `credentials.recipients`
+      // (selectDestinationType sets type:"email" for it, so scope this out).
+      if (!isPrebuilt && val.type === "email") {
         if (!val.emails || !EMAIL_LIST_REGEX.test(String(val.emails))) {
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
@@ -142,12 +158,32 @@ export const makeAddDestinationSchema = (
       }
 
       // action_id: required for action destinations.
-      if (val.type === "action" && !val.action_id) {
+      if (!isPrebuilt && val.type === "action" && !val.action_id) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["action_id"],
           message: t("alerts.validation.fieldRequired"),
         });
+      }
+
+      // Prebuilt credentials: validate the active type's credential fields from
+      // the SAME config-driven schema, re-homed under `credentials.*` so each
+      // issue lands on its OFormInput (name=`credentials.<key>`). This is what
+      // makes the single-form Save/Enter gate on the credential rules.
+      if (isPrebuilt) {
+        const credResult = makePrebuiltDestinationSchema(
+          t,
+          String(val.destination_type),
+        ).safeParse((val.credentials ?? {}) as Record<string, unknown>);
+        if (!credResult.success) {
+          for (const issue of credResult.error.issues) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              path: ["credentials", ...issue.path],
+              message: issue.message,
+            });
+          }
+        }
       }
     });
 
@@ -169,4 +205,5 @@ export const addDestinationDefaults = (): AddDestinationForm => ({
   action_id: "",
   skip_tls_verify: false,
   apiHeaders: [{ key: "", value: "" }],
+  credentials: {},
 });
