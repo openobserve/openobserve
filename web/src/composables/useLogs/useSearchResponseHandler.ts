@@ -31,7 +31,7 @@ import { getFunctionErrorMessage } from "@/utils/zincutils";
 import { useI18n } from "vue-i18n";
 import { convertDateToTimestamp } from "@/utils/date";
 import { useLogsHighlighter } from "@/composables/useLogsHighlighter";
-import { rangesFromSqlParserDetail, rangesFromServerMessage } from "@/utils/query/sqlDiagnostics";
+import { rangesFromServerError } from "@/utils/query/sqlDiagnostics";
 
 export const useSearchResponseHandler = () => {
   const { showErrorNotification, showCancelSearchNotification } =
@@ -658,31 +658,22 @@ export const useSearchResponseHandler = () => {
       searchObj.data.errorMsg = errorMsg;
       notificationMsg.value = errorMsg;
 
-      // Surface SQL parse errors as Monaco squiggles.
-      // SQL mode (code 20001): sqlparser gives "at Line: N, Column: N" in error_detail —
-      //   re-run client parser on the full SQL query for a contextual message.
-      // Non-SQL mode (both code 20001 and DataFusion message errors): reconstruct the
-      //   full SQL from the filter text and stream name, then re-run client parser so
-      //   the column points into the user's filter text, not the constructed SQL prefix.
-      if (searchObj.meta.sqlMode && code === 20001 && error_detail) {
-        const ranges = await rangesFromSqlParserDetail(
-          error_detail,
-          searchObj.data.query,
-        );
-        if (ranges.length > 0) searchObj.data.sqlSyntaxErrorRanges = ranges;
-      } else if (!searchObj.meta.sqlMode) {
-        const stream = searchObj.data.stream.selectedStream?.[0];
-        if (stream && searchObj.data.query) {
-          const prefix = `select * from "${stream}" WHERE `;
-          const constructedSql = prefix + searchObj.data.query;
-          const ranges = await rangesFromServerMessage(
-            message || error_detail || "",
-            constructedSql,
-            prefix.length,
-          );
-          if (ranges.length > 0) searchObj.data.sqlSyntaxErrorRanges = ranges;
-        }
-      }
+      // Surface backend query errors as Monaco squiggles. rangesFromServerError
+      // handles every locatable code centrally:
+      //   • 20001 syntax          → sqlparser line/column (SQL) or reconstructed
+      //                             filter parse (non-SQL).
+      //   • 20002/4/5/7/8 semantic → locate the offending identifier (unknown
+      //                             field/function/stream, GROUP BY, ambiguous)
+      //                             in the query text and squiggle each occurrence.
+      const ranges = await rangesFromServerError({
+        code,
+        message,
+        errorDetail: error_detail,
+        sqlMode: searchObj.meta.sqlMode,
+        query: searchObj.data.query,
+        streamName: searchObj.data.stream.selectedStream?.[0],
+      });
+      if (ranges.length > 0) searchObj.data.sqlSyntaxErrorRanges = ranges;
     }
   };
 

@@ -26,7 +26,14 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { buildContextualSqlMessage, isParserLimitation, validateSql } from "./sqlDiagnostics";
+import {
+  buildContextualSqlMessage,
+  isParserLimitation,
+  validateSql,
+  locateIdentifier,
+  rangesFromServerError,
+  type SqlErrorRange,
+} from "./sqlDiagnostics";
 import { Parser } from "@openobserve/node-sql-parser/build/datafusionsql";
 import basicSelect from "../../../../tests/test-data/query-agent/queries/basic_select.json";
 import aggregation from "../../../../tests/test-data/query-agent/queries/aggregation.json";
@@ -544,5 +551,250 @@ describe("isParserLimitation", () => {
       const result = await validateSql(sql);
       expect(result).toBeNull();
     }
+  });
+});
+
+// ─── Suite: locateIdentifier (the token scanner) ─────────────────────────────
+
+describe("locateIdentifier", () => {
+  const sliceHit = (sql: string, h: { line: number; startCol: number; endCol: number }) =>
+    sql.split("\n")[h.line - 1].slice(h.startCol - 1, h.endCol - 1);
+
+  it("finds every occurrence of a bare identifier", () => {
+    const sql = "SELECT a, a FROM t";
+    const hits = locateIdentifier(sql, "a");
+    expect(hits.length).toBe(2);
+    expect(hits.every((h) => sliceHit(sql, h) === "a")).toBe(true);
+  });
+
+  it("skips single-quoted string literals", () => {
+    const sql = "SELECT x FROM t WHERE y = 'x'";
+    const hits = locateIdentifier(sql, "x");
+    // Only the column `x`, not the string literal 'x'.
+    expect(hits.length).toBe(1);
+    expect(hits[0].startCol).toBe(8);
+  });
+
+  it("matches quoted identifiers (double quotes / backticks)", () => {
+    expect(locateIdentifier('SELECT "col" FROM t', "col").length).toBe(1);
+    expect(locateIdentifier("SELECT `col` FROM t", "col").length).toBe(1);
+  });
+
+  it("skips line and block comments", () => {
+    expect(locateIdentifier("SELECT a -- a a\nFROM t", "a").length).toBe(1);
+    expect(locateIdentifier("SELECT a /* a a */ FROM t", "a").length).toBe(1);
+  });
+
+  it("resolves a qualified name to its last segment", () => {
+    const sql = "SELECT status FROM t";
+    const hits = locateIdentifier(sql, "schema.status");
+    expect(hits.length).toBe(1);
+    expect(sliceHit(sql, hits[0])).toBe("status");
+  });
+
+  it("is case-insensitive", () => {
+    expect(locateIdentifier("SELECT Status FROM t", "status").length).toBe(1);
+  });
+
+  it("returns nothing when the identifier is absent", () => {
+    expect(locateIdentifier("SELECT a FROM t", "zzz").length).toBe(0);
+  });
+});
+
+// ─── Suite: rangesFromServerError — semantic error highlighting ───────────────
+//
+// End-to-end: given the backend error text + the query, the offending token(s)
+// must be located precisely and carry a helpful message. Error strings below are
+// the real phrasings from DataFusion / OpenObserve (src/infra/src/errors).
+
+describe("rangesFromServerError — semantic errors", () => {
+  const tokenAt = (query: string, r: SqlErrorRange) =>
+    query
+      .split("\n")
+      [r.startLine - 1].slice((r.column ?? 1) - 1, (r.endColumn ?? 1) - 1);
+
+  interface Case {
+    name: string;
+    message?: string;
+    errorDetail?: string;
+    query: string;
+    sqlMode?: boolean;
+    streamName?: string;
+    token: string;
+    msgIncludes: string;
+    minHits?: number;
+  }
+
+  const cases: Case[] = [
+    {
+      name: "field not found (No field named)",
+      message: "Search field not found: Schema error: No field named as.",
+      query: 'SELECT count(*) as cnt, error_id, as errid FROM "t"',
+      token: "as",
+      msgIncludes: "Unknown field",
+    },
+    {
+      name: "field not found (bare, wrapped)",
+      message: "Search field not found: eror_id. Field not found in stream schema.",
+      query: "SELECT eror_id FROM t",
+      token: "eror_id",
+      msgIncludes: "Unknown field",
+    },
+    {
+      name: "field not found (backtick-quoted)",
+      errorDetail: "Schema error: No field named `user_id`. Valid fields are a, b.",
+      query: "SELECT user_id FROM t",
+      token: "user_id",
+      msgIncludes: "Unknown field",
+    },
+    {
+      name: "function not defined",
+      message: "Search function not defined: Invalid function 'summ'.",
+      query: "SELECT summ(x) FROM t",
+      token: "summ",
+      msgIncludes: "Unknown function",
+    },
+    {
+      name: "incompatible data type",
+      errorDetail: "Incompatible data types for field amount. Expected Int64 but got Utf8",
+      query: "SELECT * FROM t WHERE amount > 'x'",
+      token: "amount",
+      msgIncludes: "incompatible data type",
+    },
+    {
+      name: "stream not found (located in FROM)",
+      message: "Search stream not found: logs2",
+      query: 'SELECT * FROM "logs2"',
+      // A quoted identifier is highlighted including its surrounding quotes.
+      token: '"logs2"',
+      msgIncludes: "Unknown stream",
+    },
+    {
+      name: "GROUP BY (DataFusion projection phrasing, qualified)",
+      errorDetail:
+        "Error during planning: Projection references non-aggregate values: Expression schema.status could not be resolved from available columns",
+      query: "SELECT status, count(*) FROM t GROUP BY code",
+      token: "status",
+      msgIncludes: "GROUP BY",
+    },
+    {
+      name: "GROUP BY (must appear phrasing)",
+      errorDetail: "column code must appear in the GROUP BY clause or be used in an aggregate function",
+      query: "SELECT code, count(*) FROM t",
+      token: "code",
+      msgIncludes: "GROUP BY",
+    },
+    {
+      name: "ambiguous column (which would be ambiguous)",
+      errorDetail:
+        "Schema error: Schema contains qualified field name t1.name and unqualified field name name which would be ambiguous",
+      query: "SELECT name FROM t1 JOIN t2 ON t1.id = t2.id",
+      token: "name",
+      msgIncludes: "ambiguous",
+    },
+    {
+      name: "ambiguous column (Ambiguous reference)",
+      errorDetail: "Schema error: Ambiguous reference to unqualified field user_id",
+      query: "SELECT user_id FROM t1 JOIN t2 ON t1.id = t2.id",
+      token: "user_id",
+      msgIncludes: "ambiguous",
+    },
+    {
+      name: "duplicate column (both occurrences)",
+      errorDetail: "Schema error: Schema contains duplicate unqualified field name amount",
+      query: "SELECT amount, amount FROM t",
+      token: "amount",
+      msgIncludes: "more than once",
+      minHits: 2,
+    },
+    {
+      name: "table / CTE not found",
+      errorDetail: "Error during planning: Table or CTE with name 'orders' not found",
+      query: "SELECT * FROM logs JOIN orders ON logs.id = orders.id",
+      token: "orders",
+      msgIncludes: "Unknown table",
+    },
+    {
+      name: "function signature mismatch",
+      errorDetail:
+        "Error during planning: No function matches the given name and argument types 'date_trunc(Utf8)'. You might need to add explicit type casts.",
+      query: "SELECT date_trunc('day', ts) FROM t",
+      token: "date_trunc",
+      msgIncludes: "wrong argument",
+    },
+  ];
+
+  cases.forEach((c) => {
+    it(c.name, async () => {
+      const ranges = await rangesFromServerError({
+        message: c.message,
+        errorDetail: c.errorDetail,
+        sqlMode: c.sqlMode ?? true,
+        query: c.query,
+        streamName: c.streamName,
+      });
+      expect(ranges.length).toBeGreaterThanOrEqual(c.minHits ?? 1);
+      // The first located range wraps exactly the offending token.
+      expect(tokenAt(c.query, ranges[0])).toBe(c.token);
+      expect(ranges[0].error).toContain(c.msgIncludes);
+    });
+  });
+});
+
+// ─── Suite: rangesFromServerError — no false positives ───────────────────────
+
+describe("rangesFromServerError — non-locatable errors produce no squiggle", () => {
+  const nonLocatable = [
+    "Search query timed out after 30s",
+    "Ratelimit exceeded",
+    "This feature is not implemented: GROUPING SETS",
+    "Arrow error: Cast error: Cannot cast string 'abc' to value of Int64 type",
+    "Full text search field not found",
+    "Server Internal Error",
+  ];
+
+  nonLocatable.forEach((message) => {
+    it(`returns [] for: ${message.slice(0, 40)}`, async () => {
+      const ranges = await rangesFromServerError({
+        message,
+        sqlMode: true,
+        query: "SELECT * FROM t",
+      });
+      expect(ranges).toEqual([]);
+    });
+  });
+
+  it("returns [] when the query is empty", async () => {
+    const ranges = await rangesFromServerError({
+      message: "Search field not found: foo",
+      sqlMode: true,
+      query: "   ",
+    });
+    expect(ranges).toEqual([]);
+  });
+});
+
+// ─── Suite: rangesFromServerError — syntax errors (20001) ────────────────────
+
+describe("rangesFromServerError — syntax errors", () => {
+  it("locates a syntax error via the sqlparser location path", async () => {
+    const ranges = await rangesFromServerError({
+      code: 20001,
+      errorDetail: "sql parser error: Expected an expression, found: EOF at Line: 1, Column: 26",
+      sqlMode: true,
+      query: "SELECT * FROM t WHERE x = ",
+    });
+    expect(ranges.length).toBeGreaterThanOrEqual(1);
+    expect(ranges[0].error).toBeTruthy();
+  });
+
+  it("detects syntax errors code-agnostically (HTTP status, not 20001)", async () => {
+    const ranges = await rangesFromServerError({
+      code: 400,
+      message: "sql parser error: Expected an expression, found: EOF at Line: 1, Column: 26",
+      sqlMode: true,
+      query: "SELECT * FROM t WHERE x = ",
+    });
+    expect(ranges.length).toBeGreaterThanOrEqual(1);
   });
 });

@@ -615,6 +615,20 @@ export const emptyStatePresets = {
       },
     ],
   },
+  "no-model-pricing": {
+    illustration: "box",
+    variant: "create",
+    titleKey: "emptyState.noModelPricing.title",
+    descriptionKey: "emptyState.noModelPricing.description",
+    actions: [
+      {
+        id: "create",
+        icon: "add",
+        titleKey: "emptyState.noModelPricing.action",
+        descriptionKey: "emptyState.noModelPricing.actionDesc",
+      },
+    ],
+  },
 
   // LLM Insights dashboard — single empty-state shape (used for all three
   // "no data" cases: no LLM streams in the org, the active stream has no
@@ -752,4 +766,5 @@ export const presetNouns: Partial<Record<EmptyStatePresetName, string>> = {
   "no-eval-jobs": "emptyState.nouns.evalJobs",
   "no-score-configs": "emptyState.nouns.scoreConfigs",
   "no-pipeline-history": "emptyState.nouns.pipelineHistory",
+  "no-model-pricing": "emptyState.nouns.modelPricing",
 };

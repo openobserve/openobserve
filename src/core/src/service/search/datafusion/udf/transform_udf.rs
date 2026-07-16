@@ -81,7 +81,7 @@ fn get_udf_vrl(
         let len = args[0].len();
         let in_params = local_fn_params.split(',').collect::<Vec<&str>>();
         let mut res_data_vec = vec![];
-        let mut runtime = crate::common::utils::functions::init_vrl_runtime();
+        let mut runtime = Runtime::new(vrl::prelude::state::RuntimeState::default());
 
         for i in 0..len {
             let mut obj_str = String::from("");

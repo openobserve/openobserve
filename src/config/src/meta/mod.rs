@@ -45,5 +45,6 @@ pub mod sql;
 pub mod stream;
 pub mod system_settings;
 pub mod timed_annotations;
+pub mod traces;
 pub mod triggers;
 pub mod user;

@@ -46,7 +46,7 @@ use crate::{
 
 /// Will no longer be used as we are using the meta stream stats to store start, end time and size
 pub const ENRICHMENT_TABLE_SIZE_KEY: &str = "/enrichment_table_size";
-pub const ENRICHMENT_TABLE_META_STREAM_STATS_KEY: &str = "/enrichment_table_meta_stream_stats";
+pub use infra::table::enrichment_tables::ENRICHMENT_TABLE_META_STREAM_STATS_KEY;
 
 pub async fn get_enrichment_table_data(
     org_id: &str,
@@ -379,45 +379,8 @@ pub async fn get_enrichment_data_from_db(
     name: &str,
     end_time_exclusive: Option<i64>,
 ) -> Result<(Vec<json::Value>, i64, i64), infra::errors::Error> {
-    let mut vec = vec![];
-    let mut min_ts = 0;
-    let mut max_ts = 0;
-    // Each record is a json array
-    // If end_time is provided, use the filtered function; otherwise use the standard one
-    let records = if end_time_exclusive.is_some() {
-        infra::table::enrichment_tables::get_by_org_and_name_with_end_time(
-            org_id,
-            name,
-            end_time_exclusive,
-        )
-        .await?
-    } else {
-        infra::table::enrichment_tables::get_by_org_and_name(org_id, name).await?
-    };
-
-    // Records are in descending order, we need to convert them to a json array
-    for record in records {
-        if min_ts == 0 || record.created_at < min_ts {
-            min_ts = record.created_at;
-        }
-        if max_ts == 0 || record.created_at > max_ts {
-            max_ts = record.created_at;
-        }
-        match serde_json::from_slice(&record.data) {
-            Ok(data) => match data {
-                json::Value::Array(arr) => {
-                    vec.extend(arr.iter().cloned());
-                }
-                _ => {
-                    log::error!("Invalid enrichment data: {data}");
-                }
-            },
-            Err(e) => {
-                log::error!("Failed to parse enrichment data: {e}");
-            }
-        }
-    }
-    Ok((vec, min_ts, max_ts))
+    infra::table::enrichment_tables::get_data_by_org_and_name(org_id, name, end_time_exclusive)
+        .await
 }
 
 pub async fn delete_enrichment_data_from_db(
@@ -473,22 +436,7 @@ pub async fn get_meta_table_stats(
     org_id: &str,
     name: &str,
 ) -> Option<EnrichmentTableMetaStreamStats> {
-    let size = match db_service::get(&format!(
-        "{ENRICHMENT_TABLE_META_STREAM_STATS_KEY}/{org_id}/{name}"
-    ))
-    .await
-    {
-        Ok(size) => size,
-        Err(_) => {
-            return None;
-        }
-    };
-    let stream_meta_stats: EnrichmentTableMetaStreamStats = serde_json::from_slice(&size)
-        .map_err(|e| {
-            log::error!("Failed to parse meta stream stats: {e}");
-        })
-        .ok()?;
-    Some(stream_meta_stats)
+    infra::table::enrichment_tables::get_meta_stats(org_id, name).await
 }
 
 pub async fn update_meta_table_stats(
