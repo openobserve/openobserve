@@ -88,8 +88,11 @@ export default defineComponent({
       // Toggle .dark on <html> for the O2 component library (Tailwind dark variant).
       // Wrapped in switchThemeMode so the mode flip animates as one frame
       // (soft curtain sweep, defined in styles/tailwind.css).
-      switchThemeMode(theme === 'dark' ? 'dark' : 'light', () => {
-        document.documentElement.classList.toggle('dark', theme === 'dark');
+      // `darkMode` is the component's source of truth and is always set to
+      // match `theme` before setTheme runs, so the html-class toggle reads it
+      // directly rather than re-deriving the boolean from the string arg.
+      switchThemeMode(theme, () => {
+        document.documentElement.classList.toggle('dark', darkMode.value);
         store.dispatch("appTheme", theme);
       });
     };

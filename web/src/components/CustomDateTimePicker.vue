@@ -8,7 +8,7 @@
         }"
         data-test="date-time-btn"
         variant="outline"
-        class="h-full rounded-sm py-0 px-[5px] text-xs min-w-auto bg-[rgba(89,96,178,0.2)]!"
+        class="h-full rounded-sm py-0 px-1.25 text-xs min-w-auto bg-[rgba(89,96,178,0.2)]!"
         :class="changeStyle ? computedClass : 'h-8!'"
         :disabled="isFirstEntry"
       >
@@ -23,7 +23,7 @@
         </template>
       </OButton>
     </template>
-    <div class="date-time-dialog w-[341px] z-[10001] max-h-150">
+    <div class="date-time-dialog w-85.25 z-[10001] max-h-150">
       <div class="flex justify-between">
         <OTabPanels v-model="picker.activeTab">
           <OTabPanel name="relative">

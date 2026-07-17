@@ -1,35 +1,14 @@
 {
   "totals": {
-    "rawPalette": 20,
-    "arbRadius": 6,
     "arbZ": 40,
-    "styleBlockHex": 5,
-    "arbPx": 21,
-    "styleKeepComment": 2,
     "unscopedStyle": 8,
     "stylePxUnit": 90,
-    "themeTernary": 2,
-    "darkMechanism": 24,
-    "inlineHexStyle": 5,
-    "hexClass": 5
+    "darkMechanism": 22,
+    "inlineHexStyle": 4
   },
   "files": {
-    "components/actionScripts/EditScript.vue": {
-      "rawPalette": 5
-    },
     "components/ai-assistant/welcome/CapabilityCards.vue": {
-      "arbRadius": 1,
-      "arbZ": 4,
-      "styleBlockHex": 2
-    },
-    "components/ai-assistant/welcome/WelcomeGreeting.vue": {
-      "arbPx": 3
-    },
-    "components/ai_toolsets/AddAiToolset.vue": {
-      "rawPalette": 4
-    },
-    "components/alerts/AlertSettingsHelpDrawer.vue": {
-      "styleKeepComment": 1
+      "arbZ": 4
     },
     "components/alerts/AlertSummary.vue": {
       "arbZ": 1
@@ -40,41 +19,23 @@
     "components/alerts/QueryEditorDialog.vue": {
       "arbZ": 2
     },
-    "components/anomaly_detection/steps/AnomalyDetectionConfig.vue": {
-      "arbPx": 1
-    },
-    "components/cipherkeys/AddAkeylessType.vue": {
-      "arbPx": 8
-    },
-    "components/cipherkeys/AddOpenobserveType.vue": {
-      "arbPx": 2
-    },
     "components/common/BaseImport.vue": {
       "unscopedStyle": 1
     },
     "components/common/LoadingProgress.vue": {
-      "rawPalette": 2,
       "arbZ": 1
     },
     "components/CustomDateTimePicker.vue": {
-      "arbPx": 2,
       "arbZ": 1
     },
     "components/dashboards/panels/HTMLRenderer.vue": {
       "unscopedStyle": 2
     },
     "components/EnterpriseUpgradeDialog.vue": {
-      "arbRadius": 2,
       "arbZ": 1
-    },
-    "components/pipeline/NodeForm/Condition.vue": {
-      "arbPx": 2
     },
     "components/pipeline/NodeForm/CreateDestinationForm.vue": {
       "arbZ": 1
-    },
-    "components/pipeline/NodeForm/Stream.vue": {
-      "arbPx": 3
     },
     "components/pipeline/NodeSidebar.vue": {
       "unscopedStyle": 1
@@ -84,15 +45,6 @@
     },
     "components/pipeline/PipelineView.vue": {
       "stylePxUnit": 6
-    },
-    "components/promql/components/OperationsList.vue": {
-      "rawPalette": 1
-    },
-    "components/query-plan/QueryPlanNode.vue": {
-      "styleKeepComment": 1
-    },
-    "components/reports/CreateReport.vue": {
-      "rawPalette": 7
     },
     "components/RichTextInput.vue": {
       "arbZ": 1
@@ -104,15 +56,12 @@
       "arbZ": 1
     },
     "components/ThemeSwitcher.vue": {
-      "themeTernary": 2,
-      "darkMechanism": 3
+      "darkMechanism": 1
     },
     "components/traces/FlameGraphView.vue": {
-      "inlineHexStyle": 5
+      "inlineHexStyle": 4
     },
     "components/WebinarBanner.vue": {
-      "rawPalette": 1,
-      "hexClass": 5,
       "arbZ": 1
     },
     "lib/core/EmptyState/illustrations/EmptyAlert.vue": {
@@ -169,9 +118,6 @@
     "lib/forms/Color/OColor.vue": {
       "arbZ": 1
     },
-    "lib/forms/Input/OInput.vue": {
-      "arbRadius": 2
-    },
     "lib/forms/Select/OSelect.vue": {
       "arbZ": 2
     },
@@ -201,12 +147,6 @@
     },
     "plugins/traces/SessionDetails.vue": {
       "arbZ": 1
-    },
-    "plugins/traces/SessionRibbon.vue": {
-      "arbRadius": 1
-    },
-    "plugins/traces/ThreadToolCalls.vue": {
-      "styleBlockHex": 3
     },
     "utils/dashboard/colorPalette.ts": {
       "darkMechanism": 5

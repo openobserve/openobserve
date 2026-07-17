@@ -613,6 +613,11 @@ defineExpose({ applyTemplate, previewTemplate });
 </template>
 
 <style scoped lang="scss">
+/* keep(complex-state): the .seg-live/-sample/-opaque/-text segment styles are
+   applied by the computed segClass() mapper to the v-for'd preview segments —
+   a dynamic, per-kind class name the utility layer cannot inline — and the
+   legend / preview-box / destination-card BEM blocks cascade hover and kind
+   variants around them. All values already resolve to design tokens. */
 // Colors use the design-token layer defined in src/lib/styles/tokens/*.css
 // (--color-*, --radius-*) — the same theme-aware tokens the O* component
 // library consumes, with dark-mode overrides in tokens/dark.css.

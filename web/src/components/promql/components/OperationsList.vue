@@ -52,7 +52,7 @@
                       <div class="font-medium">
                         {{ getStepSpec(element.id)?.name || element.id }}
                       </div>
-                      <div class="text-xs text-gray-400">
+                      <div class="text-xs text-text-muted">
                         {{ getStepSpec(element.id)?.documentation }}
                       </div>
 

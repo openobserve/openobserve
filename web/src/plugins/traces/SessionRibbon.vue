@@ -134,7 +134,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           v-for="bar in bars"
           :key="bar.index"
-          class="flex-1 min-w-0 rounded-t-[1px] transition-opacity"
+          class="flex-1 min-w-0 rounded-t-sm transition-opacity"
           :style="{
             height: Math.max(2, bar.pct) + '%',
             background: bar.color,

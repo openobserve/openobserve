@@ -147,7 +147,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ t("aiToolset.cliConfig") }}
               </div>
               <div class="flex items-center gap-1">
-                <span class="text-xs text-gray-400"
+                <span class="text-xs text-text-muted"
                   >{{ t("aiToolset.presets") }}:</span
                 >
                 <OTag
@@ -274,7 +274,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OIcon name="delete" size="xs" />
                 </OButton>
               </div>
-              <div class="text-xs text-gray-500 mb-1">
+              <div class="text-xs text-text-secondary mb-1">
                 {{ t("aiToolset.credContentHint") }}
               </div>
               <query-editor
@@ -303,7 +303,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="text-base font-medium font-semibold mb-2">
               {{ t("aiToolset.skillConfig") }}
             </div>
-            <div class="mb-1 text-xs text-gray-400">
+            <div class="mb-1 text-xs text-text-muted">
               {{ t("aiToolset.skillContent") }} *
             </div>
             <query-editor
@@ -316,7 +316,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
             <div
               v-if="skillContentError"
-              class="text-red-500 text-xs mt-[-12px] mb-4"
+              class="text-error-500 text-xs -mt-3 mb-4"
             >
               {{ t("aiToolset.skillContentRequired") }}
             </div>

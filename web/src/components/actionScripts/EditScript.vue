@@ -179,7 +179,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div class="my-2 px-2">
                     <div
                       style="font-size: 14px"
-                      class="font-bold text-gray-500 mb-2"
+                      class="font-bold text-text-secondary mb-2"
                       data-test="add-action-script-frequency-title"
                     >
                       {{ t("actions.frequency") }} *
@@ -220,7 +220,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           style="padding-top: 8px; width: 320px"
                         >
                           <div
-                            class="mb-1 font-bold text-gray-500"
+                            class="mb-1 font-bold text-text-secondary"
                             data-test="add-action-script-cron-expression-title"
                           >
                             {{ t("reports.cronExpression") + " *" }}
@@ -228,7 +228,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               data-test="add-action-script-cron-info"
                               name="info"
                               size="sm"
-                              class="ml-1 cursor-pointer text-gray-400"
+                              class="ml-1 cursor-pointer text-text-muted"
                             >
                               <OTooltip side="right" align="center">
                                 <template #content>
@@ -306,13 +306,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div>
                       <div
                         data-test="add-action-script-service-account-title"
-                        class="mb-1 font-bold text-gray-500"
+                        class="mb-1 font-bold text-text-secondary"
                       >
                         {{ t("actions.serviceAccount") + " *" }}
                         <OIcon
                           name="info"
                           size="sm"
-                          class="ml-1 cursor-pointer text-gray-400"
+                          class="ml-1 cursor-pointer text-text-muted"
                         >
                           <OTooltip side="right" align="center">
                             <template #content>

@@ -375,6 +375,19 @@
      needs to stay legible on the near-white banner. */
   --color-promo-webinar-accent:      var(--color-amber-400);
   --color-promo-webinar-accent-text: var(--color-amber-700);
+  /* Body text + separator on the amber top-bar. Fixed (theme-independent) like
+     the rest of the promo art — the bar is always amber, so the text is always
+     the same near-black and the pipe the same muted slate. */
+  --color-promo-webinar-text:        #1a1a1a;
+  --color-promo-webinar-sep:         #374151;
+
+  /* Tool-call thread identity accent (traces LLM thread view). A distinct GREEN
+     that is deliberately NOT --color-dag-node-tool (orange) nor a status/success
+     green — collapsing it onto either would merge two visually-distinct roles.
+     `-accent` is the base the borders/fills derive from via color-mix; `-text`
+     is the readable label colour (flips lighter in dark, see dark.css). */
+  --color-tool-thread-accent:        #4caf50;
+  --color-tool-thread-accent-text:   #2f7a31;
   /* Global scrollbar treatment (consumed by styles/base-elements.css). Semantic
      names for what were raw palette refs; values are unchanged. Dark steps in dark.css. */
   --color-scrollbar-thumb:       var(--color-grey-300);

@@ -42,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <label class="flex mb-3">
         <b>{{ t('cipherKey.accessId') }}</b>
       </label>
-      <pre class="[text-wrap:auto] break-words border border-input-border p-[5px] mb-[5px]">{{ accessId }}</pre>
+      <pre class="[text-wrap:auto] break-words border border-input-border p-1.25 mb-1.25">{{ accessId }}</pre>
       <OButton data-test="add-cipher-key-akeyless-access-id-input-update" variant="primary" size="sm-action" @click="isUpdateAccessID = true">{{ t('common.update') }}</OButton>
     </div>
     <OFormSelect
@@ -78,7 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <label class="flex mb-3">
             <b>{{ t('cipherKey.accessKey') }}</b>
           </label>
-          <pre class="[text-wrap:auto] break-words border border-input-border p-[5px] mb-[5px]">{{ accessKey }}</pre>
+          <pre class="[text-wrap:auto] break-words border border-input-border p-1.25 mb-1.25">{{ accessKey }}</pre>
           <OButton data-test="add-cipher-key-akeyless-access-key-input-update" variant="primary" size="sm-action" @click="isUpdateAccessKey = true">{{ t('common.update') }}</OButton>
         </div>
       </div>
@@ -97,7 +97,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <label class="flex mb-3">
             <b>{{ t('cipherKey.ldapUsername') }}</b>
           </label>
-          <pre class="[text-wrap:auto] break-words border border-input-border p-[5px] mb-[5px]">{{ ldapUsername }}</pre>
+          <pre class="[text-wrap:auto] break-words border border-input-border p-1.25 mb-1.25">{{ ldapUsername }}</pre>
           <OButton data-test="add-cipher-key-akeyless-ldap-username-input-update" variant="primary" size="sm-action" @click="isUpdateLDAPUsername = true">{{ t('common.update') }}</OButton>
         </div>
         <div v-if="!isUpdate || isUpdateLDAPPass || ldapPassword == ''">
@@ -116,7 +116,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <label class="flex mb-3">
             <b>{{ t('cipherKey.ldapPassword') }}</b>
           </label>
-          <pre class="[text-wrap:auto] break-words border border-input-border p-[5px] mb-[5px]">{{ ldapPassword }}</pre>
+          <pre class="[text-wrap:auto] break-words border border-input-border p-1.25 mb-1.25">{{ ldapPassword }}</pre>
           <OButton data-test="add-cipher-key-akeyless-ldap-password-input-update" variant="primary" size="sm-action" @click="isUpdateLDAPPass = true">{{ t('common.update') }}</OButton>
         </div>
       </div>

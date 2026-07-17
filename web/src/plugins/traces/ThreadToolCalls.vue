@@ -243,15 +243,13 @@ function formatDuration(ns: number): string {
   }
 }
 
-/* TODO(design-tokens): the tool-call thread's identity accent is a GREEN that has
-   no semantic token. It is NOT --color-dag-node-tool (that role is orange) and
-   NOT a success/status green, so neither may be reused here without collapsing
-   two visually-distinct roles. The two literals below are the only uncovered
-   values left in this file; every consumer derives from them via color-mix, so
-   minting `--color-tool-thread-accent` / `-text` is a two-line swap. */
+/* The tool-call thread's identity accent — a distinct green with its own
+   semantic tokens (--color-tool-thread-accent / -text), deliberately not the
+   orange dag-node-tool role nor a status green. Local aliases keep the many
+   color-mix consumers below terse; the -text token flips in dark on its own. */
 .thread-tools-thread {
-  --tt-accent: #4caf50;
-  --tt-accent-text: #2f7a31;
+  --tt-accent: var(--color-tool-thread-accent);
+  --tt-accent-text: var(--color-tool-thread-accent-text);
 }
 
 .thread-tool {
@@ -395,8 +393,7 @@ function formatDuration(ns: number): string {
    alpha to read), and the lighter status steps. The row/caret text colours
    are gone from here — --color-text-secondary is already theme-paired. */
 .dark .thread-tools-thread {
-  --tt-accent-text: #6dd170;
-
+  /* --tt-accent-text flips via its own token (--color-tool-thread-accent-text). */
   .thread-tool {
     background: color-mix(in srgb, var(--tt-accent) 6%, transparent);
     border-bottom-color: color-mix(in srgb, var(--tt-accent) 20%, transparent);

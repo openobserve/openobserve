@@ -33,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div v-if="!dialogConfig.isCloudLayout" class="hero-panel [flex:0_0_35%] bg-[linear-gradient(135deg,var(--color-theme-accent)_0%,color-mix(in_srgb,var(--color-theme-accent)_85%,black_15%)_100%)] p-10 flex flex-col relative text-white overflow-y-auto min-h-0 max-[56.25rem]:flex-none max-[56.25rem]:min-h-100">
 
           <div class="flex-1 flex flex-col justify-center items-center max-w-100 w-full m-auto">
-            <div class="w-20 h-20 bg-[rgba(255,255,255,0.15)] rounded-[16px] flex items-center justify-center mb-6 backdrop-blur-[10px]">
+            <div class="w-20 h-20 bg-[rgba(255,255,255,0.15)] rounded-xl flex items-center justify-center mb-6 backdrop-blur-[10px]">
               <OIcon name="workspace-premium" size="xl" />
             </div>
 
@@ -60,7 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <!-- Loaded State: Show actual data -->
               <template v-else>
-                <div data-test="enterprise-upgrade-offer-badge" class="inline-flex items-center bg-[linear-gradient(135deg,#22c55e_0%,#4ade80_100%)] py-2.5 px-5 rounded-[24px] font-bold text-sm backdrop-blur-[10px] text-white shadow-[0_4px_16px_rgba(34,197,94,0.4)]" :class="{ 'bg-[rgba(255,255,255,0.2)]! shadow-[0_4px_12px_rgba(0,0,0,0.15)]!': dialogConfig.isLicensed }">
+                <div data-test="enterprise-upgrade-offer-badge" class="inline-flex items-center bg-[linear-gradient(135deg,#22c55e_0%,#4ade80_100%)] py-2.5 px-5 rounded-xl font-bold text-sm backdrop-blur-[10px] text-white shadow-[0_4px_16px_rgba(34,197,94,0.4)]" :class="{ 'bg-[rgba(255,255,255,0.2)]! shadow-[0_4px_12px_rgba(0,0,0,0.15)]!': dialogConfig.isLicensed }">
                   <OIcon v-if="!dialogConfig.showUsageIndicator" :name="dialogConfig.badgeIcon" size="md" class="mr-1" />
                   <span>{{ dialogConfig.badgeText }}</span>
                 </div>

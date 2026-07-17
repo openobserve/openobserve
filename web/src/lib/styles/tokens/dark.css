@@ -91,6 +91,7 @@
     --color-accent:           var(--color-primary-400);  /* brand accent â€” lighter shade for dark surfaces */
     --color-sql-accent:       #A78BFA;                    /* SQL/query violet â€” lighter for dark surfaces */
     --color-function-accent:  var(--color-blue-400);      /* VRL-function blue - lighter for dark surfaces */
+    --color-tool-thread-accent-text: #6dd170;             /* tool-thread green - lighter for dark surfaces */
     /* Trace DAG node-type palette (dark) â€” lighter step per hue */
     --color-dag-node-generation: #66bb6a;
     --color-dag-node-embedding:  #64b5f6;

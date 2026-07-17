@@ -111,7 +111,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <span>
                   To check for an empty value, use
                   <span class="highlight font-bold text-text-link">""</span>. Example:
-                  <span class="code font-mono py-[1px] px-1 rounded-sm bg-code-bg text-code-text">app_name != ""</span>
+                  <span class="code font-mono py-px px-1 rounded-sm bg-code-bg text-code-text">app_name != ""</span>
                 </span>
               </div>
               <div class="flex items-start gap-2">
@@ -119,7 +119,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <span>
                   To check for an Null value, use
                   <span class="highlight font-bold text-text-link">null</span>. Example:
-                  <span class="code font-mono py-[1px] px-1 rounded-sm bg-code-bg text-code-text">app_name != null</span>
+                  <span class="code font-mono py-px px-1 rounded-sm bg-code-bg text-code-text">app_name != null</span>
                 </span>
               </div>
               <div class="flex items-start gap-2">

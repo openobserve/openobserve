@@ -56,8 +56,7 @@
           >
             <div
               v-if="index > 0 && index < timelineTicks.length - 1"
-              class="absolute w-px"
-              style="bottom: 0; height: 100%; background: #aaa"
+              class="absolute w-px bottom-0 h-full bg-grey-400"
               :style="{ left: tick.left, transform: 'translateX(-50%)' }"
             ></div>
           </template>

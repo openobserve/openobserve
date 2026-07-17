@@ -173,7 +173,7 @@ describe("QueryPlanNode", () => {
     it("should mark details as truncated and clickable when details exceed 80 chars", () => {
       wrapper = mountNode(nodeWithLongDetails);
       expect(wrapper.find(".inline-details.truncated").exists()).toBe(true);
-      expect(wrapper.find(".inline-details.clickable").exists()).toBe(true);
+      expect(wrapper.find(".inline-details.cursor-pointer").exists()).toBe(true);
     });
 
     it("should expand details on click when details are long", async () => {
@@ -189,7 +189,7 @@ describe("QueryPlanNode", () => {
 
     it("should not make details clickable when details are short", () => {
       wrapper = mountNode(makeNode({ fullText: "SomeExec: short detail" }));
-      expect(wrapper.find(".inline-details.clickable").exists()).toBe(false);
+      expect(wrapper.find(".inline-details.cursor-pointer").exists()).toBe(false);
     });
   });
 

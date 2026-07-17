@@ -16,7 +16,7 @@ const emit = defineEmits<{ (e: "select", prompt: string): void }>();
       :key="card.id"
       role="button"
       tabindex="0"
-      class="capability-card group/card relative py-4 px-4 pb-[1.125rem] border border-border-default rounded-xl cursor-pointer bg-card-bg transition-[border-color,box-shadow,translate,background] duration-200 ease-[ease] isolate overflow-hidden min-h-33 [--accent:123,97,255] hover:border-[rgba(var(--accent),0.5)] hover:-translate-y-[3px] hover:shadow-[0_1px_2px_rgba(0,0,0,0.04),0_12px_28px_-10px_rgba(var(--accent),0.35)] focus-visible:outline-none focus-visible:border-[rgba(var(--accent),0.7)] focus-visible:shadow-[0_0_0_2px_rgba(var(--accent),0.45)]"
+      class="capability-card group/card relative py-4 px-4 pb-[1.125rem] border border-border-default rounded-xl cursor-pointer bg-card-bg transition-[border-color,box-shadow,translate,background] duration-200 ease-[ease] isolate overflow-hidden min-h-33 [--accent:123,97,255] [--card-tint:linear-gradient(155deg,rgba(var(--accent),0.1)_0%,rgba(var(--accent),0.02)_40%,transparent_70%)] hover:border-[rgba(var(--accent),0.5)] hover:-translate-y-[3px] hover:shadow-[0_1px_2px_rgba(0,0,0,0.04),0_12px_28px_-10px_rgba(var(--accent),0.35)] focus-visible:outline-none focus-visible:border-[rgba(var(--accent),0.7)] focus-visible:shadow-[0_0_0_2px_rgba(var(--accent),0.45)]"
       :class="{
         '[--accent:123,97,255]': card.id === 'query',
         '[--accent:245,158,11]': card.id === 'incident',
@@ -28,7 +28,7 @@ const emit = defineEmits<{ (e: "select", prompt: string): void }>();
       @keydown.space.prevent="emit('select', t(`aiAssistant.capabilities.${card.id}.prompt`))"
     >
       <span
-        class="capability-card__glow absolute [-inset-px] rounded-[inherit] bg-[linear-gradient(135deg,rgba(var(--accent),0.45),rgba(var(--accent),0.05)_60%)] opacity-0 transition-opacity duration-[250ms] ease-[ease] pointer-events-none z-[-1] blur-[8px] group-hover/card:opacity-100"
+        class="capability-card__glow absolute [-inset-px] rounded-xl bg-[linear-gradient(135deg,rgba(var(--accent),0.45),rgba(var(--accent),0.05)_60%)] opacity-0 transition-opacity duration-[250ms] ease-[ease] pointer-events-none z-[-1] blur-[8px] group-hover/card:opacity-100"
         aria-hidden="true"
       ></span>
       <div
@@ -55,19 +55,15 @@ const emit = defineEmits<{ (e: "select", prompt: string): void }>();
 
 <style scoped>
 /* keep(brand): decorative per-card accent gradient overlay driven by the
-   inline --accent channel triple; the accent-alpha idiom matches the
-   sibling glow/chevron elements and is not expressible as a design token. */
+   inline --accent channel triple (built in the template as the --card-tint
+   custom property so no colour literal lives in this block); the accent-alpha
+   idiom matches the sibling glow/chevron elements and is not a design token. */
 .capability-card::before {
   content: "";
   position: absolute;
   inset: 0;
   border-radius: inherit;
-  background: linear-gradient(
-    155deg,
-    rgba(var(--accent), 0.1) 0%,
-    rgba(var(--accent), 0.02) 40%,
-    transparent 70%
-  );
+  background: var(--card-tint);
   pointer-events: none;
   z-index: 0;
 }

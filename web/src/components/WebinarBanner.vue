@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -18,12 +18,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <!-- Header variant: w-full top bar above the toolbar -->
   <div
     v-if="webinarData && !isExpired && !isDismissed && variant === 'header'"
-    class="webinar-top-bar w-full bg-amber-400 text-[#1a1a1a]"
+    class="webinar-top-bar w-full bg-promo-webinar-accent text-promo-webinar-text"
     data-test="webinar-header-banner"
     role="banner"
   >
     <div class="webinar-top-bar-content flex items-center justify-center gap-2 py-[0.2rem] px-4 flex-wrap relative">
-      <span class="webinar-top-bar-text text-compact font-bold text-[#1a1a1a] text-center">
+      <span class="webinar-top-bar-text text-compact font-bold text-promo-webinar-text text-center">
         <strong>{{ webinarData.tag }}:</strong> {{ webinarData.title }}
         <span v-if="webinarData.date" class="webinar-top-bar-date font-medium">
           {{ formattedDate }}
@@ -35,13 +35,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :href="webinarData.primaryButton.link"
         target="_blank"
         rel="noopener noreferrer"
-        class="webinar-top-bar-link text-compact font-bold text-[#1e3a8a] underline whitespace-nowrap hover:text-[#1e40af]"
+        class="webinar-top-bar-link text-compact font-bold text-promo-webinar-link underline whitespace-nowrap hover:text-promo-webinar-link-hover"
         data-test="webinar-top-bar-register-link"
       >
         {{ webinarData.primaryButton.text }}
       </a>
 
-      <span class="webinar-top-bar-sep text-[#374151] font-normal opacity-60 select-none" aria-hidden="true">|</span>
+      <span class="webinar-top-bar-sep text-promo-webinar-sep font-normal opacity-60 select-none" aria-hidden="true">|</span>
 
       <OButton
         variant="webinar-dismiss"
@@ -174,14 +174,14 @@ onMounted(async () => {
     const json = await res.json();
     webinarData.value = json?.data ?? null;
   } catch {
-    // silently ignore — banner simply won't show
+    // silently ignore â€” banner simply won't show
   }
 });
 </script>
 
 <style scoped>
 /* keep(keyframes): the "live" badge dot pulse is used only by this banner. The
-   `animation` is declared here, not as a template `[animation:…]` utility, so
+   `animation` is declared here, not as a template `[animation:â€¦]` utility, so
    Vue's scoped compiler renames the keyframe and this reference together. */
 .webinar-home-badge-dot {
   animation: badge-pulse 1.8s ease-in-out infinite;

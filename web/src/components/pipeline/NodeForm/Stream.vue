@@ -111,8 +111,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="flex items-start gap-2">
                   <OIcon name="info" size="sm" class="shrink-0 mt-0.5 text-status-warning-text" />
                   <span>
-                    Use curly braces <span class="code [font-family:monospace] py-[1px] px-1 rounded-sm bg-code-bg text-code-text">{}</span> to configure stream name dynamically. e.g.
-                    <span class="code [font-family:monospace] py-[1px] px-1 rounded-sm bg-code-bg text-code-text">static_text_{fieldname}_postfix</span>. Static text before/after <span class="code [font-family:monospace] py-[1px] px-1 rounded-sm bg-code-bg text-code-text">{}</span> is optional
+                    Use curly braces <span class="code [font-family:monospace] py-px px-1 rounded-sm bg-code-bg text-code-text">{}</span> to configure stream name dynamically. e.g.
+                    <span class="code [font-family:monospace] py-px px-1 rounded-sm bg-code-bg text-code-text">static_text_{fieldname}_postfix</span>. Static text before/after <span class="code [font-family:monospace] py-px px-1 rounded-sm bg-code-bg text-code-text">{}</span> is optional
                   </span>
                 </div>
               </div>

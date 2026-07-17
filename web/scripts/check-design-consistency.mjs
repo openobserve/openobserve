@@ -83,7 +83,9 @@ const WHOLE = {
   // Requiring a trailing separator (space/quote/backtick/EOL) skips prose in
   // comments ("short, rounded, inset") and JS object keys (`rounded: "..."`).
   bareRounded: /(?:^|[\s"'`])rounded(?=[\s"'`]|$)/gm,
-  arbRadius: /rounded(?:-[a-z]+)*-\[[^\]]+\]/g,
+  // Arbitrary radius VALUE — but not a CSS keyword (`rounded-[inherit]` etc.),
+  // which is not a hardcoded dimension and has no scale-token equivalent.
+  arbRadius: /rounded(?:-[a-z]+)*-\[(?!(?:inherit|initial|unset|revert|revert-layer)\])[^\]]+\]/g,
   arbTextSize: /text-\[[0-9.]+(?:px|rem)\]/g,
   unscopedStyle: /<style(?![^>]*\bscoped\b)[^>]*>/g,
   twPrefix: /\btw:/g,

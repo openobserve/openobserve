@@ -238,7 +238,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       <div
                         style="font-size: 14px"
-                        class="font-bold text-gray-500 mb-2"
+                        class="font-bold text-text-secondary mb-2"
                       >
                         {{ t("reports.reportFormat") }}
                       </div>
@@ -311,7 +311,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             size="sm"
                             class="mr-1"
                           />
-                          <span class="font-bold text-gray-500">{{
+                          <span class="font-bold text-text-secondary">{{
                             t("reports.customDimensions")
                           }}</span>
                         </div>
@@ -346,7 +346,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             />
                           </div>
                           <div class="col-auto flex items-end">
-                            <div class="text-xs text-gray-400 pb-1">
+                            <div class="text-xs text-text-muted pb-1">
                               Leave blank to use server defaults
                             </div>
                           </div>
@@ -388,7 +388,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="my-2 px-2">
                   <div
                     style="font-size: 14px"
-                    class="font-bold text-gray-500 mb-2"
+                    class="font-bold text-text-secondary mb-2"
                   >
                     Frequency
                   </div>
@@ -416,12 +416,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         class="o2-input mr-2"
                         style="padding-top: 0; width: 320px"
                       >
-                        <div class="mb-1 font-bold text-gray-500">
+                        <div class="mb-1 font-bold text-text-secondary">
                           {{ t("reports.cronExpression") + " *" }}
                           <OIcon
                             name="info"
                             size="sm"
-                            class="ml-1 cursor-pointer text-gray-400"
+                            class="ml-1 cursor-pointer text-text-muted"
                           >
                             <OTooltip side="right" align="center">
                               <template #content><span style="font-size: 14px">
@@ -639,7 +639,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     />
                   </div>
                   <div data-test="add-report-share-message-section" class="pt-3">
-                    <div style="font-size: 14px" class="font-bold text-gray-500">
+                    <div style="font-size: 14px" class="font-bold text-text-secondary">
                       Message
                     </div>
 

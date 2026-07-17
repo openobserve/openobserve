@@ -1624,6 +1624,10 @@
   --color-promo-webinar-link-hover: var(--color-promo-webinar-link-hover);
   --color-promo-webinar-accent: var(--color-promo-webinar-accent);
   --color-promo-webinar-accent-text: var(--color-promo-webinar-accent-text);
+  --color-promo-webinar-text: var(--color-promo-webinar-text);
+  --color-promo-webinar-sep: var(--color-promo-webinar-sep);
+  --color-tool-thread-accent: var(--color-tool-thread-accent);
+  --color-tool-thread-accent-text: var(--color-tool-thread-accent-text);
   --color-section-accent-secondary: var(--color-section-accent-secondary);
   --color-bg-gray: var(--color-bg-gray);
   --color-cancel-query-bg: var(--color-cancel-query-bg);
