@@ -2099,6 +2099,51 @@ dependencies = [
 ]
 
 [[package]]
+name = "common"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "arrow-schema",
+ "axum",
+ "bytes",
+ "chrono",
+ "config",
+ "dashmap",
+ "expect-test",
+ "hashbrown 0.16.1",
+ "http 1.4.0",
+ "http-body-util",
+ "infra",
+ "jsonwebtoken",
+ "log",
+ "maxminddb",
+ "o2_dex",
+ "o2_enterprise",
+ "o2_openfga",
+ "openobserve-vrl",
+ "opentelemetry",
+ "parking_lot 0.12.5",
+ "prost 0.14.3",
+ "regex",
+ "reqwest 0.13.2",
+ "rquickjs",
+ "segment",
+ "serde",
+ "serde_json",
+ "snap",
+ "strum 0.28.0",
+ "thiserror 2.0.18",
+ "time",
+ "tokio",
+ "tonic",
+ "tracing",
+ "tracing-opentelemetry",
+ "uaparser",
+ "url",
+ "utoipa",
+]
+
+[[package]]
 name = "community-id"
 version = "0.2.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6680,51 +6725,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "openobserve-common"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "arrow-schema",
- "axum",
- "bytes",
- "chrono",
- "config",
- "dashmap",
- "expect-test",
- "hashbrown 0.16.1",
- "http 1.4.0",
- "http-body-util",
- "infra",
- "jsonwebtoken",
- "log",
- "maxminddb",
- "o2_dex",
- "o2_enterprise",
- "o2_openfga",
- "openobserve-vrl",
- "opentelemetry",
- "parking_lot 0.12.5",
- "prost 0.14.3",
- "regex",
- "reqwest 0.13.2",
- "rquickjs",
- "segment",
- "serde",
- "serde_json",
- "snap",
- "strum 0.28.0",
- "thiserror 2.0.18",
- "time",
- "tokio",
- "tonic",
- "tracing",
- "tracing-opentelemetry",
- "uaparser",
- "url",
- "utoipa",
-]
-
-[[package]]
 name = "openobserve-core"
 version = "0.1.0"
 dependencies = [
@@ -6742,6 +6742,7 @@ dependencies = [
  "bytes",
  "chromiumoxide",
  "chrono",
+ "common",
  "config",
  "cron",
  "csv",
@@ -6772,7 +6773,6 @@ dependencies = [
  "o2_enterprise",
  "o2_openfga",
  "object_store",
- "openobserve-common",
  "openobserve-vrl",
  "opentelemetry",
  "opentelemetry-proto",
