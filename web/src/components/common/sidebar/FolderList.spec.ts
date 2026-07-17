@@ -205,6 +205,31 @@ describe('FolderList.vue', () => {
       // Component emits update:activeFolderId on initialization, so we check it exists
       expect(wrapper.emitted('update:activeFolderId')).toBeTruthy()
     })
+
+    it('re-emits update:activeFolderId when the ALREADY-ACTIVE folder is clicked', async () => {
+      // The v-model watcher only fires on change, so without the explicit
+      // click re-emit a click on the active tab would be silent — and the
+      // dashboards favorites view could never react to it.
+      expect(wrapper.vm.activeFolderId).toBe('default')
+      const before = wrapper.emitted('update:activeFolderId')?.length ?? 0
+
+      await wrapper
+        .find('[data-test="dashboard-folder-tab-default"]')
+        .trigger('click')
+
+      const events = wrapper.emitted('update:activeFolderId') ?? []
+      expect(events.length).toBeGreaterThan(before)
+      expect(events[events.length - 1]).toEqual(['default'])
+    })
+
+    it('does not re-emit from a click on a NON-active tab (change path owns that)', async () => {
+      // The click re-emit is only for the already-active tab; a different tab
+      // emits via the v-model watcher (covered by the watcher tests below),
+      // so the click handler itself must stay silent for it.
+      const before = wrapper.emitted('update:activeFolderId')?.length ?? 0
+      wrapper.vm.onTabClick('folder1') // not the active folder
+      expect(wrapper.emitted('update:activeFolderId')?.length ?? 0).toBe(before)
+    })
   })
 
   describe('Component Props', () => {

@@ -57,6 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :name="tab.folderId"
           class="test-class min-h-[1.5rem]"
           :data-test="`dashboard-folder-tab-${tab.folderId}`"
+          @click="onTabClick(tab.folderId)"
           >
           <div class="folder-item w-full flex items-center justify-between flex-nowrap gap-2 min-h-6 group/row" :data-test="`dashboard-folder-tab-name-${tab.name}`">
               <span class="folder-name flex-1 min-w-0 text-left truncate" :title="tab.name" :data-test="`dashboard-folder-name-${tab.name}`">{{
@@ -292,6 +293,16 @@ export default defineComponent({
       emit("update:activeFolderId", newVal);
     })
 
+    // The v-model watcher above only fires on CHANGE. Clicking the folder that
+    // is already active must still notify the parent (e.g. the dashboards list
+    // leaves its favorites view on any folder pick), so re-emit for that case.
+    // Consumers treat the event as idempotent.
+    const onTabClick = (folderId: string) => {
+      if (folderId === activeFolderId.value) {
+        emit("update:activeFolderId", folderId);
+      }
+    };
+
     const filteredTabs = computed(() => {
       if(!searchQuery.value || searchQuery.value == ""){
         return store.state.organizationData.foldersByType[props.type]
@@ -320,6 +331,7 @@ export default defineComponent({
         editFolder,
         filteredTabs,
         searchQuery,
+        onTabClick,
 
       };
     },
