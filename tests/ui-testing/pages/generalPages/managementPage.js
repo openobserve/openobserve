@@ -34,8 +34,13 @@ export
     await this.page.waitForSelector("[name ='home']");
     await this.homeIcon.hover();
     await this.page.waitForSelector('[data-test="menu-link-/settings-item"]');
-        await this.managementMenuItem.click({ force: true });
-        await expect(this.page.getByRole('main')).toContainText('General Settings');
+        // Under parallel-worker load the first settings click can land before
+        // the nav is interactive and not navigate (page stays on search). Retry
+        // the click until the settings page actually renders.
+        await expect(async () => {
+            await this.managementMenuItem.click({ force: true });
+            await expect(this.page.getByRole('main')).toContainText('General Settings', { timeout: 5000 });
+        }).toPass({ timeout: 30000 });
     }
 
     async managementPageDefaultMultiOrg() {

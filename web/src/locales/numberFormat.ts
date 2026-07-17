@@ -16,7 +16,7 @@
 import { getLanguage } from "@/utils/cookies";
 
 // App language codes are not all valid BCP-47, so map them for Intl.NumberFormat.
-const APP_LOCALE_TO_BCP47: Record<string, string> = {
+export const APP_LOCALE_TO_BCP47: Record<string, string> = {
   "en-gb": "en-GB",
   "tr-turk": "tr-TR",
   "zh-cn": "zh-CN",

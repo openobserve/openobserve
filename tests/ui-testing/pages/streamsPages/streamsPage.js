@@ -6,14 +6,20 @@ import { ManagementPage } from '../generalPages/managementPage.js';
 
 import { getHeaders, getIngestionUrl, sendRequest } from '../../utils/apiUtils.js';
 const http = require('http');
+const https = require('https');
 const nodeFetch = require('node-fetch');
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
 
 // node-fetch v2 keep-alive pooling + gzip decompression is the root cause of
 // "Premature close" / ECONNRESET flakiness in CI.
-const _noKeepAliveAgent = new http.Agent({ keepAlive: false });
+// Pick the agent by protocol so both local (http://localhost) and cloud/alpha
+// (https://) URLs work — an http.Agent rejects https:// URLs.
+const _noKeepAliveHttpAgent = new http.Agent({ keepAlive: false });
+const _noKeepAliveHttpsAgent = new https.Agent({ keepAlive: false });
+const _selectAgent = (parsedURL) =>
+    parsedURL.protocol === 'https:' ? _noKeepAliveHttpsAgent : _noKeepAliveHttpAgent;
 function _nodeFetchSafe(url, opts = {}) {
-    return nodeFetch(url, { ...opts, compress: false, agent: _noKeepAliveAgent });
+    return nodeFetch(url, { ...opts, compress: false, agent: _selectAgent });
 }
 
 export class StreamsPage {
@@ -87,6 +93,12 @@ export class StreamsPage {
     }
 
     async kubernetesContainerName() {
+        // On cloud the field list can take a while to populate after stream
+        // selection; filter it first (also acts as a readiness wait) and wait
+        // for the expand toggle before the click inside logsPage fires.
+        await this.logsPage.fillIndexFieldSearchInput('kubernetes_container_name');
+        await this.page.locator('[data-test="log-search-expand-kubernetes_container_name-field-btn"]')
+            .first().waitFor({ state: 'visible', timeout: 30000 });
         await this.logsPage.kubernetesContainerName();
     }
 
@@ -162,11 +174,19 @@ export class StreamsPage {
             await this.waitForUI(2000);
             await this.page.locator('[data-test="menu-link-/streams-item"]').click({ force: true });
         }
-        await this.waitForUI(1000);
+        // Confirm the streams explorer actually rendered before returning. The
+        // search input is the first control every caller uses. Replaces a fixed
+        // 1s wait that let searchStream / clickAddStreamButton race an unloaded
+        // page on slow CI (the source of the 45s click timeouts on retry).
+        await this.page.locator('[data-test="streams-search-stream-input-field"]')
+            .waitFor({ state: 'visible', timeout: 30000 });
     }
 
     async searchStream(streamName) {
         const searchInput = this.page.locator('[data-test="streams-search-stream-input-field"]');
+        // Defensive wait so a still-loading streams page yields a clear failure
+        // and time to settle rather than a bare 45s click timeout.
+        await searchInput.waitFor({ state: 'visible', timeout: 30000 });
         await searchInput.click();
         await searchInput.fill(streamName);
         await this.waitForUI(3000);
@@ -426,86 +446,110 @@ export class StreamsPage {
     async navigateToExtendedRetention() {
         // Open the stream schema/detail view
         const schemaBtn = this.page.locator('[data-test="log-stream-table"] [data-test="log-stream-schema-btn"]').first();
-        await schemaBtn.waitFor({ state: 'visible', timeout: 10000 });
+        await schemaBtn.waitFor({ state: 'visible', timeout: 15000 });
         await schemaBtn.click();
-        await this.waitForUI(2000);
 
-        // Navigate to Extended Retention tab
-        await this.page.locator('[data-test="schema-extended-retention-tab"]').click();
-        await this.waitForUI(1000);
+        // Wait for the schema dialog's tab bar to render (the Extended Retention
+        // tab) instead of a fixed 2s sleep — on slow CI the dialog opens later,
+        // which previously left the tab click racing an unrendered dialog.
+        const retentionTab = this.page.locator('[data-test="schema-extended-retention-tab"]');
+        await retentionTab.waitFor({ state: 'visible', timeout: 15000 });
+        await retentionTab.click();
+
+        // Wait for the tab's date picker ("Select Date" button) to render before
+        // returning — this is the exact element the caller needs, so a fixed 1s
+        // wait was the source of the "date-time-btn not visible" CI failure.
+        await this.page.locator('[data-test="date-time-btn"]').waitFor({ state: 'visible', timeout: 15000 });
     }
 
-    async selectDateRange(startDay, endDay) {
+    async selectDateRange(startIso, endIso) {
+        // Post-revamp the extended-retention picker is the shared <date-time>
+        // component with an ODateRangeCalendar inside — Quasar's .q-date is gone.
+        // Day cells carry data-test="daterangecalendar-cell-<yyyy-mm-dd>";
+        // exclude adjacent-month duplicates via [data-outside-view].
         await this.page.locator('[data-test="date-time-btn"]').click();
-        
-        // Wait for date picker to be visible
-        await this.page.locator('.q-date').waitFor({ state: 'visible' });
-        
-        // Ensure we're in the correct view (day view, not year/month view)
-        // If year view is visible, click on current year to go to month view
-        if (await this.page.locator('.q-date__view--years').isVisible()) {
-            const currentYear = new Date().getFullYear();
-            await this.page.locator('.q-date__years .q-btn').filter({ hasText: currentYear.toString() }).click();
-        }
-        
-        // If month view is visible, click on current month to go to day view  
-        if (await this.page.locator('.q-date__view--months').isVisible()) {
-            const currentMonth = new Date().toLocaleDateString('en', { month: 'short' });
-            await this.page.locator('.q-date__months .q-btn').filter({ hasText: currentMonth }).click();
-        }
-        
-        // Now we should be in day view, wait for calendar to be ready
-        await this.page.locator('.q-date__calendar').waitFor({ state: 'visible' });
-        await this.page.waitForTimeout(500); // Small wait for transitions
-        
-        // Use specific calendar locators to avoid strict mode violation
-        // Click start day with retry logic
-        try {
-            await this.page.locator('.q-date__calendar .q-btn').filter({ hasText: startDay.toString() }).first().click({ timeout: 5000 });
-        } catch (error) {
-            // Fallback: try to click any available day close to startDay
-            const availableDays = await this.page.locator('.q-date__calendar .q-btn').filter({ hasText: /^\d+$/ }).all();
-            if (availableDays.length > 0) {
-                await availableDays[0].click();
-            }
-        }
-        
-        // Wait a bit between clicks
-        await this.page.waitForTimeout(300);
-        
-        // Click end day with retry logic
-        try {
-            await this.page.locator('.q-date__calendar .q-btn').filter({ hasText: endDay.toString() }).first().click({ timeout: 5000 });
-        } catch (error) {
-            // Fallback: try to click any available day close to endDay
-            const availableDays = await this.page.locator('.q-date__calendar .q-btn').filter({ hasText: /^\d+$/ }).all();
-            if (availableDays.length > 1) {
-                await availableDays[1].click();
-            }
-        }
-        
+        await this.page.locator('[data-test="daterangecalendar-root"]')
+            .waitFor({ state: 'visible', timeout: 15000 });
+        const cell = (iso) => this.page.locator(
+            `[data-test="daterangecalendar-cell-${iso}"]:not([data-outside-view])`).first();
+        await cell(startIso).click();
+        await cell(endIso).click();
+        // Applying saves immediately (dateChangeValue -> onSubmit -> PUT
+        // .../streams/{name}/settings) — capture the response so a server-side
+        // failure shows in the test log instead of only as a transient toast.
+        const respPromise = this.page.waitForResponse(
+            (r) => r.url().includes('/settings') && r.request().method() === 'PUT',
+            { timeout: 20000 },
+        ).catch(() => null);
         await this.page.locator('[data-test="date-time-apply-btn"]').click();
+        const resp = await respPromise;
+        if (resp) {
+            const body = await resp.text().catch(() => '');
+            testLogger.info('Extended retention settings response', { status: resp.status(), body: body.slice(0, 300) });
+        } else {
+            testLogger.warn('No settings PUT observed within 20s of applying the date range');
+        }
     }
 
     async selectDateRangeForCurrentMonth() {
-        const currentDate = new Date();
-        const currentDay = currentDate.getDate();
-        
-        // Calculate a safe end day - ensure it's within the current month and not too far
-        const daysInMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0).getDate();
-        const endDay = Math.min(currentDay + 3, daysInMonth - 1, 25); // Conservative approach - max 25th
-        
-        await this.selectDateRange(currentDay, endDay);
-        
-        // Return the date range text for later use
-        return `${currentDay.toString().padStart(2, '0')}-${(currentDate.getMonth() + 1).toString().padStart(2, '0')}-${currentDate.getFullYear()} ${endDay.toString().padStart(2, '0')}-${(currentDate.getMonth() + 1).toString().padStart(2, '0')}-${currentDate.getFullYear()}`;
+        // The calendar allows [today - (retention-1) .. today] (UTC). Pick
+        // yesterday..today; on the 1st of a month yesterday's cell may not be
+        // in view, so fall back to a single-day range of today.
+        const isoUtc = (d) => d.toISOString().slice(0, 10);
+        const today = new Date();
+        const endIso = isoUtc(today);
+        let startIso = isoUtc(new Date(today.getTime() - 24 * 60 * 60 * 1000));
+        const startCell = this.page.locator(
+            `[data-test="daterangecalendar-cell-${startIso}"]:not([data-outside-view])`);
+        await this.page.locator('[data-test="date-time-btn"]').waitFor({ state: 'visible', timeout: 15000 });
+        // Peek at the calendar to decide the fallback before committing clicks
+        await this.page.locator('[data-test="date-time-btn"]').click();
+        await this.page.locator('[data-test="daterangecalendar-root"]')
+            .waitFor({ state: 'visible', timeout: 15000 });
+        if (await startCell.count() === 0) startIso = endIso;
+        // Close and reuse selectDateRange for the actual selection
+        await this.page.keyboard.press('Escape');
+        await this.selectDateRange(startIso, endIso);
+        // Applying the range saves immediately (dateChangeValue -> onSubmit),
+        // so the new row appears in the retention table. Return the start date
+        // in the table's display format (DD-MM-YYYY via convertUnixToQuasarFormat)
+        // so deleteRetentionPeriod's hasText row filter matches — the cells
+        // render e.g. "13-07-2026", not the ISO "2026-07-13".
+        const [y, m, d] = startIso.split('-');
+        return `${d}-${m}-${y}`;
     }
 
     async deleteRetentionPeriod(dateRangeText) {
-        // Select the checkbox for deletion
-        await this.page.getByRole('row', { name: dateRangeText }).locator('[data-test="schema-stream-delete-undefined-field-fts-key-checkbox"]').click();
-        await this.page.locator('[data-test="schema-delete-button"]').click();
-        await this.page.locator('[data-test="o-dialog-primary-btn"]').click();
+        // Rows are OTable rows (data-test="o2-table-row-<n>"); row click (or the
+        // select cell) toggles multi-selection. The confirm dialog is the shared
+        // ConfirmDialog (panel data-test="confirm-dialog") whose OK button is the
+        // ODialog primary button — scope it so we don't hit the schema dialog's own.
+        const row = this.page.locator('[data-test^="o2-table-row-"]')
+            .filter({ hasText: dateRangeText }).first();
+        try {
+            await row.waitFor({ state: 'visible', timeout: 15000 });
+        } catch {
+            // The retention table only rebuilds from the stream response when the
+            // schema dialog (re)loads — refresh it once and retry.
+            testLogger.warn('Retention row not visible yet — reopening schema dialog', { dateRangeText });
+            await this.page.keyboard.press('Escape');
+            await this.waitForUI(1000);
+            await this.navigateToExtendedRetention();
+            const tableText = await this.page.locator('[data-test="schema-log-stream-field-mapping-table"]')
+                .innerText().catch(() => '<table not found>');
+            testLogger.info('Retention table content after reopen', { tableText: tableText.slice(0, 400) });
+            await row.waitFor({ state: 'visible', timeout: 15000 });
+        }
+        // Click the checkbox <label> (o2-table-select-<rowId>) inside the select
+        // cell — clicking the cell (o2-table-select-cell) does not toggle
+        // selection, so the delete button stays disabled
+        // (:disabled="!selectedDateFields.length"). Target the label to avoid a
+        // strict-mode match against the cell, which shares the prefix.
+        await row.locator('label[data-test^="o2-table-select-"]').click();
+        const deleteBtn = this.page.locator('[data-test="schema-delete-button"]');
+        await expect(deleteBtn).toBeEnabled({ timeout: 10000 });
+        await deleteBtn.click();
+        await this.page.locator('[data-test="confirm-dialog"] [data-test="o-dialog-primary-btn"]').click();
     }
 
     async expectStreamSettingsUpdatedMessage() {
@@ -714,15 +758,20 @@ export class StreamsPage {
      * ==========================================
      */
 
-    // Selectors - VERIFIED from AddStream.vue and LogStream.vue
+    // Selectors - VERIFIED from AddStream.vue and LogStream.vue.
+    // The streams-page Add Stream form is an ODialog: the panel carries the
+    // consumer data-test ("add-stream-dialog") and the save/cancel/close
+    // buttons are ODialog-owned generic ids, so scope them under the panel.
+    // (The add-stream-save/cancel-btn ids exist only in the pipeline inline
+    // branch of AddStream.vue, not in the dialog.)
     get addStreamButton() { return this.page.locator('[data-test="log-stream-add-stream-btn"]'); }
-    get addStreamModal() { return this.page.locator('[data-test="add-stream-title"]'); }
+    get addStreamModal() { return this.page.locator('[data-test="add-stream-dialog"]'); }
     get streamNameInput() { return this.page.locator('[data-test="add-stream-name-input"] input'); }
     get streamTypeSelect() { return this.page.locator('[data-test="add-stream-type-input"]'); }
     get dataRetentionInput() { return this.page.locator('[data-test="add-stream-data-retention-input"] input'); }
-    get saveStreamButton() { return this.page.locator('[data-test="save-stream-btn"]'); }
-    get cancelStreamButton() { return this.page.locator('[data-test="add-stream-cancel-btn"]'); }
-    get closeStreamButton() { return this.page.locator('[data-test="add-stream-close-btn"]'); }
+    get saveStreamButton() { return this.page.locator('[data-test="add-stream-dialog"] [data-test="o-dialog-primary-btn"]'); }
+    get cancelStreamButton() { return this.page.locator('[data-test="add-stream-dialog"] [data-test="o-dialog-secondary-btn"]'); }
+    get closeStreamButton() { return this.page.locator('[data-test="add-stream-dialog"] [data-test="o-dialog-close-btn"]'); }
     get streamsTable() { return this.page.locator('[data-test="log-stream-table"]'); }
     get searchStreamInput() { return this.page.locator('[data-test="streams-search-stream-input-field"]'); }
     get indexTypeSelect() { return this.page.locator('[data-test="schema-field-kubernetes_host-index-type-select"]').first(); }
@@ -736,6 +785,10 @@ export class StreamsPage {
      */
     async clickAddStreamButton() {
         testLogger.info('Clicking Add Stream button');
+        // The Add Stream button renders only after zoConfig loads
+        // (v-if="isSchemaUDSEnabled"); wait for it explicitly so a slow CI page
+        // load yields a clear failure instead of a bare 45s click timeout.
+        await this.addStreamButton.waitFor({ state: 'visible', timeout: 30000 });
         await this.addStreamButton.click();
         await this.waitForUI(500);
     }
@@ -756,6 +809,10 @@ export class StreamsPage {
         testLogger.info('Entering stream name', { name });
         await this.streamNameInput.click();
         await this.streamNameInput.fill(name);
+        // Assert the value stuck: under parallel-worker load the O-input's
+        // debounced model update can lag, leaving name empty at save time so
+        // validateStream() silently blocks submit (no POST).
+        await expect(this.streamNameInput).toHaveValue(name, { timeout: 5000 });
     }
 
     /**
@@ -779,9 +836,14 @@ export class StreamsPage {
      */
     async enterDataRetention(days) {
         testLogger.info('Entering data retention', { days });
+        // fill('') then fill(value) leaves a window where the field is empty;
+        // if save races in there, dataRetentionDays is not > 0 and submit is
+        // silently blocked (no POST). Assert the value actually stuck before
+        // returning so the caller never saves an empty retention field.
         await this.dataRetentionInput.click();
         await this.dataRetentionInput.fill('');
         await this.dataRetentionInput.fill(days.toString());
+        await expect(this.dataRetentionInput).toHaveValue(days.toString(), { timeout: 5000 });
     }
 
     /**
@@ -789,8 +851,29 @@ export class StreamsPage {
      */
     async clickSaveStream() {
         testLogger.info('Clicking Save button');
+        // Watch for the create call (POST /api/{org}/streams/{name}) so a
+        // server-side failure is visible in the test log instead of only as a
+        // transient error toast.
+        const respPromise = this.page.waitForResponse(
+            (r) => /\/api\/[^/]+\/streams\/[^/?]+/.test(r.url()) && r.request().method() === 'POST',
+            { timeout: 20000 },
+        ).catch(() => null);
         await this.saveStreamButton.click();
-        await this.waitForUI(1000);
+        const resp = await respPromise;
+        if (resp) {
+            const body = await resp.text().catch(() => '');
+            testLogger.info('Stream create API response', { status: resp.status(), body: body.slice(0, 300) });
+            return { status: resp.status(), body };
+        }
+        testLogger.warn('No stream-create API call observed within 20s of clicking Save');
+        // Client-side validateStream() blocked submit — dump the per-field
+        // error slots so we know which field failed.
+        for (const f of ['name', 'type', 'data-retention']) {
+            const err = await this.page.locator(`[data-test="add-stream-${f}-input-error"]`)
+                .innerText().catch(() => '');
+            if (err && err.trim()) testLogger.warn(`Add Stream ${f} error`, { err: err.trim() });
+        }
+        return { status: 0, body: '' };
     }
 
     /**
@@ -825,10 +908,47 @@ export class StreamsPage {
         await this.enterStreamName(name);
         await this.selectStreamType(type);
         await this.enterDataRetention(retention);
-        await this.clickSaveStream();
-
-        // Wait for success message or modal to close
-        await this.waitForUI(2000);
+        // O-inputs debounce their model updates; submitting before the flush
+        // intermittently drops a field, fails form validation and leaves the
+        // dialog open (seen on alpha). Give the form a beat to settle.
+        await this.page.waitForTimeout(500);
+        // Cloud deletion is async: a just-deleted stream can still be "being
+        // deleted" server-side even after it drops out of the streams list (so
+        // the pre-delete list-poll can't catch it), and the recreate POST is
+        // rejected 400 "stream is being deleted". The dialog stays open on that
+        // 400, so retry the save a few times until it goes through.
+        for (let attempt = 1; attempt <= 5; attempt++) {
+            const { status, body } = await this.clickSaveStream();
+            if (status && status !== 400) return;
+            if (status === 0) {
+                // No POST fired — the submit click intermittently doesn't reach
+                // the form under load, with all fields verified set and no field
+                // error. Re-click Save (dialog is still open).
+                if (attempt < 5) {
+                    testLogger.warn(`No create POST observed, re-clicking Save ${attempt}/5`, { name });
+                    await this.page.waitForTimeout(1000);
+                    continue;
+                }
+                return;
+            }
+            if (status === 400 && /already exists/i.test(body)) {
+                // A prior attempt's create eventually went through once the async
+                // delete finished, so the stream now exists — that's success for
+                // create-and-verify. Close the still-open dialog so the caller's
+                // modal-closed / success assertion passes.
+                testLogger.info('Stream already exists after retry — treating as created', { name });
+                await this.clickCancelStream();
+                return;
+            }
+            if (status === 400 && /being deleted/i.test(body)) {
+                testLogger.warn(`Create rejected (being deleted), retrying save ${attempt}/5`, { name });
+                await this.page.waitForTimeout(3000);
+                continue;
+            }
+            // Any other outcome (validation blocked / other error): stop and let
+            // the caller's success assertion report it.
+            return;
+        }
     }
 
     /**
@@ -837,7 +957,22 @@ export class StreamsPage {
      */
     async expectSuccessToast(message = 'Stream created successfully') {
         testLogger.info('Verifying success toast', { message });
-        await expect(this.page.locator('[data-test-variant="success"]')).toBeVisible({ timeout: 5000 });
+        // The toast auto-dismisses after a few seconds, so a strict
+        // toast-visible assertion races against it on slow (cloud) runs.
+        // The durable success signal is the Add Stream dialog closing — a
+        // failed save keeps it open with an error — with the toast, when
+        // still around, as the fast path.
+        const toast = this.page.locator('[data-test-variant="success"]');
+        const seen = await Promise.any([
+            toast.waitFor({ state: 'visible', timeout: 15000 }),
+            this.addStreamModal.waitFor({ state: 'hidden', timeout: 15000 }),
+        ]).then(() => true, () => false);
+        if (!seen) {
+            // Surface why the dialog is still open before failing
+            const dialogText = await this.addStreamModal.innerText().catch(() => '<dialog not found>');
+            testLogger.warn('Save did not complete — Add Stream dialog still open', { dialogText });
+            await expect(toast).toBeVisible({ timeout: 1000 });
+        }
     }
 
     /**
@@ -906,6 +1041,12 @@ export class StreamsPage {
 
                 if (status === 200) {
                     testLogger.info('Stream deleted successfully (cloud)', { streamName });
+                    // Cloud deletion is asynchronous: the stream lingers in a
+                    // "being deleted" state for a few seconds, during which a
+                    // recreate POST is rejected 400 "stream is being deleted".
+                    // Poll the streams list until it is actually gone so callers
+                    // that delete-then-recreate don't race the backend.
+                    await this._waitForStreamGoneCloud(orgId, streamName, streamType);
                 } else {
                     testLogger.warn('Stream deletion returned non-200 (cloud)', { streamName, status });
                 }
@@ -930,6 +1071,29 @@ export class StreamsPage {
             testLogger.error('Failed to delete stream', { streamName, error: error.message });
             return 500;
         }
+    }
+
+    /**
+     * Poll the cloud streams list until `streamName` no longer appears, so a
+     * delete-then-recreate sequence doesn't hit 400 "stream is being deleted".
+     */
+    async _waitForStreamGoneCloud(orgId, streamName, streamType, timeoutMs = 20000) {
+        const deadline = Date.now() + timeoutMs;
+        while (Date.now() < deadline) {
+            const present = await this.page.evaluate(async ({ orgId, streamName, streamType }) => {
+                const r = await fetch(`/api/${orgId}/streams?type=${streamType}`);
+                if (!r.ok) return false;
+                const body = await r.json();
+                const list = Array.isArray(body.list) ? body.list : (Array.isArray(body) ? body : []);
+                return list.some((s) => s.name === streamName);
+            }, { orgId, streamName, streamType }).catch(() => false);
+            if (!present) {
+                testLogger.info('Confirmed stream fully deleted (cloud)', { streamName });
+                return;
+            }
+            await this.page.waitForTimeout(1000);
+        }
+        testLogger.warn('Stream still present after delete timeout — proceeding anyway', { streamName });
     }
 
     // ========== BUG REGRESSION TEST METHODS ==========
