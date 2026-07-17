@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       'o2-scroll-container rounded-none! overflow-x-auto relative',
       !props.scrollEl ? 'table-container' : '',
     ]"
-    style="color: var(--color-text-body)"
+    class="text-text-body"
   >
     <!-- Top progress bar: keeps rows visible while a new result set streams in
       (e.g. streaming_aggs replacing values). Same component dashboard panels
@@ -48,8 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       }"
     >
       <thead
-        class="sticky top-0 z-10"
-        style="max-height: 44px"
+        class="sticky top-0 z-10 max-h-11"
         v-for="headerGroup in table.getHeaderGroups()"
         :key="headerGroup.id"
       >
@@ -171,8 +170,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <tr v-if="!loading && errMsg != ''" class="w-full">
           <td
             :colspan="columnOrder.length"
-            class="font-bold"
-            style="opacity: 0.7"
+            class="font-bold opacity-70"
           >
             <div class="text-sm font-medium font-bold bg-warning">
               <OIcon size="xs"
@@ -188,8 +186,7 @@ class="mr-1" />
         >
           <td
             :colspan="columnOrder.length"
-            class="font-bold"
-            style="opacity: 0.6"
+            class="font-bold opacity-60"
           >
             <div
               class="text-sm font-medium font-bold pl-2 bg-status-warning-bg"
@@ -211,8 +208,7 @@ class="mr-1" />
         <tr v-if="functionErrorMsg != '' && isFunctionErrorOpen">
           <td
             :colspan="columnOrder.length"
-            style="opacity: 0.7"
-            class="px-2 bg-status-warning-bg"
+            class="opacity-70 px-2 bg-status-warning-bg"
           >
             <pre>{{ functionErrorMsg }}</pre>
           </td>
@@ -232,7 +228,7 @@ class="mr-1" />
         <tr
           v-for="r in SKEL_ROW_COUNT"
           :key="`skel-${r}`"
-          class="logs-skel-row flex items-center w-full opacity-0 h-[29px] bg-log-table-row-bg border-b border-log-table-row-border"
+          class="logs-skel-row flex items-center w-full opacity-0 h-[1.8125rem] bg-log-table-row-bg border-b border-log-table-row-border"
           :style="{ animationDelay: `${(r - 1) * 40}ms` }"
         >
           <!-- No columns loaded yet (first page load) — full-width shimmer bar -->
@@ -297,7 +293,7 @@ class="mr-1" />
             "
             :ref="(node: any) => node && rowVirtualizer.measureElement(node)"
             :class="[
-              'absolute flex w-max items-center justify-start border-b-[1px]',
+              'absolute flex w-max items-center justify-start border-b',
               !(formattedRows[virtualRow.index]?.original as any)?.isExpandedRow
                 ? 'cursor-pointer'
                 : 'cursor-default',
@@ -1253,33 +1249,13 @@ defineExpose({
 </script>
 <style>
 @import "@/assets/styles/log-highlighting.css";
-</style>
-<style>
 
-/* Compact expand/collapse button for log rows — matches original q-btn dense size="xs" flat */
-.log-row-expand-btn {
-  height: 1.25rem !important;
-  width: 1.25rem !important;
-  min-height: 1.25rem !important;
-  min-width: 1.25rem !important;
-  padding: 0 !important;
-  vertical-align: middle !important;
-}
-
-.log-row-expand-btn svg {
-  width: 0.75rem !important;
-  height: 0.75rem !important;
-}
-
-.table-row-hover:hover,
-.table-row-focus:focus-visible {
-  background-color: var(--color-log-table-row-hover) !important;
-  box-shadow: inset 3px 0 0 var(--color-accent) !important;
-}
-
-/* Fix: OButton base class (relative) overrides absolute passed via props.
+/* cross-file global: .ai-btn is also consumed by components/TenstackTable.vue and
+   redefined in styles/utilities.css, so these three rules must stay unscoped —
+   scoping them would silently drop the styling on the other table.
+   Fix: OButton's base class (relative) overrides the absolute passed via props.
    Use top:0 + translate:-50% 0 to anchor the button flush with the row top,
-   and height:100% to fill the td height (= row height minus 1px border).
+   and height:100% to fill the td height (= row height minus the border).
    Overriding the CSS `translate` property (not `transform`) is required because
    Tailwind v4 sets -translate-y-1/2 via the CSS `translate` shorthand property. */
 .ai-btn {
@@ -1303,32 +1279,55 @@ defineExpose({
 .ai-btn:hover {
   box-shadow: none !important;
 }
+</style>
+
+<style scoped>
+/* keep(lib-override:monaco) does not apply here; the keepers below are:
+   keep(complex-state) — .table-row-hover/.table-row-focus drive the virtualized
+   row background+inset marker off :hover/:focus-visible on rows that the
+   virtualizer positions absolutely; expressing them as utilities would mean
+   editing every recycled row node.
+   keep(keyframes) — the skeleton shimmer/entrance animations are referenced only
+   from CSS in this block, so Vue's scoped @keyframes renaming stays consistent. */
+
+/* Compact expand/collapse button for log rows — matches the original dense xs flat button */
+.log-row-expand-btn {
+  height: 1.25rem !important;
+  width: 1.25rem !important;
+  min-height: 1.25rem !important;
+  min-width: 1.25rem !important;
+  padding: 0 !important;
+  vertical-align: middle !important;
+}
+
+/* svg is rendered inside OButton's own template, so it needs :deep() */
+.log-row-expand-btn :deep(svg) {
+  width: 0.75rem !important;
+  height: 0.75rem !important;
+}
+
+.table-row-hover:hover,
+.table-row-focus:focus-visible {
+  background-color: var(--color-log-table-row-hover) !important;
+  box-shadow: inset 0.1875rem 0 0 var(--color-accent) !important;
+}
 
 /* ── Loading skeleton ───────────────────────────────────────────── */
 .logs-skel-row {
   animation: logs-skel-row-in 320ms ease-out forwards;
 }
 
-/* Light mode — matches histogram-skeleton --hsk-bar (grey-100 #f5f5f5) */
+/* Token-backed shimmer: --color-skeleton-* already flip with the theme, which
+   replaces the former light/dark raw-palette pair. */
 .logs-skel-pill {
   background: linear-gradient(
     90deg,
-    var(--color-grey-100)       0%,
-    rgba(255, 255, 255, 0.65)   50%,
-    var(--color-grey-100)       100%
+    var(--color-skeleton-base)      0%,
+    var(--color-skeleton-highlight) 50%,
+    var(--color-skeleton-base)      100%
   );
   background-size: 200% 100%;
   animation: logs-skel-shimmer 1.5s ease-in-out infinite;
-}
-
-/* Dark mode — matches histogram-skeleton dark --hsk-bar (grey-600 #525252) */
-.dark .logs-skel-pill {
-  background: linear-gradient(
-    90deg,
-    var(--color-grey-600)       0%,
-    rgba(255, 255, 255, 0.03)   50%,
-    var(--color-grey-600)       100%
-  );
 }
 
 @keyframes logs-skel-shimmer {
@@ -1337,7 +1336,7 @@ defineExpose({
 }
 
 @keyframes logs-skel-row-in {
-  from { opacity: 0; transform: translateY(2px); }
+  from { opacity: 0; transform: translateY(0.125rem); }
   to   { opacity: 1; transform: translateY(0); }
 }
 

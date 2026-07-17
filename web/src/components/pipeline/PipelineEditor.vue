@@ -71,7 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="nodes-drag-container pr-3 w-50">
           <div
             data-test="pipeline-editor-nodes-list-title"
-            class="nodes-header mb-2 mx-2 text-base font-semibold px-1 pb-2 text-center border-b-2 tracking-wide relative text-text-heading border-border-default"
+            class="mb-2 mx-2 text-base font-semibold px-1 pb-2 text-center border-b-2 tracking-wide relative text-text-heading border-border-default after:content-[''] after:absolute after:-bottom-0.5 after:left-0 after:w-full after:h-0.5 after:bg-accent after:rounded-full"
           >
             {{ t("pipeline.nodes") }}
           </div>
@@ -145,7 +145,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @mouseenter="isJsonEditorAiHovered = true"
         @mouseleave="isJsonEditorAiHovered = false"
       >
-        <img :src="jsonEditorAiBtnLogo" class="header-icon ai-icon" style="width:20px;height:20px;" />
+        <img :src="jsonEditorAiBtnLogo" class="header-icon ai-icon size-5" />
       </OButton>
     </template>
     <JsonEditor
@@ -1213,28 +1213,25 @@ const cleanupPipelinesContextProvider = () => {
 </script>
 
 <style>
-.nodes-header::after {
-  content: '';
-  position: absolute;
-  bottom: -2px;
-  left: 0;
-  width: 100%;
-  height: 2px;
-  background: var(--color-accent);
-  border-radius: 1px;
-}
+/* keep(lib-override:vue-flow): every rule below reaches DOM this component does
+   not render. `.vue-flow__*` are Vue Flow's own internals, emitted inside the
+   async <PipelineFlow> child — and the two `.vue-flow.dragging` / `.vue-flow:has()`
+   rules target the canvas ROOT, which is not in this template at all, so neither
+   scoping nor :deep() can reach them. `o2vf_node_*` is the shared pipeline
+   node-type convention: the same class names are defined in NodeSidebar.vue and
+   asserted by NodeSidebar.spec.ts, so this block must stay unscoped and keep
+   riding those names rather than moving to colocated utilities.
 
-/* Global rule to eliminate ALL transitions during any Vue Flow drag operation */
+   The `transition: none` blocks kill drag lag; NOTE: never set `transform: none`
+   here — Vue Flow positions each node via an inline `transform: translate(x, y)`,
+   so zeroing it would snap the node to the canvas origin mid-drag and only
+   restore on release. */
 .vue-flow.dragging *,
 .vue-flow:has(.vue-flow__node:active) * {
   transition: none !important;
   animation: none !important;
 }
 
-/* Ensure dragging nodes have zero lag.
-   NOTE: never set `transform: none` here — Vue Flow positions each node via an
-   inline `transform: translate(x, y)`, so zeroing it would snap the node to the
-   canvas origin mid-drag and only restore on release. */
 .vue-flow__node.dragging,
 .vue-flow__node:active {
   transition: none !important;
@@ -1248,17 +1245,17 @@ const cleanupPipelinesContextProvider = () => {
 }
 
 .o2vf_node .vue-flow__node {
-  padding: 8px 16px;
+  padding: 0.5rem 1rem;
   width: auto;
-  min-height: 44px;
+  min-height: 2.75rem;
   transition: background 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
-  border-radius: 12px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  border-radius: var(--radius-xl);
+  box-shadow: 0 0.25rem 0.75rem color-mix(in srgb, var(--color-black) 8%, transparent);
   cursor: grab;
   display: flex;
   align-items: center;
   background: var(--color-surface-base);
-  backdrop-filter: blur(10px);
+  backdrop-filter: blur(0.625rem);
 }
 
 .o2vf_node .vue-flow__node:active,
@@ -1276,13 +1273,13 @@ const cleanupPipelinesContextProvider = () => {
 .o2vf_node .vue-flow__node-input {
   border: 1px solid var(--color-status-info-text);
   color: var(--color-text-body);
-  border-radius: 12px;
+  border-radius: var(--radius-xl);
   background: var(--color-status-info-bg);
-  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.1);
+  box-shadow: 0 0.25rem 0.75rem color-mix(in srgb, var(--color-status-info-text) 10%, transparent);
   transition: background 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
   cursor: grab;
-  min-height: 36px;
-  padding: 8px 16px;
+  min-height: 2.25rem;
+  padding: 0.5rem 1rem;
 }
 
 .o2vf_node .o2vf_node_input:active,
@@ -1302,19 +1299,19 @@ const cleanupPipelinesContextProvider = () => {
 
 .o2vf_node .vue-flow__node-output {
   cursor: grab;
-  min-height: 36px;
-  padding: 8px 16px;
+  min-height: 2.25rem;
+  padding: 0.5rem 1rem;
   border: 1px solid var(--color-status-positive);
   color: var(--color-text-body);
-  border-radius: 8px;
+  border-radius: var(--radius-lg);
   background: var(--color-status-success-bg);
-  box-shadow: 0 2px 8px rgba(34, 197, 94, 0.1);
+  box-shadow: 0 0.125rem 0.5rem color-mix(in srgb, var(--color-status-positive) 10%, transparent);
   transition: background 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
 }
 
 .o2vf_node .vue-flow__node-output:hover {
   background: var(--color-status-success-bg);
-  box-shadow: 0 4px 12px rgba(34, 197, 94, 0.2);
+  box-shadow: 0 0.25rem 0.75rem color-mix(in srgb, var(--color-status-positive) 20%, transparent);
   border-color: var(--color-status-positive);
 }
 
@@ -1333,20 +1330,20 @@ const cleanupPipelinesContextProvider = () => {
 .o2vf_node .vue-flow__node-default {
   border: 1px solid var(--color-status-warning-text);
   color: var(--color-text-body);
-  border-radius: 12px;
+  border-radius: var(--radius-xl);
   background: var(--color-status-warning-bg);
-  box-shadow: 0 4px 12px rgba(217, 119, 6, 0.1);
+  box-shadow: 0 0.25rem 0.75rem color-mix(in srgb, var(--color-status-warning-text) 10%, transparent);
   transition: background 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
   cursor: grab;
-  min-height: 36px;
-  padding: 8px 16px;
+  min-height: 2.25rem;
+  padding: 0.5rem 1rem;
 }
 
 .o2vf_node .o2vf_node_default:hover,
 .o2vf_node .vue-flow__node-default:hover {
   border: 1px solid var(--color-status-warning-text) !important;
   background: var(--color-status-warning-bg) !important;
-  box-shadow: 0 6px 16px rgba(217, 119, 6, 0.2) !important;
+  box-shadow: 0 0.375rem 1rem color-mix(in srgb, var(--color-status-warning-text) 20%, transparent) !important;
 }
 
 .o2vf_node .o2vf_node_default:active,
@@ -1363,5 +1360,4 @@ const cleanupPipelinesContextProvider = () => {
 .o2vf_node .vue-flow__node-default.dragging * {
   transition: none !important;
 }
-
 </style>

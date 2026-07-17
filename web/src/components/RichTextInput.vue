@@ -10,6 +10,7 @@
     <div
       ref="editableDiv"
       class="rich-text-input relative outline-none text-sm leading-[1.6] min-h-10 max-h-75 overflow-y-auto break-words whitespace-pre-wrap text-text-primary"
+      :class="disabled ? 'cursor-not-allowed' : ''"
       contenteditable="true"
       :data-placeholder="placeholder"
       @input="handleInput"
@@ -22,7 +23,7 @@
     <!-- Detail Card -->
     <div
       v-if="showDetailCard"
-      class="chip-detail-card fixed max-w-75 max-h-75 border rounded-lg shadow-[0_8px_24px_rgba(0,0,0,0.25)] z-[100000] flex flex-col overflow-hidden bg-surface-base border-border-default"
+      class="chip-detail-card fixed max-w-75 max-h-75 border rounded-lg shadow-lg z-[100000] flex flex-col overflow-hidden bg-surface-base border-border-default"
       :style="{
         top: cardPosition.top + 'px',
         left: cardPosition.left + 'px',
@@ -617,25 +618,27 @@ export default defineComponent({
 });
 </script>
 
-<style>
-/* Disabled cursor on inner input */
-.rich-text-input-wrapper.is-disabled .rich-text-input {
-  cursor: not-allowed;
-}
+<style scoped>
+/* keep(generated-content) — .reference-chip and its children are built in JS with
+   document.createElement() inside the contenteditable, and .json-* spans are
+   injected via v-html. None of these nodes carry the scoped data-v attribute, so
+   they can only be reached with :deep() and cannot be expressed as utilities.
+   keep(scrollbar) — ::-webkit-scrollbar pseudo-elements have no utility form.
+   keep(complex-state) — .is-empty is toggled imperatively by the input handlers,
+   so the placeholder :before has no Tailwind variant. */
 
-/* Placeholder (theme-aware via token) */
+/* Placeholder for the empty contenteditable */
 .rich-text-input.is-empty:before {
   content: attr(data-placeholder);
   color: var(--color-text-placeholder);
   pointer-events: none;
   position: absolute;
   left: 0;
-  top: 4px;
+  top: 0.25rem;
 }
 
-/* Scrollbar styling */
 .rich-text-input::-webkit-scrollbar {
-  width: 6px;
+  width: 0.375rem;
 }
 
 .rich-text-input::-webkit-scrollbar-track {
@@ -644,19 +647,19 @@ export default defineComponent({
 
 .rich-text-input::-webkit-scrollbar-thumb {
   background: var(--color-border-strong);
-  border-radius: 3px;
+  border-radius: 0.1875rem;
 }
 
 /* Reference chips — dynamically created in JS */
-.reference-chip {
+.rich-text-input :deep(.reference-chip) {
   position: relative;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 4px 8px;
-  margin: 4px 2px;
-  border-radius: 6px;
-  font-size: 12px;
+  gap: 0.375rem;
+  padding: 0.25rem 0.5rem;
+  margin: 0.25rem 0.125rem;
+  border-radius: 0.375rem;
+  font-size: 0.75rem;
   cursor: pointer;
   user-select: none;
   vertical-align: middle;
@@ -664,79 +667,76 @@ export default defineComponent({
   line-height: 1.4;
 
   background: var(--color-file-chip-bg);
-  border: 1px solid var(--color-file-border);
+  border: 0.0625rem solid var(--color-file-border);
   color: var(--color-file-chip-text);
 }
 
-.reference-chip .chip-preview {
+.rich-text-input :deep(.reference-chip .chip-preview) {
   font-weight: 500;
-  max-width: 120px;
+  max-width: 7.5rem;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.reference-chip .chip-meta {
-  font-size: 10px;
+.rich-text-input :deep(.reference-chip .chip-meta) {
+  font-size: 0.625rem;
   white-space: nowrap;
   color: var(--color-text-secondary);
 }
 
-.reference-chip .chip-remove {
+.rich-text-input :deep(.reference-chip .chip-remove) {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 16px;
-  height: 16px;
+  width: 1rem;
+  height: 1rem;
   padding: 0;
-  margin-left: 2px;
+  margin-left: 0.125rem;
   border: none;
   background: transparent;
   cursor: pointer;
-  font-size: 16px;
+  font-size: 1rem;
   line-height: 1;
-  border-radius: 3px;
+  border-radius: 0.1875rem;
   transition: all 0.15s ease;
   color: var(--color-file-chip-remove);
 }
 
-.reference-chip .chip-remove:hover {
+.rich-text-input :deep(.reference-chip .chip-remove:hover) {
   transform: scale(1.1);
   color: var(--color-status-negative);
   background: var(--color-button-ghost-destructive-hover-bg);
 }
 
-/* Chip hover — no dedicated chip-hover token; theme-split kept via .dark */
-.reference-chip:hover {
-  background: #e6edff;
-  border-color: #b8c5ff;
-}
-
-.dark .reference-chip:hover {
-  background: #374151;
-  border-color: #5a6c7d;
+/* Chip hover — derived from the chip tokens so it flips with the theme on its
+   own (both --color-file-chip-bg and --color-file-chip-text are dark-aware),
+   which replaces the former light/dark literal pair. */
+.rich-text-input :deep(.reference-chip:hover) {
+  background: color-mix(in srgb, var(--color-file-chip-bg) 88%, var(--color-file-chip-text) 12%);
+  border-color: color-mix(in srgb, var(--color-file-border) 70%, var(--color-file-chip-text) 30%);
 }
 
 /* JSON syntax highlighting in detail card (v-html injected content) */
-.chip-detail-card .card-content .json-key {
+.chip-detail-card .card-content :deep(.json-key) {
   color: var(--color-json-key);
   font-weight: 600;
 }
 
-.chip-detail-card .card-content .json-string {
+.chip-detail-card .card-content :deep(.json-string) {
   color: var(--color-json-string);
 }
 
-.chip-detail-card .card-content .json-number {
+.chip-detail-card .card-content :deep(.json-number) {
   color: var(--color-json-number);
 }
 
-.chip-detail-card .card-content .json-boolean {
+.chip-detail-card .card-content :deep(.json-boolean) {
   color: var(--color-json-boolean);
   font-weight: 600;
 }
 
-.chip-detail-card .card-content .json-null {
+.chip-detail-card .card-content :deep(.json-null) {
   color: var(--color-json-null);
   font-weight: 600;
 }

@@ -522,9 +522,11 @@ export default defineComponent({
 });
 </script>
 
-<style>
-.dark .trace-dag-flow .vue-flow__background {
-  background-color: #1e1e1e !important;
+<style scoped>
+/* keep: lib-override:vue-flow — the library's background layer paints its own
+   surface over the canvas, so it has to be repainted here. The token flips
+   light/dark on its own, which retires the `.dark`-only twin this replaced. */
+.trace-dag-flow :deep(.vue-flow__background) {
+  background-color: var(--color-surface-panel) !important;
 }
-
 </style>

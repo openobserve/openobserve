@@ -53,7 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
 
     <!-- Content Scrollable Area -->
-      <div class="panel-content flex-1 overflow-y-auto overflow-x-hidden bg-[#0f1419] p-2.5">
+      <div class="panel-content flex-1 overflow-y-auto overflow-x-hidden bg-surface-base dark:bg-[color-mix(in_srgb,var(--color-grey-950)_85%,var(--color-indigo-900))] p-2.5">
         <!-- RED Charts Section -->
         <div
           v-if="streamFilter !== 'all' && dashboardData"
@@ -160,7 +160,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OTab
                 name="operations"
                 label="Operations"
-                style="text-transform: capitalize"
+                class="capitalize"
                 data-test="service-graph-node-panel-tab-operations"
               />
               <OTab
@@ -168,14 +168,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :key="cfg.id"
                 :name="cfg.id"
                 :label="cfg.label"
-                style="text-transform: capitalize"
+                class="capitalize"
                 :data-test="`service-graph-node-panel-tab-${cfg.id}`"
               />
               <OTab
                 v-if="!isInferred"
                 name="metrics"
                 label="Metrics"
-                style="text-transform: capitalize"
+                class="capitalize"
                 data-test="service-graph-node-panel-tab-metrics"
               />
             </OTabs>
@@ -243,8 +243,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <div
                 v-if="recentOperations.length === 0 && !loadingOperations"
-                class="text-xs italic py-2 text-center"
-                style="color: var(--color-text-secondary)"
+                class="text-xs italic py-2 text-center text-text-secondary"
               >
                 No operations found
               </div>
@@ -329,8 +328,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </template>
                     <template #empty>
                       <div
-                        class="text-xs italic py-2 text-center"
-                        style="color: var(--color-text-secondary)"
+                        class="text-xs italic py-2 text-center text-text-secondary"
                       >
                         No operations found
                       </div>
@@ -350,8 +348,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <div
                 v-if="!resourceTabData[cfg.id]?.length && !resourceTabLoading[cfg.id]"
-                class="text-xs italic py-2 text-center"
-                style="color: var(--color-text-secondary)"
+                class="text-xs italic py-2 text-center text-text-secondary"
               >
                 No {{ cfg.label.toLowerCase() }} data found
               </div>
@@ -438,8 +435,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </template>
                   <template #empty>
                     <div
-                      class="text-xs italic py-2 text-center"
-                      style="color: var(--color-text-secondary)"
+                      class="text-xs italic py-2 text-center text-text-secondary"
                     >
                       No {{ cfg.label.toLowerCase() }} data found
                     </div>
@@ -458,8 +454,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Loading state -->
               <div
                 v-if="metricsCorrelationLoading"
-                class="flex items-center gap-2 py-3 text-sm"
-                style="color: var(--color-text-secondary)"
+                class="flex items-center gap-2 py-3 text-sm text-text-secondary"
                 data-test="service-graph-side-panel-metrics-loading"
               >
                 <OSpinner size="xs" />
@@ -469,8 +464,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Error state -->
               <div
                 v-else-if="metricsCorrelationError"
-                class="flex flex-col items-center gap-3 py-6 text-center text-sm"
-                style="color: var(--color-text-secondary)"
+                class="flex flex-col items-center gap-3 py-6 text-center text-sm text-text-secondary"
                 data-test="service-graph-side-panel-metrics-error"
               >
                 <span>{{ metricsCorrelationError }}</span>
@@ -512,8 +506,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Empty state -->
               <div
                 v-else-if="metricsCorrelationLoaded"
-                class="text-xs italic py-2 text-center"
-                style="color: var(--color-text-secondary)"
+                class="text-xs italic py-2 text-center text-text-secondary"
                 data-test="service-graph-side-panel-metrics-empty"
               >
                 No metrics available for this service.
@@ -2405,95 +2398,56 @@ export default defineComponent({
 });
 </script>
 
-<style>
-.health-badge::before {
-  content: "●";
-  font-size: 10px;
-}
+<style scoped>
+/* keep(scrollbar): ::-webkit-scrollbar pseudo-elements have no utility form.
 
-.health-badge.healthy {
-  background: rgba(16, 185, 129, 0.15);
-  color: #10b981;
-}
-
-.health-badge.degraded {
-  background: rgba(251, 191, 36, 0.15);
-  color: #fbbf24;
-}
-
-.health-badge.critical {
-  background: rgba(239, 68, 68, 0.15);
-  color: #ef4444;
-}
-
-.health-badge.warning {
-  background: rgba(249, 115, 22, 0.15);
-  color: #f97316;
-}
-
-:root:not(.dark) .health-badge.healthy {
-  background: rgba(16, 185, 129, 0.08);
-  color: #059669;
-}
-
-:root:not(.dark) .health-badge.degraded {
-  background: rgba(251, 191, 36, 0.08);
-  color: #d97706;
-}
-
-:root:not(.dark) .health-badge.critical {
-  background: rgba(239, 68, 68, 0.08);
-  color: #dc2626;
-}
-
-:root:not(.dark) .health-badge.warning {
-  background: rgba(249, 115, 22, 0.08);
-  color: #ea580c;
-}
-
+   THEME NOTE (D7 is still an OPEN decision): this panel renders as a dark
+   indigo-tinted "glass" surface over the graph canvas in dark mode, but it has
+   always had a light treatment too (the panel body was white and the scrollbar
+   light). That light behaviour is preserved here — the light values are the
+   default and the dark-only values sit under `.dark &`, per the sanctioned
+   mechanism. Do NOT drop the light rules to make it always-dark until D7 is
+   actually answered; the previous description of it as "always-dark" did not
+   match what the code did. */
 .panel-content::-webkit-scrollbar {
-  width: 8px;
+  width: 0.5rem;
 }
 
 .panel-content::-webkit-scrollbar-track {
-  background: #1a1f2e;
+  background: var(--color-surface-panel);
 }
 
 .panel-content::-webkit-scrollbar-thumb {
-  background: #242938;
-  border-radius: 4px;
+  background: var(--color-border-default);
+  border-radius: 0.25rem;
 }
 
 .panel-content::-webkit-scrollbar-thumb:hover {
-  background: #2d3548;
+  background: var(--color-grey-300);
 }
 
-:root:not(.dark) .panel-content {
-  background: #ffffff;
+.dark .panel-content::-webkit-scrollbar-track {
+  background: color-mix(in srgb, var(--color-grey-900) 70%, var(--color-indigo-900));
 }
 
-:root:not(.dark) .panel-content::-webkit-scrollbar-track {
-  background: #f8f9fa;
+.dark .panel-content::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--color-grey-800) 80%, var(--color-indigo-900));
 }
 
-:root:not(.dark) .panel-content::-webkit-scrollbar-thumb {
-  background: var(--color-border-default);
-}
-
-:root:not(.dark) .panel-content::-webkit-scrollbar-thumb:hover {
-  background: #d0d0d0;
+.dark .panel-content::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--color-grey-700) 80%, var(--color-indigo-900));
 }
 
 .panel-section:last-child {
   margin-bottom: 0;
 }
 
-.red-charts-section .card-container {
+/* keep(third-party): chrome of RenderDashboardCharts' internal .card-container. */
+.red-charts-section :deep(.card-container) {
   box-shadow: none;
 }
 
-.red-charts-section .card-container :first-child {
+.red-charts-section :deep(.card-container :first-child) {
   padding: 0 0.0625rem !important;
 }
-
 </style>

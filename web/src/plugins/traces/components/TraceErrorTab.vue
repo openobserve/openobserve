@@ -42,8 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="text-sm! flex! items-center"
         />
         <span
-          class="text-sm font-semibold"
-          :style="{ color: 'var(--color-status-error-text)' }"
+          class="text-sm font-semibold text-status-error-text"
           data-test="trace-details-sidebar-error-summary-title"
         >
           {{ statusCodeTitle }}
@@ -66,8 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div class="flex items-center pl-[0.5rem]">
         <span
-          class="text-sm font-semibold"
-          :style="{ color: 'var(--color-status-error-text)' }"
+          class="text-sm font-semibold text-status-error-text"
           data-test="trace-details-sidebar-db-response-status-code-value"
         >
           {{ spanDbResponseStatusCode }}
@@ -90,8 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div class="flex items-center pl-[0.5rem]">
         <span
-          class="text-sm font-semibold"
-          :style="{ color: 'var(--color-status-error-text)' }"
+          class="text-sm font-semibold text-status-error-text"
           data-test="trace-details-sidebar-process-exit-code-value"
         >
           {{ spanProcessExitCode }}
@@ -115,8 +112,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="text-status-error-text"
       />
       <span
-        class="text-base font-semibold"
-        :style="{ color: 'var(--color-status-error-text)' }"
+        class="text-base font-semibold text-status-error-text"
         data-test="trace-details-sidebar-error-summary-title"
       >
         {{ errorBannerTitle }}
@@ -124,8 +120,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <div
       v-if="errorBannerMessage"
-      class="ml-[1.5rem] text-sm mb-[0.25rem]"
-      :style="{ color: 'var(--color-text-secondary)' }"
+      class="ml-[1.5rem] text-sm mb-[0.25rem] text-text-secondary"
       data-test="trace-details-sidebar-error-summary-message"
     >
       {{ errorBannerMessage }}
@@ -563,141 +558,102 @@ function copyStackTrace(stacktrace: string) {
 }
 </script>
 
-<style>
-.dark .stacktrace-content .stack-file {
-  color: #9cdcfe;
+<style scoped>
+/* keep(generated-content): the `.stack-*` classes style the stacktrace markup that
+   formatStackTrace() builds and the template injects with v-html — there is no
+   template element to carry a utility, so they stay as CSS (:deep, since the
+   generated nodes carry no scope attribute).
+   Every colour maps onto the shared --color-syntax-* family (the same palette
+   OCodeBlock uses); those tokens flip light<->dark in dark.css, so ONE rule set
+   covers both themes and the per-theme override list is gone. */
+.stacktrace-content :deep(.stack-line) {
+  padding: 0.125rem 0;
 }
 
-.dark .stacktrace-content .stack-path {
-  color: #ce9178;
-}
-
-.dark .stacktrace-content .stack-lineno {
-  color: #b5cea8;
-}
-
-.dark .stacktrace-content .stack-function {
-  color: #dcdcaa;
-}
-
-.dark .stacktrace-content .stack-keyword {
-  color: #c586c0;
-}
-
-.dark .stacktrace-content .stack-exception {
-  color: #f48771;
-}
-
-.dark .stacktrace-content .stack-traceback {
-  color: #808080;
-}
-
-.dark .stacktrace-content .stack-traceback-header {
-  color: #808080;
-}
-
-.dark .stacktrace-content .stack-during {
-  color: #808080;
-}
-
-.dark .stacktrace-content .stack-code {
-  color: #d4d4d4;
-}
-
-.dark .stacktrace-content .stack-call {
-  color: #4ec9b0;
-}
-
-.dark .stacktrace-content .stack-ellipsis {
-  color: #808080;
-}
-
-.dark .stacktrace-content .stack-error-msg {
-  color: #d4d4d4;
-}
-
-.dark .stacktrace-content .stack-raise {
-  color: #f48771;
-}
-
-/* Child/descendant selectors for stacktrace-content */
-.stacktrace-content .stack-line {
-  padding: 2px 0;
-}
-
-.stacktrace-content .stack-empty {
+.stacktrace-content :deep(.stack-empty) {
   height: 0.5em;
 }
 
-.stacktrace-content .stack-file {
-  color: #0066cc;
+/* `File "…", line N, in fn` scaffolding literals — a frame-header role of its
+   own, distinct from path / lineno / function which the inner spans set. */
+.stacktrace-content :deep(.stack-file) {
+  color: var(--color-syntax-builtin);
   font-weight: 500;
 }
 
-.stacktrace-content .stack-path {
-  color: #d63384;
+/* file + module paths -> string role */
+.stacktrace-content :deep(.stack-path) {
+  color: var(--color-syntax-string);
 }
 
-.stacktrace-content .stack-lineno {
-  color: #087990;
+/* line and column numbers -> number role */
+.stacktrace-content :deep(.stack-lineno) {
+  color: var(--color-syntax-number);
   font-weight: 600;
 }
 
-.stacktrace-content .stack-function {
-  color: #6f42c1;
+/* function / frame names -> function role */
+.stacktrace-content :deep(.stack-function) {
+  color: var(--color-syntax-function);
 }
 
-.stacktrace-content .stack-keyword {
-  color: #8250df;
+/* language keywords (`at`, `raise`, `panic:`, `goroutine`, `Caused by:`) */
+.stacktrace-content :deep(.stack-keyword) {
+  color: var(--color-syntax-keyword);
   font-weight: 600;
 }
 
-.stacktrace-content .stack-exception {
-  color: #d73a49;
+/* exception / error type names -> the app's error text role */
+.stacktrace-content :deep(.stack-exception) {
+  color: var(--color-status-error-text);
   font-weight: 600;
 }
 
-.stacktrace-content .stack-traceback {
-  color: #6c757d;
+/* dim framing lines (Traceback header, "During handling of…", `... N more`) */
+.stacktrace-content :deep(.stack-traceback) {
+  color: var(--color-syntax-comment);
   font-style: italic;
 }
 
-.stacktrace-content .stack-traceback-header {
-  color: #6c757d;
+.stacktrace-content :deep(.stack-traceback-header) {
+  color: var(--color-syntax-comment);
   font-weight: 600;
 }
 
-.stacktrace-content .stack-during {
-  color: #6c757d;
+.stacktrace-content :deep(.stack-during) {
+  color: var(--color-syntax-comment);
   margin: 0.5em 0;
 }
 
-.stacktrace-content .stack-during-text {
+.stacktrace-content :deep(.stack-during-text) {
   font-style: italic;
 }
 
-.stacktrace-content .stack-code {
-  color: #2c3e50;
+.stacktrace-content :deep(.stack-ellipsis) {
+  color: var(--color-syntax-comment);
+}
+
+/* echoed source line + trailing error message -> plain code body text */
+.stacktrace-content :deep(.stack-code) {
+  color: var(--color-syntax-text);
   padding-left: 2em;
 }
 
-.stacktrace-content .stack-call {
-  color: #0969da;
+.stacktrace-content :deep(.stack-error-msg) {
+  color: var(--color-syntax-text);
 }
 
-.stacktrace-content .stack-ellipsis {
-  color: #6c757d;
+/* call sites `fn(` inside the echoed source line */
+.stacktrace-content :deep(.stack-call) {
+  color: var(--color-syntax-tag);
 }
 
-.stacktrace-content .stack-error {
+/* the `raise` line's residual text — same error red as the exception it names */
+.stacktrace-content :deep(.stack-raise) {
+  color: var(--color-status-error-text);
+}
+
+.stacktrace-content :deep(.stack-error) {
   margin-top: 0.5em;
-}
-
-.stacktrace-content .stack-error-msg {
-  color: #2c3e50;
-}
-
-.stacktrace-content .stack-raise {
-  color: #d73a49;
 }
 </style>

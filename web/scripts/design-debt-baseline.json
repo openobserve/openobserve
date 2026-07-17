@@ -1,19 +1,19 @@
 {
   "totals": {
     "rawPalette": 53,
-    "arbPx": 173,
-    "arbRadius": 25,
-    "arbZ": 47,
-    "styleBlockHex": 358,
-    "unscopedStyle": 56,
-    "stylePxUnit": 698,
-    "inlineHexStyle": 21,
+    "arbPx": 159,
+    "arbRadius": 24,
+    "arbZ": 44,
+    "styleBlockHex": 107,
+    "unscopedStyle": 43,
+    "stylePxUnit": 275,
+    "inlineHexStyle": 20,
     "tsHex": 471,
     "inlineHexBind": 6,
     "bareRounded": 9,
-    "hexClass": 32,
-    "themeTernary": 10,
-    "darkMechanism": 33,
+    "hexClass": 14,
+    "themeTernary": 9,
+    "darkMechanism": 32,
     "arbTextSize": 3
   },
   "files": {
@@ -87,11 +87,6 @@
     },
     "components/cipherkeys/AddOpenobserveType.vue": {
       "arbPx": 2
-    },
-    "components/CodeQueryEditor.vue": {
-      "unscopedStyle": 1,
-      "styleBlockHex": 8,
-      "stylePxUnit": 5
     },
     "components/common/AppDialog.vue": {
       "unscopedStyle": 1
@@ -299,10 +294,7 @@
       "arbPx": 2
     },
     "components/O2AIChat.vue": {
-      "unscopedStyle": 1,
-      "arbZ": 2,
-      "styleBlockHex": 55,
-      "stylePxUnit": 216
+      "unscopedStyle": 1
     },
     "components/O2AIConfirmDialog.vue": {
       "unscopedStyle": 1,
@@ -321,9 +313,7 @@
       "unscopedStyle": 1
     },
     "components/pipeline/PipelineEditor.vue": {
-      "unscopedStyle": 1,
-      "styleBlockHex": 6,
-      "stylePxUnit": 31
+      "unscopedStyle": 1
     },
     "components/pipeline/PipelineView.vue": {
       "stylePxUnit": 6
@@ -338,10 +328,7 @@
       "rawPalette": 7
     },
     "components/RichTextInput.vue": {
-      "unscopedStyle": 1,
-      "arbZ": 1,
-      "styleBlockHex": 4,
-      "stylePxUnit": 17
+      "arbZ": 1
     },
     "components/rum/errorTracking/view/ErrorEvents.vue": {
       "stylePxUnit": 1
@@ -390,11 +377,7 @@
       "unscopedStyle": 1
     },
     "components/TenstackTable.vue": {
-      "themeTernary": 1,
-      "unscopedStyle": 2,
-      "arbPx": 4,
-      "darkMechanism": 1,
-      "stylePxUnit": 1
+      "unscopedStyle": 1
     },
     "components/ThemeSwitcher.vue": {
       "themeTernary": 2,
@@ -452,19 +435,8 @@
     "enterprise/components/billings/UsageMemberList.vue": {
       "arbPx": 2
     },
-    "enterprise/components/onlineEvals/forms/EvalJobDetail.vue": {
-      "unscopedStyle": 1,
-      "styleBlockHex": 12,
-      "stylePxUnit": 3
-    },
     "enterprise/components/onlineEvals/forms/JobFormPage.vue": {
       "arbPx": 3
-    },
-    "enterprise/components/onlineEvals/forms/ScoreConfigDialog.vue": {
-      "unscopedStyle": 1,
-      "arbPx": 3,
-      "styleBlockHex": 16,
-      "stylePxUnit": 75
     },
     "enterprise/components/onlineEvals/forms/scorer/ScorerTestPanel.vue": {
       "arbPx": 1
@@ -633,10 +605,7 @@
       "arbZ": 4
     },
     "plugins/logs/TenstackTable.vue": {
-      "unscopedStyle": 2,
-      "arbPx": 1,
-      "styleBlockHex": 4,
-      "stylePxUnit": 2
+      "unscopedStyle": 1
     },
     "plugins/metrics/MetricList.vue": {
       "arbZ": 1
@@ -656,11 +625,6 @@
       "inlineHexStyle": 1,
       "inlineHexBind": 1,
       "arbZ": 1,
-      "stylePxUnit": 1
-    },
-    "plugins/traces/components/TraceErrorTab.vue": {
-      "unscopedStyle": 1,
-      "styleBlockHex": 28,
       "stylePxUnit": 1
     },
     "plugins/traces/components/TraceLatencyCell.vue": {
@@ -686,12 +650,6 @@
       "arbPx": 1,
       "arbZ": 1
     },
-    "plugins/traces/ServiceGraphNodeSidePanel.vue": {
-      "hexClass": 1,
-      "unscopedStyle": 1,
-      "styleBlockHex": 22,
-      "stylePxUnit": 3
-    },
     "plugins/traces/SessionDetails.vue": {
       "arbPx": 2,
       "arbZ": 1,
@@ -710,28 +668,9 @@
       "styleBlockHex": 32,
       "stylePxUnit": 11
     },
-    "plugins/traces/ThreadView.vue": {
-      "hexClass": 17,
-      "arbRadius": 1,
-      "unscopedStyle": 1,
-      "arbPx": 6,
-      "arbZ": 1,
-      "styleBlockHex": 34,
-      "stylePxUnit": 9
-    },
-    "plugins/traces/TraceDAG.vue": {
-      "unscopedStyle": 1,
-      "styleBlockHex": 1
-    },
     "plugins/traces/TraceDetails.vue": {
       "arbRadius": 1,
       "arbPx": 6
-    },
-    "plugins/traces/TraceDetailsSidebar.vue": {
-      "inlineHexStyle": 1,
-      "unscopedStyle": 3,
-      "styleBlockHex": 61,
-      "stylePxUnit": 60
     },
     "plugins/traces/TurnPreviewCard.vue": {
       "arbPx": 3

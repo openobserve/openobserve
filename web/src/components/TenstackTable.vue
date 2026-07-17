@@ -68,7 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <tr
             v-for="(level, levelIdx) in pivotHeaderLevels as any[]"
             :key="'hl_' + levelIdx"
-            style="max-height: 28px; height: 28px"
+            class="max-h-7 h-7"
           >
             <!-- Row-field headers: first <tr> only, rowspan all levels -->
             <th
@@ -76,7 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-for="col in pivotRowColumns"
               :key="'rh_' + col.name"
               :rowspan="pivotHeaderLevels.length"
-              class="cursor-pointer px-2 text-center font-semibold align-middle whitespace-nowrap py-[5px] [border-right:1px_solid_var(--color-pivot-header-border)] [border-bottom:1px_solid_var(--color-pivot-header-border)] bg-sticky-col-header-bg"
+              class="cursor-pointer px-2 text-center font-semibold align-middle whitespace-nowrap py-[0.3125rem] [border-right:1px_solid_var(--color-pivot-header-border)] [border-bottom:1px_solid_var(--color-pivot-header-border)] bg-sticky-col-header-bg"
               :style="getStickyColumnStyle(col) as any"
               @click="handlePivotSort(col.name)"
             >
@@ -103,8 +103,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="px-2"
               :class="[
                 level.isLeaf
-                  ? 'text-center font-medium text-[0.85em] align-middle py-[5px] [border-right:1px_solid_var(--color-pivot-header-border)] [border-bottom:1px_solid_var(--color-pivot-header-border)] bg-sticky-col-header-bg'
-                  : 'text-center font-semibold align-middle whitespace-nowrap py-[5px] [border-right:1px_solid_var(--color-pivot-header-border)] [border-bottom:1px_solid_var(--color-pivot-header-border)] bg-sticky-col-header-bg',
+                  ? 'text-center font-medium text-[0.85em] align-middle py-[0.3125rem] [border-right:1px_solid_var(--color-pivot-header-border)] [border-bottom:1px_solid_var(--color-pivot-header-border)] bg-sticky-col-header-bg'
+                  : 'text-center font-semibold align-middle whitespace-nowrap py-[0.3125rem] [border-right:1px_solid_var(--color-pivot-header-border)] [border-bottom:1px_solid_var(--color-pivot-header-border)] bg-sticky-col-header-bg',
                 {
                   'pivot-section-border':
                     cell.hasBorder && !(stickyColTotals && cell._isTotalHeader),
@@ -139,8 +139,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- ── Standard TanStack headers (logs / non-pivot) ─────────────────── -->
         <thead
           v-else
-          class="sticky top-0 z-10"
-          style="max-height: 44px; height: 22px"
+          class="sticky top-0 z-10 max-h-11 h-5.5"
           v-for="headerGroup in table.getHeaderGroups()"
           :key="headerGroup.id"
         >
@@ -320,15 +319,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                     <!-- Filter panel -->
                     <div
-                      class="py-1"
-                      style="min-width: 200px; max-width: 300px"
+                      class="py-1 min-w-50 max-w-75"
                       :data-test="`o2-table-column-filter-panel-${header.column.id}`"
                       @click.stop
                     >
                       <!-- Search box — always visible at top -->
                       <div
-                        class="px-2 pb-1"
-                        style="border-bottom: 1px solid var(--color-table-row-divider)"
+                        class="px-2 pb-1 border-b border-table-row-divider"
                       >
                         <OInput
                           v-model="colFilterSearch[header.column.id]"
@@ -348,7 +345,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <ul
                         role="listbox"
                         aria-multiselectable="true"
-                        style="max-height: 240px; overflow-y: auto"
+                        class="max-h-60 overflow-y-auto"
                       >
                         <li
                           v-for="rawVal in getFilteredUniqueValues(header.column.id)"
@@ -375,7 +372,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </ul>
 
                       <!-- Clear filter — always visible at bottom -->
-                      <div style="border-top: 1px solid var(--color-table-row-divider)">
+                      <div class="border-t border-table-row-divider">
                         <div
                           class="px-3 py-1.5 text-xs cursor-pointer opacity-70 hover:bg-surface-panel"
                           @click.stop="clearColFilter(header.column.id)"
@@ -389,9 +386,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div
                   :data-test="`o2-table-add-data-from-column-${header.column.columnDef.header}`"
                   class="invisible items-center absolute right-2 top-0 px-2 column-actions h-full flex"
-                  :class="
-                    store.state.theme === 'dark' ? 'field_overlay_dark' : ''
-                  "
                   v-if="
                     (header.column.columnDef.meta as any)?.closable ||
                     (header.column.columnDef.meta as any)?.showWrap
@@ -434,8 +428,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <tr v-if="!loading && errMsg != ''" class="w-full">
             <td
               :colspan="columnOrder.length"
-              class="font-bold"
-              style="opacity: 0.7"
+              class="font-bold opacity-70"
             >
               <div class="text-sm font-medium font-bold bg-warning">
                 <OIcon size="sm" name="warning" class="mr-1" />
@@ -446,8 +439,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <tr data-test="o2-table-function-error" v-if="functionErrorMsg != ''">
             <td
               :colspan="columnOrder.length"
-              class="font-bold"
-              style="opacity: 0.6"
+              class="font-bold opacity-60"
             >
               <div
                 class="text-sm font-medium font-bold pl-2 bg-warning"
@@ -475,8 +467,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <tr v-if="functionErrorMsg != '' && isFunctionErrorOpen">
             <td
               :colspan="columnOrder.length"
-              style="opacity: 0.7"
-              class="px-2 bg-warning"
+              class="opacity-70 px-2 bg-warning"
             >
               <pre>{{ functionErrorMsg }}</pre>
             </td>
@@ -496,7 +487,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <tr
             v-for="r in SKEL_ROW_COUNT"
             :key="`skel-${r}`"
-            class="o2-skel-row flex items-center w-full opacity-0 h-[29px] bg-log-table-row-bg border-b border-log-table-row-border [animation:o2-skel-row-in_320ms_ease-out_forwards] motion-reduce:opacity-100 motion-reduce:animate-none"
+            class="o2-skel-row flex items-center w-full opacity-0 h-[1.8125rem] bg-log-table-row-bg border-b border-log-table-row-border [animation:o2-skel-row-in_320ms_ease-out_forwards] motion-reduce:opacity-100 motion-reduce:animate-none"
             :style="{ animationDelay: `${(r - 1) * 40}ms` }"
           >
             <!-- No columns yet (first paint) — full-width shimmer bar -->
@@ -2563,8 +2554,11 @@ defineExpose({
 </script>
 <style>
 @import "@/assets/styles/log-highlighting.css";
-</style>
-<style>
+
+/* keep(keyframes) — this block must stay unscoped: the template drives the row
+   entrance with the `[animation:o2-skel-row-in_320ms_ease-out_forwards]` utility,
+   and Vue's scoped compiler rewrites @keyframes names without rewriting the
+   template's arbitrary animation utility, which would break the reference. */
 @keyframes o2-skel-shimmer {
   0% {
     background-position: 200% 0;
@@ -2577,15 +2571,19 @@ defineExpose({
 @keyframes o2-skel-row-in {
   from {
     opacity: 0;
-    transform: translateY(2px);
+    transform: translateY(0.125rem);
   }
   to {
     opacity: 1;
     transform: translateY(0);
   }
 }
+</style>
 
-/* ── Loading skeleton pill (uses OTable skeleton tokens from lib/styles/tokens) ── */
+<style scoped>
+/* keep(keyframes) — the shimmer gradient + animation pair is kept as CSS so the
+   skeleton pill stays a single class the template can reuse; it is token-backed
+   via the OTable skeleton tokens in lib/styles/tokens. */
 .o2-skel-pill {
   background: linear-gradient(
     90deg,
@@ -2597,8 +2595,9 @@ defineExpose({
   animation: o2-skel-shimmer 1.5s ease-in-out infinite;
 }
 
+/* The row half is expressed in the template via motion-reduce:* utilities; the
+   pill needs the CSS form because the scoped rule above outranks a utility. */
 @media (prefers-reduced-motion: reduce) {
-  .o2-skel-row  { opacity: 1; animation: none; }
   .o2-skel-pill { animation: none; }
 }
 </style>

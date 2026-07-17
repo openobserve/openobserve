@@ -1,6 +1,6 @@
 ﻿<template>
   <div
-    class="chat-container w-full h-full flex flex-col overflow-hidden rounded-md text-[var(--color-button-primary-foreground)] bg-card-glass-solid [box-shadow:0_0_5px_1px_var(--color-hover-shadow)]"
+    class="chat-container w-full h-full flex flex-col overflow-hidden rounded-md text-button-primary-foreground bg-card-glass-solid [box-shadow:0_0_5px_1px_var(--color-hover-shadow)]"
     :class="[
       { 'chat-open': isOpen },    ]"
   >
@@ -9,11 +9,11 @@
       class="chat-content-wrapper flex flex-col h-full bg-transparent"
     >
       <div
-        class="chat-header"
+        class="chat-header flex justify-between items-end shrink-0 z-2 px-3 pt-0 pb-1 border-b border-separator bg-surface-base"
         :style="{ height: headerHeight ? headerHeight + 'px' : '' }"
       >
         <div
-          class="chat-title flex justify-between items-center w-full"
+          class="chat-title flex justify-between items-center w-full font-bold"
         >
           <div class="flex items-center gap-2">
             <div class="inline-flex w-6 h-6 rounded-full overflow-hidden">
@@ -25,11 +25,11 @@
                 <OButton
                   variant="ghost"
                   size="sm"
-                  class="chat-title-dropdown"
+                  class="chat-title-dropdown flex items-center overflow-hidden max-w-52.5 h-8 min-h-8 px-3 py-1.5 rounded-sm transition-colors duration-200 hover:bg-interactive-hover-bg"
                 >
                   <div class="flex items-center gap-2 max-w-55">
                     <span
-                      class="chat-title-text text-sm font-medium truncate block"
+                      class="chat-title-text text-sm font-medium truncate block max-w-45 text-button-primary-foreground"
                     >
                       {{ displayedTitle || "New Chat" }}
                       <OTooltip
@@ -50,7 +50,7 @@
               </template>
               <!-- History menu with search -->
               <div class="history-menu-container relative max-h-112.5 flex flex-col w-75">
-                <div class="search-history-bar-sticky sticky top-0 z-[2] bg-[var(--color-surface-base)] p-2 border-b border-separator shrink-0">
+                <div class="search-history-bar-sticky sticky top-0 z-2 bg-surface-base p-2 border-b border-separator shrink-0">
                   <OSearchInput
                     v-model="historySearchTerm"
                     placeholder="Search chat history"
@@ -58,13 +58,7 @@
                   />
                 </div>
                 <div
-                  class="history-list-container flex-1 overflow-y-auto overflow-x-hidden max-h-87.5"
-                  style="
-                    min-width: 200px;
-                    width: 300px;
-                    max-width: 300px;
-                    border: 1px solid var(--color-border-default);
-                  "
+                  class="history-list-container flex-1 overflow-y-auto overflow-x-hidden max-h-87.5 min-w-50 w-75 max-w-75 border border-border-default"
                 >
                   <ODropdownItem
                     v-for="chat in filteredChatHistory"
@@ -105,7 +99,7 @@
                 <!-- Clear all conversations button -->
                 <div
                   v-if="filteredChatHistory.length > 0"
-                  class="clear-all-container bg-[var(--color-surface-base)] p-2 border-t border-separator shrink-0"
+                  class="clear-all-container bg-surface-base p-2 border-t border-separator shrink-0"
                 >
                   <ODropdownSeparator />
                   <OButton
@@ -236,23 +230,27 @@
               'data:' + previewImage.mimeType + ';base64,' + previewImage.data
             "
             :alt="previewImage.filename"
-            style="max-width: 100%; max-height: 80vh; object-fit: contain"
+            class="max-w-full max-h-[80vh] object-contain"
           />
         </div>
       </ODialog>
 
       <div
-        class="chat-content"
+        class="chat-content relative flex flex-col flex-1 min-h-0 overflow-hidden bg-transparent"
       >
         <div
-          class="messages-container"
+          class="messages-container flex flex-col flex-1 min-h-0 overflow-y-auto gap-4 p-2 w-full max-w-225 mx-auto bg-transparent"
           ref="messagesContainer"
           @scroll="checkIfShouldAutoScroll"
         >
           <div
             v-if="chatMessages.length === 0"
-            class="welcome-section"
-            :class="{ 'welcome-section--centered': centeredStart }"
+            class="welcome-section flex flex-1 items-center justify-center rounded-lg"
+            :class="
+              centeredStart
+                ? 'p-0 mb-0 bg-transparent'
+                : 'p-6 mb-6 [background:linear-gradient(to_right,color-mix(in_srgb,var(--color-theme-accent)_5%,transparent),color-mix(in_srgb,var(--color-theme-accent)_10%,transparent))]'
+            "
           >
             <!-- Home tab: rich V2 welcome -->
             <O2AIHomeWelcome
@@ -279,16 +277,19 @@
           <div
             v-for="(message, index) in processedMessages"
             :key="index"
-            class="message"
+            class="message p-3 rounded-xl border border-border-default [box-shadow:0_1px_2px_color-mix(in_srgb,var(--color-text-primary)_10%,transparent)]"
             :class="[
               message.role,
+              message.role === 'user'
+                ? 'ml-10 w-[calc(100%-2.5rem)] [background:var(--color-chat-bubble-ai)] text-text-body dark:text-text-secondary'
+                : 'ml-0 w-full bg-surface-base text-button-primary-foreground dark:text-text-secondary',
               { 'error-message': message.content.startsWith('Error:') },
             ]"
           >
-            <div class="message-content">
+            <div class="message-content flex items-start gap-1.5 w-full">
               <div
                 v-if="message.role === 'user'"
-                class="inline-flex items-center justify-center w-6 h-6 rounded-full text-text-inverse [background:var(--color-gradient-ai)] dark:[background:var(--color-gradient-ai)]"
+                class="inline-flex items-center justify-center w-6 h-6 rounded-full text-text-inverse [background:var(--color-gradient-ai)] shrink-0"
               >
                 <OIcon
                   size="sm"
@@ -297,8 +298,7 @@
                 />
               </div>
               <div
-                class="message-blocks"
-                style="background-color: transparent"
+                class="message-blocks flex flex-col flex-1 gap-0 min-w-0 max-w-full overflow-x-auto [word-wrap:break-word] wrap-break-word bg-transparent"
               >
                 <!-- Loading indicator inside message box for empty assistant messages -->
                 <div v-if="message.role === 'assistant' && (!message.contentBlocks || message.contentBlocks.length === 0) && (!message.content || message.content.trim() === '') && isLoading" class="inline-loading flex items-center gap-2.5 py-2 text-text-secondary text-sm">
@@ -313,8 +313,9 @@
                   <!-- Tool call block - expandable -->
                   <div
                     v-if="block.type === 'tool_call'"
-                    class="tool-call-item"
-                    :class="[                      { 'has-details': hasToolCallDetails(block) },
+                    class="tool-call-item flex flex-col px-3 py-2 rounded-md text-compact mb-2"
+                    :class="[
+                      { 'has-details': hasToolCallDetails(block) },
                       {
                         error:
                           block.success === false && !block.pendingConfirmation,
@@ -336,7 +337,7 @@
                       toggleToolCallExpanded(index, blockIndex)
                     "
                   >
-                    <div class="tool-call-header">
+                    <div class="tool-call-header flex items-center gap-2">
                       <OIcon
                         :name="
                           block.pendingConfirmation
@@ -358,7 +359,7 @@
                               : 'text-status-positive'
                         "
                       />
-                      <span class="tool-call-name">
+                      <span class="tool-call-name font-medium flex-1">
                         {{ formatToolCallMessage(block).text
                         }}<strong
                           v-if="formatToolCallMessage(block).highlight"
@@ -372,7 +373,7 @@
                         "
                         name="open-in-new"
                         size="xs"
-                        class="navigation-icon"
+                        class="navigation-icon cursor-pointer ml-auto opacity-70 transition-opacity duration-200 hover:opacity-100"
                         @click.stop="
                           handleNavigationAction(block.navigationAction)
                         "
@@ -390,32 +391,32 @@
                             : 'expand-more'
                         "
                         size="sm"
-                        class="expand-icon"
+                        class="expand-icon opacity-60 transition-transform duration-200"
                       />
                     </div>
                     <!-- Expandable details -->
                     <div
                       v-if="isToolCallExpanded(index, blockIndex)"
-                      class="tool-call-details"
+                      class="tool-call-details mt-2.5 pt-2.5 border-t border-border-default flex flex-col gap-2"
                       @click.stop
                     >
                       <!-- Error details for failed tool calls -->
                       <template v-if="block.success === false">
-                        <div v-if="block.resultMessage" class="detail-item">
-                          <span class="detail-label">Error</span>
-                          <span class="detail-value tool-error-message">{{
+                        <div v-if="block.resultMessage" class="detail-item flex flex-col gap-1">
+                          <span class="detail-label text-2xs font-semibold uppercase opacity-60">Error</span>
+                          <span class="detail-value text-xs select-text text-status-negative">{{
                             block.resultMessage
                           }}</span>
                         </div>
-                        <div v-if="block.errorType" class="detail-item">
-                          <span class="detail-label">Type</span>
-                          <code class="detail-value">{{
+                        <div v-if="block.errorType" class="detail-item flex flex-col gap-1">
+                          <span class="detail-label text-2xs font-semibold uppercase opacity-60">Type</span>
+                          <code class="detail-value text-xs select-text">{{
                             block.errorType
                           }}</code>
                         </div>
-                        <div v-if="block.suggestion" class="detail-item">
-                          <span class="detail-label">Suggestion</span>
-                          <span class="detail-value tool-suggestion">{{
+                        <div v-if="block.suggestion" class="detail-item flex flex-col gap-1">
+                          <span class="detail-label text-2xs font-semibold uppercase opacity-60">Suggestion</span>
+                          <span class="detail-value text-xs select-text italic opacity-85">{{
                             block.suggestion
                           }}</span>
                         </div>
@@ -424,66 +425,66 @@
                       <template v-if="block.success !== false && block.summary">
                         <div
                           v-if="block.summary.count !== undefined"
-                          class="detail-item"
+                          class="detail-item flex flex-col gap-1"
                         >
-                          <span class="detail-label">Results</span>
-                          <span class="detail-value"
+                          <span class="detail-label text-2xs font-semibold uppercase opacity-60">Results</span>
+                          <span class="detail-value text-xs select-text"
                             >{{ block.summary.count }} records</span
                           >
                         </div>
                         <div
                           v-if="block.summary.took !== undefined"
-                          class="detail-item"
+                          class="detail-item flex flex-col gap-1"
                         >
-                          <span class="detail-label">Duration</span>
-                          <span class="detail-value"
+                          <span class="detail-label text-2xs font-semibold uppercase opacity-60">Duration</span>
+                          <span class="detail-value text-xs select-text"
                             >{{ block.summary.took }}ms</span
                           >
                         </div>
                         <!-- CLI tool summary (return_code / stdout_lines / stderr_lines / truncated) -->
                         <div
                           v-if="block.summary.return_code !== undefined"
-                          class="detail-item"
+                          class="detail-item flex flex-col gap-1"
                         >
-                          <span class="detail-label">Exit code</span>
-                          <code class="detail-value">{{
+                          <span class="detail-label text-2xs font-semibold uppercase opacity-60">Exit code</span>
+                          <code class="detail-value text-xs select-text">{{
                             block.summary.return_code
                           }}</code>
                         </div>
                         <div
                           v-if="block.summary.stdout_lines !== undefined"
-                          class="detail-item"
+                          class="detail-item flex flex-col gap-1"
                         >
-                          <span class="detail-label">Stdout</span>
-                          <span class="detail-value"
+                          <span class="detail-label text-2xs font-semibold uppercase opacity-60">Stdout</span>
+                          <span class="detail-value text-xs select-text"
                             >{{ block.summary.stdout_lines }} lines</span
                           >
                         </div>
                         <div
                           v-if="block.summary.stderr_lines"
-                          class="detail-item"
+                          class="detail-item flex flex-col gap-1"
                         >
-                          <span class="detail-label">Stderr</span>
-                          <span class="detail-value"
+                          <span class="detail-label text-2xs font-semibold uppercase opacity-60">Stderr</span>
+                          <span class="detail-value text-xs select-text"
                             >{{ block.summary.stderr_lines }} lines</span
                           >
                         </div>
-                        <div v-if="block.summary.truncated" class="detail-item">
-                          <span class="detail-label">Output</span>
-                          <span class="detail-value">truncated</span>
+                        <div v-if="block.summary.truncated" class="detail-item flex flex-col gap-1">
+                          <span class="detail-label text-2xs font-semibold uppercase opacity-60">Output</span>
+                          <span class="detail-value text-xs select-text">truncated</span>
                         </div>
                       </template>
                       <!-- Existing context details -->
                       <div
                         v-if="getToolCallDisplayData(block.context)?.query"
-                        class="detail-item"
+                        class="detail-item flex flex-col gap-1"
                       >
-                        <div class="detail-header">
-                          <span class="detail-label">Query</span>
+                        <div class="detail-header flex items-center justify-between">
+                          <span class="detail-label text-2xs font-semibold uppercase opacity-60">Query</span>
                           <OButton
                             variant="ghost"
                             size="icon-xs-circle"
-                            class="copy-btn"
+                            class="copy-btn opacity-60 hover:opacity-100"
                             @click.stop="
                               copyToClipboard(
                                 getToolCallDisplayData(block.context)?.query,
@@ -494,34 +495,34 @@
                             <OTooltip content="Copy query" />
                           </OButton>
                         </div>
-                        <code class="detail-value query-value">{{
+                        <code class="detail-value query-value text-xs select-text font-mono p-2 rounded-sm whitespace-pre-wrap break-all cursor-text [background:color-mix(in_srgb,var(--color-text-primary)_5%,transparent)]">{{
                           getToolCallDisplayData(block.context)?.query
                         }}</code>
                       </div>
                       <div
                         v-if="getToolCallDisplayData(block.context)?.stream"
-                        class="detail-item"
+                        class="detail-item flex flex-col gap-1"
                       >
-                        <span class="detail-label">Stream</span>
-                        <code class="detail-value">{{
+                        <span class="detail-label text-2xs font-semibold uppercase opacity-60">Stream</span>
+                        <code class="detail-value text-xs select-text">{{
                           getToolCallDisplayData(block.context)?.stream
                         }}</code>
                       </div>
                       <div
                         v-if="getToolCallDisplayData(block.context)?.type"
-                        class="detail-item"
+                        class="detail-item flex flex-col gap-1"
                       >
-                        <span class="detail-label">Type</span>
-                        <code class="detail-value">{{
+                        <span class="detail-label text-2xs font-semibold uppercase opacity-60">Type</span>
+                        <code class="detail-value text-xs select-text">{{
                           getToolCallDisplayData(block.context)?.type
                         }}</code>
                       </div>
                       <div
                         v-if="getToolCallDisplayData(block.context)?.start_time"
-                        class="detail-item"
+                        class="detail-item flex flex-col gap-1"
                       >
-                        <span class="detail-label">Start</span>
-                        <span class="detail-value">{{
+                        <span class="detail-label text-2xs font-semibold uppercase opacity-60">Start</span>
+                        <span class="detail-value text-xs select-text">{{
                           formatTimestamp(
                             getToolCallDisplayData(block.context)?.start_time,
                           )
@@ -529,10 +530,10 @@
                       </div>
                       <div
                         v-if="getToolCallDisplayData(block.context)?.end_time"
-                        class="detail-item"
+                        class="detail-item flex flex-col gap-1"
                       >
-                        <span class="detail-label">End</span>
-                        <span class="detail-value">{{
+                        <span class="detail-label text-2xs font-semibold uppercase opacity-60">End</span>
+                        <span class="detail-value text-xs select-text">{{
                           formatTimestamp(
                             getToolCallDisplayData(block.context)?.end_time,
                           )
@@ -543,10 +544,10 @@
                           getToolCallDisplayData(block.context)?.from !==
                           undefined
                         "
-                        class="detail-item"
+                        class="detail-item flex flex-col gap-1"
                       >
-                        <span class="detail-label">From</span>
-                        <span class="detail-value">{{
+                        <span class="detail-label text-2xs font-semibold uppercase opacity-60">From</span>
+                        <span class="detail-value text-xs select-text">{{
                           getToolCallDisplayData(block.context)?.from
                         }}</span>
                       </div>
@@ -555,32 +556,32 @@
                           getToolCallDisplayData(block.context)?.size !==
                           undefined
                         "
-                        class="detail-item"
+                        class="detail-item flex flex-col gap-1"
                       >
-                        <span class="detail-label">Size</span>
-                        <span class="detail-value">{{
+                        <span class="detail-label text-2xs font-semibold uppercase opacity-60">Size</span>
+                        <span class="detail-value text-xs select-text">{{
                           getToolCallDisplayData(block.context)?.size
                         }}</span>
                       </div>
                       <div
                         v-if="getToolCallDisplayData(block.context)?.query_type"
-                        class="detail-item"
+                        class="detail-item flex flex-col gap-1"
                       >
-                        <span class="detail-label">Query Type</span>
-                        <code class="detail-value">{{
+                        <span class="detail-label text-2xs font-semibold uppercase opacity-60">Query Type</span>
+                        <code class="detail-value text-xs select-text">{{
                           getToolCallDisplayData(block.context)?.query_type
                         }}</code>
                       </div>
                       <div
                         v-if="getToolCallDisplayData(block.context)?.vrl"
-                        class="detail-item"
+                        class="detail-item flex flex-col gap-1"
                       >
-                        <div class="detail-header">
-                          <span class="detail-label">VRL</span>
+                        <div class="detail-header flex items-center justify-between">
+                          <span class="detail-label text-2xs font-semibold uppercase opacity-60">VRL</span>
                           <OButton
                             variant="ghost"
                             size="icon-xs-circle"
-                            class="copy-btn"
+                            class="copy-btn opacity-60 hover:opacity-100"
                             @click.stop="
                               copyToClipboard(
                                 getToolCallDisplayData(block.context)?.vrl,
@@ -591,20 +592,20 @@
                             <OTooltip content="Copy VRL" />
                           </OButton>
                         </div>
-                        <code class="detail-value query-value">{{
+                        <code class="detail-value query-value text-xs select-text font-mono p-2 rounded-sm whitespace-pre-wrap break-all cursor-text [background:color-mix(in_srgb,var(--color-text-primary)_5%,transparent)]">{{
                           getToolCallDisplayData(block.context)?.vrl
                         }}</code>
                       </div>
                       <div
                         v-if="getToolCallDisplayData(block.context)?.command"
-                        class="detail-item"
+                        class="detail-item flex flex-col gap-1"
                       >
-                        <div class="detail-header">
-                          <span class="detail-label">Command</span>
+                        <div class="detail-header flex items-center justify-between">
+                          <span class="detail-label text-2xs font-semibold uppercase opacity-60">Command</span>
                           <OButton
                             variant="ghost"
                             size="icon-xs-circle"
-                            class="copy-btn"
+                            class="copy-btn opacity-60 hover:opacity-100"
                             @click.stop="
                               copyToClipboard(
                                 getToolCallDisplayData(block.context)?.command,
@@ -615,19 +616,19 @@
                             <OTooltip content="Copy command" />
                           </OButton>
                         </div>
-                        <code class="detail-value query-value">{{
+                        <code class="detail-value query-value text-xs select-text font-mono p-2 rounded-sm whitespace-pre-wrap break-all cursor-text [background:color-mix(in_srgb,var(--color-text-primary)_5%,transparent)]">{{
                           getToolCallDisplayData(block.context)?.command
                         }}</code>
                       </div>
                       <!-- Tool response: SearchSQL hits -->
                       <template v-if="block.response && block.response.hits">
-                        <div class="detail-item">
-                          <div class="detail-header">
-                            <span class="detail-label">Results</span>
+                        <div class="detail-item flex flex-col gap-1">
+                          <div class="detail-header flex items-center justify-between">
+                            <span class="detail-label text-2xs font-semibold uppercase opacity-60">Results</span>
                             <OButton
                               variant="ghost"
                               size="icon-xs-circle"
-                              class="copy-btn"
+                              class="copy-btn opacity-60 hover:opacity-100"
                               @click.stop="
                                 copyToClipboard(
                                   JSON.stringify(block.response.hits, null, 2),
@@ -638,24 +639,24 @@
                               <OTooltip content="Copy results" />
                             </OButton>
                           </div>
-                          <div class="tool-response-hits">
+                          <div class="tool-response-hits flex flex-col gap-1 text-xs font-mono px-2 py-1.5 rounded-sm max-h-50 overflow-y-auto [background:color-mix(in_srgb,var(--color-text-primary)_5%,transparent)]">
                             <div
                               v-for="(hit, hIdx) in block.response.hits"
                               :key="hIdx"
-                              class="tool-response-hit"
+                              class="tool-response-hit flex flex-wrap gap-x-3 gap-y-1 py-0.5 [&:not(:last-child)]:border-b [&:not(:last-child)]:border-border-default [&:not(:last-child)]:pb-1"
                             >
                               <span
                                 v-for="(val, key) in hit"
                                 :key="key"
-                                class="hit-field"
+                                class="hit-field break-all select-text cursor-text"
                               >
-                                <span class="hit-key">{{ key }}:</span>
+                                <span class="hit-key opacity-60 font-semibold">{{ key }}:</span>
                                 {{ val }}
                               </span>
                             </div>
                           </div>
                         </div>
-                        <div class="tool-response-meta">
+                        <div class="tool-response-meta flex flex-wrap gap-1.5 mt-1">
                           <span
                             v-if="block.response.total !== undefined"
                             class="context-tag"
@@ -681,20 +682,20 @@
                           (block.response.input || block.response.output)
                         "
                       >
-                        <div v-if="block.response.input" class="detail-item">
-                          <span class="detail-label">Input Events</span>
-                          <div class="tool-response-hits">
+                        <div v-if="block.response.input" class="detail-item flex flex-col gap-1">
+                          <span class="detail-label text-2xs font-semibold uppercase opacity-60">Input Events</span>
+                          <div class="tool-response-hits flex flex-col gap-1 text-xs font-mono px-2 py-1.5 rounded-sm max-h-50 overflow-y-auto [background:color-mix(in_srgb,var(--color-text-primary)_5%,transparent)]">
                             <div
                               v-for="(evt, eIdx) in block.response.input"
                               :key="eIdx"
-                              class="tool-response-hit"
+                              class="tool-response-hit flex flex-wrap gap-x-3 gap-y-1 py-0.5 [&:not(:last-child)]:border-b [&:not(:last-child)]:border-border-default [&:not(:last-child)]:pb-1"
                             >
                               <span
                                 v-for="(val, key) in evt"
                                 :key="key"
-                                class="hit-field"
+                                class="hit-field break-all select-text cursor-text"
                               >
-                                <span class="hit-key">{{ key }}:</span>
+                                <span class="hit-key opacity-60 font-semibold">{{ key }}:</span>
                                 {{
                                   typeof val === "string" && val.length > 120
                                     ? val.substring(0, 120) + "..."
@@ -704,21 +705,21 @@
                             </div>
                           </div>
                         </div>
-                        <div v-if="block.response.output" class="detail-item">
-                          <span class="detail-label">Output</span>
-                          <div class="tool-response-hits">
+                        <div v-if="block.response.output" class="detail-item flex flex-col gap-1">
+                          <span class="detail-label text-2xs font-semibold uppercase opacity-60">Output</span>
+                          <div class="tool-response-hits flex flex-col gap-1 text-xs font-mono px-2 py-1.5 rounded-sm max-h-50 overflow-y-auto [background:color-mix(in_srgb,var(--color-text-primary)_5%,transparent)]">
                             <div
                               v-for="(res, rIdx) in block.response.output"
                               :key="rIdx"
-                              class="tool-response-hit"
+                              class="tool-response-hit flex flex-wrap gap-x-3 gap-y-1 py-0.5 [&:not(:last-child)]:border-b [&:not(:last-child)]:border-border-default [&:not(:last-child)]:pb-1"
                             >
                               <template v-if="res.event">
                                 <span
                                   v-for="(val, key) in res.event"
                                   :key="key"
-                                  class="hit-field"
+                                  class="hit-field break-all select-text cursor-text"
                                 >
-                                  <span class="hit-key">{{ key }}:</span>
+                                  <span class="hit-key opacity-60 font-semibold">{{ key }}:</span>
                                   {{
                                     typeof val === "string" && val.length > 120
                                       ? val.substring(0, 120) + "..."
@@ -728,9 +729,9 @@
                               </template>
                               <span
                                 v-if="res.message"
-                                class="hit-field hit-error"
+                                class="hit-field break-all select-text cursor-text text-status-negative"
                               >
-                                <span class="hit-key">error:</span>
+                                <span class="hit-key opacity-60 font-semibold">error:</span>
                                 {{ res.message }}
                               </span>
                             </div>
@@ -747,14 +748,14 @@
                       >
                         <div
                           v-if="block.response.items.length > 0"
-                          class="detail-item"
+                          class="detail-item flex flex-col gap-1"
                         >
-                          <div class="detail-header">
-                            <span class="detail-label">Items</span>
+                          <div class="detail-header flex items-center justify-between">
+                            <span class="detail-label text-2xs font-semibold uppercase opacity-60">Items</span>
                             <OButton
                               variant="ghost"
                               size="icon-xs-circle"
-                              class="copy-btn"
+                              class="copy-btn opacity-60 hover:opacity-100"
                               @click.stop="
                                 copyToClipboard(
                                   JSON.stringify(block.response.items, null, 2),
@@ -765,18 +766,18 @@
                               <OTooltip content="Copy items" />
                             </OButton>
                           </div>
-                          <div class="tool-response-hits">
+                          <div class="tool-response-hits flex flex-col gap-1 text-xs font-mono px-2 py-1.5 rounded-sm max-h-50 overflow-y-auto [background:color-mix(in_srgb,var(--color-text-primary)_5%,transparent)]">
                             <div
                               v-for="(item, iIdx) in block.response.items"
                               :key="iIdx"
-                              class="tool-response-list-item"
+                              class="tool-response-list-item flex flex-col gap-0.5 py-1 [&:not(:last-child)]:border-b [&:not(:last-child)]:border-border-default [&:not(:last-child)]:pb-1.5"
                             >
                               <div
                                 v-for="(val, key) in item"
                                 :key="key"
-                                class="hit-field"
+                                class="hit-field break-all select-text cursor-text"
                               >
-                                <span class="hit-key">{{ key }}:</span>
+                                <span class="hit-key opacity-60 font-semibold">{{ key }}:</span>
                                 {{
                                   typeof val === "object"
                                     ? JSON.stringify(val)
@@ -788,13 +789,13 @@
                         </div>
                       </template>
                       <!-- Tool response: generic fallback (string or other) -->
-                      <div v-else-if="block.response" class="detail-item">
-                        <div class="detail-header">
-                          <span class="detail-label">Response</span>
+                      <div v-else-if="block.response" class="detail-item flex flex-col gap-1">
+                        <div class="detail-header flex items-center justify-between">
+                          <span class="detail-label text-2xs font-semibold uppercase opacity-60">Response</span>
                           <OButton
                             variant="ghost"
                             size="icon-xs-circle"
-                            class="copy-btn"
+                            class="copy-btn opacity-60 hover:opacity-100"
                             @click.stop="
                               copyToClipboard(
                                 typeof block.response === 'string'
@@ -807,7 +808,7 @@
                             <OTooltip content="Copy response" />
                           </OButton>
                         </div>
-                        <code class="detail-value query-value">{{
+                        <code class="detail-value query-value text-xs select-text font-mono p-2 rounded-sm whitespace-pre-wrap break-all cursor-text [background:color-mix(in_srgb,var(--color-text-primary)_5%,transparent)]">{{
                           typeof block.response === "string"
                             ? block.response
                             : JSON.stringify(block.response, null, 2)
@@ -818,13 +819,14 @@
                   <!-- Log Entry block - expandable -->
                   <div
                     v-else-if="block.type === 'log_entry'"
-                    class="log-entry-item"
-                    :class="[                    ]"
+                    class="log-entry-item flex flex-col px-2.5 py-1.5 rounded-md text-xs mb-1 cursor-pointer text-text-secondary [background:color-mix(in_srgb,var(--color-info)_8%,transparent)] hover:[background:color-mix(in_srgb,var(--color-info)_12%,transparent)] dark:bg-surface-panel dark:border dark:border-border-default dark:hover:bg-surface-panel dark:hover:border-text-secondary"
                     @click="toggleLogEntryExpanded(index, blockIndex)"
                   >
-                    <div class="log-entry-header">
+                    <div class="log-entry-header flex items-center gap-1.5">
                       <OIcon name="description" size="xs" />
-                      <span class="log-entry-info">
+                      <span
+                        class="log-entry-info flex-1 font-medium text-xs overflow-hidden text-ellipsis whitespace-nowrap"
+                      >
                         {{ block.preview }}
                       </span>
                       <OIcon
@@ -834,27 +836,29 @@
                             : 'expand-more'
                         "
                         size="sm"
-                        class="expand-icon"
+                        class="expand-icon opacity-60 transition-transform duration-200"
                       />
                     </div>
                     <!-- Expandable details -->
                     <div
                       v-if="isLogEntryExpanded(index, blockIndex)"
-                      class="log-entry-details"
+                      class="log-entry-details mt-2.5"
                       @click.stop
                     >
-                      <div class="log-entry-content">
+                      <div
+                        class="log-entry-content relative rounded-md border overflow-hidden bg-surface-base border-border-default [box-shadow:0_2px_8px_color-mix(in_srgb,var(--color-black)_8%,transparent)] dark:bg-surface-panel dark:[box-shadow:0_2px_8px_color-mix(in_srgb,var(--color-black)_20%,transparent)]"
+                      >
                         <OButton
                           variant="ghost"
                           size="icon-xs-circle"
-                          class="copy-btn"
+                          class="copy-btn opacity-60 hover:opacity-100 absolute top-2 right-2 z-1 rounded-sm px-2 py-1 [background:color-mix(in_srgb,var(--color-text-primary)_10%,transparent)] hover:[background:color-mix(in_srgb,var(--color-text-primary)_8%,transparent)] dark:hover:[background:color-mix(in_srgb,var(--color-text-primary)_15%,transparent)]"
                           @click.stop="copyToClipboard(block.content)"
                         >
                           <OIcon name="content-copy" size="sm" />
                           <OTooltip content="Copy content" />
                         </OButton>
                         <code
-                          class="log-entry-code"
+                          class="log-entry-code block font-mono text-2xs leading-relaxed p-3 pr-10 whitespace-pre-wrap [word-wrap:break-word] select-text cursor-text max-h-75 overflow-y-auto bg-surface-base text-text-heading dark:[background:var(--color-syntax-bg)] dark:text-text-secondary"
                           v-html="formatLogEntryContent(block.content)"
                         ></code>
                       </div>
@@ -863,23 +867,23 @@
                   <!-- Stream-level error block -->
                   <div
                     v-else-if="block.type === 'error'"
-                    class="stream-error-block"
+                    class="stream-error-block flex flex-col px-3 py-2.5 rounded-md border-l-3 border-border-default mb-2 text-compact text-text-secondary [background:color-mix(in_srgb,var(--color-status-negative)_6%,transparent)] dark:[background:color-mix(in_srgb,var(--color-status-negative)_10%,transparent)]"
                   >
-                    <div class="stream-error-header">
+                    <div class="stream-error-header flex items-center gap-2">
                       <OIcon name="warning" size="sm" />
-                      <span class="stream-error-message">{{
+                      <span class="stream-error-message font-medium text-status-negative">{{
                         block.message
                       }}</span>
                     </div>
                     <div
                       v-if="block.suggestion"
-                      class="stream-error-suggestion"
+                      class="stream-error-suggestion mt-1.5 pl-6 italic text-xs opacity-85"
                     >
                       {{ block.suggestion }}
                     </div>
                     <div
                       v-if="block.recoverable"
-                      class="stream-error-recoverable"
+                      class="stream-error-recoverable mt-1 pl-6 text-2xs opacity-70"
                     >
                       This error may be temporary. You can try again.
                     </div>
@@ -889,12 +893,12 @@
                     v-else-if="
                       block.type === 'navigation' && block.navigationAction
                     "
-                    class="navigation-block"
+                    class="navigation-block my-1 [background:color-mix(in_srgb,var(--color-info)_8%,transparent)] dark:[background:color-mix(in_srgb,var(--color-info)_12%,transparent)]"
                   >
                     <OButton
                       variant="primary"
                       size="xs"
-                      class="navigation-block-btn"
+                      class="navigation-block-btn text-compact"
                       @click="handleNavigationAction(block.navigationAction)"
                     >
                       <template #icon-left
@@ -911,11 +915,16 @@
                       )"
                       :key="'tb-' + blockIndex + '-' + tbIndex"
                     >
-                      <div v-if="textBlock.type === 'code'" class="code-block">
-                        <div class="code-block-header code-block-theme">
+                      <div
+                        v-if="textBlock.type === 'code'"
+                        class="code-block rounded-sm m-0 overflow-hidden"
+                      >
+                        <div
+                          class="code-block-header flex items-center justify-between px-2 py-1 bg-surface-subtle"
+                        >
                           <span
                             v-if="textBlock.language"
-                            class="code-type-label"
+                            class="code-type-label text-xs font-semibold px-1.5 py-0.5 rounded-sm text-theme-accent dark:text-text-secondary [background:color-mix(in_srgb,var(--color-theme-accent)_10%,transparent)]"
                           >
                             {{ getLanguageDisplay(textBlock.language) }}
                           </span>
@@ -936,7 +945,7 @@
                           ></code>
                         </span>
                         <div
-                          class="code-block-footer code-block-theme flex items-center justify-between w-full"
+                          class="code-block-footer flex items-center justify-between w-full px-2 py-1"
                         >
                           <OButton
                             variant="ghost"
@@ -951,7 +960,7 @@
                       </div>
                       <div
                         v-else
-                        class="text-block"
+                        class="text-block w-full max-w-full wrap-break-word [&:not(:last-child)]:mb-1"
                         v-html="processHtmlBlock(textBlock.content)"
                       ></div>
                     </template>
@@ -980,7 +989,7 @@
                       <img
                         :src="'data:' + img.mimeType + ';base64,' + img.data"
                         :alt="img.filename"
-                        class="max-w-50 max-h-37.5 object-contain rounded-lg border border-border-strong cursor-pointer [transition:transform_0.2s_ease,box-shadow_0.2s_ease]"
+                        class="max-w-50 max-h-37.5 object-contain rounded-lg border border-border-strong cursor-pointer [transition:transform_0.2s_ease,box-shadow_0.2s_ease] hover:scale-102 hover:shadow-[0_4px_12px_color-mix(in_srgb,var(--color-black)_15%,transparent)]"
                         @click="openImagePreview(img)"
                       />
                       <OTooltip :content="img.filename" />
@@ -990,9 +999,17 @@
                     v-for="(block, blockIndex) in message.blocks"
                     :key="'fb-' + blockIndex"
                   >
-                    <div v-if="block.type === 'code'" class="code-block">
-                      <div class="code-block-header code-block-theme">
-                        <span v-if="block.language" class="code-type-label">
+                    <div
+                      v-if="block.type === 'code'"
+                      class="code-block rounded-sm m-0 overflow-hidden"
+                    >
+                      <div
+                        class="code-block-header flex items-center justify-between px-2 py-1 bg-surface-subtle"
+                      >
+                        <span
+                          v-if="block.language"
+                          class="code-type-label text-xs font-semibold px-1.5 py-0.5 rounded-sm text-theme-accent dark:text-text-secondary [background:color-mix(in_srgb,var(--color-theme-accent)_10%,transparent)]"
+                        >
                           {{ getLanguageDisplay(block.language) }}
                         </span>
                         <OButton
@@ -1014,7 +1031,7 @@
                     </div>
                     <div
                       v-else
-                      class="text-block"
+                      class="text-block w-full max-w-full wrap-break-word [&:not(:last-child)]:mb-1"
                       v-html="processHtmlBlock(block.content)"
                     ></div>
                   </template>
@@ -1026,16 +1043,18 @@
                     message.content &&
                     message.content.trim() !== ''
                   "
-                  class="feedback-buttons"
-                  :class="{ 'feedback-active': message.feedback }"
+                  class="feedback-buttons flex items-center gap-0.5 mt-1 *:transition-opacity *:duration-200 [&>*:hover]:opacity-100"
+                  :class="message.feedback ? '*:opacity-100' : '*:opacity-50'"
                 >
                   <OButton
                     variant="ghost"
                     size="icon-xs-circle"
                     :disabled="message.feedback === 'thumbs_up'"
-                    :class="{
-                      'feedback-selected': message.feedback === 'thumbs_up',
-                    }"
+                    :class="
+                      message.feedback === 'thumbs_up'
+                        ? 'text-accent opacity-100!'
+                        : ''
+                    "
                     data-test="o2-ai-chat-thumbs-up-btn"
                     @click="likeCodeBlock(index)"
                   >
@@ -1046,9 +1065,11 @@
                     variant="ghost"
                     size="icon-xs-circle"
                     :disabled="message.feedback === 'thumbs_down'"
-                    :class="{
-                      'feedback-selected': message.feedback === 'thumbs_down',
-                    }"
+                    :class="
+                      message.feedback === 'thumbs_down'
+                        ? 'text-accent opacity-100!'
+                        : ''
+                    "
                     data-test="o2-ai-chat-thumbs-down-btn"
                     @click="dislikeCodeBlock(index)"
                   >
@@ -1066,61 +1087,70 @@
             v-for="(block, pIdx) in pendingToolCalls"
             v-show="block.type === 'tool_call'"
             :key="'pending-tc-' + pIdx"
-            class="tool-call-indicator completed"
+            class="tool-call-indicator flex items-center rounded-xl border border-border-default [background:var(--color-chat-bubble-user)] px-4 py-2 my-1"
           >
-            <div class="tool-call-content">
+            <div class="tool-call-content flex items-center gap-3 w-full">
               <OIcon
                 :name="block.success === false ? 'error' : 'check-circle'"
                 size="sm"
               />
-              <div class="tool-call-info">
-                <span class="tool-call-message">{{ block.message }}</span>
+              <div class="tool-call-info flex flex-col flex-1 min-w-0 gap-1.5">
+                <span
+                  class="tool-call-message text-sm font-medium opacity-85 text-text-secondary"
+                  >{{ block.message }}</span
+                >
               </div>
             </div>
           </div>
           <!-- Tool call indicator - shows outside message box -->
           <div
             v-if="activeToolCall"
-            class="tool-call-indicator"
+            class="tool-call-indicator flex items-center rounded-xl border border-border-default [background:var(--color-chat-bubble-user)] px-4 py-3 my-2"
           >
-            <div class="tool-call-content">
+            <div class="tool-call-content flex items-center gap-3 w-full">
               <OSpinner variant="dots" size="xs" />
-              <div class="tool-call-info">
-                <span class="tool-call-message">{{
+              <div class="tool-call-info flex flex-col flex-1 min-w-0 gap-1.5">
+                <span class="tool-call-message text-sm font-semibold text-text-secondary">{{
                   activeToolCall.message
                 }}</span>
                 <div
                   v-if="getToolCallDisplayData(activeToolCall.context)"
-                  class="tool-call-context"
+                  class="tool-call-context flex flex-wrap items-center gap-2"
                 >
                   <div
                     v-if="getToolCallDisplayData(activeToolCall.context)?.query"
-                    class="context-item"
+                    class="context-item w-full"
                   >
-                    <code class="context-query">{{
-                      truncateQuery(
-                        getToolCallDisplayData(activeToolCall.context)?.query,
-                      )
-                    }}</code>
+                    <code
+                      class="context-query block font-mono text-xs px-3 py-2 rounded-md whitespace-pre-wrap break-all max-w-full overflow-hidden bg-surface-base border border-border-default text-text-body dark:text-text-secondary"
+                      >{{
+                        truncateQuery(
+                          getToolCallDisplayData(activeToolCall.context)?.query,
+                        )
+                      }}</code
+                    >
                   </div>
                   <div
                     v-if="
                       getToolCallDisplayData(activeToolCall.context)?.vrl &&
                       !getToolCallDisplayData(activeToolCall.context)?.query
                     "
-                    class="context-item"
+                    class="context-item w-full"
                   >
-                    <code class="context-query">{{
-                      truncateQuery(
-                        getToolCallDisplayData(activeToolCall.context)?.vrl,
-                      )
-                    }}</code>
+                    <code
+                      class="context-query block font-mono text-xs px-3 py-2 rounded-md whitespace-pre-wrap break-all max-w-full overflow-hidden bg-surface-base border border-border-default text-text-body dark:text-text-secondary"
+                      >{{
+                        truncateQuery(
+                          getToolCallDisplayData(activeToolCall.context)?.vrl,
+                        )
+                      }}</code
+                    >
                   </div>
                   <span
                     v-if="
                       getToolCallDisplayData(activeToolCall.context)?.stream
                     "
-                    class="context-tag"
+                    class="context-tag inline-flex items-center text-2xs px-2 py-1 rounded-sm font-medium text-ai-accent dark:text-text-secondary [background:color-mix(in_srgb,var(--color-ai-accent)_10%,transparent)] dark:[background:color-mix(in_srgb,var(--color-ai-accent)_20%,transparent)]"
                   >
                     Stream:
                     {{ getToolCallDisplayData(activeToolCall.context)?.stream }}
@@ -1129,7 +1159,7 @@
                     v-if="
                       getToolCallDisplayData(activeToolCall.context)?.query_type
                     "
-                    class="context-tag"
+                    class="context-tag inline-flex items-center text-2xs px-2 py-1 rounded-sm font-medium text-ai-accent dark:text-text-secondary [background:color-mix(in_srgb,var(--color-ai-accent)_10%,transparent)] dark:[background:color-mix(in_srgb,var(--color-ai-accent)_20%,transparent)]"
                   >
                     Type:
                     {{
@@ -1143,11 +1173,11 @@
           <!-- Standalone loading indicator - only shown when loading with no tool calls -->
           <div
             v-if="isLoading && !activeToolCall"
-            class="tool-call-indicator"
+            class="tool-call-indicator flex items-center rounded-xl border border-border-default [background:var(--color-chat-bubble-user)] px-4 py-3 my-2"
           >
-            <div class="tool-call-content">
+            <div class="tool-call-content flex items-center gap-3 w-full">
               <OSpinner variant="dots" size="xs" />
-              <span class="tool-call-message">{{
+              <span class="tool-call-message text-sm font-semibold text-text-secondary">{{
                 currentAnalyzingMessage
               }}</span>
             </div>
@@ -1155,11 +1185,11 @@
         </div>
 
         <!-- Scroll to bottom button -->
-        <div v-show="showScrollToBottom" class="scroll-to-bottom-container absolute bottom-2.5 left-1/2 -translate-x-1/2 z-[1000] pointer-events-none [transition:all_0.3s_ease]">
+        <div v-show="showScrollToBottom" class="scroll-to-bottom-container absolute bottom-2.5 left-1/2 -translate-x-1/2 z-1000 pointer-events-none [transition:all_0.3s_ease]">
           <OButton
             variant="ghost"
             size="icon-sm"
-            class="scroll-to-bottom-btn transition-all duration-300 [animation:fadeInUp_0.3s_ease] pointer-events-auto [backdrop-filter:blur(8px)] shadow-[0_2px_8px_rgba(0,0,0,0.2)] border-2! border-text-link! text-text-link! bg-surface-base! dark:border-ai-accent! dark:text-ai-accent! dark:bg-surface-base! hover:scale-110 hover:shadow-[0_4px_12px_rgba(0,0,0,0.3)] hover:border-text-link! hover:text-text-link! hover:bg-surface-base! dark:hover:border-ai-accent! dark:hover:text-ai-accent! dark:hover:bg-surface-base! active:scale-100"
+            class="scroll-to-bottom-btn transition-all duration-300 animate-[o2ai-fade-in-up_0.3s_ease] pointer-events-auto [backdrop-filter:blur(0.5rem)] shadow-[0_2px_8px_color-mix(in_srgb,var(--color-black)_20%,transparent)] border-2! border-text-link! text-text-link! bg-surface-base! dark:border-ai-accent! dark:text-ai-accent! dark:bg-surface-base! hover:scale-110 hover:shadow-[0_4px_12px_color-mix(in_srgb,var(--color-black)_30%,transparent)] hover:border-text-link! hover:text-text-link! hover:bg-surface-base! dark:hover:border-ai-accent! dark:hover:text-ai-accent! dark:hover:bg-surface-base! active:scale-100"
             @click="scrollToBottomSmooth"
           >
             <OIcon name="arrow-downward" size="sm" />
@@ -1171,21 +1201,31 @@
       <!-- Fixed loading indicator above input - only shown when scrolled up -->
       <div
         v-if="(isLoading || activeToolCall) && showScrollToBottom"
-        class="fixed-analyzing-indicator"
+        class="fixed-analyzing-indicator flex items-center justify-center px-4 py-3 mx-4 mb-2 rounded-xl border border-border-default [background:var(--color-chat-bubble-user)] [box-shadow:0_2px_8px_color-mix(in_srgb,var(--color-black)_8%,transparent)]"
       >
         <!-- Show tool call if active -->
-        <div v-if="activeToolCall" class="analyzing-content">
+        <div
+          v-if="activeToolCall"
+          class="analyzing-content flex items-center gap-3 w-full max-w-225"
+        >
           <OSpinner variant="dots" size="xs" />
-          <span class="analyzing-message">{{ activeToolCall.message }}</span>
+          <span class="analyzing-message text-sm font-medium text-theme-accent">{{
+            activeToolCall.message
+          }}</span>
         </div>
         <!-- Show analyzing message if loading but no active tool call -->
-        <div v-else-if="isLoading" class="analyzing-content">
+        <div
+          v-else-if="isLoading"
+          class="analyzing-content flex items-center gap-3 w-full max-w-225"
+        >
           <OSpinner variant="dots" size="xs" />
-          <span class="analyzing-message">{{ currentAnalyzingMessage }}</span>
+          <span class="analyzing-message text-sm font-medium text-theme-accent">{{
+            currentAnalyzingMessage
+          }}</span>
         </div>
       </div>
 
-      <div class="chat-input-container m-3">
+      <div class="chat-input-container relative shrink-0 w-full max-w-225 mx-auto my-2 px-2">
         <!-- Confirmation dialog -->
         <O2AIConfirmDialog
           :visible="pendingConfirmation !== null"
@@ -1201,13 +1241,13 @@
           type="file"
           accept="image/png,image/jpeg"
           multiple
-          style="display: none"
+          class="hidden"
           @change="handleImageSelect"
         />
 
         <div
           v-if="!pendingConfirmation"
-          class="unified-input-box"
+          class="unified-input-box flex flex-col gap-3 px-2 py-1 rounded-xl transition-all duration-200 bg-surface-base border border-border-default focus-within:border-transparent focus-within:[box-shadow:0_0_0_2px_var(--color-accent)]"
           @dragover="handleDragOver"
           @drop="handleDrop"
           @paste="handlePaste"
@@ -1222,12 +1262,12 @@
               <img
                 :src="'data:' + img.mimeType + ';base64,' + img.data"
                 :alt="img.filename"
-                class="preview-image w-16 h-16 object-cover rounded-lg border border-border-default [transition:transform_0.2s_ease]"
+                class="preview-image w-16 h-16 object-cover rounded-lg border border-border-default [transition:transform_0.2s_ease] hover:scale-105"
               />
               <OButton
                 variant="ghost"
                 size="icon-xs-circle"
-                class="image-remove-btn absolute! top-[-6px]! right-[-6px]! w-5! h-5! min-w-5! min-h-5! p-0! bg-status-negative! z-10"
+                class="image-remove-btn absolute! -top-1.5! -right-1.5! w-5! h-5! min-w-5! min-h-5! p-0! bg-status-negative! z-10 hover:bg-status-negative!"
                 @click.stop="removeImage(index)"
               >
                 <OIcon name="close" size="xs" />
@@ -1252,7 +1292,7 @@
           />
 
           <!-- Bottom bar with buttons -->
-          <div class="input-bottom-bar">
+          <div class="input-bottom-bar flex items-center justify-between pt-2">
             <div class="flex items-center gap-2">
               <!-- Image upload button -->
               <OButton
@@ -1278,7 +1318,6 @@
                 variant="ghost"
                 size="sm"
                 class="auto-nav-toggle-btn flex items-center gap-1.5 px-2 py-1 rounded-md transition-all duration-200 hover:bg-surface-subtle"
-                :class="{ 'auto-nav-enabled': isAutoNavigationEnabled }"
               >
                 <OIcon
                   :name="
@@ -1289,10 +1328,20 @@
                   size="sm"
                   :class="[
                     'auto-nav-icon',
-                    !isAutoNavigationEnabled ? 'text-icon-color' : ''
+                    isAutoNavigationEnabled
+                      ? 'text-theme-accent!'
+                      : 'text-icon-color'
                   ]"
                 />
-                <span class="auto-nav-label ml-1 text-xs font-medium text-text-secondary">{{ t('aiAssistant.autoNavigation.label') }}</span>
+                <span
+                  class="auto-nav-label ml-1 text-xs font-medium"
+                  :class="
+                    isAutoNavigationEnabled
+                      ? 'text-theme-accent'
+                      : 'text-text-secondary'
+                  "
+                  >{{ t('aiAssistant.autoNavigation.label') }}</span
+                >
                 <OTooltip
                   :content="
                     isAutoNavigationEnabled
@@ -1311,7 +1360,7 @@
                 @click="sendMessage"
                 variant="ai-gradient"
                 size="icon-xs-circle"
-                class="send-button bg-[image:var(--color-gradient-ai)]! [transition:all_0.3s_ease]! shadow-[0_4px_15px_0_rgba(139,92,246,0.3)]!"
+                class="send-button bg-(image:--color-gradient-ai)! [transition:all_0.3s_ease]! shadow-[0_4px_15px_0_color-mix(in_srgb,var(--color-ai-accent)_30%,transparent)]!"
               >
                 <OIcon name="send" size="sm" />
               </OButton>
@@ -1322,7 +1371,7 @@
                 @click="cancelCurrentRequest"
                 variant="ghost"
                 size="icon-xs-circle"
-                class="stop-button bg-[image:var(--color-gradient-danger)]! [transition:all_0.3s_ease]! shadow-[0_4px_15px_0_rgba(245,101,101,0.3)]!"
+                class="stop-button bg-(image:--color-gradient-danger)! [transition:all_0.3s_ease]! shadow-[0_4px_15px_0_color-mix(in_srgb,var(--color-status-negative)_30%,transparent)]! hover:bg-(image:--color-gradient-danger-hover)! hover:shadow-[0_6px_20px_0_color-mix(in_srgb,var(--color-status-negative)_40%,transparent)]! hover:-translate-y-px! active:translate-y-0! active:shadow-[0_2px_10px_0_color-mix(in_srgb,var(--color-status-negative)_30%,transparent)]!"
               >
                 <OIcon name="stop" size="sm" />
               </OButton>
@@ -5763,231 +5812,48 @@ export default defineComponent({
 </script>
 
 <style>
-/* =============================================
-   .chat-container and nested rules
-   ============================================= */
-
-
-.chat-container .chat-header {
-  padding: 0px 12px 4px 12px;
-  display: flex;
-  justify-content: space-between;
-  align-items: end;
-  border-bottom: 1px solid var(--color-separator);
-  flex-shrink: 0;
-  background: var(--color-surface-base);
-  z-index: 2;
-}
-
-.chat-container .chat-header .chat-title {
-  font-weight: bold;
-}
-
-.chat-container .chat-header .chat-title-dropdown {
-  padding: 6px 12px;
-  border-radius: 4px;
-  transition: background-color 0.2s;
-  max-width: 210px;
-  height: 32px;
-  min-height: 32px;
-  display: flex;
-  align-items: center;
-  overflow: hidden;
-}
-
-.chat-container .chat-header .chat-title-dropdown:hover {
-  background-color: var(--color-interactive-hover-bg);
-}
-
-.chat-container .chat-header .chat-title-dropdown span {
-  color: var(--color-button-primary-foreground);
-}
-
-.chat-container .chat-header .chat-title-dropdown .chat-title-text {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  max-width: 180px;
-}
-
-.chat-container .chat-session-title {
-  padding: 8px 16px;
-  font-size: 14px;
-  min-height: 32px;
-  display: flex;
-  align-items: center;
-  flex-shrink: 0;
-  border-bottom: 1px solid var(--color-separator);
-}
-
-.chat-container .chat-session-title {
-  color: var(--color-text-primary);
-  background: linear-gradient(
-    to right,
-    color-mix(in srgb, var(--color-theme-accent) 8%, transparent),
-    transparent
-  );
-}
-
-.dark .chat-container .chat-session-title {
-  background: linear-gradient(
-    to right,
-    color-mix(in srgb, var(--color-theme-accent) 15%, transparent),
-    transparent
-  );
-}
-
-.chat-container .chat-session-title .title-text {
-  font-weight: 600;
-}
-
-.chat-container .chat-session-title .typing-cursor {
-  animation: blink 0.7s infinite;
-  margin-left: 2px;
-  font-weight: 400;
-}
-
-@keyframes blink {
-  0%,
-  50% {
-    opacity: 1;
-  }
-  51%,
-  100% {
-    opacity: 0;
-  }
-}
-
-.chat-container .chat-content {
-  flex: 1;
-  min-height: 0;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  background: transparent;
-  position: relative;
-}
-
-.chat-container .messages-container {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  padding: 8px;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  background: transparent;
-  max-width: 900px;
-  margin: 0 auto;
-  width: 100%;
-}
-
-.chat-container .welcome-section {
-  padding: 24px;
-  background: linear-gradient(
-    to right,
-    color-mix(in srgb, var(--color-theme-accent) 5%, transparent),
-    color-mix(in srgb, var(--color-theme-accent) 10%, transparent)
-  );
-  border-radius: 8px;
-  margin-bottom: 24px;
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.chat-container .welcome-section.welcome-section--centered {
-  background: transparent;
-  padding: 0;
-  margin-bottom: 0;
-}
-
-.chat-container .centered-input-wrap {
-  max-width: 900px;
-  width: calc(100% - 16px);
-  margin-top: 1.25em;
-  font-size: 1rem;
-}
-
-.chat-container .centered-input-wrap .rich-text-input {
-  font-size: 1rem;
-}
-
-.chat-container .fixed-analyzing-indicator {
-  padding: 12px 16px;
-  margin: 0 16px 8px 16px;
-  border-radius: 12px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  animation: fadeInSlide 0.3s ease;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-}
-
-:root:not(.dark) .chat-container .fixed-analyzing-indicator {
-  background: var(--color-chat-bubble-user);
-  border: 1px solid var(--color-border-default);
-}
-
-.dark .chat-container .fixed-analyzing-indicator {
-  background: var(--color-chat-bubble-user);
-  border: 1px solid var(--color-border-default);
-}
-
-.chat-container .fixed-analyzing-indicator .analyzing-content {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  max-width: 900px;
-  width: 100%;
-}
-
-.chat-container .fixed-analyzing-indicator .analyzing-message {
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--color-theme-accent);
-}
-
-.chat-container .fixed-analyzing-indicator .tool-call-info {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  flex: 1;
-}
-
-.chat-container .fixed-analyzing-indicator .tool-call-context-inline {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  align-items: center;
-  margin-top: 4px;
-}
-
-.chat-container .fixed-analyzing-indicator .context-query-inline {
-  font-size: 12px;
-  padding: 4px 8px;
-  border-radius: 6px;
-  background: rgba(0, 0, 0, 0.05);
-  max-width: 500px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.chat-container .fixed-analyzing-indicator .context-tag-inline {
-  font-size: 11px;
-  padding: 2px 8px;
-  border-radius: 4px;
-  background: color-mix(in srgb, var(--color-theme-accent) 10%, transparent);
-  color: var(--color-theme-accent);
-  font-weight: 500;
-}
-
-@keyframes fadeInSlide {
+/* keep(keyframes): this block is deliberately UNSCOPED. `o2ai-fade-in-up` is
+   referenced from the template as an arbitrary utility
+   (`animate-[o2ai-fade-in-up_0.3s_ease]` on .scroll-to-bottom-btn). Vue's scoped
+   compiler rewrites @keyframes names and the `animation:` shorthands *inside a
+   scoped block*, but it never rewrites animation names inside template classes —
+   scoping this would rename the keyframes and silently break the reference. The
+   name is component-prefixed because an unscoped @keyframes is global. */
+@keyframes o2ai-fade-in-up {
   from {
     opacity: 0;
-    transform: translateY(-10px);
+    transform: translateY(0.625rem) scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+</style>
+
+<style scoped>
+/* keep(generated-content): markdown/log/code markup is injected with v-html, so
+   it carries no scope attribute and cannot take utility classes — it can only be
+   reached from here through :deep().
+   keep(lib-override:hljs): highlight.js emits its own .hljs-* class names; the
+   token mapping below mirrors lib/core/Code/OCodeBlock.vue exactly (D6).
+   keep(keyframes): @keyframes and the `animation:` that consumes it must live in
+   the same block — the scoped compiler renames both together.
+   keep(complex-state): .tool-call-item's status x has-details x hover matrix and
+   .send-button's :not(.disabled):not([disabled]):not(:disabled) guard have no
+   utility equivalent (`enabled:` covers :disabled, not the .disabled class). */
+
+/* ============================================================
+   keep(keyframes) — each consumer sits next to its @keyframes
+   ============================================================ */
+.tool-call-indicator {
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-0.625rem);
   }
   to {
     opacity: 1;
@@ -5995,192 +5861,161 @@ export default defineComponent({
   }
 }
 
-.chat-container .chat-input-container {
-  position: relative;
-  flex-shrink: 0;
-  max-width: 900px;
-  width: calc(100% - 0px);
-  margin: 8px auto;
-  padding: 0 8px;
+.fixed-analyzing-indicator {
+  animation: fadeInSlide 0.3s ease;
 }
 
-.chat-container .unified-input-box {
-  display: flex;
-  flex-direction: column;
-  padding: 4px 8px;
-  border-radius: 12px;
-  transition: all 0.2s ease;
-  gap: 12px;
+@keyframes fadeInSlide {
+  from {
+    opacity: 0;
+    transform: translateY(-0.625rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
-.chat-container .unified-input-box {
-  background: var(--color-surface-base);
-  border: 1px solid var(--color-border-default);
+/* ============================================================
+   keep(complex-state) — tool call status matrix.
+   Status tint x (has-details) hover x light/dark. Each status maps to its
+   semantic token; the light/dark pairs differ only in mix strength, so dark
+   overrides just the percentage.
+   ============================================================ */
+.tool-call-item {
+  background: color-mix(in srgb, var(--color-status-positive) 8%, transparent);
+  color: var(--color-text-secondary);
+}
+.dark .tool-call-item {
+  background: color-mix(in srgb, var(--color-status-positive) 12%, transparent);
+}
+.tool-call-item.has-details {
+  cursor: pointer;
+}
+.tool-call-item.has-details:hover {
+  background: color-mix(in srgb, var(--color-status-positive) 12%, transparent);
+}
+.dark .tool-call-item.has-details:hover {
+  background: color-mix(in srgb, var(--color-status-positive) 18%, transparent);
 }
 
-.chat-container .unified-input-box:focus-within {
-  border: 1px solid transparent;
-  box-shadow: 0 0 0 2px var(--color-accent);
+.tool-call-item.error {
+  background: color-mix(in srgb, var(--color-status-negative) 8%, transparent);
+}
+.dark .tool-call-item.error {
+  background: color-mix(in srgb, var(--color-status-negative) 12%, transparent);
+}
+.tool-call-item.error.has-details:hover {
+  background: color-mix(in srgb, var(--color-status-negative) 15%, transparent);
+}
+.dark .tool-call-item.error.has-details:hover {
+  background: color-mix(in srgb, var(--color-status-negative) 22%, transparent);
 }
 
-.chat-container .unified-input-box .rich-text-input-wrapper {
+.tool-call-item.timeout {
+  background: color-mix(in srgb, var(--color-warning) 8%, transparent);
+}
+.dark .tool-call-item.timeout {
+  background: color-mix(in srgb, var(--color-warning) 12%, transparent);
+}
+.tool-call-item.timeout.has-details:hover {
+  background: color-mix(in srgb, var(--color-warning) 15%, transparent);
+}
+.dark .tool-call-item.timeout.has-details:hover {
+  background: color-mix(in srgb, var(--color-warning) 22%, transparent);
+}
+
+.tool-call-item.pending-confirmation {
+  cursor: default;
+  background: color-mix(in srgb, var(--color-warning) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-warning) 30%, transparent);
+}
+.dark .tool-call-item.pending-confirmation {
+  background: color-mix(in srgb, var(--color-warning) 15%, transparent);
+  border-color: color-mix(in srgb, var(--color-warning) 25%, transparent);
+}
+
+.tool-call-item.pending-navigation {
+  cursor: default;
+  background: color-mix(in srgb, var(--color-info) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-info) 30%, transparent);
+}
+.dark .tool-call-item.pending-navigation {
+  background: color-mix(in srgb, var(--color-info) 12%, transparent);
+  border-color: color-mix(in srgb, var(--color-info) 25%, transparent);
+}
+
+/* ============================================================
+   keep(complex-state) — send button.
+   The enabled guard is a .disabled CLASS plus [disabled] plus :disabled;
+   Tailwind's `enabled:` variant only covers the last two.
+   ============================================================ */
+.send-button:hover:not(.disabled):not([disabled]):not(:disabled) {
+  background: var(--color-gradient-ai) !important;
+  box-shadow: 0 0.375rem 1.25rem 0
+    color-mix(in srgb, var(--color-ai-accent) 40%, transparent) !important;
+  transform: translateY(-0.0625rem) !important;
+}
+.send-button:active:not(.disabled):not([disabled]):not(:disabled) {
+  transform: translateY(0) !important;
+  box-shadow: 0 0.125rem 0.625rem 0
+    color-mix(in srgb, var(--color-ai-accent) 30%, transparent) !important;
+}
+
+/* ============================================================
+   keep(generated-content) — RichTextInput is a child component, so its
+   internals carry no scope attribute of ours.
+   ============================================================ */
+.unified-input-box :deep(.rich-text-input-wrapper) {
   width: 100%;
-  min-height: 40px;
+  min-height: 2.5rem;
+}
+.unified-input-box :deep(.rich-text-input) {
+  padding: 0.25rem 0;
 }
 
-.chat-container .unified-input-box .rich-text-input {
-  padding: 4px 0;
-}
-
-.chat-container .input-bottom-bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding-top: 8px;
-}
-
-
-.chat-container .auto-nav-toggle-btn.auto-nav-enabled .auto-nav-icon {
-  color: var(--color-theme-accent) !important;
-}
-
-.chat-container .auto-nav-toggle-btn.auto-nav-enabled .auto-nav-label {
-  color: var(--color-theme-accent);
-}
-
-
-.chat-container .message {
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
-}
-
-.dark .chat-container .message {
-  box-shadow: 0 1px 2px rgba(255, 255, 255, 0.1);
-}
-
-.chat-container .message {
-  width: 100%;
-  padding: 12px;
-  border-radius: 8px;
-}
-
-.chat-container .message .message-content {
-  display: flex;
-  align-items: flex-start;
-  gap: 6px;
-  width: 100%;
-}
-
-.chat-container .message .message-blocks {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-  min-width: 0;
-  max-width: 100%;
-  overflow-x: auto;
-  word-wrap: break-word;
-  overflow-wrap: break-word;
-}
-
-.chat-container .message .feedback-buttons {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  margin-top: 4px;
-}
-
-.chat-container .message .feedback-buttons > * {
-  opacity: 0.5;
-  transition: opacity 0.2s;
-}
-
-.chat-container .message .feedback-buttons > *:hover {
-  opacity: 1;
-}
-
-.chat-container .message .feedback-buttons.feedback-active > * {
-  opacity: 1;
-}
-
-.chat-container .message .feedback-buttons .feedback-selected {
-  color: var(--color-accent);
-  opacity: 1;
-}
-
-.chat-container .message .text-block {
-  width: 100%;
-  overflow-wrap: break-word;
-  max-width: 100%;
-}
-
-.chat-container .message .text-block:not(:last-child) {
-  margin-bottom: 4px;
-}
-
-.chat-container .message .text-block pre,
-.chat-container .message .text-block .generated-code-block {
-  white-space: pre-wrap;
-  word-break: break-word;
-  overflow-wrap: break-word;
-  margin: 0;
-  padding: 0;
-  line-height: 1.4;
-  display: block;
-  max-width: 100%;
-  overflow-x: auto;
-}
-
-.chat-container .message .text-block pre code,
-.chat-container .message .text-block .generated-code-block code {
-  padding: 8px;
-  margin: 0;
-  display: block;
-  max-width: 100%;
-}
-
-.chat-container .message .text-block h1 {
+/* ============================================================
+   keep(generated-content) — markdown rendered from v-html inside .text-block.
+   `!important` retained: these fight the global base-elements typography layer.
+   ============================================================ */
+.text-block :deep(h1) {
   font-size: 1.5rem !important;
   font-weight: 600 !important;
-  margin: 16px 0 8px 0 !important;
+  margin: 1rem 0 0.5rem 0 !important;
   line-height: 1.3 !important;
 }
-
-.chat-container .message .text-block h2 {
+.text-block :deep(h2) {
   font-size: 1.25rem !important;
   font-weight: 600 !important;
-  margin: 14px 0 7px 0 !important;
+  margin: 0.875rem 0 0.4375rem 0 !important;
   line-height: 1.3 !important;
 }
-
-.chat-container .message .text-block h3 {
+.text-block :deep(h3) {
   font-size: 1.125rem !important;
   font-weight: 600 !important;
-  margin: 12px 0 6px 0 !important;
+  margin: 0.75rem 0 0.375rem 0 !important;
   line-height: 1.3 !important;
 }
-
-.chat-container .message .text-block h4 {
+.text-block :deep(h4) {
   font-size: 1rem !important;
   font-weight: 600 !important;
-  margin: 10px 0 5px 0 !important;
+  margin: 0.625rem 0 0.3125rem 0 !important;
   line-height: 1.3 !important;
 }
-
-.chat-container .message .text-block h5 {
+.text-block :deep(h5) {
   font-size: 0.875rem !important;
   font-weight: 600 !important;
-  margin: 8px 0 4px 0 !important;
+  margin: 0.5rem 0 0.25rem 0 !important;
   line-height: 1.3 !important;
 }
-
-.chat-container .message .text-block h6 {
+.text-block :deep(h6) {
   font-size: 0.75rem !important;
   font-weight: 600 !important;
-  margin: 8px 0 4px 0 !important;
+  margin: 0.5rem 0 0.25rem 0 !important;
   line-height: 1.3 !important;
 }
 
-.chat-container .message .text-block table {
+.text-block :deep(table) {
   max-width: 100%;
   width: 100%;
   table-layout: fixed;
@@ -6189,10 +6024,9 @@ export default defineComponent({
   display: block;
   white-space: nowrap;
 }
-
-.chat-container .message .text-block table th,
-.chat-container .message .text-block table td {
-  padding: 8px 12px;
+.text-block :deep(th),
+.text-block :deep(td) {
+  padding: 0.5rem 0.75rem;
   border: 1px solid var(--color-border-default);
   word-wrap: break-word;
   overflow-wrap: break-word;
@@ -6200,131 +6034,64 @@ export default defineComponent({
   overflow: hidden;
 }
 
-.chat-container .message .text-block p,
-.chat-container .message .text-block div,
-.chat-container .message .text-block span {
+.text-block :deep(p),
+.text-block :deep(div),
+.text-block :deep(span) {
   word-wrap: break-word;
   overflow-wrap: break-word;
   word-break: break-word;
   max-width: 100%;
 }
 
-.chat-container .message .text-block ol {
+.text-block :deep(ol) {
   list-style-type: decimal;
   padding-left: 1.5em;
   margin: 0.5em 0;
 }
-
-.chat-container .message .text-block ul {
+.text-block :deep(ul) {
   list-style-type: disc;
   padding-left: 1.5em;
   margin: 0.5em 0;
 }
-
-.chat-container .message .text-block li {
+.text-block :deep(li) {
   margin: 0.25em 0;
 }
 
-.chat-container .message .code-block {
-  border-radius: 4px;
-  overflow: hidden;
-  margin: 0;
-}
-
-.chat-container .message .code-block-header {
-  padding: 4px 8px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.chat-container .message .code-type-label {
-  font-size: 12px;
-  font-weight: 600;
-  padding: 2px 6px;
-  border-radius: 4px;
-  background: color-mix(in srgb, var(--color-theme-accent) 10%, transparent);
-}
-
-.code-type-label {
-  color: var(--color-theme-accent);
-}
-
-.dark .code-type-label {
-  color: var(--color-text-secondary);
-}
-
-.chat-container .message .generated-code-block {
+/* ============================================================
+   keep(generated-content) — code blocks.
+   .generated-code-block is emitted BOTH from the template and by the markdown
+   renderer (which rewrites <pre> into <span class="generated-code-block">), so
+   it must be reachable through :deep() either way. The background/border are
+   set here rather than as utilities because they have to beat .hljs below,
+   which is unlayered and would otherwise win over @layer utilities.
+   ============================================================ */
+.message-blocks :deep(.generated-code-block),
+.text-block :deep(pre) {
+  display: block;
   white-space: pre-wrap;
   word-break: break-word;
   overflow-wrap: break-word;
   margin: 0;
   padding: 0;
   line-height: 1.4;
+  max-width: 100%;
+  overflow-x: auto;
 }
-
-.chat-container .message .generated-code-block code {
-  padding: 8px;
-  margin: 0;
+.message-blocks :deep(.generated-code-block code),
+.text-block :deep(pre code) {
   display: block;
-}
-
-.dark .generated-code-block code {
+  padding: 0.5rem;
+  margin: 0;
+  max-width: 100%;
   background-color: var(--color-surface-base);
-  border: 0.5px solid var(--color-border-subtle);
+  border: 1px solid var(--color-border-subtle);
   border-top: none;
 }
 
-.generated-code-block code {
-  background-color: var(--color-surface-base);
-  border: 0.5px solid var(--color-border-subtle);
-  border-top: none;
-  color: black;
-}
-
-.chat-container .message .code-block-footer {
-  padding: 4px 8px;
-  display: flex;
-}
-
-.chat-container .message.user {
-  background: var(--color-chat-bubble-ai);
-  border: 1px solid var(--color-border-default);
-  border-radius: 12px;
-  color: var(--color-text-body);
-  margin-left: 40px;
-  width: calc(100% - 40px);
-}
-
-.chat-container .message.assistant {
-  background: var(--color-surface-base);
-  border: 1px solid var(--color-border-default);
-  border-radius: 12px;
-  color: var(--color-button-primary-foreground);
-  margin-left: 0;
-  width: 100%;
-}
-
-.dark .chat-container .message.user {
-  background: var(--color-chat-bubble-ai);
-  border: 1px solid var(--color-border-default);
-  border-radius: 12px;
-  color: var(--color-text-secondary);
-  margin-left: 40px;
-  width: calc(100% - 40px);
-}
-
-.dark .chat-container .message.assistant {
-  background: var(--color-surface-base);
-  border: 1px solid var(--color-border-default);
-  border-radius: 12px;
-  color: var(--color-text-secondary);
-  margin-left: 0;
-  width: 100%;
-}
-
-.chat-container ul pre,
-.chat-container ol pre {
+/* Markdown lists can nest a fenced block; hljs sets the palette, these two
+   only need the reset. */
+.text-block :deep(ul pre),
+.text-block :deep(ol pre) {
   white-space: pre-wrap;
   word-break: break-word;
   overflow-wrap: break-word;
@@ -6332,782 +6099,111 @@ export default defineComponent({
   padding: 0;
 }
 
-.chat-container ul pre code,
-.chat-container ol pre code {
-  background-color: white;
-  color: black;
-}
-
-/* =============================================
-   Top-level rules (outside .chat-container)
-   ============================================= */
-
-
-
-.send-button:hover:not(.disabled):not([disabled]):not(:disabled) {
-  background: var(--color-gradient-ai) !important;
-  box-shadow: 0 6px 20px 0 rgba(139, 92, 246, 0.4) !important;
-  transform: translateY(-1px) !important;
-}
-
-.send-button:active:not(.disabled):not([disabled]):not(:disabled) {
-  transform: translateY(0) !important;
-  box-shadow: 0 2px 10px 0 rgba(139, 92, 246, 0.3) !important;
-}
-
-
-.stop-button:hover {
-  background: var(--color-gradient-danger-hover) !important;
-  box-shadow: 0 6px 20px 0 rgba(245, 101, 101, 0.4) !important;
-  transform: translateY(-1px) !important;
-}
-
-.stop-button:active {
-  transform: translateY(0) !important;
-  box-shadow: 0 2px 10px 0 rgba(245, 101, 101, 0.3) !important;
-}
-
-
-.preview-image:hover {
-  transform: scale(1.05);
-}
-
-.image-remove-btn:hover {
-  background-color: var(--color-status-negative) !important;
-}
-
-.message-images .message-image-item img:hover {
-  transform: scale(1.02);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-}
-
-
-.code-block-header {
-  background-color: var(--color-surface-subtle);
-}
-
-.dark .code-block-header {
-  background-color: var(--color-surface-subtle);
-  border: 1px 1px 0px 1px solid var(--color-input-border);
-}
-
-@keyframes bounce {
-  0%,
-  20%,
-  50%,
-  80%,
-  100% {
-    transform: translateY(0);
-  }
-  40% {
-    transform: translateY(-3px);
-  }
-  60% {
-    transform: translateY(-2px);
-  }
-}
-
-@keyframes fadeInUp {
-  from {
-    opacity: 0;
-    transform: translateY(10px) scale(0.9);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
-
-.tool-call-indicator {
-  display: flex;
-  align-items: center;
-  padding: 12px 16px;
-  border-radius: 12px;
-  margin: 8px 0;
-  animation: fadeIn 0.3s ease;
-}
-
-:root:not(.dark) .tool-call-indicator {
-  background: var(--color-chat-bubble-user);
-  border: 1px solid var(--color-border-default);
-}
-
-.dark .tool-call-indicator {
-  background: var(--color-chat-bubble-user);
-  border: 1px solid var(--color-border-default);
-}
-
-/* Completed step shown live during streaming — more compact and subdued
- than the active (spinner) indicator so the in-flight step still stands out. */
-.tool-call-indicator.completed {
-    padding: 8px 16px;
-    margin: 4px 0;
-
-    .tool-call-message {
-      font-weight: 500;
-      opacity: 0.85;
-    }
-  }
-
-.tool-call-indicator .tool-call-content {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  width: 100%;
-}
-
-.tool-call-indicator .tool-call-info {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  flex: 1;
-  min-width: 0;
-}
-
-.tool-call-indicator .tool-call-status {
-  font-size: 12px;
-  font-style: italic;
-  opacity: 0.7;
-  margin-bottom: 2px;
-}
-
-.tool-call-indicator .tool-call-status {
-  color: var(--color-text-secondary);
-}
-
-.dark .tool-call-indicator .tool-call-status {
-  color: var(--color-text-caption);
-}
-
-.tool-call-indicator .tool-call-message {
-  font-weight: 600;
-  font-size: 14px;
-}
-
-.tool-call-indicator .tool-call-message {
-  color: var(--color-text-secondary);
-}
-
-.dark .tool-call-indicator .tool-call-message {
-  color: var(--color-text-secondary);
-}
-
-.tool-call-indicator .tool-call-context {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  align-items: center;
-}
-
-.tool-call-indicator .context-item {
-  width: 100%;
-}
-
-.tool-call-indicator .context-query {
-  display: block;
-  font-family: "Fira Code", "Consolas", monospace;
-  font-size: 12px;
-  padding: 8px 12px;
-  border-radius: 6px;
-  white-space: pre-wrap;
-  word-break: break-all;
-  max-width: 100%;
-  overflow: hidden;
-}
-
-.tool-call-indicator .context-query {
-  background: var(--color-surface-base);
-  color: var(--color-text-body);
-  border: 1px solid var(--color-border-default);
-}
-
-.dark .tool-call-indicator .context-query {
-  background: var(--color-surface-base);
-  color: var(--color-text-secondary);
-  border: 1px solid var(--color-border-default);
-}
-
-.tool-call-indicator .context-tag {
-  display: inline-flex;
-  align-items: center;
-  font-size: 11px;
-  padding: 4px 8px;
-  border-radius: 4px;
-  font-weight: 500;
-}
-
-.tool-call-indicator .context-tag {
-  background: rgba(139, 92, 246, 0.1);
-  color: var(--color-ai-accent);
-}
-
-.dark .tool-call-indicator .context-tag {
-  background: rgba(139, 92, 246, 0.2);
-  color: var(--color-text-secondary);
-}
-
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(-10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-
-.tool-call-item {
-  display: flex;
-  flex-direction: column;
-  padding: 8px 12px;
-  border-radius: 6px;
-  font-size: 13px;
-  margin-bottom: 8px;
-}
-
-.tool-call-item.has-details {
-  cursor: pointer;
-}
-
-:root:not(.dark) .tool-call-item.has-details:hover {
-  background: rgba(76, 175, 80, 0.12);
-}
-
-.dark .tool-call-item.has-details:hover {
-  background: rgba(76, 175, 80, 0.18);
-}
-
-:root:not(.dark) .tool-call-item {
-  background: rgba(76, 175, 80, 0.08);
-  color: var(--color-text-secondary);
-}
-
-.dark .tool-call-item {
-  background: rgba(76, 175, 80, 0.12);
-  color: var(--color-text-secondary);
-}
-
-:root:not(.dark) .tool-call-item.error {
-  background: rgba(244, 67, 54, 0.08);
-}
-
-.dark .tool-call-item.error {
-  background: rgba(244, 67, 54, 0.12);
-}
-
-:root:not(.dark) .tool-call-item.error.has-details:hover {
-  background: rgba(244, 67, 54, 0.15);
-}
-
-.dark .tool-call-item.error.has-details:hover {
-  background: rgba(244, 67, 54, 0.22);
-}
-
-:root:not(.dark) .tool-call-item.timeout {
-  background: rgba(255, 152, 0, 0.08);
-}
-
-.dark .tool-call-item.timeout {
-  background: rgba(255, 152, 0, 0.12);
-}
-
-:root:not(.dark) .tool-call-item.timeout.has-details:hover {
-  background: rgba(255, 152, 0, 0.15);
-}
-
-.dark .tool-call-item.timeout.has-details:hover {
-  background: rgba(255, 152, 0, 0.22);
-}
-
-.tool-call-item.pending-confirmation {
-  cursor: default;
-}
-
-:root:not(.dark) .tool-call-item.pending-confirmation {
-  background: rgba(255, 193, 7, 0.12);
-  border: 1px solid rgba(255, 193, 7, 0.3);
-}
-
-.dark .tool-call-item.pending-confirmation {
-  background: rgba(255, 193, 7, 0.15);
-  border: 1px solid rgba(255, 193, 7, 0.25);
-}
-
-.tool-call-item.pending-navigation {
-  cursor: default;
-}
-
-:root:not(.dark) .tool-call-item.pending-navigation {
-  background: rgba(25, 118, 210, 0.08);
-  border: 1px solid rgba(25, 118, 210, 0.3);
-}
-
-.dark .tool-call-item.pending-navigation {
-  background: rgba(66, 165, 245, 0.12);
-  border: 1px solid rgba(66, 165, 245, 0.25);
-}
-
-.tool-call-item .tool-confirmation-inline {
-  margin-top: 12px;
-}
-
-.tool-call-item .tool-confirmation-inline .confirmation-content {
-  padding: 16px;
-  border-radius: 8px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.tool-call-item .tool-confirmation-inline .confirmation-content {
-  background: var(--color-status-warning-bg);
-  border: 1px solid var(--color-border-default);
-}
-
-.dark .tool-call-item .tool-confirmation-inline .confirmation-content {
-  background: rgba(251, 191, 36, 0.15);
-  border: 1px solid rgba(251, 191, 36, 0.3);
-}
-
-.tool-call-item .tool-call-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.tool-call-item .tool-call-name {
-  font-weight: 500;
-  flex: 1;
-}
-
-.tool-call-item .tool-call-name code {
-  font-family: "Fira Code", "Consolas", monospace;
-  font-size: 12px;
-  padding: 1px 4px;
-  border-radius: 3px;
-}
-
-.tool-call-item .tool-call-name code {
-  background: rgba(0, 0, 0, 0.06);
-}
-
-.dark .tool-call-item .tool-call-name code {
-  background: rgba(255, 255, 255, 0.1);
-}
-
-.tool-call-item .expand-icon {
-  opacity: 0.6;
-  transition: transform 0.2s;
-}
-
-.tool-call-item .navigation-icon {
-  cursor: pointer;
-  margin-left: auto;
-  opacity: 0.7;
-  transition: opacity 0.2s;
-}
-
-.tool-call-item .navigation-icon:hover {
-  opacity: 1;
-}
-
-.tool-call-item .navigation-block {
-  margin: 4px 0;
-}
-
-:root:not(.dark) .tool-call-item .navigation-block {
-  background: rgba(66, 165, 245, 0.08);
-}
-
-.dark .tool-call-item .navigation-block {
-  background: rgba(66, 165, 245, 0.12);
-}
-
-.tool-call-item .navigation-block .navigation-block-btn {
-  font-size: 13px;
-}
-
-.tool-call-item .tool-call-details {
-  margin-top: 10px;
-  padding-top: 10px;
-  border-top: 1px solid rgba(128, 128, 128, 0.2);
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.tool-call-item .tool-call-details .detail-item {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.tool-call-item .tool-call-details .detail-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.tool-call-item .tool-call-details .detail-label {
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  opacity: 0.6;
-}
-
-.tool-call-item .tool-call-details .copy-btn {
-  opacity: 0.6;
-}
-
-.tool-call-item .tool-call-details .copy-btn:hover {
-  opacity: 1;
-}
-
-.tool-call-item .tool-call-details .detail-value {
-  font-size: 12px;
-  user-select: text;
-}
-
-.tool-call-item .tool-call-details .detail-value.query-value {
-  font-family: "Fira Code", "Consolas", monospace;
-  padding: 8px;
-  border-radius: 4px;
-  white-space: pre-wrap;
-  word-break: break-all;
-  user-select: text;
-  cursor: text;
-}
-
-.tool-call-item .tool-call-details .detail-value.query-value {
-  background: rgba(0, 0, 0, 0.04);
-}
-
-.dark .tool-call-item .tool-call-details .detail-value.query-value {
-  background: rgba(255, 255, 255, 0.06);
-}
-
-.log-entry-item {
-  display: flex;
-  flex-direction: column;
-  padding: 6px 10px;
-  border-radius: 6px;
-  font-size: 12px;
-  margin-bottom: 4px;
-  cursor: pointer;
-}
-
-:root:not(.dark) .log-entry-item {
-  background: rgba(33, 150, 243, 0.08);
-  color: var(--color-text-secondary);
-}
-
-.dark .log-entry-item {
-  background: var(--color-surface-panel);
-  border: 1px solid var(--color-border-default);
-  color: var(--color-text-secondary);
-}
-
-:root:not(.dark) .log-entry-item:hover {
-  background: rgba(33, 150, 243, 0.12);
-}
-
-.dark .log-entry-item:hover {
-  background: var(--color-surface-panel);
-  border-color: var(--color-text-secondary);
-}
-
-.log-entry-item .log-entry-header {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.log-entry-item .log-entry-info {
-  flex: 1;
-  font-weight: 500;
-  font-size: 12px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.log-entry-item .expand-icon {
-  opacity: 0.6;
-  transition: transform 0.2s;
-}
-
-.log-entry-item .log-entry-details {
-  margin-top: 10px;
-}
-
-.log-entry-item .log-entry-content {
-  position: relative;
-  border-radius: 6px;
-  border: 1px solid;
-  overflow: hidden;
-}
-
-.log-entry-item .log-entry-content {
-  background: var(--color-surface-base);
-  border-color: var(--color-border-default);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-}
-
-.dark .log-entry-item .log-entry-content {
-  background: var(--color-surface-panel);
-  border-color: var(--color-border-default);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-}
-
-.log-entry-item .log-entry-content .copy-btn {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  opacity: 0.6;
-  z-index: 1;
-  background: rgba(128, 128, 128, 0.1);
-  border-radius: 4px;
-  padding: 4px 8px;
-}
-
-.log-entry-item .log-entry-content .copy-btn:hover {
-  opacity: 1;
-}
-
-.log-entry-item .log-entry-content .copy-btn:hover {
-  background: rgba(0, 0, 0, 0.08);
-}
-
-.dark .log-entry-item .log-entry-content .copy-btn:hover {
-  background: rgba(255, 255, 255, 0.15);
-}
-
-.log-entry-item .log-entry-content .log-entry-code {
-  display: block;
-  font-family: "Monaco", "Menlo", "Courier New", monospace;
-  font-size: 11px;
-  line-height: 1.5;
-  padding: 12px;
-  padding-right: 40px;
-  white-space: pre-wrap;
-  word-wrap: break-word;
-  user-select: text;
-  cursor: text;
-  max-height: 300px;
-  overflow-y: auto;
-}
-
-.log-entry-item .log-entry-content .log-entry-code {
-  background: var(--color-surface-base);
-  color: var(--color-text-heading);
-}
-
-.dark .log-entry-item .log-entry-content .log-entry-code {
-  background: var(--color-syntax-bg);
-  color: var(--color-text-secondary);
-}
-
-.log-entry-item .log-entry-content .log-entry-code .json-key {
+/* ============================================================
+   keep(generated-content) — formatLogEntryContent() emits these json spans.
+   ============================================================ */
+.log-entry-code :deep(.json-key) {
   color: var(--color-json-key);
   font-weight: 600;
 }
-
-.log-entry-item .log-entry-content .log-entry-code .json-string {
+.log-entry-code :deep(.json-string) {
   color: var(--color-json-string);
 }
-
-.log-entry-item .log-entry-content .log-entry-code .json-number {
+.log-entry-code :deep(.json-number) {
   color: var(--color-json-number);
 }
-
-.log-entry-item .log-entry-content .log-entry-code .json-boolean {
+.log-entry-code :deep(.json-boolean) {
   color: var(--color-json-boolean);
   font-weight: 600;
 }
-
-.log-entry-item .log-entry-content .log-entry-code .json-null {
+.log-entry-code :deep(.json-null) {
   color: var(--color-json-null);
   font-weight: 600;
 }
 
-.tool-call-item .tool-response-hits {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  font-size: 12px;
-  font-family: "Fira Code", "Consolas", monospace;
-  padding: 6px 8px;
-  border-radius: 4px;
-  max-height: 200px;
-  overflow-y: auto;
-}
-
-.tool-call-item .tool-response-hits {
-  background: rgba(0, 0, 0, 0.04);
-}
-
-.dark .tool-call-item .tool-response-hits {
-  background: rgba(255, 255, 255, 0.06);
-}
-
-.tool-call-item .tool-response-hit {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 12px;
-  padding: 2px 0;
-}
-
-.tool-call-item .tool-response-hit:not(:last-child) {
-  border-bottom: 1px solid rgba(128, 128, 128, 0.15);
-  padding-bottom: 4px;
-}
-
-.tool-call-item .tool-response-list-item {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 4px 0;
-}
-
-.tool-call-item .tool-response-list-item:not(:last-child) {
-  border-bottom: 1px solid rgba(128, 128, 128, 0.15);
-  padding-bottom: 6px;
-}
-
-.tool-call-item .hit-field {
-  word-break: break-all;
-  user-select: text;
-  cursor: text;
-}
-
-.tool-call-item .hit-key {
-  opacity: 0.6;
-  font-weight: 600;
-}
-
-.tool-call-item .hit-error {
-  color: var(--color-status-negative);
-}
-
-.tool-call-item .tool-response-meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 4px;
-}
-
-.tool-call-item .tool-call-error {
-  font-size: 11px;
-  color: var(--color-status-negative);
-  font-style: italic;
-  max-width: 250px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.tool-call-item .tool-call-query {
-  font-family: "Fira Code", "Consolas", monospace;
-  font-size: 11px;
-  padding: 2px 6px;
-  border-radius: 4px;
-  max-width: 250px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.tool-call-item .tool-call-query {
-  background: rgba(0, 0, 0, 0.05);
-  color: var(--color-text-secondary);
-}
-
-.dark .tool-call-item .tool-call-query {
-  background: rgba(255, 255, 255, 0.08);
-  color: var(--color-text-caption);
-}
-
-.tool-call-item .tool-error-message {
-  color: var(--color-status-negative);
-}
-
-.tool-call-item .tool-suggestion {
-  font-style: italic;
-  opacity: 0.85;
-}
-
-.stream-error-block {
-  display: flex;
-  flex-direction: column;
-  padding: 10px 12px;
-  border-radius: 6px;
-  border-left: 3px solid var(--color-border-default);
-  margin-bottom: 8px;
-  font-size: 13px;
-}
-
-:root:not(.dark) .stream-error-block {
-  background: rgba(244, 67, 54, 0.06);
-  color: var(--color-text-secondary);
-}
-
-.dark .stream-error-block {
-  background: rgba(244, 67, 54, 0.1);
-  color: var(--color-text-secondary);
-}
-
-.stream-error-block .stream-error-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.stream-error-block .stream-error-message {
-  font-weight: 500;
-  color: var(--color-status-negative);
-}
-
-.stream-error-block .stream-error-suggestion {
-  margin-top: 6px;
-  padding-left: 24px;
-  font-style: italic;
-  font-size: 12px;
-  opacity: 0.85;
-}
-
-.stream-error-block .stream-error-recoverable {
-  margin-top: 4px;
-  padding-left: 24px;
-  font-size: 11px;
-  opacity: 0.7;
-}
-
-/* =============================================
-   Syntax highlighting — light mode
-   ============================================= */
-.hljs {
+/* ============================================================
+   keep(lib-override:hljs) — highlight.js output. Token mapping mirrors
+   lib/core/Code/OCodeBlock.vue (D6); tokens flip via dark.css, so one rule set
+   covers both themes.
+   ============================================================ */
+.message-blocks :deep(.hljs) {
   display: block;
   overflow-x: auto;
   padding: 0.5em;
   color: var(--color-syntax-text);
   background: var(--color-syntax-bg);
 }
-.hljs-doctag, .hljs-keyword, .hljs-meta .hljs-keyword, .hljs-template-tag,
-.hljs-template-variable, .hljs-type, .hljs-variable.language_ { color: var(--color-syntax-keyword); }
-.hljs-title, .hljs-title.class_, .hljs-title.class_.inherited__, .hljs-title.function_ { color: var(--color-syntax-function); }
-.hljs-attr, .hljs-attribute, .hljs-literal, .hljs-meta, .hljs-number, .hljs-operator,
-.hljs-variable, .hljs-selector-attr, .hljs-selector-class, .hljs-selector-id { color: var(--color-syntax-number); }
-.hljs-regexp, .hljs-string, .hljs-meta .hljs-string { color: var(--color-syntax-string); }
-.hljs-built_in, .hljs-symbol { color: var(--color-syntax-builtin); }
-.hljs-comment, .hljs-code, .hljs-formula { color: var(--color-syntax-comment); }
-.hljs-name, .hljs-quote, .hljs-selector-tag, .hljs-selector-pseudo { color: var(--color-syntax-tag); }
-.hljs-subst { color: var(--color-syntax-text); }
-.hljs-section { color: var(--color-syntax-number); font-weight: bold; }
-.hljs-bullet { color: var(--color-syntax-bullet); }
-.hljs-emphasis { color: var(--color-syntax-text); font-style: italic; }
-.hljs-strong { color: var(--color-syntax-text); font-weight: bold; }
-.hljs-addition { color: var(--color-syntax-addition-fg); background-color: var(--color-syntax-addition-bg); }
-.hljs-deletion { color: var(--color-syntax-deletion-fg); background-color: var(--color-syntax-deletion-bg); }
+.message-blocks :deep(.hljs-doctag),
+.message-blocks :deep(.hljs-keyword),
+.message-blocks :deep(.hljs-meta .hljs-keyword),
+.message-blocks :deep(.hljs-template-tag),
+.message-blocks :deep(.hljs-template-variable),
+.message-blocks :deep(.hljs-type),
+.message-blocks :deep(.hljs-variable.language_) {
+  color: var(--color-syntax-keyword);
+}
+.message-blocks :deep(.hljs-title),
+.message-blocks :deep(.hljs-title.class_),
+.message-blocks :deep(.hljs-title.class_.inherited__),
+.message-blocks :deep(.hljs-title.function_) {
+  color: var(--color-syntax-function);
+}
+.message-blocks :deep(.hljs-attr),
+.message-blocks :deep(.hljs-attribute),
+.message-blocks :deep(.hljs-literal),
+.message-blocks :deep(.hljs-meta),
+.message-blocks :deep(.hljs-number),
+.message-blocks :deep(.hljs-operator),
+.message-blocks :deep(.hljs-variable),
+.message-blocks :deep(.hljs-selector-attr),
+.message-blocks :deep(.hljs-selector-class),
+.message-blocks :deep(.hljs-selector-id) {
+  color: var(--color-syntax-number);
+}
+.message-blocks :deep(.hljs-regexp),
+.message-blocks :deep(.hljs-string),
+.message-blocks :deep(.hljs-meta .hljs-string) {
+  color: var(--color-syntax-string);
+}
+.message-blocks :deep(.hljs-built_in),
+.message-blocks :deep(.hljs-symbol) {
+  color: var(--color-syntax-builtin);
+}
+.message-blocks :deep(.hljs-comment),
+.message-blocks :deep(.hljs-code),
+.message-blocks :deep(.hljs-formula) {
+  color: var(--color-syntax-comment);
+}
+.message-blocks :deep(.hljs-name),
+.message-blocks :deep(.hljs-quote),
+.message-blocks :deep(.hljs-selector-tag),
+.message-blocks :deep(.hljs-selector-pseudo) {
+  color: var(--color-syntax-tag);
+}
+.message-blocks :deep(.hljs-subst) {
+  color: var(--color-syntax-text);
+}
+.message-blocks :deep(.hljs-section) {
+  color: var(--color-syntax-number);
+  font-weight: 600;
+}
+.message-blocks :deep(.hljs-bullet) {
+  color: var(--color-syntax-bullet);
+}
+.message-blocks :deep(.hljs-emphasis) {
+  color: var(--color-syntax-text);
+  font-style: italic;
+}
+.message-blocks :deep(.hljs-strong) {
+  color: var(--color-syntax-text);
+  font-weight: 600;
+}
+.message-blocks :deep(.hljs-addition) {
+  color: var(--color-syntax-addition-fg);
+  background-color: var(--color-syntax-addition-bg);
+}
+.message-blocks :deep(.hljs-deletion) {
+  color: var(--color-syntax-deletion-fg);
+  background-color: var(--color-syntax-deletion-bg);
+}
 </style>
