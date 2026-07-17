@@ -8,14 +8,14 @@
           true,
           {
             "message": "Hardcoded hex is banned in .vue styles. Use a --color-* token (§3.G).",
-            "severity": "warning"
+            "severity": "error"
           }
         ],
         "selector-disallowed-list": [
           ["/\\.body--(dark|light)/", "/\\.(light|dark)-mode/"],
           {
             "message": "Dark mode CSS uses .dark only (Tailwind dark: variant or :where(.dark) &). §3.R",
-            "severity": "warning"
+            "severity": "error"
           }
         ]
       }
