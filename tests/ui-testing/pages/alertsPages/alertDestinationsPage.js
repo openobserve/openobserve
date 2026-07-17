@@ -1518,6 +1518,12 @@ export class AlertDestinationsPage {
         // once the row will genuinely be there. 404 on detail = definitively gone (didn't persist).
         let apiStatus = 0;
         let inList = false;
+        // NOTE: the `.catch(() => {})` below intentionally swallows this poll's pass/fail — the
+        // poll is NOT the assertion. Its only job is to advance state (`apiStatus` / `inList`) and
+        // give the backend time to register the row. The real verdict is asserted right after:
+        // a 404 throws ("did not persist"), and the UI check below throws if the row never renders.
+        // Do not "fix" this into a hard `.toBe(true)` — a slow-but-eventually-present row would
+        // then fail here before the UI ever gets a chance to confirm it.
         await expect.poll(async () => {
             const detail = await this.page.request.get(detailUrl).catch(() => null);
             apiStatus = detail ? detail.status() : 0;
