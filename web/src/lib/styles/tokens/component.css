@@ -752,10 +752,22 @@
 }
 
 
-/* ToggleGroup â€” primary variant (colored tray) */
+/* ToggleGroup — primary variant (colored tray).
+   Token-override block (custom properties only), so it belongs in the token
+   layer, not in a component: its dark twin `.dark [data-variant="primary"]`
+   lives in dark.css. Scoping this half into OToggleGroup would raise it to
+   (0,2,0) and inject it after the token sheets, outranking the dark twin and
+   killing dark mode on primary toggle groups. The pair must stay together. */
+[data-variant="primary"] {
+  --color-toggle-track-bg: var(--color-primary-200);
+  --color-toggle-border: var(--color-primary-300);
+  --color-toggle-item-hover-bg: var(--color-primary-100);
+  --color-toggle-item-active-bg: var(--color-surface-base);
+  --color-toggle-item-active-text: var(--color-primary-700);
+}
 
 
-/* â”€â”€ Register ALL tokens for Tailwind utility generation â”€â”€ */
+/* ── Register ALL tokens for Tailwind utility generation ── */
 @theme inline {
   /* Separator */
   --spacing-separator: var(--spacing-separator);
