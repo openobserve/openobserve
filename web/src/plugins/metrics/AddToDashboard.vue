@@ -41,7 +41,7 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, watch, type Ref } from "vue";
+import { defineComponent, ref, watch, type Ref, type PropType } from "vue";
 import { useStore } from "vuex";
 import { getImageURL } from "@/utils/zincutils";
 import { useI18n } from "vue-i18n";
@@ -78,6 +78,16 @@ export default defineComponent({
     dashboardPanelData: {
       type: Object,
       required: true,
+    },
+    /**
+     * Multi-panel mode (metrics "Convert to dashboard"): an array of panel-schema
+     * `data` objects to add as SEPARATE panels in one go. When empty (the
+     * default), the component keeps its original single-panel behaviour driven by
+     * `dashboardPanelData` — so its existing consumers are untouched.
+     */
+    panels: {
+      type: Array as PropType<any[]>,
+      default: () => [],
     },
   },
   emits: ["save", "update:open"],
@@ -135,25 +145,43 @@ export default defineComponent({
     ) => {
       let dismiss = function () {};
 
+      const multi = props.panels && props.panels.length > 0;
       try {
         dismiss = toast({
-          message: "Please wait while we add the panel to the dashboard",
+          message: multi
+            ? "Please wait while we add the panels to the dashboard"
+            : "Please wait while we add the panel to the dashboard",
           variant: "loading",
           timeout: 0,
         });
-        props.dashboardPanelData.data.id = getPanelId();
-        // panel name will come from add to dashboard component
-        props.dashboardPanelData.data.title = panelTitle;
-        // to create panel dashboard id, paneldata and folderId is required
-        await addPanel(
-          store,
-          dashboardId,
-          props.dashboardPanelData.data,
-          folderId,
-          tabId,
-        );
+
+        if (multi) {
+          // Convert-to-dashboard: add each metric as its own panel. addPanel
+          // auto-positions each one (side-by-side, then wrapping), so N calls
+          // lay out an N-panel grid. Each needs a fresh panel id; the title comes
+          // from the panel data (per-metric), falling back to the form title.
+          for (const panelData of props.panels) {
+            panelData.id = getPanelId();
+            if (!panelData.title) panelData.title = panelTitle;
+            await addPanel(store, dashboardId, panelData, folderId, tabId);
+          }
+        } else {
+          props.dashboardPanelData.data.id = getPanelId();
+          // panel name will come from add to dashboard component
+          props.dashboardPanelData.data.title = panelTitle;
+          // to create panel dashboard id, paneldata and folderId is required
+          await addPanel(
+            store,
+            dashboardId,
+            props.dashboardPanelData.data,
+            folderId,
+            tabId,
+          );
+        }
         toast({
-          message: "Panel added to dashboard",
+          message: multi
+            ? "Panels added to dashboard"
+            : "Panel added to dashboard",
           variant: "success",
         });
         router.push({

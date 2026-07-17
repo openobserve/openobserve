@@ -605,14 +605,41 @@ watch(
 );
 
 if (isEditPanel) {
-  const stopEditInitialLoad = watch(
-    () => currentQueryFields().stream,
-    (streamName) => {
-      if (!streamName) return;
-      stopEditInitialLoad();
+  // In edit mode the panel's own data arrives asynchronously, so the list waits
+  // for a stream rather than fetching against a half-built query.
+  //
+  // The watch is armed in `onMounted`, NOT at setup, and `immediate` is what
+  // handles a stream that is already set. Two reasons it must be this shape:
+  //
+  //  - A parent that seeds the query in its own `onMounted` (the metrics
+  //    Visualize workspace does exactly that) sets the stream BEFORE this child
+  //    exists, so a change-only watcher never fires — the Stream dropdown then
+  //    sits on "No options found" under a stream that is plainly selected.
+  //  - `immediate` at setup would run the callback SYNCHRONOUSLY, before the
+  //    `getStreamList` const below is initialised — a TDZ ReferenceError thrown
+  //    inside a promise, which is silent in tests and fatal in the browser.
+  //    By `onMounted` every declaration in this setup body exists.
+  //
+  // `loaded` (not the stop handle) enforces "only once": the handle is still in
+  // its own TDZ during an immediate first pass.
+  onMounted(() => {
+    let loaded = false;
+    let stopEditInitialLoad: (() => void) | undefined;
+    const onStream = (streamName: string) => {
+      if (!streamName || loaded) return;
+      loaded = true;
+      // Undefined on the immediate pass — `watch` has not returned yet, so the
+      // handle does not exist. `loaded` is what stops a second run; this is only
+      // here to free the watcher when the stream arrives later.
+      stopEditInitialLoad?.();
       loadStreamsListBasedOnType();
-    },
-  );
+    };
+    stopEditInitialLoad = watch(() => currentQueryFields().stream, onStream, {
+      immediate: true,
+    });
+    // The immediate pass could not stop a watcher that did not exist yet.
+    if (loaded) stopEditInitialLoad();
+  });
 } else {
   onMounted(() => {
     loadStreamsListBasedOnType();

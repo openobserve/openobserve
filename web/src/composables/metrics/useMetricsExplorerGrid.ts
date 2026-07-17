@@ -128,6 +128,15 @@ export interface CardPreview {
   lastTriggeredAt: number | null;
   /** Cached data whose window is a different LENGTH from the selected one. */
   cachedDataDiffersFromTimeRange: boolean;
+  /**
+   * The window this preview's data was FETCHED for (µs), when it came from the
+   * persisted cache — `null` on the live path, where the fetched window IS the
+   * selected one.
+   *
+   * The card's x-axis is pinned to this in preference to the selected window, so
+   * cached points are drawn against the time they actually describe.
+   */
+  cachedTimeRange?: { start_time: number; end_time: number } | null;
   /** The function actually in effect — reflects a ⚙ override, not the default. */
   footerLabel: string;
 }
@@ -197,15 +206,20 @@ const PREVIEW_STATE_LIMIT = 300;
 /**
  * Page one holds this many cards; "Show more" reveals another increment.
  *
- * The page size is not a rendering budget — the grid is row-virtualised, so only
- * ~10 cards are ever in the DOM regardless — and it is not an upfront query
- * budget either, since a card only queries once it scrolls within a viewport of
- * the window. What it IS is a cap on how much an idle scroll can cost: a user
- * flicking down the page will query every card they pass, so the page size sets
- * the ceiling on that. 30 keeps a casual scroll cheap; anyone who actually wants
- * more is one click away.
+ * This IS an upfront query budget, whatever an earlier version of this comment
+ * claimed. `hideEmptyPanels` defaults on, and emptiness is only knowable by
+ * asking, so `sweepSlice` queries the WHOLE slice on load — not just what is on
+ * screen. At 30 that was 30 PromQL range queries before the user had done
+ * anything, against a backend that already times out on heavy metrics, and most
+ * of the answers were thrown away: a typical org hides two thirds of them as
+ * empty and renders ~11.
+ *
+ * 8 is four rows of the 2-up grid — a bit more than a screenful, so page one
+ * still fills once the empties are dropped, and a click costs another six.
+ * Divides evenly by both column counts the grid uses (2, and 1 when narrow), so
+ * no row is ever left half-empty at the fold.
  */
-export const INITIAL_PAGE_SIZE = 30;
+export const INITIAL_PAGE_SIZE = 8;
 
 /**
  * How long the slice must hold still before we query what is in it. Long enough
@@ -213,8 +227,18 @@ export const INITIAL_PAGE_SIZE = 30;
  * enough that it feels like part of the same paint.
  */
 export const SWEEP_DEBOUNCE_MS = 250;
-/** Four rows of the 3-up grid per click. */
-export const PAGE_SIZE_INCREMENT = 12;
+/**
+ * Cards revealed per "Show more" click — three rows of the 2-up grid.
+ *
+ * Was 12, from when the grid was 3-up (four rows). At 2 columns that reveals six
+ * rows at once: more than a screenful, so the user loses their place and pays for
+ * a batch of queries they did not ask to see. Six lands just past the fold, which
+ * is what makes the click feel like "a bit more" rather than "a whole new page".
+ *
+ * The button's label is computed from this constant, so it always tells the truth
+ * about what a click will do.
+ */
+export const PAGE_SIZE_INCREMENT = 6;
 
 /** Cards are ~40-60 points wide; a coarse step keeps preview responses tiny. */
 const PREVIEW_POINTS = 50;
@@ -283,6 +307,13 @@ export function useMetricsExplorerGrid() {
   const showFavoritesOnly = ref(false);
 
   /**
+   * The grid is not on screen (e.g. the page is in Visualize mode). While paused,
+   * slice changes do NOT sweep: there is no visible grid to fill, and re-querying
+   * every card for a hidden view is pure waste. The caller sets this from its mode.
+   */
+  const paused = ref(false);
+
+  /**
    * Drop cards whose query came back with no samples. On by default: a grid of
    * hatched "No data" placeholders is noise, and most orgs carry a long tail of
    * metrics that are registered but never written to.
@@ -328,6 +359,10 @@ export function useMetricsExplorerGrid() {
   /* ------------------------------------------------- local (per-browser) */
 
   const overrides = ref<Record<string, FnOverride>>({});
+
+  // The SCRATCHPAD's pinned metrics — a first-class, persisted (localStorage,
+  // org-keyed) working set of hand-picked metrics. `toggleFavorite` is its writer.
+  // The Workspace tab shows exactly this set (via showFavoritesOnly).
   const favorites = ref<string[]>([]);
 
   const loadLocalState = () => {
@@ -641,6 +676,7 @@ export function useMetricsExplorerGrid() {
     )
       return false;
     if (except !== "label" && !isLabelEligible(card)) return false;
+    // The Workspace tab (showFavoritesOnly) narrows to the scratchpad's pins.
     if (showFavoritesOnly.value && !favorites.value.includes(card.name))
       return false;
     if (
@@ -1301,11 +1337,18 @@ export function useMetricsExplorerGrid() {
     const window = timeRange.value;
     const range = cached.cacheTimeRange ?? {};
 
-    // Same rule the dashboards use: compare the DURATION of the window, not its
-    // absolute bounds. Cached data fetched for an older window is still shown —
-    // the card reports exactly how old it is through `lastTriggeredAt`, the way
-    // a panel's "Last Refreshed" clock does — and is flagged only when the
-    // selected range is a different LENGTH from the one it was fetched for.
+    // Same rule the dashboards use (usePanelDataLoader.ts:853): compare the
+    // DURATION of the window, not its absolute bounds. Cached data fetched for an
+    // older window is still shown — the card reports exactly how old it is
+    // through `lastTriggeredAt`, the way a panel's "Last Refreshed" clock does —
+    // and the ⚠ is raised only when the selected range is a different LENGTH from
+    // the one it was fetched for.
+    //
+    // Bounds drift is NOT flagged here, and must not be: re-opening the grid on a
+    // relative range ("Past 15 Minutes") re-stamps the window to `now` on every
+    // mount, so every restored card would wear a warning that told the user
+    // nothing. The honest answer to drift is to draw the data on ITS OWN axis
+    // (`cachedTimeRange` below) and let `lastTriggeredAt` say how old it is.
     const differs =
       window.end_time - window.start_time !== range.end_time - range.start_time;
 
@@ -1318,6 +1361,22 @@ export function useMetricsExplorerGrid() {
       bucketUnit: defaults.bucketUnit,
       stale: false,
       nanGuardApplied: !!cached.value.nanGuardApplied,
+      /**
+       * The window this data was actually FETCHED for — not the one currently
+       * selected. The card pins its x-axis to this.
+       *
+       * Without it the axis was pinned to `timeRange`, which a relative range
+       * re-stamps to `now` on every mount: the axis marched forward with the
+       * wall clock while the cached points underneath stayed put, so a chart
+       * claimed to show 10:15-10:30 while plotting data from 09:40. Dashboards
+       * avoid this by restoring `metadata` from the cache too
+       * (usePanelDataLoader.ts:841) and pinning from the QUERY's window, never
+       * the selected one — this is the same idea, carried on the preview.
+       */
+      cachedTimeRange:
+        range.start_time && range.end_time
+          ? { start_time: range.start_time, end_time: range.end_time }
+          : null,
       // Persisted, because this path decides emptiness too — and it fires no
       // query, so it has no way to re-derive it. Without it a sparse card would
       // paint fine on the live path and then vanish from the grid on the next
@@ -1407,6 +1466,29 @@ export function useMetricsExplorerGrid() {
 
     const step = computeStepSeconds(rangeSeconds.value, points);
 
+    // Already resolved — reuse it, fire NO query. A card that already has a
+    // SETTLED preview (done/no-data/unavailable) is just being re-triggered
+    // because it scrolled back into view or its body remounted (e.g. flipping
+    // Explore↔Visualize). Re-running would flash a loading state and re-hit the
+    // backend for a result the card already shows — exactly what a dashboard
+    // panel avoids on revisit.
+    //
+    // This is safe without a per-query validity check because previews are
+    // WINDOW-scoped: any time-range change wipes `previews.value` (see
+    // `setTimeRange`), and a ⚙ override re-requests with `skipCache`. So an
+    // existing settled preview is always valid for the current query+window.
+    // `skipCache` (refresh / time-range change / override) still forces a real
+    // re-query, and an `error`/`loading` preview falls through to retry.
+    const settled = previews.value[card.name];
+    if (
+      !opts?.skipCache &&
+      settled &&
+      settled.status !== "loading" &&
+      settled.status !== "error"
+    ) {
+      return;
+    }
+
     // Paint from the persisted result and fire no query at all — the same deal a
     // dashboard panel gets on revisit. Matters more here than there: a first
     // screenful is ~60 queries against a backend that already times out on the
@@ -1438,6 +1520,11 @@ export function useMetricsExplorerGrid() {
       sparse: false,
       lastTriggeredAt: existing?.lastTriggeredAt ?? null,
       cachedDataDiffersFromTimeRange: false,
+      // Carried with `results` above: a re-query keeps the OLD chart on screen
+      // while it runs, so the axis must keep describing that old data until the
+      // new data lands. Dropping it snapped the axis to the selected window for
+      // the duration of every refresh, then back — a visible twitch.
+      cachedTimeRange: existing?.cachedTimeRange ?? null,
       footerLabel: resolved.footerLabel,
     };
 
@@ -1509,6 +1596,11 @@ export function useMetricsExplorerGrid() {
         // cache-restored card tell the user how old its data actually is.
         lastTriggeredAt: Date.now(),
         cachedDataDiffersFromTimeRange: false,
+        // A real fetch just answered for the SELECTED window, so the card's axis
+        // must go back to tracking it. Stated rather than left undefined: this
+        // object replaces a possibly cache-restored one, and inheriting its
+        // window would pin a freshly-queried chart to a stale axis.
+        cachedTimeRange: null,
         footerLabel: resolved.footerLabel,
       };
       markEmptiness(card.name, !results.some(hasSamples) && !sparse);
@@ -1556,6 +1648,11 @@ export function useMetricsExplorerGrid() {
         lastTriggeredAt: existing?.lastTriggeredAt ?? null,
         cachedDataDiffersFromTimeRange:
           existing?.cachedDataDiffersFromTimeRange ?? false,
+        // Carried with `results`: this path KEEPS the previous chart up, so it
+        // must keep the window that chart is true of. Dropping it would pin the
+        // surviving points to the selected window — the drift bug again, but only
+        // for cards whose refresh failed.
+        cachedTimeRange: existing?.cachedTimeRange ?? null,
         footerLabel: resolved.footerLabel,
       };
     }
@@ -1995,11 +2092,19 @@ export function useMetricsExplorerGrid() {
    * The slice moved. Debounced because it moves on every keystroke of a search,
    * and each one would otherwise fire — then immediately cancel — a slice's worth
    * of queries.
+   *
+   * Skipped entirely while `paused` — the grid is not on screen (the page is in
+   * Visualize), so there is nothing to sweep FOR. Without this, merely switching
+   * away re-computes the slice (the pinned-only narrowing flips, filters are
+   * re-applied) and the grid answers by re-querying every card — ~40 requests for
+   * a view the user just left.
    */
   watch([pageSlice, hideEmptyPanels], () => {
+    if (paused.value) return;
     if (sweepTimer) clearTimeout(sweepTimer);
     sweepTimer = setTimeout(() => {
       sweepTimer = null;
+      if (paused.value) return;
       sweepSlice();
     }, SWEEP_DEBOUNCE_MS);
   });
@@ -2119,6 +2224,7 @@ export function useMetricsExplorerGrid() {
     viewMode,
     activeRail,
     showFavoritesOnly,
+    paused,
     hideEmptyPanels,
     emptyHiddenCount,
     activeFilterCount,

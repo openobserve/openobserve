@@ -73,7 +73,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <template #trigger>
                     <div class="flex items-center min-w-0">
                       <OFieldLabel :field="row" class="flex-1 min-w-0" />
-                      <div class="absolute h-full right-0 top-0 z-[5] bg-[#e8e8e8] px-[6px] invisible flex items-center group-hover:visible group-hover:opacity-100 dark:group-hover:bg-[#3f4143]">
+                      <!-- `bg-surface-subtle`, not a hex pair with a `dark:`
+                           override: the token already resolves in both themes,
+                           which is the whole point of having it. -->
+                      <div class="absolute h-full right-0 top-0 z-[5] bg-surface-subtle px-[0.375rem] invisible flex items-center group-hover:visible group-hover:opacity-100">
                         <OButton
                           icon-left="add"
                           :data-test="`metrics-list-add-${row.name}-label-btn`"
