@@ -142,12 +142,6 @@ jobs:
           NODE_OPTIONS: "--max-old-space-size=8192"
           GIT_HASH_OVERRIDE: ${{ github.sha }}
         run: |
-          # Pre-create the embed dir: the web leaf crate can compile early in
-          # cargo's dependency graph, and RustEmbed hard-errors on a missing
-          # folder if it wins the race against npm. Folder contents don't
-          # matter at compile time — release-ci has debug-assertions on, so
-          # rust-embed reads assets from /tmp/dist at RUNTIME (the e2e jobs
-          # stage the frontend-dist artifact there).
           mkdir -p /tmp/dist
           bash -c "cd web && npm run build && cp -r ./dist/. /tmp/dist/" &
           NPM_PID=$!

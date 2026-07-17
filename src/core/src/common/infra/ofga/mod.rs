@@ -476,7 +476,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
                         get_ownership_all_org_tuple(org_name, "billing_group", &mut tuples);
                     }
                     if need_synthetics_migration {
-                        get_ownership_all_org_tuple(org_name, "synfolder", &mut tuples);
+                        get_ownership_all_org_tuple(org_name, "synthetic_folder", &mut tuples);
                         get_ownership_all_org_tuple(org_name, "synthetics", &mut tuples);
                     }
                 }

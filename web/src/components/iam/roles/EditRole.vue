@@ -864,14 +864,14 @@ const updateRolePermissions = async (permissions: Permission[]) => {
       }
 
       if (!resourceMapper[resource] && resource === "synthetics") {
-        if (!resourceMapper["synfolder"]) {
-          resourceMapper["synfolder"] = getResourceByName(
+        if (!resourceMapper["synthetic_folder"]) {
+          resourceMapper["synthetic_folder"] = getResourceByName(
             permissionsState.permissions,
-            "synfolder",
+            "synthetic_folder",
           ) as Resource;
         }
 
-        await getResourceEntities(resourceMapper["synfolder"]);
+        await getResourceEntities(resourceMapper["synthetic_folder"]);
 
         if (!resourceMapper[resource]) {
           resourceMapper[resource] = getResourceByName(
@@ -931,7 +931,7 @@ const updateRolePermissions = async (permissions: Permission[]) => {
         // Synthetics entities are plain monitor ids (no folder prefix), so the
         // owning folder can't be derived from the entity — load every folder's
         // monitors so the permission can be matched to its row.
-        for (const folderEntity of resourceMapper["synfolder"]?.entities ??
+        for (const folderEntity of resourceMapper["synthetic_folder"]?.entities ??
           []) {
           await getResourceEntities(folderEntity as Entity);
         }
@@ -1154,7 +1154,7 @@ const updateJsonInTable = () => {
         ) as Entity;
       } else if (resource === "synthetics") {
         // Plain-id entity — locate the folder whose loaded monitors contain it.
-        resourceDetails = resourceMapper.value["synfolder"].entities.find(
+        resourceDetails = resourceMapper.value["synthetic_folder"].entities.find(
           (f: Entity) =>
             (f.entities ?? []).some((e: Entity) => e.name === entity),
         ) as Entity;
@@ -1212,7 +1212,7 @@ const updateJsonInTable = () => {
         ) as Entity;
       } else if (resource === "synthetics") {
         // Plain-id entity — locate the folder whose loaded monitors contain it.
-        resourceDetails = resourceMapper.value["synfolder"].entities.find(
+        resourceDetails = resourceMapper.value["synthetic_folder"].entities.find(
           (f: Entity) =>
             (f.entities ?? []).some((e: Entity) => e.name === entity),
         ) as Entity;
@@ -1565,7 +1565,7 @@ const getResourceEntities = (resource: Resource | Entity) => {
     cipher_keys: getCipherKeys,
     afolder: getAlertFolders,
     rfolder: getReportFolders,
-    synfolder: getSyntheticsFolders,
+    synthetic_folder: getSyntheticsFolders,
     synthetics: getSynthetics,
     re_patterns: getRePatterns,
     provider: getProviders,
@@ -1738,7 +1738,7 @@ const getSyntheticsFolders = async () => {
   }
 
   updateResourceEntities(
-    "synfolder",
+    "synthetic_folder",
     ["folderId"],
     [...folders.data.list],
     true,
