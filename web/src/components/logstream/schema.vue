@@ -2662,34 +2662,37 @@ export default defineComponent({
 });
 </script>
 
-<style>
-.indexDetailsContainer .o2-schema-table {
+<style scoped>
+/* keep(lib-override:otable): reaches into the OTable-rendered thead/tbody DOM
+   to tune the schema table's header/row sizing — not expressible as utilities
+   on this template. */
+.indexDetailsContainer :deep(.o2-schema-table) {
   border-radius: 0.5rem;
   position: relative;
   border: 0.0625rem solid var(--color-card-glass-border);
 }
 
-.indexDetailsContainer .o2-schema-table thead tr {
+.indexDetailsContainer :deep(.o2-schema-table thead tr) {
   height: 2.5rem;
   background: var(--color-table-header-bg) !important;
 }
 
-.indexDetailsContainer .o2-schema-table thead tr th {
+.indexDetailsContainer :deep(.o2-schema-table thead tr th) {
   font-size: var(--text-xs);
-  height: 35px;
+  height: 2.1875rem;
 }
 
-.indexDetailsContainer .o2-schema-table .o2-schema-table tbody td:after {
+.indexDetailsContainer :deep(.o2-schema-table .o2-schema-table tbody td:after) {
   background: none !important;
 }
 
-.indexDetailsContainer .o2-schema-table tbody tr {
-  height: 15px;
+.indexDetailsContainer :deep(.o2-schema-table tbody tr) {
+  height: 0.9375rem;
 }
 
-.indexDetailsContainer .o2-schema-table tbody tr td {
+.indexDetailsContainer :deep(.o2-schema-table tbody tr td) {
   font-size: 0.875rem;
-  height: 25px;
-  padding: 0px 5px;
+  height: 1.5625rem;
+  padding: 0 0.3125rem;
 }
 </style>

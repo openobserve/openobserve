@@ -360,13 +360,13 @@ export default defineComponent({
 <style>
 .warning-text strong {
   display: block;
-  margin-bottom: 4px;
+  margin-bottom: 0.25rem;
   color: var(--color-banner-warning-text);
 }
 
 .warning-text p {
   margin: 0;
-  font-size: 14px;
+  font-size: 0.875rem;
   color: var(--color-banner-warning-text);
 }
 
@@ -390,7 +390,7 @@ export default defineComponent({
 
 @keyframes slide-up {
   from {
-    transform: translateY(30px);
+    transform: translateY(1.875rem);
     opacity: 0;
   }
   to {
@@ -405,7 +405,7 @@ export default defineComponent({
     opacity: 1;
   }
   to {
-    transform: translateY(30px);
+    transform: translateY(1.875rem);
     opacity: 0;
   }
 }

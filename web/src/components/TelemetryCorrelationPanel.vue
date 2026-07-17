@@ -114,7 +114,7 @@
               <div
                 v-for="(query, idx) in traceQueries"
                 :key="`trace-${idx}`"
-                class="query-item flex items-center justify-between py-2 px-3 bg-[var(--color-surface-panel)] rounded-sm border border-[var(--color-border-default)]"
+                class="query-item flex items-center justify-between py-2 px-3 bg-surface-panel rounded-sm border border-border-default hover:bg-interactive-hover-bg"
               >
                 <div class="query-stream text-xs [font-family:monospace] text-[var(--color-text-secondary)]">{{ query.stream }}</div>
                 <OButton
@@ -139,7 +139,7 @@
               <div
                 v-for="(query, idx) in metricQueries"
                 :key="`metric-${idx}`"
-                class="query-item flex items-center justify-between py-2 px-3 bg-[var(--color-surface-panel)] rounded-sm border border-[var(--color-border-default)]"
+                class="query-item flex items-center justify-between py-2 px-3 bg-surface-panel rounded-sm border border-border-default hover:bg-interactive-hover-bg"
               >
                 <div class="query-stream text-xs [font-family:monospace] text-[var(--color-text-secondary)]">{{ query.stream }}</div>
                 <OButton
@@ -164,7 +164,7 @@
               <div
                 v-for="(query, idx) in logQueries"
                 :key="`log-${idx}`"
-                class="query-item flex items-center justify-between py-2 px-3 bg-[var(--color-surface-panel)] rounded-sm border border-[var(--color-border-default)]"
+                class="query-item flex items-center justify-between py-2 px-3 bg-surface-panel rounded-sm border border-border-default hover:bg-interactive-hover-bg"
               >
                 <div class="query-stream text-xs [font-family:monospace] text-[var(--color-text-secondary)]">{{ query.stream }}</div>
                 <OButton
@@ -289,9 +289,3 @@ function navigateToQuery(query: CorrelationQuery, type: "logs" | "traces" | "met
   emit("close");
 }
 </script>
-
-<style>
-.query-section .query-item:hover {
-  background: var(--color-interactive-hover-bg);
-}
-</style>

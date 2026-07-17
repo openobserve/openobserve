@@ -49,7 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="text-base">No integrations found matching your search</div>
     </div>
 
-    <div class="integrations-grid grid grid-cols-4 gap-4" v-else>
+    <div class="integrations-grid grid grid-cols-4 gap-4 max-[75rem]:grid-cols-3 max-[56.25rem]:grid-cols-2 max-[37.5rem]:grid-cols-1" v-else>
       <AWSIntegrationTile
         v-for="integration in filteredIntegrations"
         :key="integration.id"
@@ -140,24 +140,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style>
-@media (max-width: 1200px) {
-  .aws-integration-grid .integrations-grid {
-    grid-template-columns: repeat(3, 1fr);
-  }
-}
-
-@media (max-width: 900px) {
-  .aws-integration-grid .integrations-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-}
-
-@media (max-width: 600px) {
-  .aws-integration-grid .integrations-grid {
-    grid-template-columns: 1fr;
-  }
-}
-
-</style>

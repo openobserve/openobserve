@@ -28,9 +28,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
       </div>
 
-      <div class="dialog-split-layout flex max-h-[92vh]" :class="{ 'cloud-layout': dialogConfig.isCloudLayout }">
+      <div class="dialog-split-layout flex max-h-[92vh] max-[56.25rem]:flex-col" :class="{ 'cloud-layout': dialogConfig.isCloudLayout }">
         <!-- Left Panel - Hero Section (hidden for Cloud) -->
-        <div v-if="!dialogConfig.isCloudLayout" class="hero-panel [flex:0_0_35%] bg-[linear-gradient(135deg,var(--color-theme-accent)_0%,color-mix(in_srgb,var(--color-theme-accent)_85%,black_15%)_100%)] p-10 flex flex-col relative text-white overflow-y-auto min-h-0">
+        <div v-if="!dialogConfig.isCloudLayout" class="hero-panel [flex:0_0_35%] bg-[linear-gradient(135deg,var(--color-theme-accent)_0%,color-mix(in_srgb,var(--color-theme-accent)_85%,black_15%)_100%)] p-10 flex flex-col relative text-white overflow-y-auto min-h-0 max-[56.25rem]:flex-none max-[56.25rem]:min-h-100">
 
           <div class="flex-1 flex flex-col justify-center items-center max-w-100 w-full m-auto">
             <div class="w-20 h-20 bg-[rgba(255,255,255,0.15)] rounded-[16px] flex items-center justify-center mb-6 backdrop-blur-[10px]">
@@ -1080,19 +1080,10 @@ export default defineComponent({
 });
 </script>
 
-<style>
-.usage-chart-container .grid-stack-item-content {
-  border: 0px !important;
-}
-
-@media (max-width: 900px) {
-  .dialog-split-layout {
-    flex-direction: column;
-  }
-
-  .hero-panel {
-    flex: 0 0 auto;
-    min-height: 400px;
-  }
+<style scoped>
+/* keep(lib-override): strip the gridstack widget's default border inside the usage chart
+   (.grid-stack-item-content is gridstack-generated DOM, not addressable via template utilities) */
+.usage-chart-container :deep(.grid-stack-item-content) {
+  border: 0 !important;
 }
 </style>

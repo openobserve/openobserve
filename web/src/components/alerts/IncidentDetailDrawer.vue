@@ -2855,27 +2855,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style>
-/* Responsive scrolling */
-.incident-details-column::-webkit-scrollbar,
-.tabs-content-column .overflow-auto::-webkit-scrollbar {
-  width: 6px;
-}
-
-.incident-details-column::-webkit-scrollbar-track,
-.tabs-content-column .overflow-auto::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.incident-details-column::-webkit-scrollbar-thumb,
-.tabs-content-column .overflow-auto::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
-  border-radius: 3px;
-}
-
-.dark .incident-details-column::-webkit-scrollbar-thumb,
-.dark .tabs-content-column .overflow-auto::-webkit-scrollbar-thumb {
-  background: #475569;
-}
-</style>

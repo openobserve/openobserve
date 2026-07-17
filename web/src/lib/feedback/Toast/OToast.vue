@@ -341,6 +341,9 @@ onUnmounted(() => {
 </template>
 
 <style>
+/* keep(keyframes): timeout progress-bar shrink. Stays global — the keyframe
+   name is referenced from a template `[animation:…]` utility, which Vue's
+   scoped rewriter would not update. */
 @keyframes toast-shrink {
   from {
     transform: scaleX(1);

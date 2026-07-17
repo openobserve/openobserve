@@ -1103,36 +1103,38 @@ export default defineComponent({
 });
 </script>
 
-<style>
-tr.status-row > td:first-child {
+<style scoped>
+/* keep(generated-content): status stripe on OTable rows (row-class-driven ::before,
+   rendered inside the child OTable DOM — needs :deep) */
+:deep(tr.status-row) > td:first-child {
   position: relative;
 }
-tr.status-row > td:first-child::before {
+:deep(tr.status-row) > td:first-child::before {
   content: "";
   position: absolute;
   left: 0;
   top: 0;
   bottom: 0;
-  width: 5px;
+  width: 0.3125rem;
 }
-tr.status-online > td:first-child::before {
+:deep(tr.status-online) > td:first-child::before {
   background: var(--color-status-positive);
 }
-tr.status-offline > td:first-child::before {
+:deep(tr.status-offline) > td:first-child::before {
   background: var(--color-status-negative);
 }
-tr.status-prepare > td:first-child::before {
+:deep(tr.status-prepare) > td:first-child::before {
   background: var(--color-status-warning-text);
 }
 
-/* Legacy span-based status indicator (still used by status filter list) */
+/* Legacy span-based status indicator (slotted status filter list — parent-scoped) */
 span.status-online {
-  border-left: var(--color-status-positive) 5px solid !important;
+  border-left: var(--color-status-positive) 0.3125rem solid !important;
 }
 span.status-offline {
-  border-left: 5px solid var(--color-status-negative) !important;
+  border-left: 0.3125rem solid var(--color-status-negative) !important;
 }
 span.status-prepare {
-  border-left: 5px solid var(--color-status-warning-text) !important;
+  border-left: 0.3125rem solid var(--color-status-warning-text) !important;
 }
 </style>

@@ -137,7 +137,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="store.state.isAiChatEnabled && !isAddFunctionComponent"
         :class="[
           'w-1/4 max-w-full min-w-19',
-          heightOffset ? 'ai-chat-with-offset' : '',
+          heightOffset ? '[--ai-chat-offset:4.6875rem]' : '',
         ]"
       >
         <O2AIChat
@@ -638,9 +638,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style>
-.ai-chat-with-offset {
-  --ai-chat-offset: 75px;
-}
-</style>

@@ -213,7 +213,7 @@
                 </div>
 
                 <div class="text-xs" v-if="pricingRows.length > 0">
-                  <div class="grid gap-2 py-[7px] px-3.5 border-b border-card-glass-border bg-[rgba(0,0,0,0.015)] dark:bg-[rgba(255,255,255,0.02)] [grid-template-columns:1.5fr_1fr]">
+                  <div class="grid gap-2 py-[7px] px-3.5 border-b border-card-glass-border bg-[rgba(0,0,0,0.015)] dark:bg-[rgba(255,255,255,0.02)] grid-cols-[1.5fr_1fr]">
                     <span class="text-3xs font-semibold opacity-40">{{ t("modelPricing.usageType") }}</span>
                     <span class="text-3xs font-semibold opacity-40 text-right">{{
                       t("modelPricing.pricePerMTokens")
@@ -222,7 +222,7 @@
                   <div
                     v-for="row in pricingRows"
                     :key="row.key"
-                    class="tmm-cost-table-row grid gap-2 py-2 px-3.5 text-xs border-b border-[rgba(0,0,0,0.04)] dark:border-[rgba(255,255,255,0.04)] hover:bg-[rgba(0,0,0,0.015)] dark:hover:bg-[rgba(255,255,255,0.02)] [grid-template-columns:1.5fr_1fr]"
+                    class="tmm-cost-table-row grid gap-2 py-2 px-3.5 text-xs border-b border-[rgba(0,0,0,0.04)] dark:border-[rgba(255,255,255,0.04)] last:border-b-0 hover:bg-[rgba(0,0,0,0.015)] dark:hover:bg-[rgba(255,255,255,0.02)] grid-cols-[1.5fr_1fr]"
                   >
                     <span class="font-semibold font-[SF_Mono,JetBrains_Mono,monospace] text-2xs">{{ row.key }}</span>
                     <span class="font-semibold [font-variant-numeric:tabular-nums] text-right"

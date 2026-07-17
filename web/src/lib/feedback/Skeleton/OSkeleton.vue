@@ -36,20 +36,10 @@ const classes = computed(() => [
   />
 </template>
 
-<style>
-/*
-  translateX shimmer — fundamentally more natural than background-position.
-
-  Why this feels better:
-  • The base is a flat solid colour (bg-skeleton-base). No moving gradient.
-  • A ::after overlay physically slides across with translateX. This is
-    GPU-composited (no layout cost) and maps 1:1 to visual motion.
-  • ease-in-out on translateX mimics how light actually reflects off a surface —
-    it eases in and out naturally. (ease-in-out was wrong for background-position
-    but is correct here.)
-  • The shimmer beam is a 105° tilted gradient — a slight diagonal makes it
-    read as a gloss catch, not a mechanical wipe.
-*/
+<style scoped>
+/* keep(generated-content): translateX shimmer overlay (::after) + its keyframes.
+   A GPU-composited beam physically slides across the flat base — no moving
+   background-position — which reads as a natural gloss catch. */
 .skeleton-wave::after {
   content: "";
   position: absolute;
@@ -58,7 +48,7 @@ const classes = computed(() => [
     90deg,
     transparent        0%,
     transparent       30%,
-    var(--color-skeleton-shimmer, rgba(255, 255, 255, 0.8)) 50%,
+    var(--color-skeleton-shimmer) 50%,
     transparent       70%,
     transparent      100%
   );

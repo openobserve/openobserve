@@ -95,7 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :key="service.name"
                     class="w-full col-sm-6"
                   >
-                    <div class="service-item p-2 rounded-sm border transition-all duration-200 ease-in-out border-border-default bg-surface-panel">
+                    <div class="service-item p-2 rounded-sm border transition-all duration-200 ease-in-out border-border-default bg-surface-panel hover:bg-surface-subtle-hover">
                       <div class="flex items-start gap-2">
                         <OIcon
                           :name="getCategoryIcon(service.category)"
@@ -371,7 +371,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style>
-.azure-quick-setup .service-item:hover { background-color: var(--color-surface-subtle-hover); }
-</style>

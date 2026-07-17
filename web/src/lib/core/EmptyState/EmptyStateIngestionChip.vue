@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <component
     :is="href ? 'a' : 'button'"
-    class="es-ing-chip inline-flex items-center gap-1.25 py-1 px-3 text-[length:var(--text-compact)] font-medium rounded-full border border-border-default bg-surface-panel no-underline cursor-pointer outline-none transition-[border-color,color,background-color] duration-150 hover:border-primary-400 hover:bg-[color-mix(in_srgb,var(--color-primary-500)_6%,transparent)] focus-visible:shadow-[0_0_0_0.125rem_color-mix(in_srgb,var(--color-primary-500)_40%,transparent)]"
+    class="es-ing-chip inline-flex items-center gap-1.25 py-1 px-3 text-[length:var(--text-compact)] font-medium rounded-full border border-border-default bg-surface-panel no-underline! text-text-secondary! cursor-pointer outline-none transition-[border-color,color,background-color] duration-150 hover:border-primary-400 hover:text-primary-600! hover:bg-[color-mix(in_srgb,var(--color-primary-500)_6%,transparent)] focus-visible:shadow-[0_0_0_0.125rem_color-mix(in_srgb,var(--color-primary-500)_40%,transparent)]"
     v-bind="href ? { href, target: '_blank', rel: 'noopener noreferrer' } : { type: 'button' }"
     @click="!href && emit('click')"
   >
@@ -41,11 +41,3 @@ defineProps<{
 
 const emit = defineEmits<{ click: [] }>();
 </script>
-
-<style>
-/* Color can't be inlined: as an <a> the chip inherits the global unlayered
-   `a { color: var(--color-text-link) }`, which beats any layered  utility.
-   A class selector outranks the bare `a` selector without needing `!`. */
-.es-ing-chip { color: var(--color-text-secondary); }
-.es-ing-chip:hover { color: var(--color-primary-600); text-decoration: none; }
-</style>

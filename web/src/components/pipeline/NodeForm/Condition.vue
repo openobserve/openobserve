@@ -788,37 +788,36 @@ const deleteRoute = () => {
 
 </script>
 
-<style>
-/* Override FilterGroup styles for pipeline context */
+<style scoped>
+/* keep(lib-override): retarget the shared FilterGroup component's internal DOM
+   (.el-border / .group-container / .group-border / .conditions-input and its inline
+   margin-left styling) for the pipeline drawer context — not addressable via template utilities. */
+
 /* Force the root group box to span the full drawer width (FilterGroup defaults to w-fit) */
-.pipeline-filter-group-wrapper > .el-border {
+.pipeline-filter-group-wrapper > :deep(.el-border) {
   width: 100% !important;
 }
 
-.pipeline-filter-group-wrapper .group-container {
+.pipeline-filter-group-wrapper :deep(.group-container) {
   white-space: normal !important;
   overflow-x: visible !important;
   max-width: 100%;
+  pointer-events: auto;
 }
 
 /* Reduce margins for nested groups in pipeline */
-.pipeline-filter-group-wrapper [style*="margin-left"] {
-  margin-left: 10px !important;
+.pipeline-filter-group-wrapper :deep([style*="margin-left"]) {
+  margin-left: 0.625rem !important;
 }
 
 /* Ensure conditions fit width */
-.pipeline-filter-group-wrapper .conditions-input {
-  min-width: 120px !important;
-  max-width: 200px;
+.pipeline-filter-group-wrapper :deep(.conditions-input) {
+  min-width: 7.5rem !important;
+  max-width: 12.5rem;
 }
 
 /* Ensure group borders don't overflow */
-.pipeline-filter-group-wrapper .group-border {
-  max-width: calc(100% - 20px);
-}
-
-/* Ensure FilterGroup container doesn't interfere with clicks */
-.pipeline-filter-group-wrapper .group-container {
-  pointer-events: auto;
+.pipeline-filter-group-wrapper :deep(.group-border) {
+  max-width: calc(100% - 1.25rem);
 }
 </style>

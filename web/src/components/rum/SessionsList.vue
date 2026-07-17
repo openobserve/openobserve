@@ -152,23 +152,3 @@ const handleCellClick = (payload: any) => {
   });
 };
 </script>
-
-<style>
-.sessions_page .index-table :hover::-webkit-scrollbar,
-#tracesSearchGridComponent:hover::-webkit-scrollbar {
-  height: 0.8125rem;
-  width: 0.8125rem;
-}
-
-.sessions_page .index-table ::-webkit-scrollbar-track,
-#tracesSearchGridComponent::-webkit-scrollbar-track {
-  -webkit-box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.3);
-  border-radius: 0.625rem;
-}
-
-.sessions_page .index-table ::-webkit-scrollbar-thumb,
-#tracesSearchGridComponent::-webkit-scrollbar-thumb {
-  border-radius: 0.625rem;
-  -webkit-box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.5);
-}
-</style>

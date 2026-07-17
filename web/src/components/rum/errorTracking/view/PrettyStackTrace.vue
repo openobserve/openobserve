@@ -108,7 +108,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <!-- Frame header - clickable -->
           <div
-            class="frame-header px-3 py-2 cursor-pointer transition-all duration-200 ease-in-out !px-4 !py-3"
+            class="frame-header px-3 py-2 cursor-pointer transition-all duration-200 ease-in-out !px-4 !py-3 hover:bg-surface-subtle"
             @click="toggleFrame(traceIndex, 0)"
           >
             <div class="frame-header-content flex items-center gap-2">
@@ -172,7 +172,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Show more button - only visible when frames are hidden -->
           <div
             v-if="!expandedTraces[traceIndex]"
-            class="show-more-button px-3 py-2 cursor-pointer flex items-center gap-1.5 transition-all duration-200 ease-in-out !px-4 !py-2.5 text-xs font-medium"
+            class="show-more-button px-3 py-2 cursor-pointer flex items-center gap-1.5 transition-all duration-200 ease-in-out !px-4 !py-2.5 text-xs font-medium hover:bg-surface-subtle"
             :style="{ 'border-top': `1px solid ${borderColor}` }"
             @click="showFrames(traceIndex)"
           >
@@ -196,7 +196,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <!-- Frame header - clickable -->
               <div
-                class="collapsed-frame-header px-3 py-1 cursor-pointer transition-all duration-200 ease-in-out !px-4 !py-2.5"
+                class="collapsed-frame-header px-3 py-1 cursor-pointer transition-all duration-200 ease-in-out !px-4 !py-2.5 hover:bg-surface-subtle"
                 :style="{ 'background-color': backgroundColor }"
                 @click="toggleFrame(traceIndex, frameIndex + 1)"
               >
@@ -282,7 +282,6 @@ const router = useRouter();
 // theme (light/dark) via dark.css, so no JS theme read is needed here.
 const borderColor = "var(--color-border-default)";
 const backgroundColor = "var(--color-surface-base)";
-const hoverBackgroundColor = "var(--color-surface-subtle)";
 const errorHeaderBackground = "var(--color-banner-warning-bg)";
 const errorHeaderColor = "var(--color-status-error-text)";
 const textColor = "var(--color-text-body)";
@@ -558,17 +557,3 @@ watch(
   }
 );
 </script>
-
-<style>
-.pretty-stack-container .stack-frame-wrapper .frame-header:hover {
-  background-color: v-bind(hoverBackgroundColor);
-}
-
-.pretty-stack-container .remaining-frames .show-more-button:hover {
-  background-color: v-bind(hoverBackgroundColor);
-}
-
-.pretty-stack-container .remaining-frames .collapsed-frame-wrapper .collapsed-frame-header:hover {
-  background-color: v-bind(hoverBackgroundColor);
-}
-</style>

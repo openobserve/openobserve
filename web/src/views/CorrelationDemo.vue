@@ -15,7 +15,7 @@
               <!-- Sample Log 1 -->
               <div class="log-line group p-4 bg-(--color-surface-base,#f5f5f5) rounded-lg border-2 border-transparent cursor-pointer transition-all duration-200 relative hover:border-(--color-theme-accent) hover:bg-(--color-surface-base,#eeeeee)" @click="selectLog(sampleLog1)">
                 <div class="log-timestamp font-mono text-xs text-[var(--color-theme-accent)] mb-2">2025-12-02 10:23:45</div>
-                <div class="log-content flex flex-col gap-1 text-compact">
+                <div class="log-content flex flex-col gap-1 text-compact [&>div]:flex [&>div]:gap-2 [&_strong]:min-w-37.5 [&_strong]:text-text-secondary">
                   <div><strong>service.name:</strong> checkout-api</div>
                   <div><strong>k8s.cluster:</strong> prod-us-west</div>
                   <div><strong>k8s.deployment.name:</strong> checkout-v2</div>
@@ -30,7 +30,7 @@
               <!-- Sample Log 2 -->
               <div class="log-line group p-4 bg-(--color-surface-base,#f5f5f5) rounded-lg border-2 border-transparent cursor-pointer transition-all duration-200 relative hover:border-(--color-theme-accent) hover:bg-(--color-surface-base,#eeeeee)" @click="selectLog(sampleLog2)">
                 <div class="log-timestamp font-mono text-xs text-[var(--color-theme-accent)] mb-2">2025-12-02 10:24:12</div>
-                <div class="log-content flex flex-col gap-1 text-compact">
+                <div class="log-content flex flex-col gap-1 text-compact [&>div]:flex [&>div]:gap-2 [&_strong]:min-w-37.5 [&_strong]:text-text-secondary">
                   <div><strong>service.name:</strong> inventory-service</div>
                   <div><strong>k8s.cluster:</strong> prod-us-east</div>
                   <div><strong>environment:</strong> production</div>
@@ -44,7 +44,7 @@
               <!-- Sample Log 3 -->
               <div class="log-line group p-4 bg-(--color-surface-base,#f5f5f5) rounded-lg border-2 border-transparent cursor-pointer transition-all duration-200 relative hover:border-(--color-theme-accent) hover:bg-(--color-surface-base,#eeeeee)" @click="selectLog(sampleLog3)">
                 <div class="log-timestamp font-mono text-xs text-[var(--color-theme-accent)] mb-2">2025-12-02 10:25:30</div>
-                <div class="log-content flex flex-col gap-1 text-compact">
+                <div class="log-content flex flex-col gap-1 text-compact [&>div]:flex [&>div]:gap-2 [&_strong]:min-w-37.5 [&_strong]:text-text-secondary">
                   <div><strong>service.name:</strong> user-auth</div>
                   <div><strong>k8s.cluster:</strong> prod-us-west</div>
                   <div><strong>region:</strong> us-west-2</div>
@@ -192,16 +192,3 @@ function selectLog(log: any) {
   showCorrelation.value = true;
 }
 </script>
-
-<style>
-.log-line .log-content div {
-  display: flex;
-  gap: 8px;
-}
-
-.log-line .log-content strong {
-  min-width: 150px;
-  color: var(--color-text-secondary);
-}
-
-</style>

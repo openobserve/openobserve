@@ -143,6 +143,9 @@ const pageSizeSelectOptions = computed(() =>
 </template>
 
 <style>
+/* keep(keyframes): pagination skeleton shimmer (and its reduced-motion opt-out).
+   Stays global — the keyframe name is referenced from a template `[animation:…]`
+   utility, which Vue's scoped rewriter would not update. */
 @keyframes o2-pag-shimmer {
   0% { background-position: 200% 0; }
   100% { background-position: -200% 0; }

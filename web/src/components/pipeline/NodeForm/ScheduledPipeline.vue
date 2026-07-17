@@ -2819,36 +2819,30 @@ defineExpose({
 });
 </script>
 
-<style>
-.scheduled-pipeline-container .o-splitter__before {
+<style scoped>
+/* keep(lib-override): all of these reach into DOM owned by child/third-party components —
+   OSplitter panes (.o-splitter__*), the field-list component (.index-menu/.index-table/
+   .traces-field-table) and the Monaco-based query editor (.monaco-editor/
+   .query-editor-container) — so they cannot be expressed as template utilities. */
+.scheduled-pipeline-container :deep(.o-splitter__before),
+.scheduled-pipeline-container :deep(.o-splitter__after) {
   overflow: hidden;
 }
 
-.scheduled-pipeline-container .o-splitter__after {
-  overflow: hidden;
-}
-
-.scheduled-pipeline-container .pipeline-field-list-wrapper .index-menu,
-.scheduled-pipeline-container .pipeline-field-list-wrapper .index-table {
+.scheduled-pipeline-container .pipeline-field-list-wrapper :deep(.index-menu),
+.scheduled-pipeline-container .pipeline-field-list-wrapper :deep(.index-table) {
   height: 100%;
 }
 
-.scheduled-pipeline-container .pipeline-field-list-wrapper .traces-field-table {
+.scheduled-pipeline-container .pipeline-field-list-wrapper :deep(.traces-field-table) {
   height: 100% !important;
 }
 
-.scheduled-pipeline-container .scheduled-pipelines .monaco-editor {
+.scheduled-pipeline-container .scheduled-pipelines :deep(.monaco-editor) {
   width: 100%;
 }
 
-.scheduled-pipeline-container .scheduled-pipelines .query-editor-container {
+.scheduled-pipeline-container .scheduled-pipelines :deep(.query-editor-container) {
   width: 100% !important;
-}
-
-.o2-custom-splitter > .o-splitter__separator {
-  width: 0.625rem;
-  z-index: 999 !important;
-  height: 100%;
-  background: transparent;
 }
 </style>

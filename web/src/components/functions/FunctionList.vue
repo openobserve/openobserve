@@ -770,21 +770,22 @@ export default defineComponent({
 });
 </script>
 
-<style>
+<style scoped>
+/* keep(scrollbar): custom webkit scrollbar for the function list */
 .scrollable-list::-webkit-scrollbar {
-  width: 8px;
+  width: 0.5rem;
 }
 
 .scrollable-list::-webkit-scrollbar-thumb {
   background-color: var(--color-border-strong);
-  border-radius: 4px;
+  border-radius: 0.25rem;
 }
 
 .scrollable-list::-webkit-scrollbar-thumb:hover {
-  background-color: blue;
+  background-color: var(--color-text-muted);
 }
 
 .scrollable-list::-webkit-scrollbar-track {
-  background-color: blue;
+  background-color: transparent;
 }
 </style>

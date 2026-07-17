@@ -523,8 +523,10 @@ const fieldClasses = computed(() => [
   </div>
 </template>
 
-<style>
-/* Hide the native browser clock picker dropdown */
+<style scoped>
+/* keep(lib-override:native-time): hide the browser's native clock-picker
+   indicator on <input type=time> (a custom analog-clock popover replaces it).
+   Scoped so the override only affects this component's input. */
 input[type="time"]::-webkit-calendar-picker-indicator {
   display: none;
 }

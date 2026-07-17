@@ -1996,6 +1996,11 @@ export default defineComponent({
 </script>
 
 <style>
+/* keep(complex-state): fullscreen / sticky-header / print-mode toggled state
+   classes (compound .stickyHeader.fullscreenHeader chain + high z-index stacking)
+   plus a @media print block that must reach external ancestors
+   (.o2-app-root, main, .o2-content-scroll, .scroll) — none expressible as
+   component-scoped utilities, so the block stays an unscoped global. */
 .stickyHeader {
   position: sticky;
   top: 0;
@@ -2003,7 +2008,7 @@ export default defineComponent({
 }
 
 .stickyHeader.fullscreenHeader {
-  top: 0px;
+  top: 0;
   z-index: 5100 !important;
 }
 
@@ -2016,7 +2021,7 @@ export default defineComponent({
   z-index: 5000 !important;
   margin: 0 !important;
   padding: 0 !important;
-  background-color: var(--color-surface-base, #ffffff) !important;
+  background-color: var(--color-surface-base) !important;
 }
 
 .print-mode-container {

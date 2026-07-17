@@ -1390,18 +1390,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style>
-/* The theme chips' dark background/border are set via `dark:*` utilities,
-   which don't apply in this app (dark mode is toggled by `.dark`,
-   not the OS media query Tailwind's `dark:` variant targets). Restore them
-   with class-based rules so the chips keep their fill + border in dark mode. */
-.dark [data-test="theme-light-chip"],
-.dark [data-test="theme-dark-chip"] {
-  background: rgba(255, 255, 255, 0.05);
-  border-color: rgba(255, 255, 255, 0.15);
-}
-.dark [data-test="reset-theme-colors-btn"] {
-  border-color: rgba(255, 255, 255, 0.25);
-}
-</style>

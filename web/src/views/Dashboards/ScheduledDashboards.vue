@@ -399,29 +399,31 @@ const getTimeRangeValue = (dateTime: any) => {
 };
 </script>
 
-<style>
-.scheduled-dashboards thead tr {
+<style scoped>
+/* keep(lib-override:OTable+tabs): table header-row background and the pill-style
+   time-range tabs — target OTable / tab child DOM reached via :deep(). */
+.scheduled-dashboards :deep(thead tr) {
   background-color: var(--color-table-header-bg);
 }
 
-.scheduled-dashboards .rum-tabs {
+.scheduled-dashboards :deep(.rum-tabs) {
   border: 1px solid var(--color-border-default);
   height: fit-content;
-  border-radius: 4px;
+  border-radius: 0.25rem;
   overflow: hidden;
 }
 
-.scheduled-dashboards .rum-tab {
+.scheduled-dashboards :deep(.rum-tab) {
   width: fit-content !important;
-  padding: 4px 12px !important;
+  padding: 0.25rem 0.75rem !important;
   border: none !important;
 }
 
-.scheduled-dashboards .rum-tab:hover {
+.scheduled-dashboards :deep(.rum-tab:hover) {
   background: var(--color-surface-subtle-hover);
 }
 
-.scheduled-dashboards .rum-tab.active {
+.scheduled-dashboards :deep(.rum-tab.active) {
   background: var(--color-brand-indigo);
   color: var(--color-white) !important;
 }

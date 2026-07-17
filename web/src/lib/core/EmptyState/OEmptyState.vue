@@ -35,6 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div
     :class="[
       'o2-empty-state relative flex flex-col items-center justify-center overflow-hidden',
+      '[--empty-dot:var(--color-grey-300)] dark:[--empty-dot:var(--color-grey-800)]',
       sizeClass.root,
       { 'o2-empty-state--hero': size === 'hero' },
     ]"
@@ -360,9 +361,3 @@ const SIZE_MAP: Record<
 };
 const sizeClass = computed(() => SIZE_MAP[size.value]);
 </script>
-
-<style>
-/* CSS custom property for the dot-grid backdrop; dark mode overrides it. */
-.o2-empty-state { --empty-dot: var(--color-grey-300); }
-.dark .o2-empty-state { --empty-dot: var(--color-grey-800); }
-</style>

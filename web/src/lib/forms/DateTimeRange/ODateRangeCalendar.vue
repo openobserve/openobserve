@@ -238,26 +238,21 @@ function handleRangeChange(value: DateRange | undefined) {
   </RangeCalendarRoot>
 </template>
 
-<style>
-/*
-  While awaiting the second click, reka-ui flags every still-pickable cell
-  with [data-highlighted] (start → max-date), which would visually wash out
-  the whole future calendar. Strip that styling in awaiting mode and rely on
-  our own [data-preview] flag, which we set only on cells between start and
-  the user's current hover position.
-
-  The :not([data-selected]) guards keep the chosen start cell (which carries
-  BOTH data-selected and data-highlighted) from being affected — it should
-  continue to show the solid "selected" background.
-*/
-.o-range-cal--awaiting [data-highlighted]:not([data-selected]) {
+<style scoped>
+/* keep(lib-override:reka-ui): while awaiting the second click, reka flags every
+   still-pickable cell with [data-highlighted] (start → max-date), washing out
+   the future calendar. Strip that and paint only our own [data-preview] cells
+   (set between start and hover). The :not([data-selected]) guards keep the
+   chosen start cell's solid background. Targets reka-generated cell DOM state,
+   so the selectors need :deep. */
+.o-range-cal--awaiting :deep([data-highlighted]:not([data-selected])) {
   background-color: transparent;
   color: inherit;
 }
-.o-range-cal--awaiting [data-preview]:not([data-selected]) {
+.o-range-cal--awaiting :deep([data-preview]:not([data-selected])) {
   background-color: var(--color-datepicker-day-range-bg);
   color: var(--color-datepicker-day-range-text);
   outline: 1px dashed currentColor;
-  outline-offset: -2px;
+  outline-offset: -0.125rem;
 }
 </style>

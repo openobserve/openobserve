@@ -17,8 +17,8 @@
             ref="yesButtonRef"
             variant="outline"
             :block="true"
-            class="confirmation-btn confirm-btn w-full text-sm font-semibold rounded-md normal-case tracking-normal transition-all duration-200 text-[var(--color-theme-accent)] border-2 border-border-default bg-surface-base hover:bg-button-ghost-primary-hover-bg hover:border-[var(--color-theme-accent)]"
-            :class="{ 'btn-focused': isFocusedYes }"
+            class="confirmation-btn w-full text-sm font-semibold rounded-md normal-case tracking-normal transition-all duration-200 text-theme-accent border-2 border-border-default bg-surface-base hover:bg-button-ghost-primary-hover-bg hover:border-theme-accent"
+            :class="isFocusedYes ? 'text-white! bg-theme-accent! border-theme-accent! ring-3 ring-theme-accent/40' : ''"
             tabindex="0"
             @click="handleConfirm"
             @focus="handleYesFocus"
@@ -28,8 +28,8 @@
             ref="alwaysButtonRef"
             variant="outline"
             :block="true"
-            class="confirmation-btn always-btn w-full text-sm font-semibold rounded-md normal-case tracking-normal transition-all duration-200 text-status-positive border-2 border-border-default bg-surface-base hover:bg-button-ghost-success-hover-bg hover:border-status-positive"
-            :class="{ 'btn-focused': isFocusedAlways }"
+            class="confirmation-btn w-full text-sm font-semibold rounded-md normal-case tracking-normal transition-all duration-200 text-status-positive border-2 border-border-default bg-surface-base hover:bg-button-ghost-success-hover-bg hover:border-status-positive"
+            :class="isFocusedAlways ? 'text-white! bg-status-positive! border-status-positive! ring-3 ring-status-positive/40' : ''"
             tabindex="1"
             @click="handleAlwaysConfirm"
             @focus="handleAlwaysFocus"
@@ -39,8 +39,8 @@
             ref="noButtonRef"
             variant="outline"
             :block="true"
-            class="confirmation-btn cancel-btn w-full text-sm font-semibold rounded-md normal-case tracking-normal transition-all duration-200 text-text-primary border-2 border-border-default bg-surface-base hover:bg-button-ghost-destructive-hover-bg hover:border-status-negative"
-            :class="{ 'btn-focused': isFocusedNo }"
+            class="confirmation-btn w-full text-sm font-semibold rounded-md normal-case tracking-normal transition-all duration-200 text-text-primary border-2 border-border-default bg-surface-base hover:bg-button-ghost-destructive-hover-bg hover:border-status-negative"
+            :class="isFocusedNo ? 'text-white! bg-status-negative! border-status-negative! ring-3 ring-status-negative/40' : ''"
             tabindex="2"
             @click="handleCancel"
             @focus="handleNoFocus"
@@ -54,8 +54,8 @@
             ref="yesButtonRef"
             variant="outline"
             :block="true"
-            class="confirmation-btn confirm-btn w-full text-sm font-semibold rounded-md normal-case tracking-normal transition-all duration-200 text-[var(--color-theme-accent)] border-2 border-border-default bg-surface-base hover:bg-button-ghost-primary-hover-bg hover:border-[var(--color-theme-accent)]"
-            :class="{ 'btn-focused': isFocusedYes }"
+            class="confirmation-btn w-full text-sm font-semibold rounded-md normal-case tracking-normal transition-all duration-200 text-theme-accent border-2 border-border-default bg-surface-base hover:bg-button-ghost-primary-hover-bg hover:border-theme-accent"
+            :class="isFocusedYes ? 'text-white! bg-theme-accent! border-theme-accent! ring-3 ring-theme-accent/40' : ''"
             tabindex="0"
             @click="handleConfirm"
             @focus="handleYesFocus"
@@ -65,8 +65,8 @@
             ref="noButtonRef"
             variant="outline"
             :block="true"
-            class="confirmation-btn cancel-btn w-full text-sm font-semibold rounded-md normal-case tracking-normal transition-all duration-200 text-text-primary border-2 border-border-default bg-surface-base hover:bg-button-ghost-destructive-hover-bg hover:border-status-negative"
-            :class="{ 'btn-focused': isFocusedNo }"
+            class="confirmation-btn w-full text-sm font-semibold rounded-md normal-case tracking-normal transition-all duration-200 text-text-primary border-2 border-border-default bg-surface-base hover:bg-button-ghost-destructive-hover-bg hover:border-status-negative"
+            :class="isFocusedNo ? 'text-white! bg-status-negative! border-status-negative! ring-3 ring-status-negative/40' : ''"
             tabindex="1"
             @click="handleCancel"
             @focus="handleNoFocus"
@@ -398,6 +398,7 @@ onUnmounted(() => {
 </script>
 
 <style>
+/* keep(keyframes): slide-up entrance animation referenced by the global [animation:slideUp_*] utility */
 @keyframes slideUp {
   from {
     opacity: 0;
@@ -407,30 +408,5 @@ onUnmounted(() => {
     opacity: 1;
     transform: translateY(0);
   }
-}
-
-.confirmation-btn.confirm-btn.btn-focused {
-  color: var(--color-white) !important;
-  background-color: var(--color-theme-accent) !important;
-  border-color: var(--color-theme-accent) !important;
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.4) !important;
-}
-
-.dark .confirmation-btn.confirm-btn.btn-focused {
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.4) !important;
-}
-
-.confirmation-btn.always-btn.btn-focused {
-  color: var(--color-white) !important;
-  background-color: var(--color-status-positive) !important;
-  border-color: var(--color-status-positive) !important;
-  box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.4) !important;
-}
-
-.confirmation-btn.cancel-btn.btn-focused {
-  color: var(--color-white) !important;
-  background-color: var(--color-status-negative) !important;
-  border-color: var(--color-status-negative) !important;
-  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.4) !important;
 }
 </style>

@@ -376,7 +376,7 @@ export default defineComponent({
 });
 </script>
 
-<style>
+<style scoped>
 /*
  * HomeView Styles — Tab bar and page layout only.
  * Usage-tab-specific styles live in UsageTab.vue.
@@ -384,8 +384,14 @@ export default defineComponent({
 
 /* Home tab bar now uses the shared OTabs component (see template). */
 
+/* keep(lib-override): every selector below reaches into the AI chat component's own DOM
+   (.chat-container / .chat-content / .messages-container / .chat-header /
+   .unified-input-box), so none of it is addressable from this template's utilities.
+   The brand ribbon gradient + accent glow use the --color-gradient-brand-ribbon and
+   --color-ai-accent tokens. */
+
 /* Chat fills remaining width and height */
-.home-ai-panel .chat-container {
+.home-ai-panel :deep(.chat-container) {
   flex: 1;
   height: 100%;
   box-shadow: none;
@@ -396,8 +402,8 @@ export default defineComponent({
 
 /* Allow the input's gradient glow + shadow to spill outside the container.
    messages-container has its own overflow-y, so the page itself won't grow. */
-.home-ai-panel .chat-content-wrapper,
-.home-ai-panel .chat-content {
+.home-ai-panel :deep(.chat-content-wrapper),
+.home-ai-panel :deep(.chat-content) {
   overflow: visible;
 }
 
@@ -407,77 +413,70 @@ export default defineComponent({
    to their content height and push the input bar off the bottom. min-height:0
    lets them shrink within their flex columns so the message list scrolls and
    the input stays pinned at the bottom. */
-.home-ai-panel .chat-content,
-.home-ai-panel .messages-container {
+.home-ai-panel :deep(.chat-content),
+.home-ai-panel :deep(.messages-container) {
   min-height: 0;
 }
 
 /* Hide the entire chat header + its separator — sidebar owns this UI */
-.home-ai-panel .chat-header,
-.home-ai-panel .chat-content-wrapper > [role="separator"] {
+.home-ai-panel :deep(.chat-header),
+.home-ai-panel :deep(.chat-content-wrapper > [role="separator"]) {
   display: none;
 }
 
 /* Gradient border on the prompt input — home tab only.
    Uses the dual-background trick: bg color for padding-box, gradient for border-box.
    2px border for stronger presence + layered shadows for depth. */
-.home-ai-panel .unified-input-box {
+.home-ai-panel :deep(.unified-input-box) {
+  --color-ai-input-bg: var(--color-white);
   position: relative;
-  border: 2px solid transparent !important;
+  border: 0.125rem solid transparent !important;
   background:
-    linear-gradient(
-        var(--color-ai-input-bg, #ffffff),
-        var(--color-ai-input-bg, #ffffff)
-      )
-      padding-box,
+    linear-gradient(var(--color-ai-input-bg), var(--color-ai-input-bg)) padding-box,
     var(--color-gradient-brand-ribbon) border-box !important;
   box-shadow:
-    0 2px 4px rgba(15, 23, 42, 0.06),
-    0 8px 20px -2px rgba(15, 23, 42, 0.12),
-    0 18px 44px -10px rgba(123, 97, 255, 0.3) !important;
+    0 0.125rem 0.25rem color-mix(in srgb, var(--color-black) 6%, transparent),
+    0 0.5rem 1.25rem -0.125rem color-mix(in srgb, var(--color-black) 12%, transparent),
+    0 1.125rem 2.75rem -0.625rem color-mix(in srgb, var(--color-ai-accent) 30%, transparent) !important;
 }
 
-.home-ai-panel .unified-input-box {
-  --color-ai-input-bg: #ffffff;
-}
-
-.dark .home-ai-panel .unified-input-box {
-  --color-ai-input-bg: #191919;
+.dark .home-ai-panel :deep(.unified-input-box) {
+  --color-ai-input-bg: var(--color-surface-panel);
   box-shadow:
-    0 2px 4px rgba(0, 0, 0, 0.45),
-    0 8px 22px -2px rgba(0, 0, 0, 0.55),
-    0 20px 48px -10px rgba(123, 97, 255, 0.45) !important;
+    0 0.125rem 0.25rem color-mix(in srgb, var(--color-black) 45%, transparent),
+    0 0.5rem 1.375rem -0.125rem color-mix(in srgb, var(--color-black) 55%, transparent),
+    0 1.25rem 3rem -0.625rem color-mix(in srgb, var(--color-ai-accent) 45%, transparent) !important;
 }
 
 /* Soft ambient glow behind the input */
-.home-ai-panel .unified-input-box::before {
+.home-ai-panel :deep(.unified-input-box::before) {
   content: "";
   position: absolute;
-  inset: -10px;
+  inset: -0.625rem;
   border-radius: inherit;
   background: var(--color-gradient-brand-ribbon);
   opacity: 0.22;
-  filter: blur(22px);
+  filter: blur(1.375rem);
   z-index: -1;
   pointer-events: none;
 }
 
 /* Stronger glow + shadow on focus, no harsh ring */
-.home-ai-panel .unified-input-box:focus-within {
+.home-ai-panel :deep(.unified-input-box:focus-within) {
   box-shadow:
-    0 1px 2px rgba(15, 23, 42, 0.04),
-    0 6px 16px -2px rgba(15, 23, 42, 0.1),
-    0 16px 40px -8px rgba(123, 97, 255, 0.32) !important;
+    0 1px 0.125rem color-mix(in srgb, var(--color-black) 4%, transparent),
+    0 0.375rem 1rem -0.125rem color-mix(in srgb, var(--color-black) 10%, transparent),
+    0 1rem 2.5rem -0.5rem color-mix(in srgb, var(--color-ai-accent) 32%, transparent) !important;
 }
 
-.dark .home-ai-panel .unified-input-box:focus-within {
+.dark .home-ai-panel :deep(.unified-input-box:focus-within) {
   box-shadow:
-    0 1px 2px rgba(0, 0, 0, 0.4),
-    0 6px 20px -2px rgba(0, 0, 0, 0.55),
-    0 18px 44px -8px rgba(123, 97, 255, 0.42) !important;
+    0 1px 0.125rem color-mix(in srgb, var(--color-black) 40%, transparent),
+    0 0.375rem 1.25rem -0.125rem color-mix(in srgb, var(--color-black) 55%, transparent),
+    0 1.125rem 2.75rem -0.5rem color-mix(in srgb, var(--color-ai-accent) 42%, transparent) !important;
 }
 
-.home-ai-panel .unified-input-box:focus-within::before {
+.home-ai-panel :deep(.unified-input-box:focus-within::before) {
   opacity: 0.4;
 }
 

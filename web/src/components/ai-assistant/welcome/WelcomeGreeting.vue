@@ -78,6 +78,9 @@ const logoSrc = computed(() =>
 </template>
 
 <style>
+/* keep(keyframes): the `wave` animation is referenced from a template
+   arbitrary-value utility ([animation:wave_...]); this block must stay
+   un-scoped so Vue does not rename the keyframe out from under it. */
 @keyframes wave {
   0%,
   100% {

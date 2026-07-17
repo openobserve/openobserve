@@ -678,7 +678,11 @@ function onHorizCancel() {
   </div>
 </template>
 
-<style>
+<style scoped>
+/* keep(lib-override:native-range): browser <input type=range> shadow pseudo-
+   elements. The native thumb is hidden (transparent, pointer-events auto so the
+   real input still handles keyboard) while a custom visual thumb is rendered in
+   the template; none of this is expressible as utilities. */
 .o2-range-input::-webkit-slider-thumb {
   appearance: none;
   -webkit-appearance: none;

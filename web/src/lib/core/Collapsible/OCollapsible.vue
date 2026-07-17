@@ -170,6 +170,10 @@ watch(
 </template>
 
 <style>
+/* keep(keyframes): reka-ui height animation keyed off [data-state] +
+   --reka-collapsible-content-height. Stays global — `.o-collapsible-content`
+   is a public styling hook (consumed via :deep from FieldExpansion.vue) and
+   the animation rides reka's CollapsibleContent root element. */
 .o-collapsible-content[data-state="open"] {
   animation: o-collapsible-open 200ms ease-out;
 }

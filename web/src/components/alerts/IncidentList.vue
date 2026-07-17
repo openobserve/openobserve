@@ -651,34 +651,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style>
-/* Status badge styling — theme-aware via tokens */
-.incident-list .status-open { border: 1px solid var(--color-status-negative); }
-.incident-list .status-acknowledged { border: 1px solid var(--color-status-warning-text); }
-.incident-list .status-resolved { border: 1px solid var(--color-status-positive); }
-.incident-list .status-default { border: 1px solid var(--color-border-default); }
-
-/* Severity badge styling — theme-aware via tokens */
-.incident-list .severity-p1 { border: 1px solid var(--color-status-negative); }
-.incident-list .severity-p2 { border: 1px solid var(--color-status-warning-text); }
-.incident-list .severity-p3 { border: 1px solid var(--color-status-warning-text); }
-.incident-list .severity-p4 { border: 1px solid var(--color-border-default); }
-.incident-list .severity-default { border: 1px solid var(--color-border-default); }
-
-/* Color scheme matching schema.scss type badges — theme-aware badge outline tokens */
-.incident-list .badge-blue { border: 1px solid var(--color-badge-blue-ol-border); }
-.incident-list .badge-green { border: 1px solid var(--color-badge-success-ol-border); }
-.incident-list .badge-yellow { border: 1px solid var(--color-badge-warning-ol-border); }
-.incident-list .badge-pink { border: 1px solid var(--color-badge-error-ol-border); }
-.incident-list .badge-purple { border: 1px solid var(--color-badge-purple-ol-border); }
-.incident-list .badge-orange { border: 1px solid var(--color-badge-orange-ol-border); }
-.incident-list .badge-cyan { border: 1px solid var(--color-badge-cyan-ol-border); }
-.incident-list .badge-indigo { border: 1px solid var(--color-badge-indigo-ol-border); }
-.incident-list .badge-teal { border: 1px solid var(--color-badge-teal-ol-border); }
-.incident-list .badge-red { border: 1px solid var(--color-badge-error-ol-border); }
-.incident-list .badge-gray { border: 1px solid var(--color-badge-default-ol-border); }
-.incident-list .badge-amber { border: 1px solid var(--color-badge-amber-ol-border); }
-.incident-list .badge-violet { border: 1px solid var(--color-badge-purple-ol-border); }
-.incident-list .badge-rose { border: 1px solid var(--color-badge-error-ol-border); }
-</style>

@@ -1699,6 +1699,9 @@ export default defineComponent({
   expressed as inline  utilities in the template above.
 -->
 <style>
+/* keep(lib-override:gridstack): all selectors target GridStack-injected DOM
+   (.grid-stack*, .ui-resizable-*) that this template does not render, plus print
+   / @page setup — so the block stays an unscoped global. */
 /* When grid is static (disabled), hide resize handles */
 .grid-stack.grid-stack-static .ui-resizable-handle {
   display: none !important;
@@ -1720,7 +1723,7 @@ export default defineComponent({
   opacity: 0.8;
   z-index: 1000;
   transition: transform 0.15s ease, box-shadow 0.15s ease;
-  box-shadow: 0 0.5rem 1.5rem rgba(0, 0, 0, 0.15);
+  box-shadow: 0 0.5rem 1.5rem color-mix(in srgb, var(--color-black) 15%, transparent);
 }
 
 .grid-stack .grid-stack-item.ui-resizable-resizing {

@@ -549,13 +549,15 @@ export default {
 };
 </script>
 
-<style>
-/* Make the trigger compact - only show the icon + chevron (no label text) */
-.arg-type-select span[class~="flex-1"][class~="truncate"] {
+<style scoped>
+/* keep(lib-override:OSelect): compact the arg-type OSelect trigger to icon +
+   chevron only — hides the internal label span and tightens the trigger button,
+   which live in the select's own DOM and aren't reachable via utilities. */
+.arg-type-select :deep(span[class~="flex-1"][class~="truncate"]) {
   display: none !important;
 }
 
-.arg-type-select button[type="button"] {
+.arg-type-select :deep(button[type="button"]) {
   min-width: 2rem;
   padding-inline-end: 1.5rem !important;
 }

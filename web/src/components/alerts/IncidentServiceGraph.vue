@@ -16,19 +16,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="incident-service-graph min-h-100 flex flex-col m-3 p-5 rounded-xl overflow-hidden transition-all duration-200 bg-[linear-gradient(135deg,#f9fafb_0%,#ffffff_100%)] border border-border-default shadow-[0_1px_3px_0_rgba(0,0,0,0.08),0_1px_2px_0_rgba(0,0,0,0.04),inset_0_0_0_1px_rgba(255,255,255,0.5)] hover:shadow-[0_4px_6px_-1px_rgba(0,0,0,0.1),0_2px_4px_-1px_rgba(0,0,0,0.06),inset_0_0_0_1px_rgba(255,255,255,0.5)]"
+    class="incident-service-graph min-h-100 flex flex-col m-3 p-5 rounded-xl overflow-hidden transition-all duration-200 bg-[linear-gradient(135deg,#f9fafb_0%,#ffffff_100%)] border border-border-default shadow-[0_1px_3px_0_rgba(0,0,0,0.08),0_1px_2px_0_rgba(0,0,0,0.04),inset_0_0_0_1px_rgba(255,255,255,0.5)] hover:shadow-[0_4px_6px_-1px_rgba(0,0,0,0.1),0_2px_4px_-1px_rgba(0,0,0,0.06),inset_0_0_0_1px_rgba(255,255,255,0.5)] dark:bg-[linear-gradient(135deg,var(--color-grey-800)_0%,var(--color-grey-900)_100%)] dark:border-grey-700 dark:shadow-[0_1px_3px_0_color-mix(in_srgb,var(--color-black)_30%,transparent),0_1px_2px_0_color-mix(in_srgb,var(--color-black)_20%,transparent),inset_0_0_0_1px_color-mix(in_srgb,var(--color-grey-700)_30%,transparent)] dark:hover:shadow-[0_4px_6px_-1px_color-mix(in_srgb,var(--color-black)_40%,transparent),0_2px_4px_-1px_color-mix(in_srgb,var(--color-black)_30%,transparent),inset_0_0_0_1px_color-mix(in_srgb,var(--color-grey-700)_30%,transparent)]"
     style="height: calc(100vh - 202px); position: relative;"
   >
     <!-- Info Icon → Graph Legend popover (hover to show, like the previous behavior) -->
     <span
       v-if="!loading && graphData && graphData.nodes && graphData.nodes.length > 0"
-      class="info-icon-btn absolute top-4 right-4 z-10"
+      class="info-icon-btn group absolute top-4 right-4 z-10"
     >
       <OButton variant="ghost" size="icon-circle-sm">
         <OIcon name="info-outline" size="sm" />
       </OButton>
       <div
-        class="graph-legend absolute top-[calc(100%+8px)] right-0 min-w-60 py-3.5 px-4 text-compact leading-normal text-text-body bg-surface-overlay border border-border-default rounded-lg shadow-[0_10px_20px_rgba(0,0,0,0.12),0_3px_6px_rgba(0,0,0,0.06)] opacity-0 invisible -translate-y-1 transition-all duration-150 pointer-events-none whitespace-nowrap"
+        class="graph-legend absolute top-[calc(100%+8px)] right-0 min-w-60 py-3.5 px-4 text-compact leading-normal text-text-body bg-surface-overlay border border-border-default rounded-lg shadow-[0_10px_20px_rgba(0,0,0,0.12),0_3px_6px_rgba(0,0,0,0.06)] opacity-0 invisible -translate-y-1 transition-all duration-150 pointer-events-none whitespace-nowrap group-hover:opacity-100 group-hover:visible group-hover:translate-y-0 group-hover:pointer-events-auto group-focus-within:opacity-100 group-focus-within:visible group-focus-within:translate-y-0 group-focus-within:pointer-events-auto dark:text-grey-200 dark:bg-grey-800 dark:border-[color-mix(in_srgb,var(--color-white)_12%,transparent)] dark:shadow-[0_10px_20px_color-mix(in_srgb,var(--color-black)_60%,transparent),0_3px_6px_color-mix(in_srgb,var(--color-black)_40%,transparent)]"
         role="tooltip"
       >
         <div class="font-semibold text-sm mb-2.5">Graph Legend</div>
@@ -44,7 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span class="graph-legend__dot text-sm leading-none w-3.5 text-center shrink-0" style="color: var(--color-text-link);">●</span>
           Blue = Normal
         </div>
-        <div class="graph-legend__divider h-px bg-border-default my-2" />
+        <div class="graph-legend__divider h-px bg-border-default my-2 dark:bg-[color-mix(in_srgb,var(--color-white)_15%,transparent)]" />
         <div class="graph-legend__row flex items-center gap-2 py-1">
           <span class="graph-legend__dot text-sm leading-none w-3.5 text-center shrink-0" style="color: #a78bfa;">→</span>
           Purple arrows show temporal flow
@@ -649,53 +649,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style>
-/* Graph Legend popover — appears on hover of the info-icon-btn wrapper.
-   Background/text use explicit colors per theme because the popover-background
-   and text-primary tokens both resolve to `#F0F1F2` in dark mode, which gave
-   us a white card with invisible (same-color) text. */
-
-/* Dark-mode overrides — using both signals so it works regardless of which
-   class is currently toggled (theme.ts toggles both `.dark` and
-   `html.dark`). Vue scoped CSS scopes only the rightmost selector. */
-html.dark .graph-legend,
-.dark .graph-legend {
-  color: #e5e7eb;
-  background-color: #1f2937;
-  border-color: rgba(255, 255, 255, 0.12);
-  box-shadow:
-    0 10px 20px rgba(0, 0, 0, 0.6),
-    0 3px 6px rgba(0, 0, 0, 0.4);
-}
-
-html.dark .graph-legend__divider,
-.dark .graph-legend__divider {
-  background-color: rgba(255, 255, 255, 0.15);
-}
-
-.info-icon-btn:hover .graph-legend,
-.info-icon-btn:focus-within .graph-legend {
-  opacity: 1;
-  visibility: visible;
-  transform: translateY(0);
-  pointer-events: auto;
-}
-
-/* Dark mode for incident-service-graph container */
-.dark .incident-service-graph {
-  background: linear-gradient(135deg, #1f2937 0%, #111827 100%);
-  border: 1px solid #374151;
-  box-shadow:
-    0 1px 3px 0 rgba(0, 0, 0, 0.3),
-    0 1px 2px 0 rgba(0, 0, 0, 0.2),
-    inset 0 0 0 1px rgba(75, 85, 99, 0.3);
-}
-
-.dark .incident-service-graph:hover {
-  box-shadow:
-    0 4px 6px -1px rgba(0, 0, 0, 0.4),
-    0 2px 4px -1px rgba(0, 0, 0, 0.3),
-    inset 0 0 0 1px rgba(75, 85, 99, 0.3);
-}
-</style>

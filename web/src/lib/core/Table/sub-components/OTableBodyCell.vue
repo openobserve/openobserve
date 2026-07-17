@@ -251,7 +251,7 @@ function handleClick() {
         <button
           v-if="treeMeta?.hasChildren"
           type="button"
-          class="inline-flex items-center justify-center w-4.5 h-4.5 p-0 bg-transparent border-0 rounded-sm cursor-pointer text-(--color-text-secondary,#6b7280) hover:bg-(--color-table-row-hover-bg,rgba(0,0,0,0.05)) hover:text-text-primary"
+          class="inline-flex items-center justify-center w-4.5 h-4.5 p-0 bg-transparent border-0 rounded-sm cursor-pointer text-text-secondary hover:bg-table-row-hover-bg hover:text-text-primary"
           :data-test="`o2-table-tree-toggle-${cell.column.id}`"
           :aria-expanded="treeMeta?.isExpanded ? 'true' : 'false'"
           @click="onTreeToggle"
@@ -263,7 +263,7 @@ function handleClick() {
         </button>
         <span
           v-else
-          class="w-[7px] h-[7px] bg-(--color-theme-accent,#6366f1) opacity-75 rounded-[1px] shadow-[0_0_0_2px_var(--color-table-cell-bg,#fff)] z-3 relative"
+          class="w-[7px] h-[7px] bg-theme-accent opacity-75 rounded-[1px] shadow-[0_0_0_2px_var(--color-table-cell-bg)] z-3 relative"
           aria-hidden="true"
         />
       </span>
@@ -326,18 +326,19 @@ function handleClick() {
   </td>
 </template>
 
-<style>
-/* ── Tree connector lines (parent ↓ children) ────────────────── */
+<style scoped>
+/* keep(generated-content): tree connector lines (parent ↓ children) drawn as
+   ::before/::after pseudo-elements positioned off inline --tree-x vars. */
 
 /* Vertical line going down from below the chevron, on expanded parent rows */
 .o2-tree-parent-expanded::after {
   content: "";
   position: absolute;
   left: var(--tree-x, 0);
-  top: calc(50% + 9px);
+  top: calc(50% + 0.5625rem);
   bottom: 0;
-  width: 1.5px;
-  background-color: var(--color-theme-accent, #6366f1);
+  width: 0.09375rem;
+  background-color: var(--color-theme-accent);
   opacity: 0.55;
   z-index: 1;
 }
@@ -352,8 +353,8 @@ function handleClick() {
   left: var(--tree-parent-x, 0);
   top: 0;
   bottom: 0;
-  width: 1.5px;
-  background-color: var(--color-theme-accent, #6366f1);
+  width: 0.09375rem;
+  background-color: var(--color-theme-accent);
   opacity: 0.55;
   z-index: 1;
 }
@@ -365,11 +366,11 @@ function handleClick() {
   position: absolute;
   left: var(--tree-parent-x, 0);
   top: 50%;
-  /* Parent-row child (has its own chevron): stop the stub 9px before the
+  /* Parent-row child (has its own chevron): stop the stub 0.5625rem before the
      chevron center so the line doesn't run into the icon. */
-  width: calc(var(--tree-x, 0) - var(--tree-parent-x, 0) - 9px);
-  height: 1.5px;
-  background-color: var(--color-theme-accent, #6366f1);
+  width: calc(var(--tree-x, 0) - var(--tree-parent-x, 0) - 0.5625rem);
+  height: 0.09375rem;
+  background-color: var(--color-theme-accent);
   opacity: 0.55;
   z-index: 1;
 }

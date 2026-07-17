@@ -2726,8 +2726,10 @@ export default defineComponent({
 });
 </script>
 
-<style>
-.panel-time-picker-btn .date-time-button .date-time-label {
+<style scoped>
+/* keep(lib-override:DateTimePicker): truncate the picker label and size the arrow
+   inside the date-time button — targets the picker's internal DOM via :deep(). */
+.panel-time-picker-btn :deep(.date-time-button .date-time-label) {
   flex: 1 1 0;
   min-width: 0;
   overflow: hidden;
@@ -2735,8 +2737,8 @@ export default defineComponent({
   white-space: nowrap;
 }
 
-.panel-time-picker-btn .date-time-button .date-time-arrow {
+.panel-time-picker-btn :deep(.date-time-button .date-time-arrow) {
   flex-shrink: 0;
-  font-size: 18px !important;
+  font-size: 1.125rem !important;
 }
 </style>

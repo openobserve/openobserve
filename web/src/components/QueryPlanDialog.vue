@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OSplitter
         v-model="splitterPosition"
         :horizontal="false"
-        separator-class="query-plan-splitter"
+        separator-class="relative before:content-[''] before:absolute before:left-1/2 before:inset-y-0 before:w-px before:bg-card-glass-border before:-translate-x-1/2 before:transition-[background-color,width] before:duration-200 hover:before:bg-accent hover:before:w-0.5"
         class="h-full"
       >
         <!-- Left Pane: SQL Query -->
@@ -622,40 +622,20 @@ export default defineComponent({
 });
 </script>
 
-<style>
-.plan-surface .o-tab-panels {
+<style scoped>
+/* keep(lib-override): stretch OTabPanels/OTabPanel library-internal DOM to fill the plan surface height */
+.plan-surface :deep(.o-tab-panels) {
   flex: 1;
   min-height: 0;
   display: flex;
   flex-direction: column;
 }
 
-.plan-surface .o-tab-panel {
+.plan-surface :deep(.o-tab-panel) {
   flex: 1;
   min-height: 0;
   display: flex;
   flex-direction: column;
   overflow: hidden;
-}
-
-.query-plan-splitter {
-  position: relative;
-}
-
-.query-plan-splitter::before {
-  content: "";
-  position: absolute;
-  left: 50%;
-  top: 0;
-  bottom: 0;
-  width: 1px;
-  background-color: var(--color-card-glass-border);
-  transform: translateX(-50%);
-  transition: background-color 0.2s ease, width 0.2s ease;
-}
-
-.query-plan-splitter:hover::before {
-  background-color: var(--color-accent);
-  width: 2px;
 }
 </style>

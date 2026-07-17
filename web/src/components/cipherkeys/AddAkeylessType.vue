@@ -14,7 +14,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <div class="cipher-keys-add-akeyless-type">
+  <div class="cipher-keys-add-akeyless-type space-y-2">
     <!-- Every editable control is an OForm* field bound to the parent OForm (in
          AddCipherKey.vue) by `name`; all rules (URL/HTML/regex + the conditional
          requireds) live in AddCipherKey.schema.ts. No manual error refs, no
@@ -264,11 +264,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style>
-/* Small consistent gap between every top-level field (inputs, selects,
-   fieldsets) so they don't render flush against each other. */
-.cipher-keys-add-akeyless-type > * + * {
-  margin-top: 0.5rem;
-}
-</style>

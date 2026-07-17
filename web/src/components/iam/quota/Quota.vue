@@ -1637,18 +1637,15 @@ export default defineComponent({
 });
 </script>
 
-<style>
-.quota-page {
-  input[type="number"]::-webkit-outer-spin-button,
-  input[type="number"]::-webkit-inner-spin-button {
-    -webkit-appearance: none;
-    margin: 0;
-  }
+<style scoped>
+/* keep(lib-override): hide number-input spinners + center non-first OTable sort-trigger headers (child DOM) */
+.quota-page :deep(input[type="number"]::-webkit-outer-spin-button),
+.quota-page :deep(input[type="number"]::-webkit-inner-spin-button) {
+  -webkit-appearance: none;
+  margin: 0;
 }
 
-/* Center sortable column headers for all non-first columns in the quota table */
-.quota-page th:not([data-test="o2-table-th-module_name"]):not([data-test="o2-table-th-role_name"]) [data-test="o2-table-th-sort-trigger"] {
+.quota-page :deep(th:not([data-test="o2-table-th-module_name"]):not([data-test="o2-table-th-role_name"]) [data-test="o2-table-th-sort-trigger"]) {
   justify-content: center;
 }
-
 </style>

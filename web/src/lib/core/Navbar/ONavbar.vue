@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     aria-label="Main navigation"
     data-test="navbar-main-nav"
     data-o2-navbar
-    class="left-drawer navbar-links o2-navbar-scroll flex flex-col bg-surface-chrome-deeper shrink-0 min-h-0 overflow-y-auto w-[5.5rem] pb-1"
+    class="left-drawer navbar-links o2-navbar-scroll flex flex-col bg-surface-chrome-deeper shrink-0 min-h-0 overflow-y-auto w-[5.5rem] pb-1 dark:border-r dark:border-card-glass-border"
     @keydown="handleKeydown"
   >
     <!-- Three rail-entry shapes (see navGroups.ts):
@@ -176,17 +176,12 @@ function handleKeydown(event: KeyboardEvent) {
 }
 </script>
 
-<style>
-/* Thin overlay scrollbar: hidden at rest, revealed on hover, and — crucially —
-   it never reserves layout width, so there is no empty strip beside the labels.
-
-   A styled WebKit scrollbar is normally a classic, space-reserving bar (that is
-   what previously pushed the labels inward and clipped "Management"). The only
-   way a native scrollbar floats *over* content instead of reserving space is
-   `overflow: overlay`, which Blink/WebKit honor. Firefox doesn't support it, so
-   it falls back to `scrollbar-width: none` — a hidden bar that also reserves
-   nothing. Either way the rail keeps its full width and still scrolls via
-   wheel, trackpad, and the ArrowUp/ArrowDown keyboard handler above. */
+<style scoped>
+/* keep(scrollbar): thin overlay scrollbar — hidden at rest, revealed on hover,
+   and never reserves layout width (so no empty strip beside the labels).
+   `overflow: overlay` (Blink/WebKit) floats the bar over content; Firefox falls
+   back to `scrollbar-width: none`. WebKit scrollbar pseudo-elements and the
+   @supports/overlay behaviour can't be expressed as utilities. */
 .o2-navbar-scroll {
   scrollbar-width: none; /* Firefox: hidden, reserves nothing */
   -ms-overflow-style: none; /* legacy Edge/IE */
@@ -197,23 +192,18 @@ function handleKeydown(event: KeyboardEvent) {
   }
 }
 .o2-navbar-scroll::-webkit-scrollbar {
-  width: 6px;
+  width: 0.375rem;
 }
 .o2-navbar-scroll::-webkit-scrollbar-track {
   background: transparent;
 }
 .o2-navbar-scroll::-webkit-scrollbar-thumb {
   background-color: transparent;
-  border-radius: 9999px;
+  border-radius: var(--radius-full);
   transition: background-color 150ms ease;
 }
 /* Reveal the thumb only while the rail is hovered. */
 .o2-navbar-scroll:hover::-webkit-scrollbar-thumb {
-  background-color: var(--color-border-soft, rgba(148, 163, 184, 0.5));
-}
-
-/* Right border only in dark mode — light mode uses shadow on the content card */
-:global(.dark) .o2-navbar-scroll {
-  border-right: 1px solid var(--color-card-glass-border);
+  background-color: var(--color-scrollbar-thumb);
 }
 </style>

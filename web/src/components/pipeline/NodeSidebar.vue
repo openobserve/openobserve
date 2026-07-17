@@ -86,6 +86,11 @@ export default {
 </template>
 
 <style>
+/* keep(lib-override): o2vf_node_* are the shared vue-flow node-type classes — the same
+   convention lives in PipelineEditor.vue (global) and is asserted by NodeSidebar.spec.ts,
+   so the styling must ride these class names rather than colocated utilities.
+   .drag-handle:hover .dot is a cross-file global: .drag-handle / .dot are rendered by
+   other pipeline components (drag-handle has external consumers), so it must stay unscoped. */
 .drag-handle:hover .dot {
   background: var(--color-icon-color);
   transform: scale(1.1);
@@ -94,45 +99,45 @@ export default {
 .o2vf_node_input {
   border: 1px solid var(--color-status-info-text);
   color: var(--color-status-info-text);
-  border-radius: 8px;
+  border-radius: 0.5rem;
   background: var(--color-status-info-bg);
   transition: all 0.3s ease;
 }
 
 .o2vf_node_input:hover {
   background: var(--color-status-info-bg);
-  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.2);
+  box-shadow: 0 0.25rem 0.75rem color-mix(in srgb, var(--color-status-info-text) 20%, transparent);
   border-color: var(--color-status-info-text);
 }
 
 .o2vf_node_output {
   border: 1px solid var(--color-status-positive);
   color: var(--color-status-success-text);
-  border-radius: 8px;
+  border-radius: 0.5rem;
   background: var(--color-status-success-bg);
-  box-shadow: 0 2px 8px rgba(34, 197, 94, 0.1);
+  box-shadow: 0 0.125rem 0.5rem color-mix(in srgb, var(--color-status-positive) 10%, transparent);
   transition: all 0.3s ease;
-  padding: 8px 16px;
+  padding: 0.5rem 1rem;
 }
 
 .o2vf_node_output:hover {
   background: var(--color-status-success-bg);
-  box-shadow: 0 4px 12px rgba(34, 197, 94, 0.2);
+  box-shadow: 0 0.25rem 0.75rem color-mix(in srgb, var(--color-status-positive) 20%, transparent);
   border-color: var(--color-status-positive);
 }
 
 .o2vf_node_default {
   border: 1px solid var(--color-status-warning-text);
   color: var(--color-status-warning-text);
-  border-radius: 8px;
+  border-radius: 0.5rem;
   background: var(--color-status-warning-bg);
-  box-shadow: 0 2px 8px rgba(217, 119, 6, 0.1);
+  box-shadow: 0 0.125rem 0.5rem color-mix(in srgb, var(--color-status-warning-text) 10%, transparent);
   transition: all 0.3s ease;
 }
 
 .o2vf_node_default:hover {
   background: var(--color-status-warning-bg);
-  box-shadow: 0 4px 12px rgba(217, 119, 6, 0.2);
+  box-shadow: 0 0.25rem 0.75rem color-mix(in srgb, var(--color-status-warning-text) 20%, transparent);
   border-color: var(--color-status-warning-text);
 }
 </style>

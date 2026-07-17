@@ -352,7 +352,7 @@ function onRowBlur() {
   <tr
     v-if="showTreeWarning"
     :data-test="`o2-table-tree-warning-${row.index}`"
-    class="bg-(--color-warning-surface,rgba(251,191,36,0.08))"
+    class="bg-(--color-warning-surface)"
   >
     <td
       :colspan="
@@ -391,23 +391,24 @@ function onRowBlur() {
   </tr>
 </template>
 
-<style>
-/* Per-row status spine. Painted as an inset box-shadow on the row's first
-   cell — an extra <td> would add a phantom column on only the rows that have
-   a status color and shift their cells out of alignment under table-fixed. */
+<style scoped>
+/* keep(complex-state): per-row status spine, painted as an inset box-shadow on
+   the row's first cell (a `> td:first-child` child-combinator target) — an extra
+   <td> would add a phantom column and misalign cells under table-fixed. */
 .o2-table-row-with-status > td:first-child {
   box-shadow: inset 0.25rem 0 0 0 var(--row-status-color, transparent);
 }
 
-/* Continuation of the tree connector vertical line through the warning row */
+/* keep(generated-content): continuation of the tree connector vertical line
+   through the warning row, drawn as an ::after off the inline connector-x var. */
 .o2-table-tree-warning-cell::after {
   content: "";
   position: absolute;
   left: var(--tree-connector-x, 0);
   top: 0;
   bottom: 0;
-  width: 1.5px;
-  background-color: var(--color-theme-accent, #6366f1);
+  width: 0.09375rem;
+  background-color: var(--color-theme-accent);
   opacity: 0.55;
   z-index: 0;
 }

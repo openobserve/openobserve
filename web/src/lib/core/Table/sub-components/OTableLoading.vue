@@ -157,6 +157,9 @@ const alignClassFor = (col: Column<any, any>): string => {
 </template>
 
 <style>
+/* keep(keyframes): shimmer + row-in animations (and their reduced-motion
+   opt-out). Stays global — the keyframe names are referenced from template
+   `[animation:…]` utilities, which Vue's scoped rewriter would not update. */
 @keyframes o2-skel-shimmer {
   0% { background-position: 200% 0; }
   100% { background-position: -200% 0; }

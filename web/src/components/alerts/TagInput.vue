@@ -18,13 +18,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div data-test="tag-input-container" class="w-full h-full">
     <div
       data-test="tag-input-wrapper"
-      class="tag-input-wrapper relative flex flex-col px-[5px] py-0 border border-(--color-card-glass-border,rgba(0,0,0,0.12)) rounded-sm bg-card-glass-bg min-h-14 h-full w-full max-w-full cursor-text transition-colors duration-300 overflow-hidden"
-      :class="{ 'has-content': hasContent }"
+      class="group relative flex flex-col px-[5px] py-0 border border-(--color-card-glass-border,rgba(0,0,0,0.12)) rounded-sm bg-card-glass-bg min-h-14 h-full w-full max-w-full cursor-text transition-colors duration-300 overflow-hidden focus-within:border-theme-accent"
     >
       <label
         v-if="label"
         data-test="tag-input-label"
-        class="tag-input-label absolute top-4 left-3 text-base text-[rgba(0,0,0,0.6)] pointer-events-none transition-all duration-300 bg-transparent px-1 -ml-1"
+        class="absolute top-4 left-3 text-base pointer-events-none transition-all duration-300 bg-transparent px-1 -ml-1 group-focus-within:text-theme-accent"
+        :class="hasContent ? '-translate-y-2 scale-75 text-theme-accent' : 'text-text-secondary'"
         style="transition-timing-function: cubic-bezier(0.25, 0.8, 0.5, 1); transform-origin: left top;"
       >{{ label }}</label>
       <div data-test="tags-and-input" class="flex flex-wrap items-start gap-1 mt-[5px] w-full overflow-hidden">
@@ -54,7 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model="inputValue"
           type="text"
           :placeholder="modelValue.length > 0 ? '' : placeholder"
-          class="tag-input [flex:1_1_100px] min-w-25 border-0 outline-none bg-transparent p-1 text-sm text-(--color-text-primary)"
+          class="[flex:1_1_100px] min-w-25 border-0 outline-none bg-transparent p-1 text-sm text-text-primary placeholder:text-text-secondary"
           @keydown.enter.prevent="addTag"
           @input="handleInput"
           @keydown.delete="handleBackspace"
@@ -132,22 +132,3 @@ const handleBackspace = () => {
   }
 };
 </script>
-
-<style>
-.tag-input-wrapper:focus-within {
-  border-color: var(--color-theme-accent);
-}
-
-.tag-input-wrapper:focus-within .tag-input-label {
-  color: var(--color-theme-accent);
-}
-
-.tag-input-wrapper.has-content .tag-input-label {
-  transform: translateY(-8px) scale(0.75);
-  color: var(--color-theme-accent);
-}
-
-.tag-input::placeholder {
-  color: var(--color-text-secondary, var(--color-text-secondary));
-}
-</style>

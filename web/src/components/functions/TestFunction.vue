@@ -824,11 +824,12 @@ defineExpose({
 });
 </script>
 
-<style>
+<style scoped>
+/* keep(lib-override): compact run-query button + full-width date-time button (child DOM) */
 .test-function-query-container :deep(.test-function-run-query-btn) {
-  padding: 2px 8px !important;
-  font-size: 11px !important;
-  margin: 1px 2px !important;
+  padding: 0.125rem 0.5rem !important;
+  font-size: 0.6875rem !important;
+  margin: 1px 0.125rem !important;
 }
 
 .functions-duration-input :deep(.date-time-button) {

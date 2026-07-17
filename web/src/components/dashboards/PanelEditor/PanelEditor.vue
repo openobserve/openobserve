@@ -1286,6 +1286,9 @@ defineExpose({
 </script>
 
 <style>
+/* keep(lib-override:OSplitter): hover affordance drawn on OSplitter's separator
+   element (applied via its separatorClass prop). Cross-file shared class — also
+   used by plugins/logs/Index.vue — so it stays an unscoped global. */
 .field-list-separator::after {
   content: '';
   position: absolute;
@@ -1293,16 +1296,12 @@ defineExpose({
   bottom: 0;
   left: 50%;
   transform: translateX(-50%);
-  width: 2px;
+  width: 0.125rem;
   background-color: transparent;
   transition: background-color 0.3s;
 }
 
 .field-list-separator:hover::after {
   background-color: orange;
-}
-
-.query-editor-splitter .o-splitter__separator {
-  background-color: transparent !important;
 }
 </style>

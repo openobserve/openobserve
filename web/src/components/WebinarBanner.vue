@@ -180,6 +180,7 @@ onMounted(async () => {
 </script>
 
 <style>
+/* keep(keyframes): badge-pulse live-dot animation referenced by the global [animation:badge-pulse_*] utility */
 @keyframes badge-pulse {
   0%,
   100% {

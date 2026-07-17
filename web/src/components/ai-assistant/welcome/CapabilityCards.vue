@@ -53,7 +53,10 @@ const emit = defineEmits<{ (e: "select", prompt: string): void }>();
   </div>
 </template>
 
-<style>
+<style scoped>
+/* keep(brand): decorative per-card accent gradient overlay driven by the
+   inline --accent channel triple; the accent-alpha idiom matches the
+   sibling glow/chevron elements and is not expressible as a design token. */
 .capability-card::before {
   content: "";
   position: absolute;

@@ -49,8 +49,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-for="destType in destinationTypes"
               :key="destType.value"
               :data-test="`destination-type-card-${destType.value}`"
-              class="destination-type-card relative flex flex-col items-center justify-center py-5 px-3 border-2 rounded-xl cursor-pointer [transition:all_0.3s_ease] min-h-30 hover:-translate-y-0.5 border-border-default bg-surface-base hover:border-card-glass-border hover:shadow-[0_4px_12px_rgba(25,118,210,0.15)]"
-              :class="{ selected: destinationType === destType.value }"
+              class="destination-type-card group relative flex flex-col items-center justify-center py-5 px-3 border-2 rounded-xl cursor-pointer [transition:all_0.3s_ease] min-h-30 hover:-translate-y-0.5 hover:border-card-glass-border hover:shadow-[0_0.25rem_0.75rem_color-mix(in_srgb,var(--color-status-info-text)_15%,transparent)]"
+              :class="destinationType === destType.value
+                ? 'selected border-card-glass-border bg-status-info-bg shadow-[0_0.25rem_1rem_color-mix(in_srgb,var(--color-status-info-text)_20%,transparent)]'
+                : 'border-border-default bg-surface-base'"
               @click="form.setFieldValue('destination_type', destType.value)"
             >
               <img
@@ -63,9 +65,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-else
                 :name="destType.icon"
                 size="lg"
-                class="card-icon mb-2 text-icon-color [transition:color_0.3s_ease]"
+                class="card-icon mb-2 text-icon-color [transition:color_0.3s_ease] group-[.selected]:text-card-glass-border"
               />
-              <div class="card-label text-compact font-medium text-center leading-[1.3] mt-1 text-text-primary">{{ destType.label }}</div>
+              <div class="card-label text-compact font-medium text-center leading-[1.3] mt-1 text-text-primary group-[.selected]:text-text-body">{{ destType.label }}</div>
               <div
                 v-if="destinationType === destType.value"
                 class="absolute top-[0.375rem] right-[0.375rem] w-5 h-5 rounded-full overflow-hidden bg-status-positive text-text-inverse flex items-center justify-center z-[1]"
@@ -1281,19 +1283,3 @@ defineExpose({
   formUrl,
 });
 </script>
-
-<style>
-.destination-type-card.selected {
-  border-color: var(--color-card-glass-border);
-  background: var(--color-status-info-bg);
-  box-shadow: 0 4px 16px rgba(25, 118, 210, 0.2);
-}
-
-.destination-type-card.selected .card-icon {
-  color: var(--color-card-glass-border);
-}
-
-.destination-type-card.selected .card-label {
-  color: var(--color-text-body);
-}
-</style>

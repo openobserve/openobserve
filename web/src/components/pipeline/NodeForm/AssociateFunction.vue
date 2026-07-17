@@ -101,7 +101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OSeparator />
               <OCardSection class="p-0 function-definition-content">
                 <div class="function-code-container bg-code-block-bg dark:border dark:border-border-default rounded-none max-w-146 max-h-62.5 overflow-y-auto relative">
-                  <pre class="function-code text-code-block-text bg-transparent m-0 p-4 font-[JetBrains_Mono,Fira_Code,Monaco,Menlo,Ubuntu_Mono,monospace] text-compact leading-normal whitespace-pre-wrap break-words border-0 font-normal cursor-default select-text">{{
+                  <pre class="function-code text-code-block-text bg-transparent m-0 p-4 font-[JetBrains_Mono,Fira_Code,Monaco,Menlo,Ubuntu_Mono,monospace] text-compact leading-normal whitespace-pre-wrap break-words border-0 font-normal cursor-default select-text selection:bg-primary-100 dark:selection:bg-primary-600 dark:selection:text-text-inverse">{{
                     pipelineObj.functions[selectedFunction]?.function ||
                     "No definition available"
                   }}</pre>
@@ -426,20 +426,29 @@ const filterFunctions = (val: any, update: any) => {
 };
 </script>
 
-<style>
+<style scoped>
+/* keep(lib-override): AddFunction renders its own back/fullscreen/title chrome and name
+   input; this hides that chrome and stretches the input inside the pipeline drawer.
+   All of it is AddFunction-internal DOM, so it is not addressable via template utilities. */
 .pipeline-add-function :deep(.add-function-back-btn),
 .pipeline-add-function :deep(.add-function-fullscreen-btn),
 .pipeline-add-function :deep(.add-function-title) {
   display: none;
 }
 
-.function-code::selection {
-  background-color: var(--color-primary-100);
+.pipeline-add-function :deep(.add-function-name-input) {
+  width: 100%;
+  margin-left: 0 !important;
 }
 
-/* Custom scrollbar */
+.pipeline-add-function :deep(.add-function-name-input label) {
+  width: 100%;
+  padding-left: 0;
+}
+
+/* keep(scrollbar): ::-webkit-scrollbar pseudo-elements have no Tailwind utility equivalent. */
 .function-code-container::-webkit-scrollbar {
-  width: 6px;
+  width: 0.375rem;
 }
 
 .function-code-container::-webkit-scrollbar-track {
@@ -448,44 +457,29 @@ const filterFunctions = (val: any, update: any) => {
 
 .function-code-container::-webkit-scrollbar-thumb {
   background: var(--color-border-strong);
-  border-radius: 3px;
+  border-radius: 0.1875rem;
 }
 
 .function-code-container::-webkit-scrollbar-thumb:hover {
   background: var(--color-text-caption);
 }
 
-.dark .function-code::selection {
-  background-color: var(--color-primary-600);
-  color: var(--color-text-inverse);
-}
-
 .dark .function-code-container::-webkit-scrollbar {
-  width: 8px;
+  width: 0.5rem;
 }
 
 .dark .function-code-container::-webkit-scrollbar-track {
   background: var(--color-surface-subtle);
-  border-radius: 4px;
+  border-radius: 0.25rem;
 }
 
 .dark .function-code-container::-webkit-scrollbar-thumb {
   background: var(--color-border-strong);
-  border-radius: 4px;
+  border-radius: 0.25rem;
   border: 1px solid var(--color-border-default);
 }
 
 .dark .function-code-container::-webkit-scrollbar-thumb:hover {
   background: var(--color-text-caption);
-}
-
-.pipeline-add-function .add-function-name-input {
-  width: 100%;
-  margin-left: 0px !important;
-}
-
-.pipeline-add-function .add-function-name-input label {
-  width: 100%;
-  padding-left: 0;
 }
 </style>

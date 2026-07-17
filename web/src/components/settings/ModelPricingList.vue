@@ -240,11 +240,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <div class="font-bold text-compact mb-[3px]">
                         {{ row.name }}
                       </div>
-                      <table class="w-full border-collapse pricing-breakdown-table">
+                      <table class="w-full border-collapse">
                         <thead>
                           <tr>
-                            <th>{{ t("modelPricing.usageType") }}</th>
-                            <th>
+                            <th class="text-2xs font-semibold text-table-header-text bg-table-header-bg text-left pt-0 pb-1 pl-0 pr-4 border-b border-table-header-border">{{ t("modelPricing.usageType") }}</th>
+                            <th class="text-2xs font-semibold text-table-header-text bg-table-header-bg text-right pt-0 pb-1 pl-0 pr-0 border-b border-table-header-border">
                               {{ t("modelPricing.colPricingSimple") }}
                             </th>
                           </tr>
@@ -256,8 +256,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             )"
                             :key="key"
                           >
-                            <td>{{ formatPriceKey(key) }}</td>
-                            <td>{{ formatPerMillion(price) }}</td>
+                            <td class="text-xs py-0.5 pl-0 pr-4">{{ formatPriceKey(key) }}</td>
+                            <td class="text-xs py-0.5 pl-0 pr-0 text-right font-medium">{{ formatPerMillion(price) }}</td>
                           </tr>
                         </tbody>
                       </table>
@@ -450,11 +450,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               "
               class="mt-2 border border-card-glass-border rounded-lg overflow-hidden"
             >
-              <table class="w-full border-collapse pricing-panel-table">
+              <table class="w-full border-collapse">
                 <thead>
                   <tr>
-                    <th>{{ t("modelPricing.usageType") }}</th>
-                    <th>{{ t("modelPricing.colPricing") }}</th>
+                    <th class="text-2xs font-semibold text-table-header-text text-left py-1.5 px-3.5 bg-table-header-bg border-b border-table-header-border">{{ t("modelPricing.usageType") }}</th>
+                    <th class="text-2xs font-semibold text-table-header-text text-right py-1.5 px-3.5 bg-table-header-bg border-b border-table-header-border">{{ t("modelPricing.colPricing") }}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -463,9 +463,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       getDefaultTier(pricingDialogRow)?.prices || {},
                     )"
                     :key="key"
+                    class="last:[&>td]:border-b-0"
                   >
-                    <td>{{ formatPriceKey(key) }}</td>
-                    <td>{{ formatPerMillion(price) }}</td>
+                    <td class="text-compact py-2 px-3.5 border-b border-table-row-divider">{{ formatPriceKey(key) }}</td>
+                    <td class="text-compact py-2 px-3.5 border-b border-table-row-divider text-right font-semibold">{{ formatPerMillion(price) }}</td>
                   </tr>
                 </tbody>
               </table>
@@ -957,68 +958,3 @@ useShortcuts([
   { id: "modelPricingRefresh", handler: () => { if (!isInputFocused()) fetchModels(); } },
 ]);
 </script>
-
-<style>
-/* ── Pricing panel table (side panel) child selectors ──────────────── */
-.pricing-panel-table th {
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--color-table-header-text);
-  text-align: left;
-  padding: 6px 14px;
-  background: var(--color-table-header-bg);
-  border-bottom: 1px solid var(--color-table-header-border);
-}
-
-.pricing-panel-table th:last-child {
-  text-align: right;
-}
-
-.pricing-panel-table td {
-  font-size: 13px;
-  padding: 8px 14px;
-  border-bottom: 1px solid var(--color-table-row-divider);
-}
-
-.pricing-panel-table td:last-child {
-  text-align: right;
-  font-weight: 600;
-}
-
-.pricing-panel-table tr:last-child td {
-  border-bottom: none;
-}
-
-/* ── Pricing breakdown tooltip table child selectors ──────────────── */
-.pricing-breakdown-table th {
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--color-table-header-text);
-  background: var(--color-table-header-bg);
-  text-align: left;
-  padding: 0 16px 4px 0;
-  border-bottom: 1px solid var(--color-table-header-border);
-}
-
-.pricing-breakdown-table th:last-child {
-  text-align: right;
-  padding-right: 0;
-}
-
-.pricing-breakdown-table td {
-  font-size: 12px;
-  padding: 2px 16px 2px 0;
-  border-bottom: none;
-}
-
-.pricing-breakdown-table td:last-child {
-  text-align: right;
-  padding-right: 0;
-  font-weight: 500;
-}
-
-.pricing-breakdown-table tr:last-child td {
-  border-bottom: none;
-}
-
-</style>

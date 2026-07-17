@@ -356,8 +356,8 @@ export default defineComponent({
 });
 </script>
 
-<style>
-/* Deep override for empty-state image spacing — must stay in CSS */
+<style scoped>
+/* keep(lib-override): empty-state image spacing (child EmptyState DOM) */
 :deep(.no-data-image) {
   margin-bottom: 0.5rem;
 }

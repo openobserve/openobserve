@@ -88,7 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-model="formData.name"
                 data-test="add-alert-name-input"
                 :placeholder="t('alerts.alertNamePlaceholder')"
-                class="topbar-name-input text-sm h-7! min-h-7! min-w-30 max-w-37.5"
+                class="topbar-name-input text-sm h-7! min-h-7! min-w-30 max-w-37.5 @max-[1300px]/topbar:min-w-25 @max-[850px]/topbar:min-w-22.5 @max-[680px]/topbar:min-w-17.5"
                 :class="alertNameError ? 'field-error' : ''"
                 @update:model-value="alertNameError = false"
               />
@@ -97,7 +97,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 ref="anomalyNameRef"
                 v-model="anomalyConfig.name"
                 :placeholder="t('alerts.anomalyNamePlaceholder')"
-                class="topbar-name-input text-sm h-7! min-h-7! min-w-30 max-w-37.5"
+                class="topbar-name-input text-sm h-7! min-h-7! min-w-30 max-w-37.5 @max-[1300px]/topbar:min-w-25 @max-[850px]/topbar:min-w-22.5 @max-[680px]/topbar:min-w-17.5"
               />
             </div>
 
@@ -107,7 +107,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <InlineSelectFolderDropdown
                 :model-value="activeFolderId"
                 type="alerts"
-                class="topbar-folder-select"
+                class="topbar-folder-select min-w-15 max-w-35"
                 @update:model-value="updateActiveFolderId({ value: $event })"
               />
             </div>
@@ -136,7 +136,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-model="formData.stream_type"
             :options="streamTypes"
             :searchable="false"
-            class="stream-type-select h-7! min-h-7!"
+            class="stream-type-select h-7! min-h-7! w-37.5 @max-[900px]/stream-config:w-27.5 @max-[600px]/stream-config:w-17.5"
             :class="streamTypeError ? 'field-error' : ''"
             :disabled="beingUpdated || anomalyEditMode"
             @update:model-value="streamTypeError = false; updateStreams()"
@@ -152,7 +152,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-model="formData.stream_name"
             :options="indexOptions"
             :loading="isFetchingStreams"
-            class="stream-name-select h-7! min-h-7!"
+            class="stream-name-select h-7! min-h-7! w-40 @max-[900px]/stream-config:w-30 @max-[750px]/stream-config:w-27.5 @max-[600px]/stream-config:w-20"
             :class="streamNameError ? 'field-error' : ''"
             :disabled="beingUpdated || anomalyEditMode || !formData.stream_type"
             @update:model-value="streamNameError = false; updateStreamFields($event)"
@@ -168,7 +168,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-model="formData.is_real_time"
             :options="alertTypeOptions"
             :disabled="beingUpdated || anomalyEditMode"
-            class="alert-type-select h-7! min-h-7!"
+            class="alert-type-select h-7! min-h-7! min-w-27.5 @max-[900px]/stream-config:min-w-23.75 @max-[750px]/stream-config:min-w-21.25 @max-[600px]/stream-config:min-w-18.75"
             :searchable="false"
           />
         </div>
@@ -607,45 +607,3 @@ export default defineComponent({
 
 });
 </script>
-
-<style>
-@container topbar (max-width: 1300px) {
-  .topbar-name-input  { min-width: 100px; }
-}
-
-/* Compact — AI chat open or narrow viewport */
-@container topbar (max-width: 850px) {
-  .topbar-name-input  { min-width: 90px; }
-}
-
-/* Minimum — very narrow */
-@container topbar (max-width: 680px) {
-  .topbar-name-input  { min-width: 70px; }
-}
-
-.topbar-folder-select {
-  min-width: 60px;
-  max-width: 140px;
-}
-.stream-type-select { width: 150px; }
-.stream-name-select { width: 160px; }
-.alert-type-select  { min-width: 110px; }
-
-@container stream-config (max-width: 900px) {
-  .stream-type-select { width: 110px; }
-  .stream-name-select { width: 120px; }
-  .alert-type-select  { min-width: 95px; }
-}
-
-@container stream-config (max-width: 750px) {
-  .stream-type-select { width: 110px; }
-  .stream-name-select { width: 110px; }
-  .alert-type-select  { min-width: 85px; }
-}
-
-@container stream-config (max-width: 600px) {
-  .stream-type-select { width: 70px; }
-  .stream-name-select { width: 80px; }
-  .alert-type-select  { min-width: 75px; }
-}
-</style>

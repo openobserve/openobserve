@@ -1033,17 +1033,19 @@ export default defineComponent({
 });
 </script>
 
-<style>
-.usage-chart-container .grid-stack-item-content {
-  border: 0px !important;
+<style scoped>
+/* keep(lib-override:gridstack): zero the gridstack item border inside the usage chart */
+.usage-chart-container :deep(.grid-stack-item-content) {
+  border: 0 !important;
 }
 
+/* keep(brand): gradient accent bar on the ingestion summary (generated ::before) */
 .ingestion-summary-compact::before {
   content: "";
   position: absolute;
   top: 0;
   left: 0;
-  width: 3px;
+  width: 0.1875rem;
   height: 100%;
   background: linear-gradient(
     180deg,
@@ -1053,7 +1055,12 @@ export default defineComponent({
   opacity: 0.6;
 }
 
-.ingestion-summary-compact .summary-text-compact strong {
+.dark .ingestion-summary-compact::before {
+  opacity: 0.8;
+}
+
+/* keep(generated-content): gradient text on the v-html <strong> in the summary */
+.ingestion-summary-compact .summary-text-compact :deep(strong) {
   font-weight: 700;
   background: linear-gradient(
     135deg,
@@ -1063,19 +1070,5 @@ export default defineComponent({
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
-}
-
-.dark .futuristic-card::before {
-  background: linear-gradient(
-    90deg,
-    transparent 0%,
-    rgba(99, 102, 241, 0.7) 20%,
-    rgba(168, 85, 247, 0.7) 80%,
-    transparent 100%
-  );
-}
-
-.dark .ingestion-summary-compact::before {
-  opacity: 0.8;
 }
 </style>

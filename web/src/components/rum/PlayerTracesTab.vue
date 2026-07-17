@@ -564,12 +564,14 @@ watch(
 );
 </script>
 
-<style>
+<style scoped>
+/* keep(generated-content): reaches into TenstackTable-generated rows and the
+   embedded TraceDetails DOM, which Tailwind utilities on this template can't target */
 :deep(.trace-details-content .card-container) {
   box-shadow: none;
 }
 
 :deep(.trace-row--error td:first-child) {
-  border-left: 2px solid var(--color-status-error-text);
+  border-left: 0.125rem solid var(--color-status-error-text);
 }
 </style>

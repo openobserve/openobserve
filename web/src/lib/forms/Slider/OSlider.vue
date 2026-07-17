@@ -216,7 +216,10 @@ const resolvedSize = computed(() => props.size ?? "md");
   </div>
 </template>
 
-<style>
+<style scoped>
+/* keep(lib-override:native-range): browser <input type=range> shadow pseudo-
+   elements. The native thumb is collapsed to 0 (a custom visual thumb is drawn
+   in the template) and the native track is cleared; not expressible as utilities. */
 .o2-slider-input::-webkit-slider-thumb {
   appearance: none;
   -webkit-appearance: none;

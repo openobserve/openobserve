@@ -870,31 +870,22 @@ export default defineComponent({
 });
 </script>
 
-<style>
-/**
- * Print mode styles for ECharts
- *
- * These styles must be unscoped (global) to override ECharts' inline styles.
- * ECharts sets fixed pixel dimensions via inline styles (e.g., width: 740px),
- * which causes charts to overflow their containers in print mode when GridStack
- * scales panels down to fit the page.
- *
- * The !important declarations override inline styles, forcing both the chart
- * wrapper div and canvas elements to scale to 100% of their container size.
- * This ensures charts fit properly when printing, regardless of their original
- * render dimensions.
- */
+<style scoped>
+/* keep(lib-override:echarts): print-only overrides for ECharts' inline pixel
+   dimensions (e.g. width: 740px) so charts scale to their container when
+   GridStack shrinks panels to fit the printed page. Targets ECharts-generated
+   DOM (wrapper div / canvas / svg) that utilities can't reach. */
 @media print {
   /* Clip the ECharts wrapper to prevent chart overflow but don't scale */
-  .chart-container > div[style*="position: relative"] {
+  .chart-container > :deep(div[style*="position: relative"]) {
     overflow: hidden !important;
     max-width: 100% !important;
     max-height: 100% !important;
   }
 
   /* Prevent canvas from exceeding container size without scaling */
-  .chart-container canvas,
-  .chart-container svg {
+  .chart-container :deep(canvas),
+  .chart-container :deep(svg) {
     max-width: 100% !important;
     max-height: 100% !important;
     object-fit: contain !important;
