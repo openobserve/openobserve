@@ -171,7 +171,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
 
             <template #bottom>
-              <span class="o2-table-footer-title">{{ serviceAccountsState.service_accounts_users.length }} {{ t('serviceAccounts.header') }}</span>
+              <span class="text-xs font-normal">{{ serviceAccountsState.service_accounts_users.length }} {{ t('serviceAccounts.header') }}</span>
               <OButton
                 v-if="selectedAccounts.length > 0"
                 data-test="service-accounts-list-delete-accounts-btn"

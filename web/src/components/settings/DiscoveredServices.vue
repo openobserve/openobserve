@@ -318,7 +318,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div
                 class="bottom-btn flex items-center justify-between w-full h-[2.25rem]"
               >
-                <div class="o2-table-footer-title w-[15.625rem] mr-md">
+                <div class="text-xs font-normal w-[15.625rem] mr-md">
                   {{
                     filteredGroupCount === 1
                       ? t("settings.correlation.serviceCountSingular", {

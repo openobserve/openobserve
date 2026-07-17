@@ -242,7 +242,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                   <template #bottom>
                     <div class="flex items-center w-full h-12">
-                      <div class="o2-table-footer-title flex items-center w-55">
+                      <div class="text-xs font-normal flex items-center w-55">
                         {{ resultTotal }} {{ t("alerts.alertDetails.results") }}
                       </div>
                     </div>

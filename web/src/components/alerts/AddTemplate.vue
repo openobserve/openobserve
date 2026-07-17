@@ -14,7 +14,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <div class="p-0 o2-custom-bg"
+  <div class="p-0 overflow-hidden [background:linear-gradient(to_bottom_right,var(--color-theme-body-bg-primary),var(--color-theme-body-bg-secondary))]"
     style="height: calc(100vh - 48px); min-height: inherit"
   >
     <AppPageHeader

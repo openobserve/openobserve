@@ -199,8 +199,8 @@ const hasInsideLabel = computed(
       v-if="(hasLabel || $slots.tooltip) && labelPosition !== 'inside'"
       :for="inputId"
       :class="[
-        'o-input-label text-sm font-semibold leading-tight flex items-center gap-1',
-        disabled && 'o-input-label--disabled',
+        'o-input-label text-compact leading-tight flex items-center gap-1',
+        disabled ? 'font-normal text-input-label-text-disabled' : 'font-medium text-input-label-text',
       ]"
     >
       <slot name="label">{{ label }}</slot><span v-if="required" aria-hidden="true" class="select-none">*</span>

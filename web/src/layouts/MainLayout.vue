@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    :class="[store.state.printMode === true ? 'printMode' : '', 'o2-app-root', 'min-h-screen', 'h-screen', 'flex', 'flex-col']"
+    :class="[store.state.printMode === true ? 'printMode' : '', 'o2-app-root', 'w-full', 'transition-[width]', 'duration-300', 'ease-[ease]', 'min-h-screen', 'h-screen', 'flex', 'flex-col']"
   >
     <header class="o2-app-header shrink-0" :class="store.state.printMode === true ? 'hidden' : ''">
       <!-- Webinar announcement bar: shown above toolbar for cloud users -->

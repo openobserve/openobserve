@@ -281,7 +281,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <div class="flex flex-col gap-1 mt-4">
-            <div class="o-input-label leading-tight flex items-center">
+            <div class="o-input-label text-compact font-medium leading-tight text-input-label-text flex items-center">
               Headers
             </div>
             <div class="flex flex-col gap-2">

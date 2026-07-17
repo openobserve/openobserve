@@ -477,7 +477,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <template #bottom>
                   <div class="flex w-full justify-between items-center h-12">
                     <div
-                      class="o2-table-footer-title flex items-center w-50 mr-md"
+                      class="text-xs font-normal flex items-center w-50 mr-md"
                     >
                       {{ resultTotal }} {{ t("alerts.header") }}
                     </div>

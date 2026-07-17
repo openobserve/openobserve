@@ -257,8 +257,8 @@ export const applyThemeColors = (themeColor: string, mode: "light" | "dark", isD
 
     // Auto-calculate and apply background colors based on theme color.
     // primaryBg (1%) is reused as a subtle surface tint by other components
-    // (QueryInspector, .bg-white) — keep it. secondaryBg is kept for legacy
-    // .o2-custom-bg consumers.
+    // (QueryInspector, .bg-white) — keep it. secondaryBg is the far stop of the
+    // page-background gradient on alerts/AddDestination.vue + alerts/AddTemplate.vue.
     const primaryBg = hexToRgba(themeColor, 0.1); // 0.01 alpha (1%)
     const secondaryBg = hexToRgba(themeColor, 4); // 0.4 alpha (40%)
 

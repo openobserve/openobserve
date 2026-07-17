@@ -151,7 +151,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <div class="flex items-center gap-2">
                   <div
-                    class="o2-table-footer-title flex items-center w-20 mr-md"
+                    class="text-xs font-normal flex items-center w-20 mr-md"
                   >
                     {{ resultTotal }} {{ t("actions.header") }}
                   </div>

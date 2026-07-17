@@ -790,11 +790,12 @@ const deleteRoute = () => {
 
 <style scoped>
 /* keep(lib-override): retarget the shared FilterGroup component's internal DOM
-   (.el-border / .group-container / .group-border / .conditions-input and its inline
-   margin-left styling) for the pipeline drawer context — not addressable via template utilities. */
+   (.filter-group-box / .group-container / .group-border / .conditions-input and its
+   inline margin-left styling) for the pipeline drawer context — not addressable via
+   template utilities. */
 
 /* Force the root group box to span the full drawer width (FilterGroup defaults to w-fit) */
-.pipeline-filter-group-wrapper > :deep(.el-border) {
+.pipeline-filter-group-wrapper > :deep(.filter-group-box) {
   width: 100% !important;
 }
 

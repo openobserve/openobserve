@@ -251,7 +251,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div class="flex items-center justify-between w-full h-12">
                     <!-- Left: count + action buttons grouped together -->
                     <div class="flex items-center gap-2">
-                      <div class="o2-table-footer-title flex items-center whitespace-nowrap">
+                      <div class="text-xs font-normal flex items-center whitespace-nowrap">
                         {{ resultTotal }} {{ t("reports.header") }}
                       </div>
                       <OButton

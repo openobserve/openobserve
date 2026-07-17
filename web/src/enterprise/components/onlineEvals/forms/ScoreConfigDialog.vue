@@ -71,7 +71,7 @@
 
       <!-- Data type -->
       <div class="mb-2.5">
-        <label class="o-input-label flex items-center mb-1">
+        <label class="o-input-label text-compact font-medium leading-tight text-input-label-text flex items-center mb-1">
           {{ t("onlineEvals.scoreConfig.dataTypeLabel")
           }}<span v-if="mode === 'create'" class="select-none" aria-hidden="true">&nbsp;*</span>
         </label>
@@ -120,7 +120,7 @@
 
       <!-- Numeric range -->
       <div v-if="formValues.dataType === 'numeric'" class="mb-2.5">
-        <label class="o-input-label flex items-center mb-1">
+        <label class="o-input-label text-compact font-medium leading-tight text-input-label-text flex items-center mb-1">
           {{ t("onlineEvals.scoreConfig.numericRangeLabel") }}
         </label>
         <div class="flex items-center gap-2.5">
@@ -145,7 +145,7 @@
 
       <!-- Categories -->
       <div v-if="formValues.dataType === 'categorical'" class="mb-2.5">
-        <label class="o-input-label flex items-center mb-1">
+        <label class="o-input-label text-compact font-medium leading-tight text-input-label-text flex items-center mb-1">
           {{ t("onlineEvals.scoreConfig.categoriesLabel") }}
         </label>
         <!-- Shared TagInput (a genuine non-OForm* widget) bridged into the one
@@ -175,7 +175,7 @@
       >
         <div class="flex items-center gap-2.5 mb-3">
           <span class="inline-flex items-center gap-1">
-            <span class="o-input-label">{{ t("onlineEvals.scoreConfig.healthyThresholdTitle") }}</span>
+            <span class="o-input-label text-compact font-medium leading-tight text-input-label-text">{{ t("onlineEvals.scoreConfig.healthyThresholdTitle") }}</span>
             <OIcon name="info-outline" size="sm" class="text-text-secondary">
               <OTooltip
                 :content="t('onlineEvals.scoreConfig.healthyThresholdIntro')"

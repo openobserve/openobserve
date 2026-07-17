@@ -1178,4 +1178,34 @@ defineExpose({
 .o2-table--inset-first :deep(td[data-test^="o2-table-cell-"]:first-child) {
   padding-left: 1rem;
 }
+
+/* keep(lib-override:o2-table-modifiers): `.o2-table` / `.o2-row-md` /
+   `.o2-table-header-sticky` are a PUBLIC modifier API — call sites put them on
+   <OTable>, so they land on this component's root (attr fallthrough), but every
+   declaration targets OTable's OWN th/td/thead, which OTableHeader /
+   OTableBodyCell render. That is why they live here behind :deep() instead of
+   as template utilities: no call site owns the DOM being styled. Scoping adds
+   [data-v] to the root compound only, which the root already carries.
+   Consumers: settings/DiscoveredServices.vue, plugins/logs/DetailTable.vue,
+   plugins/logs/SearchJobInspector.vue. */
+.o2-table :deep(th),
+.o2-table :deep(td) {
+  padding: 0 0.3125rem !important;
+  height: 2.25rem;
+}
+
+.o2-table.o2-row-md :deep(th),
+.o2-table.o2-row-md :deep(td) {
+  height: 2.25rem !important;
+}
+
+.o2-table :deep(tr td) {
+  border-bottom: 1px solid var(--color-card-glass-border) !important;
+}
+
+.o2-table-header-sticky :deep(thead) {
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+}
 </style>

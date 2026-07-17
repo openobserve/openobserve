@@ -12,7 +12,7 @@
       </div>
     </div>
 
-    <div :class="[`  px-2 mb-2 el-border el-border-radius `,
+    <div :class="[`  px-2 mb-2 filter-group-box border border-card-glass-border rounded-md `,
         'mt-4',
         store.state.isAiChatEnabled ? 'w-full' : 'xl:w-fit'
     ]"

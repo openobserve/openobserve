@@ -283,7 +283,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                 <!-- Footer: selected count -->
                 <div
-                  class="p-3 border-t border-solid border-card-glass-border o2-table-footer-title"
+                  class="p-3 border-t border-solid border-card-glass-border text-xs font-normal"
                 >
                   {{ selectedMetricStreams.length }} of
                   {{ uniqueMetricStreams.length }} selected
@@ -786,7 +786,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <!-- Footer: selected count -->
               <div
-                class="p-3 border-t border-solid border-card-glass-border o2-table-footer-title"
+                class="p-3 border-t border-solid border-card-glass-border text-xs font-normal"
               >
                 {{ selectedMetricStreams.length }} of
                 {{ uniqueMetricStreams.length }} selected

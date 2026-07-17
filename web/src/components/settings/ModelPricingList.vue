@@ -342,7 +342,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #bottom="scope">
           <div class="flex items-center w-full h-12 gap-x-2">
             <div
-              class="o2-table-footer-title flex items-center w-25"
+              class="text-xs font-normal flex items-center w-25"
             >
               {{ t("modelPricing.modelsCount", { count: resultTotal }) }}
             </div>

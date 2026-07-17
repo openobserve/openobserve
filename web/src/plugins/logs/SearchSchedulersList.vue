@@ -206,7 +206,7 @@
             </template>
             <template #bottom>
               <div class="flex items-center justify-between w-full h-12">
-                <div class="o2-table-footer-title flex items-center w-25 mr-md">
+                <div class="text-xs font-normal flex items-center w-25 mr-md">
                   {{ resultTotal }} {{ t('search_scheduler_job.results') }}
                 </div>
                 <div class="ml-auto mr-2">{{ t('search_scheduler_job.max_limit') }} : <b>1000</b></div>

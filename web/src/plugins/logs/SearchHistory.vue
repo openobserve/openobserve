@@ -198,7 +198,7 @@
                 class="flex items-center justify-between w-full h-12"
               >
                 <div
-                  class="o2-table-footer-title flex items-center w-25 mr-md"
+                  class="text-xs font-normal flex items-center w-25 mr-md"
                 >
                   {{ resultTotal }} {{ t("search_history.results") }}
                 </div>

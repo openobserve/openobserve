@@ -153,7 +153,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <div
             data-test="edit-role-permissions-table-section"
-            class="el-border-radius flex-1 min-h-0 overflow-y-auto"
+            class="rounded-md flex-1 min-h-0 overflow-y-auto"
           >
             <div v-show="permissionsUiType === 'table'">
               <permissions-table

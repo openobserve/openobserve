@@ -283,7 +283,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <!-- Hint label above the row, so the error can grow below the
                      input without shoving the Add button out of alignment. -->
-                <div class="o-input-label text-sm font-semibold leading-tight mb-1">
+                <div class="o-input-label text-compact font-medium leading-tight text-input-label-text mb-1">
                   {{ t('settings.emailPlaceholder', { domain: '@' + domain.name }) }}
                 </div>
                 <div class="flex gap-x-2 items-start">
@@ -330,7 +330,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @submit="(v) => addBlockedEmail(domain, v.newEmail)"
                 v-slot="{ isSubmitting }"
               >
-                <div class="o-input-label text-sm font-semibold leading-tight mb-1">
+                <div class="o-input-label text-compact font-medium leading-tight text-input-label-text mb-1">
                   {{ t('settings.blockedEmailPlaceholder', { domain: '@' + domain.name }) }}
                 </div>
                 <div class="flex gap-x-2 items-start">

@@ -184,7 +184,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       {{ t("actions.frequency") }} *
                     </div>
-                    <div class="p-1 el-border-radius el-border w-fit">
+                    <div class="p-1 rounded-md border border-card-glass-border w-fit">
                       <template
                         v-for="visual in frequencyTabs"
                         :key="visual.value"

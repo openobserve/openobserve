@@ -273,7 +273,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="flex items-center justify-between w-full py-1"
           >
             <div
-              class="flex items-center o2-table-footer-title mr-4"
+              class="flex items-center text-xs font-normal mr-4"
             >
               {{ bottomProps.totalRows }} {{ t("pipeline.header") }}
             </div>

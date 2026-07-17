@@ -111,7 +111,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Bottom footer -->
             <template #bottom="{ totalRows }">
               <div
-                class="flex items-center o2-table-footer-title mr-4 py-2"
+                class="flex items-center text-xs font-normal mr-4 py-2"
               >
                 {{ totalRows }} Backfill Job{{ totalRows === 1 ? "" : "s" }}
               </div>

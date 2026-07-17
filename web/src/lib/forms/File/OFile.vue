@@ -204,7 +204,7 @@ const wrapperClasses = computed(() => [
     <label
       v-if="$slots.label || label || $slots.tooltip"
       :for="inputId"
-      class="o-input-label text-sm font-semibold leading-tight flex items-center gap-1"
+      class="o-input-label text-compact font-medium leading-tight text-input-label-text flex items-center gap-1"
     >
       <slot name="label">{{ label }}</slot><span v-if="required" aria-hidden="true" class="select-none">*</span>
       <OIcon

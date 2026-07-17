@@ -252,8 +252,8 @@ const wrapperClasses = computed(() => [
       v-if="(label || $slots.tooltip) && labelPosition !== 'inside'"
       :for="inputId"
       :class="[
-        'o-input-label text-sm font-semibold leading-tight flex items-center gap-1',
-        props.disabled && 'o-input-label--disabled',
+        'o-input-label text-compact leading-tight flex items-center gap-1',
+        props.disabled ? 'font-normal text-input-label-text-disabled' : 'font-medium text-input-label-text',
       ]"
     >
       {{ label }}<span v-if="required" aria-hidden="true" class="select-none">*</span>

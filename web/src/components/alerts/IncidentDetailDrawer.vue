@@ -208,7 +208,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="flex gap-3 mb-3" style="height: 100px;">
             <!-- 1. Total Alerts Card -->
             <div
-              class="flex-1 flex flex-col justify-between el-border el-border-radius bg-card-glass-bg transition-all duration-200 cursor-pointer p-3"
+              class="flex-1 flex flex-col justify-between border border-card-glass-border rounded-md bg-card-glass-bg transition-all duration-200 cursor-pointer p-3"
             >
               <!-- Top: Title and Icon -->
               <div class="flex justify-between items-start">
@@ -228,7 +228,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- 2. Unique Alerts Card -->
             <div
-              class="flex-1 flex flex-col justify-between el-border el-border-radius bg-card-glass-bg transition-all duration-200 cursor-pointer p-3"
+              class="flex-1 flex flex-col justify-between border border-card-glass-border rounded-md bg-card-glass-bg transition-all duration-200 cursor-pointer p-3"
             >
               <!-- Top: Title and Icon -->
               <div class="flex justify-between items-start">
@@ -248,7 +248,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- 3. Affected Services Card -->
             <div
-              class="flex-1 flex flex-col justify-between el-border el-border-radius bg-card-glass-bg transition-all duration-200 cursor-pointer p-3"
+              class="flex-1 flex flex-col justify-between border border-card-glass-border rounded-md bg-card-glass-bg transition-all duration-200 cursor-pointer p-3"
             >
               <!-- Top: Title and Icon -->
               <div class="flex justify-between items-start">
@@ -268,7 +268,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- 4. Active Duration Card -->
             <div
-              class="flex-1 flex flex-col justify-between el-border el-border-radius bg-card-glass-bg transition-all duration-200 cursor-pointer p-3"
+              class="flex-1 flex flex-col justify-between border border-card-glass-border rounded-md bg-card-glass-bg transition-all duration-200 cursor-pointer p-3"
             >
               <!-- Top: Title and Icon -->
               <div class="flex justify-between items-start">
@@ -290,7 +290,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- 5. Alert Frequency Card -->
             <div
-              class="flex-1 flex flex-col justify-between el-border el-border-radius bg-card-glass-bg transition-all duration-200 cursor-pointer p-3"
+              class="flex-1 flex flex-col justify-between border border-card-glass-border rounded-md bg-card-glass-bg transition-all duration-200 cursor-pointer p-3"
             >
               <!-- Top: Title and Icon -->
               <div class="flex justify-between items-start">
@@ -317,7 +317,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="flex gap-3" style="height: 50%;">
                                <!-- Incident Timeline (33.33% width) -->
                 <div
-                  class="el-border el-border-radius bg-card-glass-bg flex flex-col overflow-hidden"
+                  class="border border-card-glass-border rounded-md bg-card-glass-bg flex flex-col overflow-hidden"
                   :style="{
                     width: '33.33%'
                   }"
@@ -424,7 +424,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <!-- Incident Details (66.67% width) -->
                 <div
-                  class="el-border el-border-radius bg-card-glass-bg flex flex-col overflow-hidden"
+                  class="border border-card-glass-border rounded-md bg-card-glass-bg flex flex-col overflow-hidden"
                   :style="{
                     width: '66.67%'
                   }"
@@ -535,7 +535,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <!-- alert activity -->
                <!-- 2.1B: Alert Activity Chart (50% height, full width) -->
               <div
-                class="el-border el-border-radius bg-card-glass-bg flex flex-col overflow-hidden"
+                class="border border-card-glass-border rounded-md bg-card-glass-bg flex flex-col overflow-hidden"
                 :style="{
                   height: '50%'
                 }"
@@ -566,7 +566,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="flex flex-col gap-2" style="width: 33.33%; height: 100%;">
               <!-- 2.2A: Manage Panel (40% of available height after gaps) -->
               <div
-                class="el-border el-border-radius bg-card-glass-bg flex flex-col overflow-hidden"
+                class="border border-card-glass-border rounded-md bg-card-glass-bg flex flex-col overflow-hidden"
                 :style="{
                   height: 'calc(35% - 6.4px)'
                 }"
@@ -642,7 +642,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <!-- 2.2B: Dimensions Panel (35% when Alert Flow present, 60% when absent, or when no triggers) -->
               <div
-                class="el-border el-border-radius bg-card-glass-bg flex flex-col overflow-hidden"
+                class="border border-card-glass-border rounded-md bg-card-glass-bg flex flex-col overflow-hidden"
                 :style="{
                   height: (sortedAlertsByTriggerCount?.length)
                     ? 'calc(35% - 5.6px)'
@@ -703,7 +703,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- 2.2C: Alert Flow Panel (25% of available height after gaps) - Conditional -->
               <div
                 v-if="sortedAlertsByTriggerCount?.length"
-                class="el-border el-border-radius bg-card-glass-bg flex flex-col overflow-hidden"
+                class="border border-card-glass-border rounded-md bg-card-glass-bg flex flex-col overflow-hidden"
                 :style="{
                   height: 'calc(30% - 4px)'
                 }"

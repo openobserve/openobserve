@@ -82,7 +82,7 @@
       >
         <template #default="{ field }">
           <div style="margin-top: 10px">
-            <label class="o-input-label text-sm font-semibold leading-tight">{{ t("dashboard.enterCustomQuery") }}</label>
+            <label class="o-input-label text-compact font-medium leading-tight text-input-label-text">{{ t("dashboard.enterCustomQuery") }}</label>
             <query-editor
               data-test="scheduled-alert-sql-editor"
               ref="queryEditorRef"
@@ -161,7 +161,7 @@
               align-items: center;
             "
           >
-            <span class="o-input-label text-sm font-semibold leading-tight">{{ t("dashboard.variables") }}</span>
+            <span class="o-input-label text-compact font-medium leading-tight text-input-label-text">{{ t("dashboard.variables") }}</span>
             <OButton
               variant="primary"
               size="sm"

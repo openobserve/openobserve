@@ -131,7 +131,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
       <template #bottom>
         <div class="flex items-center gap-2">
-          <span class="o2-table-footer-title">
+          <span class="text-xs font-normal">
             {{ resultTotal }} {{ t("regex_patterns.bottom_header") }}
           </span>
           <OButton

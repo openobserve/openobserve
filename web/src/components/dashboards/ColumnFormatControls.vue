@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="divide-y divide-[rgba(128,128,128,0.08)]">
     <!-- Field type -->
     <div class="px-3 py-2">
-      <div class="o-input-label block mb-1.5">
+      <div class="o-input-label text-compact font-medium leading-tight text-input-label-text block mb-1.5">
         {{ t("dashboard.sectionFieldType") }}
       </div>
       <OToggleGroup
@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Value formatting (numeric only) -->
     <div v-if="isNumeric" class="px-3 py-2">
-      <div class="o-input-label block mb-1.5">
+      <div class="o-input-label text-compact font-medium leading-tight text-input-label-text block mb-1.5">
         {{ t("dashboard.sectionValueFormatting") }}
       </div>
       <OSelect
@@ -60,7 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Alignment -->
     <div class="px-3 py-2">
-      <div class="o-input-label block mb-1.5">
+      <div class="o-input-label text-compact font-medium leading-tight text-input-label-text block mb-1.5">
         {{ t("dashboard.sectionAlignment") }}
       </div>
       <OToggleGroup
@@ -82,9 +82,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Styling -->
     <div class="px-3 py-2">
-      <div class="o-input-label block mb-1.5">{{ t("dashboard.sectionStyling") }}</div>
+      <div class="o-input-label text-compact font-medium leading-tight text-input-label-text block mb-1.5">{{ t("dashboard.sectionStyling") }}</div>
       <div class="flex items-center gap-2 mt-2 flex-wrap">
-        <span class="o-input-label shrink-0 w-24">{{ t("dashboard.textColor") }}</span>
+        <span class="o-input-label text-compact font-medium leading-tight text-input-label-text shrink-0 w-24">{{ t("dashboard.textColor") }}</span>
         <ColorSwatchPicker
           v-model="col.textColor"
           :swatches="TEXT_SWATCHES"
@@ -92,7 +92,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
       <div class="flex items-center gap-2 mt-2 flex-wrap">
-        <span class="o-input-label shrink-0 w-24">{{ t("dashboard.bgColor") }}</span>
+        <span class="o-input-label text-compact font-medium leading-tight text-input-label-text shrink-0 w-24">{{ t("dashboard.bgColor") }}</span>
         <ColorSwatchPicker
           v-model="col.bgColor"
           :swatches="BG_SWATCHES"
@@ -107,7 +107,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click="col.autoColor = !col.autoColor"
       >
         <OCheckbox :model-value="col.autoColor" size="sm" class="pointer-events-none" />
-        <span class="o-input-label cursor-pointer">{{
+        <span class="o-input-label text-compact font-medium leading-tight text-input-label-text cursor-pointer">{{
           t("dashboard.overrideConfigUniqueValueColor")
         }}</span>
       </button>
@@ -115,7 +115,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Conditional (numeric only) -->
     <div v-if="isNumeric" class="px-3 py-2">
-      <div class="o-input-label block mb-1.5">
+      <div class="o-input-label text-compact font-medium leading-tight text-input-label-text block mb-1.5">
         {{ t("dashboard.sectionConditionalStyling") }}
       </div>
       <div
@@ -130,7 +130,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="flex flex-col gap-2 py-2 px-2.5 mb-1.5 rounded-md bg-[rgba(128,128,128,0.04)] border border-[rgba(128,128,128,0.1)]"
       >
         <div class="flex items-center gap-2 flex-wrap">
-          <span class="o-input-label shrink-0 w-28">{{ t("dashboard.conditionIfValue") }}</span>
+          <span class="o-input-label text-compact font-medium leading-tight text-input-label-text shrink-0 w-28">{{ t("dashboard.conditionIfValue") }}</span>
           <div class="w-52 shrink-0">
             <OSelect
               v-model="rule.operator"
@@ -156,7 +156,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
         <div class="flex items-center gap-2 flex-wrap">
-          <span class="o-input-label shrink-0 w-28 text-text-secondary">{{ t("dashboard.conditionThenText") }}</span>
+          <span class="o-input-label text-compact font-medium leading-tight text-input-label-text shrink-0 w-28">{{ t("dashboard.conditionThenText") }}</span>
           <ColorSwatchPicker
             v-model="rule.textColor"
             :swatches="TEXT_SWATCHES"
@@ -164,7 +164,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
         <div class="flex items-center gap-2 flex-wrap">
-          <span class="o-input-label shrink-0 w-28 text-text-secondary">{{ t("dashboard.conditionAndBg") }}</span>
+          <span class="o-input-label text-compact font-medium leading-tight text-input-label-text shrink-0 w-28">{{ t("dashboard.conditionAndBg") }}</span>
           <ColorSwatchPicker
             v-model="rule.bgColor"
             :swatches="BG_SWATCHES"

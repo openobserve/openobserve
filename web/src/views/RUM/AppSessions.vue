@@ -323,7 +323,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         class="flex items-center gap-1.5 text-xs text-text-caption"
                       >
                         <span
-                          class="o2-monospace-font"
+                          class="font-mono"
                           :title="row.session_id"
                           data-test="rum-app-sessions-session-id-text"
                         >{{ shortSessionId(row.session_id) }}</span>

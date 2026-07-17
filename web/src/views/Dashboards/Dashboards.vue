@@ -340,7 +340,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="flex w-full justify-between items-center py-1"
               >
                 <div
-                  class="o2-table-footer-title flex items-center shrink-0"
+                  class="text-xs font-normal flex items-center shrink-0"
                 >
                   {{ resultTotal || 0 }} {{ t("dashboard.header") }}
                 </div>

@@ -1017,8 +1017,8 @@ const fieldWidthClass = computed(() => {
       v-if="(label || $slots.tooltip) && labelPosition !== 'inside'"
       :for="inputId"
       :class="[
-        'o-input-label text-sm font-semibold leading-tight flex items-center gap-1',
-        disabled ? 'o-input-label--disabled' : 'cursor-pointer',
+        'o-input-label text-compact leading-tight flex items-center gap-1',
+        disabled ? 'font-normal text-input-label-text-disabled' : 'font-medium text-input-label-text cursor-pointer',
       ]"
       @click.prevent="handleLabelClick"
     >

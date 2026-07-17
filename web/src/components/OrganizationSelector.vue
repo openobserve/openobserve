@@ -357,3 +357,16 @@ const rowStateClass = (row: { org: OrgOption; index: number }) => {
     </ODropdown>
   </div>
 </template>
+
+<style scoped>
+/* keep(lib-override:o2-button): dark-only, element-scoped re-point of OButton's
+   ghost-primary tokens for the navbar organization switcher trigger. The custom properties are READ by OButton's
+   own internal DOM, so they have to be declared on the button element itself —
+   there is no utility that sets them. Scoping appends [data-v] to the
+   [data-test] compound, which is OButton's root and therefore carries this
+   component's scope id. Was a global in styles/utilities.css (W1.d). */
+.dark [data-test="navbar-organizations-select-trigger"] {
+  --color-button-ghost-primary-active-bg: var(--color-primary-900);
+  --color-button-ghost-primary-text: var(--color-primary-200);
+}
+</style>

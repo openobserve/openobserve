@@ -225,8 +225,8 @@ const labelSizeClasses: Record<NonNullable<CheckboxProps["size"]>, string> = {
     <span
       v-if="$slots.label || label"
       :class="[
-        'o-input-label text-sm font-semibold select-none leading-tight',
-        isDisabled && 'o-input-label--disabled',
+        'o-input-label text-compact select-none leading-tight',
+        isDisabled ? 'font-normal text-input-label-text-disabled' : 'font-medium text-input-label-text',
       ]"
     >
       <slot name="label">{{ label }}</slot><span v-if="required" aria-hidden="true">&nbsp;*</span>

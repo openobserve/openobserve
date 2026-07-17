@@ -143,7 +143,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <template #bottom="bottomProps">
           <div
-            class="flex items-center gap-4 py-2 px-1 o2-table-footer-title"
+            class="flex items-center gap-4 py-2 px-1 text-xs font-normal"
           >
             <span
               >{{ bottomProps.totalRows }} model{{

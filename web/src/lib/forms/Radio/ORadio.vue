@@ -117,8 +117,8 @@ const resolvedSize = computed(() => (props.size ?? "md") as "xs" | "sm" | "md");
     <span
       v-if="$slots.label || props.label"
       :class="[
-        'o-input-label text-sm font-semibold select-none leading-tight',
-        props.disabled && 'o-input-label--disabled',
+        'o-input-label text-compact select-none leading-tight',
+        props.disabled ? 'font-normal text-input-label-text-disabled' : 'font-medium text-input-label-text',
       ]"
     >
       <slot name="label">{{ props.label }}</slot>

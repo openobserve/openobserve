@@ -6,7 +6,7 @@
     "arbZ": 44,
     "styleBlockHex": 107,
     "stylePxUnit": 266,
-    "styleKeepComment": 37,
+    "styleKeepComment": 36,
     "inlineHexStyle": 20,
     "unscopedStyle": 10,
     "tsHex": 471,
@@ -528,9 +528,6 @@
     },
     "lib/core/Table/composables/useTableHighlight.ts": {
       "tsHex": 8
-    },
-    "lib/core/Table/OTable.vue": {
-      "styleKeepComment": 1
     },
     "lib/core/Table/sub-components/OTableBodyCell.vue": {
       "arbRadius": 1,

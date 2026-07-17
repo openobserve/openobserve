@@ -58,8 +58,11 @@ const pageSizeSelectOptions = computed(() =>
     <!-- Left: bulk actions slot or row count.
          The footer-title typography lives on this wrapper so BOTH the default
          row count and any custom #bottom (actions) slot content inherit it —
-         consumers don't need to remember to add `o2-table-footer-title`. -->
-    <div class="flex items-center gap-2 o2-table-footer-title">
+         font-size / weight / line-height are inherited properties. -->
+    <div
+      class="flex items-center gap-2 text-xs font-normal"
+      data-test="o2-table-pagination-actions"
+    >
       <!-- Loading: always skeleton, regardless of slot/count -->
       <span
         v-if="loading"

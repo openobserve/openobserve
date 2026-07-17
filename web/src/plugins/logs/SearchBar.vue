@@ -721,7 +721,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="search-time order-2">
           <div class="flex">
             <OButtonGroup
-              class="p-0 mr-1 element-box-shadow el-border"
+              class="p-0 mr-1 element-box-shadow border border-card-glass-border"
               v-if="
                 config.isEnterprise == 'true' &&
                 Object.keys(store.state.regionInfo).length > 0 &&
@@ -5564,7 +5564,7 @@ export default defineComponent({
 }
 
 /* Hide the redundant total-count chip on the left — "of N" on the right already shows it */
-.saved-view-table :deep([data-test="o2-table-pagination-bottom"] .o2-table-footer-title) {
+.saved-view-table :deep([data-test="o2-table-pagination-bottom"] [data-test="o2-table-pagination-actions"]) {
   display: none;
 }
 
