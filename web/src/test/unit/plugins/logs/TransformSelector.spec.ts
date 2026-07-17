@@ -669,7 +669,11 @@ describe("TransformSelector.vue", () => {
   });
 
   describe("theme support", () => {
-    it("should apply dark theme class", () => {
+    // Theming is token-driven (.dark on <html> + --color-* tokens that flip on
+    // their own); components no longer carry a per-theme root class. This guards
+    // that the legacy `dark-theme` mechanism does not come back — the component
+    // renders its button group identically regardless of store theme.
+    it("does not apply a legacy dark-theme class", () => {
       const darkStore = createStore({
         state: {
           theme: "dark",
@@ -709,7 +713,9 @@ describe("TransformSelector.vue", () => {
       });
 
       const btnGroup = wrapper.find(".btn-group");
-      expect(btnGroup.classes()).toContain("dark-theme");
+      expect(btnGroup.exists()).toBe(true);
+      expect(btnGroup.classes()).not.toContain("dark-theme");
+      expect(btnGroup.classes()).not.toContain("light-theme");
     });
   });
 
