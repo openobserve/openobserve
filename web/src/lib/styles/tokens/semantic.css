@@ -64,6 +64,12 @@
   --color-status-warning-bg:   #FFF4EB;
   --color-status-error-text:   #CC3645;
   --color-status-error-bg:     #FFF7F7;
+
+  /* Favorite (filled heart) — a rose/pink-leaning red, deliberately warmer
+     than the destructive error red so "loved" and "danger" never read as the
+     same hue on a row that carries both. Only the FILLED heart uses this;
+     unfavorited outlines stay neutral. */
+  --color-favorite: #F43F5E;
 }
 
 /* ── Register ALL semantic tokens for Tailwind utilities ── */
@@ -110,6 +116,10 @@
   --color-status-warning-bg:   var(--color-status-warning-bg);
   --color-status-error-text:   var(--color-status-error-text);
   --color-status-error-bg:     var(--color-status-error-bg);
+
+  /* Favorite (self-reference so `text-favorite` utility exists + dark override
+     applies) */
+  --color-favorite: var(--color-favorite);
 
   /* Brand / Primary (re-exports from base.css) */
   --color-primary-50:  var(--color-primary-50);

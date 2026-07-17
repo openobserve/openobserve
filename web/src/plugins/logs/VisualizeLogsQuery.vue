@@ -144,6 +144,7 @@ export default defineComponent({
     // Allowed chart types for logs visualization
     const allowedChartTypes = [
       "area",
+      "area-stacked",
       "bar",
       "h-bar",
       "line",
