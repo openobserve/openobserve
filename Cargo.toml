@@ -56,6 +56,11 @@ profiling = [
 ]
 tokio-console = ["dep:console-subscriber"]
 
+# macOS ld cannot encode compact-unwind offsets once __eh_frame exceeds 16MB;
+# harmless for a binary this size (only slows panic unwinding), so silence it.
+[lints.rust]
+linker_messages = "allow"
+
 [profile.release]
 debug = false
 strip = true
