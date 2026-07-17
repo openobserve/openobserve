@@ -63,7 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OIcon
                 v-if="tab.folderId === FAVORITES_FOLDER_ID"
                 name="favorite"
-                size="xs"
+                size="sm"
                 class="shrink-0 text-favorite"
               />
               <span class="folder-name flex-1 min-w-0 text-left truncate" :title="tab.name" :data-test="`dashboard-folder-name-${tab.name}`">{{
