@@ -1,5 +1,5 @@
-/* ============================================================
-   COMPONENT TOKENS — per-component design decisions
+﻿/* ============================================================
+   COMPONENT TOKENS â€” per-component design decisions
    Each section is owned exclusively by one component.
    ============================================================
    ARCHITECTURE (required for dark-mode + Tailwind prefix):
@@ -9,7 +9,7 @@
       unprefixed, so dark.css overrides apply correctly.
    ============================================================ */
 
-/* ── Light-mode defaults ─────────────────────────────────── */
+/* â”€â”€ Light-mode defaults â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 :root {
   /* Separator */
   --spacing-separator: var(--spacing-px);
@@ -21,7 +21,7 @@
   --color-input-label-text: var(--color-grey-800);
   --color-input-label-text-disabled: var(--color-grey-400);
 
-  /* Button — primary */
+  /* Button â€” primary */
   --color-button-primary: var(--color-primary-600);
   --color-button-primary-hover: var(--color-primary-700);
   --color-button-primary-active: var(--color-primary-800);
@@ -29,7 +29,7 @@
   --color-button-primary-foreground: var(--color-white);
   --color-button-primary-focus-ring: var(--color-primary-400);
 
-  /* Button — secondary */
+  /* Button â€” secondary */
   --color-button-secondary: var(--color-surface-panel);
   --color-button-secondary-foreground: var(--color-text-primary);
   --color-button-secondary-border: var(--color-border-subtle, #e5e7eb);
@@ -38,7 +38,7 @@
   --color-button-secondary-disabled: var(--color-surface-panel);
   --color-button-secondary-focus-ring: var(--color-primary-400);
 
-  /* Button — outline */
+  /* Button â€” outline */
   --color-button-outline-text: var(--color-text-primary);
   --color-button-outline-border: var(--color-border-default);
   --color-button-outline-hover-bg: var(--color-interactive-hover-bg);
@@ -46,58 +46,58 @@
   --color-button-outline-active-bg: var(--color-primary-100);
   --color-button-outline-focus-ring: var(--color-primary-200);
 
-  /* Button — ghost */
+  /* Button â€” ghost */
   --color-button-ghost-text: var(--color-text-primary);
   --color-button-ghost-hover-bg: var(--color-primary-50);
   --color-button-ghost-active-bg: var(--color-primary-100);
   --color-button-ghost-hover-ring: var(--color-primary-300);
   --color-button-ghost-focus-ring: var(--color-primary-400);
 
-  /* Button — ghost-primary (flat + primary color text) */
+  /* Button â€” ghost-primary (flat + primary color text) */
   --color-button-ghost-primary-text: var(--color-primary-600);
   --color-button-ghost-primary-hover-bg: var(--color-primary-50);
   --color-button-ghost-primary-active-bg: var(--color-primary-100);
   --color-button-ghost-primary-focus-ring: var(--color-primary-400);
 
-  /* Button — ghost-destructive (flat + destructive color text) */
+  /* Button â€” ghost-destructive (flat + destructive color text) */
   --color-button-ghost-destructive-text: var(--color-error-600);
   --color-button-ghost-destructive-hover-bg: var(--color-error-50);
   --color-button-ghost-destructive-active-bg: var(--color-error-100);
   --color-button-ghost-destructive-focus-ring: var(--color-error-400);
 
-  /* Button — ghost-success (flat + positive green text) — play/resume actions */
+  /* Button â€” ghost-success (flat + positive green text) â€” play/resume actions */
   --color-button-ghost-success-text: var(--color-success-600);
   --color-button-ghost-success-hover-bg: var(--color-success-50);
   --color-button-ghost-success-active-bg: var(--color-success-100);
   --color-button-ghost-success-focus-ring: var(--color-success-400);
 
-  /* Button — ghost-muted (secondary text at rest → primary text + bg on hover) */
+  /* Button â€” ghost-muted (secondary text at rest â†’ primary text + bg on hover) */
   --color-button-ghost-muted-text: var(--color-text-secondary);
   --color-button-ghost-muted-hover-text: var(--color-primary-600);
   --color-button-ghost-muted-hover-bg: var(--color-primary-50);
   --color-button-ghost-muted-active-bg: var(--color-primary-100);
   --color-button-ghost-muted-focus-ring: var(--color-primary-400);
 
-  /* Button — ghost-subtle (secondary text, 60 % opacity at rest, full on hover) */
+  /* Button â€” ghost-subtle (secondary text, 60 % opacity at rest, full on hover) */
   --color-button-ghost-subtle-text: var(--color-text-secondary);
   --color-button-ghost-subtle-hover-bg: var(--color-primary-50);
   --color-button-ghost-subtle-active-bg: var(--color-primary-100);
   --color-button-ghost-subtle-focus-ring: var(--color-primary-400);
 
-  /* Button — ghost-warning (yellow-600 text for contrast on white, faint yellow tint on hover) */
+  /* Button â€” ghost-warning (yellow-600 text for contrast on white, faint yellow tint on hover) */
   --color-button-ghost-warning-text: var(--color-warning-600);
   --color-button-ghost-warning-hover-bg: color-mix(in srgb, var(--color-warning-400) 12%, transparent);
   --color-button-ghost-warning-active-bg: color-mix(in srgb, var(--color-warning-400) 22%, transparent);
   --color-button-ghost-warning-focus-ring: color-mix(in srgb, var(--color-warning-400) 50%, transparent);
 
-  /* Button — outline-warning (transparent bg, yellow-600 border + text) */
+  /* Button â€” outline-warning (transparent bg, yellow-600 border + text) */
   --color-button-outline-warning-text: var(--color-warning-600);
   --color-button-outline-warning-border: var(--color-warning-600);
   --color-button-outline-warning-hover-bg: color-mix(in srgb, var(--color-warning-400) 12%, transparent);
   --color-button-outline-warning-active-bg: color-mix(in srgb, var(--color-warning-400) 22%, transparent);
   --color-button-outline-warning-focus-ring: color-mix(in srgb, var(--color-warning-400) 50%, transparent);
 
-  /* Button — warning (bright yellow-400 bg, yellow-500 hover — never goes brown) */
+  /* Button â€” warning (bright yellow-400 bg, yellow-500 hover â€” never goes brown) */
   --color-button-warning: var(--color-warning-400);
   --color-button-warning-hover: var(--color-warning-500);
   --color-button-warning-active: var(--color-warning-600);
@@ -105,7 +105,7 @@
   --color-button-warning-border: var(--color-warning-400);
   --color-button-warning-focus-ring: color-mix(in srgb, var(--color-warning-400) 50%, transparent);
 
-  /* Button — destructive */
+  /* Button â€” destructive */
   --color-button-destructive: var(--color-error-600);
   --color-button-destructive-hover: var(--color-error-700);
   --color-button-destructive-disabled: var(--color-error-300);
@@ -135,11 +135,11 @@
   --color-dropdown-item-disabled: var(--color-text-disabled);
   --color-dropdown-label: var(--color-text-secondary);
   --color-dropdown-separator: var(--color-border-default);
-  /* Dropdown item — destructive */
+  /* Dropdown item â€” destructive */
   --color-dropdown-item-destructive-text: var(--color-error-600);
   --color-dropdown-item-destructive-hover-bg: var(--color-error-50);
 
-  /* Tooltip — the overlay surface, matching OTooltip's own `bg-surface-overlay`.
+  /* Tooltip â€” the overlay surface, matching OTooltip's own `bg-surface-overlay`.
      Chart tooltips (ECharts) read these via chartTheme's chartColor(). */
   --color-tooltip-bg: var(--color-surface-overlay);
   --color-tooltip-text: var(--color-text-primary);
@@ -158,7 +158,7 @@
   --text-icon-xl: var(--spacing-8);
   /* 32px */
 
-  /* RefreshButton — staleness dot */
+  /* RefreshButton â€” staleness dot */
   --color-refresh-dot-idle: var(--color-text-disabled);
   --color-refresh-dot-fresh: var(--color-success-500);
   --color-refresh-dot-stale: var(--color-warning-500);
@@ -217,7 +217,7 @@
   --color-stepper-trigger-hover: var(--color-surface-subtle);
   --color-stepper-trigger-focus-ring: var(--color-primary-400);
 
-  /* ── Dialog ──────────────────────────────────────────────── */
+  /* â”€â”€ Dialog â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
   /* Overlay */
   --color-dialog-overlay: var(--color-overlay-scrim);
@@ -253,7 +253,7 @@
   --spacing-dialog-footer-px: var(--spacing-5);
   --spacing-dialog-footer-py: var(--spacing-3);
 
-  /* Badge — default (neutral grey) */
+  /* Badge â€” default (neutral grey) */
   --color-badge-default-solid-bg: var(--color-grey-200);
   --color-badge-default-solid-text: var(--color-grey-700);
   --color-badge-default-ol-border: var(--color-grey-400);
@@ -261,7 +261,7 @@
   --color-badge-default-soft-bg: var(--color-grey-50);
   --color-badge-default-soft-text: var(--color-grey-700);
 
-  /* Badge — primary */
+  /* Badge â€” primary */
   --color-badge-primary-solid-bg: var(--color-primary-600);
   --color-badge-primary-solid-text: var(--color-white);
   --color-badge-primary-ol-border: var(--color-primary-400);
@@ -269,15 +269,15 @@
   --color-badge-primary-soft-bg: var(--color-primary-100);
   --color-badge-primary-soft-text: var(--color-primary-700);
 
-  /* Keyboard-shortcut cheatsheet — soft primary highlight (light tint; reversed in dark) */
+  /* Keyboard-shortcut cheatsheet â€” soft primary highlight (light tint; reversed in dark) */
   --color-shortcut-highlight-bg: var(--color-primary-100);
 
-  /* Keyboard keycap (OShortcut) — references semantic tokens → auto dark mode */
+  /* Keyboard keycap (OShortcut) â€” references semantic tokens â†’ auto dark mode */
   --color-kbd-bg: var(--color-surface-subtle);
   --color-kbd-border: var(--color-border-default);
   --color-kbd-text: var(--color-text-secondary);
 
-  /* Badge — success */
+  /* Badge â€” success */
   --color-badge-success-solid-bg: var(--color-success-500);
   --color-badge-success-solid-text: var(--color-white);
   --color-badge-success-ol-border: var(--color-success-500);
@@ -285,7 +285,7 @@
   --color-badge-success-soft-bg: var(--color-success-50);
   --color-badge-success-soft-text: var(--color-success-700);
 
-  /* Badge — warning (dark text on yellow — never white) */
+  /* Badge â€” warning (dark text on yellow â€” never white) */
   --color-badge-warning-solid-bg: var(--color-warning-400);
   --color-badge-warning-solid-text: var(--color-grey-900);
   --color-badge-warning-ol-border: var(--color-warning-600);
@@ -293,7 +293,7 @@
   --color-badge-warning-soft-bg: var(--color-warning-50);
   --color-badge-warning-soft-text: var(--color-warning-700);
 
-  /* Badge — error */
+  /* Badge â€” error */
   --color-badge-error-solid-bg: var(--color-error-600);
   --color-badge-error-solid-text: var(--color-white);
   --color-badge-error-ol-border: var(--color-error-500);
@@ -301,15 +301,15 @@
   --color-badge-error-soft-bg: var(--color-error-50);
   --color-badge-error-soft-text: var(--color-error-700);
 
-  /* Badge — info (blue, for logs stream type) */
+  /* Badge â€” info (blue, for logs stream type) */
   --color-badge-info-ol-border: var(--color-info-700);
   --color-badge-info-ol-text:   var(--color-info-700);
 
-  /* Badge — purple (for metrics stream type) */
+  /* Badge â€” purple (for metrics stream type) */
   --color-badge-purple-ol-border: var(--color-purple-600);
   --color-badge-purple-ol-text:   var(--color-purple-700);
 
-  /* Badge — teal */
+  /* Badge â€” teal */
   --color-badge-teal-solid-bg: var(--color-teal-600);
   --color-badge-teal-solid-text: var(--color-white);
   --color-badge-teal-ol-border: var(--color-teal-500);
@@ -317,7 +317,7 @@
   --color-badge-teal-soft-bg: var(--color-teal-50);
   --color-badge-teal-soft-text: var(--color-teal-700);
 
-  /* Badge — orange */
+  /* Badge â€” orange */
   --color-badge-orange-solid-bg: var(--color-orange-600);
   --color-badge-orange-solid-text: var(--color-white);
   --color-badge-orange-ol-border: var(--color-orange-500);
@@ -325,7 +325,7 @@
   --color-badge-orange-soft-bg: var(--color-orange-50);
   --color-badge-orange-soft-text: var(--color-orange-700);
 
-  /* Badge — lime */
+  /* Badge â€” lime */
   --color-badge-lime-solid-bg: var(--color-lime-600);
   --color-badge-lime-solid-text: var(--color-white);
   --color-badge-lime-ol-border: var(--color-lime-500);
@@ -333,7 +333,7 @@
   --color-badge-lime-soft-bg: var(--color-lime-50);
   --color-badge-lime-soft-text: var(--color-lime-700);
 
-  /* Badge — amber */
+  /* Badge â€” amber */
   --color-badge-amber-solid-bg: var(--color-amber-600);
   --color-badge-amber-solid-text: var(--color-white);
   --color-badge-amber-ol-border: var(--color-amber-500);
@@ -341,7 +341,7 @@
   --color-badge-amber-soft-bg: var(--color-amber-50);
   --color-badge-amber-soft-text: var(--color-amber-700);
 
-  /* Badge — cyan */
+  /* Badge â€” cyan */
   --color-badge-cyan-solid-bg: var(--color-cyan-600);
   --color-badge-cyan-solid-text: var(--color-white);
   --color-badge-cyan-ol-border: var(--color-cyan-500);
@@ -349,7 +349,7 @@
   --color-badge-cyan-soft-bg: var(--color-cyan-50);
   --color-badge-cyan-soft-text: var(--color-cyan-700);
 
-  /* Badge — blue */
+  /* Badge â€” blue */
   --color-badge-blue-solid-bg: var(--color-blue-600);
   --color-badge-blue-solid-text: var(--color-white);
   --color-badge-blue-ol-border: var(--color-blue-500);
@@ -357,13 +357,13 @@
   --color-badge-blue-soft-bg: var(--color-blue-50);
   --color-badge-blue-soft-text: var(--color-blue-700);
 
-  /* Badge — purple (solid/soft variants for correlation) */
+  /* Badge â€” purple (solid/soft variants for correlation) */
   --color-badge-purple-solid-bg: var(--color-purple-600);
   --color-badge-purple-solid-text: var(--color-white);
   --color-badge-purple-soft-bg: var(--color-purple-50);
   --color-badge-purple-soft-text: var(--color-purple-700);
 
-  /* Badge — indigo */
+  /* Badge â€” indigo */
   --color-badge-indigo-solid-bg: var(--color-indigo-600);
   --color-badge-indigo-solid-text: var(--color-white);
   --color-badge-indigo-ol-border: var(--color-indigo-500);
@@ -371,10 +371,10 @@
   --color-badge-indigo-soft-bg: var(--color-indigo-50);
   --color-badge-indigo-soft-text: var(--color-indigo-700);
 
-  /* Badge — shared */
+  /* Badge â€” shared */
   --color-badge-focus-ring: var(--color-primary-400);
 
-  /* ── Toast ─────────────────────────────────────────────── */
+  /* â”€â”€ Toast â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
   /* success */
   --color-toast-success-bg:     var(--color-success-50);
   --color-toast-success-border: var(--color-success-500);
@@ -448,11 +448,11 @@
   --color-pagination-nav-disabled-text: var(--color-text-disabled);
 
   /* Field semantic widths (OInput, OTextarea, OSelect) */
-  /* xs  ~120px — zip codes, CVV, short numbers          */
-  /* sm  ~200px — dates, narrow labels                   */
-  /* md  ~280px — names, phone numbers (default narrow)  */
-  /* lg  ~400px — emails, full addresses                 */
-  /* full is 100% — no token needed, handled in CSS var  */
+  /* xs  ~120px â€” zip codes, CVV, short numbers          */
+  /* sm  ~200px â€” dates, narrow labels                   */
+  /* md  ~280px â€” names, phone numbers (default narrow)  */
+  /* lg  ~400px â€” emails, full addresses                 */
+  /* full is 100% â€” no token needed, handled in CSS var  */
   --spacing-field-width-xs: 7.5rem;
   --spacing-field-width-sm: 12.5rem;
   --spacing-field-width-md: 17.5rem;
@@ -464,7 +464,7 @@
   --color-input-border-hover: var(--color-primary-300);
   --color-input-border-focus: var(--color-primary-300);
   --color-input-border-error: var(--color-error-500);
-  /* Disabled-bg uses grey-200 (#e5e5e5) — `surface-subtle` (grey-100 #f5f5f5)
+  /* Disabled-bg uses grey-200 (#e5e5e5) â€” `surface-subtle` (grey-100 #f5f5f5)
      was almost identical to the enabled white bg in light mode, making
      disabled fields visually indistinguishable from enabled ones. */
   --color-input-disabled-bg: var(--color-grey-200);
@@ -474,7 +474,7 @@
   --color-input-text: var(--color-text-primary);
   --color-input-placeholder: var(--color-text-disabled);
   /* Labels were resolving to text-secondary which is the same muted grey
-     used for disabled / hint text — making every form label look disabled.
+     used for disabled / hint text â€” making every form label look disabled.
      Bumped to text-primary so labels read as active form metadata. */
   --color-input-label: var(--color-text-primary);
   --color-input-hint: var(--color-text-secondary);
@@ -497,7 +497,7 @@
   --color-select-focus-ring: var(--color-primary-200);
   --color-select-text: var(--color-text-soft);
   --color-select-placeholder: var(--color-text-disabled);
-  /* Select labels were grey (text-secondary) — same fix as input-label. */
+  /* Select labels were grey (text-secondary) â€” same fix as input-label. */
   --color-select-label: var(--color-text-primary);
   --color-select-icon: var(--color-text-secondary);
   --color-select-error-text: var(--color-error-600);
@@ -513,11 +513,11 @@
   --color-switch-focus-ring: var(--color-primary-400);
   --color-switch-label: var(--color-text-primary);
   --color-switch-label-disabled: var(--color-text-secondary);
-  /* Switch palette — single solid color (primary-500) for both border AND
+  /* Switch palette â€” single solid color (primary-500) for both border AND
      fill on ON state so the track reads as one color, not two-tone.
-       ON       → primary-500 fill + primary-500 border + white thumb
-       OFF      → primary-500 outline + primary-500 thumb on left
-       DISABLED → grey-300 dashed outline */
+       ON       â†’ primary-500 fill + primary-500 border + white thumb
+       OFF      â†’ primary-500 outline + primary-500 thumb on left
+       DISABLED â†’ grey-300 dashed outline */
   --color-switch-border: var(--color-primary-500);
   --color-switch-border-off: var(--color-primary-500);
   --color-switch-thumb-off: var(--color-primary-500);
@@ -538,7 +538,7 @@
   --color-checkbox-label: var(--color-text-primary);
   --color-checkbox-label-disabled: var(--color-text-disabled);
 
-  /* Radio (ORadio) — primary outline by default (interactive signal),
+  /* Radio (ORadio) â€” primary outline by default (interactive signal),
      grey only when disabled. */
   --color-radio-bg: var(--color-surface-base);
   --color-radio-border: var(--color-primary-600);
@@ -584,7 +584,7 @@
   --color-file-drag-bg: var(--color-primary-50);
   --color-file-drag-border: var(--color-primary-500);
 
-  /* Date / Time / Color (ODate, OTime, OColor) — share input surface */
+  /* Date / Time / Color (ODate, OTime, OColor) â€” share input surface */
   --color-datepicker-bg: var(--color-surface-base);
   --color-datepicker-border: var(--color-border-strong);
   --color-datepicker-hover-border: var(--color-primary-400);
@@ -642,7 +642,7 @@
   --color-option-group-error-text: var(--color-error-600);
 
   /* OTable */
-  /* Near-white header (prototype thead bg = --g-50 ≈ #FBFBFD): barely distinct
+  /* Near-white header (prototype thead bg = --g-50 â‰ˆ #FBFBFD): barely distinct
      from the white body, not a grey band. */
   --color-table-header-bg: var(--color-surface-panel);
   --color-table-header-text: var(--color-text-secondary);
@@ -650,7 +650,7 @@
   --color-table-row-hover-bg: var(--color-primary-50);
   --color-table-row-selected-bg: var(--color-primary-100);
   --color-table-row-striped-bg: var(--color-surface-subtle);
-  /* Row dividers use the SOFT border (HANDOFF.md §8.1): lighter than the
+  /* Row dividers use the SOFT border (HANDOFF.md Â§8.1): lighter than the
      structural table outline / sticky-header underline so rows read as a calm
      list, not a hard grid. The header underline + outer border stay default. */
   --color-table-row-divider: var(--color-border-subtle);
@@ -668,12 +668,12 @@
   /* Subtle amber wash for warning/flagged rows (was an undefined token relying
      on an inline rgba fallback; now token-based so it's theme-aware). */
   --color-warning-surface: color-mix(in srgb, var(--color-warning-400) 10%, transparent);
-  /* Row height tokens — change these to resize all OTable rows globally.
+  /* Row height tokens â€” change these to resize all OTable rows globally.
      Compact = prototype --row-h 38px. */
   --table-row-height-dense: 2.375rem;  /* 38px (prototype compact) */
   --table-row-height-normal: 2.75rem;  /* 44px */
 
-  /* ── Banner (OBanner) ──────────────────────────────────── */
+  /* â”€â”€ Banner (OBanner) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
   /* default */
   --color-banner-default-bg:      var(--color-grey-100);
   --color-banner-default-text:    var(--color-grey-800);
@@ -697,13 +697,13 @@
   --color-banner-error-bg:        var(--color-error-600);
   --color-banner-error-text:      var(--color-grey-0);
 
-  /* error-soft — tinted error banner for hints/insights (the solid `error`
+  /* error-soft â€” tinted error banner for hints/insights (the solid `error`
      variant stays reserved for hard failures). Mirrors the warning build. */
   --color-banner-error-soft-bg:     var(--color-error-50);
   --color-banner-error-soft-border: var(--color-error-300);
   --color-banner-error-soft-text:   var(--color-error-700);
 
-  /* usage-report severity banners (enterprise billings) — right-fade gradient bg +
+  /* usage-report severity banners (enterprise billings) â€” right-fade gradient bg +
      border. Light values here / dark overrides in dark.css, so the token carries
      the theme automatically (no dark: variant needed at the call site). */
   --color-usage-banner-success-bg: linear-gradient(to right, transparent 60%, #f7f7ff 70%, #cdf7e4 100%);
@@ -712,7 +712,7 @@
   --color-usage-banner-warning-border: #f0c674;
   --color-usage-banner-warning-bg:     linear-gradient(to right, transparent 60%, #fffbf0 70%, #fff3cd 100%);
 
-  /* ── Note Container (pipeline guideline cards) ─────────── */
+  /* â”€â”€ Note Container (pipeline guideline cards) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
   --color-note-bg:               var(--color-note-light-bg);
   --color-note-border:           var(--color-note-light-border);
   --color-note-text:             var(--color-note-light-text);
@@ -720,10 +720,10 @@
   --color-note-emphasis:         var(--color-grey-600);
   --color-note-code:             var(--color-note-code-light);
 
-  /* ── OText typography colours (one per variant) — these were previously only
+  /* â”€â”€ OText typography colours (one per variant) â€” these were previously only
      in the parallel .css token set, which the app does NOT load, so OText's
      per-variant colours (esp. meta/section grey) silently fell back to inherited
-     text. Define them here in the .scss set the app actually loads. ── */
+     text. Define them here in the .scss set the app actually loads. â”€â”€ */
   --color-typography-page-title:  var(--color-text-primary);
   --color-typography-section:     var(--color-text-secondary);
   --color-typography-panel-title: var(--color-text-primary);
@@ -732,7 +732,7 @@
   --color-typography-meta:        var(--color-text-secondary);
   --color-typography-mono:        var(--color-text-primary);
 
-  /* ── OCode (inline chip + block) — same .css-only gap as above ── */
+  /* â”€â”€ OCode (inline chip + block) â€” same .css-only gap as above â”€â”€ */
   --color-code-text:              var(--color-text-primary);
   --color-code-bg:                var(--color-surface-subtle);
   --color-code-border:            var(--color-border-default);
@@ -746,23 +746,23 @@
   --color-skeleton-shimmer:        rgba(255, 255, 255, 0.8);
   --color-datepicker-inner-border: var(--color-grey-100);
 
-  /* Shared hover + surface accent — real formula owned by semantic.css
+  /* Shared hover + surface accent â€” real formula owned by semantic.css
      (theme-accent tinted); --color-surface-accent is an alias of it. */
   --color-surface-accent: var(--color-interactive-hover-bg);
 }
 
 
-/* ToggleGroup — primary variant (colored tray) */
+/* ToggleGroup â€” primary variant (colored tray) */
 
 
-/* ── Register ALL tokens for Tailwind utility generation ── */
+/* â”€â”€ Register ALL tokens for Tailwind utility generation â”€â”€ */
 @theme inline {
   /* Separator */
   --spacing-separator: var(--spacing-separator);
   --color-separator: var(--color-separator);
   --color-separator-strong: var(--color-separator-strong);
 
-  /* Button — primary */
+  /* Button â€” primary */
   --color-button-primary: var(--color-button-primary);
   --color-button-primary-hover: var(--color-button-primary-hover);
   --color-button-primary-active: var(--color-button-primary-active);
@@ -770,7 +770,7 @@
   --color-button-primary-foreground: var(--color-button-primary-foreground);
   --color-button-primary-focus-ring: var(--color-button-primary-focus-ring);
 
-  /* Button — secondary */
+  /* Button â€” secondary */
   --color-button-secondary: var(--color-button-secondary);
   --color-button-secondary-hover: var(--color-button-secondary-hover);
   --color-button-secondary-active: var(--color-button-secondary-active);
@@ -778,7 +778,7 @@
   --color-button-secondary-foreground: var(--color-button-secondary-foreground);
   --color-button-secondary-focus-ring: var(--color-button-secondary-focus-ring);
 
-  /* Button — outline */
+  /* Button â€” outline */
   --color-button-outline-text: var(--color-button-outline-text);
   --color-button-outline-border: var(--color-button-outline-border);
   --color-button-outline-hover-bg: var(--color-button-outline-hover-bg);
@@ -786,58 +786,58 @@
   --color-button-outline-active-bg: var(--color-button-outline-active-bg);
   --color-button-outline-focus-ring: var(--color-button-outline-focus-ring);
 
-  /* Button — ghost */
+  /* Button â€” ghost */
   --color-button-ghost-text: var(--color-button-ghost-text);
   --color-button-ghost-hover-bg: var(--color-button-ghost-hover-bg);
   --color-button-ghost-active-bg: var(--color-button-ghost-active-bg);
   --color-button-ghost-hover-ring: var(--color-button-ghost-hover-ring);
   --color-button-ghost-focus-ring: var(--color-button-ghost-focus-ring);
 
-  /* Button — ghost-primary */
+  /* Button â€” ghost-primary */
   --color-button-ghost-primary-text: var(--color-button-ghost-primary-text);
   --color-button-ghost-primary-hover-bg: var(--color-button-ghost-primary-hover-bg);
   --color-button-ghost-primary-active-bg: var(--color-button-ghost-primary-active-bg);
   --color-button-ghost-primary-focus-ring: var(--color-button-ghost-primary-focus-ring);
 
-  /* Button — ghost-destructive */
+  /* Button â€” ghost-destructive */
   --color-button-ghost-destructive-text: var(--color-button-ghost-destructive-text);
   --color-button-ghost-destructive-hover-bg: var(--color-button-ghost-destructive-hover-bg);
   --color-button-ghost-destructive-active-bg: var(--color-button-ghost-destructive-active-bg);
   --color-button-ghost-destructive-focus-ring: var(--color-button-ghost-destructive-focus-ring);
 
-  /* Button — ghost-success */
+  /* Button â€” ghost-success */
   --color-button-ghost-success-text: var(--color-button-ghost-success-text);
   --color-button-ghost-success-hover-bg: var(--color-button-ghost-success-hover-bg);
   --color-button-ghost-success-active-bg: var(--color-button-ghost-success-active-bg);
   --color-button-ghost-success-focus-ring: var(--color-button-ghost-success-focus-ring);
 
-  /* Button — ghost-muted */
+  /* Button â€” ghost-muted */
   --color-button-ghost-muted-text: var(--color-button-ghost-muted-text);
   --color-button-ghost-muted-hover-text: var(--color-button-ghost-muted-hover-text);
   --color-button-ghost-muted-hover-bg: var(--color-button-ghost-muted-hover-bg);
   --color-button-ghost-muted-active-bg: var(--color-button-ghost-muted-active-bg);
   --color-button-ghost-muted-focus-ring: var(--color-button-ghost-muted-focus-ring);
 
-  /* Button — ghost-subtle */
+  /* Button â€” ghost-subtle */
   --color-button-ghost-subtle-text: var(--color-button-ghost-subtle-text);
   --color-button-ghost-subtle-hover-bg: var(--color-button-ghost-subtle-hover-bg);
   --color-button-ghost-subtle-active-bg: var(--color-button-ghost-subtle-active-bg);
   --color-button-ghost-subtle-focus-ring: var(--color-button-ghost-subtle-focus-ring);
 
-  /* Button — ghost-warning */
+  /* Button â€” ghost-warning */
   --color-button-ghost-warning-text: var(--color-button-ghost-warning-text);
   --color-button-ghost-warning-hover-bg: var(--color-button-ghost-warning-hover-bg);
   --color-button-ghost-warning-active-bg: var(--color-button-ghost-warning-active-bg);
   --color-button-ghost-warning-focus-ring: var(--color-button-ghost-warning-focus-ring);
 
-  /* Button — outline-warning */
+  /* Button â€” outline-warning */
   --color-button-outline-warning-text: var(--color-button-outline-warning-text);
   --color-button-outline-warning-border: var(--color-button-outline-warning-border);
   --color-button-outline-warning-hover-bg: var(--color-button-outline-warning-hover-bg);
   --color-button-outline-warning-active-bg: var(--color-button-outline-warning-active-bg);
   --color-button-outline-warning-focus-ring: var(--color-button-outline-warning-focus-ring);
 
-  /* Button — warning */
+  /* Button â€” warning */
   --color-button-warning: var(--color-button-warning);
   --color-button-warning-hover: var(--color-button-warning-hover);
   --color-button-warning-active: var(--color-button-warning-active);
@@ -845,7 +845,7 @@
   --color-button-warning-border: var(--color-button-warning-border);
   --color-button-warning-focus-ring: var(--color-button-warning-focus-ring);
 
-  /* Button — destructive */
+  /* Button â€” destructive */
   --color-button-destructive: var(--color-button-destructive);
   --color-button-destructive-hover: var(--color-button-destructive-hover);
   --color-button-destructive-disabled: var(--color-button-destructive-disabled);
@@ -891,7 +891,7 @@
   --text-icon-lg: var(--text-icon-lg);
   --text-icon-xl: var(--text-icon-xl);
 
-  /* RefreshButton — staleness dot */
+  /* RefreshButton â€” staleness dot */
   --color-refresh-dot-idle: var(--color-refresh-dot-idle);
   --color-refresh-dot-fresh: var(--color-refresh-dot-fresh);
   --color-refresh-dot-stale: var(--color-refresh-dot-stale);
@@ -1130,7 +1130,7 @@
   --spacing-dialog-footer-px: var(--spacing-dialog-footer-px);
   --spacing-dialog-footer-py: var(--spacing-dialog-footer-py);
 
-  /* Badge — default */
+  /* Badge â€” default */
   --color-badge-default-solid-bg: var(--color-badge-default-solid-bg);
   --color-badge-default-solid-text: var(--color-badge-default-solid-text);
   --color-badge-default-ol-border: var(--color-badge-default-ol-border);
@@ -1138,7 +1138,7 @@
   --color-badge-default-soft-bg: var(--color-badge-default-soft-bg);
   --color-badge-default-soft-text: var(--color-badge-default-soft-text);
 
-  /* Badge — primary */
+  /* Badge â€” primary */
   --color-badge-primary-solid-bg: var(--color-badge-primary-solid-bg);
   --color-badge-primary-solid-text: var(--color-badge-primary-solid-text);
   --color-badge-primary-ol-border: var(--color-badge-primary-ol-border);
@@ -1154,7 +1154,7 @@
   --color-kbd-border: var(--color-kbd-border);
   --color-kbd-text: var(--color-kbd-text);
 
-  /* Badge — success */
+  /* Badge â€” success */
   --color-badge-success-solid-bg: var(--color-badge-success-solid-bg);
   --color-badge-success-solid-text: var(--color-badge-success-solid-text);
   --color-badge-success-ol-border: var(--color-badge-success-ol-border);
@@ -1162,7 +1162,7 @@
   --color-badge-success-soft-bg: var(--color-badge-success-soft-bg);
   --color-badge-success-soft-text: var(--color-badge-success-soft-text);
 
-  /* Badge — warning */
+  /* Badge â€” warning */
   --color-badge-warning-solid-bg: var(--color-badge-warning-solid-bg);
   --color-badge-warning-solid-text: var(--color-badge-warning-solid-text);
   --color-badge-warning-ol-border: var(--color-badge-warning-ol-border);
@@ -1170,7 +1170,7 @@
   --color-badge-warning-soft-bg: var(--color-badge-warning-soft-bg);
   --color-badge-warning-soft-text: var(--color-badge-warning-soft-text);
 
-  /* Badge — error */
+  /* Badge â€” error */
   --color-badge-error-solid-bg: var(--color-badge-error-solid-bg);
   --color-badge-error-solid-text: var(--color-badge-error-solid-text);
   --color-badge-error-ol-border: var(--color-badge-error-ol-border);
@@ -1178,15 +1178,15 @@
   --color-badge-error-soft-bg: var(--color-badge-error-soft-bg);
   --color-badge-error-soft-text: var(--color-badge-error-soft-text);
 
-  /* Badge — info (blue) */
+  /* Badge â€” info (blue) */
   --color-badge-info-ol-border: var(--color-badge-info-ol-border);
   --color-badge-info-ol-text:   var(--color-badge-info-ol-text);
 
-  /* Badge — purple */
+  /* Badge â€” purple */
   --color-badge-purple-ol-border: var(--color-badge-purple-ol-border);
   --color-badge-purple-ol-text:   var(--color-badge-purple-ol-text);
 
-  /* Badge — teal */
+  /* Badge â€” teal */
   --color-badge-teal-solid-bg: var(--color-badge-teal-solid-bg);
   --color-badge-teal-solid-text: var(--color-badge-teal-solid-text);
   --color-badge-teal-ol-border: var(--color-badge-teal-ol-border);
@@ -1194,7 +1194,7 @@
   --color-badge-teal-soft-bg: var(--color-badge-teal-soft-bg);
   --color-badge-teal-soft-text: var(--color-badge-teal-soft-text);
 
-  /* Badge — orange */
+  /* Badge â€” orange */
   --color-badge-orange-solid-bg: var(--color-badge-orange-solid-bg);
   --color-badge-orange-solid-text: var(--color-badge-orange-solid-text);
   --color-badge-orange-ol-border: var(--color-badge-orange-ol-border);
@@ -1202,7 +1202,7 @@
   --color-badge-orange-soft-bg: var(--color-badge-orange-soft-bg);
   --color-badge-orange-soft-text: var(--color-badge-orange-soft-text);
 
-  /* Badge — lime */
+  /* Badge â€” lime */
   --color-badge-lime-solid-bg: var(--color-badge-lime-solid-bg);
   --color-badge-lime-solid-text: var(--color-badge-lime-solid-text);
   --color-badge-lime-ol-border: var(--color-badge-lime-ol-border);
@@ -1210,7 +1210,7 @@
   --color-badge-lime-soft-bg: var(--color-badge-lime-soft-bg);
   --color-badge-lime-soft-text: var(--color-badge-lime-soft-text);
 
-  /* Badge — amber */
+  /* Badge â€” amber */
   --color-badge-amber-solid-bg: var(--color-badge-amber-solid-bg);
   --color-badge-amber-solid-text: var(--color-badge-amber-solid-text);
   --color-badge-amber-ol-border: var(--color-badge-amber-ol-border);
@@ -1218,7 +1218,7 @@
   --color-badge-amber-soft-bg: var(--color-badge-amber-soft-bg);
   --color-badge-amber-soft-text: var(--color-badge-amber-soft-text);
 
-  /* Badge — cyan */
+  /* Badge â€” cyan */
   --color-badge-cyan-solid-bg: var(--color-badge-cyan-solid-bg);
   --color-badge-cyan-solid-text: var(--color-badge-cyan-solid-text);
   --color-badge-cyan-ol-border: var(--color-badge-cyan-ol-border);
@@ -1226,7 +1226,7 @@
   --color-badge-cyan-soft-bg: var(--color-badge-cyan-soft-bg);
   --color-badge-cyan-soft-text: var(--color-badge-cyan-soft-text);
 
-  /* Badge — blue */
+  /* Badge â€” blue */
   --color-badge-blue-solid-bg: var(--color-badge-blue-solid-bg);
   --color-badge-blue-solid-text: var(--color-badge-blue-solid-text);
   --color-badge-blue-ol-border: var(--color-badge-blue-ol-border);
@@ -1234,13 +1234,13 @@
   --color-badge-blue-soft-bg: var(--color-badge-blue-soft-bg);
   --color-badge-blue-soft-text: var(--color-badge-blue-soft-text);
 
-  /* Badge — purple (solid/soft variants) */
+  /* Badge â€” purple (solid/soft variants) */
   --color-badge-purple-solid-bg: var(--color-badge-purple-solid-bg);
   --color-badge-purple-solid-text: var(--color-badge-purple-solid-text);
   --color-badge-purple-soft-bg: var(--color-badge-purple-soft-bg);
   --color-badge-purple-soft-text: var(--color-badge-purple-soft-text);
 
-  /* Badge — indigo */
+  /* Badge â€” indigo */
   --color-badge-indigo-solid-bg: var(--color-badge-indigo-solid-bg);
   --color-badge-indigo-solid-text: var(--color-badge-indigo-solid-text);
   --color-badge-indigo-ol-border: var(--color-badge-indigo-ol-border);
@@ -1248,7 +1248,7 @@
   --color-badge-indigo-soft-bg: var(--color-badge-indigo-soft-bg);
   --color-badge-indigo-soft-text: var(--color-badge-indigo-soft-text);
 
-  /* Badge — shared */
+  /* Badge â€” shared */
   --color-badge-focus-ring: var(--color-badge-focus-ring);
 
   /* Toast */
@@ -1376,13 +1376,13 @@
   --color-surface-accent: var(--color-surface-accent);
 }
 
-/* ── Menu animations ── */
+/* â”€â”€ Menu animations â”€â”€ */
 
-/* ── Field type badges ──
-   .field-type-container / .field-expand-icon → colocated as template utilities
-   in components/common/sidebar/SearchFieldList.vue (W1.a, F2 — single consumer). */
+/* â”€â”€ Field type badges â”€â”€
+   .field-type-container / .field-expand-icon â†’ colocated as template utilities
+   in components/common/sidebar/SearchFieldList.vue (W1.a, F2 â€” single consumer). */
 
-/* ── sdr-fields ── */
+/* â”€â”€ sdr-fields â”€â”€ */
 @theme inline {
   --color-label-chip-ip-bg:        var(--color-label-chip-ip-bg);
   --color-label-chip-ip-text:      var(--color-label-chip-ip-text);
@@ -1418,10 +1418,10 @@
   --color-label-chip-pattern-text: var(--color-label-chip-pattern-text);
 }
 
-/* ── Table ── */
+/* â”€â”€ Table â”€â”€ */
 /* F3 .o2-table* rules moved to styles/utilities.css (W1.b) */
 
-/* ── App utilities ── */
+/* â”€â”€ App utilities â”€â”€ */
 /* F4 element typography/reset moved to styles/base-elements.css (W1.b) */
 
 /* F5 app-shell helpers moved to styles/utilities.css (W1.b) */
@@ -1434,22 +1434,22 @@
 
 /* Navbar per-button dark token overrides moved to styles/utilities.css (W1.d). */
 
-/* ── Index list ── */
+/* â”€â”€ Index list â”€â”€ */
 
 
-/* ── Pagination ── */
+/* â”€â”€ Pagination â”€â”€ */
 
 
-/* ── Schema view ── */
+/* â”€â”€ Schema view â”€â”€ */
 
 
-/* ── RCA Report ── */
+/* â”€â”€ RCA Report â”€â”€ */
 
-/* .rca-report-content → colocated (verbatim) into components/alerts/IncidentDetailDrawer.vue,
+/* .rca-report-content â†’ colocated (verbatim) into components/alerts/IncidentDetailDrawer.vue,
    its single consumer (W1.a, F9). It styles v-html markdown, so it is sanctioned
    keeper CSS (ladder step 5), not convertible to utilities. */
 
-/* ── Logs page ── */
+/* â”€â”€ Logs page â”€â”€ */
 
 /* --- logs-page.scss --- */
 
@@ -1477,8 +1477,8 @@
 
 /* The query-editor wrappers used to carry a stray `monaco-editor` class (left
    over from the old SCSS that sized the editor via `.monaco-editor { ... }`).
-   With the class present, monaco's base stylesheet applied to the wrapper —
-   including `--vscode-focusBorder` (#0090f1) and its outline — so a stray focus
+   With the class present, monaco's base stylesheet applied to the wrapper â€”
+   including `--vscode-focusBorder` (#0090f1) and its outline â€” so a stray focus
    border was painted around the non-editor wrapper, doubling up with the real
    inner editor's border. The fix is to remove that leftover class from every
    query-editor usage (see the *.vue templates). This rule is the safety net for
@@ -1494,7 +1494,7 @@
 /*
  * Relative-period chips ("Past 15m" grid) shared by DateTime.vue, DateTimePicker.vue
  * and CustomDateTimePicker.vue. They render as ghost OButtons (transparent bg), so these
- * classes supply the grey fill, size, and the selected primary fill — same rules that
+ * classes supply the grey fill, size, and the selected primary fill â€” same rules that
  * used to live in each component's <style> block on main, just hoisted here as global CSS
  * after the per-component SCSS was removed.
  */
@@ -1503,7 +1503,7 @@
 /* --- search-result.scss --- */
 
 
-/* .oo-pin-* pin tooltip → colocated (verbatim) into plugins/logs/SearchResult.vue,
+/* .oo-pin-* pin tooltip â†’ colocated (verbatim) into plugins/logs/SearchResult.vue,
    its single consumer (W1.a, F11). */
 
 /* --- search-schedulerlist.scss --- */
@@ -1524,7 +1524,7 @@
    here so they don't change fonts on every table in the app. */
 
 
-/* This "table" lays out entirely with flexbox + explicit column widths — it
+/* This "table" lays out entirely with flexbox + explicit column widths â€” it
    does not use native table column layout. Rendering the table/thead/tbody as
    block boxes makes `position: relative` (the containing block for the
    position:absolute virtual rows), `height`, and `position: sticky` on the
@@ -1560,17 +1560,17 @@
 /* Single source of truth for the count/label shown in a listing-table footer
    (e.g. "20 Dashboards"). Deliberately sets NO color so it inherits the exact
    same ambient color as the "Showing X of Y / Records per page" pagination
-   text sitting beside it — the two must always read identically. Only size and
+   text sitting beside it â€” the two must always read identically. Only size and
    weight are fixed here; consumers apply ONLY this class plus layout utilities,
    never their own color/size/weight, so every listing footer reads the same. */
 /* F3 .o2-table-footer-title moved to styles/utilities.css (W1.b) */
 
 /* @media print overrides moved to styles/base-elements.css (W1.a, F18). */
 
-/* ── Register component/domain tokens used in class utilities ──
+/* â”€â”€ Register component/domain tokens used in class utilities â”€â”€
    These tokens were previously only reachable via arbitrary class values
    (e.g. a bracketed bg-[var()] expression); registering them here generates
-   real Tailwind utilities (bg-card-glass-bg, text-status-error-text, …) so
+   real Tailwind utilities (bg-card-glass-bg, text-status-error-text, â€¦) so
    component classes no longer need arbitrary color values. */
 @theme inline {
   --color-banner-default-bg: var(--color-banner-default-bg);
@@ -1617,7 +1617,7 @@
   /* TODO(tier-integrity): indigo-700 / purple-700 are BASE primitives, exposed
      here only because a few decorative/categorical badges (eval data-type chips,
      the indigo-themed RCA panel) consume them directly. They need proper
-     categorical/component tokens — see SCOPED_CSS_AUDIT.md. Do not add more. */
+     categorical/component tokens â€” see SCOPED_CSS_AUDIT.md. Do not add more. */
   --color-indigo-700: var(--color-indigo-700);
   --color-info: var(--color-info);
   --color-json-key: var(--color-json-key);
@@ -1660,8 +1660,8 @@
   --color-wildcard-bar-orange: var(--color-wildcard-bar-orange);
   --color-wildcard-bar-purple: var(--color-wildcard-bar-purple);
 
-  /* ── Phase A registrations (O2_TOKEN_MIGRATION_PLAN §3.K.3) ── */
-  /* JSON syntax colors (json-key was already registered — complete the family) */
+  /* â”€â”€ Phase A registrations (O2_TOKEN_MIGRATION_PLAN Â§3.K.3) â”€â”€ */
+  /* JSON syntax colors (json-key was already registered â€” complete the family) */
   --color-json-boolean: var(--color-json-boolean);
   --color-json-null: var(--color-json-null);
   --color-json-number: var(--color-json-number);
@@ -1690,12 +1690,11 @@
   --color-text-soft: var(--color-text-soft);
   --color-log-table-header-bg: var(--color-log-table-header-bg);
   --color-log-table-row-hover: var(--color-log-table-row-hover);
-  --color-table-actions-bg: var(--color-table-actions-bg);
-  /* Type-scale utilities (§3.J) — text-2xs (11px) / text-compact (13px) */
+  /* Type-scale utilities (Â§3.J) â€” text-2xs (11px) / text-compact (13px) */
   --text-3xs: var(--text-3xs);
   --text-2xs: var(--text-2xs);
   --text-compact: var(--text-compact);
-  /* Domain tokens (§3.K.4) */
+  /* Domain tokens (Â§3.K.4) */
   --color-highlight-bg: var(--color-highlight-bg);
   --color-brand-indigo: var(--color-brand-indigo);
 }

@@ -1,4 +1,4 @@
-/* ============================================================
+﻿/* ============================================================
    DARK MODE TOKEN OVERRIDES
    Overrides semantic (and component) tokens for dark themes.
    ============================================================ */
@@ -16,15 +16,15 @@
      */
     color-scheme: dark;
 
-    /* ═══════════════════════════════════════════════════════════
-       DARK MODE FOUNDATION — tune these ~16 values to taste.
+    /* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+       DARK MODE FOUNDATION â€” tune these ~16 values to taste.
        Everything below (surfaces, borders, text, and the per-component
        overrides further down) references ONLY these vars, so the whole
        dark theme is tuned from here without touching components.
 
-       Elevation order (deepest → lightest), preserving the light-mode
+       Elevation order (deepest â†’ lightest), preserving the light-mode
        relationship (subtle < panel < base < overlay) so cards LIFT and
-       sub-rails RECEDE — that's what creates visible "sections":
+       sub-rails RECEDE â€” that's what creates visible "sections":
 
          chrome   top bar / left rail / gutter behind the card  (deepest)
          well     recessed fills, segmented-control track
@@ -35,15 +35,15 @@
        Two rules that must survive any tuning:
         1. BASE (the content card) is clearly LIGHTER than the chrome behind
            it, so the card visibly floats off the frame.
-        2. Borders read clearly ABOVE the surface they outline — a border
+        2. Borders read clearly ABOVE the surface they outline â€” a border
            close to its background is invisible (the bug this fixes).
 
        Accents stay on the teal brand palette (--color-primary-*), which is
-       theme-driven at runtime (utils/theme.ts) — no accent is hardcoded here.
+       theme-driven at runtime (utils/theme.ts) â€” no accent is hardcoded here.
        Surfaces are a neutral slate. Want warmer/cooler? Nudge the hex below.
-       ═══════════════════════════════════════════════════════════ */
+       â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 
-    /* Surfaces — VS Code Dark+ exact values.
+    /* Surfaces â€” VS Code Dark+ exact values.
        chrome  = title bar + activity bar (icon strip)   #333333
        panel   = sidebar / folder list                   #252526
        base    = editor / main content canvas            #1E1E1E
@@ -56,22 +56,22 @@
     --d-overlay:   #202020;  /* menus, dropdowns, tooltips, table-header (top tier,
                                 lifts above panel #181818 via border + shadow)   */
 
-    /* Borders & dividers — VS Code widget / panel borders */
+    /* Borders & dividers â€” VS Code widget / panel borders */
     --d-divider:       #3C3C3C;  /* subtle: row & section separators            */
     --d-border:        #454545;  /* default: card / input / table / rail edges  */
     --d-border-strong: #6B6B6B;  /* strong: checkbox / radio / file outlines    */
 
-    /* Text — VS Code editor foreground scale */
+    /* Text â€” VS Code editor foreground scale */
     --d-text:      #D4D4D4;  /* primary text, headings, record names            */
     --d-text-2:    #AAAAAA;  /* secondary: body, nav, labels                    */
     --d-text-3:    #858585;  /* metadata, captions, column heads, IDs           */
 
     /* Row / item states on the content surface */
-    --d-hover:     var(--color-primary-900);  /* row & list-item hover — MATCHES
+    --d-hover:     var(--color-primary-900);  /* row & list-item hover â€” MATCHES
                              the dashboard-folder hover (theme-tinted, not grey) */
     --d-selected:  color-mix(in srgb, var(--color-primary-500) 30%, var(--d-panel));
-                             /* selected row — teal-tinted (brand signal)       */
-    --d-zebra:     #252526;  /* striped-row bg — VS Code list alternating row    */
+                             /* selected row â€” teal-tinted (brand signal)       */
+    --d-zebra:     #252526;  /* striped-row bg â€” VS Code list alternating row    */
 
     /* --- Text (mapped to the foundation) --- */
     --color-text-heading:     var(--d-text);   /* h1-h6, modal titles */
@@ -88,9 +88,9 @@
     --color-text-link-hover:  var(--color-primary-300);  /* link hover state (teal) */
     --color-text-code:        var(--d-text-2);           /* inline code, monospace */
     --color-text-inverse:     var(--color-grey-900);     /* text on light/colored bg */
-    --color-accent:           var(--color-primary-400);  /* brand accent — lighter shade for dark surfaces */
-    --color-sql-accent:       #A78BFA;                    /* SQL/query violet — lighter for dark surfaces */
-    /* Trace DAG node-type palette (dark) — lighter step per hue */
+    --color-accent:           var(--color-primary-400);  /* brand accent â€” lighter shade for dark surfaces */
+    --color-sql-accent:       #A78BFA;                    /* SQL/query violet â€” lighter for dark surfaces */
+    /* Trace DAG node-type palette (dark) â€” lighter step per hue */
     --color-dag-node-generation: #66bb6a;
     --color-dag-node-embedding:  #64b5f6;
     --color-dag-node-agent:      #ce93d8;
@@ -104,7 +104,7 @@
     --color-dag-node-guardrail:  #ef5350;
     --color-dag-node-event:      #ffd54f;
     --color-dag-node-default:    #9e9e9e;
-    /* Code syntax highlighting — GitHub dark palette */
+    /* Code syntax highlighting â€” GitHub dark palette */
     --color-syntax-bg:       #0d1117;
     --color-syntax-text:     #c9d1d9;
     --color-syntax-keyword:  #ff7b72;
@@ -124,7 +124,7 @@
     --color-chat-bubble-user: linear-gradient(135deg, #1e2235 0%, #252a3d 100%);
     --color-chat-bubble-ai:   linear-gradient(135deg, #2a2d47 0%, #1e213a 100%);
 
-    /* --- Surfaces (mapped — elevation order preserved from light mode) --- */
+    /* --- Surfaces (mapped â€” elevation order preserved from light mode) --- */
     --color-surface-base:         var(--d-base);    /* content card + table canvas (lifted) */
     --color-surface-panel:        var(--d-panel);   /* folder rails, cards, table-header base */
     --color-surface-overlay:      var(--d-overlay); /* dropdowns, dialogs, selects, popovers */
@@ -133,10 +133,10 @@
     --color-surface-chrome:        var(--d-chrome);  /* top bar + left rail */
     --color-surface-chrome-deeper: var(--d-chrome);  /* gutter behind card (same frame) */
 
-    /* --- Borders (mapped — solid, clearly visible) --- */
+    /* --- Borders (mapped â€” solid, clearly visible) --- */
     --color-border-default: var(--d-border);
     --color-border-strong:  var(--d-border-strong);
-    /* Soft divider — one step quieter than border-default so row/section
+    /* Soft divider â€” one step quieter than border-default so row/section
        splits don't read as hard structural lines (but still visible). */
     --color-border-subtle:  var(--d-divider);
 
@@ -189,7 +189,7 @@
     /* destructive */
     --color-button-destructive-focus-ring: var(--color-error-300);
 
-    /* ButtonGroup ΓÇö divider inherits from border-default override above */
+    /* ButtonGroup Î“Ã‡Ã¶ divider inherits from border-default override above */
 
     /* Dropdown */
     --color-dropdown-item-hover-bg: var(--color-primary-900);
@@ -223,7 +223,7 @@
     --color-field-list-actions-bg:     var(--color-surface-subtle);
     --color-field-list-expansion-bg:   var(--color-surface-subtle);
 
-    /* Badge — tokens that change on dark backgrounds */
+    /* Badge â€” tokens that change on dark backgrounds */
     /* default: brighten bg for contrast against dark panel backgrounds (grey-700 blends into grey-900) */
     --color-badge-default-solid-bg: var(--color-grey-500);
     --color-badge-default-solid-text: var(--color-grey-100);
@@ -232,13 +232,13 @@
     --color-badge-default-soft-bg: var(--color-grey-800);
     --color-badge-default-soft-text: var(--color-grey-300);
 
-    /* primary: brighten solid bg in dark mode — primary-600 on primary-800 (active tab) has near-zero contrast */
+    /* primary: brighten solid bg in dark mode â€” primary-600 on primary-800 (active tab) has near-zero contrast */
     --color-badge-primary-solid-bg: var(--color-primary-400);
     --color-badge-primary-ol-text: var(--color-primary-300);
     --color-badge-primary-soft-bg: var(--color-primary-900);
     --color-badge-primary-soft-text: var(--color-primary-300);
 
-    /* Keyboard-shortcut cheatsheet — reversed dark tint */
+    /* Keyboard-shortcut cheatsheet â€” reversed dark tint */
     --color-shortcut-highlight-bg: var(--color-primary-900);
 
     /* success: solid unchanged; outline text brightened (700 too dark on dark bg) */
@@ -313,16 +313,16 @@
     --color-badge-indigo-soft-bg: color-mix(in srgb, var(--color-indigo-400) 15%, transparent);
     --color-badge-indigo-soft-text: var(--color-indigo-400);
 
-    /* Button — ghost-warning / outline-warning (bright yellow for readability on dark bg) */
+    /* Button â€” ghost-warning / outline-warning (bright yellow for readability on dark bg) */
     --color-button-ghost-warning-text: var(--color-warning-400);
     --color-button-outline-warning-text: var(--color-warning-400);
     --color-button-outline-warning-border: var(--color-warning-500);
 
-    /* RefreshButton — staleness dot (slightly muted in dark mode) */
+    /* RefreshButton â€” staleness dot (slightly muted in dark mode) */
     --color-refresh-dot-stale: var(--color-warning-500);
     --color-refresh-dot-critical: var(--color-error-400);
 
-    /* Input (OInput, OTextarea) — bg matches the surface the field sits on
+    /* Input (OInput, OTextarea) â€” bg matches the surface the field sits on
        (border-only, like light mode where input-bg = surface-base) rather than
        a distinct lighter gray; disabled-bg uses --d-well so disabled fields
        still read as a clearly different, inert surface. */
@@ -334,7 +334,7 @@
     --color-input-error-text: var(--color-error-400);
     --color-input-border-error: var(--color-error-400);
 
-    /* Select (OSelect) — same surface-matching bg + disabled strategy as input. */
+    /* Select (OSelect) â€” same surface-matching bg + disabled strategy as input. */
     --color-select-bg: var(--color-surface-base);
     --color-select-border: var(--color-border-default);
     --color-select-disabled-bg: var(--d-well);
@@ -349,7 +349,7 @@
     --color-select-item-selected-text: var(--color-primary-200);
     --color-select-item-disabled: var(--color-text-disabled);
 
-    /* Switch (OSwitch) — same off-vs-on-vs-disabled differentiation as light
+    /* Switch (OSwitch) â€” same off-vs-on-vs-disabled differentiation as light
        mode. OFF uses primary outline + primary thumb (interactive signal).
        ON gets a primary-filled track + white thumb (handled in the Vue
        template). DISABLED stays grey + dashed so it's clearly distinct
@@ -369,7 +369,7 @@
     --color-checkbox-disabled-bg: var(--color-surface-subtle);
     --color-checkbox-disabled-border: var(--color-border-default);
 
-    /* Radio (ORadio) — same rationale as switch: primary outline by default
+    /* Radio (ORadio) â€” same rationale as switch: primary outline by default
        (signals interactivity), grey only when disabled. */
     --color-radio-bg: var(--color-surface-panel);
     --color-radio-border: var(--color-primary-500);
@@ -473,7 +473,7 @@
     --color-skeleton-base: var(--color-grey-700);
     --color-skeleton-highlight: var(--color-grey-600);
     --color-skeleton-shimmer: rgba(255, 255, 255, 0.07);
-    /* Datepicker inner border — quieter on dark surfaces */
+    /* Datepicker inner border â€” quieter on dark surfaces */
     --color-datepicker-inner-border: var(--color-grey-600);
 
     /* ProgressBar */
@@ -516,7 +516,7 @@
     --color-note-code:             var(--color-note-code-dark);
 }
 
-/* ── Theme-driven runtime tokens, dark mode (utils/theme.ts) ──
+/* â”€â”€ Theme-driven runtime tokens, dark mode (utils/theme.ts) â”€â”€
    See semantic.css for the light-mode defaults + rationale. */
 :root.dark,
 .dark :root,
@@ -544,7 +544,7 @@
   --color-status-success-bg: #253627;
 }
 
-/* ── Domain data-viz: label chips, dark mode ── */
+/* â”€â”€ Domain data-viz: label chips, dark mode â”€â”€ */
 :root.dark,
 .dark :root,
 .dark {
@@ -582,7 +582,7 @@
   --color-label-chip-pattern-text: #88ADF7;
 }
 
-/* ToggleGroup — primary variant dark overrides */
+/* ToggleGroup â€” primary variant dark overrides */
 .dark [data-variant="primary"] {
     --color-toggle-track-bg: var(--color-primary-900);
     --color-toggle-border: var(--color-primary-700);
@@ -591,7 +591,7 @@
     --color-toggle-item-active-text: var(--color-primary-200);
 }
 
-/* ── Toast (dark) ───────────────────────────────────────── */
+/* â”€â”€ Toast (dark) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .dark {
     --color-toast-success-bg:     color-mix(in srgb, var(--color-success-700) 25%, var(--color-grey-900));
     --color-toast-success-border: var(--color-success-700);
@@ -614,7 +614,7 @@
     --color-toast-action-text:    var(--color-primary-400);
     --color-toast-action-hover:   var(--color-primary-300);
 
-    /* ── OTable (dark) — pulled onto the elevation ladder ─── */
+    /* â”€â”€ OTable (dark) â€” pulled onto the elevation ladder â”€â”€â”€ */
     --color-table-header-bg: var(--d-overlay);          /* header band lifts off rows */
     --color-table-row-hover-bg: var(--d-hover);        /* neutral hover (not teal-washed) */
     --color-table-row-selected-bg: var(--d-selected);  /* teal-tinted selection */
@@ -625,22 +625,22 @@
     --color-table-streaming-bar: var(--color-primary-400);
     --color-table-row-expanded-bg: var(--d-overlay);
 }
-/* ── Domain data-viz & migrated color tokens — dark ── */
+/* â”€â”€ Domain data-viz & migrated color tokens â€” dark â”€â”€ */
 :root.dark,
 .dark :root,
 .dark {
   --color-actions-column-shawdow: rgba(125, 125, 125, 0.694);
   --color-bg-gray: color-mix(in srgb, var(--color-theme-accent) 5%, rgb(42, 42, 42));
-  /* Form field label — dark steps (exact hex the .o-input-label rules used:
+  /* Form field label â€” dark steps (exact hex the .o-input-label rules used:
      grey-200, and #c4c4c4 which has no palette equivalent). */
   --color-input-label-text: var(--color-grey-200);
   --color-input-label-text-disabled: #c4c4c4;
-  /* Global scrollbar treatment — dark steps (values unchanged from the raw
+  /* Global scrollbar treatment â€” dark steps (values unchanged from the raw
      palette refs that styles/base-elements.css replaced). */
   --color-scrollbar-thumb:       var(--color-grey-700);
   --color-scrollbar-thumb-hover: var(--color-grey-600);
   /* Lighter teal step so the VRL section bar stays visible on dark surfaces.
-     (--color-promo-* is deliberately NOT overridden — promo art is theme-independent.) */
+     (--color-promo-* is deliberately NOT overridden â€” promo art is theme-independent.) */
   --color-section-accent-secondary: var(--color-teal-400);
   --color-card-glass-border: rgba(255, 255, 255, 0.40);
   --color-card-glass-bg: var(--color-surface-base);
@@ -674,7 +674,6 @@
   --color-status-warning-text: #E37774;
   --color-sticky-col-header-bg: #565656;
   --color-tab-text-color: #FFFFFF;
-  --color-table-actions-bg: #1f2223;
   --color-trace-border: #5A5D63;
   --color-trace-hover: #393840;
   --color-trace-selected: #D4E2FF;
@@ -687,8 +686,8 @@
   --color-wildcard-bar-orange: #DB5C5C;
   --color-wildcard-bar-purple: #955AE0;
 
-  /* Field-type chips — dark treatment mirrors the label-chip families by hue
-     (darken pastel bg toward surface, lighten text 1–2 steps). §3.K.2 */
+  /* Field-type chips â€” dark treatment mirrors the label-chip families by hue
+     (darken pastel bg toward surface, lighten text 1â€“2 steps). Â§3.K.2 */
   --color-field-type-boolean-bg: #5E3838;   /* red family (cf. method chip) */
   --color-field-type-boolean-text: #F2B1AA;
   --color-field-type-float-bg: #2F2936;      /* purple family (cf. ts chip) */
@@ -700,13 +699,13 @@
   --color-field-type-timestamp-bg: #22264A;  /* blue family (cf. url chip) */
   --color-field-type-timestamp-text: #A1AFFF;
 
-  /* Service-health — lightened ~1 step for dark-surface contrast (like severity-*). §3.K.2 */
+  /* Service-health â€” lightened ~1 step for dark-surface contrast (like severity-*). Â§3.K.2 */
   --color-service-health-critical: #FF5A5A;
   --color-service-health-degraded: #FFC53D;
   --color-service-health-healthy: #73D13D;
   --color-service-health-warning: #FFA940;
 
-  /* Misc dark overrides. §3.K.2 */
+  /* Misc dark overrides. Â§3.K.2 */
   --color-cancel-query-bg: #7A3838;
   --color-highlight-bg: #747474;
   --color-icon-color: #5e5e5e;   /* merged: single icon token with a dark override */

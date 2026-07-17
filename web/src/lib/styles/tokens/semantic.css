@@ -1,5 +1,5 @@
-/* ============================================================
-   SEMANTIC TOKENS — maps base palette to intent/meaning
+﻿/* ============================================================
+   SEMANTIC TOKENS â€” maps base palette to intent/meaning
    Used directly in components for shared design decisions.
    ============================================================
    ARCHITECTURE (required for dark-mode + Tailwind prefix):
@@ -9,11 +9,11 @@
       unprefixed, so dark.css overrides apply correctly.
    ============================================================ */
 
-/* ── Light-mode defaults ─────────────────────────────────── */
+/* â”€â”€ Light-mode defaults â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 :root {
-  /* Text — grey-based semantic hierarchy */
+  /* Text â€” grey-based semantic hierarchy */
   --color-text-heading:     var(--color-grey-900);  /* h1-h6, modal titles */
-  --color-text-primary:     var(--color-grey-900);  /* alias for heading — backward compat */
+  --color-text-primary:     var(--color-grey-900);  /* alias for heading â€” backward compat */
   --color-text-body:        var(--color-grey-800);  /* paragraphs, default body */
   --color-text-secondary:   var(--color-grey-500);  /* supporting text, descriptions */
   --color-text-caption:     var(--color-grey-500);  /* captions, footnotes, timestamps */
@@ -21,7 +21,7 @@
   --color-text-muted:       var(--color-grey-300);  /* disabled, placeholder, de-emphasized */
   --color-text-disabled:    var(--color-grey-400);
   --color-text-placeholder: var(--color-grey-400);
-  --color-text-soft:        rgba(0, 0, 0, 0.75);   /* black at 75% — readable but not harsh */
+  --color-text-soft:        rgba(0, 0, 0, 0.75);   /* black at 75% â€” readable but not harsh */
   --color-text-link:        var(--color-primary-600);  /* clickable links */
   --color-text-link-hover:  var(--color-primary-700);  /* link hover state */
   --color-text-code:        var(--color-grey-700);     /* inline code, monospace */
@@ -33,10 +33,10 @@
   --color-surface-overlay: var(--color-white);
   --color-surface-subtle:       var(--color-grey-100);
   --color-surface-subtle-hover: var(--color-grey-200);
-  /* App chrome (top bar + side rail + the gutter behind the content card) — a
-     BARELY-tinted near-white (prototype --g-100 ≈ #F5F6F9), just a whisper of
+  /* App chrome (top bar + side rail + the gutter behind the content card) â€” a
+     BARELY-tinted near-white (prototype --g-100 â‰ˆ #F5F6F9), just a whisper of
      brand hue so the white content card floats on a calm backdrop. A strong
-     tint reads as "too bright". (Must live here in the .scss set the app loads —
+     tint reads as "too bright". (Must live here in the .scss set the app loads â€”
      the parallel .css set is NOT imported by the app, so a value defined only
      there leaves the token undefined and the chrome falls through to the body
      tint.) */
@@ -46,20 +46,20 @@
   /* Borders */
   --color-border-default: var(--color-grey-200);
   --color-border-strong:  var(--color-grey-400);
-  /* Soft divider — lighter than the structural border. Use for in-list row
-     dividers and intra-card section splits (HANDOFF.md §1.3 --border-soft). */
+  /* Soft divider â€” lighter than the structural border. Use for in-list row
+     dividers and intra-card section splits (HANDOFF.md Â§1.3 --border-soft). */
   --color-border-subtle:  var(--color-grey-150);
 
-  /* Overlay scrim — semi-transparent backdrop */
+  /* Overlay scrim â€” semi-transparent backdrop */
   --color-overlay-scrim: color-mix(in srgb, var(--color-grey-950) 50%, transparent);
 
-  /* Accent — brand-primary color for accent borders/icons/rings. Flips one
-     shade lighter in dark mode (600→400, see dark.css) so it stays legible
+  /* Accent â€” brand-primary color for accent borders/icons/rings. Flips one
+     shade lighter in dark mode (600â†’400, see dark.css) so it stays legible
      on dark surfaces. Replaces the legacy primary-color token. */
   --color-accent: var(--color-primary-600);
 }
 
-/* ── Register ALL semantic tokens for Tailwind utilities ── */
+/* â”€â”€ Register ALL semantic tokens for Tailwind utilities â”€â”€ */
 @theme inline {
   /* Text */
   --color-text-heading:     var(--color-text-heading);
@@ -96,7 +96,7 @@
   /* Accent */
   --color-accent: var(--color-accent);
 
-  /* White / black — register so text-white / bg-white / text-black / border-white
+  /* White / black â€” register so text-white / bg-white / text-black / border-white
      are backed by our tokens (identical #fff/#000) and keep compiling after the
      Phase-G default-palette removal. No component changes needed. */
   --color-white: var(--color-white);
@@ -124,7 +124,7 @@
   --color-error-600: var(--color-error-600);
   --color-error-700: var(--color-error-700);
 
-  /* Success (re-exports from base.css) — registered so text-success-* / bg-success-* compile */
+  /* Success (re-exports from base.css) â€” registered so text-success-* / bg-success-* compile */
   --color-success-50:  var(--color-success-50);
   --color-success-100: var(--color-success-100);
   --color-success-400: var(--color-success-400);
@@ -152,7 +152,7 @@
   --shadow-lg: var(--shadow-lg);
 }
 
-/* ── Theme-driven runtime tokens (set inline by utils/theme.ts) ──
+/* â”€â”€ Theme-driven runtime tokens (set inline by utils/theme.ts) â”€â”€
    Static values below are the light-mode DEFAULT theme; theme.ts
    overrides these via inline style when a custom accent color is
    picked or dark mode is active. Consolidates the legacy
@@ -183,7 +183,7 @@
   --color-status-success-bg: #F2FCF3;
 }
 
-/* ── Domain data-viz: label chips (field-value type chips) ──
+/* â”€â”€ Domain data-viz: label chips (field-value type chips) â”€â”€
    Domain label-chip palette (field-value type chips). See dark.css for dark
    overrides; component.css's @theme inline registers these for Tailwind. */
 :root {
@@ -221,19 +221,19 @@
   --color-label-chip-pattern-text: #2E55A3;
 }
 
-/* ── Legacy aliases (_legacy-variables.scss) ── */
+/* â”€â”€ Legacy aliases (_legacy-variables.scss) â”€â”€ */
 :root {
   --navbar-height: 36px;
 }
 
-/* ── Domain data-viz & migrated color tokens ── */
+/* â”€â”€ Domain data-viz & migrated color tokens â”€â”€ */
 :root {
   --color-actions-column-shawdow: rgba(0, 0, 0, 0.1);
   --color-bg-gray: color-mix(in srgb, var(--color-theme-accent) 10%, rgb(237, 237, 237));
   --color-card-glass-border: rgba(0, 0, 0, 0.12);
   --color-cancel-query-bg: #f67a7a;
   --color-highlight-bg: #e7e6e6;   /* syntax-guide highlight chip (dark: #747474) */
-  --color-brand-indigo: #5960B2;   /* brand indigo — loading bar, AI accents (theme-independent) */
+  --color-brand-indigo: #5960B2;   /* brand indigo â€” loading bar, AI accents (theme-independent) */
   --color-card-glass-bg: rgba(255, 255, 255, 0.8);
   --color-card-glass-solid: rgba(255, 255, 255);
   --color-dashboard-placeholder-bg: #B3BDF1;
@@ -252,7 +252,7 @@
   --color-focus-ring: #282D5D;
   --color-gray: #818594;
   /* AI-assistant identity accents (welcome hero + prompt chips). Same values in
-     both themes — translucent bgs sit fine on light and dark surfaces. */
+     both themes â€” translucent bgs sit fine on light and dark surfaces. */
   --color-ai-accent: #7B61FF;
   /* SQL / query-editor violet accent (stream-name label, sql status bar). Theme-aware:
      lighter in dark for legibility. */
@@ -265,7 +265,7 @@
   --color-lang-promql-bg: rgba(16, 185, 129, 0.12);
   /* Trace DAG node-type palette (LLM span types). ONE base color per type;
      at the call site border = base, bg = base@12% over surface, text = base
-     mixed toward the foreground. Dark values live in dark.css — the base flips,
+     mixed toward the foreground. Dark values live in dark.css â€” the base flips,
      so consumers need NO dark: variant. */
   --color-dag-node-generation: #4caf50;
   --color-dag-node-embedding:  #2196f3;
@@ -280,7 +280,7 @@
   --color-dag-node-guardrail:  #f44336;
   --color-dag-node-event:      #ffc107;
   --color-dag-node-default:    #9e9e9e;
-  /* Code syntax highlighting (highlight.js) — GitHub light palette. Shared by
+  /* Code syntax highlighting (highlight.js) â€” GitHub light palette. Shared by
      O2AIChat + OCodeBlock; dark values in dark.css so one rule covers both themes. */
   --color-syntax-bg:       #f6f8fa;
   --color-syntax-text:     #24292e;
@@ -296,7 +296,7 @@
   --color-syntax-addition-bg: #f0fff4;
   --color-syntax-deletion-fg: #b31d28;
   --color-syntax-deletion-bg: #ffeef0;
-  /* Brand gradients — theme-independent (same in light/dark) unless noted.
+  /* Brand gradients â€” theme-independent (same in light/dark) unless noted.
      One AI gradient reused across ~40 sites; -subtle/-faint are its idle washes
      (dark alpha bumped in dark.css). */
   --color-gradient-ai:        linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%);
@@ -306,7 +306,7 @@
   --color-gradient-notification: linear-gradient(135deg, #ef4444 0%, #ec4899 100%);
   --color-gradient-danger:       linear-gradient(135deg, #f56565 0%, #e53e3e 100%);
   --color-gradient-danger-hover: linear-gradient(135deg, #e53e3e 0%, #c53030 100%);
-  /* External brand colors (destination-preview CTAs, promo banner) — fixed,
+  /* External brand colors (destination-preview CTAs, promo banner) â€” fixed,
      theme-independent by design (replicate other products' brands). */
   --color-brand-slack:        #007a5a;
   --color-brand-slack-hover:  #005a42;
@@ -316,7 +316,7 @@
   --color-brand-email-hover:  #0056b3;
   --color-promo-webinar-link:       #1e3a8a;
   --color-promo-webinar-link-hover: #1e40af;
-  /* Home-banner accent (D13 promo art — theme-independent, matches the amber
+  /* Home-banner accent (D13 promo art â€” theme-independent, matches the amber
      header top-bar). `-accent` is decorative only (gradient wash, border tint,
      blur blobs, badge dot); `-accent-text` is the darker step the badge LABEL
      needs to stay legible on the near-white banner. */
@@ -331,10 +331,10 @@
      deliberately DIFFERENT hue; this token carries that distinction (it rode on
      Quasar's teal --q-secondary until Quasar was removed). Dark step in dark.css. */
   --color-section-accent-secondary: var(--color-teal-600);
-  /* AI-chat message bubbles — subtle theme-aware gradient tints (dark in dark.css). */
+  /* AI-chat message bubbles â€” subtle theme-aware gradient tints (dark in dark.css). */
   --color-chat-bubble-user: linear-gradient(135deg, #f0f4ff 0%, #e8f0fe 100%);
   --color-chat-bubble-ai:   linear-gradient(135deg, #f8f9ff 0%, #e8edff 100%);
-  /* Destination-preview brand replicas (Slack/Teams/Email message mockups) —
+  /* Destination-preview brand replicas (Slack/Teams/Email message mockups) â€”
      FIXED, theme-independent (must look like the real product in any app theme). */
   --color-brand-msg-text: #4a5568;
   --color-brand-msg-meta: #6c757d;
@@ -388,7 +388,6 @@
   --color-status-warning-text: #E56D17;
   --color-sticky-col-header-bg: #E0E0E0;
   --color-tab-text-color: #19191E;
-  --color-table-actions-bg: white;
   --color-trace-border: #E8ECF0;
   --color-trace-hover: #F7F8FA;
   --color-trace-selected: #F5F8FE;
