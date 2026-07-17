@@ -13,9 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use ::common::infra::wal;
 use config::{cache_instance_id, ider};
 
-use crate::{common::infra::wal, service::db::metas};
+use crate::service::db::metas;
 
 pub async fn init() -> Result<(), anyhow::Error> {
     let instance_id = match metas::instance::get().await {

@@ -93,6 +93,16 @@ pub mod common {
         pub use ::common::meta::*;
 
         pub use crate::service::ingestion_types as ingestion;
+
+        /// Lives here rather than in the `common` crate so that `common` does not
+        /// depend on the `search` crate.
+        pub mod search {
+            pub use ::search::{
+                AuditContext, CAPPED_RESULTS_MSG, CacheQueryRequest, CachedQueryResponse,
+                MultiCachedQueryResponse, QueryDelta, ResultCacheSelectionStrategy,
+                SearchResultType, SortStrategy,
+            };
+        }
     }
 
     pub mod infra {

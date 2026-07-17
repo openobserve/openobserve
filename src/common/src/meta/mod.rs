@@ -23,7 +23,6 @@ pub mod middleware_data;
 pub mod organization;
 pub mod proxy;
 pub mod saved_view;
-pub mod search;
 pub mod service;
 pub mod service_account;
 pub mod stream;

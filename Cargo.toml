@@ -272,7 +272,7 @@ flight = { path = "src/flight" }
 tantivy_utils = { path = "src/tantivy_utils" }
 web = { path = "src/web" }
 openobserve-core = { path = "src/core" }
-common = { path = "src/common" }
+common = { path = "src/common", package = "openobserve-common" }
 openobserve-vrl = { path = "src/vrl" }
 search = { path = "src/search" }
 promql = { path = "src/promql" }

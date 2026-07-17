@@ -1,5 +1,5 @@
 [package]
-name = "common"
+name = "openobserve-common"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -27,7 +27,6 @@ anyhow.workspace = true
 bytes.workspace = true
 chrono.workspace = true
 dashmap.workspace = true
-datafusion.workspace = true
 arrow-schema.workspace = true
 hashbrown.workspace = true
 jsonwebtoken.workspace = true
@@ -42,7 +41,6 @@ prost.workspace = true
 regex.workspace = true
 reqwest.workspace = true
 rquickjs.workspace = true
-search.workspace = true
 segment.workspace = true
 serde.workspace = true
 serde_json.workspace = true
