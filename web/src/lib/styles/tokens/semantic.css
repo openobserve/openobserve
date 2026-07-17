@@ -95,11 +95,16 @@
   /* Accent */
   --color-accent: var(--color-accent);
 
-  /* White / black â€” register so text-white / bg-white / text-black / border-white
-     are backed by our tokens (identical #fff/#000) and keep compiling after the
-     Phase-G default-palette removal. No component changes needed. */
+  /* White / black / transparent / current / inherit — Tailwind ships these as
+     --color-* theme keys, so the Phase-G `--color-*: initial` reset (palette-reset.css)
+     wipes them too. Re-register here so bg-white/text-black/bg-transparent/
+     border-transparent/text-current/text-inherit keep compiling (119 bg-transparent,
+     59 text-white, 33 border-transparent, 14 text-inherit … in use). */
   --color-white: var(--color-white);
   --color-black: var(--color-black);
+  --color-transparent: transparent;
+  --color-current: currentColor;
+  --color-inherit: inherit;
 
   /* Brand neutral scale (re-exports from base.css).
      Registered to close a documented trap: these were defined but never

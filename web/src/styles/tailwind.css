@@ -1,5 +1,8 @@
 @import "tailwindcss";
 @import "tw-animate-css";
+/* Phase G — clear Tailwind's built-in colour palette BEFORE our tokens load, so
+   only registered design tokens generate colour utilities (see the file header). */
+@import "./palette-reset.css";
 /* Design tokens — all SCSS files removed; these 4 CSS files are the sole source. */
 @import "../lib/styles/tokens/base.css";
 @import "../lib/styles/tokens/semantic.css";

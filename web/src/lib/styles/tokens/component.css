@@ -1729,6 +1729,72 @@
   /* Domain tokens (Â§3.K.4) */
   --color-highlight-bg: var(--color-highlight-bg);
   --color-brand-indigo: var(--color-brand-indigo);
+
+  /* Ring-3 categorical shades consumed as utilities by the RUM event-type badges
+     (useEventFormatters.ts: action=blue, resource=purple). Registered so these
+     survive the Phase-G default-palette removal — the values equal Tailwind's, so
+     no visual change. red/green there map to the error/success ramps instead. */
+  --color-blue-100: var(--color-blue-100);
+  --color-blue-300: var(--color-blue-300);
+  --color-blue-700: var(--color-blue-700);
+  --color-purple-100: var(--color-purple-100);
+  --color-purple-400: var(--color-purple-400);
+}
+
+/* â”€â”€ Tier 0.3 (DESIGN_TOKEN_STANDARD Part D) â”€â”€
+   Register defined-but-unregistered SOLID domain tokens so they generate real
+   Tailwind bg / text / border utilities instead of forcing arbitrary var()
+   usage in style blocks. Excludes raw palette ramps (Phase G territory), gradient
+   values (would emit invalid background-color), the dead note chain, runtime span
+   colours, and info-* (merged into blue-* in Tier 1). */
+@theme inline {
+  --color-brand-email-accent: var(--color-brand-email-accent);
+  --color-brand-email-ink: var(--color-brand-email-ink);
+  --color-brand-email-ink-deep: var(--color-brand-email-ink-deep);
+  --color-brand-email-warning: var(--color-brand-email-warning);
+  --color-brand-msg-bg: var(--color-brand-msg-bg);
+  --color-brand-msg-border: var(--color-brand-msg-border);
+  --color-brand-msg-border-2: var(--color-brand-msg-border-2);
+  --color-brand-msg-divider: var(--color-brand-msg-divider);
+  --color-brand-msg-error: var(--color-brand-msg-error);
+  --color-brand-msg-meta: var(--color-brand-msg-meta);
+  --color-brand-msg-text: var(--color-brand-msg-text);
+  --color-brand-msg-text-dark: var(--color-brand-msg-text-dark);
+  --color-brand-msg-text-strong: var(--color-brand-msg-text-strong);
+  --color-brand-slack-aubergine: var(--color-brand-slack-aubergine);
+  --color-brand-slack-avatar: var(--color-brand-slack-avatar);
+  --color-brand-slack-green: var(--color-brand-slack-green);
+  --color-brand-slack-link: var(--color-brand-slack-link);
+  --color-brand-slack-meta: var(--color-brand-slack-meta);
+  --color-brand-slack-text: var(--color-brand-slack-text);
+  --color-brand-teams-bg: var(--color-brand-teams-bg);
+  --color-brand-teams-ink: var(--color-brand-teams-ink);
+  --color-brand-teams-text: var(--color-brand-teams-text);
+  --color-dag-node-agent: var(--color-dag-node-agent);
+  --color-dag-node-chain: var(--color-dag-node-chain);
+  --color-dag-node-default: var(--color-dag-node-default);
+  --color-dag-node-embedding: var(--color-dag-node-embedding);
+  --color-dag-node-evaluator: var(--color-dag-node-evaluator);
+  --color-dag-node-event: var(--color-dag-node-event);
+  --color-dag-node-generation: var(--color-dag-node-generation);
+  --color-dag-node-guardrail: var(--color-dag-node-guardrail);
+  --color-dag-node-rerank: var(--color-dag-node-rerank);
+  --color-dag-node-retriever: var(--color-dag-node-retriever);
+  --color-dag-node-task: var(--color-dag-node-task);
+  --color-dag-node-tool: var(--color-dag-node-tool);
+  --color-dag-node-workflow: var(--color-dag-node-workflow);
+  --color-dashboard-placeholder-bg: var(--color-dashboard-placeholder-bg);
+  --color-hover-shadow: var(--color-hover-shadow);
+  --color-pivot-header-border: var(--color-pivot-header-border);
+  --color-scrollbar-thumb: var(--color-scrollbar-thumb);
+  --color-scrollbar-thumb-hover: var(--color-scrollbar-thumb-hover);
+  --color-theme-body-bg-secondary: var(--color-theme-body-bg-secondary);
+  --color-theme-header-menu-bg: var(--color-theme-header-menu-bg);
+  --color-theme-menu-color: var(--color-theme-menu-color);
+  --color-theme-menu-gradient-end: var(--color-theme-menu-gradient-end);
+  --color-theme-menu-gradient-start: var(--color-theme-menu-gradient-start);
+  --color-theme-tab-bg-inactive: var(--color-theme-tab-bg-inactive);
+  --color-theme-table-header-bg: var(--color-theme-table-header-bg);
 }
 
 /* â”€â”€ Tier 0.3 (DESIGN_TOKEN_STANDARD Part D) â”€â”€

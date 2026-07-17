@@ -1,0 +1,28 @@
+/* ============================================================
+   PHASE G — the structural lock (DESIGN_TOKEN_STANDARD §F.5)
+   ============================================================
+   Tailwind v4 ships a full built-in colour palette (--color-red-500,
+   --color-gray-400, --color-blue-100, …). Those generate utilities
+   (bg-red-500, text-gray-400 …) that bypass the design-token system —
+   un-themed, invisible to dark mode, and impossible to retheme.
+
+   This block clears the ENTIRE --color-* theme namespace. It is imported
+   AFTER `tailwindcss` but BEFORE the token files (base/semantic/component),
+   so Tailwind's defaults are removed here and only OUR registered tokens
+   (re-added by the `@theme inline` blocks in those files, which run later in
+   source order) survive. Net effect: `bg-gray-400` / `text-red-500` no longer
+   compile to anything — a raw-palette class becomes structurally impossible,
+   not merely lint-discouraged. `bg-surface-base`, `text-text-heading`,
+   `bg-primary-600`, `bg-grey-500`, `bg-transparent`, `text-white` etc. are all
+   re-registered downstream and keep working.
+
+   Prerequisite handled before flipping this on: the only production file that
+   used Tailwind-default palette utilities (useEventFormatters.ts) was migrated
+   to project tokens, and white/black/transparent/current/inherit +
+   the RUM-badge categorical shades were explicitly re-registered.
+
+   REVERT: delete this file and its @import in styles/tailwind.css.
+   ============================================================ */
+@theme {
+  --color-*: initial;
+}

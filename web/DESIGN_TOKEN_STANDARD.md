@@ -1,9 +1,10 @@
 # OpenObserve Design-Token Standard & Canonical Allow-List
 
 > **Date:** 2026-07-17 (execution log 2026-07-18) · **Branch:** `fix/token` · **Scope:** `web/`
-> **Status:** Tiers 0–1 + safe hygiene of Tier 3 **EXECUTED** (see the Execution Status
-> section below). Tier 2 and the Phase-G lock remain — they are design-gated or need a
-> full visual-regression pass.
+> **Status:** Tiers 0–1, the **Phase-G structural lock (3.20)**, and safe Tier 3 hygiene
+> **EXECUTED** (see the Execution Status section below). What remains of Tier 2 (the coupled
+> vocab + `component.css` rewire, brand-architecture decision) and Tier 3 (traceColors
+> token-derivation, chart burn-down, `utilities.css`) is design-gated or needs a human visual pass.
 >
 > **What you asked for:** *"Check all token usage. Goal: tokens we can change and see the change
 > across the whole app — text size, text colour, colours, border, corner radius (and anything else
@@ -52,18 +53,36 @@ gone; `--color-primary-950` now JS-generated under a custom theme).
   `--leading-xs` / `--tracking-tighter` / `--font-black`; corrected the `traceColors.ts` docstring.
   Token count **1052 → 1020**.
 
-**⏳ NOT shipped — design-gated or needs a full visual-regression pass (Tier 2 + rest of Tier 3):**
-- **Tier 2.11-2.16** — growing the interaction-state semantic vocabulary and rewiring
-  `component.css`'s ~301 base-palette refs through it; the **brand-colour architecture decision**
-  (runtime engine vs. token files); dark overrides for the 45 semantic-annex/brand tokens (the
-  brand-\* replicas are *intentionally* theme-independent — changing them is a design call);
-  minting overlay/soft + chart-palette token sets; and un-registering the raw base palette.
-- **Tier 3.18-3.20** — deriving `traceColors.ts` hex from the tokens (changes rendered trace
-  colours); the 70-file chart-hex → `chartColor()` burn-down (those files are *sanctioned* by the
-  `tsHex` allowlist); dismantling `utilities.css`; and the **Phase-G `@theme { --color-*: initial }`
-  lock**, which the audit itself gates behind handling all residual raw-palette compile
-  dependencies and which needs a whole-app visual pass to land safely. The now-per-PR design
-  ratchet already prevents new raw-palette debt in the meantime.
+**✅ Shipped — Phase G, the structural lock (Tier 3.20):**
+- Migrated the one production file that used Tailwind's default palette
+  (`useEventFormatters.ts`: red→error, green→success, gray→text-secondary; blue/purple kept —
+  our ramps equal Tailwind's) and updated its spec; re-registered `transparent`/`current`/
+  `inherit` (+ existing white/black) and the RUM-badge categorical shades so they survive the reset.
+- Added **`styles/palette-reset.css`** (`@theme { --color-*: initial }`) imported after Tailwind,
+  before the token files, and wired it in `tailwind.css`. Tailwind's built-in colour palette
+  (`bg-gray-400`, `text-red-500`, …) now **no longer compiles** — a raw-palette class is
+  structurally impossible, not merely lint-discouraged. **Verified live** in the dev server:
+  `--color-red-500`/`--color-gray-400` gone; every project token + `bg-transparent`/`text-white`/
+  the RUM chips still resolve; **prose** stays coloured (the typography plugin inlines its own
+  oklch defaults, so it does not depend on the killed gray keys); Home + Logs render correctly in
+  **both light and dark**; 0 console errors; 317 tests pass.
+
+**⏳ Still not shipped — genuinely blocked, not merely deferred (rest of Tier 2 + hygiene):**
+These would either violate the standard's own D18 "only create what's used" rule if done partially,
+or change rendered output in ways no automated check can verify:
+- **Tier 2.11/2.12/2.15** — the interaction-state vocab + the ~301-ref `component.css` rewire are a
+  single coupled refactor: adding the vocab alone creates unused tokens (D18), and the rewire is
+  **not** a value-preserving alias (e.g. routing a button-bg through `--color-accent` would flip it
+  from `primary-600`→`primary-400` in dark). Needs per-token design decisions. Minting overlay/soft
+  token sets is the same trap without migrating the ~360 rgba sites.
+- **Tier 2.13/2.14** — the brand-colour architecture decision and dark overrides for the brand-\*
+  replicas: those tokens are *intentionally* theme-independent (they must look like the real
+  Slack/Teams/Email in any theme), so adding dark treatment is a product decision. The concrete
+  brand bug (`primary-950`) was already fixed in Tier 0.
+- **Tier 3.18/3.19** — deriving `traceColors.ts` hex from the tokens changes rendered trace
+  colours; the 70-file chart-hex → `chartColor()` burn-down is on files *sanctioned* by the `tsHex`
+  allowlist (hex in ECharts JS, unaffected by Phase G); dismantling `utilities.css` has a 103-file
+  blast radius. All need a human visual pass, not a mechanical edit.
 
 Correction found during execution: `--text-3xl` (7 uses) and `--text-4xl` (3 uses) are **not**
 dead (the audit's §8.1 "0 uses" was stale) — kept.
