@@ -673,13 +673,16 @@ describe("useMetricsExplorerGrid", () => {
         return i >= INITIAL_PAGE_SIZE && i < INITIAL_PAGE_SIZE + 24;
       };
 
-      // The first page renders unqueried, so a click asks for 12 more on top.
+      // The first page renders unqueried, so a click asks for PAGE_SIZE_INCREMENT
+      // more on top.
       expect(grid.pagedCards.value).toHaveLength(INITIAL_PAGE_SIZE);
       const target = INITIAL_PAGE_SIZE + PAGE_SIZE_INCREMENT;
 
       const done = grid.showMore();
-      // Drive each look-ahead batch's queries as showMore pulls them.
-      for (let i = 0; i < 12; i++) {
+      // Drive each look-ahead batch's queries as showMore pulls them. A generous
+      // fixed number of flushes — this is the harness draining batches, not the
+      // increment, so it must not be tied to PAGE_SIZE_INCREMENT.
+      for (let i = 0; i < 24; i++) {
         await flush();
         // Mid-flight the budget is untouched: the look-ahead resolves BEFORE
         // the commit, so the grid grows once — not batch by batch — and the

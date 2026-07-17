@@ -87,8 +87,8 @@ const grid = vi.hoisted(() => {
 
 vi.mock("@/composables/metrics/useMetricsExplorerGrid", () => ({
   default: () => grid,
-  INITIAL_PAGE_SIZE: 30,
-  PAGE_SIZE_INCREMENT: 12,
+  INITIAL_PAGE_SIZE: 8,
+  PAGE_SIZE_INCREMENT: 6,
 }));
 
 // Keep the real vuex (src/stores/index.ts calls createStore at import time);

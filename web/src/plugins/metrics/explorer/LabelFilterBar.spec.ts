@@ -509,6 +509,18 @@ describe("LabelFilterBar", () => {
       expect(hint(wrapper).classes()).toContain("pointer-events-none");
     });
 
+    it("yields its width rather than pushing + Filter along the row", () => {
+      wrapper = createWrapper({ filters: [] });
+      const classes = hint(wrapper).classes();
+
+      // The shared typewriter rule is `nowrap` + `ellipsis`, which only clips
+      // once something BOUNDS the width. Without these the hint took its full
+      // intrinsic width and shoved the button — the hint must always be what
+      // gives, never the control.
+      expect(classes).toContain("min-w-0");
+      expect(classes).toContain("overflow-hidden");
+    });
+
     it("yields the row once a filter exists — the chips are what the row is for", () => {
       wrapper = createWrapper({
         filters: [{ label: "pod", operator: "=", value: "api-1" }],

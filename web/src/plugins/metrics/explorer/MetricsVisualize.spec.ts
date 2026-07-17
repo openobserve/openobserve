@@ -42,13 +42,22 @@ vi.mock("@/composables/dashboard/useDashboardPanel", () => ({
   }),
 }));
 
+/** The stub's runQuery — the real PanelEditor exposes one, so the stub must too. */
+const editorRunQuery = vi.hoisted(() => vi.fn());
+
 // The real PanelEditor pulls in ECharts + the whole dashboard config surface;
 // none of that is what this container's own logic needs. Stub it, but keep its
-// emit so the add-to-dashboard handshake can be driven.
+// emit so the add-to-dashboard handshake can be driven, and EXPOSE runQuery —
+// the container drives the chart through `panelEditorRef.runQuery()`, so a stub
+// without it makes the auto-run silently no-op and the test prove nothing.
 vi.mock("@/components/dashboards/PanelEditor", () => ({
   PanelEditor: {
     name: "PanelEditor",
     emits: ["add-to-dashboard", "chart-api-error"],
+    setup: (_: any, { expose }: any) => {
+      expose({ runQuery: editorRunQuery });
+      return {};
+    },
     template:
       '<div data-test="panel-editor-stub"><button data-test="stub-add" @click="$emit(\'add-to-dashboard\')" /></div>',
   },
@@ -82,8 +91,9 @@ vi.mock("vuex", () => ({
 
 import MetricsVisualize from "./MetricsVisualize.vue";
 
-const mountVisualize = () =>
+const mountVisualize = (props: Record<string, any> = {}) =>
   mount(MetricsVisualize, {
+    props,
     global: {
       stubs: {
         // any leftover global component; PanelEditor + AddToDashboard are mocked
@@ -137,5 +147,73 @@ describe("MetricsVisualize", () => {
     expect(
       wrapper.findComponent({ name: "AddToDashboard" }).props("open"),
     ).toBe(false);
+  });
+
+  /**
+   * Opening a card in Visualize must PAINT the metric, not hand the user a fully
+   * populated query bar above a blank chart and make them press Refresh to see
+   * the thing they just clicked.
+   */
+  describe("a seeded open runs its query", () => {
+    const SEED = {
+      type: "line",
+      queryType: "promql",
+      queries: [
+        {
+          query: "avg(rate(apiserver_admission_webhook_request_total{}[5m]))",
+          customQuery: true,
+          fields: { stream: "apiserver_admission_webhook_request_total" },
+        },
+      ],
+      config: {},
+    };
+
+    it("fires the query for a card's Open", async () => {
+      const wrapper = mountVisualize({
+        seed: SEED,
+        selectedDateTime: { startTime: 1000, endTime: 2000 },
+      });
+      await flushPromises();
+      await flushPromises();
+
+      expect(editorRunQuery).toHaveBeenCalled();
+      wrapper.unmount();
+    });
+
+    it("still fires when the parent nulls the seed on `seed-consumed` (as it really does)", async () => {
+      // The REAL parent binds `@seed-consumed="visualizeSeed = null"`, and the
+      // emit happens in the child's `onBeforeMount` — so the prop is already
+      // gone by `onMounted`. Reproduce that exactly: a parent that nulls the
+      // seed the instant the child asks it to. Mounting the child alone and
+      // calling setProps afterwards is TOO LATE to catch this — the mutant
+      // survives it.
+      const Parent = {
+        components: { MetricsVisualize },
+        data: () => ({ seed: SEED as any }),
+        template:
+          '<MetricsVisualize :seed="seed" :selected-date-time="{ startTime: 1000, endTime: 2000 }" @seed-consumed="seed = null" />',
+      };
+
+      const wrapper = mount(Parent);
+      await flushPromises();
+      await flushPromises();
+
+      // The component must remember it WAS seeded rather than re-read the prop.
+      expect(editorRunQuery).toHaveBeenCalled();
+      wrapper.unmount();
+    });
+
+    it("does NOT fire for a blank Visualize — there is no query to run", async () => {
+      const wrapper = mountVisualize({
+        selectedDateTime: { startTime: 1000, endTime: 2000 },
+      });
+      await flushPromises();
+      await flushPromises();
+
+      // Entering the tab directly just sets the window and waits for the user to
+      // build a query; querying an empty panel would be a guaranteed error.
+      expect(editorRunQuery).not.toHaveBeenCalled();
+      wrapper.unmount();
+    });
   });
 });

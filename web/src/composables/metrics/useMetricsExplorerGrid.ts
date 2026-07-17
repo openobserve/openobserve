@@ -206,15 +206,20 @@ const PREVIEW_STATE_LIMIT = 300;
 /**
  * Page one holds this many cards; "Show more" reveals another increment.
  *
- * The page size is not a rendering budget — the grid is row-virtualised, so only
- * ~10 cards are ever in the DOM regardless — and it is not an upfront query
- * budget either, since a card only queries once it scrolls within a viewport of
- * the window. What it IS is a cap on how much an idle scroll can cost: a user
- * flicking down the page will query every card they pass, so the page size sets
- * the ceiling on that. 30 keeps a casual scroll cheap; anyone who actually wants
- * more is one click away.
+ * This IS an upfront query budget, whatever an earlier version of this comment
+ * claimed. `hideEmptyPanels` defaults on, and emptiness is only knowable by
+ * asking, so `sweepSlice` queries the WHOLE slice on load — not just what is on
+ * screen. At 30 that was 30 PromQL range queries before the user had done
+ * anything, against a backend that already times out on heavy metrics, and most
+ * of the answers were thrown away: a typical org hides two thirds of them as
+ * empty and renders ~11.
+ *
+ * 8 is four rows of the 2-up grid — a bit more than a screenful, so page one
+ * still fills once the empties are dropped, and a click costs another six.
+ * Divides evenly by both column counts the grid uses (2, and 1 when narrow), so
+ * no row is ever left half-empty at the fold.
  */
-export const INITIAL_PAGE_SIZE = 30;
+export const INITIAL_PAGE_SIZE = 8;
 
 /**
  * How long the slice must hold still before we query what is in it. Long enough
@@ -222,8 +227,18 @@ export const INITIAL_PAGE_SIZE = 30;
  * enough that it feels like part of the same paint.
  */
 export const SWEEP_DEBOUNCE_MS = 250;
-/** Four rows of the 3-up grid per click. */
-export const PAGE_SIZE_INCREMENT = 12;
+/**
+ * Cards revealed per "Show more" click — three rows of the 2-up grid.
+ *
+ * Was 12, from when the grid was 3-up (four rows). At 2 columns that reveals six
+ * rows at once: more than a screenful, so the user loses their place and pays for
+ * a batch of queries they did not ask to see. Six lands just past the fold, which
+ * is what makes the click feel like "a bit more" rather than "a whole new page".
+ *
+ * The button's label is computed from this constant, so it always tells the truth
+ * about what a click will do.
+ */
+export const PAGE_SIZE_INCREMENT = 6;
 
 /** Cards are ~40-60 points wide; a coarse step keeps preview responses tiny. */
 const PREVIEW_POINTS = 50;

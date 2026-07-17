@@ -282,14 +282,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          out of the way the moment there is a chip or an open picker. -->
     <span
       v-if="step === 'idle' && !filters.length"
-      class="query-editor-placeholder-overlay min-w-0 pointer-events-none select-none"
+      class="query-editor-placeholder-overlay min-w-0 flex-1 overflow-hidden pointer-events-none select-none"
       aria-hidden="true"
       data-test="metrics-explorer-label-hint"
     >
       <!-- The SAME element the Logs placeholder types into (tailwind.css:75), so
            the font, size and colour are the one shared rule rather than a second
-           opinion on it. -->
-      <span class="query-editor-placeholder-typewriter">{{ filterHint }}</span>
+           opinion on it.
+
+           `flex-1 min-w-0 overflow-hidden` on the wrapper, and `block` here: the
+           shared rule is `nowrap` + `ellipsis`, which only clips once something
+           BOUNDS the width. As a bare inline flex item it took its full intrinsic
+           width instead and pushed `+ Filter` along the row — the hint is the one
+           thing here that must yield, never the control. -->
+      <span class="query-editor-placeholder-typewriter block">{{
+        filterHint
+      }}</span>
     </span>
 
     <OButton

@@ -153,12 +153,24 @@ export default defineComponent({
       dashboardPanelData.layout.currentQueryIndex = 0;
     };
 
+    /**
+     * Whether THIS mount was seeded — captured here, not re-read from the prop.
+     *
+     * `seed-consumed` makes the parent null `visualizeSeed` immediately, so by
+     * `onMounted` the prop is already gone. Asking `props.seed` there always said
+     * "no seed", and the auto-run silently never fired: the user landed on a
+     * fully-populated query bar with a blank chart, having to press Refresh to
+     * see the very metric they just clicked.
+     */
+    let seededOnMount = false;
+
     // BEFORE the PanelEditor child mounts (matches the metrics editor route): if
     // it mounts first, it initialises an empty query area and a later assign does
     // not reflect into the already-built query bar.
     onBeforeMount(() => {
       if (props.seed) {
         applySeed(props.seed);
+        seededOnMount = true;
         emit("seed-consumed");
       } else {
         applyMetricsDefaults();
@@ -218,7 +230,9 @@ export default defineComponent({
     // mount so its exposed runQuery is available.
     onMounted(async () => {
       applyDateTime();
-      if (!props.seed) return;
+      // `seededOnMount`, NOT `props.seed` — the prop is already null by now; see
+      // its declaration.
+      if (!seededOnMount) return;
       // Two ticks: the first lets PanelEditor mount, the second lets ITS own
       // watchers settle so `panelEditorRef.runQuery` is exposed and the panel
       // state it reads is committed. One tick fires before the ref is populated
