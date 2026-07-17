@@ -262,32 +262,32 @@ impl MemorySize for NodeData {
 
 impl NodeData {
     pub fn is_pipeline_node(&self) -> bool {
-        match self {
+        matches!(
+            self,
             Self::RemoteStream(_)
-            | Self::Stream(_)
-            | Self::Query(_)
-            | Self::Function(_)
-            | Self::Condition(_)
-            | Self::LlmEvaluation(_) => true,
-            _ => false,
-        }
+                | Self::Stream(_)
+                | Self::Query(_)
+                | Self::Function(_)
+                | Self::Condition(_)
+                | Self::LlmEvaluation(_)
+        )
     }
     pub fn is_workflow_node(&self) -> bool {
-        match self {
+        matches!(
+            self,
             Self::WorkflowTrigger
-            | Self::Query(_)
-            | Self::Function(_)
-            | Self::Condition(_)
-            | Self::Destination(_) => true,
-            _ => false,
-        }
+                | Self::Query(_)
+                | Self::Function(_)
+                | Self::Condition(_)
+                | Self::Destination(_)
+        )
     }
 
     pub fn is_a_leaf_node(&self) -> bool {
-        match self {
-            Self::Stream(_) | Self::RemoteStream(_) | Self::Destination(_) => true,
-            _ => false,
-        }
+        matches!(
+            self,
+            Self::Stream(_) | Self::RemoteStream(_) | Self::Destination(_)
+        )
     }
 }
 
