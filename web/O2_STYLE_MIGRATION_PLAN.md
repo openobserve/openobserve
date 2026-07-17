@@ -1,8 +1,8 @@
 # O2 Style Migration — Style Blocks → Tailwind & Token-Layer Class Evacuation
 
-> **Status (2026-07-17): P0 ✅ · PQ ✅ · PQ2 ✅ · W1 (a–e) ✅ · W2.a ✅ · W2.b.1 ✅ · W2.c ✅ ·
-> global evacuation ✅ · W2.d guard ✅. Remaining: utilities.css legacy ladder + the final
-> zero-tolerance flips — see §15.**
+> **Status (2026-07-17): COMPLETE except the final zero-tolerance flips.**
+> P0 ✅ · PQ ✅ · PQ2 ✅ · W1 (a–e) ✅ · W2.a ✅ · W2.b.1 ✅ · W2.c ✅ · global evacuation ✅ ·
+> W2.d guard ✅ · **`utilities.css` DELETED ✅ · `keyframes.css` 19→3 ✅** — see **§16**.
 > **Token layer is pure** (`lint:token-purity` zero-tolerance). **`lint:design` GREEN.**
 > **`unscopedStyle` 204 → 10** (7 files, every one carrying a `keep()` justification).
 > Execution logs: §10–§12 · status audit §13 · session log §14 · **final state + remaining work §15**.
@@ -999,3 +999,103 @@ stash-testing). **No test was deleted, skipped, or weakened to a no-op** — sev
 Latent hazard worth fixing separately: `useMetricsExplorerGrid.spec` leaks debounced sweeps between
 tests (no `beforeEach` cancel), and `SyntaxGuide`'s portal teardown shows the same class of problem.
 Two specs were passing **only** because of cross-test pollution.
+
+---
+
+## 16. utilities.css DELETED · keyframes.css 19 → 3 (2026-07-17)
+
+Owner ruling that drove this section: **"My end goal is to get rid of these utility file. I don't
+want this extra CSS file."** And on keyframes: *"move that into their own components rather than
+having it separate. Until and unless actually they are used at multiple places, this doesn't make
+sense."* Both are done.
+
+### 16.1 `web/src/styles/utilities.css` — deleted
+
+| Wave | Lines | What went |
+|---|---:|---|
+| — | 1,847 | the W1 staging dump (deliberate zero-risk parking, §12.2) |
+| 1 | 1,775 | `.o2-table*` → OTable · app-shell · `.o-input-label` · navbar |
+| 2 | 1,601 | W1.c (AI buttons / syntax guide / misc) — **~70% dead** |
+| 3 | 643 | W1.d (schema · resizer/splitter · logs mega-block) — **~60% dead** |
+| 4 | 351 | W1.d leftovers + the cross-file tail |
+| 5 | 59 | token-blocked group, unblocked by registering `--color-function-accent` |
+| 6 | **0 — file deleted, `@import` removed** | `.card-container` (178 sites) + `.full-height` |
+
+**The headline: the file was largely fiction.** Every section came back majority-dead. Rules survived
+for years because nobody read the hits behind the grep counts.
+
+### 16.2 The verification lesson (record this)
+
+`find-class-consumers.mjs` counts are wrong *most of the time* here, and a naive `class="…"` grep is
+**not** a safe second opinion — it misses multi-line `:class` array ternaries and nearly deleted three
+LIVE rules. **Two-pass verification (tool + loose substring grep + read every hit) is mandatory.**
+Eleven distinct false-positive patterns were found: `data-test`/`data-cy` attrs · spec
+`querySelector`s returning null · route/template strings (`` `dashboard-${i}` ``) · JS identifiers
+(`layout.splitter`) · prop bindings (`:field-name="row.name"`) · component tags (`<function-selector>`)
+· enum/prop **values** (`variant:"warning"` = 334 of `.warning`'s 336 hits) · substring collisions
+(`items-flex-start` ⊃ `flex-start`) · refs inside HTML comments · compounds that never match any DOM
+(`.o2-table .actions-column`) · selectors demanding more DOM depth than the component renders.
+
+### 16.3 The cascade trap (bit every wave)
+
+These globals were **unlayered**, so each silently outranked co-occurring *layered* Tailwind
+utilities — meaning those utilities were **dead**, and deleting the global would WAKE THEM UP and
+change the render. Every wave migrated from the **computed** result and deleted the loser. Corollary
+worth remembering: **`!important` reverses layer order** — an unlayered `x!important` LOSES to a
+layered `x!` (that is why `.table-cell` was dead).
+
+Notable: **24 `.card-container` sites hid a dead `bg-*`** — 13 needed the loser removed
+(`bg-surface-base` ×9, `bg-surface-overlay`, `bg-card-glass-solid`), 11 had `card-container` itself as
+the dead one. These are **deliberate-looking authoring intents that never rendered** and deserve an
+owner's eye.
+
+### 16.4 `keyframes.css` — 19 → 3
+
+13 single-consumer keyframes moved back into their components. The reason they were global: Vue's
+scoped compiler renames `@keyframes` **and** the `animation:` in the same block together, but cannot
+rewrite a template `[animation:name]` arbitrary utility — so each move relocated the animation
+declaration into the scoped block too (proven with `compileStyle`; a control case confirmed the
+dangling-reference hazard). `o2-spin-rotate` deleted outright for Tailwind's built-in `animate-spin`.
+`o2-skeleton-shimmer` collapsed once HomeViewSkeleton used the real `<SkeletonBox>` instead of
+hand-rolled divs. The 3 survivors have ≥2 genuine consumers that cannot collapse without changing
+rendered output.
+
+### 16.5 Bugs found and fixed (this file was hiding real defects)
+
+- **3 EmptyState illustrations rendered static** — `EmptyBoard`/`EmptyHourglass`/`EmptyWaiting` started
+  scoped keyframes from template `[animation:es-*]` utilities (dangling). Fixed. Two further bugs
+  underneath: arbitrary utilities sitting *outside* `class=""` as bare attributes (so `transform-box`
+  never applied), and `:where()` reduced-motion gates that a naive fix would have silently broken
+  (zero specificity → an **unstoppable** animation).
+- **`.scrollable-content` rendered a light box in dark mode** (no dark twin). Now flipping tokens.
+- **`.histogram-unavailable-text(-light)`** was a hand-rolled theme pair → one flipping `text-warning`;
+  ternary deleted.
+- **`AlertInsightsContextMenu` silently inherited logs' `.context-menu`** — a name collision, not
+  shared design; it was overriding the component's own width.
+- `text-wrap: normal` (invalid — always computed to the initial `wrap`); several inline `style=""`.
+
+### 16.6 Corrections to earlier claims in THIS document
+
+- `.o2-table*` was **not** "a public modifier API used by ~40 list views" — 3 real consumers.
+- `.selectedLabel` / `.date-time-button.isOpen` / `.ai-hover-btn:hover .ai-icon` / `.o2-table
+  .actions-column` — all **dead**, never matched.
+- The `.regex-*-input` rules were **dead, not risky**: they demand `> div > div > div > textarea` but
+  OInput/OTextarea render only two divs. Tell: both files had already added their own `resize:none`
+  *because the global never fired*.
+- `.logs-index-menu` had **one** owner, not a cross-component fan-out.
+- `[data-variant="primary"]` was **misfiled, not blocked** — a token-only block swept out of
+  `component.css` (whose orphaned comment header was still there). Returned to the token layer beside
+  its dark twin. Scoping it into OToggleGroup would have **killed dark mode** on primary toggle groups.
+
+### 16.7 State + what remains
+
+Gates: `lint:design` · `lint:tokens` (1046 defined / 954 refs) · `lint:token-purity` · `vue-tsc` exit 0
+· stylelint **0 errors** · suite **38,519 passing**.
+
+Global CSS now lives in exactly three sanctioned files: `tailwind.css` (config + `@layer base`),
+`base-elements.css` (element reset/typography/scrollbar/print), `keyframes.css` (3 shared keyframes) —
+plus `assets/styles/log-highlighting.css` for v-html-generated log syntax.
+
+Remaining: the **W2.d zero-tolerance flips** (`unscopedStyle`/`styleBlockHex` → 0,
+`vue/enforce-style-attribute` → error, stylelint `color-no-hex` → error) and the **37 baselined
+`styleKeepComment`** blocks. Also open: D7 (§15.5), the D6 code-bg pick, and the z-index ladder (D15).
