@@ -920,4 +920,49 @@ export default defineComponent({
   flex-direction: column;
   overflow: hidden;
 }
+
+.searchdetaildialog {
+  width: 85vw;
+}
+
+/* keep(lib-override:oselect): reaches into the OSelect-rendered button to size
+   the records-per-page control. */
+.select-noof-records {
+  width: 5rem;
+}
+
+.select-noof-records :deep(button[type="button"]) {
+  height: 2.25rem;
+}
+
+/* keep(lib-override:otable): reaches into the OTable-rendered th/td DOM to
+   compress the source table and pin its header; the !important is load-bearing
+   against OTable's own row sizing. */
+.o2-schema-table :deep(th),
+.o2-schema-table :deep(td) {
+  height: 0.875rem !important;
+  min-height: 0.875rem !important;
+  padding: 0.125rem 0.1875rem !important;
+}
+
+.o2-schema-table :deep(thead) {
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+}
+
+.o2-schema-table :deep(thead th),
+.o2-schema-table :deep(tbody td) {
+  border-right: 1px solid var(--color-card-glass-border);
+  border-bottom: 1px solid var(--color-card-glass-border);
+}
+
+.o2-schema-table :deep(thead th:last-child),
+.o2-schema-table :deep(tbody td:last-child) {
+  border-right: none;
+}
+
+.o2-schema-table :deep(tbody tr:last-child td) {
+  border-bottom: none;
+}
 </style>

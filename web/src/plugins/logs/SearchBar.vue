@@ -1765,7 +1765,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <template #top>
                   <div
-                    class="p-2 font-bold favorite-label text-xs uppercase tracking-wide text-muted-foreground"
+                    class="p-2 font-bold text-xs leading-6 uppercase tracking-wide text-muted-foreground"
                   >
                     {{ t("search.favoriteViews") }}
                   </div>
@@ -5556,6 +5556,52 @@ export default defineComponent({
 .saved-view-table :deep(td) {
   background: transparent;
   box-shadow: none !important;
+  padding: 0;
+  height: 1.5625rem !important;
+  min-height: 1.5625rem !important;
+}
+
+/* ── .logs-search-bar-component: the root modifier this file puts on its own
+   wrapper. The rest of the former global block (18 nested rules — .reset-filters,
+   .toggle-container, .ddlWrapper/.listWrapper, .savedview-dropdown, #logsQueryEditor,
+   #fnEditor, the Quasar-era `> .row` rules, …) targeted DOM that no longer exists
+   and was deleted rather than moved. */
+.logs-search-bar-component {
+  height: 100%;
+  overflow: visible;
+}
+
+.logs-search-bar-component .download-logs-btn {
+  height: 1.875rem;
+  border-radius: 0.375rem;
+  transition: all 0.2s ease;
+}
+
+.logs-search-bar-component .download-logs-btn:hover {
+  background-color: var(--color-interactive-hover-bg);
+}
+
+.logs-search-bar-component .query-editor-container {
+  height: calc(100% - 2.9rem) !important;
+}
+
+/* padding-left intentionally outranks the `px-1` utility on this button — that
+   is the pre-existing computed result. */
+.logs-search-bar-component .region-dropdown-btn {
+  text-transform: capitalize;
+  font-weight: 600;
+  font-size: 0.75rem;
+  padding-left: 0.5rem;
+  height: 1.875rem;
+  padding-top: 0.1875rem;
+  border-radius: 0.375rem;
+}
+
+/* keep(lib-override:o2): .saved-view-item is rendered by the Function/Transform
+   selector child components, so it needs :deep(). The !important outranks the
+   px-3/py-2 utilities TransformSelector puts on the same node. */
+.logs-search-bar-component :deep(.saved-view-item) {
+  padding: 0.125rem 0.25rem !important;
 }
 
 /* Remove pagination top separator */

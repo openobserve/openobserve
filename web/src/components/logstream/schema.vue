@@ -337,7 +337,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
 
                   <div class="mb-3" v-if="isDialogOpen">
-                    <OCard class="add-fields-card">
+                    <OCard class="w-screen max-w-full flex flex-col">
                       <!-- Header Section -->
                       <OCardSection
                         class="p-0"
@@ -409,7 +409,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       <template #cell-name="{ row }">
                         <div class="flex items-center">
-                          <span class="field-name-text" :data-test="`schema-field-name-cell-${row.name}`">
+                          <span class="inline-block max-w-full truncate" :data-test="`schema-field-name-cell-${row.name}`">
                             {{ row.name }}
                           </span>
                           <span
@@ -668,7 +668,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                 </div>
                 <!-- floating footer for the table -->
-                <div class="floating-buttons flex-shrink-0 px-2 py-1">
+                <div class="sticky bottom-0 z-1 w-full mt-auto bg-card-glass-solid flex-shrink-0 px-2 py-1">
                   <div
                     v-if="indexData.schema.length > 0"
                     class="flex items-center justify-between"
@@ -2694,5 +2694,34 @@ export default defineComponent({
   font-size: 0.875rem;
   height: 1.5625rem;
   padding: 0 0.3125rem;
+}
+
+/* !important is load-bearing: the `tbody tr td` rule above is more specific
+   and would otherwise win the padding-left. */
+.indexDetailsContainer :deep(th:first-child),
+.indexDetailsContainer :deep(td:first-child) {
+  padding-left: 0.5rem !important;
+}
+
+.indexDetailsContainer :deep(th:nth-child(5)),
+.indexDetailsContainer :deep(td:nth-child(5)) {
+  min-width: 15rem;
+  width: 15rem;
+  max-width: 15rem;
+}
+
+/* The !important here outranks the less-specific `thead tr th` / `tbody tr td`
+   rules above — that is the pre-existing computed result, preserved verbatim. */
+.o2-schema-table :deep(th),
+.o2-schema-table :deep(td) {
+  height: 0.875rem !important;
+  min-height: 0.875rem !important;
+  padding: 0.125rem 0.1875rem !important;
+}
+
+.o2-schema-table :deep(thead) {
+  position: sticky;
+  top: 0;
+  z-index: 1000;
 }
 </style>

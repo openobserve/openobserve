@@ -461,3 +461,47 @@ export default defineComponent({
   },
 });
 </script>
+
+<style scoped>
+/* keep(lib-override:opagination): reaches into the OPagination/OSelect-rendered
+   button DOM to compress the pagination controls into the results toolbar. */
+.paginator-section {
+  line-height: 1.5rem;
+  max-height: 2rem;
+  border-radius: 0.5rem;
+  padding: 0.125rem 0.25rem;
+  background: color-mix(in srgb, var(--color-white) 10%, transparent);
+  backdrop-filter: blur(0.625rem);
+  margin-top: 0;
+  overflow: visible;
+}
+
+.paginator-section :deep(.o-pagination__btn) {
+  padding: 0.125rem 0.25rem !important;
+  height: 1.5rem !important;
+  min-height: 1.5rem !important;
+  min-width: 1.5rem !important;
+  font-size: 0.75rem !important;
+  border-radius: 0.25rem !important;
+  line-height: 1rem !important;
+}
+
+.paginator-section :deep(.o-pagination__btn svg) {
+  width: 1rem !important;
+  height: 1rem !important;
+}
+
+.select-pagination {
+  position: relative;
+  width: 4rem !important;
+  height: 1.5rem !important;
+  margin-top: 0;
+}
+
+.select-pagination :deep(button) {
+  height: 1.5rem !important;
+  min-height: 1.5rem !important;
+  font-size: 0.75rem !important;
+  padding-inline: 0.5rem !important;
+}
+</style>

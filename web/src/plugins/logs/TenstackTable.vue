@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div
     ref="parentRef"
     :class="[
-      'o2-scroll-container rounded-none! overflow-x-auto relative',
+      'o2-scroll-container overflow-auto rounded-none! overflow-x-auto relative',
       !props.scrollEl ? 'table-container' : '',
     ]"
     class="text-text-body"
@@ -108,8 +108,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   header.getResizeHandler()?.($event)
               "
               :class="[
-                'absolute right-0 top-0 h-full w-2 flex items-center justify-end select-none touch-none z-10 group/resizer',
-                header.column.getCanResize() ? 'resizer cursor-col-resize' : '',
+                'absolute right-0 top-0 h-full flex items-center justify-end select-none touch-none z-10 group/resizer',
+                header.column.getCanResize() ? 'resizer w-1.25 cursor-col-resize' : 'w-2',
               ]"
             >
               <div
@@ -1276,6 +1276,52 @@ defineExpose({
 .table-row-focus:focus-visible {
   background-color: var(--color-log-table-row-hover) !important;
   box-shadow: inset 0.1875rem 0 0 var(--color-accent) !important;
+}
+
+.table-row-hover:hover .ai-btn {
+  visibility: visible !important;
+  z-index: 2;
+}
+
+/* This "table" lays out entirely with flexbox + explicit column widths — it does
+   not use native table column layout. Rendering table/thead/tbody as block boxes
+   makes position:relative (the containing block for the position:absolute
+   virtual rows), height, and position:sticky on the header behave identically
+   across browsers; Firefox does not honor these on native table-row-group
+   boxes, which left the results table collapsed with no visible rows. */
+.logs-table {
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 0.75rem !important;
+}
+
+.logs-table,
+.logs-table > thead,
+.logs-table > tbody {
+  display: block;
+}
+
+.logs-table thead {
+  font-family: var(--font-sans);
+  font-size: 0.875rem !important;
+}
+
+.logs-table th {
+  text-align: left;
+}
+
+.logs-table th .column-actions {
+  background: var(--color-log-table-header-bg);
+}
+
+/* !important is load-bearing: it outranks the `invisible` utility the actions
+   carry by default. */
+.logs-table th:hover .column-actions {
+  visibility: visible !important;
+}
+
+.logs-table td {
+  font-family: monospace;
 }
 
 /* ── Loading skeleton ───────────────────────────────────────────── */

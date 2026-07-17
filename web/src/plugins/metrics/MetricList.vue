@@ -51,7 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           row-key="name"
           pagination="none"
           :show-global-filter="false"
-          class="field-table w-full"
+          class="field-table w-full transition-opacity duration-200 ease-in-out"
         >
           <template #cell-name="{ row }">
             <div class="p-0 mb-0.5 relative overflow-visible cursor-default group hover:shadow-[0px_4px_15px_rgba(0,0,0,0.17)] dark:hover:shadow-[0px_4px_15px_rgb(255,255,255,0.1)]">

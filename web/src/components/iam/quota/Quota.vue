@@ -316,7 +316,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <div
-        class="flex justify-end w-full ml-auto floating-buttons sticky bottom-0 top-0 z-[100] pr-3 py-2 gap-2 border-t border-border-default bg-surface-base"
+        class="flex justify-end w-full ml-auto sticky bottom-0 top-0 z-1 mt-auto pr-3 py-2 gap-2 border-t border-border-default bg-surface-base"
         v-if="editTable && activeType == 'table'"
       >
         <OButton
@@ -336,7 +336,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
       </div>
       <div
-        class="flex justify-end w-full ml-auto floating-buttons sticky bottom-0 top-0 z-[100] pr-3 mt-3 gap-2 border-t border-border-default bg-surface-base"
+        class="flex justify-end w-full ml-auto sticky bottom-0 top-0 z-1 mt-auto pr-3 gap-2 border-t border-border-default bg-surface-base"
         v-if="editTable && activeType == 'json'"
       >
         <OButton

@@ -26,13 +26,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       ref="parentRef"
       :class="[
-        'o2-scroll-container',
+        'o2-scroll-container overflow-auto rounded-lg',
         'table-container',
         'flex-1',
         'min-h-0',
         'overflow-auto',
         'relative',
-        { 'virtual-scroll-active': useVirtualScroll },
+        { 'virtual-scroll-active will-change-scroll': useVirtualScroll },
       ]"
     >
       <table
@@ -228,8 +228,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       header.getResizeHandler()?.($event)
                   "
                   :class="[
-                    'absolute right-0 top-0 h-full w-2 flex items-center justify-end select-none touch-none z-10 group/resizer',
-                    header.column.getCanResize() ? 'resizer cursor-col-resize' : '',
+                    'absolute right-0 top-0 h-full flex items-center justify-end select-none touch-none z-10 group/resizer',
+                    header.column.getCanResize() ? 'resizer w-1.25 cursor-col-resize' : 'w-2',
                   ]"
                 >
                   <div
@@ -2023,7 +2023,7 @@ watch(
     tableCellClass.value = [
       hasDefaultSourceColumn.value && !props.wrap
         ? "table-cell"
-        : "block height-stretch",
+        : "block self-stretch",
       !props.wrap
         ? "overflow-hidden text-ellipsis whitespace-nowrap"
         : "",

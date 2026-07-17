@@ -32,7 +32,7 @@
         >
           <OSpinner size="md" data-test="enrichment-schema-loading-indicator" />
         </div>
-        <div v-else class="indexDetailsContainer p-5 w-full" style="height: 100vh">
+        <div v-else class="indexDetailsContainer p-5 w-full h-screen">
           <div
             class="titleContainer flex flex-col items-flex-start gap-5 bg-surface-subtle border border-input-border rounded-md p-4"
           >
@@ -241,3 +241,20 @@
     },
     });
     </script>
+
+<style scoped>
+/* keep(lib-override:otable): reaches into the OTable-rendered th/td DOM to pin
+   the first column's inset and the fifth column's width — not expressible as
+   utilities on this template. */
+.indexDetailsContainer :deep(th:first-child),
+.indexDetailsContainer :deep(td:first-child) {
+  padding-left: 0.5rem !important;
+}
+
+.indexDetailsContainer :deep(th:nth-child(5)),
+.indexDetailsContainer :deep(td:nth-child(5)) {
+  min-width: 15rem;
+  width: 15rem;
+  max-width: 15rem;
+}
+</style>

@@ -316,7 +316,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Bottom -->
             <template #bottom>
               <div
-                class="bottom-btn flex items-center justify-between w-full h-[2.25rem]"
+                class="flex items-center justify-between w-full h-[2.25rem]"
               >
                 <div class="text-xs font-normal w-[15.625rem] mr-md">
                   {{

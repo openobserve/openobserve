@@ -388,7 +388,7 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
         <!-- Column resize handle -->
         <div
           v-if="header.column.getCanResize()"
-          class="resizer absolute right-0 top-0 h-full w-2 flex items-center justify-end cursor-col-resize select-none touch-none z-10 group/resizer"
+          class="resizer absolute right-0 top-0 h-full w-1.25 flex items-center justify-end cursor-col-resize select-none touch-none z-10 group/resizer"
           :title="'Drag to resize · double-click to reset'"
           @dblclick="header.column.resetSize()"
           @mousedown.prevent.stop="startResize(header, $event)"
@@ -521,7 +521,7 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
         </div>
         <div
           v-if="header.column.getCanResize()"
-          class="resizer absolute right-0 top-0 h-full w-2 flex items-center justify-end cursor-col-resize select-none touch-none z-10 group/resizer"
+          class="resizer absolute right-0 top-0 h-full w-1.25 flex items-center justify-end cursor-col-resize select-none touch-none z-10 group/resizer"
           :title="'Drag to resize · double-click to reset'"
           @dblclick="header.column.resetSize()"
           @mousedown.prevent.stop="startResize(header, $event)"

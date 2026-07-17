@@ -76,9 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="warning-banner flex gap-3 p-4 bg-banner-warning-bg border border-banner-warning-border rounded-md mb-5"
             >
               <OIcon name="warning" size="sm" class="text-banner-warning-text shrink-0" />
-              <div
-                class="warning-text flex-1"
-              >
+              <div class="flex-1">
                 <strong class="block mb-1 text-banner-warning-text">Range requests not supported</strong>
                 <p class="m-0 text-sm text-banner-warning-text">
                   This URL does not support resuming from the last position.

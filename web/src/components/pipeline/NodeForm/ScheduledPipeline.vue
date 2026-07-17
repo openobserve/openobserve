@@ -785,7 +785,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </template>
           <template #separator>
-            <div class="splitter-vertical splitter-enabled"></div>
+            <div
+              class="w-1 h-full bg-transparent transition-colors duration-300 hover:bg-[var(--color-orange-500)]"
+            ></div>
           </template>
           <template #after>
             <div class="w-full flex flex-col border-l border-border-default" style="height: 100%">

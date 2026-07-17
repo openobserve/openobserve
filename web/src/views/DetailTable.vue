@@ -46,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             No data available.
           </div>
-          <div v-else class="indexDetailsContainer">
+          <div v-else>
             <ul
               style="height: calc(100vh - 220px); width: 70vw"
               class="detail-list px-0 py-0 flex flex-col divide-y divide-border"

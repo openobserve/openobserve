@@ -67,7 +67,9 @@
       <template #separator>
         <!-- Allow page to override the separator (e.g. for custom toggle placement) -->
         <slot name="separator">
-          <div class="splitter-vertical splitter-enabled"></div>
+          <div
+            class="w-1 h-full bg-transparent transition-colors duration-300 hover:bg-[var(--color-orange-500)]"
+          ></div>
         </slot>
       </template>
       <template #after>

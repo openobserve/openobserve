@@ -61,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div
           v-else
-          class="flex-1 min-w-0 text-left pl-2 warning flex items-center flex-wrap gap-1.5"
+          class="flex-1 min-w-0 text-left pl-2 text-warning flex items-center flex-wrap gap-1.5"
           data-test="logs-search-result-title"
           :data-search-state="searchObj.loading || searchObj.loadingCounter ? 'loading' : 'complete'"
           :data-hits-count="searchObj.data?.queryResults?.hits?.length ?? 0"
@@ -2198,6 +2198,196 @@ export default defineComponent({
         background: color-mix(in srgb, var(--color-status-error-text) 20%, transparent);
       }
     }
+  }
+}
+
+/* keep(lib-override:opagination): reaches into the OPagination/OSelect-rendered
+   button DOM to compress the pagination controls into the results toolbar. */
+.paginator-section {
+  line-height: 1.5rem;
+  max-height: 2rem;
+  border-radius: 0.5rem;
+  padding: 0.125rem 0.25rem;
+  background: color-mix(in srgb, var(--color-white) 10%, transparent);
+  backdrop-filter: blur(0.625rem);
+  margin-top: 0;
+  overflow: visible;
+
+  :deep(.o-pagination__btn) {
+    padding: 0.125rem 0.25rem !important;
+    height: 1.5rem !important;
+    min-height: 1.5rem !important;
+    min-width: 1.5rem !important;
+    font-size: 0.75rem !important;
+    border-radius: 0.25rem !important;
+    line-height: 1rem !important;
+
+    svg {
+      width: 1rem !important;
+      height: 1rem !important;
+    }
+  }
+}
+
+.select-pagination {
+  position: relative;
+  width: 4rem !important;
+  height: 1.5rem !important;
+  margin-top: 0;
+
+  :deep(button) {
+    height: 1.5rem !important;
+    min-height: 1.5rem !important;
+    font-size: 0.75rem !important;
+    padding-inline: 0.5rem !important;
+  }
+}
+/* keep(keyframes): the histogram skeleton's shimmer @keyframes and the
+   animation: that references it must stay in the same scoped block so Vue
+   renames both consistently. Migrated from styles/utilities.css — all of this
+   DOM is this template's own. */
+.histogram-container {
+  border-radius: 0.5rem;
+  position: relative;
+
+  &--visible {
+    height: 6.25rem;
+    padding-top: 0.25rem;
+    opacity: 1;
+    transition: all 0.3s ease-in-out;
+  }
+
+  &--hidden {
+    height: 0;
+    opacity: 0;
+    overflow: hidden;
+    transition: all 0.3s ease-in-out;
+  }
+}
+
+.histogram-chart {
+  max-height: 6.25rem;
+  border-radius: 0.5rem;
+}
+
+.histogram-empty {
+  height: 6.25rem;
+  border-radius: 0.5rem;
+
+  &__message {
+    min-height: 2rem;
+  }
+}
+
+.histogram-skeleton {
+  --hsk-bar:     var(--color-grey-100);
+  --hsk-shimmer: color-mix(in srgb, var(--color-white) 65%, transparent);
+
+  .dark & {
+    --hsk-bar:     var(--color-grey-700);
+    --hsk-shimmer: color-mix(in srgb, var(--color-white) 6%, transparent);
+  }
+
+  height: 6.25rem;
+  display: flex;
+  flex-direction: column;
+  padding-top: 0.25rem;
+  overflow: hidden;
+
+  &__main {
+    flex: 1;
+    display: flex;
+    min-height: 0;
+  }
+
+  &__y-axis {
+    width: 2.25rem;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    align-items: flex-end;
+    padding-right: 0.3125rem;
+    padding-bottom: 0.125rem;
+  }
+
+  &__y-label {
+    height: 0.4375rem;
+    border-radius: 0.125rem;
+    background-color: var(--hsk-bar);
+  }
+
+  &__plot {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    border-left: 1px solid var(--color-card-glass-border);
+    border-bottom: 1px solid var(--color-card-glass-border);
+  }
+
+  &__bars {
+    flex: 1;
+    display: flex;
+    align-items: flex-end;
+    gap: 0.125rem;
+    padding: 0.25rem 0.25rem 0;
+    overflow: hidden;
+    position: relative;
+
+    &::after {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: -100%;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(
+        90deg,
+        transparent        0%,
+        transparent       20%,
+        var(--hsk-shimmer) 50%,
+        transparent       80%,
+        transparent       100%
+      );
+      animation: histogram-bar-shimmer 1.6s ease-in-out infinite;
+      pointer-events: none;
+    }
+  }
+
+  &__bar {
+    flex: 0 0 0.4375rem;
+    flex-shrink: 0;
+    border-radius: 0.0625rem 0.0625rem 0 0;
+    background-color: var(--hsk-bar);
+  }
+
+  &__x-axis {
+    display: flex;
+    justify-content: space-between;
+    padding-left: 2.25rem;
+    padding-top: 0.1875rem;
+  }
+
+  &__x-label {
+    width: 2.25rem;
+    height: 0.4375rem;
+    border-radius: 0.125rem;
+    background-color: var(--color-skeleton-base);
+  }
+}
+
+@keyframes histogram-bar-shimmer {
+  from { left: -100%; }
+  to   { left: 100%; }
+}
+
+.histogram-error {
+  margin: 0.5rem 0;
+  border-radius: 0.5rem;
+
+  &__message {
+    min-height: 2rem;
   }
 }
 </style>

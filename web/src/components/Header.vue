@@ -148,7 +148,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="inline bg-status-warning-bg p-1.25 rounded-sm"
       >
         <OIcon name="warning"
-size="xs" class="warning" />{{
+size="xs" class="text-warning" />{{
           store.state.organizationData.quotaThresholdMsg
         }}
       </div>

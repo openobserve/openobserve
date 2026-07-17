@@ -120,13 +120,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Collapsed dimension sidebar bar (shown when hidden) -->
         <div
           v-if="!showDimensionSelector"
-          class="field-list-sidebar-header-collapsed card-container bg-surface-panel! shrink-0 cursor-pointer flex flex-col items-center justify-start pt-2 gap-1.5"
-          style="width: 50px; height: 100%"
+          class="card-container bg-surface-panel! shrink-0 cursor-pointer flex flex-col items-center justify-start pt-2 gap-1.5 w-12.5 h-full overflow-y-auto"
           data-test="dimension-selector-collapsed-bar"
           @click="toggleDimensionSelector"
         >
-          <OIcon name="expand-all" size="sm" class="field-list-collapsed-icon rotate-90 mt-2.5 text-xl" />
-          <div class="field-list-collapsed-title [writing-mode:vertical-rl] [text-orientation:mixed] font-bold text-xs">Dimensions</div>
+          <OIcon name="expand-all" size="sm" class="rotate-90 mt-2.5 text-xl" />
+          <div class="[writing-mode:vertical-rl] [text-orientation:mixed] font-bold text-xs">Dimensions</div>
         </div>
 
         <OSplitter
@@ -228,7 +227,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <template #separator>
-            <div class="splitter-vertical splitter-enabled"></div>
+            <div
+              class="w-1 h-full bg-transparent transition-colors duration-300 hover:bg-[var(--color-orange-500)]"
+            ></div>
           </template>
 
           <!-- RIGHT: Dashboard Charts -->

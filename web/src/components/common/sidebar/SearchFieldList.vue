@@ -21,7 +21,7 @@
         <!-- Group header (only rendered for grouped/label rows) -->
         <template #group-header="{ row, groupName }">
           <div
-            class="field-group-header h-full w-full flex justify-between items-center rounded-sm"
+            class="field-group-header h-full w-full flex justify-between items-center rounded-lg"
             :data-test="`search-field-list-group-${row.group}-header`"
             @click="toggleGroup(row.group)"
           >
@@ -748,6 +748,7 @@ const copyContentValue = (value: string) => {
 .field-group-header {
   font-weight: 600;
   font-size: 0.75rem;
+  line-height: 1.75rem;
   padding: 0 0.325rem;
   cursor: pointer;
   background-color: var(--color-surface-subtle);

@@ -3,10 +3,10 @@
     "rawPalette": 53,
     "arbPx": 149,
     "arbRadius": 24,
-    "arbZ": 44,
+    "arbZ": 42,
     "styleBlockHex": 107,
     "stylePxUnit": 266,
-    "styleKeepComment": 36,
+    "styleKeepComment": 35,
     "inlineHexStyle": 20,
     "unscopedStyle": 10,
     "tsHex": 471,
@@ -224,8 +224,7 @@
     "components/iam/quota/Quota.vue": {
       "hexClass": 6,
       "inlineHexStyle": 1,
-      "inlineHexBind": 1,
-      "arbZ": 2
+      "inlineHexBind": 1
     },
     "components/ingestion/ai/content/AIIntegrationCard.vue": {
       "stylePxUnit": 2,
@@ -648,9 +647,6 @@
     "plugins/traces/TraceDetails.vue": {
       "arbRadius": 1,
       "arbPx": 6
-    },
-    "plugins/traces/TraceDetailsSidebar.vue": {
-      "styleKeepComment": 1
     },
     "plugins/traces/TurnPreviewCard.vue": {
       "arbPx": 3

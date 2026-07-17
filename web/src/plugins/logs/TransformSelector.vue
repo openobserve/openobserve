@@ -336,3 +336,12 @@ const getTransformLabelTooltip = computed(() => {
 });
 </script>
 
+<style scoped>
+/* keep(lib-override:obuttongroup): rounds OButtonGroup's own root, which this
+   component only receives as a class — not settable from the template without
+   losing to the group's internal radius. */
+.transform-selector {
+  border-radius: 0.375rem;
+}
+</style>
+

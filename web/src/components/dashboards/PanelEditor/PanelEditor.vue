@@ -98,7 +98,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @scroll.passive="onBuilderScroll"
               >
                 <div
-                  class="layout-panel-container flex flex-col w-full h-full"
+                  class="flex flex-col w-full h-full"
                   :style="layoutPanelContainerStyle"
                 >
                   <!-- Mode selection + Add To Dashboard row. Skip when empty (e.g.

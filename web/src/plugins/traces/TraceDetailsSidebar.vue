@@ -2320,4 +2320,18 @@ export default defineComponent({
 .traces-events-table-container :deep(.table-container) {
   border-radius: 0 !important;
 }
+/* keep(complex-state): sticky header cells for the links table — position:sticky
+   must sit on the cells (tr > *), not the <thead>, so it cannot be a utility on
+   the thead element this template owns. Migrated from styles/utilities.css;
+   the former .tfoot-sticky twin was deleted (no consumer). */
+.thead-sticky tr > * {
+  position: sticky;
+  opacity: 1;
+  z-index: 1;
+  background: var(--color-grey-200);
+}
+
+.thead-sticky tr:last-child > * {
+  top: 0;
+}
 </style>
