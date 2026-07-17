@@ -44,6 +44,11 @@ class FunctionsPage {
     this.testEventsEditorQueryDiv = this.page.locator('[data-test="vrl-function-test-events-editor"] [data-test="query-editor"]');
     this.testOutputEditor = this.page.locator('[data-test="vrl-function-test-events-output-editor"]');
 
+    // Runtime (non-syntax) errors come back on a 200 with the message attached
+    // per event, so they land in this section rather than the output editor —
+    // the editor keeps showing the events so you can see which ones failed.
+    this.functionErrorDetails = this.page.locator('[data-test="function-error-details"]');
+
     // Confirm dialog (delete confirmation) — primary/secondary buttons
     this.confirmDialog = this.page.locator('[data-test="confirm-dialog"]');
     this.confirmDialogPrimaryBtn = this.page.locator('[data-test="confirm-dialog"] [data-test="o-dialog-primary-btn"]');
@@ -327,6 +332,14 @@ class FunctionsPage {
   async expectTestOutputContains(text) {
     const outputText = await this.getTestOutput();
     expect(outputText).toContain(text);
+  }
+
+  /**
+   * Assert the runtime-error section shows the given text.
+   * @param {string} text - Expected substring (e.g. 'ReferenceError')
+   */
+  async expectFunctionErrorContains(text) {
+    await expect(this.functionErrorDetails).toContainText(text, { timeout: 15000 });
   }
 
   async expectFunctionInList(functionName) {

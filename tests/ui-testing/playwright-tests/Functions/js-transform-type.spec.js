@@ -154,11 +154,13 @@ test.describe('JavaScript Transform Type', { tag: ['@jsTransformType', '@functio
       expect(errorOutput).toBeTruthy();
       testLogger.info(`Error test output: ${errorOutput}`);
 
-      // `row.field = undefinedVar` throws ReferenceError — message always contains 'error'
-      const hasError = errorOutput.toLowerCase().includes('error') ||
-                      errorOutput.toLowerCase().includes('failed');
+      // `row.field = undefinedVar` throws a ReferenceError at RUNTIME, not compile
+      // time — the code is syntactically valid. Only syntax errors fail the request
+      // now, so this returns 200 with the message attached per event and the output
+      // editor keeps showing the (untransformed) events. The error surfaces in the
+      // error-details section instead, which is what we assert on.
+      await pm.functionsPage.expectFunctionErrorContains('ReferenceError');
 
-      expect(hasError).toBe(true);
       testLogger.info('Error handling works - error message displayed');
       await pm.functionsPage.clickCancelButton();
     });
