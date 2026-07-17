@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="flex-[0_0_calc(32%-0.625rem)] flex flex-col gap-2 overflow-y-auto overflow-x-clip" style="height: calc(100vh - 302px); position: sticky; top: 0;">
     <!-- Preview Section -->
     <div
-      class="collapsible-section card-container preview-section flex flex-col transition-all duration-300 bg-card-glass-bg rounded-md shadow-[0_0_5px_1px_var(--color-hover-shadow)] border border-card-glass-border"
+      class="collapsible-section preview-section flex flex-col transition-all duration-300 bg-card-glass-bg rounded-md shadow-[0_0_5px_1px_var(--color-hover-shadow)] border border-card-glass-border"
       :style="previewSectionStyle"
     >
       <div
@@ -78,7 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Summary Section -->
     <div
-      class="collapsible-section card-container flex flex-col transition-all duration-300 bg-card-glass-bg rounded-md shadow-[0_0_5px_1px_var(--color-hover-shadow)] border border-card-glass-border"
+      class="collapsible-section flex flex-col transition-all duration-300 bg-card-glass-bg rounded-md shadow-[0_0_5px_1px_var(--color-hover-shadow)] border border-card-glass-border"
       :style="summarySectionStyle"
     >
       <div

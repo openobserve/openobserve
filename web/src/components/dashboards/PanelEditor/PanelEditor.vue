@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Chart Type Selection Sidebar -->
       <div>
         <div
-          class="flex flex-col scroll card-container bg-surface-panel! border-r border-border-default"
+          class="flex flex-col scroll bg-surface-panel! border-r border-border-default"
           style="
             overflow-y: auto;
             overflow-x: hidden;
@@ -50,7 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Collapsed field list bar -->
         <div
           v-if="!dashboardPanelData.layout.showFieldList"
-          class="cursor-pointer overflow-y-auto flex flex-col items-center justify-start card-container bg-surface-panel!"
+          class="cursor-pointer overflow-y-auto flex flex-col items-center justify-start bg-surface-panel!"
           data-test="panel-editor-field-list-sidebar-collapsed"
           @click="collapseFieldList"
           style="width: 50px; height: 100%; flex-shrink: 0"
@@ -79,7 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div :class="fieldListWrapperClass">
               <div
                 v-if="dashboardPanelData.layout.showFieldList"
-                class="flex flex-col card-container bg-surface-panel!"
+                class="flex flex-col bg-surface-panel!"
                 :style="fieldListContainerStyle"
               >
                 <div class="flex flex-col" :style="fieldListInnerStyle">
@@ -363,7 +363,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="flex flex-col column"
         :style="{ height: contentHeight, flex: 1 }"
       >
-        <div class="card-container h-full flex flex-col">
+        <div class="bg-card-glass-bg h-full flex flex-col">
           <!-- Variables Selector for HTML (dashboard mode only) -->
           <VariablesValueSelector
             v-if="resolvedConfig.showVariablesSelector"
@@ -398,7 +398,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="flex flex-col column"
         :style="{ height: contentHeight, flex: 1 }"
       >
-        <div class="card-container h-full flex flex-col">
+        <div class="bg-card-glass-bg h-full flex flex-col">
           <!-- Variables Selector for Markdown (dashboard mode only) -->
           <VariablesValueSelector
             v-if="resolvedConfig.showVariablesSelector"
@@ -436,7 +436,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Collapsed field list bar for custom chart -->
         <div
           v-if="!dashboardPanelData.layout.showFieldList"
-          class="cursor-pointer overflow-y-auto flex flex-col items-center justify-start card-container bg-surface-panel!"
+          class="cursor-pointer overflow-y-auto flex flex-col items-center justify-start bg-surface-panel!"
           data-test="panel-editor-field-list-sidebar-collapsed"
           @click="collapseFieldList"
           style="width: 50px; height: 100%; flex-shrink: 0"
@@ -469,7 +469,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #before>
             <div class="w-full h-full">
               <div
-                class="flex flex-col scroll card-container"
+                class="flex flex-col scroll bg-card-glass-bg"
                 :style="{ height: contentHeight, overflowY: 'auto' }"
               >
                 <div
@@ -488,7 +488,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Custom chart content area -->
           <template #after>
             <div
-              class="flex card-container"
+              class="flex bg-card-glass-bg"
               :style="{ height: contentHeight, overflow: 'hidden' }"
             >
               <div
@@ -929,9 +929,9 @@ const chartAreaStyle = computed(() => {
 // Main content area class - logs needs flat background without card styling
 const mainContentAreaClass = computed(() => {
   if (props.pageType === "logs") {
-    return "flex card-container";
+    return "flex bg-card-glass-bg";
   }
-  return "flex card-container h-full overflow-y-hidden";
+  return "flex bg-card-glass-bg h-full overflow-y-hidden";
 });
 
 // Row style - logs/build needs height: 100%, others need overflow-y: auto

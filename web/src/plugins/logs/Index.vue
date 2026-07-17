@@ -21,10 +21,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       v-show="!showSearchHistory && !showSearchScheduler"
       id="secondLevel"
-      class="full-height"
+      class="h-full max-h-full overflow-hidden"
     >
       <OSplitter
-        class="full-height"
+        class="h-full max-h-full overflow-hidden"
         v-model="splitterModel"
         :horizontal="true"
         unit="px"
@@ -60,7 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template v-slot:after>
           <div
             id="thirdLevel"
-            class="flex scroll relative-position thirdlevel full-height overflow-visible p-0 m-0 box-border logsPageMainSection w-full border-t border-border-default"
+            class="flex scroll relative-position thirdlevel h-full max-h-full overflow-hidden p-0 m-0 box-border logsPageMainSection w-full border-t border-border-default"
             v-show="
               searchObj.meta.logsVisualizeToggle == 'logs' ||
               searchObj.meta.logsVisualizeToggle == 'patterns'
@@ -70,7 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OSplitter
               v-model="searchObj.config.splitterModel"
               :limits="searchObj.config.splitterLimit"
-              class="full-height w-full logs-splitter-smooth"
+              class="h-full max-h-full overflow-hidden w-full logs-splitter-smooth"
               separatorClass="field-list-separator"
               :separatorStyle="{ width: '10px', marginLeft: '-5px', marginRight: '-5px', zIndex: '10' }"
               @update:model-value="onSplitterUpdate"
@@ -80,7 +80,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <index-list
                     v-if="searchObj.meta.showFields"
                     data-test="logs-search-index-list"
-                    class="card-container"
                     @setInterestingFieldInSQLQuery="
                       setInterestingFieldInSQLQuery
                     "
@@ -90,7 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template #after>
                 <div class="h-full">
                   <div
-                    class="card-container h-full w-full relative-position"
+                    class="bg-card-glass-bg h-full w-full relative-position"
                   >
                     <div
                       v-if="
@@ -225,7 +224,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div
                       v-else
                       data-test="logs-search-search-result"
-                      class="full-height"
+                      class="h-full max-h-full overflow-hidden"
                     >
                       <search-result
                         ref="searchResultRef"
@@ -284,7 +283,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </OSplitter>
     </div>
-    <div v-show="showSearchHistory" class="full-height">
+    <div v-show="showSearchHistory" class="h-full max-h-full overflow-hidden">
       <search-history
         v-if="store.state.zoConfig.usage_enabled"
         ref="searchHistoryRef"
@@ -329,7 +328,7 @@ size="md" />
         </div>
       </div>
     </div>
-    <div v-show="showSearchScheduler" class="full-height">
+    <div v-show="showSearchScheduler" class="h-full max-h-full overflow-hidden">
       <SearchSchedulersList
         ref="searchSchedulerRef"
         @closeSearchHistory="closeSearchSchedulerFn"

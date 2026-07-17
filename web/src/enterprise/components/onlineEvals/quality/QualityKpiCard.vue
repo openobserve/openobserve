@@ -1,6 +1,6 @@
 <template>
   <div
-    class="card-container rounded-lg flex flex-col px-[0.875rem] pt-[0.625rem] pb-[0.625rem] gap-[0.25rem] bg-surface-base border border-border-default transition-shadow duration-200 ease-in-out hover:shadow-[0_1px_6px_rgba(0,0,0,0.08)]"
+    class="bg-card-glass-bg rounded-lg flex flex-col px-[0.875rem] pt-[0.625rem] pb-[0.625rem] gap-[0.25rem] border border-border-default transition-shadow duration-200 ease-in-out hover:shadow-[0_1px_6px_rgba(0,0,0,0.08)]"
     :data-test="`quality-kpi-${kpi.id}`"
   >
     <div class="flex flex-col gap-[0.25rem]">

@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="edit-role-title"
       class="shrink-0"
     >
-    <div class="card-container py-2 flex flex-col">
+    <div class="bg-card-glass-bg py-2 flex flex-col">
            <AppTabs
               data-test="edit-role-tabs"
               :tabs="tabs"
@@ -62,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           v-show="activeTab === 'permissions'"
           data-test="edit-role-permissions-section"
-          class="card-container flex flex-col h-full"
+          class="bg-card-glass-bg flex flex-col h-full"
         >
           <div
             class="flex justify-between items-center flex-shrink-0 bg-surface-base"
@@ -242,7 +242,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="flex justify-end w-full flex-shrink-0 mt-[0.625rem]"
         style="z-index: 2"
       >
-      <div class="card-container w-full py-2 px-3 justify-end flex gap-2 border-t border-border-default">
+      <div class="bg-card-glass-bg w-full py-2 px-3 justify-end flex gap-2 border-t border-border-default">
         <OButton
           data-test="edit-role-cancel-btn"
           variant="outline"

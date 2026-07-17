@@ -69,7 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
     </AppPageHeader>
     <div
-      class="w-full flex card-container overflow-hidden h-[calc(100%-3.125)]! flex-1 min-h-0"
+      class="w-full flex bg-card-glass-bg overflow-hidden h-[calc(100%-3.125)]! flex-1 min-h-0"
     >
       <OSplitter
         v-model="splitterSize"

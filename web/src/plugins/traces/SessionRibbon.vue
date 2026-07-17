@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <div
-    class="card-container rounded-lg border border-border-default pt-[1rem] px-[1rem] pb-[0.625rem] flex flex-col"
+    class="bg-card-glass-bg rounded-lg border border-border-default pt-[1rem] px-[1rem] pb-[0.625rem] flex flex-col"
     data-test="session-ribbon"
   >
     <!-- Header: title + subtitle (left) · metric toggle (right) -->

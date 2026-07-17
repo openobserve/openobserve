@@ -44,7 +44,7 @@
         </div>
       </div>
 
-      <section v-if="dataType === 'numeric'" class="card-container py-3 px-3.5 pb-3.5 bg-surface-base border border-border-default rounded-md">
+      <section v-if="dataType === 'numeric'" class="bg-card-glass-bg py-3 px-3.5 pb-3.5 border border-border-default rounded-md">
         <header class="mb-1.5">
           <h4 class="m-0 text-compact font-semibold text-text-primary">
             {{ t("onlineEvals.quality.detail.trendTitle") }}
@@ -66,7 +66,7 @@
         </div>
       </section>
 
-      <section v-if="dataType === 'numeric'" class="card-container py-3 px-3.5 pb-3.5 bg-surface-base border border-border-default rounded-md">
+      <section v-if="dataType === 'numeric'" class="bg-card-glass-bg py-3 px-3.5 pb-3.5 border border-border-default rounded-md">
         <header class="mb-1.5">
           <h4 class="m-0 text-compact font-semibold text-text-primary">{{ t("onlineEvals.quality.detail.distributionTitle") }}</h4>
         </header>
@@ -82,7 +82,7 @@
         </div>
       </section>
 
-      <section v-if="dataType === 'boolean'" class="card-container py-3 px-3.5 pb-3.5 bg-surface-base border border-border-default rounded-md">
+      <section v-if="dataType === 'boolean'" class="bg-card-glass-bg py-3 px-3.5 pb-3.5 border border-border-default rounded-md">
         <header class="mb-1.5">
           <h4 class="m-0 text-compact font-semibold text-text-primary">
             {{ t("onlineEvals.quality.detail.passRateTitle") }}
@@ -100,7 +100,7 @@
         </div>
       </section>
 
-      <section v-if="dataType === 'boolean'" class="card-container py-3 px-3.5 pb-3.5 bg-surface-base border border-border-default rounded-md">
+      <section v-if="dataType === 'boolean'" class="bg-card-glass-bg py-3 px-3.5 pb-3.5 border border-border-default rounded-md">
         <header class="mb-1.5">
           <h4 class="m-0 text-compact font-semibold text-text-primary">{{ t("onlineEvals.quality.detail.trueFalseTitle") }}</h4>
         </header>
@@ -116,7 +116,7 @@
         </div>
       </section>
 
-      <section v-if="dataType === 'categorical'" class="card-container py-3 px-3.5 pb-3.5 bg-surface-base border border-border-default rounded-md">
+      <section v-if="dataType === 'categorical'" class="bg-card-glass-bg py-3 px-3.5 pb-3.5 border border-border-default rounded-md">
         <header class="mb-1.5">
           <h4 class="m-0 text-compact font-semibold text-text-primary">{{ t("onlineEvals.quality.detail.categoryDistributionTitle") }}</h4>
         </header>

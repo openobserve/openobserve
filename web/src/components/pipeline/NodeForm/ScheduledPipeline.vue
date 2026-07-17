@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Collapsed field list bar (shown when hidden) -->
         <div
           v-if="collapseFields"
-          class="card-container bg-surface-panel! shrink-0 cursor-pointer flex flex-col items-center justify-start pt-2 gap-1.5"
+          class="bg-surface-panel! shrink-0 cursor-pointer flex flex-col items-center justify-start pt-2 gap-1.5"
           style="width: 50px; height: 100%"
           data-test="scheduled-pipeline-field-list-collapsed-bar"
           @click="collapseFieldList"

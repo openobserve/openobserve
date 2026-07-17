@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="px-4 border-b border-border-default"
       />
       <div
-        class="flex card-container flex-1 min-h-0 overflow-auto"
+        class="flex bg-card-glass-bg flex-1 min-h-0 overflow-auto"
       >
         <div
           ref="addAlertFormRef"
@@ -690,7 +690,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
     <div
-      class="flex justify-end px-3 w-full py-3 card-container sticky! bottom-0 border-t border-card-glass-border bg-surface-base"
+      class="flex justify-end px-3 w-full py-3 bg-card-glass-bg sticky! bottom-0 border-t border-card-glass-border"
       style="z-index: 2"
     >
       <OButton

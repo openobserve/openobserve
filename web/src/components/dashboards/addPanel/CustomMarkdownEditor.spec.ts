@@ -614,14 +614,14 @@ console.log('Hello World');
       expect(separator.exists()).toBe(true);
     });
 
-    it("should render the editor container with card-container class", () => {
+    it("should render the editor container with bg-card-glass-bg class", () => {
       wrapper = createWrapper();
 
       const container = wrapper.find(
         '[data-test="dashboard-custom-markdown-editor-container"]',
       );
       expect(container.exists()).toBe(true);
-      expect(container.classes()).toContain('card-container');
+      expect(container.classes()).toContain('bg-card-glass-bg');
     });
   });
 

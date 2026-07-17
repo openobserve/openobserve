@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-slot="{ isSubmitting }"
     >
       <!-- Form content -->
-      <div class="card-container flex-1 min-h-0 mb-2 flex flex-col" style="padding: 1rem">
+      <div class="bg-card-glass-bg flex-1 min-h-0 mb-2 flex flex-col" style="padding: 1rem">
         <!-- Row 1: Name & Description -->
         <div style="display: flex; gap: 1rem; margin-bottom: 1rem">
           <div style="flex: 1; display: flex; flex-direction: column">
@@ -123,7 +123,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Footer -->
       <div
-        class="card-container flex items-center justify-end px-3 py-2.5 shrink-0 gap-2"
+        class="bg-card-glass-bg flex items-center justify-end px-3 py-2.5 shrink-0 gap-2"
       >
         <OButton
           data-test="eval-template-editor-cancel-btn"

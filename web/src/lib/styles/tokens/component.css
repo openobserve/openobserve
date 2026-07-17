@@ -16,7 +16,7 @@
   --color-separator: var(--color-border-default);
   --color-separator-strong: var(--color-border-strong);
 
-  /* Form field label (.o-input-label, styles/utilities.css). Values are the
+  /* Form field label (.o-input-label, now template utilities). Values are the
      exact hex the rule used to hard-code (grey-800 / grey-400). Dark in dark.css. */
   --color-input-label-text: var(--color-grey-800);
   --color-input-label-text-disabled: var(--color-grey-400);
@@ -1431,20 +1431,20 @@
 }
 
 /* â”€â”€ Table â”€â”€ */
-/* F3 .o2-table* rules moved to styles/utilities.css (W1.b) */
+/* F3 .o2-table* rules now live in lib/core/Table/OTable.vue (scoped). */
 
 /* â”€â”€ App utilities â”€â”€ */
 /* F4 element typography/reset moved to styles/base-elements.css (W1.b) */
 
-/* F5 app-shell helpers moved to styles/utilities.css (W1.b) */
+/* F5 app-shell helpers are now template utilities on their owners. */
 
 
-/* F7 .o-input-label* moved to styles/utilities.css (W1.b) */
+/* F7 .o-input-label* is now template utilities; the class name survives only as the opt-out marker for base-elements.css's label rule. */
 
 /* F7 interaction-affordance + destructive-icon rules moved to styles/base-elements.css (W1.b) */
 
 
-/* Navbar per-button dark token overrides moved to styles/utilities.css (W1.d). */
+/* Navbar per-button dark token overrides now live scoped in Header.vue / OrganizationSelector.vue. */
 
 /* â”€â”€ Index list â”€â”€ */
 
@@ -1575,7 +1575,7 @@
    text sitting beside it â€” the two must always read identically. Only size and
    weight are fixed here; consumers apply ONLY this class plus layout utilities,
    never their own color/size/weight, so every listing footer reads the same. */
-/* F3 .o2-table-footer-title moved to styles/utilities.css (W1.b) */
+/* F3 .o2-table-footer-title is now template utilities (text-xs font-normal) at its call sites. */
 
 /* @media print overrides moved to styles/base-elements.css (W1.a, F18). */
 

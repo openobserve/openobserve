@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       style="height: calc(100vh - 106px)"
     >
       <template v-slot:before>
-        <div class="card-container h-full flex flex-col">
+        <div class="bg-card-glass-bg h-full flex flex-col">
           <div class="p-3 overflow-auto">
             <div class="w-full pb-2 pt-2 o2-input">
             <OInput
@@ -119,7 +119,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
       <template v-slot:after>
         <div
-          class="px-2 pt-2 h-full overflow-auto card-container border-l border-border-default"
+          class="px-2 pt-2 h-full overflow-auto bg-card-glass-bg border-l border-border-default"
         >
           <div class="font-bold py-2 px-1 text-sm font-medium">
             {{ t("alert_templates.variable_guide_header") }}

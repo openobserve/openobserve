@@ -28,7 +28,7 @@
           </div>
         </template>
       </AppPageHeader>
-      <div class="card-container flex-1 min-h-0 overflow-hidden">
+      <div class="bg-card-glass-bg flex-1 min-h-0 overflow-hidden">
           <OTable
             :frame="false"
             data-test="search-scheduler-table"

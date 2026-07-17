@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :subtitle="'Create and manage organizations'"
         class="shrink-0 px-4 border-b border-border-default"
       />
-      <div class="card-container flex-1 min-h-0 mt-2.5 overflow-hidden">
+      <div class="bg-card-glass-bg flex-1 min-h-0 mt-2.5 overflow-hidden">
       <OTable
         :frame="false"
         data-test="org-management-list-table"

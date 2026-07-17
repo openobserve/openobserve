@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <div class="w-full flex-1 min-h-0 px-2.5 pb-2.5 pt-1">
         <div
-          class="card-container overflow-auto"
+          class="bg-card-glass-bg overflow-auto"
           style="max-height: calc(100vh - var(--navbar-height) - 157px)"
         >
           <div
@@ -427,7 +427,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div class="mx-2">
         <div
-          class="flex justify-end gap-2 px-3 w-full py-[0.625rem] card-container"
+          class="flex justify-end gap-2 px-3 w-full py-[0.625rem] bg-card-glass-bg"
           style="position: sticky; bottom: 0px; z-index: 2"
         >
           <OButton

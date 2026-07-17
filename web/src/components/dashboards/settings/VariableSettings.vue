@@ -14,8 +14,8 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <div class="full-height">
-    <div v-if="isAddVariable" class="flex flex-col full-height">
+  <div class="h-full max-h-full overflow-hidden">
+    <div v-if="isAddVariable" class="flex flex-col h-full max-h-full overflow-hidden">
       <AddSettingVariable
         v-if="isAddVariable"
         @save="handleSaveVariable"
@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :dashboardVariablesList="dashboardVariablesList"
       />
     </div>
-    <div v-else class="flex flex-col full-height">
+    <div v-else class="flex flex-col h-full max-h-full overflow-hidden">
       <DashboardHeader title="Variables">
         <template #right>
           <div class="flex gap-2">

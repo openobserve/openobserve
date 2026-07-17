@@ -1654,7 +1654,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :global-filter="searchObj.data.savedViewFilterFields"
                 :page-size="rowsPerPage"
                 :page-size-options="[10, 20, 50]"
-                class="saved-view-table full-height o2-table-hide-header"
+                class="saved-view-table h-full! max-h-full o2-table-hide-header"
               >
                 <template #top>
                   <div class="px-2 py-2 w-full min-w-0 box-border">
@@ -1761,7 +1761,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :columns="savedViewColumns"
                 row-key="view_id"
                 pagination="none"
-                class="saved-view-table full-height o2-table-hide-header"
+                class="saved-view-table h-full! max-h-full o2-table-hide-header"
               >
                 <template #top>
                   <div

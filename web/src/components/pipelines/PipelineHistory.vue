@@ -76,7 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="flex-1 min-h-0 overflow-hidden">
       <div
         data-test="pipeline-history-table"
-        class="pipeline-history-table card-container h-full"
+        class="pipeline-history-table bg-card-glass-bg h-full"
       >
         <OTable
           :frame="false"

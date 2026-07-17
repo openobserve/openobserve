@@ -74,7 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <keep-alive>
         <div class="flex-1 min-h-0">
           <div
-            class="card-container h-full overflow-hidden"
+            class="bg-card-glass-bg h-full overflow-hidden"
           >
             <component
               :is="Component"

@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="source-maps-container card-container flex flex-col h-full overflow-hidden"
+    class="source-maps-container bg-card-glass-bg flex flex-col h-full overflow-hidden"
   >
     <!-- Filters Section -->
     <div class="p-3 bg-(--color-surface-base)">

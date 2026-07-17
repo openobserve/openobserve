@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <section
-    class="card-container flex flex-col h-full px-2.5 py-1.5 min-w-0"
+    class="bg-card-glass-bg flex flex-col h-full px-2.5 py-1.5 min-w-0"
     data-test="rum-errors-over-time-chart"
   >
     <h4>{{ t("rum.errorsOverTime") }}</h4>

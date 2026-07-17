@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </AppPageHeader>
 
     <!-- Stepper -->
-    <div class="card-container h-[calc(100vh-7rem)] py-2 px-3 overflow-auto">
+    <div class="bg-card-glass-bg h-[calc(100vh-7rem)] py-2 px-3 overflow-auto">
     <div style="max-width: 720px;">
       <OForm
         ref="storageForm"

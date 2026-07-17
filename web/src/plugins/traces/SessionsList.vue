@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="sessions-list h-full! flex flex-col bg-surface-base card-container"
+    class="sessions-list h-full! flex flex-col bg-card-glass-bg"
   >
     <!-- No LLM streams exist in the org at all — nothing to select, so show
          the rich first-run empty state on its own (no table chrome). -->

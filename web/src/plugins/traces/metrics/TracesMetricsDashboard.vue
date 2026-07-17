@@ -722,7 +722,7 @@ defineExpose({
 
 <style scoped>
 /* keep(lib-override:render-dashboard-charts): RenderDashboardCharts renders its
-   own .card-container / .render-dashboard-charts-container DOM that we can only
+   own .bg-card-glass-bg / .render-dashboard-charts-container DOM that we can only
    reach through :deep to flatten the card shadow and tighten the chart padding. */
 .traces-metrics-dashboard :deep(.card-container) {
   box-shadow: none;

@@ -35,7 +35,7 @@
     <div class="job-form__body flex-1 min-h-0 overflow-hidden flex gap-2 max-[68.75rem]:flex-col">
       <div class="job-form__main flex-[6.5] min-w-0 min-h-0 overflow-auto flex flex-col gap-2 p-2 max-[68.75rem]:flex-auto">
         <!-- Target -->
-        <section class="card-container border border-(--color-dialog-header-border,var(--color-border-default)) rounded-md overflow-hidden shrink-0">
+        <section class="bg-card-glass-bg border border-(--color-dialog-header-border,var(--color-border-default)) rounded-md overflow-hidden shrink-0">
           <div class="flex items-center py-2.5 px-3 border-b border-(--color-border-default,var(--color-border-default))">
             <div class="w-[3px] h-4 rounded-sm mr-2 shrink-0 bg-(--color-theme-accent)" />
             <span class="text-compact font-semibold tracking-[0.01em] text-(--color-text-primary,currentColor)">{{ t("onlineEvals.job.targetSection") }}</span>
@@ -86,7 +86,7 @@
         </section>
 
         <!-- Scorers + Filter + Mapping -->
-        <section class="card-container border border-(--color-dialog-header-border,var(--color-border-default)) rounded-md overflow-hidden shrink-0">
+        <section class="bg-card-glass-bg border border-(--color-dialog-header-border,var(--color-border-default)) rounded-md overflow-hidden shrink-0">
           <div class="flex items-center py-2.5 px-3 border-b border-(--color-border-default,var(--color-border-default))">
             <div class="w-[3px] h-4 rounded-sm mr-2 shrink-0 bg-(--color-theme-accent)" />
             <span class="text-compact font-semibold tracking-[0.01em] text-(--color-text-primary,currentColor)">{{ t("onlineEvals.job.scorersSection") }}</span>
@@ -112,7 +112,7 @@
         </section>
 
         <!-- Sampling -->
-        <section class="card-container border border-(--color-dialog-header-border,var(--color-border-default)) rounded-md overflow-hidden shrink-0">
+        <section class="bg-card-glass-bg border border-(--color-dialog-header-border,var(--color-border-default)) rounded-md overflow-hidden shrink-0">
           <div class="flex items-center py-2.5 px-3 border-b border-(--color-border-default,var(--color-border-default))">
             <div class="w-[3px] h-4 rounded-sm mr-2 shrink-0 bg-(--color-theme-accent)" />
             <span class="text-compact font-semibold tracking-[0.01em] text-(--color-text-primary,currentColor)">{{ t("onlineEvals.job.stepper.sampling") }}</span>

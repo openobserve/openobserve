@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="sessions_page">
     <SearchBar></SearchBar>
     <OSplitter
-      class="logs-horizontal-splitter full-height"
+      class="logs-horizontal-splitter h-full max-h-full overflow-hidden"
       v-model="splitterModel"
       unit="px"
     >

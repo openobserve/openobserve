@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     data-test="error-viewer-container"
-    class="card-container h-full overflow-y-auto"
+    class="bg-card-glass-bg h-full overflow-y-auto"
   >
     <template v-if="isLoading.length">
       <div

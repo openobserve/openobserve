@@ -65,7 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Advanced Options -->
-          <div class="collapsible-section card-container flex flex-col transition-all overflow-hidden bg-card-glass-bg rounded-md shadow-[0_0_5px_1px_var(--color-hover-shadow)] border border-card-glass-border" data-test="advanced-options-section">
+          <div class="collapsible-section flex flex-col transition-all overflow-hidden bg-card-glass-bg rounded-md shadow-[0_0_5px_1px_var(--color-hover-shadow)] border border-card-glass-border" data-test="advanced-options-section">
             <div
               class="section-header flex items-center justify-between px-4 py-3 cursor-pointer shrink-0 border-b border-border-subtle transition-all rounded-t-md select-none hover:bg-interactive-hover-bg active:bg-interactive-hover-bg"
               @click="showAdvanced = !showAdvanced"

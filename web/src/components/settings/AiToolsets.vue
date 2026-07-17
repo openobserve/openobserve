@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </AppPageHeader>
 
       <!-- Table -->
-      <div class="card-container mt-2.5 overflow-hidden">
+      <div class="bg-card-glass-bg mt-2.5 overflow-hidden">
       <OTable
         :frame="false"
         :data="visibleRows"

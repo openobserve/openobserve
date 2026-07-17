@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="shrink-0 px-4 border-b border-border-default"
     />
     <div class="w-full flex-1 min-h-0 overflow-hidden">
-      <div class="card-container h-full">
+      <div class="bg-card-glass-bg h-full">
         <OTable
           :data="invitations"
           :columns="columns"

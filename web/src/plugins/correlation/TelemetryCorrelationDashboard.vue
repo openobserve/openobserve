@@ -167,7 +167,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Two-column body: sidebar + charts (q-splitter matching TracesAnalysisDashboard style) -->
           <OSplitter
             v-model="splitterModel"
-            class="flex-1 min-h-0 full-height w-full"
+            class="flex-1 min-h-0 h-full max-h-full overflow-hidden w-full"
           >
             <!-- -- Left sidebar -- -->
             <template #before>
@@ -671,7 +671,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Two-column body: sidebar + charts (q-splitter matching TracesAnalysisDashboard style) -->
         <OSplitter
           v-model="splitterModel"
-          class="flex-1 min-h-0 full-height w-full"
+          class="flex-1 min-h-0 h-full max-h-full overflow-hidden w-full"
         >
           <!-- -- Left sidebar -- -->
           <template #before>

@@ -85,7 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </AppPageHeader>
 
       <!-- List Table -->
-      <div class="card-container flex-1 min-h-0 overflow-hidden">
+      <div class="bg-card-glass-bg flex-1 min-h-0 overflow-hidden">
       <OTable
         ref="qTableRef"
         :frame="false"

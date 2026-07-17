@@ -18,16 +18,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
   <div
-    class="flex flex-col full-height"
-    style="
-      overflow: hidden !important;
-      padding: 0 !important;
-      margin: 0 !important;
-      height: 100%;
-    "
+    class="flex flex-col h-full max-h-full overflow-hidden"
   >
     <div
-      class="full-height w-full flex flex-col"
+      class="h-full max-h-full overflow-hidden w-full flex flex-col"
       ref="searchListContainer"
     >
       <!-- Section header: static at top -->

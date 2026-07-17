@@ -113,7 +113,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <!-- Right: dashboards table -->
       <div class="flex-1 min-w-0 h-full">
-        <div class="h-full card-container">
+        <div class="h-full bg-card-glass-bg">
           <OTable
             ref="oTableRef"
             :data="dashboards"

@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="card-container h-full flex flex-col pb-[0.3rem]">
+  <div class="bg-card-glass-bg h-full flex flex-col pb-[0.3rem]">
     <!-- Current org section (if super org, not a member) -->
     <div v-if="currentOrgToShow" class="mb-3">
       <div class="rounded-lg bg-card-glass-bg dark:bg-surface-base">
@@ -199,11 +199,11 @@ export default defineComponent({
 /* keep(lib-override:o2-tabs): OTabs/OTab internals (.o-tabs--vertical, .o-tab,
    .o-tabs) are child-component DOM this component can only reach through :deep();
    the active-tab → .member-id opacity is a descendant state chain. */
-.card-container :deep(.o-tabs--vertical) {
+.members-tabs :deep(.o-tabs--vertical) {
   margin: 0.3125rem;
 }
 
-.card-container :deep(.o-tabs--vertical .o-tab) {
+.members-tabs :deep(.o-tabs--vertical .o-tab) {
   justify-content: flex-start;
   padding: 0.375rem 1rem 0.375rem 1.25rem;
   border-radius: 0.5rem;
@@ -211,7 +211,7 @@ export default defineComponent({
   text-transform: none;
 }
 
-.card-container :deep(.o-tabs--vertical .o-tab[data-state="active"] .member-id) {
+.members-tabs :deep(.o-tabs--vertical .o-tab[data-state="active"] .member-id) {
   opacity: 0.85;
 }
 

@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="session-details-page h-[calc(100vh-2.6rem)]"
   >
   <div
-    class="session-details card-container h-full flex flex-col overflow-hidden bg-surface-base"
+    class="session-details bg-card-glass-bg h-full flex flex-col overflow-hidden"
   >
     <!-- Header — fixed top bar (back button + title + session identity +
          status/turns badges, trace-explorer action pinned right). Sits above the
@@ -74,7 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OSkeleton type="rect" animation="wave" class="rounded-sm w-[6.5rem] h-[0.6rem] mt-[0.4rem]" />
           </div>
         </div>
-        <div class="card-container rounded-lg border border-border-default pt-[1rem] px-[1rem] pb-[0.625rem] flex flex-col">
+        <div class="bg-card-glass-bg rounded-lg border border-border-default pt-[1rem] px-[1rem] pb-[0.625rem] flex flex-col">
           <OSkeleton type="rect" animation="wave" class="rounded-sm w-[8rem] h-[0.85rem] flex-shrink-0" />
           <!-- Fill the panel height (it stretches to the 6-tile block on the left)
                so the skeleton matches the real ribbon and leaves no gap below. -->
@@ -90,7 +90,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OSkeleton type="rect" animation="wave" class="rounded-sm flex-1 h-9" />
             <OSkeleton v-for="n in 3" :key="n" type="rect" animation="wave" class="rounded-sm w-[8rem] h-9" />
           </div>
-          <div class="card-container rounded-lg border border-border-default flex flex-col overflow-hidden">
+          <div class="bg-card-glass-bg rounded-lg border border-border-default flex flex-col overflow-hidden">
             <div class="flex items-center gap-[0.625rem] px-[1rem] py-[0.75rem] border-b border-border-default flex-shrink-0">
               <OSkeleton type="rect" animation="wave" class="rounded-sm w-[7rem] h-[1rem]" />
             </div>
@@ -105,7 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             v-for="c in 3"
             :key="c"
-            class="card-container rounded-lg border border-border-default flex flex-col overflow-hidden"
+            class="bg-card-glass-bg rounded-lg border border-border-default flex flex-col overflow-hidden"
           >
             <div class="px-[0.75rem] py-[0.5rem] border-b border-border-default flex-shrink-0">
               <OSkeleton type="rect" animation="wave" class="rounded-sm w-[6rem] h-[0.8rem]" />
@@ -317,7 +317,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Conversation panel -->
       <div
-        class="card-container rounded-lg border border-border-default mb-[0.625rem] flex flex-col overflow-hidden"
+        class="bg-card-glass-bg rounded-lg border border-border-default mb-[0.625rem] flex flex-col overflow-hidden"
         data-test="session-conversation-panel"
       >
         <!-- panel header: title + count chip + jump buttons -->
@@ -579,7 +579,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="session-rail"
       >
         <!-- Tool Hotspots (by time + calls; cost pending backend attribution) -->
-        <div class="card-container rounded-lg border border-border-default flex flex-col overflow-hidden">
+        <div class="bg-card-glass-bg rounded-lg border border-border-default flex flex-col overflow-hidden">
           <div class="flex items-center gap-[0.4rem] px-[0.75rem] py-[0.5rem] border-b border-border-default flex-shrink-0">
             <OIcon name="build" size="xs" class="text-text-muted" />
             <span class="text-xs font-semibold text-text-heading">
@@ -652,7 +652,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Cost Hotspots -->
-        <div class="card-container rounded-lg border border-border-default flex flex-col overflow-hidden">
+        <div class="bg-card-glass-bg rounded-lg border border-border-default flex flex-col overflow-hidden">
           <div class="flex items-center gap-[0.4rem] px-[0.75rem] py-[0.5rem] border-b border-border-default flex-shrink-0">
             <OIcon name="trending-up" size="xs" class="text-text-muted" />
             <span class="text-xs font-semibold text-text-heading">
@@ -696,7 +696,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Slowest Turns -->
-        <div class="card-container rounded-lg border border-border-default flex flex-col overflow-hidden">
+        <div class="bg-card-glass-bg rounded-lg border border-border-default flex flex-col overflow-hidden">
           <div class="flex items-center gap-[0.4rem] px-[0.75rem] py-[0.5rem] border-b border-border-default flex-shrink-0">
             <OIcon name="schedule" size="xs" class="text-text-muted" />
             <span class="text-xs font-semibold text-text-heading">

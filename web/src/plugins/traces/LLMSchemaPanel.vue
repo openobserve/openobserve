@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <div
-    class="card-container rounded-lg p-[1rem] flex flex-col border border-border-default"
+    class="bg-card-glass-bg rounded-lg p-[1rem] flex flex-col border border-border-default"
   >
     <div class="flex items-baseline justify-between mb-[0.25rem]">
       <div>

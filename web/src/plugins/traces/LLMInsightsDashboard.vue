@@ -16,8 +16,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <!-- Page wrapper is intentionally chrome-less: KPI tiles and trend
-       panels each carry their own `card-container`. Wrapping them in
-       another card-container would render same-bg-on-same-bg and the
+       panels each carry their own `bg-card-glass-bg`. Wrapping them in
+       another bg-card-glass-bg would render same-bg-on-same-bg and the
        inner cards would visually disappear (no border contrast). -->
   <div
     class="bg-transparent h-full flex flex-col px-2.5"
@@ -167,7 +167,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           v-for="card in kpiCards"
           :key="card.label"
-          class="card-container rounded-lg flex flex-col px-3.5 pt-2.5 pb-2.5 gap-1 bg-surface-base border border-border-default transition-shadow duration-200 hover:shadow-[0_1px_6px_rgba(0,0,0,0.08)]"
+          class="bg-card-glass-bg rounded-lg flex flex-col px-3.5 pt-2.5 pb-2.5 gap-1 border border-border-default transition-shadow duration-200 hover:shadow-[0_1px_6px_rgba(0,0,0,0.08)]"
         >
           <!-- P95 rides its own (slower) query — skeleton the WHOLE card while
                it loads, matching the initial strip skeleton tile (see

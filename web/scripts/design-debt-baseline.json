@@ -11,7 +11,7 @@
     "unscopedStyle": 10,
     "tsHex": 471,
     "inlineHexBind": 6,
-    "bareRounded": 8,
+    "bareRounded": 5,
     "hexClass": 14,
     "themeTernary": 9,
     "darkMechanism": 32,
@@ -364,9 +364,6 @@
     },
     "components/shared/HomeViewSkeleton.vue": {
       "arbRadius": 1
-    },
-    "components/shared/SkeletonBox.vue": {
-      "bareRounded": 3
     },
     "components/ThemeSwitcher.vue": {
       "themeTernary": 2,

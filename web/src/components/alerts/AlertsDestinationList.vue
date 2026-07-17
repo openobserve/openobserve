@@ -64,7 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </AppPageHeader>
       </template>
-      <div class="card-container flex-1 min-h-0">
+      <div class="bg-card-glass-bg flex-1 min-h-0">
         <OTable
           data-test="alert-destinations-list-table"
           :data="visibleRows"

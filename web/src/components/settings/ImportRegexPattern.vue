@@ -166,7 +166,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="activeTab === 'import_built_in_patterns'"
       class="w-full flex-1 min-h-0 overflow-hidden flex flex-col"
     >
-      <div class="card-container pt-2 px-2.5">
+      <div class="bg-card-glass-bg pt-2 px-2.5">
         <div class="app-tabs-container h-9 w-fit">
           <app-tabs
             data-test="regex-pattern-import-tabs"

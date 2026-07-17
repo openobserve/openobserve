@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="card-container w-[100vw] h-[100vh]">
+  <div class="bg-card-glass-bg w-[100vw] h-[100vh]">
     <div style="max-width: 400px; padding-top: 100px" class="mx-auto p-3">
       <div
         class="flex justify-center text-center"

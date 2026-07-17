@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="rounded-md p-0 flex flex-col h-full"
   >
     <div class="flex-none">
-      <div class="card-container">
+      <div class="bg-card-glass-bg">
         <div
           class="flex flex-col px-4 py-3 border-b-[1px]"
           style="position: sticky; top: 0; z-index: 1000;"
@@ -87,7 +87,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div class="flex-1 min-h-0">
       <div class="w-full h-full">
-        <div class="card-container h-full">
+        <div class="bg-card-glass-bg h-full">
           <div
             v-show="selectedQueryTypeTab === 'all'"
             class="h-full"

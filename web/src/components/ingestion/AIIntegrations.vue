@@ -101,7 +101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <template v-slot:after>
           <div class="w-full h-full">
-            <div class="card-container h-full" data-test="ai-integrations-detail-pane">
+            <div class="bg-card-glass-bg h-full" data-test="ai-integrations-detail-pane">
               <div class="overflow-auto h-full pt-0.5">
                 <router-view />
               </div>

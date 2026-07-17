@@ -12,8 +12,6 @@
    utilities, which Vue's scoped rewriter cannot follow (§3 — a component-local
    unscoped <style> is not a sanctioned global home). */
 @import "./keyframes.css";
-/* Shared @utility definitions — last resort, kept deliberately tiny (§3.2). */
-@import "./utilities.css";
 
 @plugin "@tailwindcss/typography";
 

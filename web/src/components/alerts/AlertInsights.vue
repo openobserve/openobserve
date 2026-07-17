@@ -205,7 +205,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Dashboard Content -->
     <div class="flex-1 min-h-0 px-2.5 pb-2.5">
-      <div class="card-container mb-2.5 h-[calc(100vh-13rem)]">
+      <div class="bg-card-glass-bg mb-2.5 h-[calc(100vh-13rem)]">
         <div
           @contextmenu="handleNativeContextMenu"
         >

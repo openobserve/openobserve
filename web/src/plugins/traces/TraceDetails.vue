@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         )
       "
     >
-      <div v-if="showHeader" class="trace-combined-header-wrapper card-container border-b border-border-default py-[0.2rem] shrink-0">
+      <div v-if="showHeader" class="trace-combined-header-wrapper bg-card-glass-bg border-b border-border-default py-[0.2rem] shrink-0">
         <!-- Standalone (routed) header: shared AppPageHeader -->
         <AppPageHeader
           v-if="mode === 'standalone'"
@@ -381,7 +381,7 @@ size="xs"
         </header>
       </div>
       <div
-        class="card-container overflow-hidden h-full"
+        class="bg-card-glass-bg overflow-hidden h-full"
         style="display: flex; flex-direction: column; min-height: 0"
       >
         <!-- Tabs & Search Bar -->

@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="flex flex-col h-full">
       <div
         data-test="iam-service-accounts-selection-filters"
-       class="flex justify-start px-3 py-2 card-container shrink-0"
+       class="flex justify-start px-3 py-2 bg-card-glass-bg shrink-0"
       >
         <div data-test="iam-service-accounts-selection-show-toggle" class="mr-3">
           <div class="flex items-center">
@@ -57,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
       </div>
-      <div data-test="iam-service-accounts-selection-table" class="flex-1 min-h-0 card-container">
+      <div data-test="iam-service-accounts-selection-table" class="flex-1 min-h-0 bg-card-glass-bg">
         <OTable
           :data="rows"
           :columns="columns"

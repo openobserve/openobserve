@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     data-test="dashboard-custom-html-editor-container"
-    class="card-container"
+    class="bg-card-glass-bg"
     style="width: 100%; height: 100%; overflow: hidden"
   >
     <div

@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template v-if="isSessionReplayEnabled">
       <div>
         <div
-          class="card-container border-b border-border-default py-[0.375rem] px-[0.375rem]"
+          class="bg-card-glass-bg border-b border-border-default py-[0.375rem] px-[0.375rem]"
         >
           <div class="flex items-start gap-1">
             <!-- Query editor (flex-grow to fill available space) -->
@@ -115,7 +115,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :horizontal="false"
       >
         <template #before>
-          <div class="card-container p-[0.325rem] h-full overflow-auto border-r border-border-default">
+          <div class="bg-card-glass-bg p-[0.325rem] h-full overflow-auto border-r border-border-default">
             <SearchFieldList
               :fields="streamFields"
               :time-stamp="{
@@ -134,7 +134,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #after>
           <div class="h-full flex flex-col min-h-0">
       <!-- KPI summary strip -->
-      <div class="card-container border-b border-border-default">
+      <div class="bg-card-glass-bg border-b border-border-default">
         <SessionsMetricsStrip
           :total="kpiMetrics.total"
           :error-sessions="kpiMetrics.errorSessions"
@@ -268,7 +268,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
 
-            <div class="card-container flex-1 min-h-0">
+            <div class="bg-card-glass-bg flex-1 min-h-0">
                 <OTable
                   :data="tableRows"
                   :columns="tableColumns"
@@ -380,7 +380,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OSplitter>
     </template>
     <template v-else>
-      <div class="card-container">
+      <div class="bg-card-glass-bg">
         <div class="p-4 enable-rum max-w-[64rem]">
           <div class="pb-4">
             <div class="text-left text-xl font-semibold font-bold pb-3">

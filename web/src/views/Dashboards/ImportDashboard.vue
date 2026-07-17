@@ -57,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OForm id="import-dashboard-form" :form="form" class="h-full flex flex-col min-h-0">
             <div class="w-full h-full flex flex-col min-h-0">
               <div
-                class="card-container py-[0.625rem] pl-[0.625rem] mb-1 shrink-0"
+                class="bg-card-glass-bg py-[0.625rem] pl-[0.625rem] mb-1 shrink-0"
               >
                 <div class="app-tabs-container h-9 w-fit">
                   <app-tabs
@@ -71,7 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div
                 v-if="activeTab == 'import_json_url'"
-                class="editor-container-url card-container py-1 flex-1 min-h-0 flex flex-col"
+                class="editor-container-url bg-card-glass-bg py-1 flex-1 min-h-0 flex flex-col"
               >
                 <div class="mx-2 mt-1 mb-1 flex flex-col flex-1 min-h-0">
                   <div style="width: calc(100% - 10px)" class="flex gap-2 w-full items-center shrink-0">
@@ -111,7 +111,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div
                 v-if="activeTab == 'import_json_file'"
-                class="dashboard-import-json-container card-container py-1 flex-1 min-h-0 flex flex-col"
+                class="dashboard-import-json-container bg-card-glass-bg py-1 flex-1 min-h-0 flex flex-col"
               >
                 <div class="mx-2 mt-1 mb-1 flex flex-col flex-1 min-h-0">
                   <div style="width: calc(100% - 10px)" class="flex gap-2 w-full items-center shrink-0">
@@ -172,7 +172,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #after>
             <div
               data-test="dashboard-import-error-container"
-              class="card-container h-full flex flex-col min-h-0 border-l border-border-default"
+              class="bg-card-glass-bg h-full flex flex-col min-h-0 border-l border-border-default"
             >
               <div class="text-center text-sm font-semibold text-text-primary py-3 shrink-0">Error Validations</div>
               <OSeparator class="mt-1 shrink-0" />

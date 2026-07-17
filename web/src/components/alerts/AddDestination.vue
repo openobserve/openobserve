@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
     </AppPageHeader>
     <div
-      class="card-container py-2"
+      class="bg-card-glass-bg py-2"
       style="flex: 1; overflow-y: auto; overflow-x: hidden"
     >
       <div>

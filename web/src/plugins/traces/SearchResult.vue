@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div data-test="traces-search-result" class="overflow-hidden h-full">
     <div
-      class="card-container h-full flex flex-col overflow-hidden"
+      class="bg-card-glass-bg h-full flex flex-col overflow-hidden"
     >
       <!-- Section header: title + count badge + insights + pagination -->
       <div

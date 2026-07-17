@@ -120,7 +120,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Collapsed dimension sidebar bar (shown when hidden) -->
         <div
           v-if="!showDimensionSelector"
-          class="card-container bg-surface-panel! shrink-0 cursor-pointer flex flex-col items-center justify-start pt-2 gap-1.5 w-12.5 h-full overflow-y-auto"
+          class="bg-surface-panel! shrink-0 cursor-pointer flex flex-col items-center justify-start pt-2 gap-1.5 w-12.5 h-full overflow-y-auto"
           data-test="dimension-selector-collapsed-bar"
           @click="toggleDimensionSelector"
         >
@@ -140,7 +140,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="relative-position h-full">
               <div
                 v-if="showDimensionSelector"
-                class="dimension-sidebar card-container h-full flex flex-col bg-surface-overlay"
+                class="dimension-sidebar bg-card-glass-bg h-full flex flex-col"
                 data-test="dimension-selector-sidebar"
               >
                 <!-- Sidebar Header with collapse button -->

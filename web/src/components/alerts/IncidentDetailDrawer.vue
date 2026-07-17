@@ -122,7 +122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </AppPageHeader>
 
     <!-- Content -->
-    <div v-if="!loading && incidentDetails" class="card-container flex flex-col overflow-hidden flex-1 min-h-0">
+    <div v-if="!loading && incidentDetails" class="bg-card-glass-bg flex flex-col overflow-hidden flex-1 min-h-0">
       <div class="flex-shrink-0 px-2 border-b border-border-default">
         <OTabs
           v-model="activeTab"

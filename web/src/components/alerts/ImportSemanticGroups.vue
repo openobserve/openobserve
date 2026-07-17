@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template #full-width-content>
       <div class="w-full p-2 h-full flex-1 min-h-0 flex flex-col overflow-hidden">
         <!-- Compact Header with File Upload -->
-        <div class="card-container p-2 mb-2">
+        <div class="bg-card-glass-bg p-2 mb-2">
           <div class="flex items-center">
             <div class="w-full col-md-8">
               <OFile
@@ -74,7 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Diff Preview Section with Scrollable Content -->
         <div v-if="diffData" class="flex flex-col h-full overflow-hidden">
           <!-- Compact Summary Bar -->
-          <div class="card-container p-2 mb-2">
+          <div class="bg-card-glass-bg p-2 mb-2">
             <div class="flex items-center gap-2">
               <div class="col-auto">
                 <OTag type="diffCategory" value="new" class="text-sm!">
@@ -116,7 +116,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Scrollable Groups Container -->
-          <div class="card-container groups-scroll-container flex-1 overflow-y-auto overflow-x-hidden p-2">
+          <div class="bg-card-glass-bg groups-scroll-container flex-1 overflow-y-auto overflow-x-hidden p-2">
             <!-- Additions -->
             <div v-if="diffData.additions.length > 0" class="mb-2">
               <div class="text-sm font-semibold border-b border-separator mb-1 text-status-positive p-1">
@@ -229,7 +229,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- No Diff State -->
         <div
           v-else-if="!isImporting && !diffData"
-          class="card-container p-4 text-center"
+          class="bg-card-glass-bg p-4 text-center"
         >
           <OIcon name="cloud-upload" class="mb-3" style="width: 64px; height: 64px;" />
           <div class="text-xl font-semibold text-text-muted mb-2">

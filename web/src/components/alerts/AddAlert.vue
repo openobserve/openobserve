@@ -121,7 +121,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div style="flex: 6.5; min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 8px; padding: 8px 0;">
 
       <!-- Stream Name & Stream Type -->
-      <div class="card-container shrink-0 stream-config-card [container-type:inline-size] [container-name:stream-config]">
+      <div class="bg-card-glass-bg shrink-0 stream-config-card [container-type:inline-size] [container-name:stream-config]">
         <div class="flex items-center gap-0 py-2.5 px-3 border-b border-border-default">
           <div class="w-[3px] h-4 rounded-sm mr-2 shrink-0 bg-[var(--color-theme-accent)]" />
           <span class="text-compact font-semibold tracking-[0.01em]">{{ t('alerts.streamConfig') }} <span class="text-text-primary">*</span></span>
@@ -176,7 +176,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- TIER 3: Configuration Tabs -->
-      <div class="alert-v3-tabs card-container" style="flex: 1; min-height: 0; display: flex; flex-direction: column; margin: 0 8px;">
+      <div class="alert-v3-tabs bg-card-glass-bg" style="flex: 1; min-height: 0; display: flex; flex-direction: column; margin: 0 8px;">
         <!-- Tab Headers -->
         <OToggleGroup
           :model-value="activeTab"
@@ -331,7 +331,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Footer: Cancel / Save (left column, separate card) -->
       <div
-        class="card-container flex items-center justify-end px-3 py-2.5 shrink-0 gap-2 border-t border-border-default"
+        class="bg-card-glass-bg flex items-center justify-end px-3 py-2.5 shrink-0 gap-2 border-t border-border-default"
       >
         <OButton
           data-test="add-alert-cancel-btn"
@@ -355,7 +355,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- border-l: full-height vertical divider flush against the Preview/Summary pane -->
       <div class="flex flex-col gap-2 border-l border-border-default pt-2 pb-2" style="flex: 3.5; min-width: 0; min-height: 0; overflow: hidden;">
         <!-- Preview Card -->
-        <div class="card-container overflow-hidden flex flex-col" style="flex: 1; min-height: 0;">
+        <div class="bg-card-glass-bg overflow-hidden flex flex-col" style="flex: 1; min-height: 0;">
           <div
             class="flex items-center px-3 py-[0.625rem] select-none border-b border-border-default shrink-0 gap-2"
           >
@@ -397,7 +397,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Summary Card -->
-        <div class="card-container overflow-hidden flex flex-col" style="flex: 1; min-height: 0;">
+        <div class="bg-card-glass-bg overflow-hidden flex flex-col" style="flex: 1; min-height: 0;">
           <div
             class="flex items-center px-3 py-[0.625rem] select-none border-b border-border-default shrink-0"
           >

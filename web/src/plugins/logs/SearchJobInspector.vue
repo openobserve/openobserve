@@ -225,7 +225,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Profile Data Table (OTable handles loading skeleton) -->
       <div v-if="loading || (profileData && profileData.events)" class="w-full flex-1 min-h-0 overflow-hidden">
-        <div class="card-container h-full">
+        <div class="bg-card-glass-bg h-full">
           <OTable
             :data="hierarchicalEvents"
             :columns="columns"

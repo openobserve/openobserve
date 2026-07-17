@@ -57,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :fieldValues="fieldValues"
               :isLoading="searchObj.loading"
               :activeTab="activeTab"
-              class="card-container"
+              class="bg-card-glass-bg"
               @searchdata="searchData"
               @onChangeTimezone="refreshTimezone"
               @update:activeTab="activeTab = $event"
@@ -128,7 +128,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :active-include-field-values="activeIncludeFilterValues"
                     :active-exclude-field-values="activeExcludeFilterValues"
                     data-test="traces-search-index-list"
-                    class="card-container h-full"
+                    class="h-full"
                     :key="searchObj.data.stream.streamLists"
                     @update:changeStream="onChangeStream"
                     @update:selectedFields="updateFieldVisibility"
@@ -152,7 +152,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                        so the empties don't flash in between. -->
                   <div
                     v-else-if="searchObj.loadingStream"
-                    class="card-container h-full flex flex-col items-center justify-center gap-2 text-text-secondary"
+                    class="bg-card-glass-bg h-full flex flex-col items-center justify-center gap-2 text-text-secondary"
                     data-test="traces-search-loading"
                   >
                     <OSpinner size="sm" />
@@ -164,7 +164,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       parseInt(searchObj.data.errorCode) !== 0 &&
                       searchObj.loading == false
                     "
-                    class="card-container h-full"
+                    class="bg-card-glass-bg h-full"
                   >
                     <div class="text-center pt-[2rem]">
                       <!-- Actual error case -->
@@ -232,7 +232,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       !searchObj.loading
                     "
                     data-test="traces-search-error-text"
-                    class="text-center py-10 text-xl card-container h-full"
+                    class="text-center py-10 text-xl bg-card-glass-bg h-full"
                   >
                     <SanitizedHtmlRenderer
                       data-test="traces-search-detail-error-message"

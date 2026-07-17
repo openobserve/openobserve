@@ -89,7 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- Header with title -->
-      <div class="card-container shrink-0 mb-[0.625rem]">
+      <div class="bg-card-glass-bg shrink-0 mb-[0.625rem]">
         <div
           class="services-header-bar flex justify-between items-center w-full py-3 px-4 h-[4.25rem]"
         >

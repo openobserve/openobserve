@@ -55,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           separator-class="w-[0.0625rem] bg-card-glass-border"
         >
           <template v-slot:before>
-            <div class="px-2 pt-2 pb-3 card-container h-full flex flex-col min-h-0">
+            <div class="px-2 pt-2 pb-3 bg-card-glass-bg h-full flex flex-col min-h-0">
               <div class="pb-2 o2-input flex flex-col flex-1 min-h-0">
                   <FullViewContainer
                     name="function"
@@ -121,7 +121,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </template>
           <template v-slot:after>
-            <div class="px-2 pt-2 pb-3 h-full overflow-y-auto card-container">
+            <div class="px-2 pt-2 pb-3 h-full overflow-y-auto bg-card-glass-bg">
               <TestFunction
                 ref="testFunctionRef"
                 :vrlFunction="vrlFunctionData"

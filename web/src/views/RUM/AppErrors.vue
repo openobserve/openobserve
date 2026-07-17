@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="sessions_page flex flex-col flex-1 min-h-0 overflow-hidden">
     <div>
-      <div class="card-container border-b border-border-default py-[0.375rem] px-[0.375rem]">
+      <div class="bg-card-glass-bg border-b border-border-default py-[0.375rem] px-[0.375rem]">
         <div class="flex items-start gap-1">
           <!-- Query editor (flex-grow to fill available space) -->
           <div class="flex-1 min-w-0 relative">
@@ -88,7 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
           </div><!-- end controls -->
         </div><!-- end flex row -->
-      </div><!-- end card-container -->
+      </div><!-- end bg-card-glass-bg -->
     </div><!-- end toolbar wrapper -->
     <OSplitter
       class="logs-horizontal-splitter flex-1 min-h-0"
@@ -97,7 +97,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :horizontal="false"
     >
       <template #before>
-        <div class="card-container p-[0.325rem] h-full overflow-auto border-r border-border-default">
+        <div class="bg-card-glass-bg p-[0.325rem] h-full overflow-auto border-r border-border-default">
           <SearchFieldList
             :fields="streamFields"
             :time-stamp="{
@@ -147,7 +147,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </div>
 
-          <div class="card-container flex-1 min-h-0 overflow-hidden">
+          <div class="bg-card-glass-bg flex-1 min-h-0 overflow-hidden">
           <OTable
             :data="visibleIssues"
             :columns="tableColumns"

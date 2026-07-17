@@ -85,7 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
     </AppPageHeader>
     <div class="flex-1 min-h-0 px-2.5 pt-2">
-      <div class="card-container h-full">
+      <div class="bg-card-glass-bg h-full">
         <OTable
           data-test="alert-history-table"
           :data="rows"

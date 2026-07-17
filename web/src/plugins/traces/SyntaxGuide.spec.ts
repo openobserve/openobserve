@@ -1,4 +1,4 @@
-// Copyright 2026 OpenObserve Inc.
+﻿// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -111,7 +111,11 @@ describe("SyntaxGuide", () => {
       const menu = document.querySelector('[data-test="syntax-guide-menu"]');
       expect(menu).toBeTruthy();
 
-      const title = document.querySelector(".syntax-guide-title .label");
+      // The .syntax-guide-title hook was removed when the rule moved to template
+
+      // utilities; the title still renders as .label inside the menu panel.
+
+      const title = document.querySelector('[data-test="syntax-guide-menu"] .label');
       expect(title?.textContent).toBe("Syntax Guide");
     });
 
@@ -120,10 +124,12 @@ describe("SyntaxGuide", () => {
       await button.trigger("click");
       await flushPromises();
 
-      const guideList = document.querySelector(".guide-list");
+      // .guide-list hook removed with its rule; the list is the panel's own <ul>.
+
+      const guideList = document.querySelector('[data-test="syntax-guide-menu"] ul');
       expect(guideList).toBeTruthy();
 
-      const listItems = document.querySelectorAll(".guide-list li");
+      const listItems = document.querySelectorAll('[data-test="syntax-guide-menu"] ul li');
       expect(listItems.length).toBeGreaterThan(0);
 
       // Check for specific normal mode content
@@ -159,7 +165,11 @@ describe("SyntaxGuide", () => {
       await button.trigger("click");
       await flushPromises();
 
-      const title = document.querySelector(".syntax-guide-title .label");
+      // The .syntax-guide-title hook was removed when the rule moved to template
+
+      // utilities; the title still renders as .label inside the menu panel.
+
+      const title = document.querySelector('[data-test="syntax-guide-menu"] .label');
       expect(title?.textContent).toBe("Syntax Guide: SQL Mode");
     });
 
@@ -168,10 +178,12 @@ describe("SyntaxGuide", () => {
       await button.trigger("click");
       await flushPromises();
 
-      const guideList = document.querySelector(".guide-list");
+      // .guide-list hook removed with its rule; the list is the panel's own <ul>.
+
+      const guideList = document.querySelector('[data-test="syntax-guide-menu"] ul');
       expect(guideList).toBeTruthy();
 
-      const listItems = document.querySelectorAll(".guide-list li");
+      const listItems = document.querySelectorAll('[data-test="syntax-guide-menu"] ul li');
       expect(listItems.length).toBeGreaterThan(0);
 
       // Check for specific SQL mode content
@@ -272,7 +284,7 @@ describe("SyntaxGuide", () => {
     });
   });
 
-  // ─── New tests covering functionality added after Dec 29 2025 ───────────────
+  // â”€â”€â”€ New tests covering functionality added after Dec 29 2025 â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   // Theming contract: `.dark` on <html> + --color-* tokens that flip
   // automatically. The menu no longer carries a per-theme root class; it is

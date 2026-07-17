@@ -67,7 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #before>
             <div class="w-full h-full flex flex-col border-r border-border-default">
               <!-- Tabs Section -->
-              <div class="card-container py-2 px-2 mb-1 shrink-0">
+              <div class="bg-card-glass-bg py-2 px-2 mb-1 shrink-0">
                 <div class="app-tabs-container h-9 w-fit">
                   <app-tabs
                     :data-test="`${testPrefix}-import-tabs`"
@@ -82,7 +82,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- URL Import Tab -->
               <div
                 v-if="activeTab === 'import_json_url'"
-                class="editor-container-url card-container py-1 flex-1 min-h-0 flex flex-col"
+                class="editor-container-url bg-card-glass-bg py-1 flex-1 min-h-0 flex flex-col"
               >
                 <div class="mx-2 mt-1 pb-2 flex flex-col flex-1 min-h-0">
                   <!-- Slot for custom URL input section -->
@@ -111,7 +111,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div
                 v-if="activeTab === 'import_json_file'"
-                class="editor-container-json card-container py-1 flex-1 min-h-0 flex flex-col"
+                class="editor-container-json bg-card-glass-bg py-1 flex-1 min-h-0 flex flex-col"
               >
                 <div class="mx-2 mt-1 pb-2 flex flex-col flex-1 min-h-0">
                   <!-- Slot for custom file input section -->
@@ -162,7 +162,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #after>
             <div
               :data-test="`${testPrefix}-import-output-editor`"
-              class="card-container w-full h-full flex flex-col min-h-0"
+              class="bg-card-glass-bg w-full h-full flex flex-col min-h-0"
             >
               <!-- Slot for complete output section customization -->
               <slot name="output-section">

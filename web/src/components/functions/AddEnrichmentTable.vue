@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-slot="{ isSubmitting }"
     >
       <!-- Form content -->
-      <div class="card-container flex-1 min-h-0 mb-2 flex flex-col overflow-y-auto p-4">
+      <div class="bg-card-glass-bg flex-1 min-h-0 mb-2 flex flex-col overflow-y-auto p-4">
         <div class="flex flex-col gap-4 max-w-[40rem]">
             <OFormInput
               name="name"
@@ -181,7 +181,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Footer -->
       <div
-        class="card-container flex items-center justify-end -mx-2.5 px-3 py-2.5 shrink-0 gap-2 border-t border-border-default"
+        class="bg-card-glass-bg flex items-center justify-end -mx-2.5 px-3 py-2.5 shrink-0 gap-2 border-t border-border-default"
       >
         <OButton
           data-test="add-enrichment-table-cancel-btn"

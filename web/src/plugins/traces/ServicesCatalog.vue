@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     ref="catalogContainerRef"
-    class="services-catalog h-full! flex flex-col bg-card-glass-solid card-container px-[0.625rem] relative overflow-hidden"
+    class="services-catalog h-full! flex flex-col bg-card-glass-bg px-[0.625rem] relative overflow-hidden"
   >
     <!-- Toolbar: stream selector (width-matched to the rail below) + search
          (width-matched to the table below) + status pills. The stream selector
@@ -298,7 +298,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            + records-per-page + pager) all match. OTable owns pagination, so we
            feed it the full sorted list and it paginates internally. -->
       <div v-else class="flex-1 min-w-0 h-full">
-        <div class="h-full card-container">
+        <div class="h-full bg-card-glass-bg">
           <OTable
             ref="oTableRef"
             :data="sortedServices"

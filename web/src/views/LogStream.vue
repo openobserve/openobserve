@@ -44,7 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </AppPageHeader>
       </template>
 
-      <div class="card-container h-full">
+      <div class="bg-card-glass-bg h-full">
       <OTable
         data-test="log-stream-table"
         :data="logStream"

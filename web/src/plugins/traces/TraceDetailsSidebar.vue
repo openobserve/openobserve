@@ -740,7 +740,7 @@ class="h-5! text-xs!">
         <!-- Correlated Logs Tab Panel -->
         <OTabPanel
           name="correlated-logs"
-          class="p-0 full-height traces-correlated-logs-container"
+          class="p-0 h-full max-h-full overflow-hidden traces-correlated-logs-container"
         >
           <CorrelatedLogsTable
             v-if="correlationProps"
@@ -793,7 +793,7 @@ class="h-5! text-xs!">
         <!-- Correlated Metrics Tab Panel -->
         <OTabPanel
           name="correlated-metrics"
-          class="p-0 full-height traces-correlated-metrics-container"
+          class="p-0 h-full max-h-full overflow-hidden traces-correlated-metrics-container"
         >
           <TelemetryCorrelationDashboard
             v-if="correlationProps"
