@@ -835,7 +835,11 @@
     "pipeline": "Boru hatları",
     "language": "Dil",
     "actions": "Eylemler",
-    "keyboardShortcuts": "Klavye Kısayolları"
+    "keyboardShortcuts": "Klavye Kısayolları",
+    "incidents": "Olaylar",
+    "evals": "Evalar",
+    "aiObservability": "Yapay Zeka Gözlemlenebilirliği",
+    "synthetic": "Sentetik"
   },
   "rum": {
     "title": "Gerçek Kullanıcı İzleme",
@@ -6532,6 +6536,70 @@
       "rumErrorsRefresh": "Listeyi yenileme",
       "rumSessionsRefresh": "Listeyi yenileme",
       "sourceMapsRefresh": "Listeyi yenileme"
+    }
+  },
+  "synthetics": {
+    "scheduleAlert": {
+      "title": "Zamanlama ve Uyarı",
+      "frequency": "Frekans",
+      "frequencyOptions": {
+        "1min": "1 dakika",
+        "5min": "5 dakika",
+        "15min": "15 dakika",
+        "30min": "30 dakika",
+        "1hour": "1 saat",
+        "cron": "Cron"
+      },
+      "scheduleNow": "Şimdi planlayın",
+      "scheduleLater": "Daha sonra planlayın",
+      "scheduleNowTooltip": "Kontrol, geçerli tarih ve saat dilimini kullanarak hemen aktif hale gelir.",
+      "scheduleLaterTooltip": "Çeki etkinleştirmek için gelecekteki bir tarih ve saat seçin.",
+      "startDate": "Başlangıç tarihi",
+      "startTime": "Başlangıç saati",
+      "timezone": "Saat dilimi",
+      "cronExpression": "Cron ifadesi",
+      "cronPlaceholder": "*/5* * * *",
+      "retries": "Tekrar denemeler",
+      "retriesOnFailure": "Başarısızlıkta yeniden deneniyor",
+      "retriesOnFailureSuffix": "zaman.",
+      "retryDelay": "Bekle",
+      "retryDelaySuffix": "Tekrar denemeler arasında ms.",
+      "alert": "Alarm",
+      "alertedIfFails": "Test başarısız olursa uyarılır",
+      "alertedIfFailsSuffix": "zaman.",
+      "destinations": "Destinasyonlar",
+      "noDestinations": "Mevcut varış noktası yok",
+      "refreshDestinations": "Hedefleri yenileme",
+      "addNewDestination": "Yeni Hedef Ekle",
+      "destinationRequired": "En az bir varış yeri gereklidir",
+      "cooldownPeriod": "Bekleme Süresi",
+      "minutes": "dakikalar"
+    },
+    "locations": {
+      "title": "Konumlar",
+      "locationAwsEast": "AWS · us-east-1",
+      "comingSoon": "Daha fazla bölge ve özel konum — Çok yakında"
+    },
+    "results": {
+      "title": "Sonuçları İzle",
+      "monitors": "Monitörler",
+      "editMonitor": "Monitörü Düzenle",
+      "uptime": "Çalışma Süresi",
+      "p95Duration": "P95 Süresi",
+      "failedRuns": "Başarısız Çalışmalar",
+      "lastRun": "Son Koşu",
+      "responseTime": "Yanıt Süresi",
+      "responseTimeSubtitle": "Toplam yolculuk süresi",
+      "recentRuns": "Son Koşullar",
+      "runs": "Koşuyor",
+      "noRuns": "Seçilen zaman aralığı için çalışma bulunamadı.",
+      "status": "Durum",
+      "started": "Başladı",
+      "duration": "Süre",
+      "location": "Yer",
+      "trigger": "Tetikleyici",
+      "passed": "Geçti",
+      "failed": "Başarısız"
     }
   }
 }

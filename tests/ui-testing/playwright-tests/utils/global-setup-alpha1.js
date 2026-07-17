@@ -495,9 +495,12 @@ async function performGlobalIngestion(page) {
     return;
   }
 
+  // Only e2e_automate is pre-provisioned as a shared fixture. The Alerts ui-operations
+  // tests that used to rely on a shared 'auto_playwright_stream' now self-ingest their
+  // own unique per-run streams, so we no longer pre-create (or wait on) that stream —
+  // on the shared cloud org it was routinely stuck "being deleted" by other branch runs.
   const streams = [
     { name: 'e2e_automate', data: logsdata },
-    { name: 'auto_playwright_stream', data: [{ level: 'info', job: 'test', log: 'test message for openobserve' }] },
   ];
 
   for (const stream of streams) {
@@ -539,12 +542,11 @@ async function performGlobalIngestion(page) {
 
       if (streamsResult.ok) {
         const hasE2e = streamsResult.names.includes('e2e_automate');
-        const hasAuto = streamsResult.names.includes('auto_playwright_stream');
-        if (hasE2e && hasAuto) {
-          testLogger.info(`[alpha1] Both streams indexed after ${Date.now() - startTime}ms`);
+        if (hasE2e) {
+          testLogger.info(`[alpha1] e2e_automate indexed after ${Date.now() - startTime}ms`);
           break;
         }
-        testLogger.debug(`[alpha1] Streams not yet indexed (e2e_automate=${hasE2e}, auto_playwright_stream=${hasAuto}), waiting...`);
+        testLogger.debug(`[alpha1] e2e_automate not yet indexed, waiting...`);
       } else {
         testLogger.debug(`[alpha1] Streams API returned ${streamsResult.status}, retrying...`);
       }
@@ -638,9 +640,12 @@ async function performGlobalIngestionWithFetch() {
     return;
   }
 
+  // Only e2e_automate is pre-provisioned as a shared fixture. The Alerts ui-operations
+  // tests that used to rely on a shared 'auto_playwright_stream' now self-ingest their
+  // own unique per-run streams, so we no longer pre-create (or wait on) that stream —
+  // on the shared cloud org it was routinely stuck "being deleted" by other branch runs.
   const streams = [
     { name: 'e2e_automate', data: logsdata },
-    { name: 'auto_playwright_stream', data: [{ level: 'info', job: 'test', log: 'test message for openobserve' }] },
   ];
 
   for (const stream of streams) {
@@ -673,8 +678,8 @@ async function performGlobalIngestionWithFetch() {
       if (r.ok) {
         const data = await r.json();
         const names = (data.list || []).map(s => s.name);
-        if (names.includes('e2e_automate') && names.includes('auto_playwright_stream')) {
-          testLogger.info(`[alpha1] Both streams indexed after ${Date.now() - startTime}ms`);
+        if (names.includes('e2e_automate')) {
+          testLogger.info(`[alpha1] e2e_automate indexed after ${Date.now() - startTime}ms`);
           return;
         }
       }

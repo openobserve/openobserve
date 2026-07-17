@@ -566,6 +566,15 @@ pub async fn create_org(
                     org.identifier
                 );
             }
+            if let Err(e) =
+                infra::table::synthetics_probe_tokens::create_for_org(&org.identifier, user_email)
+                    .await
+            {
+                log::error!(
+                    "Failed to create synthetics probe token for org '{}': {e}",
+                    org.identifier
+                );
+            }
 
             // Determine which user to add to the org
             // If service_account is specified, add it instead of the caller
@@ -771,6 +780,15 @@ pub async fn check_and_create_org(org_id: &str) -> Result<Organization, anyhow::
                     org.identifier
                 );
             }
+            if let Err(e) =
+                infra::table::synthetics_probe_tokens::create_for_org(&org.identifier, "system")
+                    .await
+            {
+                log::error!(
+                    "Failed to create synthetics probe token for org '{}': {e}",
+                    org.identifier
+                );
+            }
             Ok(org.clone())
         }
         Err(e) => {
@@ -805,6 +823,15 @@ pub async fn check_and_create_org_without_ofga(
             {
                 log::error!(
                     "Failed to create default ingestion token for org '{}': {e}",
+                    org.identifier
+                );
+            }
+            if let Err(e) =
+                infra::table::synthetics_probe_tokens::create_for_org(&org.identifier, "system")
+                    .await
+            {
+                log::error!(
+                    "Failed to create synthetics probe token for org '{}': {e}",
                     org.identifier
                 );
             }

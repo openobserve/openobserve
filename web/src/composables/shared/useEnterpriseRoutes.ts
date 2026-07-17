@@ -16,6 +16,17 @@
 import config from "@/aws-exports";
 import ServiceAccountsList from "@/components/iam/serviceAccounts/ServiceAccountsList.vue";
 import { routeGuard } from "@/utils/zincutils";
+import store from "@/stores";
+
+// Synthetics routes are gated on the backend /config flag `synthetics_enabled`
+// (enterprise O2_SYNTHETICS_ENABLED). Direct URL access redirects home when off.
+const syntheticsRouteGuard = (to: any, from: any, next: any) => {
+  if (store.state.zoConfig?.synthetics_enabled === false) {
+    next("/");
+    return;
+  }
+  routeGuard(to, from, next);
+};
 
 const IdentityAccessManagement = () =>
   import("@/views/IdentityAccessManagement.vue");
@@ -115,6 +126,46 @@ const useEnterpriseRoutes = () => {
   //the above are the routes that we support for oss including both enterprise and cloud
 
   if (config.isCloud == "true" || config.isEnterprise == "true") {
+    routes.push({
+      path: "synthetic",
+      name: "synthetic",
+      component: () => import("@/views/SyntheticMonitoring.vue"),
+      meta: { title: "Synthetic Monitoring" },
+      beforeEnter(to: any, from: any, next: any) {
+        syntheticsRouteGuard(to, from, next);
+      },
+    });
+
+    routes.push(
+      {
+        path: "synthetic/new",
+        name: "synthetic-new",
+        component: () => import("@/views/synthetics/CreateCheck.vue"),
+        meta: { title: "New Check" },
+        beforeEnter(to: any, from: any, next: any) {
+          syntheticsRouteGuard(to, from, next);
+        },
+      },
+      {
+        path: "synthetic/:id/results",
+        name: "synthetic-monitor-results",
+        component: () => import("@/views/synthetics/MonitorResults.vue"),
+        meta: { title: "Monitor Results" },
+        beforeEnter(to: any, from: any, next: any) {
+          syntheticsRouteGuard(to, from, next);
+        },
+      },
+      {
+        path: "synthetic/:id/results/run/:runId/:executionId",
+        name: "synthetic-run-detail",
+        component: () => import("@/views/synthetics/RunDetail.vue"),
+        meta: { title: "Run Detail" },
+        beforeEnter(to: any, from: any, next: any) {
+          syntheticsRouteGuard(to, from, next);
+        },
+      }
+    );
+
     routes.push(
       {
         path: "incidents",

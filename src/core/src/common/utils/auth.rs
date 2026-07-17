@@ -381,6 +381,30 @@ where
             path_columns[0].to_string()
         };
 
+        // Synthetics probe job + agent APIs — no org_id in path, authenticated
+        // via the o2syn_ probe token.
+        if method.eq("POST")
+            && path_columns.first() == Some(&"synthetics")
+            && matches!(path_columns.get(1), Some(&"jobs") | Some(&"agent"))
+        {
+            if let Some(auth_header) = parts.headers.get("Authorization")
+                && let Ok(auth_str) = auth_header.to_str()
+            {
+                return Ok(AuthExtractor {
+                    auth: auth_str.to_owned(),
+                    method,
+                    o2_type: String::new(),
+                    org_id: String::new(),
+                    bypass_check: true,
+                    parent_id: folder,
+                    use_all_org: false,
+                    use_self_context: false,
+                    use_self_parent: false,
+                });
+            }
+            return Err(AuthExtractorRejection::unauthorized("Unauthorized Access"));
+        }
+
         // This is case for ingestion endpoints where we need to check
         // permissions on the stream. Classified against the authoritative
         // ingestion-route table (method + exact path shape) rather than

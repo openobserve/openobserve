@@ -146,6 +146,13 @@ export class AlertTemplatesPage {
     }
 
     /**
+     * Wait for the templates list page to be ready (Add Template button visible).
+     */
+    async waitForTemplateListReady() {
+        await this.page.locator(this.addTemplateButton).waitFor({ state: 'visible', timeout: 30000 });
+    }
+
+    /**
      * Create a template via API first, fall back to UI if API fails
      * @param {string} templateName - Name of the template
      */

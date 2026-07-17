@@ -63,6 +63,7 @@ pub mod short_url;
 pub mod sourcemaps;
 pub mod status;
 pub mod stream;
+pub mod synthetics;
 
 pub use openobserve_api_common::request::{BulkDeleteRequest, BulkDeleteResponse};
 

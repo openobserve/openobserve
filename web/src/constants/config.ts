@@ -28,3 +28,12 @@ export const siteURL = {
   contactSupport: "https://openobserve.ai/contactus/",
   pricingJsonUrl: "https://openobserve.ai/pricing.json",
 }
+
+// Synthetics browser-test recorder (OpenObserve Extension / playwright-crx).
+// `extensionId` is the Chrome extension id the web app messages over
+// externally_connectable; overridable per-environment via the Vite env var.
+export const synthetics = {
+  extensionId:
+    import.meta.env.VITE_SYNTHETICS_EXTENSION_ID ||
+    "openobserve-recorder-extension",
+};

@@ -52,6 +52,7 @@ pub enum FolderType {
     Dashboards,
     Alerts,
     Reports,
+    Synthetics,
 }
 
 /// Common folder fields used in HTTP request and response bodies.
@@ -98,6 +99,7 @@ impl From<FolderType> for config::meta::folder::FolderType {
             FolderType::Dashboards => Self::Dashboards,
             FolderType::Alerts => Self::Alerts,
             FolderType::Reports => Self::Reports,
+            FolderType::Synthetics => Self::Synthetics,
         }
     }
 }

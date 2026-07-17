@@ -835,7 +835,11 @@
     "pipeline": "파이프라인",
     "language": "언어",
     "actions": "액션",
-    "keyboardShortcuts": "키보드 단축키"
+    "keyboardShortcuts": "키보드 단축키",
+    "incidents": "인시던트",
+    "evals": "평가",
+    "aiObservability": "AI 옵저버빌리티",
+    "synthetic": "합성"
   },
   "rum": {
     "title": "실제 사용자 모니터링",
@@ -6532,6 +6536,70 @@
       "rumErrorsRefresh": "목록 새로 고침",
       "rumSessionsRefresh": "목록 새로 고침",
       "sourceMapsRefresh": "목록 새로 고침"
+    }
+  },
+  "synthetics": {
+    "scheduleAlert": {
+      "title": "일정 및 알림",
+      "frequency": "주파수",
+      "frequencyOptions": {
+        "1min": "1분",
+        "5min": "5분",
+        "15min": "15분",
+        "30min": "30분",
+        "1hour": "1시간",
+        "cron": "크론"
+      },
+      "scheduleNow": "지금 예약하기",
+      "scheduleLater": "추후 일정 수립",
+      "scheduleNowTooltip": "체크는 현재 날짜 및 시간대를 사용하여 즉시 활성화됩니다.",
+      "scheduleLaterTooltip": "확인을 활성화할 미래 날짜 및 시간을 선택합니다.",
+      "startDate": "시작 날짜",
+      "startTime": "시작 시간",
+      "timezone": "타임존",
+      "cronExpression": "크론 표현식",
+      "cronPlaceholder": "*/5 * * * *",
+      "retries": "재시도",
+      "retriesOnFailure": "실패 시 재시도",
+      "retriesOnFailureSuffix": "타임스.",
+      "retryDelay": "기다려",
+      "retryDelaySuffix": "재시도 간격 (ms)",
+      "alert": "경고",
+      "alertedIfFails": "테스트 실패 시 알림",
+      "alertedIfFailsSuffix": "타임스.",
+      "destinations": "목적지",
+      "noDestinations": "이용 가능한 목적지 없음",
+      "refreshDestinations": "목적지 새로 고침",
+      "addNewDestination": "새 목적지 추가",
+      "destinationRequired": "목적지가 하나 이상 필요합니다.",
+      "cooldownPeriod": "쿨다운 기간",
+      "minutes": "분"
+    },
+    "locations": {
+      "title": "위치",
+      "locationAwsEast": "AWS · 미국-동부-1",
+      "comingSoon": "더 많은 지역 및 프라이빗 위치 — 곧 오픈 예정"
+    },
+    "results": {
+      "title": "모니터 결과",
+      "monitors": "모니터",
+      "editMonitor": "모니터 편집",
+      "uptime": "업타임",
+      "p95Duration": "P95 기간",
+      "failedRuns": "실패한 실행",
+      "lastRun": "라스트 런",
+      "responseTime": "응답 시간",
+      "responseTimeSubtitle": "총 여행 시간",
+      "recentRuns": "최근 런",
+      "runs": "뛰다",
+      "noRuns": "선택한 시간 범위에 해당하는 런을 찾을 수 없습니다.",
+      "status": "상태",
+      "started": "시작됨",
+      "duration": "지속",
+      "location": "위치",
+      "trigger": "트리거",
+      "passed": "합격",
+      "failed": "실패"
     }
   }
 }
