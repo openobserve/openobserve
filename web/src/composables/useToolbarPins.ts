@@ -42,13 +42,9 @@ const STORAGE_KEY = "logs_toolbar_pinned_items";
 // explicit pin/unpin, after which STORAGE_KEY alone is authoritative.
 //
 // - histogram: was a fixed toolbar control before it became pinnable.
-// - savedViews: its quick dropdown (apply/update in one click) only exists as
-//   a pinned control, so leaving it unpinned by default would hide the fast
-//   path behind the More menu's dialog flow.
-const DEFAULT_PINNED: ToolbarPinKey[] = ["histogram", "savedViews"];
+const DEFAULT_PINNED: ToolbarPinKey[] = ["histogram"];
 const PIN_DECIDED_KEYS: Partial<Record<ToolbarPinKey, string>> = {
   histogram: "logs_toolbar_histogram_pin_decided",
-  savedViews: "logs_toolbar_saved_views_pin_decided",
 };
 
 const isValidKey = (key: string): key is ToolbarPinKey =>

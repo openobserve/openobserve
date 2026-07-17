@@ -27,51 +27,21 @@ describe("useToolbarPins defaults", () => {
     window.localStorage.clear();
   });
 
-  it("pins histogram AND savedViews by default on a pristine profile", async () => {
+  it("pins ONLY histogram by default on a pristine profile", async () => {
     const { useToolbarPins } = await importFresh();
     const { isPinned } = useToolbarPins();
     expect(isPinned("histogram")).toBe(true);
-    expect(isPinned("savedViews")).toBe(true);
+    expect(isPinned("savedViews")).toBe(false);
     expect(isPinned("sqlMode")).toBe(false);
   });
 
-  it("adds savedViews for a pre-existing profile that never decided on it", async () => {
-    // A pins array persisted before savedViews became default-pinned: its
-    // absence means "never decided", not "unpinned".
+  it("keeps savedViews pinned for a user who pinned it explicitly", async () => {
     window.localStorage.setItem(
       "logs_toolbar_pinned_items",
-      JSON.stringify(["sqlMode"]),
+      JSON.stringify(["histogram", "savedViews"]),
     );
     const { useToolbarPins } = await importFresh();
-    const { isPinned } = useToolbarPins();
-    expect(isPinned("sqlMode")).toBe(true);
-    expect(isPinned("savedViews")).toBe(true);
-  });
-
-  it("respects an explicit unpin of savedViews (decided flag set)", async () => {
-    window.localStorage.setItem(
-      "logs_toolbar_pinned_items",
-      JSON.stringify(["histogram"]),
-    );
-    window.localStorage.setItem("logs_toolbar_saved_views_pin_decided", "true");
-    const { useToolbarPins } = await importFresh();
-    expect(useToolbarPins().isPinned("savedViews")).toBe(false);
-  });
-
-  it("unpinning savedViews records the decision so the default stops reapplying", async () => {
-    const { useToolbarPins } = await importFresh();
-    const { isPinned, togglePin } = useToolbarPins();
-    expect(isPinned("savedViews")).toBe(true);
-
-    togglePin("savedViews");
-    expect(isPinned("savedViews")).toBe(false);
-    expect(
-      window.localStorage.getItem("logs_toolbar_saved_views_pin_decided"),
-    ).toBe("true");
-
-    // A later session must not silently re-pin it.
-    const fresh = await importFresh();
-    expect(fresh.useToolbarPins().isPinned("savedViews")).toBe(false);
+    expect(useToolbarPins().isPinned("savedViews")).toBe(true);
   });
 
   it("keeps the histogram decided-flag behavior intact", async () => {
@@ -92,7 +62,6 @@ describe("useToolbarPins defaults", () => {
     expect(pinnedItems.value).toEqual([
       "histogram",
       "sqlMode",
-      "savedViews",
       "syntaxGuide",
     ]);
   });
