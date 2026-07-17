@@ -1,5 +1,6 @@
 {
   "totals": {
+    "rawProjectRamp": 146,
     "rawVarInComponent": 617,
     "arbZ": 40,
     "darkMechanism": 22,
@@ -8,7 +9,11 @@
   },
   "files": {
     "components/CodeQueryEditor.vue": {
+      "rawProjectRamp": 1,
       "rawVarInComponent": 2
+    },
+    "components/CommunitySlackInvite.vue": {
+      "rawProjectRamp": 6
     },
     "components/CustomDateTimePicker.vue": {
       "arbZ": 1
@@ -19,10 +24,14 @@
     "components/Header.vue": {
       "rawVarInComponent": 2
     },
+    "components/MenuLink.vue": {
+      "rawProjectRamp": 9
+    },
     "components/O2AIChat.vue": {
       "rawVarInComponent": 50
     },
     "components/OrganizationSelector.vue": {
+      "rawProjectRamp": 3,
       "rawVarInComponent": 2
     },
     "components/RichTextInput.vue": {
@@ -30,6 +39,7 @@
       "rawVarInComponent": 18
     },
     "components/TenstackTable.vue": {
+      "rawProjectRamp": 1,
       "rawVarInComponent": 3
     },
     "components/ThemeSwitcher.vue": {
@@ -69,6 +79,9 @@
     "components/alerts/IncidentRCAAnalysis.vue": {
       "rawVarInComponent": 36
     },
+    "components/alerts/IncidentServiceGraph.vue": {
+      "rawProjectRamp": 3
+    },
     "components/alerts/PrebuiltDestinationSelector.vue": {
       "arbZ": 2
     },
@@ -78,14 +91,42 @@
     "components/alerts/SemanticFieldGroupsConfig.vue": {
       "rawVarInComponent": 1
     },
+    "components/alerts/steps/QueryConfig.vue": {
+      "rawProjectRamp": 2
+    },
     "components/anomaly_detection/AnomalySummary.vue": {
       "rawVarInComponent": 7
+    },
+    "components/common/AppBreadcrumb.vue": {
+      "rawProjectRamp": 1
+    },
+    "components/common/AppPageHeader.vue": {
+      "rawProjectRamp": 1
     },
     "components/common/BaseImport.vue": {
       "unscopedStyle": 1
     },
     "components/common/LoadingProgress.vue": {
+      "rawProjectRamp": 2,
       "arbZ": 1
+    },
+    "components/common/SectionHub.vue": {
+      "rawProjectRamp": 5
+    },
+    "components/common/empty-states/QuickStartCard.vue": {
+      "rawProjectRamp": 4
+    },
+    "components/dashboards/AddDashboardFromGitHub.vue": {
+      "rawProjectRamp": 1
+    },
+    "components/dashboards/ColorSwatchPicker.vue": {
+      "rawProjectRamp": 3
+    },
+    "components/dashboards/ColumnFormatControls.vue": {
+      "rawProjectRamp": 2
+    },
+    "components/dashboards/OverrideConfigPopup.vue": {
+      "rawProjectRamp": 2
     },
     "components/dashboards/QueryInspector.vue": {
       "rawVarInComponent": 4
@@ -112,6 +153,7 @@
       "rawVarInComponent": 2
     },
     "components/pipeline/NodeForm/AssociateFunction.vue": {
+      "rawProjectRamp": 2,
       "rawVarInComponent": 7
     },
     "components/pipeline/NodeForm/CreateDestinationForm.vue": {
@@ -124,6 +166,9 @@
     "components/pipeline/PipelineEditor.vue": {
       "unscopedStyle": 1,
       "rawVarInComponent": 20
+    },
+    "components/pipeline/PipelineSectionTabs.vue": {
+      "rawProjectRamp": 2
     },
     "components/pipeline/PipelineView.vue": {
       "stylePxUnit": 6,
@@ -147,28 +192,107 @@
     "components/settings/OrgStorageEditor.vue": {
       "arbZ": 1
     },
+    "components/synthetics/CreateBrowserTestSkeleton.vue": {
+      "rawProjectRamp": 1
+    },
+    "components/synthetics/configure/CheckAlerts.vue": {
+      "rawProjectRamp": 1
+    },
+    "components/synthetics/configure/CheckAuthNetwork.vue": {
+      "rawProjectRamp": 1
+    },
+    "components/synthetics/configure/CheckBrowserDevices.vue": {
+      "rawProjectRamp": 1
+    },
+    "components/synthetics/configure/CheckCapture.vue": {
+      "rawProjectRamp": 1
+    },
+    "components/synthetics/configure/CheckDetails.vue": {
+      "rawProjectRamp": 1
+    },
+    "components/synthetics/configure/CheckLocations.vue": {
+      "rawProjectRamp": 1
+    },
+    "components/synthetics/configure/CheckSchedule.vue": {
+      "rawProjectRamp": 1
+    },
+    "components/synthetics/configure/types/CheckHttpConfig.vue": {
+      "rawProjectRamp": 1
+    },
+    "components/synthetics/configure/types/CheckSshConfig.vue": {
+      "rawProjectRamp": 1
+    },
+    "components/synthetics/configure/types/CheckTcpConfig.vue": {
+      "rawProjectRamp": 1
+    },
+    "components/synthetics/configure/types/CheckTlsConfig.vue": {
+      "rawProjectRamp": 1
+    },
+    "components/synthetics/journey/BrowserJourney.vue": {
+      "rawProjectRamp": 1
+    },
+    "components/synthetics/journey/BrowserJourneyStep.vue": {
+      "rawProjectRamp": 3
+    },
+    "components/synthetics/journey/JourneySteps.vue": {
+      "rawProjectRamp": 3
+    },
+    "components/synthetics/results/ProtocolRunSummary.vue": {
+      "rawProjectRamp": 6
+    },
+    "components/traces/FlameGraphView.vue": {
+      "rawProjectRamp": 1
+    },
+    "enterprise/components/billings/BillingGroup.vue": {
+      "rawProjectRamp": 5
+    },
+    "enterprise/components/billings/plans.vue": {
+      "rawProjectRamp": 1
+    },
+    "enterprise/components/onlineEvals/forms/EvalJobDetail.vue": {
+      "rawProjectRamp": 1
+    },
     "enterprise/components/onlineEvals/forms/ScoreConfigDetail.vue": {
       "rawVarInComponent": 4
     },
     "enterprise/components/onlineEvals/forms/ScoreConfigDialog.vue": {
+      "rawProjectRamp": 5,
       "rawVarInComponent": 6
     },
     "enterprise/components/onlineEvals/forms/ScorerDetail.vue": {
       "rawVarInComponent": 47
     },
     "enterprise/components/onlineEvals/forms/ScorerFormPage.vue": {
+      "rawProjectRamp": 4,
       "rawVarInComponent": 1
     },
     "enterprise/components/onlineEvals/forms/job/JobFilterBuilder.vue": {
       "rawVarInComponent": 2
     },
+    "enterprise/components/onlineEvals/forms/job/JobInputMapping.vue": {
+      "rawProjectRamp": 1
+    },
+    "enterprise/components/onlineEvals/forms/scorer/ScorerTestPanel.vue": {
+      "rawProjectRamp": 1
+    },
+    "lib/core/Button/OButton.vue": {
+      "rawProjectRamp": 4
+    },
+    "lib/core/Code/OCode.vue": {
+      "rawProjectRamp": 2
+    },
     "lib/core/Code/OCodeBlock.vue": {
       "rawVarInComponent": 13
     },
+    "lib/core/EmptyState/EmptyStateActionCard.vue": {
+      "rawProjectRamp": 4
+    },
     "lib/core/EmptyState/EmptyStateIngestionCard.vue": {
+      "rawProjectRamp": 3,
       "rawVarInComponent": 12
     },
     "lib/core/EmptyState/EmptyStateIngestionChip.vue": {
+      "rawProjectRamp": 3,
       "rawVarInComponent": 5
     },
     "lib/core/EmptyState/illustrations/EmptyAlert.vue": {
@@ -222,6 +346,9 @@
     "lib/core/EmptyState/illustrations/EmptyWaiting.vue": {
       "stylePxUnit": 2
     },
+    "lib/core/Navbar/ONavGroup.vue": {
+      "rawProjectRamp": 1
+    },
     "lib/core/Navbar/ONavbar.vue": {
       "rawVarInComponent": 1
     },
@@ -237,6 +364,9 @@
     "lib/core/Table/sub-components/OTableBodyRow.vue": {
       "rawVarInComponent": 1
     },
+    "lib/core/Table/sub-components/OTableColumnToggle.vue": {
+      "rawProjectRamp": 1
+    },
     "lib/feedback/Skeleton/OSkeleton.vue": {
       "rawVarInComponent": 1
     },
@@ -246,12 +376,22 @@
     "lib/forms/DateTimeRange/ODateRangeCalendar.vue": {
       "rawVarInComponent": 2
     },
+    "lib/forms/Input/OInput.vue": {
+      "rawProjectRamp": 1
+    },
     "lib/forms/Select/OSelect.vue": {
+      "rawProjectRamp": 4,
       "arbZ": 2
+    },
+    "lib/forms/Switch/OSwitch.vue": {
+      "rawProjectRamp": 2
     },
     "lib/lists/FieldList/OFieldList.vue": {
       "arbZ": 2,
       "rawVarInComponent": 1
+    },
+    "lib/navigation/Tabs/OTab.vue": {
+      "rawProjectRamp": 1
     },
     "lib/overlay/Dropdown/ODropdown.vue": {
       "arbZ": 1
@@ -277,6 +417,9 @@
     },
     "plugins/logs/patterns/PatternList.vue": {
       "rawVarInComponent": 6
+    },
+    "plugins/metrics/explorer/FunctionConfigDialog.vue": {
+      "rawProjectRamp": 2
     },
     "plugins/pipelines/CustomNode.vue": {
       "arbZ": 7,
@@ -307,6 +450,7 @@
       "rawVarInComponent": 9
     },
     "plugins/traces/SessionDetails.vue": {
+      "rawProjectRamp": 1,
       "arbZ": 1,
       "rawVarInComponent": 9
     },
@@ -376,6 +520,9 @@
     "views/Dashboards/DashboardSettings.vue": {
       "rawVarInComponent": 3
     },
+    "views/Dashboards/Dashboards.vue": {
+      "rawProjectRamp": 1
+    },
     "views/Dashboards/ImportDashboard.vue": {
       "unscopedStyle": 1
     },
@@ -390,14 +537,27 @@
       "unscopedStyle": 1,
       "rawVarInComponent": 1
     },
+    "views/HomeChatHistory.vue": {
+      "rawProjectRamp": 1
+    },
     "views/HomeView.vue": {
       "rawVarInComponent": 18
     },
     "views/OverviewTab.vue": {
+      "rawProjectRamp": 14,
       "arbZ": 1
     },
     "views/UsageTab.vue": {
       "rawVarInComponent": 2
+    },
+    "views/synthetics/CreateBrowserTest.vue": {
+      "rawProjectRamp": 3
+    },
+    "views/synthetics/MonitorRuns.vue": {
+      "rawProjectRamp": 3
+    },
+    "views/synthetics/RunDetail.vue": {
+      "rawProjectRamp": 1
     }
   }
 }

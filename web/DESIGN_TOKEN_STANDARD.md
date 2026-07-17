@@ -134,6 +134,23 @@ With that, **all 20 recommendations in AUDIT §11 are closed** — 17 implemente
 explicit recorded decision (5→superseded-by-standard, 13→intentional brand replicas,
 16→behaviour-preservation) rather than silence.
 
+**✅ Standard self-check pass (closing this doc's own last two open threads):**
+- **A9 (half-wired type scales)** — resolved per its "register the used steps" option: the USED
+  steps (`font-sans`/`font-mono`, weights normal/medium/semibold/bold re-exported under the correct
+  v4 `--font-weight-*` keys, `tracking-tight/normal/wide`) are now explicitly registered in
+  `component.css`'s `@theme inline`. **Probe-verified byte-identical** computed values before/after
+  (Geist stacks, 500/600/700, ±0.025em) — the utilities already resolved to our tokens via the
+  `:root` cascade-override of Tailwind's same-named theme vars; registration makes that declared
+  instead of incidental. `--leading-sm..xl` deliberately stay unregistered (0 utility uses —
+  var()-layer element sources only, D18).
+- **Part B / G.16 (stop registering the raw base ramps)** — the grey/primary ramps **stay
+  registered** while their 146 feature-code consumers exist: un-registering breaks them, and
+  migrating is not value-preserving (e.g. `bg-primary-600`→`bg-accent` flips 600→400 in dark).
+  Enforcement instead: a new **`rawProjectRamp` ratchet category** freezes those 146 sites — any
+  NEW `grey-*`/`primary-*` utility in feature code fails the per-PR `lint:design` gate, so the
+  count can only shrink toward the Part-B ideal. This is the one remaining *migration* (not
+  decision) in the system, and it is now mechanically fenced.
+
 Correction found during execution: `--text-3xl` (7 uses) and `--text-4xl` (3 uses) are **not**
 dead (the audit's §8.1 "0 uses" was stale) — kept.
 

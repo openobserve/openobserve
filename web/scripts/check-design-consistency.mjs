@@ -75,6 +75,12 @@ const PROPS = "text|bg|border|ring|fill|stroke|divide|outline|decoration|placeho
 // Categories evaluated over the WHOLE file text.
 const WHOLE = {
   rawPalette: new RegExp(`\\b(?:dark:|hover:|focus:|group-hover:|active:)*(?:${PROPS})-(?:${PALETTE})-\\d{2,3}\\b`, "g"),
+  // PROJECT raw-ramp utilities (Part B, Ring 3): feature code reaching for our own
+  // primitives (grey-*/primary-*) instead of semantic tokens. The ramps stay
+  // REGISTERED while these consumers exist (un-registering would break them, and
+  // migrating is not value-preserving — e.g. accent flips 600→400 in dark), so
+  // this ratchet freezes the count: it can only shrink toward the Part-B ideal.
+  rawProjectRamp: new RegExp(`\\b(?:dark:|hover:|focus:|group-hover:|active:|focus-visible:)*(?:${PROPS}|ring)-(?:grey|primary)-\\d{2,3}\\b`, "g"),
   hexClass: /-\[#[0-9a-fA-F]{3,8}\]/g,
   inlineHexStyle: /style="[^"]*#[0-9a-fA-F]{3,8}/g,
   inlineHexBind: /:style="[^"]*#[0-9a-fA-F]{3,8}/g,

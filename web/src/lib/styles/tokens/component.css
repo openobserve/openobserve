@@ -1726,6 +1726,23 @@
   --text-xl--line-height: calc(1.75 / 1.25);
   --text-2xl: var(--text-2xl);
   --text-2xl--line-height: calc(2 / 1.5);
+  /* A9 — explicitly register the USED font/tracking steps so the tokens declare
+     the utilities rather than relying on :root cascade-override of Tailwind's
+     same-named theme vars (verified: computed values identical before/after —
+     Geist stacks, 500/600/700, ±0.025em). Weight tokens live in base.css under
+     the legacy --font-<weight> names (v4's --font-* namespace is font-FAMILY,
+     so they are re-exported here under the correct --font-weight-* keys).
+     --leading-sm..xl are deliberately NOT registered: 0 utility uses — they are
+     var()-layer sources for element styles only (D18). */
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
+  --font-weight-normal: var(--font-normal);
+  --font-weight-medium: var(--font-medium);
+  --font-weight-semibold: var(--font-semibold);
+  --font-weight-bold: var(--font-bold);
+  --tracking-tight: var(--tracking-tight);
+  --tracking-normal: var(--tracking-normal);
+  --tracking-wide: var(--tracking-wide);
   /* Domain tokens (Â§3.K.4) */
   --color-highlight-bg: var(--color-highlight-bg);
   --color-brand-indigo: var(--color-brand-indigo);
