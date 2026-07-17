@@ -248,17 +248,18 @@ const handleToggle = (val: boolean) => {
 defineExpose({ reset: () => fieldValuesPanelRef.value?.reset() });
 </script>
 
-<style>
-.field-expansion-item button[data-state]:not([role="checkbox"]) {
-  min-height: 24px !important;
+<style scoped>
+/* keep(complex-state): :deep overrides of the child collapsible's trigger button
+   and content wrapper; the [data-state] rule targets this component's own item. */
+.field-expansion-item :deep(button[data-state]:not([role="checkbox"])) {
+  min-height: 1.5rem !important;
 }
 
-.field-expansion-item .o-collapsible-content {
+.field-expansion-item :deep(.o-collapsible-content) {
   width: 100%;
 }
 
 .field-expansion-item[data-state="open"] {
   margin-bottom: 0.375rem;
 }
-
 </style>

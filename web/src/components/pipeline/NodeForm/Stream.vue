@@ -526,17 +526,18 @@ defineExpose({
 });
 </script>
 
-<style>
+<style scoped>
+/* keep(complex-state): :deep overrides of the nested add-stream form's internal
+   structure (header row, nth input alignment, separators). */
 .pipeline-add-stream {
-  .add-stream-header.row {
+  :deep(.add-stream-header.row) {
     display: none;
   }
-  .add-stream-inputs :nth-child(5) {
-    /* background-color: red; */
+  :deep(.add-stream-inputs :nth-child(5)) {
     justify-content: flex-start;
   }
 
-  [role="separator"] {
+  :deep([role="separator"]) {
     display: none !important;
   }
 }

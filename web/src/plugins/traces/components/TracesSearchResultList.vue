@@ -400,8 +400,9 @@ const totalPages = computed(() =>
 );
 </script>
 
-<style>
-.traces-table-container .table-container {
+<style scoped>
+/* keep(complex-state): :deep override to square off the child table's corners */
+.traces-table-container :deep(.table-container) {
   border-radius: 0 !important;
 }
 </style>
