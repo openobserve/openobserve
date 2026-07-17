@@ -179,81 +179,81 @@ jobs:
       fail-fast: false
       matrix:
         include:
-#           - testfolder: "GeneralTests"
-#             browser: "chrome"
-#             run_files:
-#               [
-#                 "sanity.spec.js",
-#                 "changeOrg.spec.js",
-#                 "enrichment.spec.js",
-#                 "schema.spec.js",
-#                 "schemaload.spec.js",
-#                 "serviceAccount.spec.js",
-#                 "usersOrg.spec.js",
-#                 "org.spec.js",
-#                 "theme-management.spec.js",
-#                 "ingestion-config.spec.js",
-#                 "ingestionTokens.spec.js",
-#                 "landingPage.spec.js",
-#                 "languageTranslation.spec.js",
-#                 "model-pricing.spec.js",
-#                 "edition-features.spec.js",
-#                 "logsqueries.sql-comments.spec.js",
-#                 "iam-form-validation.spec.js",
-#                 "regex-patterns-form-validation.spec.js",
-#                 "cipher-keys-form-validation.spec.js",
-#                 "settings-form-validation.spec.js",
-#                 "ai-toolsets-form-validation.spec.js",
-#                 "shared-components-form-validation.spec.js",
-#                 "onboarding-form-validation.spec.js",
-#                 "rum-form-validation.spec.js",
-#               ]
-#           - testfolder: "Logs-Builder-Basic"
-#             browser: "chrome"
-#             run_files:
-#               [
-#                 "logsQueryBuilder-chart.spec.js",
-#                 "logsQueryBuilder-filters-basic.spec.js",
-#                 "pagination.spec.js",
-#                 "unflattened.spec.js",
-#               ]
-#           - testfolder: "Logs-Builder-Advanced"
-#             browser: "chrome"
-#             run_files:
-#               [
-#                 "logsQueryBuilder-editor.spec.js",
-#                 "logsQueryBuilder-filters-advanced.spec.js",
-#                 "logsquickmode.spec.js",
-#                 "logshistogram.spec.js",
-#               ]
-#           - testfolder: "Logs-Core"
-#             browser: "chrome"
-#             run_files:
-#               [
-#                 "logspage.spec.js",
-#                 "logstable.spec.js",
-#                 "logsqueries.spec.js",
-#                 "join.spec.js",
-#                 "shareLink.spec.js",
-#                 "logsAnalyzeDimensions.spec.js",
-#                 "monaco-query-prefill.spec.js",
-#                 "logsqueries.matchall.spec.js",
-#                 "ftsDefaultColumn.spec.js",
-#                 "logsVisualizePersistence.spec.js",
-#               ]
-#           - testfolder: "Logs-Features"
-#             browser: "chrome"
-#             run_files: [
-#                 "logs-autocomplete-suggestions.spec.js",
-#                 # "searchJobInspector.spec.js",  # TODO: update these tests for new correlation feature
-#                 "logs-sql-autocomplete.spec.js",
-#                 "logsqueries.cte.spec.js",
-#                 "logsDownloads.spec.js",
-#                 "secondsPrecisionAdded.spec.js",
-#                 "searchpartition.spec.js",
-#                 "indexquery.spec.js",
-#                 "region.spec.js",
-#               ]
+          - testfolder: "GeneralTests"
+            browser: "chrome"
+            run_files:
+              [
+                "sanity.spec.js",
+                "changeOrg.spec.js",
+                "enrichment.spec.js",
+                "schema.spec.js",
+                "schemaload.spec.js",
+                "serviceAccount.spec.js",
+                "usersOrg.spec.js",
+                "org.spec.js",
+                "theme-management.spec.js",
+                "ingestion-config.spec.js",
+                "ingestionTokens.spec.js",
+                "landingPage.spec.js",
+                "languageTranslation.spec.js",
+                "model-pricing.spec.js",
+                "edition-features.spec.js",
+                "logsqueries.sql-comments.spec.js",
+                "iam-form-validation.spec.js",
+                "regex-patterns-form-validation.spec.js",
+                "cipher-keys-form-validation.spec.js",
+                "settings-form-validation.spec.js",
+                "ai-toolsets-form-validation.spec.js",
+                "shared-components-form-validation.spec.js",
+                "onboarding-form-validation.spec.js",
+                "rum-form-validation.spec.js",
+              ]
+          - testfolder: "Logs-Builder-Basic"
+            browser: "chrome"
+            run_files:
+              [
+                "logsQueryBuilder-chart.spec.js",
+                "logsQueryBuilder-filters-basic.spec.js",
+                "pagination.spec.js",
+                "unflattened.spec.js",
+              ]
+          - testfolder: "Logs-Builder-Advanced"
+            browser: "chrome"
+            run_files:
+              [
+                "logsQueryBuilder-editor.spec.js",
+                "logsQueryBuilder-filters-advanced.spec.js",
+                "logsquickmode.spec.js",
+                "logshistogram.spec.js",
+              ]
+          - testfolder: "Logs-Core"
+            browser: "chrome"
+            run_files:
+              [
+                "logspage.spec.js",
+                "logstable.spec.js",
+                "logsqueries.spec.js",
+                "join.spec.js",
+                "shareLink.spec.js",
+                "logsAnalyzeDimensions.spec.js",
+                "monaco-query-prefill.spec.js",
+                "logsqueries.matchall.spec.js",
+                "ftsDefaultColumn.spec.js",
+                "logsVisualizePersistence.spec.js",
+              ]
+          - testfolder: "Logs-Features"
+            browser: "chrome"
+            run_files: [
+                "logs-autocomplete-suggestions.spec.js",
+                # "searchJobInspector.spec.js",  # TODO: update these tests for new correlation feature
+                "logs-sql-autocomplete.spec.js",
+                "logsqueries.cte.spec.js",
+                "logsDownloads.spec.js",
+                "secondsPrecisionAdded.spec.js",
+                "searchpartition.spec.js",
+                "indexquery.spec.js",
+                "region.spec.js",
+              ]
           - testfolder: "Alerts"
             browser: "chrome"
             run_files: [
@@ -270,211 +270,211 @@ jobs:
                 "alerts-form-validation.spec.js",
                 "anomaly-detection-form-validation.spec.js",
               ]
-#           - testfolder: "Dashboards-Core"
-#             browser: "chrome"
-#             run_files:
-#               [
-#                 "dashboard.spec.js",
-#                 "dashboard2.spec.js",
-#                 "dashboardtype.spec.js",
-#                 "dashboard-folder.spec.js",
-#                 "dashboard-import.spec.js",
-#                 "maxquery.spec.js",
-#                 "dashboard-chartJson.spec.js",
-#                 "dashboard-promql-suggestions.spec.js",
-#                 "dashboard-sql-autocomplete.spec.js",
-#                 "dashboard-share-link.spec.js",
-#                 "crossLinking.spec.js",
-#                 "dashboard-multi-sql.spec.js",
-#                 "crossLinkMultiStream.spec.js",
-#                 "dashboards-form-validation.spec.js",
-#               ]
-#           - testfolder: "Dashboards-Settings"
-#             browser: "chrome"
-#             run_files:
-#               [
-#                 "dashboard-filter.spec.js",
-#                 "dashboard-general-setting.spec.js",
-#                 "dashboard-tabs-setting.spec.js",
-#                 "dashboard-transpose.spec.js",
-#                 "dashboard-join.spec.js",
-#                 "dashboard-nested-functions.spec.js",
-#                 "dashboard-legends-copy.spec.js",
-#                 "dashboard-raw-query.spec.js",
-#               ]
-#           - testfolder: "Dashboards-Charts"
-#             browser: "chrome"
-#             run_files:
-#               [
-#                 "custom-charts.spec.js",
-#                 "dashboard-geoMap.spec.js",
-#                 "dashboard-maps.spec.js",
-#                 "dashboard-multi-y-axis.spec.js",
-#                 "dashboard-html-chart.spec.js",
-#                 "visualize.spec.js",
-#                 "visualize-vrl.spec.js",
-#                 "dashboard-create-alert.spec.js",
-#                 "dashboard-sankey.spec.js",
-#                 "dashboard-pie-donut.spec.js",
-#                 "dashboard-table-chart.spec.js",
-#                 "dashboard-table-copy-cell.spec.js",
-#                 "dashboard-table-csv-download.spec.js",
-#                 "dashboard-table-column-formatting.spec.js",
-#                 "dashboard-table-column-filtering.spec.js",
-#                 "dashboard-metric-camelcase.spec.js",
-#               ]
-#           - testfolder: "Dashboards-Streaming"
-#             browser: "chrome"
-#             run_files: ["dashboard-streaming.spec.js"]
-#           - testfolder: "Pipelines"
-#             browser: "chrome"
-#             run_files: [
-#                 "pipeline-conditions.spec.js",
-#                 "pipeline-conditions-validation.spec.js",
-#                 "pipelines.spec.js",
-#                 "pipeline-dynamic.spec.js",
-#                 "pipeline-core.spec.js",
-#                 "pipeline-traces.spec.js",
-#                 "pipeline-metrics.spec.js",
-#                 "pipeline-backfill.spec.js",
-#                 "pipeline-history.spec.js",
-#                 "scheduled-pipeline-query-builder.spec.js",
-#                 # "remotepipeline.spec.js"
-#                 "pipelines-form-validation.spec.js",
-#               ]
-#           - testfolder: "Functions"
-#             browser: "chrome"
-#             run_files:
-#               [
-#                 "js-transform-type.spec.js",
-#                 "row-expansion.spec.js",
-#                 "enrichment-table-url.spec.js",
-#                 "functions-form-validation.spec.js",
-#                 "action-scripts-form-validation.spec.js",
-#               ]
-#           - testfolder: "Reports"
-#             browser: "chrome"
-#             run_files:
-#               [
-#                 "reportsScheduleNow.spec.js",
-#                 "reportsScheduleLater.spec.js",
-#                 "reportFolders.spec.js",
-#                 "reports-bulk-operations.spec.js",
-#                 "reports-form-validation.spec.js",
-#                 "reportCsvMediaType.spec.js",
-#               ]
-#           - testfolder: "Streams"
-#             browser: "chrome"
-#             run_files:
-#               [
-#                 "multiselect-stream.spec.js",
-#                 "streamname.spec.js",
-#                 "streaming.spec.js",
-#                 "stream-settings.spec.js",
-#                 "streams-form-validation.spec.js",
-#               ]
-#           - testfolder: "Traces"
-#             browser: "chrome"
-#             run_files:
-#               [
-#                 "service-catalog.spec.js",
-#                 "tracesSearch.spec.js",
-#                 "traceQueryEditor.spec.js",
-#                 "traceErrorFilter.spec.js",
-#                 "traceDetails.spec.js",
-#                 "traceAdvancedFiltering.spec.js",
-#                 "tracesAnalyzeDimensions.spec.js",
-#                 "traces-autocomplete-suggestions.spec.js",
-#               ]
-#           # The RUM ingest/token/sourcemaps routes are part of the standard
-#           # (OSS) router (src/api/src/handler/http/router/mod.rs), so these specs run
-#           # against the OSS binary built by this workflow. Ingestion-auth
-#           # negative cases live in the API suite (tests/api-testing/tests/rum).
-#           - testfolder: "RUM"
-#             browser: "chrome"
-#             run_files:
-#               [
-#                 "rum-cdn-dataflow.spec.js",
-#                 "rum-npm-dataflow.spec.js",
-#                 "rum-page-dataflow.spec.js",
-#                 "rum-onboarding-snippets.spec.js",
-#                 "sourcemap-ui.spec.js",
-#                 "sourcemap-upload-pretty.spec.js",
-#               ]
-#           # rum-token.spec.js RESETS the org RUM token; running it beside the
-#           # dataflow specs (workers run files in parallel) would 401 their
-#           # in-flight SDK beacons. Own shard = own isolated instance.
-#           - testfolder: "RUM-Token"
-#             browser: "chrome"
-#             run_files: ["rum-token.spec.js"]
-#           - testfolder: "Metrics"
-#             browser: "chrome"
-#             run_files:
-#               [
-#                 "metrics.spec.js",
-#                 "metrics-queries.spec.js",
-#                 "metrics-aggregations.spec.js",
-#                 "metrics-advanced.spec.js",
-#                 "metrics-config-tabs.spec.js",
-#                 "metrics-visualizations.spec.js",
-#                 "metrics-config.spec.js",
-#                 "metrics-promql-query-persistence.spec.js",
-#                 "metrics-table-column-order.spec.js",
-#                 "metrics-promql-builder.spec.js",
-#                 "promqlAutocomplete.spec.js",
-#                 "metrics-share-deep-link.spec.js",
-#               ]
-#           - testfolder: "Dashboards-Variables"
-#             browser: "chrome"
-#             run_files:
-#               [
-#                 "dashboard-variables-setting.spec.js",
-#                 "dashboard-variables-global.spec.js",
-#                 "dashboard-variables-tab-level.spec.js",
-#                 "dashboard-variables-panel-level.spec.js",
-#                 "dashboard-variables-dependency.spec.js",
-#                 "dashboard-variables-refresh.spec.js",
-#                 "dashboard-variables-url-sync.spec.js",
-#                 "dashboard-variables-creation-scopes.spec.js",
-#                 "dashboard-variables-default-values-chain.spec.js",
-#                 "dashboard-variables-custom-parents.spec.js",
-#                 "dashboard-variables-stream-field.spec.js",
-#                 "dashboard-mustache-variables.spec.js",
-#               ]
-#           - testfolder: "Dashboard-Table-Pagination"
-#             browser: "chrome"
-#             run_files: ["dashboard-table-pagination.spec.js"]
-#           - testfolder: "Dashboard-Pivot-Table"
-#             browser: "chrome"
-#             run_files: ["dashboard-pivot-table.spec.js"]
-#           - testfolder: "Dashboards-Panel-Level-DateTime-Config"
-#             browser: "chrome"
-#             run_files:
-#               [
-#                 "dashboard-panel-time-config-behavior.spec.js",
-#                 "dashboard-panel-time-url-priority.spec.js",
-#                 "dashboard-panel-time-advanced-edge-cases.spec.js",
-#                 "dashboard-panel-time-apply-behavior.spec.js",
-#                 "dashboard-panel-time-variables-behavior.spec.js",
-#               ]
-#           - testfolder: "Dashboard-Config-Settings"
-#             browser: "chrome"
-#             run_files:
-#               [
-#                 "dashboard-series-color-multiwindow.spec.js",
-#                 "dashboard-config-advanced.spec.js",
-#                 "dashboard-config-axis.spec.js",
-#                 "dashboard-config-gauge-maps.spec.js",
-#                 "dashboard-config-general.spec.js",
-#                 "dashboard-config-legends.spec.js",
-#                 "dashboard-config-line-style.spec.js",
-#                 "dashboard-config-panel-time.spec.js",
-#                 "dashboard-config-table.spec.js",
-#                 "dashboard-config-trellis.spec.js",
-#                 "dashboard-config-drilldown.spec.js",
-#                 "dashboard-config-promql.spec.js",
-#                 "dashboard-config-markline.spec.js",
-#               ]
+          - testfolder: "Dashboards-Core"
+            browser: "chrome"
+            run_files:
+              [
+                "dashboard.spec.js",
+                "dashboard2.spec.js",
+                "dashboardtype.spec.js",
+                "dashboard-folder.spec.js",
+                "dashboard-import.spec.js",
+                "maxquery.spec.js",
+                "dashboard-chartJson.spec.js",
+                "dashboard-promql-suggestions.spec.js",
+                "dashboard-sql-autocomplete.spec.js",
+                "dashboard-share-link.spec.js",
+                "crossLinking.spec.js",
+                "dashboard-multi-sql.spec.js",
+                "crossLinkMultiStream.spec.js",
+                "dashboards-form-validation.spec.js",
+              ]
+          - testfolder: "Dashboards-Settings"
+            browser: "chrome"
+            run_files:
+              [
+                "dashboard-filter.spec.js",
+                "dashboard-general-setting.spec.js",
+                "dashboard-tabs-setting.spec.js",
+                "dashboard-transpose.spec.js",
+                "dashboard-join.spec.js",
+                "dashboard-nested-functions.spec.js",
+                "dashboard-legends-copy.spec.js",
+                "dashboard-raw-query.spec.js",
+              ]
+          - testfolder: "Dashboards-Charts"
+            browser: "chrome"
+            run_files:
+              [
+                "custom-charts.spec.js",
+                "dashboard-geoMap.spec.js",
+                "dashboard-maps.spec.js",
+                "dashboard-multi-y-axis.spec.js",
+                "dashboard-html-chart.spec.js",
+                "visualize.spec.js",
+                "visualize-vrl.spec.js",
+                "dashboard-create-alert.spec.js",
+                "dashboard-sankey.spec.js",
+                "dashboard-pie-donut.spec.js",
+                "dashboard-table-chart.spec.js",
+                "dashboard-table-copy-cell.spec.js",
+                "dashboard-table-csv-download.spec.js",
+                "dashboard-table-column-formatting.spec.js",
+                "dashboard-table-column-filtering.spec.js",
+                "dashboard-metric-camelcase.spec.js",
+              ]
+          - testfolder: "Dashboards-Streaming"
+            browser: "chrome"
+            run_files: ["dashboard-streaming.spec.js"]
+          - testfolder: "Pipelines"
+            browser: "chrome"
+            run_files: [
+                "pipeline-conditions.spec.js",
+                "pipeline-conditions-validation.spec.js",
+                "pipelines.spec.js",
+                "pipeline-dynamic.spec.js",
+                "pipeline-core.spec.js",
+                "pipeline-traces.spec.js",
+                "pipeline-metrics.spec.js",
+                "pipeline-backfill.spec.js",
+                "pipeline-history.spec.js",
+                "scheduled-pipeline-query-builder.spec.js",
+                # "remotepipeline.spec.js"
+                "pipelines-form-validation.spec.js",
+              ]
+          - testfolder: "Functions"
+            browser: "chrome"
+            run_files:
+              [
+                "js-transform-type.spec.js",
+                "row-expansion.spec.js",
+                "enrichment-table-url.spec.js",
+                "functions-form-validation.spec.js",
+                "action-scripts-form-validation.spec.js",
+              ]
+          - testfolder: "Reports"
+            browser: "chrome"
+            run_files:
+              [
+                "reportsScheduleNow.spec.js",
+                "reportsScheduleLater.spec.js",
+                "reportFolders.spec.js",
+                "reports-bulk-operations.spec.js",
+                "reports-form-validation.spec.js",
+                "reportCsvMediaType.spec.js",
+              ]
+          - testfolder: "Streams"
+            browser: "chrome"
+            run_files:
+              [
+                "multiselect-stream.spec.js",
+                "streamname.spec.js",
+                "streaming.spec.js",
+                "stream-settings.spec.js",
+                "streams-form-validation.spec.js",
+              ]
+          - testfolder: "Traces"
+            browser: "chrome"
+            run_files:
+              [
+                "service-catalog.spec.js",
+                "tracesSearch.spec.js",
+                "traceQueryEditor.spec.js",
+                "traceErrorFilter.spec.js",
+                "traceDetails.spec.js",
+                "traceAdvancedFiltering.spec.js",
+                "tracesAnalyzeDimensions.spec.js",
+                "traces-autocomplete-suggestions.spec.js",
+              ]
+          # The RUM ingest/token/sourcemaps routes are part of the standard
+          # (OSS) router (src/api/src/handler/http/router/mod.rs), so these specs run
+          # against the OSS binary built by this workflow. Ingestion-auth
+          # negative cases live in the API suite (tests/api-testing/tests/rum).
+          - testfolder: "RUM"
+            browser: "chrome"
+            run_files:
+              [
+                "rum-cdn-dataflow.spec.js",
+                "rum-npm-dataflow.spec.js",
+                "rum-page-dataflow.spec.js",
+                "rum-onboarding-snippets.spec.js",
+                "sourcemap-ui.spec.js",
+                "sourcemap-upload-pretty.spec.js",
+              ]
+          # rum-token.spec.js RESETS the org RUM token; running it beside the
+          # dataflow specs (workers run files in parallel) would 401 their
+          # in-flight SDK beacons. Own shard = own isolated instance.
+          - testfolder: "RUM-Token"
+            browser: "chrome"
+            run_files: ["rum-token.spec.js"]
+          - testfolder: "Metrics"
+            browser: "chrome"
+            run_files:
+              [
+                "metrics.spec.js",
+                "metrics-queries.spec.js",
+                "metrics-aggregations.spec.js",
+                "metrics-advanced.spec.js",
+                "metrics-config-tabs.spec.js",
+                "metrics-visualizations.spec.js",
+                "metrics-config.spec.js",
+                "metrics-promql-query-persistence.spec.js",
+                "metrics-table-column-order.spec.js",
+                "metrics-promql-builder.spec.js",
+                "promqlAutocomplete.spec.js",
+                "metrics-share-deep-link.spec.js",
+              ]
+          - testfolder: "Dashboards-Variables"
+            browser: "chrome"
+            run_files:
+              [
+                "dashboard-variables-setting.spec.js",
+                "dashboard-variables-global.spec.js",
+                "dashboard-variables-tab-level.spec.js",
+                "dashboard-variables-panel-level.spec.js",
+                "dashboard-variables-dependency.spec.js",
+                "dashboard-variables-refresh.spec.js",
+                "dashboard-variables-url-sync.spec.js",
+                "dashboard-variables-creation-scopes.spec.js",
+                "dashboard-variables-default-values-chain.spec.js",
+                "dashboard-variables-custom-parents.spec.js",
+                "dashboard-variables-stream-field.spec.js",
+                "dashboard-mustache-variables.spec.js",
+              ]
+          - testfolder: "Dashboard-Table-Pagination"
+            browser: "chrome"
+            run_files: ["dashboard-table-pagination.spec.js"]
+          - testfolder: "Dashboard-Pivot-Table"
+            browser: "chrome"
+            run_files: ["dashboard-pivot-table.spec.js"]
+          - testfolder: "Dashboards-Panel-Level-DateTime-Config"
+            browser: "chrome"
+            run_files:
+              [
+                "dashboard-panel-time-config-behavior.spec.js",
+                "dashboard-panel-time-url-priority.spec.js",
+                "dashboard-panel-time-advanced-edge-cases.spec.js",
+                "dashboard-panel-time-apply-behavior.spec.js",
+                "dashboard-panel-time-variables-behavior.spec.js",
+              ]
+          - testfolder: "Dashboard-Config-Settings"
+            browser: "chrome"
+            run_files:
+              [
+                "dashboard-series-color-multiwindow.spec.js",
+                "dashboard-config-advanced.spec.js",
+                "dashboard-config-axis.spec.js",
+                "dashboard-config-gauge-maps.spec.js",
+                "dashboard-config-general.spec.js",
+                "dashboard-config-legends.spec.js",
+                "dashboard-config-line-style.spec.js",
+                "dashboard-config-panel-time.spec.js",
+                "dashboard-config-table.spec.js",
+                "dashboard-config-trellis.spec.js",
+                "dashboard-config-drilldown.spec.js",
+                "dashboard-config-promql.spec.js",
+                "dashboard-config-markline.spec.js",
+              ]
     steps:
       - name: Kill background apt processes
         run: |
