@@ -180,7 +180,7 @@ describe("FunctionPicker", () => {
     const wrapper = createWrapper({ showFlatten: false });
     await flushPromises();
     expect(
-      wrapper.find('[data-test="function-picker-after-flatten-toggle"]').exists(),
+      wrapper.find('[data-test="associate-function-after-flattening-toggle"]').exists(),
     ).toBe(false);
   });
 });

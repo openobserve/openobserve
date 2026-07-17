@@ -67,7 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         v-if="conditionsError"
         class="text-xs text-input-error-text mt-1"
-        data-test="condition-builder-error"
+        data-test="add-condition-error"
       >
         {{ conditionsError }}
       </div>

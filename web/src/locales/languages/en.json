@@ -517,6 +517,7 @@
     },
     "function": {
       "createNew": "Create New Function",
+      "createNewNoteWorkflow": "Note: The function will be created, then you will be redirected to the previous form to associate the newly created function with the workflow.",
       "select": "Select Function",
       "required": "Field is required",
       "loadError": "Failed to load functions",

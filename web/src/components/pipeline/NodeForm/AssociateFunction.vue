@@ -44,9 +44,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @click:secondary="openCancelDialog"
     @click:neutral="openDeleteDialog"
   >
+    <!-- Padding drops away once the inline editor expands, so it can run
+         full-bleed and the picker's toggle row supplies its own spacing —
+         same contract WorkflowNodeDrawer follows. Padding here unconditionally
+         double-pads the toggle against that row. -->
     <div
       data-test="add-function-node-routing-section"
-      class="flex flex-col h-full px-3 pt-3 pb-3"
+      class="flex flex-col h-full"
+      :class="creating ? '' : 'px-3 pt-3 pb-3'"
     >
       <!-- NOTE: `is-updating` is deliberately NOT bound to pipelineObj.isEditNode.
            That flag means "editing the NODE"; the picker's isUpdating means

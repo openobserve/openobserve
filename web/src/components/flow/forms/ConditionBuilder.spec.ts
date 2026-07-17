@@ -112,7 +112,7 @@ describe("ConditionBuilder", () => {
     });
     await expect((wrapper.vm as any).submit()).resolves.toBeNull();
     await flushPromises();
-    expect(wrapper.find('[data-test="condition-builder-error"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="add-condition-error"]').exists()).toBe(true);
     expect(mockToast).not.toHaveBeenCalledWith(
       expect.objectContaining({ variant: "error" }),
     );

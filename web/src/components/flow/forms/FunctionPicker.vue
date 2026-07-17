@@ -28,6 +28,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
      a pipeline runs VRL, a workflow Function node runs JS — so each only offers
      functions it can actually execute.
 
+  ⚠️ The `data-test` hooks below (create-function-toggle,
+  associate-function-select-function-input, associate-function-definition-section,
+  associate-function-after-flattening-toggle) are the ORIGINAL names this markup
+  had while it lived in pipeline/NodeForm/AssociateFunction.vue. The pipeline e2e
+  suite locates by them, so they are a CONTRACT — extracting this component moved
+  the markup, not the behaviour, so renaming them would only break tests for no
+  gain. Keep them as-is; don't "namespace" them to the new file name.
+
   Props:
     initialName          — preselected function name (edit mode)
     initialAfterFlatten  — initial RAF/RBF value (default true)
@@ -59,8 +67,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OSwitch
           v-model="createNewFunction"
           :label="t('flow.function.createNew')"
-          data-test="function-picker-create-toggle"
+          data-test="create-function-toggle"
         />
+        <!-- Saving here creates the function and drops the user back on the
+             select form — surprising enough that it needs saying up front, so
+             the note lives at the toggle, not at the save. The host owns the
+             wording: this component is shared, and a workflow must not be told
+             its function is being associated with a "pipeline". -->
+        <div
+          v-if="createNewFunction"
+          class="text-sm text-text-secondary"
+          data-test="create-function-note"
+        >
+          ({{
+            wantsJs
+              ? t("flow.function.createNewNoteWorkflow")
+              : t("alerts.newFunctionAssociationMsg")
+          }})
+        </div>
       </div>
 
       <!-- inline function editor (full-width; its own toolbar owns save/cancel) -->
@@ -96,13 +120,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           searchable
           :readonly="isUpdating"
           :disabled="isUpdating"
-          data-test="function-picker-select"
+          data-test="associate-function-select-function-input"
         />
 
         <!-- read-only definition preview -->
         <div
           v-if="selectedFunction && selectedDefinition"
-          data-test="function-picker-definition"
+          data-test="associate-function-definition-section"
           class="mt-4 mb-4"
         >
           <!-- Dark styling is bound to the app theme (store.state.theme), NOT
@@ -149,7 +173,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OFormSwitch
             name="afterFlattening"
             :label="t('flow.function.flatten')"
-            data-test="function-picker-after-flatten-toggle"
+            data-test="associate-function-after-flattening-toggle"
           />
           <div class="bg-[#f9f290] text-[#2d3748] w-full rounded-md p-3 flex flex-col gap-2">
             <div class="text-sm text-[#2d3748]">
