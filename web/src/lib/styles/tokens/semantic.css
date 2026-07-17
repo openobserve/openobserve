@@ -35,6 +35,13 @@
   --color-surface-overlay: var(--color-white);
   --color-surface-subtle:       var(--color-grey-100);
   --color-surface-subtle-hover: var(--color-grey-200);
+  /* Accent-tinted interaction surfaces (§6). The ONE place the "hover/active on an
+     accent-tinted control" treatment lives, so buttons, menu items, tabs, selected
+     rows etc. share it — change it here and every accent hover/active surface moves.
+     Value-preserving repoint of the primary-50/100 (light) + primary-900/800 (dark)
+     cluster in component.css/dark.css. */
+  --color-surface-accent-hover:  var(--color-primary-50);
+  --color-surface-accent-active: var(--color-primary-100);
   /* App chrome (top bar + side rail + the gutter behind the content card) â€” a
      BARELY-tinted near-white (prototype --g-100 â‰ˆ #F5F6F9), just a whisper of
      brand hue so the white content card floats on a calm backdrop. A strong
@@ -81,6 +88,8 @@
   --color-surface-overlay: var(--color-surface-overlay);
   --color-surface-subtle:       var(--color-surface-subtle);
   --color-surface-subtle-hover: var(--color-surface-subtle-hover);
+  --color-surface-accent-hover:  var(--color-surface-accent-hover);
+  --color-surface-accent-active: var(--color-surface-accent-active);
   --color-surface-chrome:        var(--color-surface-chrome);
   --color-surface-chrome-deeper: var(--color-surface-chrome-deeper);
 

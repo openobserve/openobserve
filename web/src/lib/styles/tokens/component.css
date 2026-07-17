@@ -33,8 +33,8 @@
   --color-button-secondary: var(--color-surface-panel);
   --color-button-secondary-foreground: var(--color-text-heading);
   --color-button-secondary-border: var(--color-border-subtle, #e5e7eb);
-  --color-button-secondary-hover: var(--color-primary-50);
-  --color-button-secondary-active: var(--color-primary-100);
+  --color-button-secondary-hover: var(--color-surface-accent-hover);
+  --color-button-secondary-active: var(--color-surface-accent-active);
   --color-button-secondary-disabled: var(--color-surface-panel);
   --color-button-secondary-focus-ring: var(--color-primary-400);
 
@@ -43,20 +43,20 @@
   --color-button-outline-border: var(--color-border-default);
   --color-button-outline-hover-bg: var(--color-interactive-hover-bg);
   --color-button-outline-hover-border: var(--color-primary-300);
-  --color-button-outline-active-bg: var(--color-primary-100);
+  --color-button-outline-active-bg: var(--color-surface-accent-active);
   --color-button-outline-focus-ring: var(--color-primary-200);
 
   /* Button â€” ghost */
   --color-button-ghost-text: var(--color-text-heading);
-  --color-button-ghost-hover-bg: var(--color-primary-50);
-  --color-button-ghost-active-bg: var(--color-primary-100);
+  --color-button-ghost-hover-bg: var(--color-surface-accent-hover);
+  --color-button-ghost-active-bg: var(--color-surface-accent-active);
   --color-button-ghost-hover-ring: var(--color-primary-300);
   --color-button-ghost-focus-ring: var(--color-primary-400);
 
   /* Button â€” ghost-primary (flat + primary color text) */
   --color-button-ghost-primary-text: var(--color-primary-600);
-  --color-button-ghost-primary-hover-bg: var(--color-primary-50);
-  --color-button-ghost-primary-active-bg: var(--color-primary-100);
+  --color-button-ghost-primary-hover-bg: var(--color-surface-accent-hover);
+  --color-button-ghost-primary-active-bg: var(--color-surface-accent-active);
   --color-button-ghost-primary-focus-ring: var(--color-primary-400);
 
   /* Button â€” ghost-destructive (flat + destructive color text) */
@@ -74,14 +74,14 @@
   /* Button â€” ghost-muted (secondary text at rest â†’ primary text + bg on hover) */
   --color-button-ghost-muted-text: var(--color-text-secondary);
   --color-button-ghost-muted-hover-text: var(--color-primary-600);
-  --color-button-ghost-muted-hover-bg: var(--color-primary-50);
-  --color-button-ghost-muted-active-bg: var(--color-primary-100);
+  --color-button-ghost-muted-hover-bg: var(--color-surface-accent-hover);
+  --color-button-ghost-muted-active-bg: var(--color-surface-accent-active);
   --color-button-ghost-muted-focus-ring: var(--color-primary-400);
 
   /* Button â€” ghost-subtle (secondary text, 60 % opacity at rest, full on hover) */
   --color-button-ghost-subtle-text: var(--color-text-secondary);
-  --color-button-ghost-subtle-hover-bg: var(--color-primary-50);
-  --color-button-ghost-subtle-active-bg: var(--color-primary-100);
+  --color-button-ghost-subtle-hover-bg: var(--color-surface-accent-hover);
+  --color-button-ghost-subtle-active-bg: var(--color-surface-accent-active);
   --color-button-ghost-subtle-focus-ring: var(--color-primary-400);
 
   /* Button â€” ghost-warning (yellow-600 text for contrast on white, faint yellow tint on hover) */
@@ -120,7 +120,7 @@
   --color-toggle-item-bg: transparent;
   --color-toggle-item-text: var(--color-text-heading);
   --color-toggle-item-hover-bg: var(--color-primary-50);
-  --color-toggle-item-active-bg: var(--color-primary-100);
+  --color-toggle-item-active-bg: var(--color-surface-accent-active);
   --color-toggle-item-active-text: var(--color-primary-700);
   --color-toggle-item-disabled: var(--color-text-disabled);
   --color-toggle-border: var(--color-border-default);
@@ -130,8 +130,8 @@
   --color-dropdown-bg: var(--color-surface-overlay);
   --color-dropdown-border: var(--color-border-default);
   --color-dropdown-item-text: var(--color-text-heading);
-  --color-dropdown-item-hover-bg: var(--color-primary-50);
-  --color-dropdown-item-active-bg: var(--color-primary-100);
+  --color-dropdown-item-hover-bg: var(--color-surface-accent-hover);
+  --color-dropdown-item-active-bg: var(--color-surface-accent-active);
   --color-dropdown-item-disabled: var(--color-text-disabled);
   --color-dropdown-label: var(--color-text-secondary);
   --color-dropdown-separator: var(--color-border-default);
@@ -167,7 +167,7 @@
   /* Tabs */
   --color-tabs-indicator: var(--color-primary-600);
   --color-tabs-active-text: var(--color-primary-600);
-  --color-tabs-active-bg: var(--color-primary-100);
+  --color-tabs-active-bg: var(--color-surface-accent-active);
   --color-tabs-inactive-text: var(--color-text-heading);
   --color-tabs-hover-text: var(--color-text-heading);
   --color-tabs-hover-bg: color-mix(in srgb, var(--color-primary-100) 50%, var(--color-primary-50));
@@ -186,7 +186,7 @@
   --color-collapsible-caption: var(--color-text-secondary);
   --color-collapsible-icon: var(--color-text-secondary);
   --color-collapsible-trigger-hover-bg: var(--color-primary-100);
-  --color-collapsible-trigger-active-bg: var(--color-primary-100);
+  --color-collapsible-trigger-active-bg: var(--color-surface-accent-active);
   --color-collapsible-trigger-focus-ring: var(--color-primary-400);
 
   /* OFieldList / OFieldRow / OFieldLabel */
@@ -504,8 +504,8 @@
   --color-select-content-bg: var(--color-surface-overlay);
   --color-select-content-border: var(--color-border-default);
   --color-select-item-text: var(--color-text-heading);
-  --color-select-item-hover-bg: var(--color-primary-50);
-  --color-select-item-selected-bg: var(--color-primary-100);
+  --color-select-item-hover-bg: var(--color-surface-accent-hover);
+  --color-select-item-selected-bg: var(--color-surface-accent-active);
   --color-select-item-selected-text: var(--color-primary-700);
   --color-select-item-disabled: var(--color-text-disabled);
 
@@ -604,13 +604,13 @@
   --color-datepicker-popup-bg: var(--color-surface-overlay);
   --color-datepicker-popup-border: var(--color-border-default);
   --color-datepicker-day-text: var(--color-text-heading);
-  --color-datepicker-day-hover-bg: var(--color-primary-50);
+  --color-datepicker-day-hover-bg: var(--color-surface-accent-hover);
   --color-datepicker-day-selected-bg: var(--color-primary-600);
   --color-datepicker-day-selected-text: var(--color-white);
   --color-datepicker-day-today-border: var(--color-primary-400);
   --color-datepicker-day-outside-text: var(--color-text-disabled);
   --color-datepicker-day-disabled-text: var(--color-text-disabled);
-  --color-datepicker-nav-hover-bg: var(--color-primary-50);
+  --color-datepicker-nav-hover-bg: var(--color-surface-accent-hover);
   --color-datepicker-heading-text: var(--color-text-heading);
   --color-datepicker-weekday-text: var(--color-text-secondary);
   --color-datepicker-day-range-bg: var(--color-primary-100);
@@ -622,13 +622,13 @@
   --color-datepicker-clock-hand: var(--color-primary-600);
   --color-datepicker-clock-selected-bg: var(--color-primary-600);
   --color-datepicker-clock-selected-text: var(--color-white);
-  --color-datepicker-clock-hover-bg: var(--color-primary-50);
+  --color-datepicker-clock-hover-bg: var(--color-surface-accent-hover);
   /* DateTimeRange relative quick-select buttons */
   --color-datepicker-relative-btn-bg: var(--color-surface-subtle);
   --color-datepicker-relative-btn-text: var(--color-text-heading);
   --color-datepicker-relative-btn-selected-bg: var(--color-primary-600);
   --color-datepicker-relative-btn-selected-text: var(--color-white);
-  --color-datepicker-relative-btn-hover-bg: var(--color-primary-50);
+  --color-datepicker-relative-btn-hover-bg: var(--color-surface-accent-hover);
   --color-datepicker-relative-label: var(--color-text-secondary);
 
   /* Color picker (OColor) */

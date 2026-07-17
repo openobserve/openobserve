@@ -67,22 +67,38 @@ gone; `--color-primary-950` now JS-generated under a custom theme).
   oklch defaults, so it does not depend on the killed gray keys); Home + Logs render correctly in
   **both light and dark**; 0 console errors; 317 tests pass.
 
-**⏳ Still not shipped — genuinely blocked, not merely deferred (rest of Tier 2 + hygiene):**
-These would either violate the standard's own D18 "only create what's used" rule if done partially,
-or change rendered output in ways no automated check can verify:
-- **Tier 2.11/2.12/2.15** — the interaction-state vocab + the ~301-ref `component.css` rewire are a
-  single coupled refactor: adding the vocab alone creates unused tokens (D18), and the rewire is
-  **not** a value-preserving alias (e.g. routing a button-bg through `--color-accent` would flip it
-  from `primary-600`→`primary-400` in dark). Needs per-token design decisions. Minting overlay/soft
-  token sets is the same trap without migrating the ~360 rgba sites.
-- **Tier 2.13/2.14** — the brand-colour architecture decision and dark overrides for the brand-\*
-  replicas: those tokens are *intentionally* theme-independent (they must look like the real
-  Slack/Teams/Email in any theme), so adding dark treatment is a product decision. The concrete
-  brand bug (`primary-950`) was already fixed in Tier 0.
-- **Tier 3.18/3.19** — deriving `traceColors.ts` hex from the tokens changes rendered trace
-  colours; the 70-file chart-hex → `chartColor()` burn-down is on files *sanctioned* by the `tsHex`
-  allowlist (hex in ECharts JS, unaffected by Phase G); dismantling `utilities.css` has a 103-file
-  blast radius. All need a human visual pass, not a mechanical edit.
+**✅ Shipped — §6 semantic growth + rewire, and remaining hygiene:**
+- **§6 (the "root disease")** — grew the semantic layer with two interaction-state knobs,
+  `--color-surface-accent-hover` (light `primary-50` / dark `primary-900`) and
+  `--color-surface-accent-active` (light `primary-100` / dark `primary-800`), and repointed the
+  **22 component tokens** that conformed to that exact pair in *both* themes (button-ghost family,
+  dropdown/select items, tabs-active, datepicker hovers, …). **Verified value-preserving** in the
+  dev server: every repointed token resolves to the identical value it had before in light AND dark
+  — but the accent hover/active surface is now one knob, not 22 copies. Non-conforming refs
+  (`toggle`→`primary-950`, `table-selected`→`d-selected`, and the many where a base shade *is* the
+  right level — e.g. a button's `primary-600` brand bg) were correctly left alone.
+- **§8.1** — deleted the 16 dead raw-palette ramp ends (`teal-100/200/800/900`, `orange-100/200/800`,
+  `lime-100/200/800/900`, `amber-800/900`, `cyan-100/200/800`; `orange-900`/`cyan-900` kept — used).
+  Token count now **1009**.
+- **§10** — `utilities.css` no longer exists (removed since the audit — the dismantle is moot);
+  `traceColors.ts` — the audit's actual bug (docstring lying that it reads the tokens) was fixed in
+  the prior pass. Deriving `getSpanColorHex` from `--color-span-*` was deliberately NOT done: it
+  feeds the trace **service-colour registry**, so it would silently reassign every service's colour
+  with no benefit (both sets are just "distinct colours").
+
+**⏳ Deliberately not shipped — a design decision, not a mechanical edit:**
+- **Tier 2.13/2.14 dark overrides for the brand-\* annex (§8.4).** Reviewed all 50 tokens that lack a
+  dark override: they are *intentionally* theme-independent per their own authoring comments — the
+  brand replicas must look like real Slack/Teams/Email in any app theme, the promo-banner art is
+  always-amber, and the language/AI accent tints are translucent (sit fine on light and dark). Adding
+  dark treatment would make them *wrong*, so §8.4 is resolved-as-intended, not a defect. The one
+  concrete brand bug (`primary-950`) was fixed in Tier 0.
+- **Tier 2.15 overlay/soft/chart-palette token sets** — skipped on purpose: minting them without
+  migrating the ~360 rgba / chart-hex consumers would create unused tokens, which violates the
+  standard's own D18 ("only create what's used").
+- **Tier 3.19 chart-hex burn-down** — the ~70 ECharts `.ts` files are hex-in-JS, `tsHex`-allowlisted
+  and unaffected by Phase G; converting them to `chartColor()` changes rendered chart palettes and
+  needs a human visual pass per chart, not a codemod.
 
 Correction found during execution: `--text-3xl` (7 uses) and `--text-4xl` (3 uses) are **not**
 dead (the audit's §8.1 "0 uses" was stale) — kept.

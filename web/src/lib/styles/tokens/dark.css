@@ -130,6 +130,10 @@
     --color-surface-overlay:      var(--d-overlay); /* dropdowns, dialogs, selects, popovers */
     --color-surface-subtle:       var(--d-well);    /* recessed fills, segmented track */
     --color-surface-subtle-hover: var(--d-panel);   /* hover on a recessed fill (one step up) */
+    /* Accent-tinted interaction surfaces (§6) — dark values of the repointed
+       primary-900/800 cluster. Change the accent hover/active look here for dark. */
+    --color-surface-accent-hover:  var(--color-primary-900);
+    --color-surface-accent-active: var(--color-primary-800);
     --color-surface-chrome:        var(--d-chrome);  /* top bar + left rail */
     --color-surface-chrome-deeper: var(--d-chrome);  /* gutter behind card (same frame) */
 
@@ -146,8 +150,8 @@
     --color-button-secondary: var(--color-surface-overlay);
     --color-button-secondary-foreground: var(--color-text-heading);
     --color-button-secondary-border: var(--color-border-subtle, rgba(255,255,255,0.12));
-    --color-button-secondary-hover: var(--color-primary-900);
-    --color-button-secondary-active: var(--color-primary-800);
+    --color-button-secondary-hover: var(--color-surface-accent-hover);
+    --color-button-secondary-active: var(--color-surface-accent-active);
     --color-button-secondary-disabled: var(--color-surface-overlay);
 
     /* outline */
@@ -155,17 +159,17 @@
     --color-button-outline-border: var(--color-border-default);
     --color-button-outline-hover-bg: var(--color-primary-900);
     --color-button-outline-hover-border: var(--color-border-strong);
-    --color-button-outline-active-bg: var(--color-primary-800);
+    --color-button-outline-active-bg: var(--color-surface-accent-active);
 
     /* ghost */
     --color-button-ghost-text: var(--color-text-heading);
-    --color-button-ghost-hover-bg: var(--color-primary-900);
-    --color-button-ghost-active-bg: var(--color-primary-800);
+    --color-button-ghost-hover-bg: var(--color-surface-accent-hover);
+    --color-button-ghost-active-bg: var(--color-surface-accent-active);
 
     /* ghost-primary */
     --color-button-ghost-primary-text: var(--color-primary-400);
-    --color-button-ghost-primary-hover-bg: var(--color-primary-900);
-    --color-button-ghost-primary-active-bg: var(--color-primary-800);
+    --color-button-ghost-primary-hover-bg: var(--color-surface-accent-hover);
+    --color-button-ghost-primary-active-bg: var(--color-surface-accent-active);
 
     /* ghost-destructive */
     --color-button-ghost-destructive-text: var(--color-error-400);
@@ -179,12 +183,12 @@
 
     /* ghost-muted */
     --color-button-ghost-muted-hover-text: var(--color-primary-400);
-    --color-button-ghost-muted-hover-bg: var(--color-primary-900);
-    --color-button-ghost-muted-active-bg: var(--color-primary-800);
+    --color-button-ghost-muted-hover-bg: var(--color-surface-accent-hover);
+    --color-button-ghost-muted-active-bg: var(--color-surface-accent-active);
 
     /* ghost-subtle */
-    --color-button-ghost-subtle-hover-bg: var(--color-primary-900);
-    --color-button-ghost-subtle-active-bg: var(--color-primary-800);
+    --color-button-ghost-subtle-hover-bg: var(--color-surface-accent-hover);
+    --color-button-ghost-subtle-active-bg: var(--color-surface-accent-active);
 
     /* destructive */
     --color-button-destructive-focus-ring: var(--color-error-300);
@@ -192,8 +196,8 @@
     /* ButtonGroup Î“Ã‡Ã¶ divider inherits from border-default override above */
 
     /* Dropdown */
-    --color-dropdown-item-hover-bg: var(--color-primary-900);
-    --color-dropdown-item-active-bg: var(--color-primary-800);
+    --color-dropdown-item-hover-bg: var(--color-surface-accent-hover);
+    --color-dropdown-item-active-bg: var(--color-surface-accent-active);
     --color-dropdown-item-destructive-text: var(--color-error-400);
     --color-dropdown-item-destructive-hover-bg: var(--color-surface-overlay);
 
@@ -209,14 +213,14 @@
     --color-toggle-item-active-text: var(--color-white);
 
     /* Tabs */
-    --color-tabs-active-bg: var(--color-primary-800);
+    --color-tabs-active-bg: var(--color-surface-accent-active);
     --color-tabs-active-text: var(--color-white);
     --color-tabs-hover-bg: var(--color-primary-900);
     --color-tabs-bar-border: var(--color-grey-700);
 
     /* Collapsible */
     --color-collapsible-trigger-hover-bg: var(--color-primary-900);
-    --color-collapsible-trigger-active-bg: var(--color-primary-800);
+    --color-collapsible-trigger-active-bg: var(--color-surface-accent-active);
 
     /* OFieldList / OFieldRow / OFieldLabel */
     --color-field-list-row-hover-bg:   var(--color-primary-900);
@@ -344,8 +348,8 @@
     --color-select-border-error: var(--color-error-400);
     --color-select-content-bg: var(--color-surface-overlay);
     --color-select-content-border: var(--color-border-default);
-    --color-select-item-hover-bg: var(--color-primary-900);
-    --color-select-item-selected-bg: var(--color-primary-800);
+    --color-select-item-hover-bg: var(--color-surface-accent-hover);
+    --color-select-item-selected-bg: var(--color-surface-accent-active);
     --color-select-item-selected-text: var(--color-primary-200);
     --color-select-item-disabled: var(--color-text-disabled);
 
@@ -410,20 +414,20 @@
     /* DatePicker calendar popup */
     --color-datepicker-popup-bg: var(--color-surface-overlay);
     --color-datepicker-popup-border: var(--color-border-default);
-    --color-datepicker-day-hover-bg: var(--color-primary-900);
+    --color-datepicker-day-hover-bg: var(--color-surface-accent-hover);
     --color-datepicker-day-selected-bg: var(--color-primary-500);
     --color-datepicker-day-today-border: var(--color-primary-400);
     --color-datepicker-day-outside-text: var(--color-text-disabled);
-    --color-datepicker-nav-hover-bg: var(--color-primary-900);
+    --color-datepicker-nav-hover-bg: var(--color-surface-accent-hover);
     --color-datepicker-day-range-bg: var(--color-primary-900);
     --color-datepicker-day-range-text: var(--color-primary-200);
     --color-datepicker-clock-face-bg: var(--color-surface-panel);
     --color-datepicker-clock-header-bg: var(--color-primary-800);
     --color-datepicker-clock-selected-bg: var(--color-primary-500);
-    --color-datepicker-clock-hover-bg: var(--color-primary-900);
+    --color-datepicker-clock-hover-bg: var(--color-surface-accent-hover);
     --color-datepicker-relative-btn-bg: var(--color-surface-panel);
     --color-datepicker-relative-btn-selected-bg: var(--color-primary-500);
-    --color-datepicker-relative-btn-hover-bg: var(--color-primary-900);
+    --color-datepicker-relative-btn-hover-bg: var(--color-surface-accent-hover);
 
     /* Color picker */
     --color-colorpicker-popup-bg: var(--color-surface-overlay);
@@ -573,7 +577,7 @@
     --color-toggle-track-bg: var(--color-primary-900);
     --color-toggle-border: var(--color-primary-700);
     --color-toggle-item-hover-bg: var(--color-primary-950);
-    --color-toggle-item-active-bg: var(--color-primary-800);
+    --color-toggle-item-active-bg: var(--color-surface-accent-active);
     --color-toggle-item-active-text: var(--color-primary-200);
 }
 
