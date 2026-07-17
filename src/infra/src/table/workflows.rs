@@ -102,15 +102,14 @@ pub struct WorkflowRunData {
 
 impl From<workflow_run_data::Model> for WorkflowRunData {
     fn from(value: workflow_run_data::Model) -> Self {
-        let ret = Self {
+        Self {
             id: value.id,
             org_id: value.org_id,
             workflow_id: value.workflow_id,
             run_id: value.run_id,
             triggered_at: value.triggered_at,
             data: value.data,
-        };
-        ret
+        }
     }
 }
 
@@ -320,9 +319,7 @@ pub async fn delete_all_errors_older_than(
 
     txn.commit().await?;
 
-    let ret: Result<Vec<_>, anyhow::Error> = errors.into_iter().map(|v| v.try_into()).collect();
-
-    Ok(ret?)
+    errors.into_iter().map(|v| v.try_into()).collect()
 }
 
 pub async fn delete_all_runs_older_than(ts: i64) -> Result<Vec<WorkflowRunData>, anyhow::Error> {

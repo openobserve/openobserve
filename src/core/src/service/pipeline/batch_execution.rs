@@ -1139,6 +1139,7 @@ struct ProcessMetadata {
     return_value_for_error: bool,
 }
 
+#[allow(clippy::type_complexity)]
 struct ProcessChannels {
     receiver: Receiver<PipelineItem>,
     child_senders: Vec<Sender<PipelineItem>>,
