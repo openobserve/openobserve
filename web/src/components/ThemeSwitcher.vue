@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <OButton variant="ghost" size="icon-panel" data-test="navbar-theme-toggle-btn" @click="toggleDarkMode">
+  <OButton variant="ghost" size="icon-toolbar" data-test="navbar-theme-toggle-btn" @click="toggleDarkMode">
     <Transition name="theme-icon" mode="out-in">
       <OIcon :key="darkMode ? 'dark' : 'light'" :name="darkMode ? 'dark-mode' : 'light-mode'" size="sm" class="size-5!" />
     </Transition>
