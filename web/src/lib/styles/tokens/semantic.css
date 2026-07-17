@@ -169,15 +169,12 @@
   --color-syntax-deletion-fg: var(--color-syntax-deletion-fg);
   --color-syntax-deletion-bg: var(--color-syntax-deletion-bg);
 
-  /* Brand gradients (D14). Registered so bg-gradient-ai works as a utility
-     instead of an [image:var(--color-gradient-ai)] arbitrary property. */
-  --color-gradient-ai:            var(--color-gradient-ai);
-  --color-gradient-ai-subtle:     var(--color-gradient-ai-subtle);
-  --color-gradient-ai-faint:      var(--color-gradient-ai-faint);
-  --color-gradient-brand-ribbon:  var(--color-gradient-brand-ribbon);
-  --color-gradient-notification:  var(--color-gradient-notification);
-  --color-gradient-danger:        var(--color-gradient-danger);
-  --color-gradient-danger-hover:  var(--color-gradient-danger-hover);
+  /* NOTE — the --color-gradient-* family is deliberately NOT registered here.
+     Registering it would generate `bg-gradient-ai`, which emits
+     `background-color: <a linear-gradient()>` — invalid CSS that the browser
+     drops, i.e. a utility that compiles but renders nothing. Gradients must be
+     consumed as `bg-[image:var(--color-gradient-ai)]` (background-image), which
+     is the established form across the codebase. */
 }
 
 /* â”€â”€ Theme-driven runtime tokens (set inline by utils/theme.ts) â”€â”€
