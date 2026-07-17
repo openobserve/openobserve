@@ -419,22 +419,6 @@ pub fn format_key(key: &str, with_prefix: bool) -> String {
     }
 }
 
-static DEFAULT_SIGNER: Lazy<Option<Box<dyn object_store::signer::Signer + Send + Sync>>> =
-    Lazy::new(|| {
-        if is_local_disk_storage() {
-            return None;
-        }
-        let (_, mut account_map) = accounts::parse_storage_config(&get_config().s3);
-        let storage_config = account_map.remove("default")?;
-        match remote::build_signer(storage_config) {
-            Ok(signer) => Some(signer),
-            Err(e) => {
-                log::error!("failed to build presign signer: {e}");
-                None
-            }
-        }
-    });
-
 pub async fn presign_url(
     key: &str,
     method: reqwest::Method,
@@ -445,9 +429,12 @@ pub async fn presign_url(
             "presigned URLs not supported in local disk mode"
         ));
     }
-    let signer = DEFAULT_SIGNER
-        .as_ref()
-        .ok_or_else(|| anyhow::anyhow!("no default storage account configured for presigning"))?;
+    let (_, mut account_map) = accounts::parse_storage_config(&get_config().s3);
+    let storage_config = account_map
+        .remove("default")
+        .ok_or_else(|| anyhow::anyhow!("no default storage account configured"))?;
+    let signer =
+        remote::build_signer(storage_config).map_err(|e| anyhow::anyhow!("build signer: {e}"))?;
     let path = format_key(key, true);
     signer
         .signed_url(method, &path.as_str().into(), expires)
