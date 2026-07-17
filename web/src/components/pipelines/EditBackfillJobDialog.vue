@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -103,15 +103,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="mt-2 p-3 rounded-md border bg-banner-warning-bg border-banner-warning-border"
                 >
                   <div class="flex items-start">
-                    <OIcon name="warning" size="sm" class="mr-2 tw-mt-0.5" />
+                    <OIcon name="warning" size="sm" class="mr-2 mt-0.5" />
                     <div class="text-xs text-banner-warning-text">
-                      <div class="tw-font-semibold tw-mb-1">Warning: Irreversible Data Deletion</div>
-                      <div class="tw-mb-2">
+                      <div class="font-semibold mb-1">Warning: Irreversible Data Deletion</div>
+                      <div class="mb-2">
                         This will permanently delete all data in the destination stream for the specified time
                         range before running the backfill. This action cannot be undone.
                       </div>
-                      <div class="tw-font-semibold tw-text-xs tw-mb-1">Time Alignment Requirements (UTC):</div>
-                      <ul class="tw-ml-5 tw-space-y-0.5 tw-list-disc tw-text-xs">
+                      <div class="font-semibold text-xs mb-1">Time Alignment Requirements (UTC):</div>
+                      <ul class="ml-5 space-y-0.5 list-disc text-xs">
                         <li><strong>Logs</strong> streams: Times must align to hour boundaries in UTC (e.g., 10:00:00, not 10:15:00)</li>
                         <li><strong>Metrics/Traces</strong> streams: Times must align to day boundaries in UTC (e.g., 00:00:00)</li>
                       </ul>
@@ -199,9 +199,9 @@ const blankDefaults = (): BackfillForm => ({
   deleteBeforeBackfill: false,
 });
 
-// Rule ③ OWNER pattern: this component OWNS <OForm> and needs the live values
+// Rule â‘¢ OWNER pattern: this component OWNS <OForm> and needs the live values
 // for the delete-warning `v-if` + the update payload, so it creates the form
-// here with useOForm and reads it reactively via form.useStore — a SINGLE
+// here with useOForm and reads it reactively via form.useStore â€” a SINGLE
 // source of truth (no mirror, no store.subscribe).
 const form = useOForm<BackfillForm>({
   defaultValues: backfillDefaults.value,
@@ -249,7 +249,7 @@ const onCancel = () => {
   show.value = false;
 };
 
-// @submit handler — OForm only calls it once the schema passes (the time-range
+// @submit handler â€” OForm only calls it once the schema passes (the time-range
 // cross-field guard + chunk/delay numeric ranges live in the schema). `value`
 // is the validated, single-source-of-truth payload.
 const onSubmit = async (value: BackfillForm) => {

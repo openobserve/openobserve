@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       name="warning" class="text-warning" style="width: 80px; height: 80px;" /><br />
     <h5>
       <b
-        ><u><span class="text-red">Warning:</span></u></b
+        ><u><span class="text-status-negative">Warning:</span></u></b
       >
       The content of this page cannot be viewed because the selected
       organization's is on pending subscription state. <br /><br /><OButton

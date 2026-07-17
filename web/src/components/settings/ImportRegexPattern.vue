@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          BaseImport's built-in header is hidden (hide-header) so this single header
          serves all three tabs. The title preserves the existing per-tab text: the
          Built-in Patterns tab keeps t('regex_patterns.import_title') ("Import
-         Pattern") and the File / URL tabs keep "Import Regex Pattern" — no header
+         Pattern") and the File / URL tabs keep "Import Regex Pattern" â€” no header
          text is changed by this migration. -->
     <AppPageHeader
       :title="headerTitle"
@@ -91,7 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       <span
                         data-test="regex-pattern-import-name-error"
-                        class="text-red"
+                        class="text-status-negative"
                         v-if="
                           typeof errorMessage === 'object' &&
                           errorMessage.field == 'regex_pattern_name'
@@ -109,7 +109,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </span>
                       <span
                         data-test="regex-pattern-import-pattern-error"
-                        class="text-red"
+                        class="text-status-negative"
                         v-else-if="
                           typeof errorMessage === 'object' &&
                           errorMessage.field == 'regex_pattern'
@@ -126,7 +126,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           />
                         </div>
                       </span>
-                      <span class="text-red" v-else>{{ errorMessage }}</span>
+                      <span class="text-status-negative" v-else>{{ errorMessage }}</span>
                     </div>
                   </div>
                 </div>
@@ -148,7 +148,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :class="{
                       'py-1.25 text-sm font-bold': true,
                       'text-green ': val.success,
-                      'text-red': !val.success,
+                      'text-status-negative': !val.success,
                     }"
                     :data-test="`regex-pattern-import-creation-${index}-message`"
                   >

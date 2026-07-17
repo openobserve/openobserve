@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="sm-action"
           @click="goToCommunityDashboards"
           data-test="dashboard-panel-tutorial-btn"
-          >{{ t("dashboard.communityDashboard") }}</OButton
+        >{{ t("dashboard.communityDashboard") }}</OButton
         >
         <OButton
           variant="outline"
@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-close-popup
           data-test="dashboard-import-cancel-btn"
           @click="goBack()"
-          >{{ t("function.cancel") }}</OButton
+        >{{ t("function.cancel") }}</OButton
         >
         <OButton
           variant="primary"
@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           form="import-dashboard-form"
           :loading="!!isLoading"
           data-test="dashboard-import-submit-btn"
-          >{{ t("dashboard.import") }}</OButton
+        >{{ t("dashboard.import") }}</OButton
         >
       </template>
     </AppPageHeader>
@@ -74,10 +74,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="editor-container-url bg-card-glass-bg py-1 flex-1 min-h-0 flex flex-col"
               >
                 <div class="mx-2 mt-1 mb-1 flex flex-col flex-1 min-h-0">
-                  <div style="width: calc(100% - 10px)" class="flex gap-2 w-full items-center shrink-0">
+                  <div class="flex gap-2 w-full items-center shrink-0 w-[calc(100%_-_0.625rem)]">
                     <div
                       data-test="dashboard-import-url-input"
-                      style="width: 69%"
+                      class="w-[69%]"
                     >
                       <OFormInput
                         data-test="dashboard-import-url-control"
@@ -88,9 +88,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
 
                     <div
-                      style="width: calc(30%)"
                       data-test="dashboard-folder-dropdown"
-                      class="import-folder-dropdown-container"
+                      class="import-folder-dropdown-container w-[calc(30%)]"
                     >
                       <select-folder-dropdown
                         @folder-selected="selectedFolder = $event"
@@ -114,10 +113,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="dashboard-import-json-container bg-card-glass-bg py-1 flex-1 min-h-0 flex flex-col"
               >
                 <div class="mx-2 mt-1 mb-1 flex flex-col flex-1 min-h-0">
-                  <div style="width: calc(100% - 10px)" class="flex gap-2 w-full items-center shrink-0">
+                  <div class="flex gap-2 w-full items-center shrink-0 w-[calc(100%_-_0.625rem)]">
                     <div
                       data-test="dashboard-import-file-input"
-                      style="width: 69%"
+                      class="w-[69%]"
                     >
                       <OFormFile
                         data-test="dashboard-import-file-control"
@@ -131,8 +130,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       />
                     </div>
                     <div
-                      style="width: calc(30%)"
-                      class="import-folder-dropdown-container"
+                      class="import-folder-dropdown-container w-[calc(30%)]"
                     >
                       <select-folder-dropdown
                         @folder-selected="selectedFolder = $event"
@@ -143,12 +141,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <div v-for="importResult in filesImportResults">
                         <span
                           v-if="importResult.status == 'rejected'"
-                          class="text-red"
+                          class="text-status-negative"
                           data-test="dashboard-import-file-rejected"
                         >
                           <code
-                            style="background-color: var(--color-surface-panel); padding: 3px"
-                            >{{ importResult?.reason?.file }}</code
+                            class="bg-surface-panel p-0.75"
+                          >{{ importResult?.reason?.file }}</code
                           >
                           : {{ importResult?.reason?.error }}
                         </span>
@@ -189,16 +187,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       errorMessage, errorIndex
                     ) in dashboardErrorsToDisplay"
                     :key="errorIndex"
-                    class="error-item py-[5px] text-sm"
+                    class="error-item py-1.25 text-sm"
                   >
                     <span
                       v-if="errorMessage.field == 'dashboard_title'"
-                      class="text-red"
+                      class="text-status-negative"
                       data-test="dashboard-import-error-title-message"
                     >
                       {{ errorMessage.message }}
-                      <div
-                        style="width: 300px"
+                      <div class="w-75"
                         data-test="dashboard-import-error-title-input"
                       >
                         <OInput
@@ -216,10 +213,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </span>
                     <span
                       v-else-if="errorMessage.field == 'stream_type'"
-                      class="text-red"
+                      class="text-status-negative"
                     >
                       {{ errorMessage.message }}
-                      <div style="width: 300px">
+                      <div class="w-75">
                         <OSelect
                           v-model="streamTypes[errorIndex]"
                           :options="streamTypeSelectOptions"
@@ -239,7 +236,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                     <span
                       v-else-if="errorMessage.field == 'dashboard_validation'"
-                      class="text-red"
+                      class="text-status-negative"
                       data-test="dashboard-import-error-validation-message"
                     >
                       {{ errorMessage.message }}
@@ -364,9 +361,9 @@ export default defineComponent({
     // store the results of the import (for files)
     const filesImportResults = ref([]);
 
-    // OWNER pattern (rule ③): the page owns <OForm> (url + jsonFiles) and the
+    // OWNER pattern (rule â‘¢): the page owns <OForm> (url + jsonFiles) and the
     // fetch/parse watchers + import logic read those values, so it creates the
-    // form with useOForm and reads it via form.useStore — ONE source, no mirror.
+    // form with useOForm and reads it via form.useStore â€” ONE source, no mirror.
     // url/jsonFiles are name=-owned; every write goes through setFormField. The
     // deep JSON validation + recovery inputs + the Monaco editor stay outside the
     // form (documented no-OForm* exceptions).

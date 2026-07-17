@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -56,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   <span
                     data-test="model-pricing-import-name-error"
-                    class="text-red"
+                    class="text-status-negative"
                     v-if="
                       typeof errorMessage === 'object' &&
                       errorMessage.field == 'model_pricing_name'
@@ -74,7 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </span>
                   <span
                     data-test="model-pricing-import-pattern-error"
-                    class="text-red"
+                    class="text-status-negative"
                     v-else-if="
                       typeof errorMessage === 'object' &&
                       errorMessage.field == 'model_pricing_pattern'
@@ -90,7 +90,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       />
                     </div>
                   </span>
-                  <span class="text-red" v-else>{{ errorMessage }}</span>
+                  <span class="text-status-negative" v-else>{{ errorMessage }}</span>
                 </div>
               </div>
             </div>
@@ -113,7 +113,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :class="{
                   'py-1.25 text-sm font-bold': true,
                   'text-green ': val.success,
-                  'text-red': !val.success,
+                  'text-status-negative': !val.success,
                 }"
                 :data-test="`model-pricing-import-creation-${index}-message`"
               >
@@ -385,7 +385,7 @@ async function createModelPricing(jsonObj: any, index: number) {
     const errorMessage =
       error?.response?.data?.message || "Unknown error";
 
-    // Skip bottom snackbar for 403 — global interceptor already shows persistent top banner.
+    // Skip bottom snackbar for 403 â€” global interceptor already shows persistent top banner.
     if (error?.response?.status !== 403) {
       toast({
         message: `Failed to import "${jsonObj.name}": ${errorMessage}`,

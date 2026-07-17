@@ -3,13 +3,12 @@
        skeleton must not add one (otherwise a top/outer border flashes only while
        loading and disappears once data arrives). -->
   <div
-    class="home-view-skeleton w-full px-[0.625rem] py-[0.625rem]"
-    style="display: flex; flex-direction: column; height: calc(100vh - 52px)"
+    class="home-view-skeleton w-full px-[0.625rem] py-[0.625rem] flex flex-col h-[calc(100vh-3.25rem)]"
   >
     <!-- 1st section - Streams container -->
     <div
       data-test="home-view-skeleton-streams-container"
-      class="feature-card bg-(--tile-bg) border-[0.0625rem] border-card-glass-border rounded-lg p-4"
+      class="feature-card bg-surface-base border border-card-glass-border rounded-lg p-4"
     >
       <!-- Header -->
       <div data-test="home-view-skeleton-streams-header" class="flex justify-between items-center mb-4">
@@ -21,10 +20,10 @@
       </div>
 
       <!-- Tiles using same grid as HomeView -->
-      <div class="tiles-grid grid gap-4" style="grid-template-columns: repeat(auto-fit, minmax(240px, 1fr))">
-        <div v-for="n in 5" :key="n" data-test="home-view-skeleton-tile" class="rounded-[0.325rem] border-[0.0625rem] border-card-glass-border">
+      <div class="tiles-grid grid gap-4 grid-cols-[repeat(auto-fit,minmax(15rem,1fr))]">
+        <div v-for="n in 5" :key="n" data-test="home-view-skeleton-tile" class="rounded-md border border-card-glass-border">
           <div
-            class="tile-content h-full p-4 rounded-lg gap-2 rounded-sm text-center flex flex-col justify-between bg-surface-base border border-border-default text-text-primary"
+            class="tile-content h-full p-4 gap-2 rounded-sm text-center flex flex-col justify-between bg-surface-base border border-border-default text-text-primary"
           >
             <!-- Top Section (60%) -->
             <div class="flex flex-col justify-between">
@@ -51,7 +50,7 @@
         <!-- Functions tile -->
         <div class="tile-wrapper flex-1 flex min-w-0 w-full">
           <div
-            class="feature-card bg-surface-base border-[0.0625rem] border-border-default rounded-lg p-4 w-full rounded-sm text-center flex flex-col justify-between text-text-primary"
+            class="feature-card bg-surface-base border border-border-default p-4 w-full rounded-sm text-center flex flex-col justify-between text-text-primary"
           >
             <div class="flex flex-col justify-between">
               <div
@@ -71,7 +70,7 @@
         <!-- Dashboards tile -->
         <div class="tile-wrapper flex-1 flex min-w-0 w-full">
           <div
-            class="feature-card bg-surface-base border-[0.0625rem] border-border-default rounded-lg p-4 w-full rounded-sm text-center flex flex-col justify-between text-text-primary"
+            class="feature-card bg-surface-base border border-border-default p-4 w-full rounded-sm text-center flex flex-col justify-between text-text-primary"
           >
             <div class="flex flex-col justify-between">
               <div
@@ -91,7 +90,7 @@
 
       <!-- Alerts Chart -->
       <div
-        class="feature-card first-chart-container bg-surface-base border-[0.0625rem] border-border-default rounded-lg rounded-sm p-4"
+        class="feature-card first-chart-container bg-surface-base border border-border-default rounded-sm p-4"
       >
         <div class="details-container flex flex-col gap-3 mb-4">
           <!-- Header -->
@@ -103,7 +102,7 @@
             <OSkeleton class="w-10 h-10" />
           </div>
           <!-- Stats row -->
-          <div class="flex pt-2" style="gap: 16px">
+          <div class="flex pt-2 gap-4">
             <div class="flex flex-col">
               <OSkeleton type="text" class="w-25 h-3.5 mb-1" />
               <OSkeleton type="text" class="w-10 h-5" />
@@ -129,7 +128,7 @@
 
       <!-- Pipelines Chart -->
       <div
-        class="feature-card second-chart-container bg-surface-base border-[0.0625rem] border-border-default rounded-lg rounded-sm p-4"
+        class="feature-card second-chart-container bg-surface-base border border-border-default rounded-sm p-4"
       >
         <div class="details-container flex flex-col gap-3 mb-4">
           <!-- Header -->
@@ -141,7 +140,7 @@
             <OSkeleton class="w-10 h-10" />
           </div>
           <!-- Stats row -->
-          <div class="flex pt-2" style="gap: 16px">
+          <div class="flex pt-2 gap-4">
             <div class="flex flex-col">
               <OSkeleton type="text" class="w-30 h-3.5 mb-1" />
               <OSkeleton type="text" class="w-10 h-5" />

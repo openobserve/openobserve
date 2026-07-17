@@ -671,8 +671,15 @@
   --color-status-info-bg: #181829;
   --color-status-info-text: #A1AFFF;
   --color-status-neutral-text: #9DA0A8;
-  --color-status-warning-bg: #402929;
-  --color-status-warning-text: #E37774;
+  /* BUG FIX: these two were byte-identical to the ERROR tokens
+     (bg == --color-status-error-bg #402929, text == --color-status-negative
+     #E37774), so every warning in dark mode rendered red and was
+     indistinguishable from an error across ~73 consumers. Light mode was always
+     correctly orange (#FFF4EB / #E56D17). Re-pointed at the app's existing dark
+     warning amber — the same formula --color-banner-warning-bg already uses —
+     so warning is visually distinct from error again and stays self-maintaining. */
+  --color-status-warning-bg: color-mix(in srgb, var(--color-warning-900) 20%, transparent);
+  --color-status-warning-text: var(--color-warning);
   --color-sticky-col-header-bg: #565656;
   --color-tab-text-color: #FFFFFF;
   --color-trace-border: #5A5D63;
