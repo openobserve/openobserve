@@ -6774,6 +6774,7 @@ dependencies = [
  "parking_lot 0.12.5",
  "parquet",
  "prometheus",
+ "promql",
  "promql-parser",
  "prost 0.14.3",
  "prost-wkt-types",
@@ -7617,6 +7618,31 @@ dependencies = [
  "procfs",
  "protobuf",
  "thiserror 2.0.18",
+]
+
+[[package]]
+name = "promql"
+version = "0.1.0"
+dependencies = [
+ "ahash 0.8.12",
+ "async-recursion",
+ "async-trait",
+ "chrono",
+ "config",
+ "datafusion",
+ "expect-test",
+ "futures",
+ "hashbrown 0.16.1",
+ "infra",
+ "itertools 0.14.0",
+ "log",
+ "o2_enterprise",
+ "promql-parser",
+ "rayon",
+ "regex",
+ "strum 0.28.0",
+ "tokio",
+ "tracing",
 ]
 
 [[package]]

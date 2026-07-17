@@ -389,7 +389,7 @@ function escapePromqlString(value) {
  * name as a bare identifier: OpenObserve stream-name normalization strips only
  * `[^a-zA-Z0-9_:]`, so a name may begin with a digit, which is not a valid
  * PromQL identifier. The engine resolves the name from the `__name__` matcher
- * (src/service/promql/engine.rs:360).
+ * (src/promql/src/engine.rs:357).
  *
  * Matchers are emitted in deterministic (sorted) order so an equal filter set
  * always produces a byte-identical query — that is what makes the preview
