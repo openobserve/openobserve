@@ -205,7 +205,7 @@ describe("Ingestion", () => {
         return;
       }
       expect(wrapper.vm.rumRoutes).toEqual(["frontendMonitoring"]);
-      expect(wrapper.vm.metricRoutes).toEqual(["prometheus", "otelCollector", "telegraf", "cloudwatchMetrics"]);
+      expect(wrapper.vm.metricRoutes).toEqual(["prometheus", "vmagent", "otelCollector", "telegraf", "cloudwatchMetrics"]);
       expect(wrapper.vm.traceRoutes).toEqual(["tracesOTLP"]);
     });
   });
