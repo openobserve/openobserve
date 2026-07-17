@@ -1415,7 +1415,7 @@ export default defineComponent({
           (v: any) => !v.disabled && v.field === property.name,
         )
       ) {
-        const matchedEntry = Object.entries(settings.partition_keys).find(
+        const matchedEntry = Object.entries<{ field: string; types?: string | { hash?: string } }>(settings.partition_keys).find(
           ([, partition]) => partition["field"] === property.name,
         );
         if (!matchedEntry) return fieldIndices;

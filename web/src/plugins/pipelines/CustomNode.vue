@@ -103,7 +103,7 @@ const {
 } = useDragAndDrop();
 const showButtons = ref(false);
 const showDeleteTooltip = ref(false);
-let hideButtonsTimeout: ReturnType<typeof window.setTimeout> | null = null;
+let hideButtonsTimeout: number | null = null;
 
 // last_error is set at runtime but absent from the base pipeline literal type;
 // narrow the dynamic value instead of asserting a shape.

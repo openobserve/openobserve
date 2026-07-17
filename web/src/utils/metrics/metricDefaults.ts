@@ -1411,7 +1411,7 @@ export function getMetricDefaults(
 
   const supportsNanGuard = RATE_FREE_KINDS.includes(cardKind);
   const guarded = !!ctx?.applyNanGuard && supportsNanGuard;
-  const guard = guarded ? withNanGuard : (selector) => selector;
+  const guard = guarded ? withNanGuard : (selector: string) => selector;
 
   const sel = guard(buildSelector(metricName, filters));
   const baseSel = guard(buildSelector(base, filters));
