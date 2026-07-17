@@ -244,9 +244,13 @@ export default defineComponent({
         if(router.currentRoute.value.query.folder) {
           activeFolderId.value = router.currentRoute.value.query.folder;
         }
-        else {
+        else if (!props.showFavorites) {
           activeFolderId.value = "default";
         }
+        // With showFavorites, the owning view decides the landing folder
+        // (favorites-first) and pushes it to the route; self-assigning
+        // "default" here would race that decision and clobber it. The route
+        // watcher below selects the tab once the owner has pushed.
       });
 
       watch(()=> router.currentRoute.value.query.folder, (newVal)=> {

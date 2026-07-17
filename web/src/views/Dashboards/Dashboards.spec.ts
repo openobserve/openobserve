@@ -617,6 +617,37 @@ describe("Dashboards.vue", () => {
       expect(wrapper.vm.showFavoritesOnly).toBe(false);
     });
 
+    it("an app-stamped ?folder=default does NOT beat the favorites landing", async () => {
+      // The folder watcher writes ?folder=default into the URL on every
+      // ordinary visit, so a reload always carries it — it is not an explicit
+      // deep link and must not suppress favorites-first.
+      useFavoriteDashboards().favorites.value = [
+        { dashboardId: "dash1", folderId: "default", label: "Dashboard 1" },
+      ];
+      await router.push({ path: "/dashboards", query: { folder: "default" } });
+      wrapper = shallowMount(Dashboards, {
+        global: buildGlobalConfig(storeWithTwo(), router, i18n),
+      });
+      await settle();
+
+      expect(wrapper.vm.activeFolderId).toBe("__favorites__");
+    });
+
+    it("ignores folder emissions that arrive before the landing decision", async () => {
+      useFavoriteDashboards().favorites.value = [
+        { dashboardId: "dash1", folderId: "default", label: "Dashboard 1" },
+      ];
+      wrapper = shallowMount(Dashboards, {
+        global: buildGlobalConfig(storeWithTwo(), router, i18n),
+      });
+      // FolderList's async init emits "default" before onMounted decides —
+      // simulate that immediate emission.
+      wrapper.vm.updateActiveFolderId("default");
+      await settle();
+
+      expect(wrapper.vm.activeFolderId).toBe("__favorites__");
+    });
+
     it("a Favorites deep link is honored even with zero favorites", async () => {
       await router.push({
         path: "/dashboards",

@@ -628,6 +628,9 @@ export default defineComponent({
     const confirmDeleteDialog = ref<boolean>(false);
     const selectedDelete = ref(null);
     const activeFolderId = ref(null);
+    // Set once the onMounted landing decision has run; folder-selection events
+    // arriving earlier are child-initialization noise, not user intent.
+    let landingDecided = false;
     const isFolderEditMode = ref(false);
     const selectedFolderDelete = ref(null);
     const selectedFolderToEdit = ref(null);
@@ -866,15 +869,18 @@ export default defineComponent({
       const userId = store.state.userInfo?.email;
       if (org && userId) await loadFavorites(org, userId);
 
-      // Landing rules: a deep link (?folder=...) always wins — including the
-      // Favorites pseudo-folder. With no deep link, land on Favorites when the
-      // user has any (their hand-picked set is the best start page), else on
-      // the default folder exactly as before.
+      // Landing rules: an explicit deep link (?folder=...) wins — including
+      // the Favorites pseudo-folder. `folder=default` is NOT treated as
+      // explicit: the folder watcher stamps it into the URL on every ordinary
+      // visit, so honoring it would defeat the favorites-first landing on
+      // every reload. With no (effective) deep link, land on Favorites when
+      // the user has any, else on the default folder exactly as before.
       activeFolderId.value = null;
       if (route.query.folder === FAVORITES_FOLDER_ID) {
         activeFolderId.value = FAVORITES_FOLDER_ID;
       } else if (
         route.query.folder &&
+        route.query.folder !== "default" &&
         store.state.organizationData.folders.find(
           (it: any) => it.folderId === route.query.folder,
         )
@@ -885,6 +891,7 @@ export default defineComponent({
       } else {
         activeFolderId.value = "default";
       }
+      landingDecided = true;
     });
 
     watch(
@@ -1423,6 +1430,11 @@ export default defineComponent({
     });
 
     const updateActiveFolderId = (folderId: any) => {
+      // FolderList emits its own initialization value asynchronously; before
+      // the landing decision in onMounted has run, that emission is rail
+      // presentation state, not a user action — letting it through would
+      // clobber the favorites-first landing with "default".
+      if (!landingDecided) return;
       activeFolderId.value = folderId;
       filterQuery.value = "";
       searchQuery.value = "";
