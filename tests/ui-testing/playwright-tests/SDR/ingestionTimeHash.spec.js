@@ -113,7 +113,7 @@ test.describe("Ingestion Time Hash - Combined Test", { tag: '@enterprise' }, () 
       await pm.sdrPatternsPage.verifyPatternCreatedSuccess();
 
       await pm.sdrPatternsPage.navigateToRegexPatterns();
-      const exists = await pm.sdrPatternsPage.checkPatternExists(patternConfig.name);
+      const exists = await pm.sdrPatternsPage.waitForPatternCreated(patternConfig.name); // backend-consistent create gate (API source of truth)
       if (!exists) {
         testLogger.error(`Pattern ${patternConfig.name} was not created successfully!`);
         throw new Error(`Pattern ${patternConfig.name} creation failed - not found in list`);

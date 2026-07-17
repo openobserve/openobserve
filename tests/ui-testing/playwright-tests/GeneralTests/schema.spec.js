@@ -45,6 +45,90 @@ test.describe("Schema testcases", () => {
         testLogger.debug('Ingestion response', { response });
     }
 
+    /**
+     * Backend-readiness gate: poll the streams list API until the freshly-created
+     * stream is actually listed by the backend.
+     *
+     * WHY: On cloud under load (--workers=5), a just-ingested stream is not
+     * immediately visible in the logs stream-list dropdown due to streams-list
+     * indexing/consistency lag. logsPage.selectStream() reloads the logs page 5x
+     * internally, but if the backend still hasn't listed the stream those retries
+     * are exhausted and the test fails with
+     * `selectStream: Failed to find stream "..." after N attempts`.
+     *
+     * This gates on the REAL readiness signal the dropdown itself consumes
+     * (GET /api/{org}/streams?type=logs -> body.list contains the stream), so the
+     * subsequent selectStream() succeeds deterministically instead of racing.
+     * Not a blind retry bump.
+     *
+     * @param {import('@playwright/test').Page} page
+     * @param {string} targetStreamName stream that must appear in the list
+     */
+    async function waitForStreamListed(page, targetStreamName) {
+        const orgId = getOrgIdentifier();
+        // Use the SAME base the app's own stream-readiness check uses
+        // (logsPage.waitForStreamAvailable: INGESTION_URL || ZO_BASE_URL) so we poll
+        // the exact host/endpoint that feeds selectStream's dropdown. On cloud these
+        // two hosts differ, so matching the canonical order avoids hitting the wrong one.
+        const rawBase = process.env.INGESTION_URL || process.env.ZO_BASE_URL || '';
+        const baseUrl = rawBase.endsWith('/') ? rawBase.slice(0, -1) : rawBase;
+        const streamsUrl = `${baseUrl}/api/${orgId}/streams?type=logs`;
+        const headers = getAuthHeaders();
+
+        // Bounded poll: ~60s worst case (20 attempts x 3s backoff), well above the
+        // observed consistency lag while still failing fast if the stream is truly
+        // never created. Transient network errors are tolerated and retried.
+        const maxAttempts = 20;
+        const backoffMs = 3000;
+
+        for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+            let listed = false;
+            try {
+                const response = await page.request.get(streamsUrl, {
+                    headers,
+                    timeout: 15000,
+                });
+                if (response.ok()) {
+                    const body = await response.json().catch(() => null);
+                    const list = (body && body.list) || [];
+                    listed = list.some((s) => s && s.name === targetStreamName);
+                } else {
+                    testLogger.debug('waitForStreamListed non-OK response', {
+                        status: response.status(),
+                        targetStreamName,
+                        attempt,
+                    });
+                }
+            } catch (error) {
+                // Transient Connection timeout / ECONNRESET etc. — retry.
+                testLogger.debug('waitForStreamListed request error (will retry)', {
+                    error: error.message,
+                    targetStreamName,
+                    attempt,
+                });
+            }
+
+            if (listed) {
+                testLogger.info('Stream is listed by backend — safe to selectStream', {
+                    targetStreamName,
+                    attempt,
+                });
+                return;
+            }
+
+            if (attempt < maxAttempts) {
+                // Documented consistency backoff (streams-list indexing lag on cloud).
+                await page.waitForTimeout(backoffMs);
+            }
+        }
+
+        throw new Error(
+            `waitForStreamListed: stream "${targetStreamName}" was not listed by ` +
+            `GET ${streamsUrl} after ${maxAttempts} attempts (~${(maxAttempts * backoffMs) / 1000}s). ` +
+            `Backend never made the ingested stream available.`
+        );
+    }
+
     test('stream schema settings updated to be displayed under logs', async ({ page }, testInfo) => {
         const testStreamName = "test1";
         
@@ -64,6 +148,9 @@ test.describe("Schema testcases", () => {
         await pm.logsPage.navigateToLogs(getOrgIdentifier());
         await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
 
+        // Backend-readiness gate: ensure the just-ingested stream is actually listed
+        // by the streams API before selecting it, avoiding streams-list lag races.
+        await waitForStreamListed(page, testStreamName);
         await pm.logsPage.selectStream(testStreamName);
 
         const allsearch = page.waitForResponse(`**/api/${getOrgIdentifier()}/_search**`, { timeout: 60000 });
@@ -98,6 +185,9 @@ test.describe("Schema testcases", () => {
         // Navigate to logs page with VRL editor enabled
         await pm.logsPage.navigateToLogs(getOrgIdentifier());
 
+        // Backend-readiness gate: ensure the just-ingested stream is actually listed
+        // by the streams API before selecting it, avoiding streams-list lag races.
+        await waitForStreamListed(page, testStreamName);
         await pm.logsPage.selectStream(testStreamName);
         const allsearch2 = page.waitForResponse(`**/api/${getOrgIdentifier()}/_search**`, { timeout: 60000 });
         await pm.schemaPage.applyQuery();
@@ -129,6 +219,9 @@ test.describe("Schema testcases", () => {
         // Navigate to logs page with VRL editor enabled
         await pm.logsPage.navigateToLogs(getOrgIdentifier());
 
+        // Backend-readiness gate: ensure the just-ingested stream is actually listed
+        // by the streams API before selecting it, avoiding streams-list lag races.
+        await waitForStreamListed(page, testStreamName);
         await pm.logsPage.selectStream(testStreamName);
         const allsearch3 = page.waitForResponse(`**/api/${getOrgIdentifier()}/_search**`, { timeout: 60000 });
         await pm.schemaPage.applyQuery();
