@@ -105,24 +105,36 @@
                     <strong
                       >SQL Query :
                       <span>
+                        <!-- Copy is the same neutral action in both sections; the
+                             SQL/VRL accent stays on the block's left border, which
+                             is what actually marks which language you're looking
+                             at. Tinting the button too made the two copies read as
+                             different actions. -->
                         <OButton
-                          variant="ghost"
-                          size="icon"
-                          class="ml-2 border! border-sql-accent! text-sql-accent!"
+                          data-test="search-history-copy-sql-btn"
+                          variant="outline"
+                          size="icon-chip"
+                          class="ml-2"
                           @click.stop="
                             copyToClipboard(row.sql, { successMessage: 'SQL Query Copied Successfully!', timeout: 5000 })
                           "
                         >
-                          <OIcon name="content-copy" size="sm" /> </OButton></span
+                          <OIcon name="content-copy" size="xs" /> </OButton></span
                     ></strong>
+                    <!-- Logs and Inspect are both navigations, so they share one
+                         variant and size. Logs was outline-destructive (red reads
+                         as "delete") and Inspect was ghost (no affordance at all),
+                         at two different sizes. -->
+                    <!-- No mx-2: the row is already `gap-2`, so a margin here
+                         stacked on top of it and doubled the spacing to 16px. -->
                     <OButton
-                      variant="outline-destructive"
+                      data-test="search-history-go-to-logs-btn"
+                      variant="outline"
                       size="chip"
-                      class="copy-btn mx-2"
                       @click.stop="goToLogs(row)"
                     >
                       <template #icon-left
-                        ><OIcon name="search" size="sm"
+                        ><OIcon name="search" size="xs"
                       /></template>
                       Logs
                     </OButton>
@@ -132,13 +144,13 @@
                         config.isCloud == 'false' &&
                         store.state.zoConfig.search_inspector_enabled
                       "
-                      variant="ghost"
-                      size="sm"
-                      class="copy-btn"
+                      data-test="search-history-inspect-btn"
+                      variant="outline"
+                      size="chip"
                       @click.stop="goToInspector(row)"
                     >
                       <template #icon-left
-                        ><OIcon name="analytics" size="sm"
+                        ><OIcon name="analytics" size="xs"
                       /></template>
                       Inspect
                     </OButton>
@@ -159,10 +171,12 @@
                     <strong
                       >Function Definition :
                       <span>
+                        <!-- Same neutral copy affordance as the SQL block above. -->
                         <OButton
-                          variant="ghost"
-                          size="icon"
-                          class="ml-2 border! border-function-accent! text-function-accent!"
+                          data-test="search-history-copy-function-btn"
+                          variant="outline"
+                          size="icon-chip"
+                          class="ml-2"
                           @click.stop="
                             copyToClipboard(
                               row.function,
@@ -170,7 +184,7 @@
                             )
                           "
                         >
-                          <OIcon name="content-copy" size="sm" /> </OButton></span
+                          <OIcon name="content-copy" size="xs" /> </OButton></span
                     ></strong>
                   </div>
 
