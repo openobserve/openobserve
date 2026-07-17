@@ -536,6 +536,11 @@ pub async fn send_workflow_trigger(
     metadata: HashMap<String, String>,
     data: &[Value],
 ) -> Result<(), anyhow::Error> {
+    let o2_cfg = get_o2_config();
+    if !o2_cfg.common.workflows_enabled {
+        return Ok(());
+    }
+
     let data = serde_json::to_string(data)?;
     let run_id = config::ider::uuid();
 
@@ -570,6 +575,10 @@ pub async fn send_workflow_trigger(
 }
 
 pub async fn handle_workflow_trigger(trigger: WorkflowTrigger) {
+    let o2_cfg = get_o2_config();
+    if !o2_cfg.common.workflows_enabled {
+        return;
+    }
     match get_nats_lock(format!(
         "workflow-trigger-{:?}-handler",
         trigger.trigger_type
