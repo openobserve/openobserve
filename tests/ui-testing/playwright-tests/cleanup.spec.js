@@ -36,6 +36,9 @@ test.describe("Pre-Test Cleanup", () => {
         'e2e_vrl_',                // alerts-vrl-encoding.spec.js (VRL encoding tests)
         'e2e_sched_',              // alerts-scheduled-features.spec.js (scheduled alert tests)
         'e2e_metrics_',            // alerts-metrics-notification.spec.js (metrics notification tests)
+        'e2e_alertfv_',            // alerts-form-validation.spec.js (seeded prerequisite destinations)
+        'test_fv_alerts_dest_',    // alerts-form-validation.spec.js (custom destinations created by the test cases)
+        'test_fv_alerts_slack_',   // alerts-form-validation.spec.js (slack destination created by the test cases)
         /^destination\d{1,3}$/     // destination4, destination44, destination444, etc.
       ],
       // Template prefixes to clean up
@@ -58,7 +61,9 @@ test.describe("Pre-Test Cleanup", () => {
         'e2e_promql_',             // alerts-regression.spec.js (Bug #9967 PromQL tests)
         'e2e_vrl_',                // alerts-vrl-encoding.spec.js (VRL encoding tests)
         'e2e_sched_',              // alerts-scheduled-features.spec.js (scheduled alert tests)
-        'e2e_metrics_'            // alerts-metrics-notification.spec.js (metrics notification tests)
+        'e2e_metrics_',            // alerts-metrics-notification.spec.js (metrics notification tests)
+        'e2e_alertfv_',            // alerts-form-validation.spec.js (seeded prerequisite templates)
+        'test_fv_alerts_tmpl_'     // alerts-form-validation.spec.js (templates created by the test cases)
       ],
       // Folder prefixes to clean up
       ['auto_', 'incident_e2e_folder_', 'E2E Incidents ', 'E2E Scheduled ']
@@ -305,7 +310,7 @@ test.describe("Pre-Test Cleanup", () => {
         /^dedup_test_/,                                // Dedup test streams (dedup_test_*)
         /^dedup_src_/,                                 // Dedup source streams (dedup_src_*)
         /^alert_validation_stream$/,                   // Alert validation stream
-        /^auto_playwright_stream$/,                    // Auto playwright stream
+        /^auto_pw_stream_/,                            // Per-run alerts-ui-operations streams (auto_pw_stream_<suffix>)
         /^incident_e2e_/,                              // Incident e2e test streams (incident_e2e_*)
         /ellipsis_testing/,                            // Bug #7468 ellipsis test streams (long stream names)
         /^e2e_test_cpu_usage$/,                        // Pipeline regression test metrics stream (Issue #9901)
