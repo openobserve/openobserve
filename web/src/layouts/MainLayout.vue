@@ -79,10 +79,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 : '100%',
           }"
         >
-          <!-- White content card — rounded, soft shadow (light) / border (dark). All pages render inside this. -->
+          <!-- Content card — all pages render inside this. The border stays present in both
+               themes (transparent in light) so toggling dark mode can't shift page content by 1px. -->
           <div
-            class="flex-1 flex flex-col min-h-0 bg-surface-base rounded-xl overflow-hidden shadow-[0_1px_3px_rgba(16,40,55,0.06),0_6px_20px_rgba(16,40,55,0.08)]"
-            :class="isDark ? 'border border-border-default' : ''"
+            class="flex-1 flex flex-col min-h-0 bg-surface-base rounded-xl overflow-hidden border shadow-[0_1px_3px_rgba(16,40,55,0.06),0_6px_20px_rgba(16,40,55,0.08)]"
+            :class="isDark ? 'border-border-default' : 'border-transparent'"
           >
             <div
               v-if="isLoading"
