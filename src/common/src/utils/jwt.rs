@@ -24,7 +24,7 @@ use {
 };
 
 #[cfg(feature = "enterprise")]
-use crate::common::meta::user::TokenValidationResponse;
+use crate::meta::user::TokenValidationResponse;
 
 #[cfg(feature = "enterprise")]
 type VerifyTokenResult = Result<

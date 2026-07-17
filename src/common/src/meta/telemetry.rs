@@ -32,7 +32,7 @@ use infra::{
 };
 use segment::{Message, message::Track};
 
-use crate::common::infra::config::*;
+use crate::infra::config::*;
 
 static TELEMETRY_CLIENT: LazyLock<reqwest::Client> = LazyLock::new(|| {
     reqwest::Client::builder()

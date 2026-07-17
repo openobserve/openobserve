@@ -23,7 +23,7 @@ use config::utils::json;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-use super::stream::SchemaRecords;
+use crate::common::meta::stream::SchemaRecords;
 
 /// System job types for backend ingestion processes
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

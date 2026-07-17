@@ -13,32 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use ::config::{cache_instance_id, ider};
-
-use crate::service::db::metas;
-
 pub mod cluster;
 pub mod config;
-#[cfg(feature = "enterprise")]
-pub mod ofga;
 pub mod wal;
-
-pub async fn init() -> Result<(), anyhow::Error> {
-    // set instance id
-    let instance_id = match metas::instance::get().await {
-        Ok(Some(instance)) => instance,
-        Ok(None) | Err(_) => {
-            log::info!("Generating new instance id");
-            let id = ider::generate();
-            let _ = metas::instance::set(&id).await;
-            id
-        }
-    };
-    cache_instance_id(&instance_id);
-
-    wal::init()?;
-    // because of asynchronous, we need to wait for a while
-    tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-
-    Ok(())
-}

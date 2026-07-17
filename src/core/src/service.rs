@@ -13,67 +13,26 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::{meta::stream::StreamParams, utils::schema::format_stream_name};
+use config::meta::stream::StreamParams;
+pub use config::utils::schema::format_stream_name;
 use infra::errors::Result;
 use opentelemetry::trace::TraceContextExt;
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
-pub mod alerts;
+pub use crate::{
+    alerts, auth, authz, bootstrap, cache, cluster_info, compact, dashboards, db, enrichment,
+    enrichment_table, file_downloader, file_list, file_list_dump, folders, functions, github, grpc,
+    http, ingestion, ingestion_tokens, ingestion_types, kv, logs, metadata, metrics, node,
+    org_cleanup, organization, pipeline, promql, runtime_metrics, schema, search, self_reporting,
+    session, short_url, sourcemaps, stream, stream_utils, synthetics, tantivy, tls, traces, users,
+};
 #[cfg(feature = "enterprise")]
-pub mod anomaly_detection;
-pub mod authz;
-pub mod cluster_info;
-pub mod compact;
-pub mod dashboards;
-pub mod db;
-pub mod enrichment;
-pub mod enrichment_table;
-pub mod file_downloader;
-pub mod file_list;
-pub mod file_list_dump;
-pub mod folders;
-pub mod functions;
-pub mod github;
-pub mod grpc;
-pub mod http;
-pub mod ingestion;
-pub mod ingestion_tokens;
-pub mod kv;
-#[cfg(feature = "enterprise")]
-pub mod llm_evaluations;
-pub mod logs;
-pub mod metadata;
-pub mod metrics;
-pub mod node;
-pub mod org_cleanup;
-#[cfg(feature = "enterprise")]
-pub mod org_storage_providers;
+pub use crate::{
+    anomaly_detection, llm_evaluations, ofga, org_storage_providers, providers, ratelimit,
+    search_jobs,
+};
 #[cfg(feature = "cloud")]
-pub mod org_usage;
-pub mod organization;
-pub mod pipeline;
-pub mod promql;
-#[cfg(feature = "enterprise")]
-pub mod providers;
-#[cfg(feature = "enterprise")]
-pub mod ratelimit;
-pub mod runtime_metrics;
-pub mod schema;
-pub mod search;
-#[cfg(feature = "enterprise")]
-pub mod search_jobs;
-pub mod self_reporting;
-pub mod session;
-pub mod short_url;
-pub mod sourcemaps;
-pub mod stream;
-pub mod synthetics;
-pub mod tantivy;
-pub mod tls;
-pub mod traces;
-#[cfg(feature = "cloud")]
-pub mod trial_quota;
-pub mod users;
+pub use crate::{org_usage, trial_quota};
 
 // format stream name
 pub async fn get_formatted_stream_name(params: StreamParams) -> Result<String> {

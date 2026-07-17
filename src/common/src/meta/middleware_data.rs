@@ -26,7 +26,7 @@ use maxminddb::geoip2::city::Location;
 use serde::{Deserialize, Serialize};
 use uaparser::{Parser, UserAgentParser};
 
-use crate::{USER_AGENT_REGEX_FILE, common::infra::config::MAXMIND_DB_CLIENT};
+use crate::{USER_AGENT_REGEX_FILE, infra::config::MAXMIND_DB_CLIENT};
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
 pub struct GeoInfoData<'a> {
