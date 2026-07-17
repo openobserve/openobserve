@@ -288,6 +288,8 @@ describe("MetricsExplorer wiring", () => {
       // t() is mocked to echo the key — the label must come from i18n.
       expect(btn.text()).toContain("metrics.explorer.refresh");
       expect(btn.attributes("size")).toBe("sm-toolbar");
+      // Same treatment as the logs/traces Run Query button.
+      expect(btn.attributes("variant")).toBe("primary");
     });
   });
 

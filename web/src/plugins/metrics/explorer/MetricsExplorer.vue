@@ -119,7 +119,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              in Explore/Workspace it refreshes the grid — so its
              disabled/loading state follows the grid only there. -->
         <OButton
-          variant="outline"
+          variant="primary"
           size="sm-toolbar"
           icon-left="refresh"
           :disabled="isGridMode && (refreshing || grid.loading.value)"
