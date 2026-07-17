@@ -1,11 +1,13 @@
 # O2 Style Migration — Style Blocks → Tailwind & Token-Layer Class Evacuation
 
-> **Status: POLICY APPROVED 2026-07-16 (§3 ruling). P0 ✅ · PQ ✅ · PQ2 ✅ · W1 COMPLETE (a–e) ✅ ·
-> W2.b.1 (EmptyState scoping) ✅ · W2.a in progress · W2.b.2+/c/d pending (2026-07-16).**
-> **The 4 token files now contain tokens only; `lint:token-purity` is zero-tolerance (baseline deleted).**
-> ⚠ **`npm run lint:design` is currently RED (8 regressions)** — see the independent status audit **§13**.
-> Execution log, findings that CORRECT this plan, and the remaining queue: **§10–§13**.
-> ⚠ §1 counts and some §5/§9 claims are pre-execution estimates — several proved wrong; see §10.2.
+> **Status (2026-07-17): P0 ✅ · PQ ✅ · PQ2 ✅ · W1 (a–e) ✅ · W2.a ✅ · W2.b.1 ✅ · W2.c ✅ ·
+> global evacuation ✅ · W2.d guard ✅. Remaining: utilities.css legacy ladder + the final
+> zero-tolerance flips — see §15.**
+> **Token layer is pure** (`lint:token-purity` zero-tolerance). **`lint:design` GREEN.**
+> **`unscopedStyle` 204 → 10** (7 files, every one carrying a `keep()` justification).
+> Execution logs: §10–§12 · status audit §13 · session log §14 · **final state + remaining work §15**.
+> ⚠ §1 counts and some §5/§9 claims are pre-execution estimates — many proved wrong; see §10.2, §11.3,
+> §12.3 and §15.3 for the corrections (several were disproved by evidence during execution).
 >
 > Written 2026-07-16 on `fix/token`. Companion to `O2_TOKEN_MIGRATION_PLAN.md` (Part II Phase E —
 > this document **supersedes and extends** Phase E), `O2_TOKEN_DECISIONS.md` (D1–D20), and
@@ -884,3 +886,95 @@ agents:
 **Remaining after this session:** `unscopedStyle` 144 (was 204 at plan start), `styleBlockHex` 469,
 `stylePxUnit` 974. The W2.a/W2.c batch wave (per §14.3) is still the efficient path for the bulk and
 should be re-dispatched once the account session limit resets.
+
+---
+
+## 15. FINAL STATE — W2 substantially complete (2026-07-17)
+
+The batch waves were re-dispatched after the limit reset and have landed. This section supersedes
+§14's "remaining" line.
+
+### 15.1 Where the debt actually ended up
+
+| Category | Plan start | **Now** | Notes |
+|---|---:|---:|---|
+| `unscopedStyle` | 204 | **10** | across **7 files**, every one carrying a `keep()` justification (§15.2) |
+| `styleBlockHex` | 632* | **107** | *real baseline was 480 (§10.2.8) |
+| `stylePxUnit` | 1,015 | **266** | ratchet-only by design (§12.4) |
+| `hexClass` | 139 | **14** | |
+| `arbTextSize` | 302 | **3** | |
+| `themeTernary` | 151 | **9** | |
+| `darkMechanism` | 310 | **32** | D19/D20 sweep still parked |
+| `styleKeepComment` (NEW) | — | **37** | new guard, baselined; see §15.4 |
+
+Gates: `lint:design` GREEN · `lint:tokens` GREEN (1,047 tokens, 951 refs) · `lint:token-purity` GREEN
+(zero-tolerance) · `vue-tsc` exit 0 · stylelint **0 errors** (14 warnings, was 174) · unit suite
+**38,466 passing**.
+
+### 15.2 The 7 surviving unscoped blocks — all justified
+
+These target DOM the component does not own, so neither `scoped` nor `:deep()` can reach them:
+`PipelineEditor` (vue-flow canvas root, rendered inside an async child) · `RenderDashboardCharts`
+(GridStack-injected DOM + `@page`) · `ImportDashboard` (monaco; `.editor-container-url` is shared with
+BaseImport) · `ViewDashboard` (print rules reaching `.o2-app-root`/`main` in MainLayout) · `NodeSidebar`
+(styles *other* components' drag handles) · `OFieldList` (OButton slot DOM) · `BaseImport` (scrollbar).
+
+### 15.3 Two systemic blockers, both resolved
+
+1. **Keyframes** — ~20 blocks were unscoped *only* because Vue's scoped compiler renames `@keyframes`
+   and rewrites `animation:` together, but cannot follow a template `[animation:name_…]` arbitrary
+   utility. Fixed by creating **`src/styles/keyframes.css`** (232 lines, 19 namespaced `o2-*` keyframes,
+   imported from `tailwind.css`) and relocating them. **3 duplicate definitions collapsed**
+   (`o2-skel-shimmer` existed 3×). Keyframes referenced only from CSS were scoped instead, which also
+   hashes generic names (`slide-up`, `fadeIn`) out of the global namespace.
+2. **Cross-file globals** — evacuated to `utilities.css`'s unlayered-legacy section, selectors moved
+   byte-identical: `printMode`/`hideOnPrintMode`, `o2-table-hide-header`, `regex-pattern-input`,
+   `date-time-table`, `ai-btn`, `field-list-separator`.
+
+**Premises this plan asserted that execution disproved** (each was checked against the code, not the
+grep count): `.selectedLabel` is a JS computed ref, never a class (dead) · `.date-time-button.isOpen`
+is never applied to any element (dead) · AppDialog's `.fade-*` is own-element-only, not a 5-file global
+· the `.ai-btn` "duplicate" in utilities.css is a *different* nested rule (deduping it would have
+dropped row-hover behaviour) · `.card-container` has 178 consumers, not ~5 (§10.2.5). Following the
+brief literally would have added dead rules and broken behaviour — **verify before you evacuate.**
+
+### 15.4 Remaining work (honest list)
+
+1. **`utilities.css` legacy ladder — the big one.** 1,563 lines / 176 class selectors, still zero
+   `@utility`. This is the W1 evacuation's deliberate staging (§12.2, zero-visual-risk) plus the new
+   cross-file arrivals. Every rule still owes a §3.1 ladder pass; the file must shrink toward the
+   "deliberately tiny" §3.2 target, not stabilise here.
+2. **`styleKeepComment` = 37** — pre-existing scoped blocks with no justification (OCodeBlock, OTable,
+   EmptyState illustrations, SetupCardRenderer, …). The guard freezes them; burn down, then flip to
+   zero-tolerance.
+3. **Scrollbar dedup (W2.b.2)** — 14 `.vue` files still define `::-webkit-scrollbar` locally; the
+   global treatment in `base-elements.css` likely covers most. (Was 21; the RUM batch deleted several.)
+4. **Final zero-tolerance flips** — `unscopedStyle`/`styleBlockHex` → 0, `vue/enforce-style-attribute`
+   → error, stylelint `color-no-hex` → error. Gated on 1–3.
+5. **`stylePxUnit` 266 / `arbPx` 159 / `arbZ` 44** — ratchet-only categories; z-index still needs the
+   D15 ladder call.
+6. **Parked:** D19/D20 dark-mechanism sweep (`darkMechanism` 32) · `ODialog`/`ODrawer`
+   `clearBodyValidation()` dead path (§11.1) · `tsHex` 471 (mostly allowlisted palette homes).
+
+### 15.5 Open decisions surfaced during execution
+
+- **D7 (ServiceGraphNodeSidePanel: theme-aware vs always-dark) is UNANSWERED and now matters.** The
+  pending doc described the panel as "always-dark", but the code carried real `:root:not(.dark)`
+  light-mode rules (white body + light scrollbar). Briefed on the stale description, the agent removed
+  them — an unapproved visible change. **Restored** via the sanctioned `dark:` / `.dark &` form; the
+  panel is theme-aware exactly as before. Answer D7 before anyone "simplifies" it again.
+- **D6 light code-bg** (`#ffffff` vs `#f6f8fa`) — the syntax family shipped; this is cosmetic only.
+- **z-index scale** — `RichTextInput` needs `z-[100000]` (fixed detail card must clear dialogs) and no
+  token scale exists (D15 was skipped). Blocks `arbZ`.
+
+### 15.6 Bugs found hiding in the CSS (fixed in passing)
+
+The migration was not cosmetic — deleting this CSS surfaced real defects:
+- **O2AIChat** forced `color: black` on generated code blocks → black-on-dark in dark mode.
+- **TenstackTable** had a theme ternary applying `field_overlay_dark` to an element that never carried
+  `field_overlay` — it could never match (dead dark-mode code).
+- **CodeQueryEditor**: ~85% of its 214-line block was dead; all 8 hex lived in the dead part.
+- **`@keyframes pulse` ×4** competing globally, load-order dependent (§11.3.3, earlier phase).
+- **SkeletonBox's `::after`** shimmer was silently relied on by two raw divs in HomeViewSkeleton.
+- **Header.spec** (61 tests) had been failing since `952c8ebc12`; `useTheme()`'s `useStore()` needs the
+  vuex injection, which the spec never provided. Fixed.
