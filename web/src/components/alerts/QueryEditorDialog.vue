@@ -244,7 +244,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         data-test="alert-saved-vrl-function-select"
                         labelKey="name"
                         valueKey="name"
-                        @filter="filterFunctionOptions"
                         @update:modelValue="onFunctionSelect"
                         class="mini-select alert-v3-select"
                         clearable
@@ -714,20 +713,6 @@ watch(() => props.savedFunctions, (newVal) => {
   functionOptions.value = [...newVal];
 });
 
-// Filter functions
-const filterFunctionOptions = (val: string, update: any) => {
-  update(() => {
-    if (val === "") {
-      functionOptions.value = [...props.savedFunctions];
-    } else {
-      const needle = val.toLowerCase();
-      functionOptions.value = props.savedFunctions.filter((v: any) =>
-        v.name.toLowerCase().indexOf(needle) > -1
-      );
-    }
-  });
-};
-
 // Update handlers
 const updateSqlQuery = (value: string) => {
   localSqlQuery.value = value;
@@ -787,11 +772,13 @@ const handleAlertFunctionEditorGenerationSuccess = (payload: {
   // Function code is already updated via @update:query handler
 };
 
-// Column and function selection
-const onFunctionSelect = (func: any) => {
-  if (func && func.function) {
-    vrlFunctionContent.value = func.function;
-    updateVrlFunction(func.function);
+// Column and function selection.
+// OSelect emits the resolved `valueKey` (the function name), not the option
+// object — look the function up before reading its body.
+const onFunctionSelect = (name: any) => {
+  const func = props.savedFunctions.find((f: any) => f.name === name);
+  if (func) {
+    updateVrlFunction(func.function || func.body || "");
   }
 };
 
