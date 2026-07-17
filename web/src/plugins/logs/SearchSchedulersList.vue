@@ -126,24 +126,23 @@
               </div>
               <div v-if="activeTab == 'query'">
                 <div class="text-left mb-2 px-4 py-0 w-[calc(95vw-2.5rem)] min-w-[calc(90vw-1.25rem)] max-h-screen overflow-hidden">
-                  <div class="flex items-center py-2">
+                  <div class="flex items-center py-2 gap-2">
                     <strong
                       >{{ t('search_scheduler_job.sql_query') }} :
                       <span>
                         <OButton
-                          variant="ghost"
-                          size="icon"
-                          class="ml-2 border! border-sql-accent! text-sql-accent!"
+                          variant="outline"
+                          size="icon-chip"
+                          class="ml-2"
                           data-test="search-scheduler-copy-sql-btn"
                           @click.stop="copyToClipboard(row.sql, { successMessage: `SQL Query ${t('search_scheduler_job.copy_success')}`, timeout: 5000 })"
                         >
-                          <OIcon name="content-copy" size="sm" />
+                          <OIcon name="content-copy" size="xs" />
                         </OButton></span
                     ></strong>
                     <OButton
-                      variant="ghost-destructive"
-                      size="sm"
-                      class="copy-btn mx-2"
+                      variant="outline"
+                      size="chip"
                       data-test="search-scheduler-go-to-logs-btn"
                       :disabled="
                         row.status_code == 0 ||
@@ -157,9 +156,17 @@
                   </div>
                   <div class="flex items-start justify-center">
                     <div
-                      class="w-full overflow-y-auto p-2.5 h-full max-h-50 border border-border-default border-l-3 border-l-sql-accent bg-surface-subtle text-text-primary"
+                      class="w-full overflow-y-auto p-2.5 h-full max-h-50 border border-border-default border-l-3 border-l-sql-accent bg-surface-subtle text-text-primary o2-colorized-query"
                     >
-                      <pre class="text-wrap">{{ row?.sql }}</pre>
+                      <!-- Monaco-colorized SQL (sanitized in colorizeRow). Falls
+                           back to plain text before colorize resolves / if it throws. -->
+                      <pre
+                        v-if="colorizedSql[row.trace_id]"
+                        class="font-mono text-compact leading-[1.6] m-0 whitespace-pre-wrap break-words"
+                        data-test="search-scheduler-sql-colorized"
+                        v-html="colorizedSql[row.trace_id]"
+                      ></pre>
+                      <pre v-else class="font-mono text-compact leading-[1.6] m-0 whitespace-pre-wrap break-words">{{ row?.sql }}</pre>
                     </div>
                   </div>
                 </div>
@@ -167,26 +174,33 @@
                   v-if="row?.function"
                   class="text-left mb-2 px-4 py-0 w-[calc(95vw-2.5rem)] min-w-[calc(90vw-1.25rem)] max-h-screen overflow-hidden"
                 >
-                  <div class="flex items-center py-2">
+                  <div class="flex items-center py-2 gap-2">
                     <strong
                       >{{ t('search_scheduler_job.function_definition') }} :
                       <span>
                         <OButton
-                          variant="ghost"
-                          size="icon"
-                          class="ml-2 border! border-function-accent! text-function-accent!"
+                          data-test="search-scheduler-copy-function-btn"
+                          variant="outline"
+                          size="icon-chip"
+                          class="ml-2"
                           @click.stop="copyToClipboard(row.function, { successMessage: `Function Defination ${t('search_scheduler_job.copy_success')}`, timeout: 5000 })"
                         >
-                          <OIcon name="content-copy" size="sm" />
+                          <OIcon name="content-copy" size="xs" />
                         </OButton></span
                     ></strong>
                   </div>
 
                   <div class="flex items-start justify-center">
                     <div
-                      class="w-full overflow-y-auto p-2.5 h-full max-h-50 border border-border-default border-l-3 border-l-function-accent bg-surface-subtle text-text-primary"
+                      class="w-full overflow-y-auto p-2.5 h-full max-h-50 border border-border-default border-l-3 border-l-function-accent bg-surface-subtle text-text-primary o2-colorized-query"
                     >
-                      <pre class="text-wrap">{{ row?.function }}</pre>
+                      <pre
+                        v-if="colorizedFunction[row.trace_id]"
+                        class="font-mono text-compact leading-[1.6] m-0 whitespace-pre-wrap break-words"
+                        data-test="search-scheduler-function-colorized"
+                        v-html="colorizedFunction[row.trace_id]"
+                      ></pre>
+                      <pre v-else class="font-mono text-compact leading-[1.6] m-0 whitespace-pre-wrap break-words">{{ row?.function }}</pre>
                     </div>
                   </div>
                 </div>
@@ -266,6 +280,8 @@ import { defineAsyncComponent, defineComponent, reactive } from "vue";
 import { searchState } from "@/composables/useLogs/searchState";
 import TenstackTable from "../../plugins/logs/TenstackTable.vue";
 import searchService from "@/services/search";
+import DOMPurify from "dompurify";
+import { colorizeQuery } from "@/utils/query/colorizeQuery";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import DateTime from "@/components/DateTime.vue";
 import { useI18n } from "vue-i18n";
@@ -646,6 +662,27 @@ export default defineComponent({
       return { formatted: result, raw: rawDuration };
     };
 
+    /* Monaco-colorized SQL / VRL for the expanded row, keyed by trace_id — the
+       same treatment the dashboard Query Inspector and Search History give their
+       queries. Runs on expand: colorizing is async and only the expanded row is
+       ever on screen. */
+    const colorizedSql = ref<Record<string, string>>({});
+    const colorizedFunction = ref<Record<string, string>>({});
+
+    const colorizeRow = async (row: any) => {
+      if (!row?.trace_id) return;
+      if (row.sql && colorizedSql.value[row.trace_id] === undefined) {
+        colorizedSql.value[row.trace_id] = DOMPurify.sanitize(
+          await colorizeQuery(row.sql, "sql"),
+        );
+      }
+      if (row.function && colorizedFunction.value[row.trace_id] === undefined) {
+        colorizedFunction.value[row.trace_id] = DOMPurify.sanitize(
+          await colorizeQuery(row.function, "vrl"),
+        );
+      }
+    };
+
     const onExpandedIdsChange = (ids: string[]) => {
       expandedIds.value = ids;
       const expandedId = ids[0];
@@ -656,6 +693,7 @@ export default defineComponent({
       const row = dataToBeLoaded.value.find((r: any) => r.trace_id === expandedId);
       if (row) {
         query.value = JSON.stringify(filterRow(row), null, 2);
+        colorizeRow(row);
       }
     };
     const goToLogs = (row) => {
@@ -807,6 +845,8 @@ export default defineComponent({
       expandedIds,
       goToLogs,
       onExpandedIdsChange,
+      colorizedSql,
+      colorizedFunction,
       copyToClipboard,
       formatTime,
       delayMessage,
@@ -840,3 +880,14 @@ export default defineComponent({
   },
 });
 </script>
+
+<style scoped>
+/* keep(generated-content): Monaco's colorize() injects .mtkN token spans via
+   v-html, so these can't be template utilities. Every colour but .mtk1 comes
+   from Monaco's own global stylesheet; .mtk1 is its default-text token, which
+   we point back at the block's own colour so the query inherits our theme
+   instead of Monaco's. Mirrors dashboards/QueryInspector.vue. */
+.o2-colorized-query :deep(.mtk1) {
+  color: inherit;
+}
+</style>

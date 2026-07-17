@@ -157,9 +157,19 @@
                   </div>
                   <div class="flex items-start justify-center">
                     <div
-                      class="w-full overflow-y-auto p-2.5 h-full max-h-50 border border-border-default border-l-3 border-l-sql-accent bg-surface-subtle text-text-primary"
+                      class="w-full overflow-y-auto p-2.5 h-full max-h-50 border border-border-default border-l-3 border-l-sql-accent bg-surface-subtle text-text-primary o2-colorized-query"
                     >
-                      <pre class="text-wrap">{{ row?.sql }}</pre>
+                      <!-- Monaco-colorized SQL (sanitized in colorizeRow), same
+                           as the dashboard Query Inspector. Falls back to plain
+                           text for the frame before colorize resolves, and if
+                           Monaco throws (colorizeQuery escapes on failure). -->
+                      <pre
+                        v-if="colorizedSql[row.uuid]"
+                        class="font-mono text-compact leading-[1.6] m-0 whitespace-pre-wrap break-words"
+                        data-test="search-history-sql-colorized"
+                        v-html="colorizedSql[row.uuid]"
+                      ></pre>
+                      <pre v-else class="font-mono text-compact leading-[1.6] m-0 whitespace-pre-wrap break-words">{{ row?.sql }}</pre>
                     </div>
                   </div>
                 </div>
@@ -190,9 +200,15 @@
 
                   <div class="flex items-start justify-center">
                     <div
-                      class="w-full overflow-y-auto p-2.5 h-full max-h-50 border border-border-default border-l-3 border-l-function-accent bg-surface-subtle text-text-primary"
+                      class="w-full overflow-y-auto p-2.5 h-full max-h-50 border border-border-default border-l-3 border-l-function-accent bg-surface-subtle text-text-primary o2-colorized-query"
                     >
-                      <pre class="text-wrap">{{ row?.function }}</pre>
+                      <pre
+                        v-if="colorizedFunction[row.uuid]"
+                        class="font-mono text-compact leading-[1.6] m-0 whitespace-pre-wrap break-words"
+                        data-test="search-history-function-colorized"
+                        v-html="colorizedFunction[row.uuid]"
+                      ></pre>
+                      <pre v-else class="font-mono text-compact leading-[1.6] m-0 whitespace-pre-wrap break-words">{{ row?.function }}</pre>
                     </div>
                   </div>
                 </div>
@@ -248,6 +264,8 @@ import { defineAsyncComponent, defineComponent } from "vue";
 import { searchState } from "@/composables/useLogs/searchState";
 import TenstackTable from "../../plugins/logs/TenstackTable.vue";
 import searchService from "@/services/search";
+import DOMPurify from "dompurify";
+import { colorizeQuery } from "@/utils/query/colorizeQuery";
 import NoData from "@/components/shared/grid/NoData.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import DateTime from "@/components/DateTime.vue";
@@ -545,6 +563,27 @@ export default defineComponent({
       return { formatted: result, raw: rawDuration };
     };
 
+    /* Monaco-colorized SQL / VRL for the expanded row, keyed by row uuid — the
+       same treatment the dashboard Query Inspector gives its queries. Colorizing
+       is async and only the expanded row is ever visible, so it runs on expand
+       rather than up-front for every row. */
+    const colorizedSql = ref<Record<string, string>>({});
+    const colorizedFunction = ref<Record<string, string>>({});
+
+    const colorizeRow = async (row: any) => {
+      if (!row?.uuid) return;
+      if (row.sql && colorizedSql.value[row.uuid] === undefined) {
+        colorizedSql.value[row.uuid] = DOMPurify.sanitize(
+          await colorizeQuery(row.sql, "sql"),
+        );
+      }
+      if (row.function && colorizedFunction.value[row.uuid] === undefined) {
+        colorizedFunction.value[row.uuid] = DOMPurify.sanitize(
+          await colorizeQuery(row.function, "vrl"),
+        );
+      }
+    };
+
     const onExpandedIdsChange = (ids: string[]) => {
       expandedIds.value = ids;
       const expandedId = ids[0];
@@ -555,6 +594,7 @@ export default defineComponent({
       const row = dataToBeLoaded.value.find((r: any) => r.uuid === expandedId);
       if (row) {
         moreDetailsToDisplay.value = JSON.stringify(filterRow(row), null, 2);
+        colorizeRow(row);
       }
     };
     const goToLogs = (row) => {
@@ -665,6 +705,8 @@ export default defineComponent({
       goToLogs,
       goToInspector,
       onExpandedIdsChange,
+      colorizedSql,
+      colorizedFunction,
       copyToClipboard,
       formatTime,
       delayMessage,
@@ -681,3 +723,14 @@ export default defineComponent({
   },
 });
 </script>
+
+<style scoped>
+/* keep(generated-content): Monaco's colorize() injects .mtkN token spans via
+   v-html, so these can't be template utilities. Every colour but .mtk1 comes
+   from Monaco's own global stylesheet; .mtk1 is its default-text token, which
+   we point back at the block's own colour so the query inherits our theme
+   instead of Monaco's. Mirrors dashboards/QueryInspector.vue. */
+.o2-colorized-query :deep(.mtk1) {
+  color: inherit;
+}
+</style>
