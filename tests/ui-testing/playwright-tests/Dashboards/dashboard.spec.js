@@ -64,7 +64,7 @@ test.describe("dashboard UI testcases", () => {
       state: "visible",
     });
 
-    // Search for the created dashboard
+    // Search for the created dashboard.
     await pm.dashboardCreate.searchDashboard(randomDashboardName);
     await pm.dashboardList.duplicateDashboard(randomDashboardName);
 
