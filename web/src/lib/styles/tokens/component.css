@@ -1605,6 +1605,7 @@
   --color-banner-warning-text: var(--color-banner-warning-text);
   --color-ai-accent: var(--color-ai-accent);
   --color-sql-accent: var(--color-sql-accent);
+  --color-function-accent: var(--color-function-accent);
   --color-brand-slack: var(--color-brand-slack);
   --color-brand-slack-hover: var(--color-brand-slack-hover);
   --color-brand-teams: var(--color-brand-teams);

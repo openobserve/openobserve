@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="flex flex-col logs-index-menu pr-[0.375rem]! h-full bg-surface-panel!"
+    class="flex flex-col logs-index-menu w-full pr-[0.375rem]! h-full bg-surface-panel!"
   >
     <div
       class="flex items-center gap-1"
@@ -2117,3 +2117,36 @@ export default defineComponent({
   },
 });
 </script>
+
+<style scoped>
+/* keep(lib-override:o2-table): `.logs-index-menu` and both `.index-table` divs are
+   this component's own template, but the tbody/tr/td they lay out are OTable's
+   internal render (via GroupedFieldList) and `.schema-field-toggle` is
+   FieldListPagination's DOM — child DOM this owner can only reach with :deep().
+   The `.logs-index-menu` ancestor is kept so the selectors match at their original
+   specificity. */
+.logs-index-menu .index-table {
+  width: 100%;
+  height: calc(100% - 2.5rem);
+}
+
+.logs-index-menu .index-table :deep(tr) {
+  margin-bottom: 1px;
+}
+
+.logs-index-menu .index-table :deep(tbody),
+.logs-index-menu .index-table :deep(tr),
+.logs-index-menu .index-table :deep(td) {
+  width: 100%;
+  display: block;
+  height: fit-content;
+  overflow: hidden;
+}
+
+.logs-index-menu .index-table :deep(.schema-field-toggle) {
+  border: 1px solid var(--color-card-glass-border);
+  border-radius: 0.325rem;
+  background-color: transparent;
+  line-height: 0.625rem;
+}
+</style>

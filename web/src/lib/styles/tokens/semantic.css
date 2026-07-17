@@ -257,6 +257,11 @@
   /* SQL / query-editor violet accent (stream-name label, sql status bar). Theme-aware:
      lighter in dark for legibility. */
   --color-sql-accent: #7C3AED;
+  /* VRL-function blue accent, the sibling of --color-sql-accent: the two mark the
+     SQL vs function halves of an expanded search-history / scheduler row. Minted
+     because no blue "function" accent existed; the raw literal it replaces had no
+     dark treatment at all. Theme-aware: lighter in dark for legibility. */
+  --color-function-accent: #0A7EBC;
   --color-lang-sql-text: #7B61FF;
   --color-lang-sql-bg: rgba(123, 97, 255, 0.10);
   --color-lang-vrl-text: #F59E0B;

@@ -41,10 +41,11 @@
                   <OButton
                     :data-test="`date-time-relative-${item}-${period.value}-btn`"
                     variant="ghost"
+                    class="h-8! w-8! font-bold! disabled:opacity-35"
                     :class="
                       isSelected(item, period.value)
-                        ? 'rp-selector-selected'
-                        : 'rp-selector'
+                        ? 'bg-button-primary! text-button-primary-foreground!'
+                        : 'bg-[color-mix(in_srgb,var(--color-text-primary)_7%,transparent)]!'
                     "
                     @click="setRelativeDate(period, item)"
                     >{{ item }}</OButton

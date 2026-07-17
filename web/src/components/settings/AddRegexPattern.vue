@@ -583,3 +583,14 @@ export default defineComponent({
 });
 </script>
 
+<style scoped>
+/* keep(lib-override:o2-textarea): squares the top corners of the textarea's own
+   border box (OTextarea's internal wrapper div, only reachable via :deep()) so
+   each field reads as one unit under its flat full-width section-header strip. */
+.regex-pattern-input :deep(.rounded-md.border),
+.regex-test-string-input :deep(.rounded-md.border) {
+  border-top-left-radius: 0 !important;
+  border-top-right-radius: 0 !important;
+}
+</style>
+

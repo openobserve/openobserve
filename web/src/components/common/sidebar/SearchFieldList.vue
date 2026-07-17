@@ -2,7 +2,7 @@
 
 <template>
   <div class="flex flex-col w-full index-menu default-index-menu h-full!">
-    <div class="index-table logs-index-menu h-full! w-full">
+    <div class="index-table h-full! w-full">
       <OFieldList
         ref="fieldListRef"
         :fields="fieldListItems"

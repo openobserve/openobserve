@@ -118,12 +118,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               !searchObj.loadingCounter &&
               searchObj.meta.showHistogram
             "
-            class="shrink-0 cursor-pointer"
-            :class="
-              isDark
-                ? 'histogram-unavailable-text'
-                : 'histogram-unavailable-text-light'
-            "
+            class="shrink-0 cursor-pointer text-warning"
           >
             <OIcon name="info-outline" size="sm"> </OIcon>
             <OTooltip :content="searchObj.data.histogram.errorMsg" side="top" align="center" />

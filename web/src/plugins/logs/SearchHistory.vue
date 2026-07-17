@@ -108,7 +108,7 @@
                         <OButton
                           variant="ghost"
                           size="icon"
-                          class="copy-btn-sql ml-2"
+                          class="ml-2 border! border-sql-accent! text-sql-accent!"
                           @click.stop="
                             copyToClipboard(row.sql, { successMessage: 'SQL Query Copied Successfully!', timeout: 5000 })
                           "
@@ -144,8 +144,10 @@
                     </OButton>
                   </div>
                   <div class="flex items-start justify-center">
-                    <div class="scrollable-content expanded-sql">
-                      <pre style="text-wrap: wrap">{{ row?.sql }}</pre>
+                    <div
+                      class="w-full overflow-y-auto p-2.5 h-full max-h-50 border border-border-default border-l-3 border-l-sql-accent bg-surface-subtle text-text-primary"
+                    >
+                      <pre class="text-wrap">{{ row?.sql }}</pre>
                     </div>
                   </div>
                 </div>
@@ -160,7 +162,7 @@
                         <OButton
                           variant="ghost"
                           size="icon"
-                          class="copy-btn-function ml-2"
+                          class="ml-2 border! border-function-accent! text-function-accent!"
                           @click.stop="
                             copyToClipboard(
                               row.function,
@@ -173,8 +175,10 @@
                   </div>
 
                   <div class="flex items-start justify-center">
-                    <div class="scrollable-content expanded-function">
-                      <pre style="text-wrap: wrap">{{ row?.function }}</pre>
+                    <div
+                      class="w-full overflow-y-auto p-2.5 h-full max-h-50 border border-border-default border-l-3 border-l-function-accent bg-surface-subtle text-text-primary"
+                    >
+                      <pre class="text-wrap">{{ row?.function }}</pre>
                     </div>
                   </div>
                 </div>

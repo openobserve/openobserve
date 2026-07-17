@@ -93,12 +93,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       queryRangeRestrictionInHour > 0
                     "
                     :data-test="`date-time-relative-${item}-${period.value}-btn`"
+                    class="h-8! w-8! font-bold! disabled:opacity-35"
                     :class="
                       selectedType == 'relative' &&
                       relativePeriod == period.value &&
                       relativeValue == item
-                        ? 'rp-selector-selected'
-                        : `rp-selector ${relativePeriod}`
+                        ? 'bg-button-primary! text-button-primary-foreground!'
+                        : `bg-[color-mix(in_srgb,var(--color-text-primary)_7%,transparent)]! ${relativePeriod}`
                     "
                     variant="ghost"
                     size="xs"

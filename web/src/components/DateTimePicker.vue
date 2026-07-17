@@ -74,12 +74,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :key="item"
               >
                 <OButton
+                  class="h-8! w-8! font-bold! disabled:opacity-35"
                   :class="
                     data.selectedDate.tab == 'relative' &&
                     data.selectedDate.relative.period.value == period.value &&
                     data.selectedDate.relative.value == item
-                      ? 'rp-selector-selected'
-                      : `rp-selector ${data.selectedDate.relative.period.value}`
+                      ? 'bg-button-primary! text-button-primary-foreground!'
+                      : `bg-[color-mix(in_srgb,var(--color-text-primary)_7%,transparent)]! ${data.selectedDate.relative.period.value}`
                   "
                   variant="ghost"
                   size="xs"

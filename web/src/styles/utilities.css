@@ -1,137 +1,54 @@
-﻿/* Copyright 2026 OpenObserve Inc. */
+/* Copyright 2026 OpenObserve Inc. */
 /* ============================================================
-   SHARED UTILITIES â€” deliberately minimal.
+   SHARED UTILITIES - deliberately minimal.
    ============================================================
-   Ladder step 4 of O2_STYLE_MIGRATION_PLAN.md Â§3.1 â€” the LAST RESORT.
+   Ladder step 4 of O2_STYLE_MIGRATION_PLAN.md S3.1 - the LAST RESORT.
 
    Before adding anything here, exhaust the ladder in order:
-     1. DELETE            â€” the rule is dead / duplicates Tailwind.
-     2. Template utilities â€” the template owns the element â†’ put bare Tailwind
+     1. DELETE            - the rule is dead / duplicates Tailwind.
+     2. Template utilities - the template owns the element -> put bare Tailwind
                              utilities on it. (The default destination.)
-     3. Extract a component â€” the markup+style repeats â†’ build/extend an O*
+     3. Extract a component - the markup+style repeats -> build/extend an O*
                              component whose TEMPLATE carries the utilities.
-                             **Preferred over any shared class** (Â§3 ruling).
-     4. @utility (here)    â€” ONLY for a pure styling concern with no markup of
-                             its own to componentize, recurring across â‰¥3 files.
+                             **Preferred over any shared class** (S3 ruling).
+     4. @utility (here)    - ONLY for a pure styling concern with no markup of
+                             its own to componentize, recurring across >=3 files.
                              Realistically: scrollbar treatment. Little else
-                             should ever qualify. If torn between 3 and 4 â†’ 3.
+                             should ever qualify. If torn between 3 and 4 -> 3.
 
    RULES:
-   - Colours via var(--color-*) only â€” never a raw hex.
+   - Colours via var(--color-*) only - never a raw hex.
    - rem units (1px hairline borders excepted).
    - Each @utility carries a one-line comment saying why it is not a component.
+
+   STATUS: W2.c walked the last of the legacy globals down the ladder. The two
+   rules below are ALL that remain, and each is parked for its own dedicated
+   wave. Everything else that ever lived here has been deleted as dead,
+   colocated onto its owning component, or migrated to a flipping --color-*
+   token; the per-rule history is in the git log, not in this file.
+   Cascade trap both survivors share: these rules are UNLAYERED, so each one
+   silently beats any co-occurring layered bg-*/text-* utility. Converting one
+   means migrating from the COMPUTED result and deleting the utility it was
+   overriding.
    ============================================================ */
 
-/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-   UNLAYERED LEGACY HELPERS â€” evacuated from the token layer in W1.b, then
-   walked down the Â§3.1 ladder in W2.a. `.card-container` is the last one
-   standing; everything else in this section is gone:
-     F3 .o2-table / .o2-row-md / .o2-table-header-sticky â†’ scoped CSS in
-        lib/core/Table/OTable.vue (public modifier API, styled through :deep()).
-     F3 .o2-row-sm, .o2-table*.actions-column â†’ deleted, zero live DOM.
-     F3 .o2-table-footer-title â†’ `text-xs font-normal` on the 31 call sites.
-     F5 .o2-app-root / .o2-custom-bg / .o2-monospace-font / .el-border* â†’
-        template utilities on their owning components.
-     F7 .o-input-label* â†’ template utilities; the class name survives ONLY as
-        the opt-out marker read by `label:not(.o-input-label)` in
-        styles/base-elements.css and onlineEvals/forms/ScorerFormPage.vue.
-   Note the cascade trap this section exists to document: these rules are
-   UNLAYERED, so each one beats any co-occurring layered bg-*/text-* utility.
-   Converting one means deleting the utility it was silently overriding.
-   â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
-
-/*
- * NOTE: the legacy `.bg-white { background-color: var(--color-theme-body-bg-primary) }`
- * shim was removed. It collided with Tailwind's `bg-white` utility once the
- * `tw:` prefix was dropped, silently overriding every `bg-white` with the 1%
- * body tint (e.g. the OSwitch thumb rendered invisible). Components that need
- * the tint reference `var(--color-theme-body-bg-primary)` directly (QueryInspector,
- * alerts/AddDestination.vue, alerts/AddTemplate.vue); `bg-white` now means
- * Tailwind white everywhere.
- */
-
-/* â”€â”€ F5 â€” .card-container : NOT YET MOVED. 178 applications across 102 files on
+/* -- F5 - .card-container : NOT YET MOVED. 178 applications across 102 files on
    arbitrary page/panel/footer wrappers that share no markup, so there is no
    component to fold it into, plus 5 files use it as a `:deep(.card-container)`
    styling hook into a child's DOM. Its single declaration equals the
    `bg-card-glass-bg` utility, but this rule is UNLAYERED and therefore beats
-   any co-occurring layered `bg-*` utility â€” 24 templates pair it with another
+   any co-occurring layered `bg-*` utility - 24 templates pair it with another
    `bg-*` that is dead today and would silently win the moment this becomes a
    utility. Converting it needs its own wave with per-surface visual checks and
-   removal of the losing `bg-*` at each of those 24 sites. â”€â”€ */
+   removal of the losing `bg-*` at each of those 24 sites. -- */
 .card-container {
   background-color: var(--color-card-glass-bg);
 }
 
-/* â”€â”€ W1.c â€” F6 AI buttons Â· F13 syntax guide Â· F17 misc: FULLY EVACUATED.
-     F6 .ai-hover-btn (+ dark/hover twins, `:hover img`) â†’ `<style scoped>` in
-        lib/core/EmptyState/EmptyStateIngestionChip.vue â€” it is that chip's
-        modifier API; the 4 empty states keep passing the class.
-     F6 .ai-btn-active (+ twins) â†’ deleted: all 5 call sites already carry the
-        equivalent `[background:var(--color-gradient-ai-subtle)]!` /
-        `hover:[background:var(--color-gradient-ai)]!` utilities unconditionally,
-        so the rule was a no-op. The class name survives as the state hook read
-        by FunctionsToolbar's `[.ai-btn-active_&]:!opacity-100`.
-     F6 .o2-ai-context-btn (+ twins) â†’ template utilities on its owning
-        component, common/O2AIContextAddBtn.vue; class name dropped.
-     F6 .ai-hover-btn:hover .ai-icon â†’ deleted, the compound never matched DOM.
-     F13 .guide-list(+li) / .syntax-guide-button(-dark) / .syntax-guide-title /
-        .syntax-guide-text / .bg-highlight â†’ all deleted, zero live DOM
-        (`syntax-guide-button` survives only as a data-cy attr; `.bg-highlight`
-        call sites moved to `bg-highlight-bg px-1.25`).
-     F17 .splitter-icon-collapse/-expand â†’ deleted, sole call site is commented
-        out in enterprise billings/Billing.vue.
-     F17 .alert-field-highlight â†’ already colocated as `:deep()` in
-        alerts/AddAlert.vue; the global was a redundant duplicate.
-     F17 .displayDiv .vue-grid-item.vue-grid-placeholder â†’ scoped `:deep()` in
-        Dashboards/RenderDashboardCharts.vue.
-     F17 .warning-msg / .dashboard-chart-border / .no-data-image â†’ deleted, zero
-        consumers. â”€â”€ */
-
-/* â”€â”€ W1.d â€” F8 schema explorer Â· F14 resizer/splitter/layout Â· F10 logs
-   mega-block Â· stragglers (verbatim from component.css, file order preserved
-   so the DIFFERENT-body duplicate pairs â€” Â§11.3.2 â€” keep their cascade
-   winners). 41 dead rules (38 dead classes incl. .logPage_bkcss, .badge-*,
-   .tile-content-*, .schema-input-box*) were deleted after a full-corpus
-   consumer check incl. dynamic-construction patterns. The W2 ladder
-   (template utilities / colocation / component extraction) processes this
-   section batch by batch with visual checks. â”€â”€ */
-
-/* â”€â”€ W2.b â€” this section is now DONE except for the four KEEPs argued inline
-   below (.logs-index-menu, .histogram-unavailable-text*,
-   .rp-selector*) and the two with their own waves (.card-container, .full-height).
-   Deleted as DEAD after a two-pass check (find-class-consumers + loose grep +
-   reading every hit): .search-list (both defs â€” fully subsumed by the .full-height
-   + w-full already on its one consumer), .table-container's base rule (its
-   border-radius lost to `rounded-none!` in one TenstackTable and tied `rounded-lg`
-   in the other; the class name survives only as a :deep() hook for 3 files), both
-   .report-list-tabs inner blocks (.rum-tabs/.rum-tab have zero live DOM),
-   .logs-json-preview-tabs' inner blocks (.o2-tab/.active do not exist â€” AppTabs
-   renders OToggleGroup), .search-list's .chart/.my-sticky-header-table subtrees,
-   .pagination-block (its one declaration was already in the consumer's own
-   .select-pagination rule), and the .log-key/.log-separator light colours (dead
-   since assets/styles/log-highlighting.css is imported AFTER tailwind.css in
-   main.ts and redeclares them).
-   Colocated: .visualize-container/.build-container/.search-history-empty â†’
-   template utilities in plugins/logs/Index.vue Â· .logs-saved-view-icon,
-   .table-container's modifiers, .result-bar, .search-spinner, .detail-table-dialog
-   â†’ plugins/logs/SearchResult.vue + SearchBar.vue templates Â· .table-pre,
-   .log_json_content, .log-json-field-dropdown-btn, .syntax-section,
-   .expanded-content â†’ templates of their owners Â· .logs-query-editor â†’
-   components/CodeQueryEditor.vue (its only consumer) Â· .context-menu(+twins) â†’
-   plugins/logs/JsonPreview.vue template, twins collapsed onto flipping tokens Â·
-   .ai-icon/.navbar-links/button.date-time-button/.wrap-content-btn/
-   .dark .syntax-guide-in-toolbar â†’ template utilities on their owners Â·
-   .log-key/.log-separator font-weight + .dark .log-separator â†’
-   assets/styles/log-highlighting.css, the sanctioned generated-content home.
-   From the W2.a cross-file tail: .o2-table-hide-header â†’ lib/core/Table/OTable.vue,
-   .field-list-separator â†’ lib/core/Splitter/OSplitter.vue, .ai-btn â†’
-   common/O2AIContextAddBtn.vue (all three were modifier APIs of the component
-   that renders the DOM), .date-time-table .relative-row â†’ `[&>*]:mr-1.5` on all
-   six rows in the three date pickers. â”€â”€ */
-
-
-
+/* -- .full-height : NOT YET MOVED, own wave. Six !important declarations applied
+   as one opaque bundle across many unrelated wrappers; every declaration would
+   have to be re-proved per call site (and the `!important`s re-argued) before it
+   can become template utilities. -- */
 .full-height {
   height: 100% !important;
   max-height: 100% !important;
@@ -140,197 +57,3 @@
   box-sizing: border-box !important;
   overflow: hidden !important;
 }
-
-/* -- .logs-index-menu : KEPT (trimmed). Re-examined in W2.b for an OTable hook
-   that would let this live in an owning component; there is none, and the fan-out
-   is worse than first recorded. `.logs-index-menu` is applied by
-   plugins/logs/IndexList.vue (line 19), but `.index-table` â€” the descendant this
-   rule qualifies â€” is produced by THREE different components underneath it:
-   IndexList.vue's own divs (lines 65, 110), and common/sidebar/SearchFieldList.vue,
-   which carries `index-table` AND `logs-index-menu` together on its root (line 5)
-   so it matches as a descendant of IndexList's ancestor. The tbody/tr/td being
-   styled are then OTable's internal render, and `.schema-field-toggle` is a fourth
-   component's DOM (common/FieldListPagination.vue) that must stay qualified by the
-   ancestor â€” it is used outside this tree too. No single scope reaches all four,
-   and OTable exposes no modifier hook that would carry the ancestor condition
-   with it. The other ~130 lines of this block were deleted as dead after
-   a full-corpus check: .field_list (and its .field_label/.field-container/
-   .field_overlay/.field_icons subtree), .field-table (+ .field-list-pagination,
-   .pagination-nav-btn, .pagination-page-btn, .field-list-reset, .reset-icon),
-   .pagination-field-count, and BOTH the `.dark &` / `:root:not(.dark) &` twins
-   (which only ever targeted those dead classes). -- */
-.logs-index-menu {
-  width: 100%;
-
-  .index-table {
-    width: 100%;
-    height: calc(100% - 2.5rem);
-
-    tr {
-      margin-bottom: 1px;
-    }
-
-    tbody,
-    tr,
-    td {
-      width: 100%;
-      display: block;
-      height: fit-content;
-      overflow: hidden;
-    }
-
-    .schema-field-toggle {
-      border: 1px solid var(--color-card-glass-border);
-      border-radius: 0.325rem;
-      background-color: transparent;
-      line-height: 0.625rem;
-    }
-  }
-}
-
-/* â”€â”€ .histogram-unavailable-text / -light : KEPT. Sole consumer is
-   plugins/logs/SearchResult.vue, which picks between them with an isDark ternary
-   â€” so this is exactly the dark/light twin the migration wants collapsed onto one
-   flipping token. It cannot be: both values are oranges (the dark one is the same
-   value as --color-note-light-border, the light one has no token at all) and NO
-   registered --color-* matches. --color-warning-400/500/600 are yellows
-   (#eab308 family), so pointing at them recolours a user-visible warning. The
-   correct fix is to register a new semantic --color-* for "metric unavailable",
-   and lib/styles/tokens/* is read-only in this wave. Needs a token decision, not
-   a colocation. â”€â”€ */
-.histogram-unavailable-text {
-  color: #f5a623;
-}
-
-.histogram-unavailable-text-light {
-  color: #ff8800;
-}
-
-/* â”€â”€ .rp-selector / -selected : KEPT. The relative-period chips ("Past 15m" grid)
-   documented in lib/styles/tokens/component.css. Three SIBLING components â€”
-   components/DateTime.vue, components/DateTimePicker.vue and
-   components/CustomDateTimePicker.vue â€” each author their own copy of the chip
-   grid and put the class on their own ghost OButton, so there is no single owner
-   to colocate into and no modifier API: it is one appearance duplicated across
-   three files. Â§3.1 says that shape becomes a component (an ORelativePeriodChip),
-   which is a bigger refactor than a colocation and needs the three grids
-   reconciled first (two of them also append a `${relativePeriod}` marker class).
-   Blocking detail for the template-utility route: the grey fill is a neutral 7%
-   black scrim with NO registered --color-* equivalent (--color-interactive-hover-bg
-   is accent-tinted, not neutral), so inlining it would copy a raw colour into
-   three more files instead of one. â”€â”€ */
-.rp-selector,
-.rp-selector-selected {
-  height: 32px;
-  width: 32px;
-  background: rgba(0, 0, 0, 0.07);
-  font-weight: 700;
-}
-
-.rp-selector:disabled,
-.rp-selector-selected:disabled {
-  opacity: 0.35;
-  cursor: not-allowed;
-}
-
-.rp-selector-selected {
-  color: #ffffff;
-  background: var(--color-button-primary);
-}
-
-/* â”€â”€ .scrollable-content / .copy-btn-sql / .copy-btn-function / .expanded-sql /
-   .expanded-function : KEPT as a group â€” all five are the expanded-row detail
-   panel shared verbatim by plugins/logs/SearchSchedulersList.vue and
-   plugins/logs/SearchHistory.vue (2 files, each applying them to its own DOM).
-   Colocation is blocked on the same thing for every one of them: their entire
-   body is raw colour with NO registered --color-* equivalent â€” a purple that
-   means "SQL" and a blue that means "function" (semantic accents this token set
-   has never had), plus .scrollable-content's light-only grey panel, which has no
-   dark twin at all and renders a light box in dark mode today. This wave forbids
-   hex in both destinations (template arbitrary values AND scoped <style>), and
-   lib/styles/tokens/* is read-only here, so there is nowhere legal to put them.
-   They need ~4 new semantic tokens registered first â€” and .scrollable-content
-   needs its missing dark treatment decided â€” then this block colocates into the
-   two files (or, better, the repeated expansion markup becomes one component).
-   Deliberately parked, not overlooked. â”€â”€ */
-.scrollable-content {
-  width: 100%;
-  overflow-y: auto;
-  padding: 10px;
-  border: 1px solid #ddd;
-  height: 100%;
-  max-height: 200px;
-  text-wrap: normal;
-  background-color: #e8e8e8;
-  color: black;
-}
-
-.copy-btn-sql {
-  border: #7a54a2 1px solid;
-  color: #7a54a2;
-}
-
-.copy-btn-function {
-  border: #0a7ebc 1px solid;
-  color: #0a7ebc;
-}
-
-.expanded-sql {
-  border-left: #7a54a2 3px solid;
-}
-
-.expanded-function {
-  border-left: #0a7ebc 3px solid;
-}
-
-/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-   W2.a â€” GENUINELY CROSS-FILE RULES EVACUATED FROM UNSCOPED .vue BLOCKS.
-   Each rule below was defined in a component-local UNSCOPED <style> block
-   while its markup lives in OTHER files, so scoping it in place would have
-   silently unstyled those consumers. A component-local unscoped block is not
-   a sanctioned global home (Â§3.1) â€” these are the sanctioned one. Every rule
-   is byte-equivalent to its origin apart from pxâ†’rem and hexâ†’token.
-   â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
-
-/* â”€â”€ .printMode .hideOnPrintMode : owner dashboards/settings/VariableAdHocValueSelector.vue.
-   Global because the two halves are authored in different files â€” `.printMode`
-   is put on the app root by layouts/MainLayout.vue (store.state.printMode) while
-   `.hideOnPrintMode` is placed by VariableAdHocValueSelector.vue,
-   pipeline/PipelineEditor.vue and views/Dashboards/ViewDashboard.vue. No single
-   component owns both ends, so no scope can express it. â”€â”€ */
-.printMode .hideOnPrintMode {
-  display: none;
-}
-
-/* â”€â”€ .regex-pattern-input / .regex-test-string-input : KEPT â€” re-examined in W2.b
-   and it is NOT the clean OInput-modifier the note below assumed. In
-   components/settings/AddRegexPattern.vue the same class sits on plain wrapper
-   <div>s (lines 120, 148, 193, 215) AND on the OInput itself (line 157), while
-   logstream/AssociatedRegexPatterns.vue puts it only on its own OInputs (and
-   already carries its own `.regex-test-string-input :deep(textarea)` rule at
-   line 890). Because the selector is depth-counted â€” `> div > div > div >
-   textarea` â€” those two placements match at DIFFERENT depths, so the rule almost
-   certainly fires for only one of them today and moving it into OInput would
-   silently change WHICH. Untangling that needs the AddRegexPattern markup
-   normalised first (one class, one anchor) â€” a markup fix, not a colocation, and
-   too risky to fold into this wave blind. Left global with this note. â”€â”€ */
-.regex-pattern-input > div > div > div > textarea {
-  height: 12.5rem !important;
-  resize: none !important;
-  padding-left: 0.5rem !important;
-}
-
-.regex-test-string-input > div > div > div > textarea {
-  resize: none !important;
-  padding-left: 0.5rem !important;
-}
-
-/* The section header strips (Write Pattern / Input string / Output) are flat
-   full-width bars. Square the textareas' own border box so each field reads as
-   one connected unit under its strip instead of a detached rounded-sm box. */
-.regex-pattern-input .rounded-md.border,
-.regex-test-string-input .rounded-md.border {
-  border-top-left-radius: 0 !important;
-  border-top-right-radius: 0 !important;
-}
-
