@@ -116,7 +116,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="hasSubtitle"
           variant="meta"
           as="div"
-          class="flex items-center h-5 min-w-0"
+          class="flex items-center h-5 min-w-0 -mt-0.5"
         >
           <slot name="subtitle">
             <AppBreadcrumb
