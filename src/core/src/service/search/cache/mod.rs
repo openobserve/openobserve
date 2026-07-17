@@ -568,7 +568,11 @@ pub async fn prepare_cache_response(
             } else {
                 sql.time_range
             };
-        cacher::handle_histogram(&mut origin_sql, q_time_range, req.query.histogram_interval);
+        crate::service::search::sql::histogram::handle_histogram(
+            &mut origin_sql,
+            q_time_range,
+            req.query.histogram_interval,
+        );
     }
 
     // calculate hash for the query with version (after normalizing histogram interval)
