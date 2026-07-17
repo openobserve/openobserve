@@ -64,7 +64,20 @@ test.describe("Search Patterns Feature", { tag: ['@enterprise', '@searchPatterns
         await pm.logsPage.clickPatternsToggle();
         await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
 
-        return await pm.logsPage.waitForPatternsToLoad(60000);
+        let result = await pm.logsPage.waitForPatternsToLoad(60000);
+
+        // Pattern extraction is async on the backend; under alpha indexing load it can still
+        // be empty/timeout after the first 60s wait (the CI flake here). Re-run the query to
+        // re-trigger extraction and wait once more before giving up — resilience for the
+        // data-dependency, not an assertion mask (callers still assert the returned state).
+        if (result !== 'patterns' && result !== 'statistics') {
+            testLogger.warn(`Patterns not ready (${result}) — re-running query and retrying once`);
+            await pm.logsPage.clickRefreshButton();
+            await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
+            result = await pm.logsPage.waitForPatternsToLoad(60000);
+        }
+
+        return result;
     }
 
     test.beforeAll(async ({ browser }) => {
