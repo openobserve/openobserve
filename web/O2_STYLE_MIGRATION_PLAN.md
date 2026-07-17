@@ -909,7 +909,9 @@ The batch waves were re-dispatched after the limit reset and have landed. This s
 
 Gates: `lint:design` GREEN · `lint:tokens` GREEN (1,047 tokens, 951 refs) · `lint:token-purity` GREEN
 (zero-tolerance) · `vue-tsc` exit 0 · stylelint **0 errors** (14 warnings, was 174) · unit suite
-**38,466 passing**.
+**38,521 passing / 1 failing** — the single failure is the long-documented `AlertList` load-flake
+(66/66 in isolation; §11.4). The suite went 51 failures → 1 during this work: **none of the 51 were
+caused by the migration** (see §15.7).
 
 ### 15.2 The 7 surviving unscoped blocks — all justified
 
@@ -978,3 +980,22 @@ The migration was not cosmetic — deleting this CSS surfaced real defects:
 - **SkeletonBox's `::after`** shimmer was silently relied on by two raw divs in HomeViewSkeleton.
 - **Header.spec** (61 tests) had been failing since `952c8ebc12`; `useTheme()`'s `useStore()` needs the
   vuex injection, which the spec never provided. Fixed.
+
+### 15.7 The 51 pre-existing spec failures (all fixed, none caused by this work)
+
+The full suite was red before this work; the migration surfaced it rather than caused it. Each was
+proved pre-existing before being touched (component untouched since the base commit, or verified by
+stash-testing). **No test was deleted, skipped, or weakened to a no-op** — several were *strengthened*:
+
+| Spec | Was | Reality |
+|---|---|---|
+| `Header` (61) | every test threw on `store.state` | `useTheme()`'s `useStore()` needs the vuex injection key; the spec only passed the store as a prop. Pre-existing since `952c8ebc12` |
+| `TraceDAG` (35) | asserted hex/`dark:` node strings | component ships the D1 token/`color-mix` map. Expectations pinned per-token + anchor tests so helpers can't become self-fulfilling mirrors. **Found: `span` now maps identically to default → 13 distinct styles, not 14** |
+| `MetricLegends` (10) | asserted `theme-light`/`theme-dark` | component reads `store.state.theme` but **never binds it** — theme is not a render input. Strengthened: markup is byte-identical across theme flips |
+| `SyntaxGuide` (3) | 2 theme classes + 1 unrelated | the third was **cross-test pollution**: the theme test's `attachTo:"#app"` + mid-test unmount tore down the shared Reka portal, blanking the next test's dropdown |
+| `TransformSelector` (1) | asserted a `dark-theme` class | component has no such class (D19/D20 removed it). Passed in-suite only via pollution; failed in isolation |
+| `useMetricsExplorerGrid` (1) | 5s timeout, not an assertion | **harness defect, not a product bug** — production is correctly bounded (60 queries / 30 cards, exactly 2 each, nothing outside the page). The shared `landPreview` helper caps at 5 rounds while the grid's 250ms debounced sweep resolves later batches. Strengthened: despite its name it never counted a query; now asserts `max(asked) < 30`, `distinct == 30`, `<=2` per metric, `total == 60` |
+
+Latent hazard worth fixing separately: `useMetricsExplorerGrid.spec` leaks debounced sweeps between
+tests (no `beforeEach` cancel), and `SyntaxGuide`'s portal teardown shows the same class of problem.
+Two specs were passing **only** because of cross-test pollution.
