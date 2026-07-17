@@ -1206,11 +1206,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- pr-1.5 mirrors the editor's ml-1.5 so the editor area sits at 10px on
          the right (4px wrapper + 6px), aligning with the results panel below.
          data-fullscreen is a stable test hook exposing the fullscreen state
-         (the styling itself is driven by the inline `isFocused` class binding). -->
+         (the styling itself is driven by the inline `isFocused` class binding).
+         Expanded state carries no border/radius/shadow of its own: the editor
+         fills the area it is given, and the panel chrome around it already
+         supplies the frame — a second curved, shadowed edge on top of it just
+         reads as a stray card. -->
     <div
       ref="editorContainerRef"
       class="flex relative query-editor-container w-full overflow-visible"
-      :class="{ 'overflow-hidden! bg-theme-body-bg-primary! border border-card-glass-border rounded-md [box-shadow:0_0.5rem_2rem_rgba(0,0,0,0.18)]': isFocused }"
+      :class="{ 'overflow-hidden! bg-theme-body-bg-primary!': isFocused }"
       :data-fullscreen="isFocused ? 'true' : 'false'"
       :style="editorFullscreenStyle"
     >
