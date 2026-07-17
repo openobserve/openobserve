@@ -56,6 +56,7 @@
           :toggle-loading-map="toggleLoadingMap"
           :trigger-loading-map="triggerLoadingMap"
           :bulk-action-loading="bulkActionLoading"
+          :has-filters="hasActiveFilters"
           @row-click="openDetail"
           @edit="openEdit"
           @toggle-enabled="toggleEnabled"
@@ -69,7 +70,7 @@
           @enable-selected="bulkEnableMonitors"
           @trigger-selected="bulkTriggerMonitors"
           @navigate-to-folder="(id) => { searchAcrossFolders = false; updateActiveFolderId(id) }"
-          @empty-action="(actionId) => { if (actionId === 'create') openCreate() }"
+          @empty-action="onEmptyAction"
         >
           <!-- Toolbar content rendered inside OTable's toolbar bar -->
           <template #toolbar>
@@ -110,11 +111,10 @@
 
               <!-- Status filter -->
               <OSelect
-                v-if="false"
                 v-model="statusFilter"
                 :options="statusOpts"
                 size="md"
-                class="w-28!"
+                class="w-35!"
               />
             </div>
           </template>
@@ -515,9 +515,8 @@ const enrichedMonitors = computed(() => {
 const statusTabs = computed(() => {
   const ms = enrichedMonitors.value
   const tabs = [
-    { filter: 'all',      label: t('synthetics.filters.all'),      count: ms.length },
+    { filter: 'all',      label: t('synthetics.filters.allStatuses'),      count: ms.length },
     { filter: 'passed',   label: t('synthetics.filters.passed'),   count: ms.filter(m => m.status === 'passed').length },
-    { filter: 'warning',  label: t('synthetics.filters.warning'),  count: ms.filter(m => m.status === 'warning').length },
     { filter: 'failed',   label: t('synthetics.filters.failed'),   count: ms.filter(m => m.status === 'failed').length },
   ]
   const unknownCount = ms.filter(m => m.status === 'unknown').length
@@ -542,6 +541,18 @@ const filteredMonitors = computed(() =>
     (!search.value || m.name.toLowerCase().includes(search.value.toLowerCase()) || m.url.toLowerCase().includes(search.value.toLowerCase()))
   )
 )
+
+const hasActiveFilters = computed(
+  () => statusFilter.value !== 'all'
+    || locationFilter.value !== 'all'
+    || search.value.trim() !== ''
+)
+
+const clearFilters = () => {
+  search.value = ''
+  statusFilter.value = 'all'
+  locationFilter.value = 'all'
+}
 
 const footerTitle = computed(() =>
   activeTab.value === 'browser' ? t('synthetics.footer.browserTests') : t('synthetics.footer.checks')
@@ -624,6 +635,11 @@ async function bulkTriggerMonitors() {
   }
   bulkActionLoading.value = false
   selectedMonitorIds.value = []
+}
+
+const onEmptyAction = (actionId: string) => {
+  if (actionId === 'create') openCreate()
+  else if (actionId === 'clear-filters') clearFilters()
 }
 
 const openCreate = (type: SyntheticCheckType = 'browser') =>

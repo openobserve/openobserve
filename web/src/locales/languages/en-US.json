@@ -8698,6 +8698,7 @@
       "actionClick": "click",
       "actionType": "type",
       "all": "All",
+      "allStatuses": "All Statuses",
       "allBrowsers": "All browsers",
       "allDevices": "All devices",
       "allLocations": "All locations",
@@ -9186,7 +9187,7 @@
       "url": "URL"
     },
     "tabs": {
-      "all": "All Checks",
+      "all": "All",
       "browser": "Browser",
       "http": "HTTP",
       "ssh": "SSH",

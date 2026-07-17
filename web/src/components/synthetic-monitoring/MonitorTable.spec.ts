@@ -129,7 +129,7 @@ const OEmptyStateStub = {
   name: "OEmptyStateStub",
   template: `<div :data-test="$attrs['data-test'] || ''" class="oemptystate-stub"><slot /></div>`,
   inheritAttrs: false,
-  props: ["size", "preset", "description"],
+  props: ["size", "preset", "description", "filtered"],
 };
 
 // ── Mount factory ───────────────────────────────────────────────────────
@@ -435,6 +435,26 @@ describe("MonitorTable", () => {
       await emptyState.vm.$emit("action", "create-monitor");
       expect(wrapper.emitted("empty-action")).toHaveLength(1);
       expect(wrapper.emitted("empty-action")![0]).toEqual(["create-monitor"]);
+    });
+
+    // ── hasFilters prop ───────────────────────────────────────────
+
+    it("should pass filtered=false to OEmptyState when hasFilters defaults to false", () => {
+      wrapper = mountMonitorTable({ data: [] });
+      const emptyState = wrapper.findComponent({ name: "OEmptyStateStub" });
+      expect(emptyState.props("filtered")).toBe(false);
+    });
+
+    it("should pass filtered=true to OEmptyState when hasFilters is true", () => {
+      wrapper = mountMonitorTable({ data: [], hasFilters: true });
+      const emptyState = wrapper.findComponent({ name: "OEmptyStateStub" });
+      expect(emptyState.props("filtered")).toBe(true);
+    });
+
+    it("should pass filtered=false to OEmptyState when hasFilters is explicitly false", () => {
+      wrapper = mountMonitorTable({ data: [], hasFilters: false });
+      const emptyState = wrapper.findComponent({ name: "OEmptyStateStub" });
+      expect(emptyState.props("filtered")).toBe(false);
     });
   });
 
