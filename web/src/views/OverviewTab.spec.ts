@@ -92,12 +92,15 @@ import OverviewTab from "./OverviewTab.vue";
 
 // ── Local helpers ────────────────────────────────────────────────────────────
 
+type SectionKey = "incidents" | "services" | "anomalies" | "recentEvents";
+
 interface Deferred<T> {
   promise: Promise<T>;
   resolve: (value: T) => void;
 }
 
-/** A promise whose settlement the test controls — used to pin `isLoading`. */
+/** A promise whose settlement the test controls — lets one section hang while
+ *  the others resolve, which is how the interleaving tests below are staged. */
 function deferred<T>(): Deferred<T> {
   let resolve!: (value: T) => void;
   const promise = new Promise<T>((res) => {
@@ -112,26 +115,44 @@ const mountOverviewTab = () =>
   });
 
 /**
- * OverviewTab's `hasAnyData` / `isLoading` are `<script setup>` bindings with no
- * public API. Reading them is how we pin the computed itself: a template-only
- * assertion cannot tell "computed returns false" from "identifier was deleted
- * and silently evaluates to undefined".
+ * `hasAnyData` / `isLoading` / `sectionState` are `<script setup>` bindings with
+ * no public API. Reading them is how we pin the state machine itself: a
+ * template-only assertion cannot tell "computed returns false" from "identifier
+ * was deleted and silently evaluates to undefined".
  */
 const internals = (w: VueWrapper) =>
-  w.vm as unknown as { hasAnyData: boolean; isLoading: boolean };
+  w.vm as unknown as {
+    hasAnyData: boolean;
+    isLoading: boolean;
+    sectionState: Record<SectionKey, { loading: boolean; loaded: boolean }>;
+  };
 
 describe("OverviewTab", () => {
   let wrapper: VueWrapper;
   let orgSeq = 0;
   let originalZoConfig: Record<string, unknown>;
+  let originalFlags: { isEnterprise: string; isCloud: string };
 
-  const SKELETON = '[data-test="overview-skeleton"]';
   const EMPTY_STATE = '[data-test="overview-all-clear-empty-state"]';
   const RECENT_EVENTS = '[data-test="overview-recent-events-section"]';
   const ANOMALIES = '[data-test="overview-anomalies-section"]';
   const INCIDENTS = '[data-test="overview-incidents-section"]';
   const SERVICES = '[data-test="overview-services-section"]';
   const REFRESH_BTN = '[data-test="overview-refresh-btn-stub"]';
+
+  const skeletonOf = (section: SectionKey) =>
+    `[data-test="overview-skeleton-${section}"]`;
+
+  /**
+   * Every skeleton currently on screen, by section. Asserted against an exact
+   * array rather than `.exists() === false` per selector: a prefix query keeps
+   * working if the sections are renamed, so a typo'd selector can't quietly
+   * turn a "no skeleton" assertion into a vacuous pass.
+   */
+  const visibleSkeletons = () =>
+    wrapper
+      .findAll('[data-test^="overview-skeleton-"]')
+      .map((s) => s.attributes("data-test")?.replace("overview-skeleton-", ""));
 
   /** Resolve every loader with an empty payload — the "no data" baseline. */
   const givenNoData = () => {
@@ -157,8 +178,31 @@ describe("OverviewTab", () => {
     } as never);
   };
 
+  /** Make the anomalies fetch hang until the returned deferred is resolved. */
+  const givenAnomaliesHang = () => {
+    const pending = deferred<{ data: unknown[] }>();
+    vi.mocked(anomalyService.list).mockReturnValue(pending.promise as never);
+    return pending;
+  };
+
+  /** Make the recent-events fetch hang until the returned deferred is resolved. */
+  const givenRecentEventsHang = () => {
+    const pending = deferred<{ data: { hits: unknown[] } }>();
+    vi.mocked(alertsService.getHistory).mockReturnValue(pending.promise as never);
+    return pending;
+  };
+
   beforeEach(() => {
     originalZoConfig = { ...store.state.zoConfig };
+
+    // Pin the build flags to OSS. `config` is built from import.meta.env, and
+    // this repo's .env sets VITE_OPENOBSERVE_ENTERPRISE=true — so without this
+    // the suite would inherit whatever the local/CI .env happens to say and
+    // silently change which sections exist. The enterprise-gated branches get
+    // their own describe below, which opts in explicitly.
+    originalFlags = { isEnterprise: config.isEnterprise, isCloud: config.isCloud };
+    config.isEnterprise = "false";
+    config.isCloud = "false";
 
     // OverviewTab caches anomaly history in a module-level Map keyed by org id.
     // A unique org per test keeps that cache cold, so no test can inherit
@@ -177,6 +221,8 @@ describe("OverviewTab", () => {
   afterEach(() => {
     wrapper?.unmount();
     store.commit("setConfig", originalZoConfig);
+    config.isEnterprise = originalFlags.isEnterprise;
+    config.isCloud = originalFlags.isCloud;
     vi.clearAllMocks();
   });
 
@@ -192,8 +238,8 @@ describe("OverviewTab", () => {
       expect(wrapper.find(EMPTY_STATE).exists()).toBe(true);
     });
 
-    it("should not render the skeleton when loading finished with no data", () => {
-      expect(wrapper.find(SKELETON).exists()).toBe(false);
+    it("should not render any skeleton when loading finished with no data", () => {
+      expect(visibleSkeletons()).toEqual([]);
     });
 
     it("should not render any content section when there is no data", () => {
@@ -202,28 +248,29 @@ describe("OverviewTab", () => {
     });
   });
 
-  describe("loading with no data yet (first load)", () => {
-    // Recreated per test — a describe-scoped deferred would already be settled
-    // by the time the second test mounts.
-    let pending: Deferred<{ data: { hits: unknown[] } }>;
+  describe("first load with every section still in flight", () => {
+    let anomaliesPending: Deferred<{ data: unknown[] }>;
+    let recentEventsPending: Deferred<{ data: { hits: unknown[] } }>;
 
     beforeEach(async () => {
-      pending = deferred<{ data: { hits: unknown[] } }>();
-      vi.mocked(alertsService.getHistory).mockReturnValue(
-        pending.promise as never,
-      );
+      // Recreated per test — a describe-scoped deferred would already be
+      // settled by the time the second test mounts.
+      anomaliesPending = givenAnomaliesHang();
+      recentEventsPending = givenRecentEventsHang();
       wrapper = mountOverviewTab();
       await nextTick();
     });
 
     afterEach(() => {
-      pending.resolve({ data: { hits: [] } });
+      anomaliesPending.resolve({ data: [] });
+      recentEventsPending.resolve({ data: { hits: [] } });
     });
 
-    it("should render the skeleton when loading with no data yet", () => {
+    it("should render a skeleton for each pending section when nothing has landed yet", () => {
       expect(internals(wrapper).isLoading).toBe(true);
       expect(internals(wrapper).hasAnyData).toBe(false);
-      expect(wrapper.find(SKELETON).exists()).toBe(true);
+      // incidents/services are enterprise-gated and absent on OSS.
+      expect(visibleSkeletons()).toEqual(["anomalies", "recentEvents"]);
     });
 
     it("should not render the empty state while the first load is in flight", () => {
@@ -231,45 +278,113 @@ describe("OverviewTab", () => {
     });
   });
 
-  describe("loaded with data", () => {
+  // ── The bug this block exists for ─────────────────────────────────────────
+  // The four datasets are fetched concurrently and land at different times. A
+  // single global placeholder gated on `hasAnyData` dies the moment the FIRST
+  // dataset arrives, so the sections still in flight go blank and then pop in.
+  // Each section must hold its own placeholder until its own data lands.
+  describe("sections resolve independently", () => {
+    let anomaliesPending: Deferred<{ data: unknown[] }>;
+
     beforeEach(async () => {
+      // Recent events resolves immediately with rows; anomalies hangs.
       givenRecentEvents();
+      anomaliesPending = givenAnomaliesHang();
       wrapper = mountOverviewTab();
       await flushPromises();
     });
 
-    it("should render the recent events section when the alert history returns hits", () => {
-      expect(internals(wrapper).hasAnyData).toBe(true);
-      expect(wrapper.find(RECENT_EVENTS).exists()).toBe(true);
-      expect(wrapper.find(RECENT_EVENTS).text()).toContain("High error rate");
+    afterEach(() => {
+      anomaliesPending.resolve({ data: [] });
     });
 
-    it("should render neither the skeleton nor the empty state when loaded with data", () => {
-      expect(internals(wrapper).isLoading).toBe(false);
-      expect(wrapper.find(SKELETON).exists()).toBe(false);
-      expect(wrapper.find(EMPTY_STATE).exists()).toBe(false);
+    it("should render the anomalies skeleton while anomalies are in flight and recent events have landed", () => {
+      // The exact user complaint: content and placeholder coexist. Under a
+      // global `isLoading && !hasAnyData` gate the arrival of recentEvents
+      // flips hasAnyData true and this skeleton vanishes.
+      expect(wrapper.find(RECENT_EVENTS).exists()).toBe(true);
+      expect(wrapper.find(RECENT_EVENTS).text()).toContain("High error rate");
+      expect(wrapper.find(skeletonOf("anomalies")).exists()).toBe(true);
+    });
+
+    it("should still be loading with data on screen while one section is pending", () => {
+      expect(internals(wrapper).isLoading).toBe(true);
+      expect(internals(wrapper).hasAnyData).toBe(true);
+    });
+
+    it("should not render a skeleton for the section that already landed", () => {
+      expect(visibleSkeletons()).toEqual(["anomalies"]);
+      expect(internals(wrapper).sectionState.recentEvents).toEqual({
+        loading: false,
+        loaded: true,
+      });
+      expect(internals(wrapper).sectionState.anomalies).toEqual({
+        loading: true,
+        loaded: false,
+      });
+    });
+
+    it("should swap the anomalies skeleton for its content when the fetch resolves", async () => {
+      vi.mocked(anomalyService.list).mockResolvedValue({
+        data: mockOverview.anomalyConfigs,
+      } as never);
+      vi.mocked(anomalyService.getAllHistory).mockResolvedValue({
+        data: mockOverview.buildAnomalyHistory(),
+      } as never);
+      anomaliesPending.resolve({ data: mockOverview.anomalyConfigs });
+      await flushPromises();
+
+      expect(visibleSkeletons()).toEqual([]);
+      expect(wrapper.find(ANOMALIES).exists()).toBe(true);
+      expect(wrapper.find(RECENT_EVENTS).exists()).toBe(true);
     });
   });
 
-  // ── The regression this suite exists for ──────────────────────────────────
+  describe("a section that completed with an empty result", () => {
+    let anomaliesPending: Deferred<{ data: unknown[] }>;
+
+    beforeEach(async () => {
+      givenRecentEvents();
+      anomaliesPending = givenAnomaliesHang();
+      wrapper = mountOverviewTab();
+      await flushPromises();
+    });
+
+    afterEach(() => {
+      anomaliesPending.resolve({ data: [] });
+    });
+
+    it("should not render a skeleton once the section resolves empty", async () => {
+      expect(wrapper.find(skeletonOf("anomalies")).exists()).toBe(true);
+
+      anomaliesPending.resolve({ data: [] });
+      await flushPromises();
+
+      // Empty is a legitimate answer — `loaded` is true, so it never
+      // re-skeletons even though the section renders nothing.
+      expect(internals(wrapper).sectionState.anomalies).toEqual({
+        loading: false,
+        loaded: true,
+      });
+      expect(wrapper.find(ANOMALIES).exists()).toBe(false);
+      expect(visibleSkeletons()).toEqual([]);
+    });
+  });
+
+  // ── The original regression ───────────────────────────────────────────────
   // The skeleton is a first-load placeholder, not a refresh spinner. When it
-  // was gated on `isLoading` alone, refreshing with rows on screen appended the
-  // skeleton BELOW them. `hasAnyData` fixed it; deleting the computed while the
-  // template still said `!hasAnyData` silently collapsed the gate back — an
-  // undefined template identifier that neither ESLint nor vue-tsc reports.
+  // was gated on `isLoading` alone, refreshing with rows on screen rendered the
+  // skeleton BELOW them instead of standing in for them.
   describe("refreshing with data already on screen", () => {
     let pending: Deferred<{ data: { hits: unknown[] } }>;
 
     beforeEach(async () => {
-      pending = deferred<{ data: { hits: unknown[] } }>();
       givenRecentEvents();
       wrapper = mountOverviewTab();
       await flushPromises();
 
       // Second fetch never settles — freezes the component mid-refresh.
-      vi.mocked(alertsService.getHistory).mockReturnValue(
-        pending.promise as never,
-      );
+      pending = givenRecentEventsHang();
       await wrapper.find(REFRESH_BTN).trigger("click");
       await nextTick();
     });
@@ -278,10 +393,10 @@ describe("OverviewTab", () => {
       pending.resolve({ data: { hits: [] } });
     });
 
-    it("should not render the skeleton when refreshing with data already on screen", () => {
+    it("should not render any skeleton when refreshing with data already on screen", () => {
       expect(internals(wrapper).isLoading).toBe(true);
       expect(internals(wrapper).hasAnyData).toBe(true);
-      expect(wrapper.find(SKELETON).exists()).toBe(false);
+      expect(visibleSkeletons()).toEqual([]);
     });
 
     it("should keep the existing rows on screen while refreshing", () => {
@@ -293,10 +408,57 @@ describe("OverviewTab", () => {
       expect(wrapper.find(EMPTY_STATE).exists()).toBe(false);
     });
 
-    it("should pass the refresh loading state to the refresh button instead of the skeleton", () => {
+    it("should pass the refresh loading state to the refresh button instead of a skeleton", () => {
       const refreshBtn = wrapper.findComponent({ name: "ORefreshButton" });
       expect(refreshBtn.exists()).toBe(true);
       expect(refreshBtn.props("loading")).toBe(true);
+    });
+  });
+
+  // This is the ONLY arrangement that exercises the `!loaded` half of
+  // `isSectionPending`. A non-empty section renders its own `v-if` branch, so
+  // its `v-else-if` skeleton is unreachable no matter what the flag says — the
+  // section must be EMPTY (so the else-if is live) AND re-fetching. Anomalies
+  // can't be used: its cache short-circuits an unchanged window on refresh, so
+  // it never re-enters `loading`.
+  describe("refreshing a section that previously resolved empty", () => {
+    let recentEventsPending: Deferred<{ data: { hits: unknown[] } }>;
+
+    beforeEach(async () => {
+      // First load: anomalies has rows (so content is on screen), recent events
+      // legitimately empty.
+      vi.mocked(anomalyService.list).mockResolvedValue({
+        data: mockOverview.anomalyConfigs,
+      } as never);
+      vi.mocked(anomalyService.getAllHistory).mockResolvedValue({
+        data: mockOverview.buildAnomalyHistory(),
+      } as never);
+      wrapper = mountOverviewTab();
+      await flushPromises();
+
+      // Refresh: the recent-events fetch hangs, leaving that empty section
+      // loading-but-already-loaded.
+      recentEventsPending = givenRecentEventsHang();
+      await wrapper.find(REFRESH_BTN).trigger("click");
+      await nextTick();
+    });
+
+    afterEach(() => {
+      recentEventsPending.resolve({ data: { hits: [] } });
+    });
+
+    it("should not re-render a skeleton for a section that already resolved empty", () => {
+      // Preconditions: anomalies holds content, recent events is empty.
+      expect(wrapper.find(ANOMALIES).exists()).toBe(true);
+      expect(wrapper.find(RECENT_EVENTS).exists()).toBe(false);
+
+      // Empty is a legitimate answer, so `loaded` stays true and the section
+      // must not fall back to its placeholder while re-fetching.
+      expect(internals(wrapper).sectionState.recentEvents).toEqual({
+        loading: true,
+        loaded: true,
+      });
+      expect(visibleSkeletons()).toEqual([]);
     });
   });
 
@@ -311,14 +473,14 @@ describe("OverviewTab", () => {
       pending.resolve({ data: { hits: [] } });
     });
 
-    it("should never render the skeleton or empty state alongside content across the refresh lifecycle", async () => {
+    it("should never render a skeleton or the empty state alongside content across the refresh lifecycle", async () => {
       givenRecentEvents();
       wrapper = mountOverviewTab();
       await flushPromises();
 
       // Phase 1 — loaded with data: content only.
       expect(wrapper.find(RECENT_EVENTS).exists()).toBe(true);
-      expect(wrapper.find(SKELETON).exists()).toBe(false);
+      expect(visibleSkeletons()).toEqual([]);
       expect(wrapper.find(EMPTY_STATE).exists()).toBe(false);
 
       // Phase 2 — refreshing with data: still content only.
@@ -328,14 +490,14 @@ describe("OverviewTab", () => {
       await wrapper.find(REFRESH_BTN).trigger("click");
       await nextTick();
       expect(wrapper.find(RECENT_EVENTS).exists()).toBe(true);
-      expect(wrapper.find(SKELETON).exists()).toBe(false);
+      expect(visibleSkeletons()).toEqual([]);
       expect(wrapper.find(EMPTY_STATE).exists()).toBe(false);
 
       // Phase 3 — refresh returns nothing: empty state replaces the content.
       pending.resolve({ data: { hits: [] } });
       await flushPromises();
       expect(wrapper.find(RECENT_EVENTS).exists()).toBe(false);
-      expect(wrapper.find(SKELETON).exists()).toBe(false);
+      expect(visibleSkeletons()).toEqual([]);
       expect(wrapper.find(EMPTY_STATE).exists()).toBe(true);
     });
   });
@@ -358,7 +520,7 @@ describe("OverviewTab", () => {
         "Checkout latency anomaly",
       );
       expect(wrapper.find(EMPTY_STATE).exists()).toBe(false);
-      expect(wrapper.find(SKELETON).exists()).toBe(false);
+      expect(visibleSkeletons()).toEqual([]);
     });
 
     it("should not count a failed alert history fetch as data", async () => {
@@ -372,27 +534,26 @@ describe("OverviewTab", () => {
       expect(internals(wrapper).hasAnyData).toBe(false);
       expect(wrapper.find(RECENT_EVENTS).exists()).toBe(false);
       expect(wrapper.find(EMPTY_STATE).exists()).toBe(true);
-      expect(wrapper.find(SKELETON).exists()).toBe(false);
+      // A rejected fetch must still mark the section loaded, or it skeletons
+      // forever.
+      expect(internals(wrapper).sectionState.recentEvents).toEqual({
+        loading: false,
+        loaded: true,
+      });
+      expect(visibleSkeletons()).toEqual([]);
     });
   });
 
   describe("enterprise sections", () => {
-    let originalIsEnterprise: string;
-
     beforeEach(() => {
       // `config` is a plain object read by the `isEnterpriseOrCloud` computed on
       // first render; flipping it before mount is the only way to reach the
-      // enterprise-gated branches.
-      originalIsEnterprise = config.isEnterprise;
+      // enterprise-gated branches. The outer afterEach restores it.
       config.isEnterprise = "true";
       store.commit("setConfig", {
         ...store.state.zoConfig,
         incidents_enabled: true,
       });
-    });
-
-    afterEach(() => {
-      config.isEnterprise = originalIsEnterprise;
     });
 
     it("should count incidents as data when the incident list returns rows", async () => {
@@ -409,7 +570,7 @@ describe("OverviewTab", () => {
         "Checkout service degraded",
       );
       expect(wrapper.find(EMPTY_STATE).exists()).toBe(false);
-      expect(wrapper.find(SKELETON).exists()).toBe(false);
+      expect(visibleSkeletons()).toEqual([]);
     });
 
     it("should count services as data when the topology returns nodes", async () => {
@@ -423,26 +584,46 @@ describe("OverviewTab", () => {
       expect(internals(wrapper).hasAnyData).toBe(true);
       expect(wrapper.find(SERVICES).exists()).toBe(true);
       expect(wrapper.find(EMPTY_STATE).exists()).toBe(false);
-      expect(wrapper.find(SKELETON).exists()).toBe(false);
+      expect(visibleSkeletons()).toEqual([]);
     });
 
-    it("should render the enterprise-shaped skeleton when loading with no data yet", async () => {
+    it("should render only the incidents skeleton when the incident list alone is in flight", async () => {
       const pending = deferred<{ data: { incidents: unknown[] } }>();
       vi.mocked(incidentsService.list).mockReturnValue(pending.promise as never);
+      vi.mocked(serviceGraphService.getCurrentTopology).mockResolvedValue({
+        data: mockOverview.serviceGraphTopology,
+      } as never);
 
       wrapper = mountOverviewTab();
-      await nextTick();
+      await flushPromises();
 
-      expect(wrapper.find(SKELETON).exists()).toBe(true);
-      expect(
-        wrapper.find('[data-test="overview-skeleton-incidents"]').exists(),
-      ).toBe(true);
-      expect(
-        wrapper.find('[data-test="overview-skeleton-services"]').exists(),
-      ).toBe(true);
+      // Services landed and render content; incidents still holds its shape.
+      expect(visibleSkeletons()).toEqual(["incidents"]);
+      expect(wrapper.find(SERVICES).exists()).toBe(true);
 
       pending.resolve({ data: { incidents: [] } });
       await flushPromises();
+      expect(visibleSkeletons()).toEqual([]);
+    });
+
+    it("should render only the services skeleton when the topology alone is in flight", async () => {
+      const pending = deferred<{ data: { nodes: unknown[]; edges: unknown[] } }>();
+      vi.mocked(serviceGraphService.getCurrentTopology).mockReturnValue(
+        pending.promise as never,
+      );
+      vi.mocked(incidentsService.list).mockResolvedValue({
+        data: mockOverview.buildIncidentList(),
+      } as never);
+
+      wrapper = mountOverviewTab();
+      await flushPromises();
+
+      expect(visibleSkeletons()).toEqual(["services"]);
+      expect(wrapper.find(INCIDENTS).exists()).toBe(true);
+
+      pending.resolve({ data: { nodes: [], edges: [] } });
+      await flushPromises();
+      expect(visibleSkeletons()).toEqual([]);
     });
   });
 });
