@@ -18,6 +18,7 @@ use std::{
     time::{Duration, UNIX_EPOCH},
 };
 
+use ::promql::{DEFAULT_LOOKBACK, PromqlContext, TableProvider, name_visitor};
 use async_trait::async_trait;
 use config::{
     meta::{
@@ -35,10 +36,7 @@ use proto::cluster_rpc;
 use rayon::slice::ParallelSliceMut;
 use tokio::sync::mpsc;
 
-use crate::service::{
-    promql::{DEFAULT_LOOKBACK, PromqlContext, TableProvider, name_visitor},
-    search,
-};
+use crate::service::search;
 
 mod storage;
 mod wal;
