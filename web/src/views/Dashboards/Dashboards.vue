@@ -1367,6 +1367,10 @@ export default defineComponent({
       activeFolderId.value = folderId;
       filterQuery.value = "";
       searchQuery.value = "";
+      // Picking a folder is an explicit ask to see THAT folder — leave the
+      // folder-independent favorites view, otherwise the click appears to do
+      // nothing (the favorites rows ignore the active folder).
+      showFavoritesOnly.value = false;
     };
     const multipleExportDashboard = async () => {
       try {

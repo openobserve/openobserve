@@ -544,6 +544,29 @@ describe("Dashboards.vue", () => {
       expect(columnIds).toContain("folder");
     });
 
+    it("selecting a folder exits the favorites view and shows that folder", async () => {
+      wrapper = shallowMount(Dashboards, {
+        global: buildGlobalConfig(storeWithTwo(), router, i18n),
+      });
+      await nextTick();
+      await nextTick();
+
+      useFavoriteDashboards().favorites.value = [
+        { dashboardId: "dash1", folderId: "default", label: "Dashboard 1" },
+      ];
+      wrapper.vm.showFavoritesOnly = true;
+      await nextTick();
+      expect(wrapper.vm.dashboards).toHaveLength(1);
+
+      // A folder click while favorites is on would otherwise appear to do
+      // nothing — it must drop the user into the normal folder view.
+      wrapper.vm.updateActiveFolderId("folder1");
+      await nextTick();
+
+      expect(wrapper.vm.showFavoritesOnly).toBe(false);
+      expect(wrapper.vm.activeFolderId).toBe("folder1");
+    });
+
     it("toggleFavorite persists the per-user setting resolved to the active folder", async () => {
       const testStore = storeWithTwo();
       (testStore.state.userInfo as any).email = "me@example.com";
