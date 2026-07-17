@@ -33,7 +33,7 @@ const logoSrc = computed(() =>
       <div class="welcome-hero__heading-block flex items-center">
         <div class="welcome-hero__title m-0 text-3xl font-bold tracking-[-0.01em] leading-[1.15] text-typography-body flex items-center gap-2">
           {{ greeting }}
-          <span class="welcome-hero__wave text-2xl leading-none inline-block [animation:wave_2.4s_ease-in-out_0.4s_2] [transform-origin:70%_70%]" aria-hidden="true">👋</span>
+          <span class="welcome-hero__wave text-2xl leading-none inline-block [animation:o2-welcome-wave_2.4s_ease-in-out_0.4s_2] [transform-origin:70%_70%]" aria-hidden="true">👋</span>
         </div>
       </div>
     </div>
@@ -77,26 +77,3 @@ const logoSrc = computed(() =>
   </header>
 </template>
 
-<style>
-/* keep(keyframes): the `wave` animation is referenced from a template
-   arbitrary-value utility ([animation:wave_...]); this block must stay
-   un-scoped so Vue does not rename the keyframe out from under it. */
-@keyframes wave {
-  0%,
-  100% {
-    transform: rotate(0deg);
-  }
-  20% {
-    transform: rotate(14deg);
-  }
-  40% {
-    transform: rotate(-8deg);
-  }
-  60% {
-    transform: rotate(10deg);
-  }
-  80% {
-    transform: rotate(-4deg);
-  }
-}
-</style>

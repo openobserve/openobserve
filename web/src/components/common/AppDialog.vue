@@ -168,12 +168,13 @@ export default defineComponent({
 });
 </script>
 
-<style>
-/* keep(complex-state): Vue <Transition name="fade"> global — the enter/leave
-   classes are applied by Vue to the teleported backdrop and share the app-wide
-   "fade" convention (also defined in CodeQueryEditor.vue / RetryJobDialog.vue).
-   Scoping would break the transition, so this stays unscoped. */
-/* Transition effects */
+<style scoped>
+/* keep(complex-state): the enter/leave pair Vue applies for <Transition name="fade">.
+   Not expressible as template utilities — Vue adds these classes itself, mid-transition.
+   Scoped is correct and sufficient: the backdrop is THIS component's own template
+   element, so it carries this file's data-v attribute even after <Teleport> moves it
+   into body. "fade" is not a shared contract — the only other <Transition name="fade">
+   in the app (functions/RetryJobDialog.vue) declares its own identical scoped pair. */
 .fade-enter-active,
 .fade-leave-active {
   transition: opacity 0.2s ease;

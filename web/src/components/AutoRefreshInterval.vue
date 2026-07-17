@@ -382,18 +382,3 @@ export default defineComponent({
 });
 </script>
 
-<style>
-/* keep(keyframes): @keyframes cannot be expressed as Tailwind utilities; the name
-   must stay global because it is referenced from arbitrary `animation:` utilities
-   in the template (Vue rewrites keyframe names inside `scoped` blocks, which would
-   break that reference). Renamed from generic `rotate` to a component-prefixed name
-   to avoid app-wide keyframe collisions. */
-@keyframes auto-refresh-rotate {
-  0% {
-    transform: rotate(0deg);
-  }
-  100% {
-    transform: rotate(360deg);
-  }
-}
-</style>

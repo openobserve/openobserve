@@ -1735,3 +1735,113 @@ button.date-time-button {
   --color-button-ghost-primary-active-bg: var(--color-primary-900);
   --color-button-ghost-primary-text: var(--color-primary-200);
 }
+
+/* ════════════════════════════════════════════════════════════════════════
+   W2.a — GENUINELY CROSS-FILE RULES EVACUATED FROM UNSCOPED .vue BLOCKS.
+   Each rule below was defined in a component-local UNSCOPED <style> block
+   while its markup lives in OTHER files, so scoping it in place would have
+   silently unstyled those consumers. A component-local unscoped block is not
+   a sanctioned global home (§3.1) — these are the sanctioned one. Every rule
+   is byte-equivalent to its origin apart from px→rem and hex→token.
+   ════════════════════════════════════════════════════════════════════════ */
+
+/* ── .printMode .hideOnPrintMode : owner dashboards/settings/VariableAdHocValueSelector.vue.
+   Global because the two halves are authored in different files — `.printMode`
+   is put on the app root by layouts/MainLayout.vue (store.state.printMode) while
+   `.hideOnPrintMode` is placed by VariableAdHocValueSelector.vue,
+   pipeline/PipelineEditor.vue and views/Dashboards/ViewDashboard.vue. No single
+   component owns both ends, so no scope can express it. ── */
+.printMode .hideOnPrintMode {
+  display: none;
+}
+
+/* ── .o2-table-hide-header : owner components/queries/QueryList.vue.
+   Public OTable modifier — `thead` is OTable's internal DOM, and the modifier is
+   applied by QueryList.vue and plugins/logs/SearchBar.vue (x2). Was defined
+   identically in both files; this is the single definition. ── */
+.o2-table-hide-header thead {
+  display: none;
+}
+
+/* ── .regex-pattern-input / .regex-test-string-input : owner
+   components/settings/AddRegexPattern.vue. The selectors reach through OInput's
+   internal wrapper DOM down to its <textarea>, and logstream/AssociatedRegexPatterns.vue
+   applies both classes to its own OInputs and relies on these rules for the
+   textarea height/padding and the squared-off top corners. ── */
+.regex-pattern-input > div > div > div > textarea {
+  height: 12.5rem !important;
+  resize: none !important;
+  padding-left: 0.5rem !important;
+}
+
+.regex-test-string-input > div > div > div > textarea {
+  resize: none !important;
+  padding-left: 0.5rem !important;
+}
+
+/* The section header strips (Write Pattern / Input string / Output) are flat
+   full-width bars. Square the textareas' own border box so each field reads as
+   one connected unit under its strip instead of a detached rounded-sm box. */
+.regex-pattern-input .rounded-md.border,
+.regex-test-string-input .rounded-md.border {
+  border-top-left-radius: 0 !important;
+  border-top-right-radius: 0 !important;
+}
+
+/* ── .date-time-table .relative-row : owners components/DateTime.vue +
+   components/DateTimePicker.vue (identical copies in both). Global because
+   components/CustomDateTimePicker.vue authors the same .date-time-table /
+   .relative-row markup, carries NO style block of its own, and depends on this
+   rule for its relative-tab row spacing. ── */
+.date-time-table .relative-row > * {
+  margin-right: 0.375rem;
+}
+
+/* ── .ai-btn : owner plugins/logs/TenstackTable.vue, also consumed by
+   components/TenstackTable.vue, which applies .ai-btn to its own row button.
+   Fix: OButton's base class (relative) overrides the absolute passed via props.
+   Use top:0 + translate:-50% 0 to anchor the button flush with the row top,
+   and height:100% to fill the td height (= row height minus the border).
+   Overriding the CSS `translate` property (not `transform`) is required because
+   Tailwind v4 sets -translate-y-1/2 via the CSS `translate` shorthand property. ── */
+.ai-btn {
+  position: absolute !important;
+  top: 50% !important;
+  right: 0.875rem !important;
+  translate: -50% -50% !important;
+  height: 0.875rem !important;
+  min-height: 0 !important;
+  width: 0.900rem !important;
+  min-width: 0 !important;
+  border-radius: 0.25rem !important;
+}
+
+.ai-btn img.ai-icon {
+  width: 0.75rem !important;
+  height: 0.75rem !important;
+}
+
+/* Suppress the hover box-shadow — it visually bleeds outside the row boundary */
+.ai-btn:hover {
+  box-shadow: none !important;
+}
+
+/* ── .field-list-separator : owner plugins/logs/Index.vue. Hover affordance drawn
+   on OSplitter's separator element, which OSplitter renders internally — the class
+   only ever arrives via its `separatorClass` prop, so no consumer's scope can
+   reach it. Applied by plugins/logs/Index.vue and dashboards/PanelEditor/PanelEditor.vue. ── */
+.field-list-separator::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0.125rem;
+  background-color: transparent;
+  transition: background-color 0.3s;
+}
+
+.field-list-separator:hover::after {
+  background-color: orange;
+}

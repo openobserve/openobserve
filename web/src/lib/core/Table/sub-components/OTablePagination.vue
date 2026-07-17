@@ -63,7 +63,7 @@ const pageSizeSelectOptions = computed(() =>
       <!-- Loading: always skeleton, regardless of slot/count -->
       <span
         v-if="loading"
-        class="o2-pag-skel inline-block h-3 w-24 rounded-md [background:linear-gradient(90deg,var(--color-skeleton-base)_0%,var(--color-skeleton-highlight)_50%,var(--color-skeleton-base)_100%)] [background-size:200%_100%] [animation:o2-pag-shimmer_1.5s_ease-in-out_infinite]"
+        class="o2-pag-skel inline-block h-3 w-24 rounded-md [background:linear-gradient(90deg,var(--color-skeleton-base)_0%,var(--color-skeleton-highlight)_50%,var(--color-skeleton-base)_100%)] [background-size:200%_100%] [animation:o2-skel-shimmer_1.5s_ease-in-out_infinite]"
         aria-hidden="true"
         data-test="o2-table-pagination-count-skel"
       />
@@ -77,7 +77,7 @@ const pageSizeSelectOptions = computed(() =>
     <div class="flex items-center gap-3">
       <span
         v-if="loading"
-        class="o2-pag-skel inline-block h-3 w-36 rounded-md [background:linear-gradient(90deg,var(--color-skeleton-base)_0%,var(--color-skeleton-highlight)_50%,var(--color-skeleton-base)_100%)] [background-size:200%_100%] [animation:o2-pag-shimmer_1.5s_ease-in-out_infinite]"
+        class="o2-pag-skel inline-block h-3 w-36 rounded-md [background:linear-gradient(90deg,var(--color-skeleton-base)_0%,var(--color-skeleton-highlight)_50%,var(--color-skeleton-base)_100%)] [background-size:200%_100%] [animation:o2-skel-shimmer_1.5s_ease-in-out_infinite]"
         aria-hidden="true"
         data-test="o2-table-pagination-info-skel"
       />
@@ -142,14 +142,15 @@ const pageSizeSelectOptions = computed(() =>
   </div>
 </template>
 
-<style>
-/* keep(keyframes): pagination skeleton shimmer (and its reduced-motion opt-out).
-   Stays global — the keyframe name is referenced from a template `[animation:…]`
-   utility, which Vue's scoped rewriter would not update. */
-@keyframes o2-pag-shimmer {
-  0% { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
-}
+<style scoped>
+/* keep(keyframes): reduced-motion opt-out for the pagination skeleton shimmer.
+   The keyframe itself was `o2-pag-shimmer`, byte-identical to the table
+   skeleton's `o2-skel-shimmer` — merged into that one name in
+   styles/keyframes.css, which is where it must live because the template starts
+   it from an `[animation:…]` utility. This cancel rule stays as CSS: a
+   `motion-reduce:animate-none` utility does not reliably outrank the arbitrary
+   `[animation:…]` utility it has to override. `.o2-pag-skel` is this
+   component's own element, so scoping is safe. */
 @media (prefers-reduced-motion: reduce) {
   .o2-pag-skel { animation: none; }
 }

@@ -68,11 +68,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             preserveAspectRatio="none"
           >
             <path
-              class="panel-tile__area-fill [animation:llm-line-pulse_1.6s_ease-in-out_infinite] fill-[color-mix(in_srgb,var(--color-text-primary)_8%,transparent)]"
+              class="panel-tile__area-fill [animation:o2-llm-line-pulse_1.6s_ease-in-out_infinite] fill-[color-mix(in_srgb,var(--color-text-primary)_8%,transparent)]"
               d="M0,55 C20,42 35,52 55,46 C72,41 85,30 105,28 C125,26 140,42 160,38 C175,35 190,22 200,18 L200,80 L0,80 Z"
             />
             <path
-              class="panel-tile__line-stroke [animation:llm-line-pulse_1.6s_ease-in-out_infinite] stroke-[color-mix(in_srgb,var(--color-text-primary)_18%,transparent)]"
+              class="panel-tile__line-stroke [animation:o2-llm-line-pulse_1.6s_ease-in-out_infinite] stroke-[color-mix(in_srgb,var(--color-text-primary)_18%,transparent)]"
               d="M0,55 C20,42 35,52 55,46 C72,41 85,30 105,28 C125,26 140,42 160,38 C175,35 190,22 200,18"
               fill="none"
               stroke-width="2"
@@ -119,12 +119,21 @@ defineProps<{ kpiOnly?: boolean; hideToolbar?: boolean }>();
 const store = useStore();
 </script>
 
-<style>
-/* keep(keyframes): shimmer/pulse keyframes below, plus the shared --tile-*
-   token contract this rule publishes for sibling skeletons (HomeViewSkeleton
-   reads --tile-bg from the global .tile-content class) and the SkeletonBox
-   child-component gradient overrides — none of which can be scoped. Tile tokens
-   map to the centralized --color-* system, which is theme-paired automatically. */
+<style scoped>
+/* keep(keyframes): the `.skeleton-box` gradient overrides below re-skin the root
+   of the SkeletonBox child component per theme and pair with the `o2-skel-wave`
+   animation. Kept as CSS rather than utilities on each <SkeletonBox> because the
+   `background` shorthand has to beat the child's own `bg-skeleton-base` utility
+   (class order does not guarantee that) and because `.dark` / `:root:not(.dark)`
+   ancestor pairs have no utility form here.
+   Scoping IS safe: Vue puts this component's scope id on a child component's
+   root element, and the `o2-skel-wave` / `o2-llm-line-pulse` keyframes now live
+   in styles/keyframes.css — the scoped compiler only renames names declared in
+   this block, so the references below and in the template both still resolve.
+   `.tile-content` publishes the --tile-* contract for this component's own
+   tiles; it is scoped now because the other `.tile-content` users
+   (HomeViewSkeleton, logstream/schema) set their own bg/border/text utilities
+   and never depended on these values. */
 .tile-content {
   --tile-bg: var(--color-surface-base);
   --tile-border: var(--color-border-default);
@@ -141,7 +150,7 @@ const store = useStore();
     transparent
   );
   background-size: 200% 100%;
-  animation: llm-skel-wave 1.5s ease-in-out infinite;
+  animation: o2-skel-wave 1.5s ease-in-out infinite;
   position: relative;
   overflow: hidden;
 }
@@ -164,24 +173,5 @@ const store = useStore();
     color-mix(in srgb, var(--color-black) 4%, transparent)
   );
   background-size: 200% 100%;
-}
-
-@keyframes llm-skel-wave {
-  0% {
-    background-position: -200% 0;
-  }
-  100% {
-    background-position: 200% 0;
-  }
-}
-
-@keyframes llm-line-pulse {
-  0%,
-  100% {
-    opacity: 0.55;
-  }
-  50% {
-    opacity: 1;
-  }
 }
 </style>

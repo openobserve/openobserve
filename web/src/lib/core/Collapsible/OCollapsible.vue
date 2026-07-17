@@ -169,11 +169,16 @@ watch(
   </CollapsibleRoot>
 </template>
 
-<style>
+<style scoped>
 /* keep(keyframes): reka-ui height animation keyed off [data-state] +
-   --reka-collapsible-content-height. Stays global — `.o-collapsible-content`
-   is a public styling hook (consumed via :deep from FieldExpansion.vue) and
-   the animation rides reka's CollapsibleContent root element. */
+   --reka-collapsible-content-height; no utility can express it.
+   These keyframes are referenced ONLY from the CSS in this block (never from a
+   template `[animation:…]` utility), so `scoped` is safe: Vue renames the
+   @keyframes and the `animation:` shorthands together and stays consistent.
+   That is also why they do NOT belong in styles/keyframes.css.
+   `.o-collapsible-content` sits on reka's CollapsibleContent in THIS
+   component's template, so it carries this scope id. FieldExpansion.vue reaches
+   the same class through its own `:deep()`, which is unaffected. */
 .o-collapsible-content[data-state="open"] {
   animation: o-collapsible-open 200ms ease-out;
 }

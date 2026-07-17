@@ -156,26 +156,14 @@ const alignClassFor = (col: Column<any, any>): string => {
   </tbody>
 </template>
 
-<style>
-/* keep(keyframes): shimmer + row-in animations (and their reduced-motion
-   opt-out). Stays global — the keyframe names are referenced from template
-   `[animation:…]` utilities, which Vue's scoped rewriter would not update. */
-@keyframes o2-skel-shimmer {
-  0% { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
-}
-
-@keyframes o2-skel-row-in {
-  from {
-    opacity: 0;
-    transform: translateY(2px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
+<style scoped>
+/* keep(keyframes): reduced-motion opt-out for the skeleton animations. The
+   `o2-skel-shimmer` / `o2-skel-row-in` keyframes themselves now live in
+   styles/keyframes.css (shared with TenstackTable + OTablePagination) because
+   the template starts them from `[animation:…]` utilities. This cancel rule
+   stays as CSS: a `motion-reduce:animate-none` utility does not reliably
+   outrank the arbitrary `[animation:…]` utility it has to override. Both
+   selectors are this component's own elements, so scoping is safe. */
 @media (prefers-reduced-motion: reduce) {
   .o2-skel-row {
     opacity: 1;

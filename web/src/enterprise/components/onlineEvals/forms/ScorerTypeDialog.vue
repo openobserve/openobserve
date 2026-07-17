@@ -117,18 +117,3 @@ defineEmits<{
 const { t } = useI18n();
 </script>
 
-<style>
-/* keep(keyframes): not expressible as Tailwind utilities. Names are component-
-   prefixed and must stay global — they are referenced from arbitrary
-   `animate-[…]` utilities in the template, and Vue rewrites keyframe names
-   inside `scoped` blocks. */
-@keyframes scorer-type-scrim-in {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-@keyframes scorer-type-pop-in {
-  from { opacity: 0; transform: scale(0.96); }
-  to { opacity: 1; transform: scale(1); }
-}
-</style>

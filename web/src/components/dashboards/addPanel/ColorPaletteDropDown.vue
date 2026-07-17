@@ -319,8 +319,3 @@ export default defineComponent({
   },
 });
 </script>
-<style>
-.selectedLabel span {
-  text-transform: none !important;
-}
-</style>

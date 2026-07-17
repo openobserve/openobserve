@@ -127,33 +127,3 @@ export default defineComponent({
 });
 </script>
 
-<style>
-/* keep(keyframes): @keyframes cannot be expressed as Tailwind utilities, and the
-   names must stay global because they are referenced from arbitrary `animation:`
-   utilities in the template (Vue rewrites keyframe names inside `scoped` blocks,
-   which would break that reference). Both names are component-prefixed.
-
-   These were previously named `shimmer` / `pulse` and sat alongside a global
-   `.animate-pulse { … }` rule. Because this block is unscoped, that rule and the
-   generic `pulse` name overrode Tailwind's own `animate-pulse` utility and its
-   keyframes for the WHOLE app (MenuLink, OSkeleton, OTable, sparklines, …)
-   whenever this component happened to be loaded. Namespaced to end the collision. */
-@keyframes loading-progress-shimmer {
-  0% {
-    transform: translateX(-200%);
-  }
-  100% {
-    transform: translateX(200%);
-  }
-}
-
-@keyframes loading-progress-pulse {
-  0%,
-  100% {
-    opacity: 0.2;
-  }
-  50% {
-    opacity: 0.4;
-  }
-}
-</style>

@@ -2552,34 +2552,6 @@ defineExpose({
   getRows: () => table?.getRowModel().rows.map((r: any) => r.original) ?? [],
 });
 </script>
-<style>
-@import "@/assets/styles/log-highlighting.css";
-
-/* keep(keyframes) — this block must stay unscoped: the template drives the row
-   entrance with the `[animation:o2-skel-row-in_320ms_ease-out_forwards]` utility,
-   and Vue's scoped compiler rewrites @keyframes names without rewriting the
-   template's arbitrary animation utility, which would break the reference. */
-@keyframes o2-skel-shimmer {
-  0% {
-    background-position: 200% 0;
-  }
-  100% {
-    background-position: -200% 0;
-  }
-}
-
-@keyframes o2-skel-row-in {
-  from {
-    opacity: 0;
-    transform: translateY(0.125rem);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-</style>
-
 <style scoped>
 /* keep(keyframes) — the shimmer gradient + animation pair is kept as CSS so the
    skeleton pill stays a single class the template can reuse; it is token-backed

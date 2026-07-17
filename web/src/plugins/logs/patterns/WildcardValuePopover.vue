@@ -18,8 +18,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div
     v-show="visible && !!anchorEl"
     ref="popoverRef"
-    class="wcp w-72 bg-card-glass-solid border border-border-default rounded-lg overflow-hidden shadow-[0_0.5rem_1.5rem_rgba(0,0,0,0.14),0_0.125rem_0.375rem_rgba(0,0,0,0.06)] [animation:wcpIn_0.15s_ease-out]"
-    :class="{ '[animation-name:wcpInUp]': flipUpward }"
+    class="wcp w-72 bg-card-glass-solid border border-border-default rounded-lg overflow-hidden shadow-[0_0.5rem_1.5rem_rgba(0,0,0,0.14),0_0.125rem_0.375rem_rgba(0,0,0,0.06)] [animation:o2-wcp-in_0.15s_ease-out]"
+    :class="{ '[animation-name:o2-wcp-in-up]': flipUpward }"
     :style="popoverStyle"
     data-test="wildcard-value-popover"
     @mouseenter="$emit('popoverEnter')"
@@ -211,11 +211,3 @@ watch(
 );
 </script>
 
-<style>
-/* keep(keyframes): wcpIn / wcpInUp are referenced by name from template
-   arbitrary utilities ([animation:wcpIn_...] / [animation-name:wcpInUp]), so
-   this block must stay unscoped — scoping would hash the @keyframes names and
-   break those template references. */
-@keyframes wcpIn    { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
-@keyframes wcpInUp  { from { opacity: 0; transform: translateY(4px);  } to { opacity: 1; transform: none; } }
-</style>

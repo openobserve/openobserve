@@ -1174,14 +1174,3 @@ const getBtnLogo = computed(() => {
 })
 </script>
 
-<style>
-/* keep(keyframes): not expressible as a Tailwind utility. Name is component-
-   prefixed and must stay global — it is referenced from an arbitrary
-   `[animation:…]` utility in the template, and Vue rewrites keyframe names
-   inside `scoped` blocks. Was the generic `pulse`, which (from this unscoped
-   block) collided with Tailwind's own `animate-pulse` keyframes app-wide. */
-@keyframes query-editor-dot-pulse {
-  0%, 100% { opacity: 1; }
-  50%       { opacity: 0.3; }
-}
-</style>

@@ -60,7 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template v-slot:after>
           <div
             id="thirdLevel"
-            class="flex scroll relative-position thirdlevel full-height overflow-hidden logsPageMainSection w-full border-t border-border-default"
+            class="flex scroll relative-position thirdlevel full-height overflow-visible p-0 m-0 box-border logsPageMainSection w-full border-t border-border-default"
             v-show="
               searchObj.meta.logsVisualizeToggle == 'logs' ||
               searchObj.meta.logsVisualizeToggle == 'patterns'
@@ -3635,34 +3635,12 @@ export default defineComponent({
 }) as any;
 </script>
 
-<style>
-.logPage .index-menu .field_list .field_overlay .field_label {
-  font-size: 12px !important;
-}
-
-.logPage .thirdlevel {
-  padding: 0 !important;
-  margin: 0 !important;
-  box-sizing: border-box !important;
-  height: 100% !important;
-  overflow: visible !important;
-  /* Changed from hidden to visible for button */
-}
-
-.field-list-separator::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 2px;
-  background-color: transparent;
-  transition: background-color 0.3s;
-}
-
-.field-list-separator:hover::after {
-  background-color: orange;
+<style scoped>
+/* keep(complex-state): the field label is rendered deep inside the IndexList /
+   FieldRow child components, so this reaches it with :deep() rather than a
+   template utility. Mirrors the identical rule in plugins/traces/Index.vue. */
+.logPage :deep(.index-menu .field_list .field_overlay .field_label) {
+  font-size: 0.75rem !important;
 }
 </style>
 

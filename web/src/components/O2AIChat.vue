@@ -5811,26 +5811,6 @@ export default defineComponent({
 });
 </script>
 
-<style>
-/* keep(keyframes): this block is deliberately UNSCOPED. `o2ai-fade-in-up` is
-   referenced from the template as an arbitrary utility
-   (`animate-[o2ai-fade-in-up_0.3s_ease]` on .scroll-to-bottom-btn). Vue's scoped
-   compiler rewrites @keyframes names and the `animation:` shorthands *inside a
-   scoped block*, but it never rewrites animation names inside template classes —
-   scoping this would rename the keyframes and silently break the reference. The
-   name is component-prefixed because an unscoped @keyframes is global. */
-@keyframes o2ai-fade-in-up {
-  from {
-    opacity: 0;
-    transform: translateY(0.625rem) scale(0.9);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
-</style>
-
 <style scoped>
 /* keep(generated-content): markdown/log/code markup is injected with v-html, so
    it carries no scope attribute and cannot take utility classes — it can only be

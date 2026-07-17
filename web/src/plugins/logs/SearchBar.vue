@@ -524,7 +524,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :aria-disabled="isDownloadDisabled || undefined"
               @mouseenter="!isDownloadDisabled && (showDownloadSubmenu = true)"
               @mouseleave="showDownloadSubmenu = false"
-              class="relative flex items-center gap-2 py-[0.375rem] px-3 text-[var(--text-sm)] [line-height:1.2] cursor-pointer select-none hover:bg-interactive-hover-bg search-download-item"
+              class="relative flex items-center gap-2 py-[0.375rem] px-3 text-[var(--text-sm)] [line-height:1.2] cursor-pointer select-none hover:bg-interactive-hover-bg search-download-item before:content-[''] before:absolute before:top-0 before:right-full before:w-2.5 before:h-full"
               :class="{ 'cursor-not-allowed! text-text-muted hover:bg-transparent!': isDownloadDisabled }"
             >
               <span class="inline-flex items-center justify-center w-7 h-7 rounded-md bg-section-header-bg text-text-secondary shrink-0">
@@ -5530,60 +5530,43 @@ export default defineComponent({
 });
 </script>
 
-<style>
-.search-download-item::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  right: 100%;
-  width: 0.625rem;
-  height: 100%;
-}
-
-
-/* When function editor is open, move AI button flush to the right of the query panel */
-.fn-editor-open .ai-floating-button {
-  right: 0.25rem;
-}
-
-
-.o2-table-hide-header thead {
-  display: none;
-}
-
-.saved-view-table .action-btn-hover {
+<style scoped>
+/* keep(complex-state): every selector below reaches into OTable's internal DOM
+   (its <td>, its border/pagination wrappers, its footer chip) from the
+   .saved-view-table modifier this file puts on the OTable root, so they need
+   :deep() rather than template utilities — the markup is not ours to annotate. */
+.saved-view-table :deep(.action-btn-hover) {
   opacity: 0;
   transition: opacity 0.15s;
 }
 
-.saved-view-table tr:hover .action-btn-hover {
+.saved-view-table :deep(tr:hover .action-btn-hover) {
   opacity: 1;
 }
 
 /* Remove outer box border so both panels blend into the dialog background
    Exclude elements that also have rounded-md (OInput wrapper) so the
    search input keeps its visible border. */
-.saved-view-table .border:not(.rounded-md) {
+.saved-view-table :deep(.border:not(.rounded-md)) {
   border: none;
 }
 
 /* Normalize cell background and strip the auto-pin shadow
    (isAction columns are auto-pinned right by OTable, which adds an inline box-shadow) */
-.saved-view-table td {
+.saved-view-table :deep(td) {
   background: transparent;
   box-shadow: none !important;
 }
 
 /* Remove pagination top separator */
-.saved-view-table .border-t {
+.saved-view-table :deep(.border-t) {
   border-top: none;
 }
 
 /* Hide the redundant total-count chip on the left — "of N" on the right already shows it */
-.saved-view-table [data-test="o2-table-pagination-bottom"] .o2-table-footer-title {
+.saved-view-table :deep([data-test="o2-table-pagination-bottom"] .o2-table-footer-title) {
   display: none;
 }
-
 
 /* Query editor placeholder text styling is global (styles/tailwind.css) —
    shared with traces, RUM sessions, RUM error tracking, and alerts. */

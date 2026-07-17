@@ -69,7 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="webinar-home-left flex flex-col gap-[0.3rem]">
         <!-- Live badge -->
         <div class="webinar-home-badge inline-flex items-center gap-[0.375rem] text-2xs font-bold uppercase tracking-[0.06em] text-promo-webinar-accent-text">
-          <span class="webinar-home-badge-dot w-[0.5rem] h-[0.5rem] rounded-full bg-(--color-promo-webinar-accent) shrink-0 [animation:badge-pulse_1.8s_ease-in-out_infinite]" />
+          <span class="webinar-home-badge-dot w-[0.5rem] h-[0.5rem] rounded-full bg-(--color-promo-webinar-accent) shrink-0 [animation:o2-webinar-badge-pulse_1.8s_ease-in-out_infinite]" />
           {{ webinarData.tag }}
         </div>
 
@@ -179,18 +179,3 @@ onMounted(async () => {
 });
 </script>
 
-<style>
-/* keep(keyframes): badge-pulse live-dot animation referenced by the global [animation:badge-pulse_*] utility */
-@keyframes badge-pulse {
-  0%,
-  100% {
-    transform: scale(1);
-    opacity: 1;
-  }
-
-  50% {
-    transform: scale(1.5);
-    opacity: 0.5;
-  }
-}
-</style>

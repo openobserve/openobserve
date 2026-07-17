@@ -1288,12 +1288,3 @@ export default defineComponent({
 });
 </script>
 
-<style>
-.date-time-button.isOpen .date-time-arrow {
-  transform: rotate(180deg);
-}
-
-.date-time-table .relative-row > * {
-  margin-right: 6px;
-}
-</style>

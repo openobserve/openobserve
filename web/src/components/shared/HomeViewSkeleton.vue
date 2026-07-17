@@ -130,7 +130,7 @@
           class="custom-first-chart my-auto xl:min-h-50 h-[calc(100vh-500px)] md:h-[calc(100vh-500px)] lg:h-[calc(100vh-550px)] xl:h-[calc(100vh-645px)] w-full"
         >
           <div
-            class="skeleton-box bg-skeleton-base relative overflow-hidden rounded-lg"
+            class="skeleton-box bg-skeleton-base relative overflow-hidden rounded-lg after:content-[''] after:absolute after:inset-0 after:[background:linear-gradient(90deg,transparent_0%,transparent_30%,var(--color-skeleton-shimmer)_50%,transparent_70%,transparent_100%)] after:[animation:o2-skeleton-shimmer_1.8s_ease-in-out_infinite]"
             style="width: 100%; height: 100%"
           ></div>
         </div>
@@ -177,7 +177,7 @@
           class="custom-second-chart my-auto xl:min-h-50 h-[calc(100vh-500px)] md:h-[calc(100vh-500px)] lg:h-[calc(100vh-550px)] xl:h-[calc(100vh-645px)]"
         >
           <div
-            class="skeleton-box bg-skeleton-base relative overflow-hidden rounded-lg"
+            class="skeleton-box bg-skeleton-base relative overflow-hidden rounded-lg after:content-[''] after:absolute after:inset-0 after:[background:linear-gradient(90deg,transparent_0%,transparent_30%,var(--color-skeleton-shimmer)_50%,transparent_70%,transparent_100%)] after:[animation:o2-skeleton-shimmer_1.8s_ease-in-out_infinite]"
             style="width: 100%; height: 100%"
           ></div>
         </div>

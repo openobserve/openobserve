@@ -155,7 +155,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </OIcon>
                     </span>
                     <span v-else-if="row.aggregateStatus === 'processing'">
-                      <OIcon name="sync" size="sm" class="[animation:rotate_1s_linear_infinite]">
+                      <OIcon name="sync" size="sm" class="[animation:o2-spin-rotate_1s_linear_infinite]">
                         <OTooltip>
                           <template #content>
                             <div style="max-width: 300px;">
@@ -996,13 +996,3 @@ export default defineComponent({
 });
 </script>
 
-<style>
-@keyframes rotate {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
-}
-</style>

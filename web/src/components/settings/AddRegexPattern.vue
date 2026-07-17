@@ -583,24 +583,3 @@ export default defineComponent({
 });
 </script>
 
-<style>
-.regex-pattern-input > div > div > div > textarea {
-  height: 200px !important;
-  resize: none !important;
-  padding-left: 0.5rem !important;
-}
-
-.regex-test-string-input > div > div > div > textarea {
-  resize: none !important;
-  padding-left: 0.5rem !important;
-}
-
-/* The section header strips (Write Pattern / Input string / Output) are flat
-   full-width bars. Square the textareas' own border box so each field reads as
-   one connected unit under its strip instead of a detached rounded-sm box. */
-.regex-pattern-input .rounded-md.border,
-.regex-test-string-input .rounded-md.border {
-  border-top-left-radius: 0 !important;
-  border-top-right-radius: 0 !important;
-}
-</style>

@@ -32,12 +32,15 @@ import SkeletonBox from "@/components/shared/SkeletonBox.vue";
 withDefaults(defineProps<{ count?: number }>(), { count: 5 });
 </script>
 
-<style>
-/* keep(keyframes): the shimmer @keyframes cannot be a utility. `.skeleton-box`
-   is SkeletonBox.vue's shared class (cross-file) — this global override drives
-   the wave gradient + animation on that child element, so the block must stay
-   unscoped (a scope id would never reach the child, and scoping renames the
-   keyframe). */
+<style scoped>
+/* keep(keyframes): wave gradient + animation applied to the `.skeleton-box`
+   root of the SkeletonBox child component. Kept as CSS rather than utilities on
+   each <SkeletonBox> because the `background` shorthand has to beat the child's
+   own `bg-skeleton-base` utility, which class order does not guarantee.
+   Scoping IS safe here: Vue puts this component's scope id on a child
+   component's root element. The `o2-skel-wave` keyframe lives in
+   styles/keyframes.css (shared with LLMInsightsSkeleton) and is NOT renamed by
+   the scoped compiler, which only rewrites names it declares in this block. */
 .skeleton-box {
   position: relative;
   overflow: hidden;
@@ -48,11 +51,6 @@ withDefaults(defineProps<{ count?: number }>(), { count: 5 });
     var(--color-skeleton-highlight),
     var(--color-skeleton-base)
   );
-  animation: qkpi-skel-wave 1.5s ease-in-out infinite;
-}
-
-@keyframes qkpi-skel-wave {
-  0%   { background-position: -200% 0; }
-  100% { background-position:  200% 0; }
+  animation: o2-skel-wave 1.5s ease-in-out infinite;
 }
 </style>

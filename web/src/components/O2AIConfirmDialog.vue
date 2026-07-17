@@ -1,5 +1,5 @@
 <template>
-  <div v-if="visible" class="confirmation-overlay w-full mb-2 [animation:slideUp_0.25s_ease-out]">
+  <div v-if="visible" class="confirmation-overlay w-full mb-2 [animation:o2-ai-confirm-slide-up_0.25s_ease-out]">
     <div
       class="confirmation-dialog w-full pt-4 px-4 pb-3.5 rounded-xl flex flex-col gap-3.5 bg-surface-base border-2 border-border-default shadow-[0_2px_8px_rgba(0,0,0,0.1)] dark:shadow-[0_2px_8px_rgba(0,0,0,0.3)]"
       @keydown="handleDialogKeydown"
@@ -397,16 +397,3 @@ onUnmounted(() => {
 });
 </script>
 
-<style>
-/* keep(keyframes): slide-up entrance animation referenced by the global [animation:slideUp_*] utility */
-@keyframes slideUp {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-</style>

@@ -329,7 +329,7 @@ onUnmounted(() => {
         aria-hidden="true"
       >
         <div
-          :class="['h-full w-full origin-left [animation:toast-shrink_linear_forwards]', progressBarColorClasses[variant ?? 'default']]"
+          :class="['h-full w-full origin-left [animation:o2-toast-shrink_linear_forwards]', progressBarColorClasses[variant ?? 'default']]"
           :style="{
             animationDuration: `${timeout}ms`,
             animationPlayState: isPaused ? 'paused' : 'running',
@@ -340,16 +340,3 @@ onUnmounted(() => {
   </ToastRoot>
 </template>
 
-<style>
-/* keep(keyframes): timeout progress-bar shrink. Stays global — the keyframe
-   name is referenced from a template `[animation:…]` utility, which Vue's
-   scoped rewriter would not update. */
-@keyframes toast-shrink {
-  from {
-    transform: scaleX(1);
-  }
-  to {
-    transform: scaleX(0);
-  }
-}
-</style>

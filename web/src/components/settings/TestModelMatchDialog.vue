@@ -392,13 +392,11 @@ function formatRate(rate: number) {
 }
 </script>
 
-<style>
-/* :last-child pseudo selector — kept in <style> per project rules */
-.tmm-cost-table-row:last-child {
-  border-bottom: none;
-}
-
-/* ── Transition animations ── */
+<style scoped>
+/* keep(complex-state): the enter/leave classes Vue applies for
+   <Transition name="tmm-fade"> — Vue adds them itself, mid-transition, so no
+   template utility can express them. Scoped is correct: every transitioned
+   element is this component's own template child. */
 .tmm-fade-enter-active,
 .tmm-fade-leave-active {
   transition: all 0.18s ease;

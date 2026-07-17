@@ -127,8 +127,3 @@ export default defineComponent({
 });
 </script>
 
-<style>
-.printMode .hideOnPrintMode {
-  display: none;
-}
-</style>

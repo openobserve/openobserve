@@ -1,0 +1,251 @@
+/*
+ * keyframes.css — the app-wide home for @keyframes.
+ *
+ * WHY THIS FILE EXISTS
+ * Every animation below is started from a template *arbitrary utility* —
+ * `[animation:NAME_1s_linear_infinite]`, `animate-[NAME_0.3s_ease]` or
+ * `[animation-name:NAME]` — rather than from a CSS rule. Vue's `scoped`
+ * compiler renames `@keyframes NAME` to `NAME-<hash>` and rewrites the
+ * `animation:` shorthands *inside the same style block*, but it never looks at
+ * class strings in the template. So a scoped keyframe + a template
+ * `[animation:…]` reference silently drift apart and the animation dies.
+ *
+ * The old workaround was an UNSCOPED `<style>` block in each component. That is
+ * not a sanctioned global home (see O2_STYLE_MIGRATION_PLAN.md §3) and it leaks:
+ * an unscoped `@keyframes` is global, so generic names collide app-wide. A real
+ * bug this caused: four components each defined a global `pulse`, and whichever
+ * loaded last hijacked Tailwind's own `animate-pulse` everywhere.
+ *
+ * RULES FOR THIS FILE
+ * - Every name is namespaced with an owning-component prefix. Never add a
+ *   generic name (`pulse`, `rotate`, `wave`, `fadeIn`, `shimmer`, `spin`) — it
+ *   will collide with Tailwind's built-ins or with another component.
+ * - Grep `web/src` for the name before adding it; exactly one definition may exist.
+ * - Colours via `var(--color-*)` / `color-mix()` only. Sizes in rem.
+ * - Only put a keyframe here if it is referenced from a TEMPLATE. A keyframe
+ *   referenced solely from CSS in its own component belongs in that component's
+ *   `<style scoped>` block, where Vue's rename stays self-consistent.
+ */
+
+/* ── WelcomeGreeting.vue — the 👋 hand wave in the AI assistant hero ───────── */
+@keyframes o2-welcome-wave {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  20% {
+    transform: rotate(14deg);
+  }
+  40% {
+    transform: rotate(-8deg);
+  }
+  60% {
+    transform: rotate(10deg);
+  }
+  80% {
+    transform: rotate(-4deg);
+  }
+}
+
+/* ── QueryEditorDialog.vue — "generating" status dot ──────────────────────── */
+@keyframes query-editor-dot-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.3;
+  }
+}
+
+/* ── LoadingProgress.vue — top-of-page progress bar (gloss + head glow) ───── */
+@keyframes loading-progress-shimmer {
+  0% {
+    transform: translateX(-200%);
+  }
+  100% {
+    transform: translateX(200%);
+  }
+}
+
+@keyframes loading-progress-pulse {
+  0%,
+  100% {
+    opacity: 0.2;
+  }
+  50% {
+    opacity: 0.4;
+  }
+}
+
+/* ── SkeletonBox.vue — translateX gloss beam sliding over the flat base.
+      ease-in-out on the translate is intentional: it mimics light reflection.
+      (OSkeleton.vue keeps its own identically-shaped keyframe inside its scoped
+      block — it is CSS-referenced there, so Vue's rename stays consistent.) ── */
+@keyframes o2-skeleton-shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+/* ── AutoRefreshInterval.vue — spinning refresh icon ──────────────────────── */
+@keyframes auto-refresh-rotate {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+/* ── O2AIChat.vue — scroll-to-bottom button entrance ──────────────────────── */
+@keyframes o2ai-fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(0.625rem) scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* ── O2AIConfirmDialog.vue — inline confirmation entrance ─────────────────── */
+@keyframes o2-ai-confirm-slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(0.625rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ── Table skeletons — SHARED by TenstackTable.vue, OTableLoading.vue and
+      OTablePagination.vue. All three previously carried byte-identical copies
+      (OTablePagination's under the alias `o2-pag-shimmer`); merged here. ───── */
+@keyframes o2-skel-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+@keyframes o2-skel-row-in {
+  from {
+    opacity: 0;
+    transform: translateY(0.125rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ── Skeleton wave — SHARED by QualityKpiSkeleton.vue (was `qkpi-skel-wave`)
+      and LLMInsightsSkeleton.vue (was `llm-skel-wave`); identical bodies.
+      Sweeps background-position the opposite way to o2-skel-shimmer. ──────── */
+@keyframes o2-skel-wave {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+/* ── WebinarBanner.vue — "live" badge dot ─────────────────────────────────── */
+@keyframes o2-webinar-badge-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.5);
+    opacity: 0.5;
+  }
+}
+
+/* ── Enrichment-table job spinner — SHARED by AddEnrichmentTable.vue and
+      EnrichmentTableList.vue (both defined a global `rotate`); merged. ────── */
+@keyframes o2-spin-rotate {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ── ScorerTypeDialog.vue — scrim fade + dialog pop ───────────────────────── */
+@keyframes scorer-type-scrim-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes scorer-type-pop-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* ── OToast.vue — auto-dismiss timeout progress bar ───────────────────────── */
+@keyframes o2-toast-shrink {
+  from {
+    transform: scaleX(1);
+  }
+  to {
+    transform: scaleX(0);
+  }
+}
+
+/* ── WildcardValuePopover.vue — popover entrance; `-up` is the flipped
+      (top-placed) variant, swapped in via `[animation-name:…]`. ───────────── */
+@keyframes o2-wcp-in {
+  from {
+    opacity: 0;
+    transform: translateY(-0.25rem);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes o2-wcp-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(0.25rem);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* ── LLMInsightsSkeleton.vue — breathing sparkline placeholder ────────────── */
+@keyframes o2-llm-line-pulse {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+}

@@ -79,8 +79,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div
                 class="warning-text flex-1"
               >
-                <strong>Range requests not supported</strong>
-                <p>
+                <strong class="block mb-1 text-banner-warning-text">Range requests not supported</strong>
+                <p class="m-0 text-sm text-banner-warning-text">
                   This URL does not support resuming from the last position.
                   The job will restart from the beginning.
                 </p>
@@ -357,19 +357,15 @@ export default defineComponent({
 });
 </script>
 
-<style>
-.warning-text strong {
-  display: block;
-  margin-bottom: 0.25rem;
-  color: var(--color-banner-warning-text);
-}
-
-.warning-text p {
-  margin: 0;
-  font-size: 0.875rem;
-  color: var(--color-banner-warning-text);
-}
-
+<style scoped>
+/* keep(keyframes): the <Transition name="fade"> enter/leave pair and the
+   slide-up / slide-down dialog animations it drives. `slide-up` / `slide-down`
+   are referenced ONLY from the CSS in this block (never from a template
+   `[animation:…]` utility), so `scoped` is safe and correct here: Vue renames
+   the @keyframes and the `animation:` shorthands together, which also hashes
+   these otherwise-generic names out of the global namespace. That is why they
+   do NOT belong in styles/keyframes.css. Every selector below is this
+   component's own element. */
 .fade-enter-active,
 .fade-leave-active {
   transition: opacity 0.2s ease;

@@ -1,6 +1,6 @@
 <template>
   <div
-    class="skeleton-box bg-skeleton-base relative overflow-hidden rounded-sm"
+    class="skeleton-box bg-skeleton-base relative overflow-hidden rounded-sm after:content-[''] after:absolute after:inset-0 after:[background:linear-gradient(90deg,transparent_0%,transparent_30%,var(--color-skeleton-shimmer)_50%,transparent_70%,transparent_100%)] after:[animation:o2-skeleton-shimmer_1.8s_ease-in-out_infinite]"
     :class="[
       variantClass,
       rounded && 'rounded-lg',
@@ -92,32 +92,3 @@ const computedHeight = computed(() => {
   }
 })
 </script>
-
-<style>
-/* keep(keyframes): shimmer ::after overlay + @keyframes are shared globally —
-   HomeViewSkeleton's raw .skeleton-box divs rely on this unscoped rule, so it
-   must not be scoped. */
-/* Flat base colour + sliding ::after overlay.
-   The base is always solid (no moving gradient), the shimmer is a separate
-   translucent gloss that physically slides left→right via translateX.
-   ease-in-out on translateX is intentional — it mimics real light reflection. */
-.skeleton-box::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(
-    90deg,
-    transparent       0%,
-    transparent      30%,
-    var(--color-skeleton-shimmer) 50%,
-    transparent      70%,
-    transparent     100%
-  );
-  animation: skeleton-shimmer 1.8s ease-in-out infinite;
-}
-
-@keyframes skeleton-shimmer {
-  0%   { transform: translateX(-100%); }
-  100% { transform: translateX(100%); }
-}
-</style>

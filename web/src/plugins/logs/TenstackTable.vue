@@ -1247,40 +1247,6 @@ defineExpose({
   processedResults,
 });
 </script>
-<style>
-@import "@/assets/styles/log-highlighting.css";
-
-/* cross-file global: .ai-btn is also consumed by components/TenstackTable.vue and
-   redefined in styles/utilities.css, so these three rules must stay unscoped —
-   scoping them would silently drop the styling on the other table.
-   Fix: OButton's base class (relative) overrides the absolute passed via props.
-   Use top:0 + translate:-50% 0 to anchor the button flush with the row top,
-   and height:100% to fill the td height (= row height minus the border).
-   Overriding the CSS `translate` property (not `transform`) is required because
-   Tailwind v4 sets -translate-y-1/2 via the CSS `translate` shorthand property. */
-.ai-btn {
-  position: absolute !important;
-  top: 50% !important;
-  right: 0.875rem !important;
-  translate: -50% -50% !important;
-  height: 0.875rem !important;
-  min-height: 0 !important;
-  width: 0.900rem !important;
-  min-width: 0 !important;
-  border-radius: 0.25rem !important;
-}
-
-.ai-btn img.ai-icon {
-  width: 0.75rem !important;
-  height: 0.75rem !important;
-}
-
-/* Suppress the hover box-shadow — it visually bleeds outside the row boundary */
-.ai-btn:hover {
-  box-shadow: none !important;
-}
-</style>
-
 <style scoped>
 /* keep(lib-override:monaco) does not apply here; the keepers below are:
    keep(complex-state) — .table-row-hover/.table-row-focus drive the virtualized
