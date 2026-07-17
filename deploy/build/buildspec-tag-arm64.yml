@@ -4,7 +4,7 @@ phases:
   pre_build:
     commands:
       - aws ecr-public get-login-password --region us-east-1 | docker login --username AWS --password-stdin public.ecr.aws/zinclabs
-      - docker login --username openobserve --password $DOCKER_HUB_ACCESS_TOKEN
+      - docker login --username $DOCKER_HUB_ACCESS_USER --password $DOCKER_HUB_ACCESS_TOKEN
 
   build:
     commands:
@@ -15,7 +15,10 @@ phases:
       - swapon /swapfile || true
       - pwd
       - GIT_TAG="$(git describe --tags --abbrev=0)"
-      
+      # pre-release tags like 0.91.0-rc2 should not update the latest tags
+      - PUSH_LATEST=true
+      - case "$GIT_TAG" in *-rc*|*-beta*|*-alpha*) PUSH_LATEST=false ;; esac
+
       # simd version
       - docker build -t openobserve:latest-arm64 -f deploy/build/Dockerfile.tag.aarch64 .
       - docker tag openobserve:latest-arm64 public.ecr.aws/zinclabs/openobserve:$GIT_TAG-arm64-simd
