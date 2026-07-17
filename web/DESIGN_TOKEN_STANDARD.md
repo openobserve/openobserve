@@ -109,12 +109,21 @@ Legend: **✅ keep** · **➕ add/register** (see Part D) · **⛔ retire** (see
 
 ### A3 · Border — `border-*`
 
+**One app-facing border knob.** Measured usage: `border-default` **466**, `border-strong` **10**,
+`border-subtle` **11**. The three are *not* the same literal (default = grey-200, strong = grey-400,
+subtle = grey-150, distinct in dark too) — but feature code overwhelmingly reaches for `default`, and
+`strong`/`subtle` earn their keep inside the **O2 library** (checkbox border → strong, table
+row-divider / tooltip → subtle), not in views. So keep one knob here and demote the other two to Ring 2.
+
 | Token | Utility | Use for | |
 |---|---|---|---|
-| `--color-border-default` | `border-border-default` | default 1px borders/dividers | ✅ (also the global `*` border colour) |
-| `--color-border-strong` | `border-border-strong` | emphasised borders | ✅ |
-| `--color-border-subtle` | `border-border-subtle` | in-list row dividers | ✅ |
-| `--color-border-accent` | `border-border-accent` | focused/active accent borders | ➕ **add** (Part D) |
+| `--color-border-default` | `border-border-default` | **the** border/divider colour for app code — all 1px borders, dividers, outlines | ✅ **canonical** (also the global `*` border colour) |
+| `--color-border-strong` | `border-border-strong` | emphasised/control borders | ⚠️ **Ring 2 only** — library-internal; feature code uses `border-default`. 10 feature uses → codemod to default. |
+| `--color-border-subtle` | `border-border-subtle` | quiet in-list row dividers | ⚠️ **Ring 2 only** — library-internal; 11 feature uses → codemod to default. |
+
+> **Do not add `--color-border-accent`.** It has 0 uses and would collide with the `border-accent`
+> utility already produced by `--color-accent` (A8). A focused/active border is `border-accent`
+> (the brand knob) — not a second token. *(Reverses the earlier Part D proposal.)*
 
 ### A4 · Type scale (font size) — `text-*`
 
@@ -137,26 +146,37 @@ AUDIT §8.3). Register the whole ladder and delete the hand-pinned `.text-sm`/`.
 
 ### A5 · Corner radius — `rounded-*`
 
-Works today (AUDIT §5.B, ~88%). Only gap: three used-but-unregistered steps.
+**Standardise on a 4-step scale: `sm / md / lg / full`.** Measured usage makes the case decisively —
+`sm` **487**, `md` **336**, `lg` **290**, `full` **184** cover **96%** of all 1352 `rounded-*` uses.
+The remaining steps are long-tail noise: `xl` 40, `xs` 10, `2xl` 4, `3xl` 1. Do **not** register the
+unregistered ones (reverses the earlier "register xs/2xl/3xl" proposal) — retire them instead.
 
-| Token | Utility | rem | |
-|---|---|---|---|
-| `--radius-sm` | `rounded-sm` | 0.25 | ✅ |
-| `--radius-md` | `rounded-md` | 0.375 | ✅ |
-| `--radius-lg` | `rounded-lg` | 0.5 | ✅ |
-| `--radius-xl` | `rounded-xl` | 0.75 | ✅ |
-| `--radius-full` | `rounded-full` | 9999 | ✅ |
-| `--radius-xs` / `--radius-2xl` / `--radius-3xl` | `rounded-xs`/`-2xl`/`-3xl` | — | ➕ **register** (used, currently fall back to Tailwind defaults) |
+| Token | Utility | rem | Use for | |
+|---|---|---|---|---|
+| `--radius-sm` | `rounded-sm` | 0.25 | controls, inputs, chips, small cards | ✅ **canonical** |
+| `--radius-md` | `rounded-md` | 0.375 | cards, panels, popovers | ✅ **canonical** |
+| `--radius-lg` | `rounded-lg` | 0.5 | dialogs, large containers | ✅ **canonical** |
+| `--radius-full` | `rounded-full` | 9999 | pills, avatars, circular | ✅ **canonical** |
+| `--radius-xl` | `rounded-xl` | 0.75 | — | ⚠️ **judgement call** (40 uses). Recommend fold into `lg`; keep only if a distinct "extra-large container" step is wanted. |
+| `--radius-xs` | `rounded-xs` | — | — | ⛔ **retire** (10 uses → `sm`; never registered) |
+| `--radius-2xl` / `--radius-3xl` | — | — | — | ⛔ **retire** (4 + 1 uses → `lg`; never registered) |
 
-> Ban bare `rounded` and `rounded-[…]` arbitrary values (already ratcheted).
+> Total churn to reach the standard: **15 feature uses** to codemod (xs→sm, 2xl/3xl→lg), plus a
+> decision on `xl`'s 40. Ban bare `rounded` and `rounded-[…]` arbitrary values (already ratcheted).
 
 ### A6 · Elevation — `shadow-*`
 
+**Two real elevations, plus one "flat" baseline.** Only `md` and `lg` actually render a shadow —
+that is the whole vocabulary the app needs. Measured usage: `shadow-sm` **50**, `shadow-md` **37**,
+`shadow-lg` **13**, `shadow-xs` **1**. Note `shadow-sm` is defined as `none` (the hairline-border
+philosophy), so those 50 uses paint nothing — it's the explicit "no elevation" token, not a shadow.
+
 | Token | Utility | | Note |
 |---|---|---|---|
-| `--shadow-sm` | `shadow-sm` | ✅ | intentionally `none` (hairline-border philosophy) |
-| `--shadow-md` | `shadow-md` | ✅ | dialogs, menus |
-| `--shadow-lg` | `shadow-lg` | ✅ | large overlays |
+| `--shadow-sm` | `shadow-sm` | ✅ | the **flat** baseline — intentionally `none` (hairline-border philosophy). Keep as the one way to say "no elevation". |
+| `--shadow-md` | `shadow-md` | ✅ **canonical** | dropdowns, menus, popovers |
+| `--shadow-lg` | `shadow-lg` | ✅ **canonical** | dialogs, large overlays |
+| `--shadow-xs` | `shadow-xs` | ⛔ **retire** | recently registered, **1 use** — redundant between the flat baseline and `md`. Codemod → `md`, unregister. |
 
 ### A7 · Status / feedback (semantic, theme-aware)
 
@@ -202,8 +222,10 @@ icon box sizing instead of arbitrary `w-[..]`.
 
 ---
 
-**Canonical count:** ~**55 app-facing tokens** across A1–A10 (after retiring aliases). That is the
-"use only these" set. Everything below is either library-internal, data/brand-only, or banned.
+**Canonical count:** ~**50 app-facing tokens** across A1–A10 (after retiring aliases, demoting
+`border-strong`/`-subtle` to Ring 2, and standardising radius to `sm/md/lg/full` + elevation to
+`md/lg` over the flat baseline). That is the "use only these" set. Everything below is either
+library-internal, data/brand-only, or banned.
 
 ---
 
@@ -271,8 +293,8 @@ of un-themeable raw values — it removes debt, not adds surface.
 | Add | Why (what it kills) | Evidence |
 |---|---|---|
 | **Register ~91 already-defined tokens** (`--color-brand-*`, `--color-dag-node-*`, `--color-syntax-*`, `--color-theme-*`, `--color-gradient-*`) in `@theme inline` | Unblocks the **single largest raw-`var()` cluster** — these have consumers but no utility, forcing `<style>`/arbitrary usage | AUDIT §8.3 (mechanical, zero-risk) |
-| **Register the type scale** `--text-{xs,sm,base,lg,xl,2xl}` + **radius** `--radius-{xs,2xl,3xl}` | Makes the font-size and radius **knobs actually drive the utilities**; lets you delete the hand-pin in `tailwind.css` | AUDIT §5.B, §8.3 |
-| **Interaction-state vocabulary** — `--color-surface-accent-subtle`, `--color-border-accent`, `--color-focus-ring`, `--color-surface-hover`, `--color-surface-active` | Prerequisite to rewiring the **301** component-layer raw-palette refs — right now there's no semantic token to route `primary-50/100/300` through | AUDIT §6 |
+| **Register the type scale** `--text-{xs,sm,base,lg,xl,2xl}` | Makes the font-size **knobs actually drive the utilities**; lets you delete the hand-pin in `tailwind.css`. *(Radius is **not** registered further — A5 standardises on `sm/md/lg/full` and retires xs/2xl/3xl.)* | AUDIT §5.B, §8.3 |
+| **Interaction-state vocabulary** — `--color-surface-accent-subtle`, `--color-focus-ring`, `--color-surface-hover`, `--color-surface-active` | Prerequisite to rewiring the **301** component-layer raw-palette refs — right now there's no semantic token to route `primary-50/100/300` through. *(No separate `--color-border-accent` — an accent border is `border-accent` from A8, see A3.)* | AUDIT §6 |
 | **Overlay / alpha scale** — `--color-overlay-*` | Nowhere for ~**360 rgba** overlays to go (`rgba(0,0,0,.05)`, `rgba(255,255,255,.15)` …) | AUDIT §10; offender map (EnterpriseUpgradeDialog 22 rgba) |
 | **`-soft` / `-faint` mix tokens** for the repeated `color-mix()` formulas | Converts the largest "legitimately raw" bucket (~330–480 `color-mix()` sites) into ordinary utilities | AUDIT §7 |
 | **A chart-palette token set + `chartColor()` usage** | Kills the biggest un-themeable hotspot: ECharts `const colors=['#5470C6',…]` and per-file `isDarkMode ? '#..' : '#..'` in `components/alerts/*`, `components/traces/*`, `enterprise/onlineEvals/*` | offender map hotspots #1–2, #5; AUDIT §10 (`traceColors.ts` divergence) |
@@ -286,6 +308,8 @@ of un-themeable raw values — it removes debt, not adds surface.
 | The `note` subsystem — `--color-note-*` (component + base chain) | **16** tokens, 0 external refs | AUDIT §8.1 |
 | Unused palette ramp ends (`teal/orange/lime/amber/cyan-100/-200/-800/-900`, …) | **24** | AUDIT §8.1 |
 | Unused type/scale tokens — `--text-3xl`, `--text-4xl`, `--leading-xs`, `--tracking-tighter`, `--font-black` | **8** | AUDIT §8.1 |
+| Long-tail radius steps — `--radius-xs`, `--radius-2xl`, `--radius-3xl` (codemod xs→sm, 2xl/3xl→lg first) | 3 tokens, 15 feature uses | A5 (standardise on `sm/md/lg/full`) |
+| Redundant elevation — `--shadow-xs` (codemod → `md` first) | 1 token, 1 use | A6 (only `md`/`lg` render) |
 | Retired aliases — `--color-text-primary`, `--color-text-caption` (after codemod) | 2 | Part C.1–C.2 |
 | Shipped typo — `--color-actions-column-shawdow` (rename → `-shadow`) | 1 | AUDIT §8.3 |
 | Two false code comments claiming a `.scss` set / "not imported" | — | AUDIT §9 |
@@ -359,7 +383,7 @@ Grouped by payoff-to-effort. Tiers 0–1 are near-zero-risk and deliver the "sin
 1. Wire `lint:design` + `lint:token-purity` into `playwright.yml`; flip stylelint hex to `error`. *(F.6)*
 2. Fix the `primary-950` bug in `generatePrimaryPalette`. *(C.4)*
 3. Register the ~91 defined-but-unregistered `--color-*` tokens. *(D)*
-4. Register `--radius-xs/-2xl/-3xl` and the `--text-{xs,sm,base,lg,xl,2xl}` scale; delete the hand-pin in `tailwind.css:33-56`. *(A4/A5, D)*
+4. Register the `--text-{xs,sm,base,lg,xl,2xl}` scale; delete the hand-pin in `tailwind.css:33-56`. Do **not** register more radius steps — instead codemod `rounded-xs`→`sm`, `rounded-2xl`/`-3xl`→`lg` and retire those tokens (A5), codemod `shadow-xs`→`md` and retire it (A6), and codemod the ~21 feature `border-strong`/`border-subtle` uses → `border-default` (A3). *(A4/A5/A6/A3, D, E)*
 5. Delete the two false `.scss` comments; regenerate or delete the stale PLAN/PENDING docs. *(E, AUDIT §9)*
 
 ### Tier 1 — The alias kill (the actual answer to "can I change it in one place?")
