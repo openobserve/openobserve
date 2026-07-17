@@ -28,7 +28,81 @@ use datafusion::{
 use hashbrown::HashSet;
 use promql_parser::label::{MatchOp, Matchers};
 
-#[allow(clippy::items_after_test_module)]
+pub fn apply_matchers(df: DataFrame, schema: &Schema, matchers: &Matchers) -> Result<DataFrame> {
+    let mut df = df;
+    for mat in matchers.matchers.iter() {
+        if mat.name == TIMESTAMP_COL_NAME
+            || mat.name == VALUE_LABEL
+            || schema.field_with_name(&mat.name).is_err()
+        {
+            continue;
+        }
+        match &mat.op {
+            MatchOp::Equal => df = df.filter(col(mat.name.clone()).eq(lit(mat.value.clone())))?,
+            MatchOp::NotEqual => {
+                df = df.filter(col(mat.name.clone()).not_eq(lit(mat.value.clone())))?
+            }
+            MatchOp::Re(regex) => {
+                let regex = format!("^{}$", regex.as_str());
+                let predicate = regexp_like().call(vec![col(mat.name.clone()), lit(regex)]);
+                df = df.filter(predicate)?
+            }
+            MatchOp::NotRe(regex) => {
+                let regex = format!("^{}$", regex.as_str());
+                let predicate = regexp_like().call(vec![col(mat.name.clone()), lit(regex)]);
+                df = df.filter(predicate.not())?
+            }
+        }
+    }
+    Ok(df)
+}
+
+pub fn apply_label_selector(
+    df: DataFrame,
+    schema: &Schema,
+    label_selector: &HashSet<String>,
+) -> Option<DataFrame> {
+    let mut df = df;
+    if !label_selector.is_empty() {
+        let schema_fields = schema
+            .fields()
+            .iter()
+            .map(|f| f.name())
+            .collect::<HashSet<_>>();
+        let mut def_labels = vec![
+            HASH_LABEL.to_string(),
+            VALUE_LABEL.to_string(),
+            BUCKET_LABEL.to_string(),
+            TIMESTAMP_COL_NAME.to_string(),
+        ];
+        for label in label_selector.iter() {
+            if def_labels.contains(label) {
+                def_labels.retain(|x| x != label);
+            }
+        }
+        // include only found columns and required _timestamp, hash, value, le cols
+        let selected_cols: Vec<_> = label_selector
+            .iter()
+            .chain(def_labels.iter())
+            .filter_map(|label| {
+                if schema_fields.contains(label) {
+                    Some(col(label))
+                } else {
+                    None
+                }
+            })
+            .collect();
+        df = match df.select(selected_cols) {
+            Ok(df) => df,
+            Err(e) => {
+                log::error!("Selecting cols error: {e}");
+                return None;
+            }
+        };
+    }
+    Some(df)
+}
+
 #[cfg(test)]
 mod tests {
     use std::sync::Arc;
@@ -187,79 +261,4 @@ mod tests {
             1
         );
     }
-}
-
-pub fn apply_matchers(df: DataFrame, schema: &Schema, matchers: &Matchers) -> Result<DataFrame> {
-    let mut df = df;
-    for mat in matchers.matchers.iter() {
-        if mat.name == TIMESTAMP_COL_NAME
-            || mat.name == VALUE_LABEL
-            || schema.field_with_name(&mat.name).is_err()
-        {
-            continue;
-        }
-        match &mat.op {
-            MatchOp::Equal => df = df.filter(col(mat.name.clone()).eq(lit(mat.value.clone())))?,
-            MatchOp::NotEqual => {
-                df = df.filter(col(mat.name.clone()).not_eq(lit(mat.value.clone())))?
-            }
-            MatchOp::Re(regex) => {
-                let regex = format!("^{}$", regex.as_str());
-                let predicate = regexp_like().call(vec![col(mat.name.clone()), lit(regex)]);
-                df = df.filter(predicate)?
-            }
-            MatchOp::NotRe(regex) => {
-                let regex = format!("^{}$", regex.as_str());
-                let predicate = regexp_like().call(vec![col(mat.name.clone()), lit(regex)]);
-                df = df.filter(predicate.not())?
-            }
-        }
-    }
-    Ok(df)
-}
-
-pub fn apply_label_selector(
-    df: DataFrame,
-    schema: &Schema,
-    label_selector: &HashSet<String>,
-) -> Option<DataFrame> {
-    let mut df = df;
-    if !label_selector.is_empty() {
-        let schema_fields = schema
-            .fields()
-            .iter()
-            .map(|f| f.name())
-            .collect::<HashSet<_>>();
-        let mut def_labels = vec![
-            HASH_LABEL.to_string(),
-            VALUE_LABEL.to_string(),
-            BUCKET_LABEL.to_string(),
-            TIMESTAMP_COL_NAME.to_string(),
-        ];
-        for label in label_selector.iter() {
-            if def_labels.contains(label) {
-                def_labels.retain(|x| x != label);
-            }
-        }
-        // include only found columns and required _timestamp, hash, value, le cols
-        let selected_cols: Vec<_> = label_selector
-            .iter()
-            .chain(def_labels.iter())
-            .filter_map(|label| {
-                if schema_fields.contains(label) {
-                    Some(col(label))
-                } else {
-                    None
-                }
-            })
-            .collect();
-        df = match df.select(selected_cols) {
-            Ok(df) => df,
-            Err(e) => {
-                log::error!("Selecting cols error: {e}");
-                return None;
-            }
-        };
-    }
-    Some(df)
 }
