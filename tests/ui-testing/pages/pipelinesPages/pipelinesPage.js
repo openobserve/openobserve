@@ -1,5 +1,6 @@
 // pipelinesPage.js
 const http = require('http');
+const https = require('https');
 const { expect } = require('@playwright/test')
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
 const fetch = require('node-fetch');
@@ -10,7 +11,12 @@ const randomNodeName = `remote-node-${Math.floor(Math.random() * 1000)}`;
 
 // HTTP agent that never pools connections. node-fetch v2 keep-alive pooling
 // is the primary cause of "Premature close" / ECONNRESET flakiness in CI.
-const noKeepAliveAgent = new http.Agent({ keepAlive: false });
+// Pick the agent by protocol so both local (http://localhost) and cloud/alpha
+// (https://) URLs work — an http.Agent rejects https:// URLs.
+const noKeepAliveHttpAgent = new http.Agent({ keepAlive: false });
+const noKeepAliveHttpsAgent = new https.Agent({ keepAlive: false });
+const selectAgent = (parsedURL) =>
+    parsedURL.protocol === 'https:' ? noKeepAliveHttpsAgent : noKeepAliveHttpAgent;
 
 /**
  * Perform a fetch, retrying on transient network errors.
@@ -28,7 +34,7 @@ async function fetchWithRetry(url, options, maxRetries = 3) {
     const requestOpts = {
         ...options,
         compress: false,
-        agent: noKeepAliveAgent,
+        agent: selectAgent,
     };
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
         try {

@@ -803,6 +803,10 @@ pub async fn init() -> Result<(), anyhow::Error> {
             log::error!("Failed to start anomaly detection scheduler: {e}");
         }
     }
+    #[cfg(feature = "enterprise")]
+    if LOCAL_NODE.is_alert_manager() {
+        o2_enterprise::enterprise::synthetics::init().await;
+    }
     tokio::task::spawn(metrics::run());
     let _ = promql::run();
     tokio::task::spawn(alert_manager::run());

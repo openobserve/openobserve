@@ -835,7 +835,11 @@
     "pipeline": "Pijpleidingen",
     "language": "taal",
     "actions": "Acties",
-    "keyboardShortcuts": "Sneltoetsen"
+    "keyboardShortcuts": "Sneltoetsen",
+    "incidents": "Incidenten",
+    "evals": "Evalen",
+    "aiObservability": "AI-waarneembaarheid",
+    "synthetic": "Synthetisch"
   },
   "rum": {
     "title": "Monitoring van echte gebruikers",
@@ -6551,6 +6555,70 @@
       "rumErrorsRefresh": "Lijst verversen",
       "rumSessionsRefresh": "Lijst verversen",
       "sourceMapsRefresh": "Lijst verversen"
+    }
+  },
+  "synthetics": {
+    "scheduleAlert": {
+      "title": "Schema en waarschuwingen",
+      "frequency": "Frequentie",
+      "frequencyOptions": {
+        "1min": "1 minuut",
+        "5min": "5 minuten",
+        "15min": "15 minuten",
+        "30min": "30 minuten",
+        "1hour": "1 uur",
+        "cron": "Cron"
+      },
+      "scheduleNow": "Nu plannen",
+      "scheduleLater": "Later plannen",
+      "scheduleNowTooltip": "De controle wordt onmiddellijk actief op basis van de huidige datum en tijdzone.",
+      "scheduleLaterTooltip": "Kies een toekomstige datum en tijd om de cheque te activeren.",
+      "startDate": "Startdatum",
+      "startTime": "Starttijd",
+      "timezone": "Tijdzone",
+      "cronExpression": "Cron-expressie",
+      "cronPlaceholder": "*/5 * * * *",
+      "retries": "Probeert opnieuw",
+      "retriesOnFailure": "Probeert opnieuw bij mislukking",
+      "retriesOnFailureSuffix": "keer.",
+      "retryDelay": "Wacht tot",
+      "retryDelaySuffix": "Ik zit tussen de nieuwe pogingen.",
+      "alert": "Waarschuwing",
+      "alertedIfFails": "Wordt gewaarschuwd als de test mislukt",
+      "alertedIfFailsSuffix": "keer.",
+      "destinations": "Bestemmingen",
+      "noDestinations": "Geen bestemmingen beschikbaar",
+      "refreshDestinations": "Bestemmingen vernieuwen",
+      "addNewDestination": "Nieuwe bestemming toevoegen",
+      "destinationRequired": "Er is minstens één bestemming vereist",
+      "cooldownPeriod": "Afkoelperiode",
+      "minutes": "minuten"
+    },
+    "locations": {
+      "title": "Locaties",
+      "locationAwsEast": "AWS · oost-amerikaan-1",
+      "comingSoon": "Meer regio's en privélocaties — Binnenkort beschikbaar"
+    },
+    "results": {
+      "title": "Resultaten monitoren",
+      "monitors": "Monitoren",
+      "editMonitor": "Monitor bewerken",
+      "uptime": "Uptime",
+      "p95Duration": "P95 Duur",
+      "failedRuns": "Mislukte runs",
+      "lastRun": "Laatste run",
+      "responseTime": "Reactietijd",
+      "responseTimeSubtitle": "Totale reisduur",
+      "recentRuns": "Recente hardloopsessies",
+      "runs": "Loopt",
+      "noRuns": "Er zijn geen runs gevonden voor de geselecteerde periode.",
+      "status": "Status",
+      "started": "Gestart",
+      "duration": "Duur",
+      "location": "Locatie",
+      "trigger": "Trigger",
+      "passed": "Geslaagd",
+      "failed": "Mislukt"
     }
   }
 }

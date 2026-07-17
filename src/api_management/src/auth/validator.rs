@@ -260,6 +260,43 @@ pub async fn validate_credentials(
         path_columns.pop();
     }
 
+    // Synthetics probe job + agent APIs — no org_id in path. Look up exclusively
+    // in synthetics_probe_tokens (o2syn_ prefix). Separate table from o2oi_
+    // ingest tokens.
+    let is_synthetics_job_path = path_columns.first() == Some(&"synthetics")
+        && matches!(path_columns.get(1), Some(&"jobs") | Some(&"agent"));
+    if is_synthetics_job_path
+        && user_password
+            .starts_with(infra::table::synthetics_probe_tokens::SYNTHETICS_PROBE_TOKEN_PREFIX)
+    {
+        match infra::table::synthetics_probe_tokens::find_global(user_password).await {
+            Ok(Some(_)) => {
+                return Ok(TokenValidationResponse {
+                    is_valid: true,
+                    user_email: user_id.to_string(),
+                    is_internal_user: true,
+                    user_role: None,
+                    user_name: "synthetics-probe".to_string(),
+                    family_name: "".to_string(),
+                    given_name: "synthetics-probe".to_string(),
+                });
+            }
+            Ok(None) => {
+                return Ok(TokenValidationResponse {
+                    is_valid: false,
+                    ..Default::default()
+                });
+            }
+            Err(e) => {
+                log::error!("[synthetics] error validating probe token: {e}");
+                return Ok(TokenValidationResponse {
+                    is_valid: false,
+                    ..Default::default()
+                });
+            }
+        }
+    }
+
     // Decide whether an org ingestion token (`o2oi_`) may be used on this
     // request. GHSA-wffq-g8qf-ccmv: the previous check accepted the token
     // whenever an ingestion word appeared *anywhere* in the path for *any*
@@ -740,12 +777,17 @@ async fn check_and_create_org(user_id: &str, method: &Method, path: &str) -> Res
     if path_columns[0].eq("node") || path_columns[0].eq("profile") {
         return Ok(());
     }
+    // Synthetics probe job API has no org_id in path — skip org check.
+    if path_columns[0].eq("synthetics") && path_columns.get(1) == Some(&"jobs") {
+        return Ok(());
+    }
     // Hack for v2 apis
     let org_id = if path_columns.len() > 2
         && path_columns[0].eq("v2")
         && (path_columns[2].eq("alerts")
             || path_columns[2].eq("folders")
-            || path_columns[2].eq("reports"))
+            || path_columns[2].eq("reports")
+            || path_columns[2].eq("synthetics"))
     {
         path_columns[1]
     } else {
