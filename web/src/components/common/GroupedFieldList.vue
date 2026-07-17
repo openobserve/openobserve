@@ -5,6 +5,7 @@
     ref="ofieldListRef"
     :fields="visibleFields"
     :search="search"
+    :search-class="searchClass"
     :search-placeholder="t('search.searchField')"
     :current-page="currentPage"
     :page-size="pageSize"
@@ -84,6 +85,8 @@ const { t } = useI18n();
 interface Props {
   fields: any[];
   search?: string;
+  /** Passed to OFieldList so the owning panel can inset the search control. */
+  searchClass?: string;
   loading?: boolean;
   theme?: string;
   currentPage?: number;
@@ -93,6 +96,7 @@ interface Props {
 
 const props = withDefaults(defineProps<Props>(), {
   search: "",
+  searchClass: "",
   loading: false,
   theme: "light",
   currentPage: 1,

@@ -16,10 +16,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="flex flex-col logs-index-menu w-full pr-[0.375rem]! h-full bg-surface-panel!"
+    class="flex flex-col logs-index-menu w-full h-full bg-surface-panel!"
   >
+    <!-- Stream type + stream selector. Pads its own right edge to match the
+         panel's 10px left inset: these are controls, so they sit inside the
+         gutter — as does the field search below it (via GroupedFieldList's
+         search-class). The scrolling list itself deliberately does NOT: it runs
+         flush to the divider so its scrollbar lands on the panel edge. -->
     <div
-      class="flex items-center gap-1"
+      class="flex items-center gap-1 pr-[0.625rem]"
       style="max-width: 100%; overflow: hidden"
     >
       <OButton
@@ -112,6 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         ref="fieldListRef"
         :fields="streamFieldsRows"
         :search="searchObj.data.stream.filterField"
+        search-class="pr-[0.625rem]"
         :loading="searchObj.loadingStream"
         :theme="store.state.theme"
         :show-pagination="true"

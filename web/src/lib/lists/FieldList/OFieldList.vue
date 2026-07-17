@@ -7,8 +7,12 @@
       <slot name="before-list" />
     </div>
 
-    <!-- Search input -->
-    <div v-if="showSearch" class="shrink-0 py-1.5">
+    <!-- Search input. `searchClass` lets the owning panel pull this control
+         inside its gutter while the scrolling body below stays flush to the
+         panel edge (so the scrollbar lands on the edge, not floating off it).
+         The gutter is the panel's concern, not the list's, so the value comes
+         from the consumer rather than being baked in here. -->
+    <div v-if="showSearch" class="shrink-0 py-1.5" :class="searchClass">
       <OInput
         :model-value="searchModel"
         data-test="o-field-list-search"
@@ -133,6 +137,8 @@ const props = withDefaults(
     fields: FieldItem[];
     search?: string;
     searchPlaceholder?: string;
+    /** Extra classes for the search block — see the template note on gutters. */
+    searchClass?: string;
     loading?: boolean;
     currentPage?: number;
     pageSize?: number;
@@ -148,6 +154,7 @@ const props = withDefaults(
   {
     search: "",
     searchPlaceholder: "Search fields",
+    searchClass: "",
     loading: false,
     currentPage: 1,
     pageSize: 50,

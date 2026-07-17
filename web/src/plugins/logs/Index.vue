@@ -76,7 +76,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @update:model-value="onSplitterUpdate"
             >
               <template #before>
-                <div class="relative-position h-full pl-[0.625rem] pt-2 border-r border-border-default bg-surface-panel">
+                <!-- 10px on top/left (matching the search bar's 4+6 above it).
+                     No right/bottom gutter here: the field list runs into the
+                     divider so its scrollbar sits on the panel edge, and scrolls
+                     into the panel foot. The stream selector is the exception and
+                     pads its own right edge (see IndexList) — it's a control, not
+                     a scrolling surface. -->
+                <div class="relative-position h-full pt-[0.625rem] pl-[0.625rem] border-r border-border-default bg-surface-panel">
                   <index-list
                     v-if="searchObj.meta.showFields"
                     data-test="logs-search-index-list"
