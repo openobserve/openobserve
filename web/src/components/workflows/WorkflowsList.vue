@@ -50,13 +50,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </span>
           </template>
           <template #actions>
-            <!-- v1: only the Alert Fired trigger exists, so Add Workflow goes
+            <!-- v1: only the Alert Fired trigger exists, so New Workflow goes
                  straight to the editor (which pre-places the Alert Trigger). -->
             <OButton
               data-test="workflow-list-add-btn"
               variant="primary"
               size="sm"
-              icon-left="add"
               @click="openCreateEditor()"
             >
               {{ t("workflow.create") }}
@@ -376,7 +375,7 @@ const getWorkflows = async () => {
 };
 
 // --- navigation --------------------------------------------------------------
-// Add Workflow -> editor with the chosen trigger seeded (PipelineEditor-style,
+// New Workflow -> editor with the chosen trigger seeded (PipelineEditor-style,
 // no dialog). The editor's seedTrigger reads `?trigger`. The workflow is created
 // on Save.
 const openCreateEditor = (trigger = "alert_fired") => {

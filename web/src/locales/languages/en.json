@@ -1782,7 +1782,7 @@
   "workflow": {
     "header": "Workflows",
     "subtitle": "Automate Actions With Triggers, Logic, And Destinations",
-    "create": "Add Workflow",
+    "create": "New Workflow",
     "createTitle": "Create Workflow",
     "createConfirm": "Create",
     "createSuccess": "Workflow Created Successfully",

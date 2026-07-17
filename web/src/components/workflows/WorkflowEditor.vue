@@ -236,13 +236,15 @@ const { t } = useI18n();
 const router = useRouter();
 const store = useStore();
 
-// On edit the saved name is the title; on create it's the module name (the name
-// is typed in the title-trail input instead). Shared by the `title` prop (which
-// feeds the h1's tooltip) and the `#title` slot that renders it next to the Beta tag.
+// On edit the saved name is the title; on create it's "New Workflow" — the same
+// label as the list's create button, mirroring how the pipeline editor's create
+// route reuses `pipeline.addPipeline` for its crumb (the name itself is typed in
+// the title-trail input). Shared by the `title` prop (which feeds the h1's
+// tooltip) and the `#title` slot that renders it next to the Beta tag.
 const headerTitle = computed(() =>
   workflowObj.isEditWorkflow
     ? workflowObj.currentSelectedWorkflow.name || t("workflow.header")
-    : t("workflow.header"),
+    : t("workflow.create"),
 );
 const {
   resetWorkflowData,

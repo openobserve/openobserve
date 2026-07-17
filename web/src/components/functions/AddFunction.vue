@@ -110,6 +110,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       />
                       <div
                         v-if="expandState.functionError"
+                        data-test="function-error-details"
                         class="px-2 pb-2 border-l-4 border-red-500"
                         :class="
                           store.state.theme === 'dark'
