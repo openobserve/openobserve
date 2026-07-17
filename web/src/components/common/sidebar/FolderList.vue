@@ -64,7 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-if="tab.folderId === FAVORITES_FOLDER_ID"
                 name="favorite"
                 size="xs"
-                class="shrink-0"
+                class="shrink-0 text-favorite"
               />
               <span class="folder-name flex-1 min-w-0 text-left truncate" :title="tab.name" :data-test="`dashboard-folder-name-${tab.name}`">{{
               tab.name
