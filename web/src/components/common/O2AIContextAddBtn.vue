@@ -11,10 +11,43 @@
         :style="props.style"
         >
         <div class="flex items-center flex-nowrap">
-            <img :height="props.imageHeight" :width="props.imageWidth" :src="getBtnLogo" class="header-icon ai-icon [transition:transform_0.6s_ease,filter_0.6s_ease] group-hover:brightness-0 group-hover:invert group-hover:rotate-180" />
+            <img :height="props.imageHeight" :width="props.imageWidth" :src="getBtnLogo" class="header-icon ai-icon [transition:transform_0.6s_ease] group-hover:brightness-0 group-hover:invert group-hover:rotate-180" />
         </div>
     </OButton>
 </template>
+
+<style scoped>
+/* keep(lib-override:o2-button): `.ai-btn` is this component's row-button modifier — it is
+   passed in through `props.class` by plugins/logs/TenstackTable.vue and
+   components/TenstackTable.vue, and every element it styles (the OButton root and
+   the <img class="ai-icon"> above) is rendered HERE, so this is the owning scope.
+   Migrated from styles/utilities.css (W2.b), where it had been parked as
+   "cross-file" because two call sites apply it.
+   Why the !important: OButton's own base `relative` outranks the positioning
+   passed via props. `translate` (not `transform`) is the property to override —
+   Tailwind v4 emits -translate-y-1/2 through the CSS `translate` shorthand. */
+.ai-btn {
+  position: absolute !important;
+  top: 50% !important;
+  right: 0.875rem !important;
+  translate: -50% -50% !important;
+  height: 0.875rem !important;
+  min-height: 0 !important;
+  width: 0.9rem !important;
+  min-width: 0 !important;
+  border-radius: 0.25rem !important;
+}
+
+.ai-btn img.ai-icon {
+  width: 0.75rem !important;
+  height: 0.75rem !important;
+}
+
+/* Suppress the hover box-shadow — it visually bleeds outside the row boundary */
+.ai-btn:hover {
+  box-shadow: none !important;
+}
+</style>
 
 <script setup lang="ts">
 import { getImageURL } from '@/utils/zincutils';

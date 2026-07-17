@@ -33,6 +33,17 @@
   color: #9ca3af;
 
 }
+/* Migrated from styles/utilities.css (W2.b). `.log-key`/`.log-separator` reach the
+   DOM through composables/useLogsHighlighter.ts v-html strings as well as
+   components/JsonPreview.vue + plugins/logs/JsonPreview.vue spans, so no component
+   scope spans every producer — this generated-content stylesheet is their home.
+   The utilities.css copies of the light `color:` declarations were dead: this file
+   is imported AFTER styles/tailwind.css in main.ts, so these rules already won.
+   Only these two declarations were live there. */
+.log-key,
+.log-separator {
+  font-weight: normal;
+}
 .log-object-brace {
   color: #9ca3af;
 
@@ -92,6 +103,12 @@
 .dark .log-string {
   color: #6EE7B7; /* Soft mint green */
 
+}
+/* Migrated from styles/utilities.css (W2.b) — the only dark syntax colour that
+   had no counterpart here. The `.dark .log-key` copy in utilities.css was an
+   exact duplicate of the rule above and was dropped. */
+.dark .log-separator {
+  color: #999;
 }
 .dark .log-number {
   color: #60A5FA; /* Light blue for numbers */

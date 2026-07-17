@@ -11,8 +11,12 @@
             data-test="search-history-wrap-content-btn"
             variant="ghost"
             size="icon"
-            class="wrap-content-btn"
-            :class="{ 'wrap-content-btn--active': wrapText }"
+            class="h-6! min-h-6! w-[1.45rem]! p-0! m-0 border-[0.0626rem]! border-solid! border-card-glass-border! rounded-sm! [transition:all_0.2s_ease] backdrop-blur-[0.625rem]! flex! items-center! justify-center!"
+            :class="
+              wrapText
+                ? 'bg-theme-accent! text-white hover:opacity-85'
+                : 'bg-white/10! hover:bg-white/15!'
+            "
             @click="wrapText = !wrapText"
           >
             <OIcon name="wrap-text" size="sm" />
@@ -96,7 +100,7 @@
                 />
               </div>
               <div v-show="activeTab === 'query'">
-                <div class="text-left px-2 mb-2 expanded-content">
+                <div class="text-left mb-2 px-4 py-0 w-[calc(95vw-2.5rem)] min-w-[calc(90vw-1.25rem)] max-h-screen overflow-hidden">
                   <div class="flex items-center py-2 gap-2">
                     <strong
                       >SQL Query :
@@ -147,7 +151,7 @@
                 </div>
                 <div
                   v-if="row?.function"
-                  class="text-left mb-2 px-2 expanded-content"
+                  class="text-left mb-2 px-4 py-0 w-[calc(95vw-2.5rem)] min-w-[calc(90vw-1.25rem)] max-h-screen overflow-hidden"
                 >
                   <div class="flex items-center py-2">
                     <strong

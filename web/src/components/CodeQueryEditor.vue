@@ -1224,6 +1224,19 @@ export default defineComponent({
   --vscode-focusBorder: transparent !important;
 }
 
+/* Migrated from styles/utilities.css (W2.b). This file is the only place
+   `.logs-query-editor` is applied, so the safety net documented in
+   lib/styles/tokens/component.css can live here: neutralise monaco's stray focus
+   outline / focus-border on the mount, the real inner editor, the overflow guard
+   and the hidden focus textarea. The last three are monaco-generated DOM. */
+.logs-query-editor,
+.logs-query-editor :deep(.monaco-editor),
+.logs-query-editor :deep(.overflow-guard),
+.logs-query-editor :deep(.inputarea) {
+  outline: none !important;
+  --vscode-focusBorder: transparent !important;
+}
+
 .logs-query-editor :deep(.monaco-editor .editor-widget .suggest-widget),
 .logs-query-editor :deep(.monaco-editor .monaco-editor .editor-widget .suggest-widget) {
   z-index: 9999;

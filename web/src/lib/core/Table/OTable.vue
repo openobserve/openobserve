@@ -1203,6 +1203,15 @@ defineExpose({
   border-bottom: 1px solid var(--color-card-glass-border) !important;
 }
 
+/* keep(lib-override:o2-table-hide-header): public modifier, same shape as the
+   block above — `thead` is this component's own render, and the class is passed
+   in by components/queries/QueryList.vue and plugins/logs/SearchBar.vue (x2).
+   Migrated here from styles/utilities.css (W2.b); it had been duplicated
+   identically in both of those files before W2.a hoisted it. */
+.o2-table-hide-header :deep(thead) {
+  display: none;
+}
+
 .o2-table-header-sticky :deep(thead) {
   position: sticky;
   top: 0;

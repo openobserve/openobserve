@@ -467,7 +467,7 @@ class="mr-1" />
                   class="absolute right-0 top-1/2 -translate-y-1/2 invisible"
                 >
                   <O2AIContextAddBtn
-                    class="right-0 ai-btn"
+                    class="ai-btn"
                     @send-to-ai-chat="sendToAiChat(JSON.stringify(cell.row.original), true)"
                     :size="'2px'"
                   />

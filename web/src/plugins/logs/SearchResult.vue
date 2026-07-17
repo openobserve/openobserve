@@ -27,11 +27,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     "
   >
     <div
-      class="search-list full-height w-full flex flex-col"
+      class="full-height w-full flex flex-col"
       ref="searchListContainer"
     >
       <!-- Section header: static at top -->
-      <div class="flex items-center h-[2.25rem] shrink-0 result-bar bg-surface-panel">
+      <div class="flex items-center h-[2.25rem] shrink-0 border-b border-card-glass-border bg-card-glass-bg">
         <!-- Field panel toggle — same style as add-panel config sidebar -->
         <OButton
           variant="outline"
@@ -110,7 +110,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span v-else class="truncate min-w-0">{{ patternSummaryText }}</span>
           </template>
           <span v-if="searchObj.loadingCounter" class="shrink-0">
-            <OSpinner size="xs" class="search-spinner" />
+            <OSpinner size="xs" class="mx-auto block" />
           </span>
           <div
             v-else-if="
@@ -130,7 +130,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
 
-        <div class="flex-none pr-2 pagination-block flex items-center justify-end gap-1">
+        <div class="flex-none pr-2 flex items-center justify-end gap-1">
           <!-- OVERFLOW MENU (narrow): refresh + all action buttons collapse here -->
           <ODropdown v-if="shouldMoveActionsToMenu" side="bottom" align="end">
             <template #trigger>
@@ -503,8 +503,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               !searchObj.meta.showHistogram ||
               (searchObj.meta.showHistogram &&
                 searchObj.data.histogram.errorCode == -1)
-                ? 'table-container--without-histogram'
-                : 'table-container--with-histogram',
+                ? 'min-h-full!'
+                : 'min-h-[calc(100%-6.25rem)]!',
             ]"
             @update:columnSizes="handleColumnSizesUpdate"
             @update:columnOrder="handleColumnOrderUpdate"
@@ -528,8 +528,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             !searchObj.meta.showHistogram ||
             (searchObj.meta.showHistogram &&
               searchObj.data.histogram.errorCode == -1)
-              ? 'table-container--without-histogram'
-              : 'table-container--with-histogram',
+              ? 'min-h-full!'
+              : 'min-h-[calc(100%-6.25rem)]!',
           ]"
         >
           <!-- Patterns List -->
@@ -576,7 +576,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :correlation-loading="correlationLoading"
           :correlation-error="correlationError"
           :initial-tab="detailTableInitialTab"
-          class="detail-table-dialog"
+          class="rounded-lg"
           :currentIndex="searchObj.meta.resultGrid.navigation.currentRowIndex"
           :totalLength="parseInt(searchObj.data.queryResults.hits.length)"
           :highlight-query="searchObj.data.highlightQuery"

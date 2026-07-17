@@ -96,21 +96,55 @@
    consumer check incl. dynamic-construction patterns. The W2 ladder
    (template utilities / colocation / component extraction) processes this
    section batch by batch with visual checks. ── */
+
+/* ── W2.b — this section is now DONE except for the four KEEPs argued inline
+   below ([data-variant="primary"], .logs-index-menu, .histogram-unavailable-text*,
+   .rp-selector*) and the two with their own waves (.card-container, .full-height).
+   Deleted as DEAD after a two-pass check (find-class-consumers + loose grep +
+   reading every hit): .search-list (both defs — fully subsumed by the .full-height
+   + w-full already on its one consumer), .table-container's base rule (its
+   border-radius lost to `rounded-none!` in one TenstackTable and tied `rounded-lg`
+   in the other; the class name survives only as a :deep() hook for 3 files), both
+   .report-list-tabs inner blocks (.rum-tabs/.rum-tab have zero live DOM),
+   .logs-json-preview-tabs' inner blocks (.o2-tab/.active do not exist — AppTabs
+   renders OToggleGroup), .search-list's .chart/.my-sticky-header-table subtrees,
+   .pagination-block (its one declaration was already in the consumer's own
+   .select-pagination rule), and the .log-key/.log-separator light colours (dead
+   since assets/styles/log-highlighting.css is imported AFTER tailwind.css in
+   main.ts and redeclares them).
+   Colocated: .visualize-container/.build-container/.search-history-empty →
+   template utilities in plugins/logs/Index.vue · .logs-saved-view-icon,
+   .table-container's modifiers, .result-bar, .search-spinner, .detail-table-dialog
+   → plugins/logs/SearchResult.vue + SearchBar.vue templates · .table-pre,
+   .log_json_content, .log-json-field-dropdown-btn, .syntax-section,
+   .expanded-content → templates of their owners · .logs-query-editor →
+   components/CodeQueryEditor.vue (its only consumer) · .context-menu(+twins) →
+   plugins/logs/JsonPreview.vue template, twins collapsed onto flipping tokens ·
+   .ai-icon/.navbar-links/button.date-time-button/.wrap-content-btn/
+   .dark .syntax-guide-in-toolbar → template utilities on their owners ·
+   .log-key/.log-separator font-weight + .dark .log-separator →
+   assets/styles/log-highlighting.css, the sanctioned generated-content home.
+   From the W2.a cross-file tail: .o2-table-hide-header → lib/core/Table/OTable.vue,
+   .field-list-separator → lib/core/Splitter/OSplitter.vue, .ai-btn →
+   common/O2AIContextAddBtn.vue (all three were modifier APIs of the component
+   that renders the DOM), .date-time-table .relative-row → `[&>*]:mr-1.5` on all
+   six rows in the three date pickers. ── */
+
+/* ── [data-variant="primary"] : KEPT. This is the LIGHT half of a token-override
+   pair whose DARK half — `.dark [data-variant="primary"]` — lives in the
+   READ-ONLY lib/styles/tokens/dark.css (line ~586). The attribute is emitted by
+   lib/core/ToggleGroup/OToggleGroup.vue on both the group and its items, so the
+   obvious destination is that component — but scoping it there rewrites the
+   selector to `[data-variant="primary"][data-v-…]` (0,2,0) and SFC styles inject
+   after the token sheets, so the light half would start OUTRANKING the dark half
+   and primary toggle groups would lose dark mode entirely. It cannot move until
+   the dark twin can move with it, and that file is out of bounds. ── */
 [data-variant="primary"] {
   --color-toggle-track-bg: var(--color-primary-200);
   --color-toggle-border: var(--color-primary-300);
   --color-toggle-item-hover-bg: var(--color-primary-100);
   --color-toggle-item-active-bg: var(--color-surface-base);
   --color-toggle-item-active-text: var(--color-primary-700);
-}
-
-.ai-icon {
-  transition: transform 0.6s ease;
-}
-
-:root.dark .navbar-links,
-.dark .navbar-links {
-  --color-tabs-inactive-text: var(--color-text-secondary);
 }
 
 .full-height {
@@ -122,48 +156,19 @@
   overflow: hidden !important;
 }
 
-.visualize-container {
-  height: 100%;
-}
-
-.build-container {
-  height: 100%;
-  overflow: hidden;
-}
-
-.search-history-empty {
-  height: 12.5rem;
-  border-radius: 0.5rem;
-
-  &__content {
-    height: 80vh;
-    border-radius: 0.5rem;
-  }
-
-  &__icon {
-    font-size: 6.25rem;
-    opacity: 0.1;
-  }
-
-  &__title {
-    opacity: 0.8;
-  }
-
-  &__info {
-    opacity: 0.8;
-  }
-}
-
-.logs-saved-view-icon:hover {
-  color: var(--color-text-primary) !important;
-  background-color: var(--color-interactive-hover-bg) !important;
-}
-
-/* -- .logs-index-menu : KEPT (trimmed). Genuinely cross-component: the
-   `.logs-index-menu` ancestor is applied by plugins/logs/IndexList.vue while the
-   `.index-table` tbody/tr/td it styles are OTable DOM rendered by
-   common/sidebar/SearchFieldList.vue two components down, so no single scope
-   spans both ends. The other ~130 lines of this block were deleted as dead after
+/* -- .logs-index-menu : KEPT (trimmed). Re-examined in W2.b for an OTable hook
+   that would let this live in an owning component; there is none, and the fan-out
+   is worse than first recorded. `.logs-index-menu` is applied by
+   plugins/logs/IndexList.vue (line 19), but `.index-table` — the descendant this
+   rule qualifies — is produced by THREE different components underneath it:
+   IndexList.vue's own divs (lines 65, 110), and common/sidebar/SearchFieldList.vue,
+   which carries `index-table` AND `logs-index-menu` together on its root (line 5)
+   so it matches as a descendant of IndexList's ancestor. The tbody/tr/td being
+   styled are then OTable's internal render, and `.schema-field-toggle` is a fourth
+   component's DOM (common/FieldListPagination.vue) that must stay qualified by the
+   ancestor — it is used outside this tree too. No single scope reaches all four,
+   and OTable exposes no modifier hook that would carry the ancestor condition
+   with it. The other ~130 lines of this block were deleted as dead after
    a full-corpus check: .field_list (and its .field_label/.field-container/
    .field_overlay/.field_icons subtree), .field-table (+ .field-list-pagination,
    .pagination-nav-btn, .pagination-page-btn, .field-list-reset, .reset-icon),
@@ -198,35 +203,16 @@
   }
 }
 
-.table-container {
-  border-radius: 0.5rem;
-  overflow: auto !important;
-
-  &--with-histogram {
-    min-height: calc(100% - 6.25rem) !important;
-  }
-
-  &--without-histogram {
-    min-height: 100% !important;
-  }
-}
-
-.search-spinner {
-  margin: 0 auto;
-  display: block;
-}
-
-.detail-table-dialog {
-  border-radius: 0.5rem;
-}
-
-.search-list {
-  padding: 0 !important;
-  margin: 0 !important;
-  height: 100%;
-  overflow: hidden !important;
-}
-
+/* ── .histogram-unavailable-text / -light : KEPT. Sole consumer is
+   plugins/logs/SearchResult.vue, which picks between them with an isDark ternary
+   — so this is exactly the dark/light twin the migration wants collapsed onto one
+   flipping token. It cannot be: both values are oranges (the dark one is the same
+   value as --color-note-light-border, the light one has no token at all) and NO
+   registered --color-* matches. --color-warning-400/500/600 are yellows
+   (#eab308 family), so pointing at them recolours a user-visible warning. The
+   correct fix is to register a new semantic --color-* for "metric unavailable",
+   and lib/styles/tokens/* is read-only in this wave. Needs a token decision, not
+   a colocation. ── */
 .histogram-unavailable-text {
   color: #f5a623;
 }
@@ -235,125 +221,19 @@
   color: #ff8800;
 }
 
-.logs-json-preview-tabs {
-  height: fit-content;
-  overflow: hidden;
-  border: none;
-  border-top: 1px solid var(--color-card-glass-border);
-  border-left: 1px solid var(--color-card-glass-border);
-  border-right: 1px solid var(--color-card-glass-border);
-
-  .o2-tab {
-    width: fit-content !important;
-    padding: 0.25rem 0.5rem !important;
-    font-size: 12px !important;
-    border-bottom: 3px solid var(--color-card-glass-border) !important;
-  }
-
-  .active {
-    border-bottom: 3px solid var(--color-button-primary) !important;
-  }
-}
-
-.context-menu {
-  min-width: 200px;
-  padding: 4px 0;
-  font-size: 13px;
-
-  .context-menu-item {
-    padding: 6px 12px;
-    display: flex;
-    align-items: center;
-    cursor: pointer;
-    transition: background-color 0.2s;
-  }
-}
-
-.context-menu-dark {
-  background-color: #1a1a1a;
-  border: 1px solid #4a5568;
-
-  .context-menu-item {
-    color: #e2e8f0;
-
-    &:hover {
-      background-color: #4a5568;
-    }
-  }
-}
-
-.context-menu-light {
-  background-color: #ffffff;
-  border: 1px solid #e2e8f0;
-
-  .context-menu-item {
-    &:hover {
-      background-color: #f3f4f6;
-    }
-  }
-}
-
-.table-pre {
-  word-wrap: break-word;
-  display: inline;
-  font-weight: normal;
-  font-family: monospace;
-  margin: 0;
-  padding: 0;
-}
-
-.logs-query-editor,
-.logs-query-editor .monaco-editor,
-.logs-query-editor .overflow-guard,
-.logs-query-editor .inputarea {
-  outline: none !important;
-  --vscode-focusBorder: transparent !important;
-}
-
-.log_json_content {
-  white-space: pre-wrap;
-  font-family: monospace;
-  font-size: 12px;
-}
-
-.log-json-field-dropdown-btn {
-  height: 20px !important;
-  width: 20px !important;
-  min-height: 20px !important;
-  min-width: 20px !important;
-  padding: 0 !important;
-  vertical-align: middle;
-}
-
-.log-key {
-  color: #b71c1c;
-  font-weight: normal;
-}
-
-.dark .log-key {
-  color: #f67a7aff;
-}
-
-.log-separator {
-  color: #666;
-  font-weight: normal;
-}
-
-.dark .log-separator {
-  color: #999;
-}
-
-.expanded-content {
-  padding: 0 0.5rem 0rem 1rem;
-  width: calc(95vw - 40px);
-  max-height: 100vh;
-  overflow: hidden;
-}
-
-button.date-time-button {
-  height: 36px !important;
-}
-
+/* ── .rp-selector / -selected : KEPT. The relative-period chips ("Past 15m" grid)
+   documented in lib/styles/tokens/component.css. Three SIBLING components —
+   components/DateTime.vue, components/DateTimePicker.vue and
+   components/CustomDateTimePicker.vue — each author their own copy of the chip
+   grid and put the class on their own ghost OButton, so there is no single owner
+   to colocate into and no modifier API: it is one appearance duplicated across
+   three files. §3.1 says that shape becomes a component (an ORelativePeriodChip),
+   which is a bigger refactor than a colocation and needs the three grids
+   reconciled first (two of them also append a `${relativePeriod}` marker class).
+   Blocking detail for the template-utility route: the grey fill is a neutral 7%
+   black scrim with NO registered --color-* equivalent (--color-interactive-hover-bg
+   is accent-tinted, not neutral), so inlining it would copy a raw colour into
+   three more files instead of one. ── */
 .rp-selector,
 .rp-selector-selected {
   height: 32px;
@@ -373,127 +253,21 @@ button.date-time-button {
   background: var(--color-button-primary);
 }
 
-.wrap-content-btn {
-  height: 1.5rem !important;
-  min-height: 1.5rem !important;
-  width: 1.45rem !important;
-  padding: 0 !important;
-  border: 0.0626rem solid var(--color-card-glass-border) !important;
-  border-radius: 0.25rem !important;
-  transition: all 0.2s ease;
-  margin: 0;
-  background: rgba(255, 255, 255, 0.1) !important;
-  backdrop-filter: blur(10px) !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-
-  &:hover {
-    background: rgba(255, 255, 255, 0.15) !important;
-  }
-}
-
-.wrap-content-btn--active {
-  background: var(--color-theme-accent) !important;
-  color: white;
-}
-
-.wrap-content-btn--active:hover {
-  background: var(--color-theme-accent) !important;
-  opacity: 0.85;
-}
-
-.report-list-tabs {
-  height: fit-content;
-
-  .rum-tabs {
-    border: 1px solid #464646;
-  }
-
-  .rum-tab {
-    &:hover {
-      background: #464646;
-    }
-
-    &.active {
-      background: #5960b2;
-      color: #ffffff !important;
-    }
-  }
-}
-
-.report-list-tabs {
-  padding: 0 1rem;
-  height: fit-content;
-  width: fit-content;
-
-  .rum-tabs {
-    border: 1px solid #eaeaea;
-    height: fit-content;
-    border-radius: 4px;
-    overflow: hidden;
-  }
-
-  .rum-tab {
-    width: fit-content !important;
-    padding: 4px 12px !important;
-    border: none !important;
-
-    &:hover {
-      background: #eaeaea;
-    }
-
-    &.active {
-      background: #5960b2;
-      color: #ffffff !important;
-    }
-  }
-}
-
-.result-bar {
-  border-bottom: 1px solid var(--color-card-glass-border);
-  background: var(--color-card-glass-bg);
-}
-
-.pagination-block {
-  .select-pagination {
-    position: relative;
-  }
-}
-
-.search-list {
-  width: 100%;
-  height: 100%;
-  padding: 0 !important;
-  margin: 0 !important;
-  box-sizing: border-box !important;
-  overflow: hidden !important;
-
-  .chart {
-    width: 100%;
-    border-bottom: 1px solid rgba(0, 0, 0, 0.12);
-  }
-
-  .my-sticky-header-table {
-    thead tr th {
-      background-color: white;
-      position: sticky;
-      z-index: 1;
-    }
-
-    thead tr:first-child th {
-      top: 0;
-    }
-  }
-}
-
-.expanded-content {
-  padding: 0 1rem;
-  min-width: calc(90vw - 20px);
-  max-height: 100vh;
-  overflow: hidden;
-}
-
+/* ── .scrollable-content / .copy-btn-sql / .copy-btn-function / .expanded-sql /
+   .expanded-function : KEPT as a group — all five are the expanded-row detail
+   panel shared verbatim by plugins/logs/SearchSchedulersList.vue and
+   plugins/logs/SearchHistory.vue (2 files, each applying them to its own DOM).
+   Colocation is blocked on the same thing for every one of them: their entire
+   body is raw colour with NO registered --color-* equivalent — a purple that
+   means "SQL" and a blue that means "function" (semantic accents this token set
+   has never had), plus .scrollable-content's light-only grey panel, which has no
+   dark twin at all and renders a light box in dark mode today. This wave forbids
+   hex in both destinations (template arbitrary values AND scoped <style>), and
+   lib/styles/tokens/* is read-only here, so there is nowhere legal to put them.
+   They need ~4 new semantic tokens registered first — and .scrollable-content
+   needs its missing dark treatment decided — then this block colocates into the
+   two files (or, better, the repeated expansion markup becomes one component).
+   Deliberately parked, not overlooked. ── */
 .scrollable-content {
   width: 100%;
   overflow-y: auto;
@@ -524,14 +298,6 @@ button.date-time-button {
   border-left: #0a7ebc 3px solid;
 }
 
-.dark .syntax-guide-in-toolbar {
-  border: 0.0625rem solid var(--color-card-glass-border) !important;
-}
-
-.syntax-section {
-  margin-bottom: 5px;
-}
-
 /* ════════════════════════════════════════════════════════════════════════
    W2.a — GENUINELY CROSS-FILE RULES EVACUATED FROM UNSCOPED .vue BLOCKS.
    Each rule below was defined in a component-local UNSCOPED <style> block
@@ -551,19 +317,18 @@ button.date-time-button {
   display: none;
 }
 
-/* ── .o2-table-hide-header : owner components/queries/QueryList.vue.
-   Public OTable modifier — `thead` is OTable's internal DOM, and the modifier is
-   applied by QueryList.vue and plugins/logs/SearchBar.vue (x2). Was defined
-   identically in both files; this is the single definition. ── */
-.o2-table-hide-header thead {
-  display: none;
-}
-
-/* ── .regex-pattern-input / .regex-test-string-input : owner
-   components/settings/AddRegexPattern.vue. The selectors reach through OInput's
-   internal wrapper DOM down to its <textarea>, and logstream/AssociatedRegexPatterns.vue
-   applies both classes to its own OInputs and relies on these rules for the
-   textarea height/padding and the squared-off top corners. ── */
+/* ── .regex-pattern-input / .regex-test-string-input : KEPT — re-examined in W2.b
+   and it is NOT the clean OInput-modifier the note below assumed. In
+   components/settings/AddRegexPattern.vue the same class sits on plain wrapper
+   <div>s (lines 120, 148, 193, 215) AND on the OInput itself (line 157), while
+   logstream/AssociatedRegexPatterns.vue puts it only on its own OInputs (and
+   already carries its own `.regex-test-string-input :deep(textarea)` rule at
+   line 890). Because the selector is depth-counted — `> div > div > div >
+   textarea` — those two placements match at DIFFERENT depths, so the rule almost
+   certainly fires for only one of them today and moving it into OInput would
+   silently change WHICH. Untangling that needs the AddRegexPattern markup
+   normalised first (one class, one anchor) — a markup fix, not a colocation, and
+   too risky to fold into this wave blind. Left global with this note. ── */
 .regex-pattern-input > div > div > div > textarea {
   height: 12.5rem !important;
   resize: none !important;
@@ -584,60 +349,3 @@ button.date-time-button {
   border-top-right-radius: 0 !important;
 }
 
-/* ── .date-time-table .relative-row : owners components/DateTime.vue +
-   components/DateTimePicker.vue (identical copies in both). Global because
-   components/CustomDateTimePicker.vue authors the same .date-time-table /
-   .relative-row markup, carries NO style block of its own, and depends on this
-   rule for its relative-tab row spacing. ── */
-.date-time-table .relative-row > * {
-  margin-right: 0.375rem;
-}
-
-/* ── .ai-btn : owner plugins/logs/TenstackTable.vue, also consumed by
-   components/TenstackTable.vue, which applies .ai-btn to its own row button.
-   Fix: OButton's base class (relative) overrides the absolute passed via props.
-   Use top:0 + translate:-50% 0 to anchor the button flush with the row top,
-   and height:100% to fill the td height (= row height minus the border).
-   Overriding the CSS `translate` property (not `transform`) is required because
-   Tailwind v4 sets -translate-y-1/2 via the CSS `translate` shorthand property. ── */
-.ai-btn {
-  position: absolute !important;
-  top: 50% !important;
-  right: 0.875rem !important;
-  translate: -50% -50% !important;
-  height: 0.875rem !important;
-  min-height: 0 !important;
-  width: 0.900rem !important;
-  min-width: 0 !important;
-  border-radius: 0.25rem !important;
-}
-
-.ai-btn img.ai-icon {
-  width: 0.75rem !important;
-  height: 0.75rem !important;
-}
-
-/* Suppress the hover box-shadow — it visually bleeds outside the row boundary */
-.ai-btn:hover {
-  box-shadow: none !important;
-}
-
-/* ── .field-list-separator : owner plugins/logs/Index.vue. Hover affordance drawn
-   on OSplitter's separator element, which OSplitter renders internally — the class
-   only ever arrives via its `separatorClass` prop, so no consumer's scope can
-   reach it. Applied by plugins/logs/Index.vue and dashboards/PanelEditor/PanelEditor.vue. ── */
-.field-list-separator::after {
-  content: "";
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 0.125rem;
-  background-color: transparent;
-  transition: background-color 0.3s;
-}
-
-.field-list-separator:hover::after {
-  background-color: orange;
-}

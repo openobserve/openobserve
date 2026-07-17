@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <syntax-guide
           data-test="logs-search-bar-sql-mode-toggle-btn"
           :sqlmode="searchObj.meta.sqlMode"
-          class="syntax-guide-in-toolbar element-box-shadow"
+          class="element-box-shadow dark:border! dark:border-solid! dark:border-card-glass-border!"
         ></syntax-guide>
       </div>
       <div class="float-right col-auto">

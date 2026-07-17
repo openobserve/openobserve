@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         ref="datetimeBtn"
         data-cy="date-time-button"
         variant="outline"
-        class="date-time-button h-7.5 min-h-7.5 rounded-sm py-0 px-[5px] min-w-auto justify-start!"
+        class="date-time-button h-9! min-h-7.5 rounded-sm py-0 px-[5px] min-w-auto justify-start!"
         icon-left="schedule"
       >
         <span class="date-time-label font-semibold flex-1 text-left">{{ displayValue }}</span>
@@ -60,7 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OTabPanel name="relative">
           <div class="date-time-table relative flex flex-col">
             <div
-              class="relative-row px-3 py-2 flex items-center border-b border-border-default"
+              class="relative-row [&>*]:mr-1.5 px-3 py-2 flex items-center border-b border-border-default"
               v-for="(period, index) in relativePeriods"
               :key="'date_' + index"
             >
@@ -90,7 +90,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
 
-            <div class="relative-row px-3 py-2 flex items-center border-b border-border-default">
+            <div class="relative-row [&>*]:mr-1.5 px-3 py-2 flex items-center border-b border-border-default">
               <div class="text-sm font-semibold min-w-18.75">Custom</div>
 
               <div class="flex gap-2 flex-1 min-w-0">

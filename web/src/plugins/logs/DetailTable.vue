@@ -143,7 +143,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :data-test="`log-details-include-exclude-field-btn-${row.field}`"
                         size="icon-xs"
                         variant="ghost"
-                        class="log-json-field-dropdown-btn"
+                        class="h-5! w-5! min-h-5! min-w-5! p-0! align-middle"
                         aria-label="Add icon"
                       >
                         <OIcon :name="tableDropdownOpenMap[row.field] ? 'arrow-drop-up' : 'arrow-drop-down'" size="sm" />
@@ -229,7 +229,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </ODropdown>
                   <pre
                     :data-test="`log-detail-${row.field}-value`"
-                    class="table-pre flex-1 min-w-0"
+                    class="wrap-break-word inline font-normal font-mono m-0 p-0 flex-1 min-w-0"
                     :class="
                       !shouldWrapValues
                         ? 'whitespace-nowrap overflow-hidden text-ellipsis'

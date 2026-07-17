@@ -6,7 +6,7 @@
     "arbZ": 42,
     "styleBlockHex": 107,
     "stylePxUnit": 266,
-    "styleKeepComment": 35,
+    "styleKeepComment": 34,
     "inlineHexStyle": 20,
     "unscopedStyle": 10,
     "tsHex": 471,
@@ -46,9 +46,6 @@
       "arbPx": 1,
       "styleBlockHex": 2,
       "stylePxUnit": 12,
-      "styleKeepComment": 1
-    },
-    "components/alerts/AlertInsightsContextMenu.vue": {
       "styleKeepComment": 1
     },
     "components/alerts/AlertSettingsHelpDrawer.vue": {

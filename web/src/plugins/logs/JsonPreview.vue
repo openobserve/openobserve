@@ -3,7 +3,7 @@
     <div class="pb-1 flex justify-start px-3 copy-log-btn">
       <app-tabs
         v-if="filteredTabs.length"
-        class="mb-[0.375rem] logs-json-preview-tabs mr-2 border border-solid border-card-glass-border rounded-sm text-[]"
+        class="mb-[0.375rem] mr-2 h-fit overflow-hidden border-t border-l border-r border-solid border-card-glass-border rounded-sm"
         data-test="logs-json-preview-tabs"
         :tabs="filteredTabs"
         v-model:active-tab="activeTab"
@@ -72,7 +72,7 @@
     <div v-show="activeTab !== 'unflattened'" class="pl-3">
       {
       <div
-        class="log_json_content flex"
+        class="log_json_content whitespace-pre-wrap font-mono text-xs flex"
         v-for="(key, index) in Object.keys(value)"
         :key="key"
         :data-test="`log-detail-row-${key}`"
@@ -88,7 +88,7 @@
               data-test="log-details-include-exclude-field-btn"
               size="xs"
               variant="ghost"
-              class="ml-2 log-json-field-dropdown-btn"
+              class="ml-2 h-5! w-5! min-h-5! min-w-5! p-0! align-middle"
               aria-label="Add icon"
             >
               <OIcon :name="dropdownOpenMap[key] ? 'arrow-drop-up' : 'arrow-drop-down'" size="sm" />
@@ -188,24 +188,25 @@
       }
       <div
         v-if="showMenu"
-        class="context-menu shadow-lg rounded-sm"
+        class="context-menu shadow-lg rounded-sm min-w-50 py-1 [font-size:0.8125rem] bg-surface-overlay border border-border-default text-text-primary"
         :style="{
           position: 'fixed',
           top: `${menuY}px`,
           left: `${menuX}px`,
           zIndex: 9999,
         }"
-        :class="
-          isDark
-            ? 'context-menu-dark'
-            : 'context-menu-light'
-        "
       >
-        <div class="context-menu-item" @click="copySelectedText">
+        <div
+          class="py-1.5 px-3 flex items-center cursor-pointer [transition:background-color_0.2s] hover:bg-dropdown-item-hover-bg"
+          @click="copySelectedText"
+        >
           <OIcon name="content-copy" size="sm" class="mr-2" />
           Copy
         </div>
-        <div class="context-menu-item" @click="handleCreateRegex">
+        <div
+          class="py-1.5 px-3 flex items-center cursor-pointer [transition:background-color_0.2s] hover:bg-dropdown-item-hover-bg"
+          @click="handleCreateRegex"
+        >
           <img
             :src="regexIconForContextMenu"
             class="mr-2"

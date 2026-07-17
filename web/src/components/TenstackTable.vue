@@ -1021,7 +1021,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             cell.column.columnDef.id ===
                               store.state.zoConfig.timestamp_column
                           "
-                          class="absolute right-0 top-1/2 transform invisible -translate-y-1/2 -translate-x-1/2 ai-btn"
+                          class="invisible ai-btn"
                           @send-to-ai-chat="
                             sendToAiChat(
                               JSON.stringify(cell.row.original),

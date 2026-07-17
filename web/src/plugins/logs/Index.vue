@@ -248,7 +248,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div
             v-show="searchObj.meta.logsVisualizeToggle == 'visualize'"
-            class="visualize-container border-t border-border-default"
+            class="h-full border-t border-border-default"
             :style="{ '--splitter-width': `${100 - splitterModel}vw` }"
           >
             <VisualizeLogsQuery
@@ -263,7 +263,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div
             v-if="searchObj.meta.logsVisualizeToggle == 'build'"
-            class="build-container"
+            class="h-full overflow-hidden"
             :style="{ '--splitter-width': `${100 - splitterModel}vw` }"
           >
             <BuildQueryPage
@@ -293,22 +293,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
       <div
         v-else-if="showSearchHistory && !store.state.zoConfig.usage_enabled"
-        class="search-history-empty"
+        class="h-50 rounded-lg"
       >
         <div
-          class="search-history-empty__content text-center p-3 flex flex-center"
+          class="h-[80vh] rounded-lg text-center p-3 flex flex-center"
         >
           <div>
             <div>
               <OIcon
                 name="history"
-                class="search-history-empty__icon" style="width: 100px; height: 100px;" />
+                class="w-25 h-25 [font-size:6.25rem] opacity-10" />
             </div>
-            <div class="text-3xl font-semibold search-history-empty__title">
+            <div class="text-3xl font-semibold opacity-80">
               Search history is not enabled.
             </div>
             <div
-              class="search-history-empty__info mt-2 flex items-center justify-center"
+              class="opacity-80 mt-2 flex items-center justify-center"
             >
               <OIcon name="info" class="mr-1"
 size="md" />

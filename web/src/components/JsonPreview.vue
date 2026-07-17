@@ -17,7 +17,7 @@
     </div>
     {
     <div
-      class="log_json_content flex"
+      class="whitespace-pre-wrap font-mono text-xs flex"
       v-for="(key, index) in Object.keys(value)"
       :key="key"
     >
@@ -33,7 +33,7 @@
             data-test="json-preview-field-dropdown-btn"
             size="xs"
             variant="ghost"
-            class="ml-2 log-json-field-dropdown-btn"
+            class="ml-2 h-5! w-5! min-h-5! min-w-5! p-0! align-middle"
             aria-label="Add icon"
           >
             <OIcon :name="dropdownOpenMap[key] ? 'arrow-drop-up' : 'arrow-drop-down'" size="sm" />

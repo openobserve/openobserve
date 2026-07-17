@@ -1694,7 +1694,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div class="flex items-center gap-0.5">
                     <OButton
                       :title="t('common.favourite')"
-                      class="logs-saved-view-icon action-btn-hover"
+                      class="hover:text-text-primary! hover:bg-interactive-hover-bg! action-btn-hover"
                       variant="ghost-neutral"
                       size="icon-sm"
                       :data-test="`logs-search-bar-favorite-${row.view_id}-saved-view-btn`"
@@ -1716,7 +1716,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </OButton>
                     <OButton
                       :title="t('common.edit')"
-                      class="logs-saved-view-icon action-btn-hover"
+                      class="hover:text-text-primary! hover:bg-interactive-hover-bg! action-btn-hover"
                       variant="ghost-neutral"
                       size="icon-sm"
                       :data-test="`logs-search-bar-update-${row.view_id}-saved-view-btn`"
@@ -1726,7 +1726,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </OButton>
                     <OButton
                       :title="t('common.delete')"
-                      class="logs-saved-view-icon action-btn-hover"
+                      class="hover:text-text-primary! hover:bg-interactive-hover-bg! action-btn-hover"
                       variant="ghost-neutral"
                       size="icon-sm"
                       :data-test="`logs-search-bar-delete-${row.view_id}-saved-view-btn`"
@@ -1788,7 +1788,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div class="flex items-center gap-0.5">
                     <OButton
                       :title="t('common.favourite')"
-                      class="logs-saved-view-icon action-btn-hover"
+                      class="hover:text-text-primary! hover:bg-interactive-hover-bg! action-btn-hover"
                       variant="ghost-neutral"
                       size="icon-sm"
                       :data-test="`logs-search-bar-favorite-${row.view_id}-saved-view-btn`"
@@ -1798,7 +1798,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </OButton>
                     <OButton
                       :title="t('common.edit')"
-                      class="logs-saved-view-icon action-btn-hover"
+                      class="hover:text-text-primary! hover:bg-interactive-hover-bg! action-btn-hover"
                       variant="ghost-neutral"
                       size="icon-sm"
                       :data-test="`logs-search-bar-update-${row.view_id}-favorite-saved-view-btn`"
@@ -1808,7 +1808,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </OButton>
                     <OButton
                       :title="t('common.delete')"
-                      class="logs-saved-view-icon action-btn-hover"
+                      class="hover:text-text-primary! hover:bg-interactive-hover-bg! action-btn-hover"
                       variant="ghost-neutral"
                       size="icon-sm"
                       :data-test="`logs-search-bar-delete-${row.view_id}-favorite-saved-view-btn`"

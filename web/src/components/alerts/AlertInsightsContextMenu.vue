@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="context-menu fixed z-9999 min-w-55 overflow-hidden bg-surface-overlay border border-border-default rounded-md shadow-[0_4px_12px_rgba(0,0,0,0.15)]"
+    class="context-menu fixed z-9999 min-w-50 py-1 overflow-hidden bg-surface-overlay border border-border-default rounded-md shadow-[0_4px_12px_rgba(0,0,0,0.15)]"
     :style="{ top: `${y}px`, left: `${x}px` }"
     @click.stop
     data-test="alert-insights-context-menu"
@@ -191,6 +191,16 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+/* keep(complex-state): `.menu-item` hover/active are state pseudo-classes on this
+   file's own rows; kept as CSS so the two states stay declared together.
+   NOTE (W2.b): this element used to silently inherit an UNLAYERED global
+   `.context-menu` rule (min-width / vertical padding / font-size) from
+   styles/utilities.css that was authored for plugins/logs/JsonPreview.vue — a
+   name collision, not a shared design. Being unlayered it outranked the layered
+   `min-w-55` here, so the menu really rendered at the narrower min-w-50 width.
+   That global is now gone; `min-w-50` + `py-1` on the root above reproduce the
+   computed result exactly. Its inherited font-size was a no-op — every text node
+   below carries its own text-xs / text-sm. */
 .context-menu .menu-item:hover {
   background-color: var(--color-dropdown-item-hover-bg);
 }

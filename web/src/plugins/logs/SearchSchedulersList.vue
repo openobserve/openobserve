@@ -116,7 +116,7 @@
               />
             </template>
             <template #expansion="{ row }">
-              <div class="app-tabs-schedule-list report-list-tabs">
+              <div class="app-tabs-schedule-list px-4 py-0 h-fit w-fit">
                 <app-tabs
                   data-test="expanded-list-tabs"
                   class="mr-3"
@@ -125,7 +125,7 @@
                 />
               </div>
               <div v-if="activeTab == 'query'">
-                <div class="text-left px-2 mb-2 expanded-content">
+                <div class="text-left mb-2 px-4 py-0 w-[calc(95vw-2.5rem)] min-w-[calc(90vw-1.25rem)] max-h-screen overflow-hidden">
                   <div class="flex items-center py-2">
                     <strong
                       >{{ t('search_scheduler_job.sql_query') }} :
@@ -163,7 +163,7 @@
                 </div>
                 <div
                   v-if="row?.function"
-                  class="text-left mb-2 px-2 expanded-content"
+                  class="text-left mb-2 px-4 py-0 w-[calc(95vw-2.5rem)] min-w-[calc(90vw-1.25rem)] max-h-screen overflow-hidden"
                 >
                   <div class="flex items-center py-2">
                     <strong
@@ -189,7 +189,7 @@
               </div>
               <div class="py-3" v-else>
                 <div
-                  class="text-left px-2 mb-2 expanded-content flex flex-col"
+                  class="text-left mb-2 px-4 py-0 w-[calc(95vw-2.5rem)] min-w-[calc(90vw-1.25rem)] max-h-screen overflow-hidden flex flex-col"
                 >
                   <query-editor
                     style="height: 130px"
