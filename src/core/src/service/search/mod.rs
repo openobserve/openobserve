@@ -64,27 +64,21 @@ use crate::{
     },
 };
 
-pub mod bloom_pruner;
 pub mod cache;
 #[cfg(feature = "enterprise")]
 pub mod cardinality;
 pub mod cluster;
-pub mod datafusion;
 pub mod grpc;
 pub mod grpc_search;
 pub mod grpc_server;
-pub mod index;
-pub mod inspector;
 pub mod partition;
 mod searcher;
-pub mod sql;
 pub mod streaming;
 #[cfg(feature = "enterprise")]
 pub mod super_cluster;
-pub mod tantivy;
-pub mod utils;
 pub mod work_group;
 
+pub use ::search::{bloom_pruner, datafusion, index, inspector, sql, tantivy, utils};
 pub use searcher::Searcher;
 
 /// The result of search in cluster

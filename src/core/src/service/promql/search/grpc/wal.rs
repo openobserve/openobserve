@@ -15,6 +15,7 @@
 
 use std::sync::Arc;
 
+use ::promql::{apply_label_selector, apply_matchers};
 use arrow::record_batch::RecordBatch;
 use config::{
     TIMESTAMP_COL_NAME, get_config,
@@ -34,10 +35,7 @@ use proto::cluster_rpc::{self, IndexInfo, QueryIdentifier};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 use crate::service::{
-    promql::{
-        search::grpc::Context,
-        utils::{apply_label_selector, apply_matchers},
-    },
+    promql::search::grpc::Context,
     search::{
         datafusion::{
             distributed_plan::{
