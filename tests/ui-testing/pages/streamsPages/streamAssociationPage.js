@@ -107,7 +107,11 @@ export class StreamAssociationPage {
 
     if (!opened) {
       testLogger.warn('Sidebar did not open with JavaScript click, trying regular click...');
-      await detailButton.scrollIntoViewIfNeeded();
+      // Use an instant native scrollIntoView instead of Playwright's scrollIntoViewIfNeeded:
+      // the revamped Reka-based streams table detaches/re-renders rows mid-animation, so the
+      // scrollIntoViewIfNeeded stability polling could spin until the 45s actionTimeout even
+      // though the button (already waited visible above) is present. Native scroll resolves once.
+      await detailButton.evaluate((el) => el.scrollIntoView({ block: 'center', inline: 'nearest' })).catch(() => {});
       await detailButton.click();
       testLogger.info('Executed Playwright click on Stream Detail button');
       await updateSettingsButton.waitFor({ state: 'visible', timeout: 5000 });
@@ -156,11 +160,15 @@ export class StreamAssociationPage {
       throw new Error(`Add Pattern button not found for field ${fieldName}`);
     }
 
-    await addPatternButton.waitFor({ state: 'visible', timeout: 5000 });
+    // Assert the real readiness signal (the Add Pattern control is visible) before scrolling.
+    await expect(addPatternButton).toBeVisible({ timeout: 10000 });
 
-    // Scroll into view before clicking
-    await addPatternButton.scrollIntoViewIfNeeded();
-    await this.page.waitForTimeout(500);
+    // Scroll into view before clicking. Use an instant native scrollIntoView rather than
+    // Playwright's scrollIntoViewIfNeeded: the schema table inside the (still-animating) stream
+    // detail ODrawer re-renders rows mid-animation, so scrollIntoViewIfNeeded's attached+stable
+    // polling can spin until the 45s actionTimeout. Native scroll resolves the element once and
+    // returns immediately; the JS/Playwright click below drives the actual interaction.
+    await addPatternButton.evaluate((el) => el.scrollIntoView({ block: 'center', inline: 'nearest' })).catch(() => {});
 
     testLogger.info(`Clicking Add Pattern button for field: ${fieldName}`);
 
@@ -722,9 +730,14 @@ export class StreamAssociationPage {
       throw new Error(`Field ${fieldName} does not have any patterns linked`);
     }
 
-    await viewPatternsLink.waitFor({ state: 'visible', timeout: 5000 });
-    await viewPatternsLink.scrollIntoViewIfNeeded();
-    await this.page.waitForTimeout(500);
+    // Assert the real readiness signal (the "View N Patterns" link is visible) before scrolling.
+    await expect(viewPatternsLink).toBeVisible({ timeout: 10000 });
+
+    // Instant native scrollIntoView instead of scrollIntoViewIfNeeded: the schema table inside
+    // the stream detail ODrawer re-renders/detaches rows mid-animation, so the attached+stable
+    // polling of scrollIntoViewIfNeeded can spin until the 45s actionTimeout even though the link
+    // is already visible. Native scroll returns immediately; the click below drives interaction.
+    await viewPatternsLink.evaluate((el) => el.scrollIntoView({ block: 'center', inline: 'nearest' })).catch(() => {});
 
     testLogger.info(`Clicking View Patterns link for field: ${fieldName}`);
 

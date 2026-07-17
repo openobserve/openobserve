@@ -715,11 +715,19 @@ export class MetricsPage {
                 return false;
             }
 
-            // Click the chart type button
+            // Click the chart type button, then deterministically confirm the type
+            // actually became active instead of a blind 1s sleep. ChartSelection.vue
+            // stamps data-selected="true" on the selected item — wait for that real
+            // signal. If it never flips (e.g. a disabled chart type), return false so
+            // callers see the true outcome rather than a masked success.
             await chartButton.click();
-            await this.page.waitForTimeout(1000);
-
-            return true;
+            const activeItem = this.page.locator(
+                `[data-test="selected-chart-${chartType}-item"][data-selected="true"]`
+            );
+            return await activeItem
+                .waitFor({ state: 'visible', timeout: 5000 })
+                .then(() => true)
+                .catch(() => false);
         } catch (error) {
             // Take screenshot for debugging
             await this.page.screenshot({
@@ -2222,27 +2230,29 @@ export class MetricsPage {
      * @returns {Promise<boolean>} true when both buttons were clicked successfully
      */
     async switchToPromQLCustomMode() {
-        // Step 1 — ensure PromQL language is active
+        // Step 1 — ensure PromQL language is active.
+        // These are reka OToggleGroupItem buttons whose active state is exposed via
+        // data-state="on" (not a 'selected' class). Click only when not active, then
+        // poll data-state until it settles — deterministic, no fixed sleep.
         const promqlBtn = this.page.locator('[data-test="dashboard-promql-query-type"]');
         if (!await promqlBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
             return false;
         }
-        const promqlClasses = await promqlBtn.getAttribute('class') || '';
-        if (!promqlClasses.includes('selected')) {
+        const isOn = async (btn) => (await btn.getAttribute('data-state').catch(() => null)) === 'on';
+        if (!await isOn(promqlBtn)) {
             await promqlBtn.click();
-            await this.page.waitForTimeout(300);
         }
+        await expect.poll(async () => await isOn(promqlBtn), { timeout: 5000, intervals: [100, 200, 400] }).toBe(true);
 
         // Step 2 — switch to Custom sub-mode
         const customBtn = this.page.locator('[data-test="dashboard-custom-query-type"]');
         if (!await customBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
             return false;
         }
-        const customClasses = await customBtn.getAttribute('class') || '';
-        if (!customClasses.includes('selected')) {
+        if (!await isOn(customBtn)) {
             await customBtn.click();
-            await this.page.waitForTimeout(300);
         }
+        await expect.poll(async () => await isOn(customBtn), { timeout: 5000, intervals: [100, 200, 400] }).toBe(true);
         return true;
     }
 
@@ -2348,7 +2358,9 @@ export class MetricsPage {
     async selectPromqlTableMode(modeValue) {
         const trigger = this.page.locator('[data-test="dashboard-config-promql-table-mode-trigger"]');
         await trigger.waitFor({ state: 'visible', timeout: 5000 });
-        await trigger.scrollIntoViewIfNeeded();
+        // Bound the scroll to the element's own actionability window so it can never
+        // hang on the default 30s timeout if layout is momentarily unstable.
+        await trigger.scrollIntoViewIfNeeded({ timeout: 5000 });
         await trigger.click();
         await this.promqlTableModePopover.waitFor({ state: 'visible', timeout: 5000 });
         // Pick the option by its data-test-value (per AGENT_RULES §4 OSelectItem stamp).

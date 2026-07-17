@@ -2,14 +2,23 @@
  * Language Translation Coverage Tests
  *
  * Tests translation coverage for all supported languages.
- * Runs in parallel for faster execution.
  */
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
 
-// Configure parallel execution within this file
-test.describe.configure({ mode: 'parallel' });
+// Run the 10 language cases SEQUENTIALLY within this file (default mode), NOT in
+// parallel. Each case is an exhaustive ~27-page full-app crawl (Logs/Metrics/
+// Traces/RUM/Dashboards — chart, monaco and websocket-heavy views) held in one
+// context for up to 6 minutes. Under the CI `--workers=5` override, `mode:'parallel'`
+// let up to 5 of these giant crawls run at once and OOM-killed a worker browser
+// process — every case scheduled on that worker then failed with "Target page,
+// context or browser has been closed" (an 8-test cascade in run 29481437880).
+// Default mode keeps at most ONE language crawl resident per worker while OTHER
+// GeneralTests spec files still parallelise across the remaining workers, and —
+// unlike `mode:'serial'` — a single case failure does NOT skip the rest.
+// (Full coverage is preserved; only the concurrency is reduced.)
+test.describe.configure({ mode: 'default' });
 
 const languages = [
   { code: 'de', name: 'German (Deutsch)', tag: '@de' },

@@ -217,6 +217,20 @@ class LanguagePage {
     return this.page.locator(`[data-test="${tabDataTest}"]`).first();
   }
 
+  /**
+   * A closed page/context (or a Playwright "Target ... has been closed" error) is
+   * fatal and non-recoverable — it means the worker's browser process crashed
+   * (typically OOM under high parallelism). Such errors must NEVER be swallowed by
+   * best-effort try/catch blocks: doing so lets the test limp through the rest of
+   * the crawl and report a bogus coverage percentage instead of failing honestly.
+   * @param {Error} error
+   * @returns {boolean}
+   */
+  _isFatalClosedError(error) {
+    return this.page.isClosed()
+      || /has been closed|Target (page|frame)?.*closed|Target closed/i.test((error && error.message) || '');
+  }
+
   // ============================================================================
   // PUBLIC ACTIONS
   // ============================================================================
@@ -630,6 +644,8 @@ class LanguagePage {
           }
         }
       } catch (e) {
+        // Rethrow fatal browser-crash errors — never mask a dead page/context.
+        if (this._isFatalClosedError(e)) throw e;
         testLogger.warn(`Could not test sub-page ${subPage.name}: ${e.message}`);
       }
     }
@@ -664,7 +680,10 @@ class LanguagePage {
         results.totalTranslated += analysis.translatedCount;
         testLogger.info(`    Modal (Add Dashboard): ${analysis.percentage}%`);
       }
-    } catch (e) { /* ignore */ }
+    } catch (e) {
+      // Rethrow fatal browser-crash errors; only best-effort modal issues are ignored.
+      if (this._isFatalClosedError(e)) throw e;
+    }
   }
 }
 

@@ -971,14 +971,52 @@ export class PipelinesPage {
     }
 
     async navigateToAddEnrichmentTable() {
-        await openNavFlyoutChild(this.page, 'pipeline');
-        // The enrichment-table tab uses a Reka-based OToggleGroup — `force` avoids
-        // visibility races when the tab list animates in.
-        await this.enrichmentTableTabLocator.click({ force: true });
-        await this.addEnrichmentTableText.click();
-        // The Add Enrichment Table form (`add-enrichment-table-page`) renders
-        // inside the same parent — wait for it to be visible before returning.
-        await this.addEnrichmentTablePage.waitFor({ state: 'visible', timeout: 15000 });
+        // Land directly on the enrichment-tables LIST page instead of the old
+        // two-hop route (flyout → pipelines list → click the
+        // `pipeline-section-tab-enrichmentTables` OTab). That tab lives in the
+        // pipelines page header (PipelineSectionTabs, rendered in AppPageHeader's
+        // #tabs slot) and only mounts once that page has fully rendered — so on
+        // cloud a slow/missed flyout nav left the tab locator unattached and the
+        // blind `force` click timed out at 45s (systematic across every test).
+        // `enrichmentTables` has its own left-nav flyout child, so navigate
+        // straight to its list page and skip the fragile section-tab hop.
+        const enrichmentListUrlRe = /\/pipeline\/enrichment-tables/;
+        const listPage = this.page.locator('[data-test="enrichment-tables-list-page"]');
+
+        // Prefer SPA nav via the direct flyout child; fall back to a hard goto
+        // if the hover-driven flyout click misses (same recovery pattern as
+        // enrichmentPage.gotoEnrichmentTablesWithOrg).
+        try {
+            await openNavFlyoutChild(this.page, 'enrichment');
+            await this.page.waitForURL(enrichmentListUrlRe, { timeout: 15000 });
+        } catch (navError) {
+            testLogger.warn('Enrichment flyout nav missed — falling back to direct goto', {
+                error: navError.message,
+            });
+            let org = process.env.ORGNAME;
+            try {
+                org = new URL(this.page.url()).searchParams.get('org_identifier') || org;
+            } catch { /* about:blank etc. — keep ORGNAME fallback */ }
+            await this.page.goto(
+                `${process.env.ZO_BASE_URL}/web/pipeline/enrichment-tables?org_identifier=${org}`,
+                { waitUntil: 'domcontentloaded' },
+            );
+            await this.page.waitForURL(enrichmentListUrlRe, { timeout: 15000 });
+        }
+
+        // Wait for the list page container, then settle+retry the Add-button
+        // click. The OButton in the AppPageHeader #actions slot can detach
+        // mid-render while the list hydrates (documented add-btn detach race),
+        // so re-resolve the locator and tolerate a transient detach. Short-circuit
+        // if a prior attempt already opened the form (the Add button is v-if'd
+        // out once the form mounts, so re-asserting its visibility would loop).
+        await listPage.waitFor({ state: 'visible', timeout: 20000 });
+        await expect(async () => {
+            if (await this.addEnrichmentTablePage.isVisible().catch(() => false)) return;
+            await expect(this.addEnrichmentTableText).toBeVisible({ timeout: 5000 });
+            await this.addEnrichmentTableText.click({ timeout: 5000 });
+            await expect(this.addEnrichmentTablePage).toBeVisible({ timeout: 10000 });
+        }).toPass({ timeout: 45000 });
     }
 
     async uploadEnrichmentTable(fileName, fileContentPath) {
