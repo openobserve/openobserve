@@ -343,6 +343,11 @@ export class AlertsPage {
         }
     }
 
+    /** Wait for the alerts list page to be ready (Add Alert button visible). */
+    async waitForAlertListReady() {
+        await this.page.locator(this.locators.addAlertButton).waitFor({ state: 'visible', timeout: 30000 });
+    }
+
     async createAlert(streamName, column, value, destinationName, randomValue) {
         const result = await this.creationWizard.createAlert(streamName, column, value, destinationName, randomValue);
         this.currentAlertName = result;

@@ -207,6 +207,11 @@ export class AlertDestinationsPage {
         }
     }
 
+    /** Wait for the destinations list page to be ready (Add Destination button visible). */
+    async waitForDestinationListReady() {
+        await this.page.locator(this.addDestinationButton).waitFor({ state: 'visible', timeout: 30000 });
+    }
+
     /** @param {string} destinationName @param {string} url @param {string} templateName */
     async createDestination(destinationName, url, templateName) {
         await this.navigateToDestinations();
