@@ -36,10 +36,10 @@
     <p>You can reference a variable with the following format:</p>
     <ul>
       <li>
-        <span class="bg-highlight bg-code-bg">${variable_name}</span>
+        <span class="bg-highlight-bg px-1.25">${variable_name}</span>
         <br />
         (For Example, if your variable name is "test", you can use
-        <span class="bg-highlight bg-code-bg">${test}</span>)
+        <span class="bg-highlight-bg px-1.25">${test}</span>)
       </li>
     </ul>
 
@@ -48,8 +48,8 @@
     <div class="font-bold">Use current query</div>
     <p>You can reference current query with the following format:</p>
     <ul>
-      <li><span class="bg-highlight bg-code-bg">${query}</span></li>
-      <li><span class="bg-highlight bg-code-bg">${query_encoded}</span></li>
+      <li><span class="bg-highlight-bg px-1.25">${query}</span></li>
+      <li><span class="bg-highlight-bg px-1.25">${query_encoded}</span></li>
     </ul>
     <br />
 
@@ -58,17 +58,17 @@
       You can reference current selected Time period with the following format:
     </p>
     <ul>
-      <li><span class="bg-highlight bg-code-bg">${start_time}</span></li>
-      <li><span class="bg-highlight bg-code-bg">${end_time}</span></li>
+      <li><span class="bg-highlight-bg px-1.25">${start_time}</span></li>
+      <li><span class="bg-highlight-bg px-1.25">${end_time}</span></li>
     </ul>
     For Example:
-    <span class="bg-highlight bg-code-bg">from=${start_time}&to=${end_time}</span>
+    <span class="bg-highlight-bg px-1.25">from=${start_time}&to=${end_time}</span>
     <br />
     <span class="font-bold">Note: </span>
     <span
       >Even with a relative time period, you can still use
-      <span class="bg-highlight bg-code-bg">start_time</span> and
-      <span class="bg-highlight bg-code-bg">end_time</span>.</span
+      <span class="bg-highlight-bg px-1.25">start_time</span> and
+      <span class="bg-highlight-bg px-1.25">end_time</span>.</span
     >
     <br />
     <br />
@@ -77,15 +77,15 @@
 
     <ul>
       <li>
-        <span class="bg-highlight bg-code-bg">${series.__name}</span> – The name of the
+        <span class="bg-highlight-bg px-1.25">${series.__name}</span> – The name of the
         series.
       </li>
       <li>
-        <span class="bg-highlight bg-code-bg">${series.__value}</span> – The numeric value
+        <span class="bg-highlight-bg px-1.25">${series.__value}</span> – The numeric value
         of the data point.
       </li>
       <li>
-        <span class="bg-highlight bg-code-bg">${series.__axisValue}</span> – The value on
+        <span class="bg-highlight-bg px-1.25">${series.__axisValue}</span> – The value on
         the axis for the selected/clicked data point.
       </li>
     </ul>
@@ -98,15 +98,15 @@
     </p>
     <ul>
       <li>
-        <span class="bg-highlight bg-code-bg"
+        <span class="bg-highlight-bg px-1.25"
           >${row.field["field_label"]} or ${row.field.field_label}</span
         >
         <br />
         (For Example, if your want to use "test" column's value of clicked row,
-        you can use <span class="bg-highlight bg-code-bg">${row.field.test} </span> or
-        <span class="bg-highlight bg-code-bg">${row.field["test"]}</span>)
+        you can use <span class="bg-highlight-bg px-1.25">${row.field.test} </span> or
+        <span class="bg-highlight-bg px-1.25">${row.field["test"]}</span>)
       </li>
-      <li><span class="bg-highlight bg-code-bg">${row.index}</span></li>
+      <li><span class="bg-highlight-bg px-1.25">${row.index}</span></li>
     </ul>
 
     <br />
@@ -114,8 +114,8 @@
     <div class="font-bold">For Pie/Donut chart drilldown</div>
     <p>You can reference the series and value with the following variables:</p>
     <ul>
-      <li><span class="bg-highlight bg-code-bg">${series.__name}</span></li>
-      <li><span class="bg-highlight bg-code-bg">${series.__value}</span></li>
+      <li><span class="bg-highlight-bg px-1.25">${series.__name}</span></li>
+      <li><span class="bg-highlight-bg px-1.25">${series.__value}</span></li>
     </ul>
 
     <br />
@@ -128,14 +128,14 @@
     <ul>
       <li class="font-bold">Edge</li>
       <ul>
-        <li><span class="bg-highlight bg-code-bg">${edge.__source}</span></li>
-        <li><span class="bg-highlight bg-code-bg">${edge.__target}</span></li>
-        <li><span class="bg-highlight bg-code-bg">${edge.__value}</span></li>
+        <li><span class="bg-highlight-bg px-1.25">${edge.__source}</span></li>
+        <li><span class="bg-highlight-bg px-1.25">${edge.__target}</span></li>
+        <li><span class="bg-highlight-bg px-1.25">${edge.__value}</span></li>
       </ul>
       <li class="font-bold">Node</li>
       <ul>
-        <li><span class="bg-highlight bg-code-bg">${node.__name}</span></li>
-        <li><span class="bg-highlight bg-code-bg">${node.__value}</span></li>
+        <li><span class="bg-highlight-bg px-1.25">${node.__name}</span></li>
+        <li><span class="bg-highlight-bg px-1.25">${node.__value}</span></li>
       </ul>
     </ul>
   </div>

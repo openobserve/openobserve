@@ -590,7 +590,7 @@ describe("SyntaxGuideMetrics — PromQL guide content (normal mode)", () => {
     await button.trigger("click");
     await flushPromises();
     expect(document.querySelector(".answers ul")).toBeTruthy();
-    expect(document.querySelector(".answers .bg-highlight")).toBeTruthy();
+    expect(document.querySelector(".answers .bg-highlight-bg")).toBeTruthy();
   });
 });
 
@@ -695,7 +695,7 @@ describe("SyntaxGuideMetrics — SQL mode guide content", () => {
     await button.trigger("click");
     await flushPromises();
     expect(document.querySelector(".answers ul")).toBeTruthy();
-    expect(document.querySelector(".answers .bg-highlight")).toBeTruthy();
+    expect(document.querySelector(".answers .bg-highlight-bg")).toBeTruthy();
   });
 });
 

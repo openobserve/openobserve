@@ -1,7 +1,7 @@
 {
   "totals": {
     "rawPalette": 53,
-    "arbPx": 159,
+    "arbPx": 149,
     "arbRadius": 24,
     "arbZ": 44,
     "styleBlockHex": 107,
@@ -588,7 +588,7 @@
       "arbZ": 1
     },
     "plugins/metrics/SyntaxGuideMetrics.vue": {
-      "arbPx": 16
+      "arbPx": 6
     },
     "plugins/pipelines/CustomNode.vue": {
       "inlineHexStyle": 1,

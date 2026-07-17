@@ -607,3 +607,19 @@ export default defineComponent({
 
 });
 </script>
+
+<style scoped>
+/* keep(complex-state): `.alert-field-highlight` is a transient state class that
+   AlertFocusManager (utils/alerts/focusManager.ts) adds/removes at RUNTIME via
+   classList on refs registered from useAlertForm — no template ever writes it,
+   so it cannot become a template utility. AddAlert is the alert-form root and
+   owns every registered field's DOM (incl. the QueryConfig subtree, which
+   instantiates its own focusManager), so one `:deep()` here covers them all.
+   `!important` is preserved: it must beat the field components' own border
+   utilities, exactly as the previous global rule did. */
+:deep(.alert-field-highlight) {
+  border: 0.125rem solid var(--color-accent) !important;
+  border-radius: 0.25rem;
+  transition: border 0.3s ease;
+}
+</style>

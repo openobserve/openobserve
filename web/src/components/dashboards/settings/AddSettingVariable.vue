@@ -204,7 +204,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     />
                     <template #content>
                       {{ t('dashboard.filterInfoTooltip') }}
-                      <span class="bg-highlight bg-code-bg">$variableName</span>.
+                      <span class="bg-highlight-bg px-1.25">$variableName</span>.
                     </template>
                   </OTooltip>
                 </div>

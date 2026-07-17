@@ -34,12 +34,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="icon-toolbar"
           @click="toggleAIChat"
           data-test="add-regex-pattern-open-close-ai-btn"
-          class="ai-hover-btn"
+          class="group [background:var(--color-gradient-ai-subtle)]! text-ai-accent! dark:text-white! [transition:background_0.3s_ease,box-shadow_0.3s_ease,color_0.3s_ease] dark:shadow-[0_0.25rem_0.75rem_0_color-mix(in_srgb,var(--color-ai-accent)_20%,transparent)] hover:[background:var(--color-gradient-ai)]! hover:text-white! hover:shadow-[0_0.25rem_0.75rem_0_color-mix(in_srgb,var(--color-ai-accent)_35%,transparent)] dark:hover:shadow-[0_0.25rem_0.75rem_0_color-mix(in_srgb,var(--color-ai-accent)_35%,transparent)]"
           :class="store.state.isAiChatEnabled ? 'ai-btn-active' : ''"
           @mouseenter="isHovered = true"
           @mouseleave="isHovered = false"
         >
-          <img :src="getBtnLogo" class="header-icon ai-icon" />
+          <img :src="getBtnLogo" class="header-icon [transition:transform_0.6s_ease] group-hover:rotate-180 group-hover:brightness-0 group-hover:invert group-hover:[transition:filter_0.3s_ease]" />
         </OButton>
         <OButton
           data-test="add-regex-pattern-fullscreen-btn"

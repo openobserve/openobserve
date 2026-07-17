@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
     <div>
       <div v-if="!sqlmode">
-        <div class="syntax-guide-title w-105">
+        <div class="w-105">
           <div class="label text-sm font-bold">{{ t("search.syntaxGuideLabel") }}</div>
         </div>
         <div class="border-t my-1 border-dropdown-separator" />
@@ -40,23 +40,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <ul class="px-2.5 mt-2.5 mb-0 text-sm leading-[23px]">
                 <li>
                   For instant vector selectors, use
-                  <span class="bg-highlight px-[5px]"
+                  <span class="bg-highlight-bg px-1.25"
                     >metric_name{label1="value1", label2="value2"}</span
                   >
                 </li>
                 <li>
                   For range vector selectors, use
-                  <span class="bg-highlight px-[5px]">metric_name[5m]</span>
+                  <span class="bg-highlight-bg px-1.25">metric_name[5m]</span>
                 </li>
                 <li>
                   To aggregate data, use
-                  <span class="bg-highlight px-[5px]">sum by (label)(metric_name)</span>
+                  <span class="bg-highlight-bg px-1.25">sum by (label)(metric_name)</span>
                   or
-                  <span class="bg-highlight px-[5px]"> avg by (label)(metric_name)</span>
+                  <span class="bg-highlight-bg px-1.25"> avg by (label)(metric_name)</span>
                 </li>
                 <li>
                   For rate calculations over a range vector, use
-                  <span class="bg-highlight px-[5px]">rate(metric_name[5m])</span>
+                  <span class="bg-highlight-bg px-1.25">rate(metric_name[5m])</span>
                 </li>
               </ul>
             </div>
@@ -64,7 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       <div v-else>
-        <div class="syntax-guide-title w-105">
+        <div class="w-105">
           <div class="label text-sm font-bold">Syntax Guide: SQL Mode</div>
         </div>
         <div class="border-t my-1 border-dropdown-separator" />
@@ -74,33 +74,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <ul class="px-2.5 mt-2.5 mb-0 text-sm leading-[23px]">
                 <li>
                   For full text search of value 'error' use
-                  <span class="bg-highlight px-[5px]"
+                  <span class="bg-highlight-bg px-1.25"
                     >SELECT * FROM <b>stream</b> WHERE match_all('error')</span
                   >
                 </li>
                 <li>
                   For column search of value 'error' use
-                  <span class="bg-highlight px-[5px]"
+                  <span class="bg-highlight-bg px-1.25"
                     >SELECT * FROM <b>stream</b> WHERE
                     str_match(<b>fieldname</b>, 'error')</span
                   >
                 </li>
                 <li>
                   To search value 200 for code column use
-                  <span class="bg-highlight px-[5px]"
+                  <span class="bg-highlight-bg px-1.25"
                     >SELECT * FROM <b>stream</b> WHERE code=200</span
                   >
                 </li>
                 <li>
                   To search value 'stderr' for stream column use
-                  <span class="bg-highlight px-[5px]"
+                  <span class="bg-highlight-bg px-1.25"
                     >SELECT * FROM <b>stream</b> WHERE stream='stderr'</span
                   >
                 </li>
                 <li>
                   To search and use query function <i>extract_ip</i> on column
                   log use
-                  <span class="bg-highlight px-[5px]"
+                  <span class="bg-highlight-bg px-1.25"
                     >SELECT extract_ip(log) FROM <b>stream</b> WHERE
                     code=200</span
                   >

@@ -38,7 +38,7 @@ const mockGetBoundingClientRect = vi.fn(() => ({
 const getUserGuideEl = (): HTMLElement | null =>
   document.body.querySelector(".user-guide");
 const getHighlightEls = (): HTMLElement[] =>
-  Array.from(document.body.querySelectorAll(".user-guide .bg-highlight"));
+  Array.from(document.body.querySelectorAll(".user-guide .bg-highlight-bg"));
 const getGuideText = (): string => getUserGuideEl()?.textContent ?? "";
 
 describe("DrilldownUserGuide", () => {
@@ -432,7 +432,7 @@ describe("DrilldownUserGuide", () => {
 
       // Check that highlights have the correct class
       highlights.forEach((highlight) => {
-        expect(highlight.classList.contains("bg-highlight")).toBe(true);
+        expect(highlight.classList.contains("bg-highlight-bg")).toBe(true);
       });
     });
   });

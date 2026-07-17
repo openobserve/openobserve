@@ -140,12 +140,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         size="icon-toolbar"
         @click="toggleJsonEditorAIChat"
         data-test="menu-link-ai-item"
-        class="ai-hover-btn"
+        class="group [background:var(--color-gradient-ai-subtle)]! text-ai-accent! dark:text-white! [transition:background_0.3s_ease,box-shadow_0.3s_ease,color_0.3s_ease] dark:shadow-[0_0.25rem_0.75rem_0_color-mix(in_srgb,var(--color-ai-accent)_20%,transparent)] hover:[background:var(--color-gradient-ai)]! hover:text-white! hover:shadow-[0_0.25rem_0.75rem_0_color-mix(in_srgb,var(--color-ai-accent)_35%,transparent)] dark:hover:shadow-[0_0.25rem_0.75rem_0_color-mix(in_srgb,var(--color-ai-accent)_35%,transparent)]"
         :class="store.state.isAiChatEnabled ? 'ai-btn-active' : ''"
         @mouseenter="isJsonEditorAiHovered = true"
         @mouseleave="isJsonEditorAiHovered = false"
       >
-        <img :src="jsonEditorAiBtnLogo" class="header-icon ai-icon size-5" />
+        <img :src="jsonEditorAiBtnLogo" class="header-icon size-5 [transition:transform_0.6s_ease] group-hover:rotate-180 group-hover:brightness-0 group-hover:invert group-hover:[transition:filter_0.3s_ease]" />
       </OButton>
     </template>
     <JsonEditor
