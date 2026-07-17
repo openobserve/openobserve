@@ -32,7 +32,7 @@ test.describe("Alerts Advanced Coverage Tests", () => {
         const alertsUrl = `${logData.alertUrl}?org_identifier=${getOrgIdentifier()}`;
         await page.goto(alertsUrl);
         await page.waitForLoadState('networkidle', { timeout: NETWORK_IDLE_TIMEOUT_MS }).catch(() => {});
-        await pm.alertsPage.waitForAlertListReady();
+        await pm.alertsPage.waitForAddAlertButton();
     });
 
     // ==================== ADVANCED CONDITIONS TESTS ====================
@@ -61,7 +61,7 @@ test.describe("Alerts Advanced Coverage Tests", () => {
 
         const alertsUrl = `${logData.alertUrl}?org_identifier=${getOrgIdentifier()}`;
         await page.goto(alertsUrl);
-        await pm.alertsPage.waitForAlertListReady();
+        await pm.alertsPage.waitForAddAlertButton();
 
         const alertName = await pm.alertsPage.createAlertWithMultipleConditions(
             TEST_STREAM,
@@ -98,7 +98,7 @@ test.describe("Alerts Advanced Coverage Tests", () => {
         // Navigate back to alerts page
         const alertsUrl = `${logData.alertUrl}?org_identifier=${getOrgIdentifier()}`;
         await page.goto(alertsUrl);
-        await pm.alertsPage.waitForAlertListReady();
+        await pm.alertsPage.waitForAddAlertButton();
 
         // Verifies: multiple conditions can be added, AND is default, can toggle to OR
         const result = await pm.alertsPage.testConditionOperatorToggle(TEST_STREAM, uniqueSuffix);
@@ -131,16 +131,16 @@ test.describe("Alerts Advanced Coverage Tests", () => {
 
         const alertsUrl = `${logData.alertUrl}?org_identifier=${getOrgIdentifier()}`;
         await page.goto(alertsUrl);
-        await pm.alertsPage.waitForAlertListReady();
+        await pm.alertsPage.waitForAddAlertButton();
 
         // Create two alerts for bulk operations
         await pm.alertsPage.createAlertWithDefaults(TEST_STREAM, destinationName, 'bulk1_' + uniqueSuffix);
-        await pm.alertsPage.waitForAlertListReady();
+        await pm.alertsPage.waitForAddAlertButton();
         const createdAlert1 = pm.alertsPage.currentAlertName;
         testLogger.info('Created first alert for bulk test', { alertName: createdAlert1 });
 
         await pm.alertsPage.createAlertWithDefaults(TEST_STREAM, destinationName, 'bulk2_' + uniqueSuffix);
-        await pm.alertsPage.waitForAlertListReady();
+        await pm.alertsPage.waitForAddAlertButton();
         const createdAlert2 = pm.alertsPage.currentAlertName;
         testLogger.info('Created second alert for bulk test', { alertName: createdAlert2 });
 
@@ -150,7 +150,7 @@ test.describe("Alerts Advanced Coverage Tests", () => {
         testLogger.info('Bulk pause completed');
 
         // Wait for alert list table to be ready before re-selecting
-        await pm.alertsPage.waitForAlertListReady();
+        await pm.alertsPage.waitForAddAlertButton();
 
         // Selection cleared after operation, re-select
         await pm.alertsPage.selectMultipleAlerts([createdAlert1, createdAlert2]);
@@ -187,7 +187,7 @@ test.describe("Alerts Advanced Coverage Tests", () => {
 
         const alertsUrl = `${logData.alertUrl}?org_identifier=${getOrgIdentifier()}`;
         await page.goto(alertsUrl);
-        await pm.alertsPage.waitForAlertListReady();
+        await pm.alertsPage.waitForAddAlertButton();
 
         const dedupConfig = {
             timeWindowMinutes: 30
@@ -262,7 +262,7 @@ test.describe("Alerts Advanced Coverage Tests", () => {
         await pm.commonActions.navigateToAlerts();
         await page.reload();
         await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-        await pm.alertsPage.waitForAlertListReady();
+        await pm.alertsPage.waitForAddAlertButton();
 
         // Create scheduled alert with deduplication for validation
         const dedupConfig = {

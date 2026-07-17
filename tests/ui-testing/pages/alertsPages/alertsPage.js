@@ -343,8 +343,8 @@ export class AlertsPage {
         }
     }
 
-    /** Wait for the alerts list page to be ready (Add Alert button visible). */
-    async waitForAlertListReady() {
+    /** Wait for the Add Alert button to render — the readiness gate before creating an alert. */
+    async waitForAddAlertButton() {
         await this.page.locator(this.locators.addAlertButton).waitFor({ state: 'visible', timeout: 30000 });
     }
 
