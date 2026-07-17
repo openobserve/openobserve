@@ -326,7 +326,6 @@ import CallMade from "~icons/material-symbols/call-made";
 import CallReceived from "~icons/material-symbols/call-received";
 import Inbox from "~icons/material-symbols/inbox-outline";
 import StarRate from "~icons/material-symbols/star-rate-outline";
-import StarRateFilled from "~icons/material-symbols/star-rate";
 import CardMembership from "~icons/material-symbols/card-membership-outline";
 import Domain from "~icons/material-symbols/domain";
 import DataArray from "~icons/material-symbols/data-array";
@@ -652,7 +651,6 @@ export const iconRegistry = {
   "call-received": CallReceived,
   "inbox": Inbox,
   "star-rate": StarRate,
-  "star-rate-filled": StarRateFilled,
   "card-membership": CardMembership,
   "domain": Domain,
   "data-array": DataArray,

@@ -186,7 +186,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   size="sm-toolbar"
                   :active="showFavoritesOnly"
                   :icon-left="
-                    showFavoritesOnly ? 'star-rate-filled' : 'star-rate'
+                    showFavoritesOnly ? 'favorite' : 'favorite-border'
                   "
                   class="shrink-0"
                   :title="t('dashboard.showFavoritesOnly')"
@@ -215,7 +215,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   variant="ghost"
                   size="icon-xs-sq"
                   :icon-left="
-                    isFavorite(row.id) ? 'star-rate-filled' : 'star-rate'
+                    isFavorite(row.id) ? 'favorite' : 'favorite-border'
                   "
                   :class="
                     isFavorite(row.id)
