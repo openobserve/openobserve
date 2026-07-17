@@ -1,6 +1,6 @@
 ﻿<template>
   <div
-    class="chat-container w-full h-full flex flex-col overflow-hidden rounded-md text-button-primary-foreground bg-card-glass-solid [box-shadow:0_0_5px_1px_var(--color-hover-shadow)]"
+    class="chat-container w-full h-full flex flex-col overflow-hidden rounded-md text-text-body bg-card-glass-solid [box-shadow:0_0_5px_1px_var(--color-hover-shadow)]"
     :class="[
       { 'chat-open': isOpen },    ]"
   >
@@ -29,7 +29,7 @@
                 >
                   <div class="flex items-center gap-2 max-w-55">
                     <span
-                      class="chat-title-text text-sm font-medium truncate block max-w-45 text-button-primary-foreground"
+                      class="chat-title-text text-sm font-medium truncate block max-w-45 text-text-body"
                     >
                       {{ displayedTitle || "New Chat" }}
                       <OTooltip
@@ -282,7 +282,7 @@
               message.role,
               message.role === 'user'
                 ? 'ml-10 w-[calc(100%-2.5rem)] [background:var(--color-chat-bubble-ai)] text-text-body dark:text-text-secondary'
-                : 'ml-0 w-full bg-surface-base text-button-primary-foreground dark:text-text-secondary',
+                : 'ml-0 w-full bg-surface-base text-text-body dark:text-text-secondary',
               { 'error-message': message.content.startsWith('Error:') },
             ]"
           >
