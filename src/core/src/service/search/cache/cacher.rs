@@ -35,7 +35,7 @@ use crate::{
             MultiCachedQueryResponse,
             result_utils::{get_ts_value, has_non_timestamp_ordering, is_timestamp_field},
         },
-        sql::{RE_HISTOGRAM, Sql, visitor::histogram_interval::generate_histogram_interval},
+        sql::Sql,
     },
 };
 
@@ -907,46 +907,6 @@ pub async fn delete_cache(
     Ok(true)
 }
 
-pub fn handle_histogram(
-    origin_sql: &mut String,
-    q_time_range: (i64, i64),
-    histogram_interval: i64,
-) {
-    let caps = if let Some(caps) = RE_HISTOGRAM.captures(origin_sql.as_str()) {
-        caps
-    } else {
-        return;
-    };
-
-    // 0th capture is the whole histogram(...) ,
-    // 1st capture is the comma-delimited list of args
-    // ideally there should be at least one arg, otherwise df with anyways complain,
-    // so we we return from here if capture[1] is None
-    let args = match caps.get(1) {
-        Some(v) => v
-            .as_str()
-            .split(',')
-            .map(|v| v.trim().trim_matches(|v| v == '\'' || v == '"'))
-            .collect::<Vec<&str>>(),
-        None => return,
-    };
-
-    let interval = if histogram_interval > 0 {
-        format!("{histogram_interval} second")
-    } else {
-        args.get(1)
-            .map_or_else(|| generate_histogram_interval(q_time_range), |v| *v)
-            .to_string()
-    };
-
-    let field = args.first().unwrap_or(&"_timestamp");
-
-    *origin_sql = origin_sql.replace(
-        caps.get(0).unwrap().as_str(),
-        &format!("histogram({field},'{interval}')"),
-    );
-}
-
 fn calculate_deltas_multi(
     results: &[CachedQueryResponse],
     start_time: i64,
@@ -1162,16 +1122,6 @@ mod tests {
             delta_end_time: 1747659600000000,
         }];
         assert_eq!(deltas, expected_deltas);
-    }
-
-    #[test]
-    fn test_handle_histogram() {
-        // Test case 1: Basic histogram with numeric interval
-        let mut sql = "SELECT histogram(_timestamp, '10 seconds') FROM logs".to_string();
-        let time_range = (1640995200000000, 1641081600000000); // 2022-01-01 to 2022-01-02
-        handle_histogram(&mut sql, time_range, 10);
-        assert!(sql.contains("histogram(_timestamp,"));
-        assert!(sql.contains("second"));
     }
 
     #[test]

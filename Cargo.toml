@@ -239,7 +239,9 @@ members = [
     "src/api_query",
     "src/api_common",
     "src/core",
+    "src/vrl",
     "src/search",
+    "src/promql",
     "src/jobs",
     "src/config",
     "src/infra",
@@ -269,7 +271,9 @@ flight = { path = "src/flight" }
 tantivy_utils = { path = "src/tantivy_utils" }
 web = { path = "src/web" }
 openobserve-core = { path = "src/core" }
+openobserve-vrl = { path = "src/vrl" }
 search = { path = "src/search" }
+promql = { path = "src/promql" }
 openobserve-api = { path = "src/api" }
 openobserve-api-management = { path = "src/api_management" }
 openobserve-api-query = { path = "src/api_query" }
@@ -306,7 +310,7 @@ multer = "3.1"
 pprof = { version = "0.15", features = ["flamegraph", "protobuf-codec"] }
 promql-parser = { version = "0.6", git = "https://github.com/openobserve/promql-parser", branch = "openobserve" }
 rcgen = "0.14.4"
-rust-embed-for-web = "11.3"
+rust-embed-for-web = "11.4.1"
 sourcemap = "9.3.2"
 tikv-jemalloc-ctl = { version = "0.6", features = [
     "use_std",

@@ -13,6 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+// macOS ld cannot encode compact-unwind offsets once __eh_frame exceeds 16MB;
+// harmless for a binary this size (only slows panic unwinding), so silence it.
+#![allow(linker_messages)]
+
 #[cfg(test)]
 mod tests {
     use core::time;
