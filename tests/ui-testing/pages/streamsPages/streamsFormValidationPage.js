@@ -44,12 +44,20 @@ export class StreamsFormValidationPage {
 
     async navigateToStreamsPage() {
         testLogger.info('Navigating to Streams explorer page');
-        await this.page.locator(this.streamsMenuLink).click();
+        // Navigate by URL instead of clicking the left-nav tile: post-revamp the
+        // tile is a hover-flyout group and a plain click from the home page can
+        // land without the streams list (seen on cloud). The org_identifier
+        // param keeps the app bound to the test org.
+        await this.page.goto(`${process.env.ZO_BASE_URL}/web/streams?org_identifier=${process.env.ORGNAME}`);
+        await this.page.waitForLoadState('domcontentloaded');
         await this.page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
     }
 
     async openAddStreamDialog() {
         testLogger.info('Opening Add Stream dialog');
+        // The Add Stream button renders only after zoConfig loads
+        // (v-if="isSchemaUDSEnabled"), so wait for it rather than click-timeout.
+        await this.page.locator(this.addStreamButton).waitFor({ state: 'visible', timeout: 30000 });
         await this.page.locator(this.addStreamButton).click();
         await this.page.locator(this.addStreamDialog).waitFor({ state: 'visible', timeout: 10000 });
     }

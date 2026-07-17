@@ -107,7 +107,7 @@ test.describe("Logs Table Field Management - Complete Test Suite", () => {
     for (let attempt = 0; attempt < 2 && !restored; attempt++) {
       await page.reload();
       await page.waitForLoadState('domcontentloaded');
-      await expect(page.locator('[data-test="logs-search-result-logs-table"]')).toBeVisible({ timeout: 30000 }).catch(() => {});
+      await pageManager.logsPage.expectLogsTableVisible().catch(() => {});
       await pageManager.logsPage.waitForFieldListReady().catch(() => {});
       restored = await page
         .locator(`[data-test="log-search-result-table-th-${fieldName}"]`)
@@ -629,10 +629,7 @@ test.describe("Severity Color Mapping Tests - Issue #9439", () => {
     // Poll until at least the expected number of distinct-level bars have rendered.
     await expect
       .poll(
-        async () =>
-          pageManager.logsPage.page
-            .locator('tbody tr[data-index] [data-test="log-table-row-status-color"]')
-            .count(),
+        () => pageManager.logsPage.countSeverityColorBars(),
         { timeout: 30000, message: 'severity status color bars did not render in time' },
       )
       .toBeGreaterThanOrEqual(Object.keys(expectedColorByLevel).length);

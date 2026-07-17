@@ -12,7 +12,7 @@ const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
 
 test.describe('Anomaly Detection form validation', { tag: ['@anomaly-form-validation', '@P0', '@smoke'] }, () => {
-    test.describe.configure({ mode: 'serial' });
+    test.describe.configure({ mode: 'parallel' });
     let pm;
 
     test.beforeEach(async ({ page }, testInfo) => {

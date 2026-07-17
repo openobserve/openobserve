@@ -2066,19 +2066,24 @@ export class LogsPage {
         const field = 'kubernetes_pod_name';
         const editor = this.page.locator(this.queryEditor);
 
-        // Quick mode ON gates the star icons via v-if="showQuickMode".
-        // If the field list items are not visible, turn quick mode on and retry.
+        // Quick mode ON gates the star (ⓘ) icons via v-if="showQuickMode".
+        // Root cause of prior CI flakiness: an instant isVisible() check raced
+        // the field list re-rendering after the query completed, then toggled
+        // quick mode (already ON) which churned the utilities menu without
+        // helping. Instead: assert quick mode ON once (idempotent — safe whether
+        // the caller enabled it or not), then WAIT deterministically for the
+        // field list to render its interesting buttons. Slow CI runners need the
+        // wait, not a toggle.
         const fieldItem = this.page.locator('[data-test^="log-search-index-list-interesting-"]').first();
-        for (let attempt = 1; attempt <= 2; attempt++) {
-            const isVisible = await fieldItem.isVisible().catch(() => false);
-            if (isVisible) break;
-            testLogger.warn(`Field list items not visible (attempt ${attempt}/2) — turning quick mode on`);
+        await this.ensureQuickModeState(true);
+        try {
+            await fieldItem.waitFor({ state: 'visible', timeout: 20000 });
+        } catch {
+            // Fallback: a stray earlier toggle may have flipped quick mode off —
+            // re-assert and wait once more before giving up.
+            testLogger.warn('Interesting-field buttons not visible after 20s — re-asserting quick mode and waiting');
             await this.ensureQuickModeState(true);
-            // Wait for the field list to populate after quick mode toggle
-            await fieldItem.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
-        }
-        if (!(await fieldItem.isVisible().catch(() => false))) {
-            throw new Error('Field list items still not visible after 2 quick-mode retries');
+            await fieldItem.waitFor({ state: 'visible', timeout: 15000 });
         }
 
         await this.fillIndexFieldSearchInput(field);
@@ -4456,6 +4461,16 @@ export class LogsPage {
     }
 
     /**
+     * Multistream variant: hover the LAST rendered field row (a field can appear
+     * once per selected stream, so target the last occurrence) to render its
+     * action buttons, then click the interesting-field (ⓘ) toggle on that row.
+     */
+    async hoverAndClickInterestingFieldLast(field) {
+        await this.page.locator(this.fieldListItem(field)).last().hover();
+        await this.page.locator(this.interestingFieldBtn(field)).last().click({ force: true });
+    }
+
+    /**
      * Idempotent version of clickInterestingFieldButton: only clicks if the field is
      * NOT already marked as interesting.  Use this when the goal is to guarantee the
      * field is in interestingFieldList, not to toggle it.  If the button's title
@@ -6652,6 +6667,17 @@ export class LogsPage {
      * Get severity colors from all visible log rows
      * Returns array of {severity, color} objects
      */
+    /**
+     * Count the per-row severity status-color bars currently rendered in the results
+     * table. Mirrors the selector getSeverityColors() reads, so callers can poll for the
+     * table to actually paint its rows before reading colors (avoids a fixed sleep).
+     */
+    async countSeverityColorBars() {
+        return await this.page
+            .locator('tbody tr[data-index] [data-test="log-table-row-status-color"]')
+            .count();
+    }
+
     async getSeverityColors() {
         return await this.page.evaluate(() => {
             const rows = document.querySelectorAll('tbody tr[data-index]');

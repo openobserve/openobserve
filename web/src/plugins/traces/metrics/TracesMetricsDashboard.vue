@@ -87,7 +87,6 @@ import { deepCopy, formatTimeWithSuffix } from "@/utils/zincutils";
 import useTraces from "@/composables/useTraces";
 import { parseDurationWhereClause } from "@/composables/useDurationPercentiles";
 import { parseSpanKindWhereClause } from "@/utils/traces/constants";
-import useParser from "@/composables/useParser";
 
 const RenderDashboardCharts = defineAsyncComponent(
   () => import("@/views/Dashboards/RenderDashboardCharts.vue"),
@@ -119,7 +118,7 @@ const emit = defineEmits<{
 
 const { showErrorNotification } = useNotifications();
 const store = useStore();
-const { searchObj } = useTraces();
+const { searchObj, tracesParser } = useTraces();
 const { t } = useI18n();
 
 
@@ -208,7 +207,6 @@ const contextMenuPosition = ref({ x: 0, y: 0 });
 const contextMenuValue = ref(0);
 const contextMenuFieldName = ref("");
 const contextMenuData = ref<any>(null);
-const sqlParser = ref<any>(null);
 
 const getBaseFilters = () => {
   let baseFilters = [];
@@ -232,13 +230,13 @@ const getBaseFilters = () => {
   if (effectiveFilter.value?.trim().length) {
     const parsed = parseDurationWhereClause(
       effectiveFilter.value.trim(),
-      sqlParser.value,
+      tracesParser.value,
       searchObj.data.stream.selectedStream.value,
     );
     baseFilters.push(
       parseSpanKindWhereClause(
         typeof parsed === "string" ? parsed : effectiveFilter.value.trim(),
-        sqlParser.value,
+        tracesParser.value,
         searchObj.data.stream.selectedStream.value,
       ),
     );
@@ -275,7 +273,7 @@ const loadDashboard = async () => {
           // and span_kind labels back to numeric OTEL keys.
           const parsedFilter = parseDurationWhereClause(
             effectiveFilter.value.trim(),
-            sqlParser.value,
+            tracesParser.value,
             searchObj.data.stream.selectedStream.value,
           );
           errorFilters.push(
@@ -283,7 +281,7 @@ const loadDashboard = async () => {
               typeof parsedFilter === "string"
                 ? parsedFilter
                 : effectiveFilter.value.trim(),
-              sqlParser.value,
+              tracesParser.value,
               searchObj.data.stream.selectedStream.value,
             ),
           );
@@ -702,10 +700,8 @@ const stopAutoRefresh = () => {
   }
 };
 
-onMounted(async () => {
+onMounted(() => {
   loadDashboard();
-  const { sqlParser: loadSqlParser } = useParser();
-  sqlParser.value = await loadSqlParser();
 });
 
 onBeforeUnmount(() => {
