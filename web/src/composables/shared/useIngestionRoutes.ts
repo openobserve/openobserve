@@ -27,6 +27,7 @@ import AzureConfig from "@/components/ingestion/recommended/AzureConfig.vue";
 import FileBeat from "@/components/ingestion/logs/FileBeat.vue";
 import OpenTelemetry from "@/components/ingestion/traces/OpenTelemetry.vue";
 import PrometheusConfig from "@/components/ingestion/metrics/PrometheusConfig.vue";
+import VMagentConfig from "@/components/ingestion/metrics/VMagentConfig.vue";
 import OtelCollector from "@/components/ingestion/metrics/OtelCollector.vue";
 import TelegrafConfig from "@/components/ingestion/metrics/TelegrafConfig.vue";
 import CloudWatchMetricConfig from "@/components/ingestion/metrics/CloudWatchMetrics.vue";
@@ -234,6 +235,14 @@ const useIngestionRoutes = () => {
                   path: "prometheus",
                   name: "prometheus",
                   component: PrometheusConfig,
+                  beforeEnter(to: any, from: any, next: any) {
+                    routeGuard(to, from, next);
+                  },
+                },
+                {
+                  path: "vmagent",
+                  name: "vmagent",
+                  component: VMagentConfig,
                   beforeEnter(to: any, from: any, next: any) {
                     routeGuard(to, from, next);
                   },
