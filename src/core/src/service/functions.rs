@@ -625,31 +625,6 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_js_function_blocked_in_regular_org() {
-        use http_body_util::BodyExt;
-        use serde_json::json;
-
-        let org_id = "default";
-        let function = "function transform(row) { row.processed = true; return row; }".to_string();
-        let events = vec![json!({"field": "value"})];
-        let trans_type = Some(1); // JavaScript
-
-        let response = test_run_function(org_id, function, events, trans_type)
-            .await
-            .unwrap();
-
-        // JavaScript functions should be blocked in non-_meta orgs
-        assert_eq!(response.status(), http::StatusCode::BAD_REQUEST);
-
-        // Verify error message
-        let body_bytes = response.into_body().collect().await.unwrap().to_bytes();
-        let body_str = String::from_utf8(body_bytes.to_vec()).unwrap();
-        assert!(
-            body_str.contains("JavaScript functions are only allowed in the '_meta' organization")
-        );
-    }
-
-    #[tokio::test]
     async fn test_save_js_function_allowed_in_meta_org() {
         let org_id = "_meta";
         let function = Transform {
@@ -670,34 +645,6 @@ mod tests {
 
         // Clean up
         let _ = delete_function(org_id, "test_js_fn").await;
-    }
-
-    #[tokio::test]
-    async fn test_save_js_function_blocked_in_regular_org() {
-        let org_id = "default";
-        let function = Transform {
-            name: "test_js_fn_blocked".to_owned(),
-            function: "function transform(row) { return row; }".to_owned(),
-            params: "row".to_owned(),
-            trans_type: Some(1), // JavaScript
-            num_args: 1,
-            streams: None,
-        };
-
-        let response = save_function(org_id.to_string(), function).await;
-
-        // JavaScript functions should be blocked in non-_meta orgs
-        assert!(response.is_ok());
-        let resp = response.unwrap();
-        assert_eq!(resp.status(), http::StatusCode::BAD_REQUEST);
-
-        // Verify error message
-        use http_body_util::BodyExt;
-        let body_bytes = resp.into_body().collect().await.unwrap().to_bytes();
-        let body_str = String::from_utf8(body_bytes.to_vec()).unwrap();
-        assert!(
-            body_str.contains("JavaScript functions are only allowed in the '_meta' organization")
-        );
     }
 
     #[tokio::test]

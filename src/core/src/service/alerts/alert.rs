@@ -3899,7 +3899,7 @@ mod tests {
         );
         assert_eq!(
             AlertError::AlertDestinationMissing.to_string(),
-            "Alert destinations is required"
+            "Alert destination or workflows is required"
         );
         assert_eq!(AlertError::AlertNotFound.to_string(), "Alert not found");
         assert_eq!(
