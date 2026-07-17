@@ -1,24 +1,23 @@
 /**
  * Language Translation Coverage Tests
  *
- * Tests translation coverage for all supported languages.
+ * Tests translation coverage for all supported languages. Runs in parallel.
  */
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
 
-// Run the 10 language cases SEQUENTIALLY within this file (default mode), NOT in
-// parallel. Each case is an exhaustive ~27-page full-app crawl (Logs/Metrics/
-// Traces/RUM/Dashboards — chart, monaco and websocket-heavy views) held in one
-// context for up to 6 minutes. Under the CI `--workers=5` override, `mode:'parallel'`
-// let up to 5 of these giant crawls run at once and OOM-killed a worker browser
-// process — every case scheduled on that worker then failed with "Target page,
-// context or browser has been closed" (an 8-test cascade in run 29481437880).
-// Default mode keeps at most ONE language crawl resident per worker while OTHER
-// GeneralTests spec files still parallelise across the remaining workers, and —
-// unlike `mode:'serial'` — a single case failure does NOT skip the rest.
-// (Full coverage is preserved; only the concurrency is reduced.)
-test.describe.configure({ mode: 'default' });
+// Keep the 10 language cases running in parallel (fast, fits the shard timeout).
+// The OOM cascade seen in run 29481437880 (a worker browser process killed →
+// "Target page, context or browser has been closed" across 8 cases) is addressed
+// WITHOUT serialising: the crawl (languagePage.js) now navigates with
+// `waitUntil:'domcontentloaded'` + a bounded settle instead of waiting up to 10–30s
+// for `networkidle` on chart/websocket-heavy pages. That cuts each heavy page's
+// live-at-peak-memory dwell from ~10s to ~3s (so 5 concurrent crawls are far less
+// likely to spike memory simultaneously) and makes each crawl ~3–4× faster. The
+// fail-fast on a closed page/context (languagePage.js / landingPage.spec.js) stays
+// as defence-in-depth so any residual crash surfaces at its true origin.
+test.describe.configure({ mode: 'parallel' });
 
 const languages = [
   { code: 'de', name: 'German (Deutsch)', tag: '@de' },

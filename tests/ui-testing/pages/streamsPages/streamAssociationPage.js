@@ -92,35 +92,24 @@ export class StreamAssociationPage {
       throw new Error('Stream Detail button not found in the row');
     }
 
-    await detailButton.waitFor({ state: 'visible', timeout: 5000 });
-    testLogger.info('Stream Detail button is visible, attempting click with JavaScript...');
-
-    // Try JavaScript click first - sometimes Playwright's click doesn't work if element is partially obscured
-    await detailButton.evaluate(el => el.click());
-    testLogger.info('Executed JavaScript click on Stream Detail button');
-
-    // Wait for sidebar to open - just use waitFor, no fixed timeout
     const updateSettingsButton = this.page.locator('[data-test="schema-update-settings-button"]');
 
-    // Wait up to 3 seconds for sidebar to appear, if not try regular click
-    const opened = await updateSettingsButton.waitFor({ state: 'visible', timeout: 3000 }).then(() => true).catch(() => false);
-
-    if (!opened) {
-      testLogger.warn('Sidebar did not open with JavaScript click, trying regular click...');
-      // Use an instant native scrollIntoView instead of Playwright's scrollIntoViewIfNeeded:
-      // the revamped Reka-based streams table detaches/re-renders rows mid-animation, so the
-      // scrollIntoViewIfNeeded stability polling could spin until the 45s actionTimeout even
-      // though the button (already waited visible above) is present. Native scroll resolves once.
-      await detailButton.evaluate((el) => el.scrollIntoView({ block: 'center', inline: 'nearest' })).catch(() => {});
-      await detailButton.click();
-      testLogger.info('Executed Playwright click on Stream Detail button');
-      await updateSettingsButton.waitFor({ state: 'visible', timeout: 5000 });
-    }
+    // The revamped Reka-based streams table re-renders/detaches rows mid-animation,
+    // so a one-shot Playwright `click()` can spin on actionability until the 45s
+    // actionTimeout, and a single JS click can race the sidebar-open on a slow cloud.
+    // Re-resolve the row's Stream Detail button FRESH each attempt (the row may have
+    // detached), fire a native DOM click (no actionability polling to hang on), and
+    // verify the detail sidebar actually opened — retry the whole sequence until it
+    // does. Deterministic: keyed to the real "sidebar open" signal, not blind waits.
+    await expect(async () => {
+      const btn = streamRow.getByRole('button', { name: 'Stream Detail' }).first();
+      await expect(btn).toBeVisible({ timeout: 5000 });
+      await btn.evaluate((el) => el.scrollIntoView({ block: 'center', inline: 'nearest' })).catch(() => {});
+      await btn.evaluate((el) => el.click());
+      await expect(updateSettingsButton).toBeVisible({ timeout: 5000 });
+    }).toPass({ timeout: 45000 });
 
     testLogger.info('Stream detail sidebar opened successfully');
-
-    // Wait for schema table to load (minimal wait)
-    await this.page.waitForTimeout(300);
   }
 
   async clickAddPatternCell(fieldName) {

@@ -231,6 +231,25 @@ class LanguagePage {
       || /has been closed|Target (page|frame)?.*closed|Target closed/i.test((error && error.message) || '');
   }
 
+  /**
+   * Navigate to a page for text scraping with a BOUNDED settle.
+   *
+   * Translation strings are static i18n rendered on component mount, so we do not
+   * need a fully loaded/idle page — waiting for `networkidle` on chart/monaco/
+   * websocket-heavy views (Metrics/Traces/RUM/Dashboards) never settles, wasting
+   * up to 10–30s per page AND holding that heavy page live at peak renderer memory
+   * the whole time. Under `--workers=5` that prolonged, overlapping memory spike is
+   * what OOM-kills a worker. Using `domcontentloaded` + a short bounded settle caps
+   * each heavy page's live-at-peak dwell to ~a few seconds (lower OOM probability)
+   * and makes the crawl ~3–4× faster (fits the shard timeout).
+   * @param {string} url
+   * @param {number} settleMs bounded max settle after DOMContentLoaded
+   */
+  async _navigateForScrape(url, settleMs = 2500) {
+    await this.page.goto(url, { waitUntil: 'domcontentloaded' });
+    await this.page.waitForLoadState('networkidle', { timeout: settleMs }).catch(() => {});
+  }
+
   // ============================================================================
   // PUBLIC ACTIONS
   // ============================================================================
@@ -343,8 +362,7 @@ class LanguagePage {
    */
   async navigateToHome() {
     const homeUrl = `/web/?org_identifier=${process.env["ORGNAME"]}`;
-    await this.page.goto(homeUrl);
-    await this.page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
+    await this._navigateForScrape(homeUrl, 5000);
   }
 
   /**
@@ -572,8 +590,7 @@ class LanguagePage {
    */
   async _testSinglePage(pageConfig, langCode) {
     const pageUrl = `/web${pageConfig.path}?org_identifier=${process.env["ORGNAME"]}`;
-    await this.page.goto(pageUrl);
-    await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+    await this._navigateForScrape(pageUrl);
 
     const allTexts = await this._extractAllVisibleText();
     return this._analyzeTranslation(allTexts, langCode);
@@ -622,8 +639,7 @@ class LanguagePage {
         } else if (subPage.path) {
           // Navigate to sub-page URL
           const subPageUrl = `/web${subPage.path}?org_identifier=${process.env["ORGNAME"]}`;
-          await this.page.goto(subPageUrl);
-          await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+          await this._navigateForScrape(subPageUrl);
           const texts = await this._extractAllVisibleText();
           results.push({
             name: subPage.name,
