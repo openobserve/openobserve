@@ -115,19 +115,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           trigger
           @trigger="onRefreshTick"
         />
-        <!-- Same refresh control as the dashboard toolbar. In Visualize it
-             re-runs the chart's query; in Explore/Workspace it refreshes the
-             grid — so its disabled/loading state follows the grid only there. -->
+        <!-- Labeled Refresh button. In Visualize it re-runs the chart's query;
+             in Explore/Workspace it refreshes the grid — so its
+             disabled/loading state follows the grid only there. -->
         <OButton
           variant="outline"
-          size="icon-toolbar"
+          size="sm-toolbar"
           icon-left="refresh"
           :disabled="isGridMode && (refreshing || grid.loading.value)"
           :loading="isGridMode && refreshing"
           data-test="metrics-explorer-refresh"
           @click="onRefresh"
         >
-          <OTooltip :content="t('metrics.explorer.refresh')" />
+          {{ t("metrics.explorer.refresh") }}
         </OButton>
       </div>
     </div>

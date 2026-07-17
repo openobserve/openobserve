@@ -50,6 +50,21 @@ vi.mock("@/utils/dashboard/convertDashboardSchemaVersion", () => ({
   convertDashboardSchemaVersion: vi.fn((dashboard) => dashboard),
 }));
 
+// Settings v2 KV backend for the home pin + per-user favorites — mocked so
+// mount-time loads and favorite toggles never hit the network.
+vi.mock("@/services/settings", () => ({
+  default: {
+    getSetting: vi.fn().mockResolvedValue({ data: null }),
+    setOrgSetting: vi.fn().mockResolvedValue({}),
+    setUserSetting: vi.fn().mockResolvedValue({}),
+    deleteOrgSetting: vi.fn().mockResolvedValue({}),
+    deleteUserSetting: vi.fn().mockResolvedValue({}),
+  },
+}));
+
+import settingsService from "@/services/settings";
+import { useFavoriteDashboards } from "@/composables/useFavoriteDashboards";
+
 // Mock DOM methods to prevent errors from missing DOM APIs
 Object.defineProperty(Element.prototype, 'removeAttribute', {
   writable: true,
@@ -452,6 +467,94 @@ describe("Dashboards.vue", () => {
       await nextTick();
 
       expect(wrapper.vm.resultTotal).toBe(3);
+    });
+  });
+
+  describe("Favorite dashboards", () => {
+    const storeWithTwo = () => {
+      const testStore = createMockStore();
+      testStore.state.organizationData.allDashboardList = {
+        default: [
+          { dashboardId: "dash1", title: "Dashboard 1", description: "", owner: "", created: "2023-01-01T00:00:00Z" },
+          { dashboardId: "dash2", title: "Dashboard 2", description: "", owner: "", created: "2023-01-01T00:00:00Z" },
+        ],
+      };
+      return testStore;
+    };
+
+    beforeEach(() => {
+      useFavoriteDashboards().favorites.value = [];
+    });
+
+    it("shows everything by default and only favorites when the filter is on", async () => {
+      wrapper = shallowMount(Dashboards, {
+        global: buildGlobalConfig(storeWithTwo(), router, i18n),
+      });
+      await nextTick();
+      await nextTick();
+
+      useFavoriteDashboards().favorites.value = [
+        { dashboardId: "dash2", folderId: "default", label: "Dashboard 2" },
+      ];
+      expect(wrapper.vm.dashboards).toHaveLength(2);
+
+      wrapper.vm.showFavoritesOnly = true;
+      await nextTick();
+
+      expect(wrapper.vm.dashboards).toHaveLength(1);
+      expect(wrapper.vm.dashboards[0].id).toBe("dash2");
+      // Filtered BEFORE mapping, so the index column renumbers from 01.
+      expect(wrapper.vm.dashboards[0]["#"]).toBe("01");
+      expect(wrapper.vm.resultTotal).toBe(1);
+
+      wrapper.vm.showFavoritesOnly = false;
+      await nextTick();
+      expect(wrapper.vm.dashboards).toHaveLength(2);
+    });
+
+    it("toggleFavorite persists the per-user setting resolved to the active folder", async () => {
+      const testStore = storeWithTwo();
+      (testStore.state.userInfo as any).email = "me@example.com";
+      wrapper = shallowMount(Dashboards, {
+        global: buildGlobalConfig(testStore, router, i18n),
+      });
+      await nextTick();
+      await nextTick();
+
+      await wrapper.vm.toggleFavorite({ id: "dash1", name: "Dashboard 1" });
+
+      expect(settingsService.setUserSetting).toHaveBeenCalledWith(
+        "test-org",
+        "me@example.com",
+        "favorite_dashboards",
+        [{ dashboardId: "dash1", folderId: "default", label: "Dashboard 1" }],
+        "ui",
+      );
+      expect(wrapper.vm.isFavorite("dash1")).toBe(true);
+    });
+
+    it("toggleFavorite on an existing favorite removes it", async () => {
+      const testStore = storeWithTwo();
+      (testStore.state.userInfo as any).email = "me@example.com";
+      wrapper = shallowMount(Dashboards, {
+        global: buildGlobalConfig(testStore, router, i18n),
+      });
+      await nextTick();
+      await nextTick();
+
+      useFavoriteDashboards().favorites.value = [
+        { dashboardId: "dash1", folderId: "default", label: "Dashboard 1" },
+      ];
+      await wrapper.vm.toggleFavorite({ id: "dash1", name: "Dashboard 1" });
+
+      expect(wrapper.vm.isFavorite("dash1")).toBe(false);
+      expect(settingsService.setUserSetting).toHaveBeenCalledWith(
+        "test-org",
+        "me@example.com",
+        "favorite_dashboards",
+        [],
+        "ui",
+      );
     });
   });
 

@@ -181,6 +181,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </OInput>
                 </div>
 
+                <OButton
+                  variant="outline"
+                  size="sm-toolbar"
+                  :active="showFavoritesOnly"
+                  :icon-left="
+                    showFavoritesOnly ? 'star-rate-filled' : 'star-rate'
+                  "
+                  class="shrink-0"
+                  :title="t('dashboard.showFavoritesOnly')"
+                  data-test="dashboard-favorites-filter"
+                  @click="showFavoritesOnly = !showFavoritesOnly"
+                  >{{ t("dashboard.favorites") }}</OButton
+                >
               </div>
             </template>
             <template #toolbar-trailing>
@@ -197,6 +210,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
             <template #cell-name="{ row, value }">
               <span class="inline-flex items-center gap-1">
+                <!-- One-click favorite toggle — filled star when favorited. -->
+                <OButton
+                  variant="ghost"
+                  size="icon-xs-sq"
+                  :icon-left="
+                    isFavorite(row.id) ? 'star-rate-filled' : 'star-rate'
+                  "
+                  :class="
+                    isFavorite(row.id)
+                      ? 'text-primary shrink-0'
+                      : 'text-text-secondary shrink-0'
+                  "
+                  :title="
+                    isFavorite(row.id)
+                      ? t('dashboard.removeFromFavorites')
+                      : t('dashboard.addToFavorites')
+                  "
+                  :data-test="`dashboard-favorite-toggle-${value}`"
+                  @click.stop="toggleFavorite(row)"
+                />
                 <span
                   class="text-text-primary"
                   :data-test="`dashboard-name-cell-${value}`"
@@ -322,11 +355,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OEmptyState
                 size="hero"
                 :preset="activeFolderId !== 'default' ? 'no-dashboards-in-folder' : 'no-dashboards'"
-                :filtered="!!filterQuery"
+                :filtered="!!filterQuery || showFavoritesOnly"
                 @action="
                   (id) =>
                     id === 'clear-filters'
-                      ? (filterQuery = '')
+                      ? ((filterQuery = ''), (showFavoritesOnly = false))
                       : id === 'import'
                         ? importDashboard()
                         : id === 'templates'
@@ -538,6 +571,7 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 import { useHomeDashboard } from "@/composables/useHomeDashboard";
+import { useFavoriteDashboards } from "@/composables/useFavoriteDashboards";
 
 const MoveDashboardToAnotherFolder = defineAsyncComponent(() => {
   return import("@/components/dashboards/MoveDashboardToAnotherFolder.vue");
@@ -613,6 +647,28 @@ export default defineComponent({
 
     const { isHome, setHomeDashboard, clearHomeDashboard, homeDashboard } =
       useHomeDashboard();
+
+    // Per-user favorites — star toggle on each row + a favorites-only filter.
+    const {
+      isFavorite,
+      toggleFavorite: toggleFavoriteSetting,
+      load: loadFavorites,
+    } = useFavoriteDashboards();
+    const showFavoritesOnly = ref(false);
+    const toggleFavorite = (row: any) => {
+      const org = store.state.selectedOrganization?.identifier;
+      const userId = store.state.userInfo?.email;
+      // Same folder resolution as toggleHome: row.folder_id only exists in
+      // search-across-folders mode; otherwise the active folder is the one.
+      const folderId = searchAcrossFolders.value
+        ? row.folder_id
+        : activeFolderId.value || "default";
+      toggleFavoriteSetting(org, userId, {
+        dashboardId: row.id,
+        folderId,
+        label: row.name,
+      });
+    };
     const openHomeDashboard = async () => {
       if (!homeDashboard.value) return;
       const org = store.state.selectedOrganization?.identifier;
@@ -692,6 +748,8 @@ export default defineComponent({
       // on another system since this tab last loaded.
       const org = store.state.selectedOrganization?.identifier;
       if (org) useHomeDashboard().load(org);
+      const userId = store.state.userInfo?.email;
+      if (org && userId) loadFavorites(org, userId);
     });
     onUnmounted(() => {
       offDashboardEvent(handleAiDashboardEvent);
@@ -1078,11 +1136,20 @@ export default defineComponent({
             activeFolderId.value
           ] ?? [],
         );
-        return dashboardList.map((board: any, index) =>
+        // Filter BEFORE mapping so the "#" column stays sequential.
+        const visible = showFavoritesOnly.value
+          ? dashboardList.filter((board: any) => isFavorite(board.dashboardId))
+          : dashboardList;
+        return visible.map((board: any, index) =>
           mapDashboard(board, index),
         );
       } else {
-        return filteredResults.value.map((board: any, index) =>
+        const visible = showFavoritesOnly.value
+          ? filteredResults.value.filter((board: any) =>
+              isFavorite(board.dashboard?.dashboardId),
+            )
+          : filteredResults.value;
+        return visible.map((board: any, index) =>
           mapDashboard(board, index, {
             name: board.folder_name,
             id: board.folder_id,
@@ -1092,13 +1159,9 @@ export default defineComponent({
     });
 
     const resultTotal = computed(function () {
-      if (!searchAcrossFolders.value || searchQuery.value == "") {
-        return store.state.organizationData?.allDashboardList[
-          activeFolderId.value
-        ]?.length;
-      } else {
-        return filteredResults.value.length;
-      }
+      // Derived from the rendered rows so the footer count matches what the
+      // favorites filter / cross-folder search actually shows.
+      return dashboards.value.length;
     });
 
     const deleteDashboard = async () => {
@@ -1514,6 +1577,9 @@ export default defineComponent({
       toggleHome,
       homeDashboard,
       openHomeDashboard,
+      isFavorite,
+      toggleFavorite,
+      showFavoritesOnly,
     };
   },
   methods: {

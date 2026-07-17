@@ -111,6 +111,7 @@ export default defineComponent({
     // PromQL time series. Mirrors the logs visualize constraint.
     const allowedChartTypes = [
       "area",
+      "area-stacked",
       "bar",
       "h-bar",
       "line",
