@@ -1,4 +1,4 @@
-// Copyright 2026 OpenObserve Inc.
+﻿// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -72,9 +72,7 @@ describe("Deduplication.vue", () => {
     });
 
     it("should render with correct theme class (light mode)", () => {
-      expect(wrapper.find(".step-deduplication.light-mode").exists()).toBe(
-        true
-      );
+      expect(wrapper.find(".step-deduplication").exists()).toBe(true); expect(wrapper.find(".step-deduplication.light-mode").exists()).toBe(false);
     });
 
     it("should render with correct theme class (dark mode)", async () => {
@@ -95,9 +93,7 @@ describe("Deduplication.vue", () => {
         },
       });
 
-      expect(darkWrapper.find(".step-deduplication.dark-mode").exists()).toBe(
-        true
-      );
+      expect(darkWrapper.find(".step-deduplication").exists()).toBe(true); expect(darkWrapper.find(".step-deduplication.dark-mode").exists()).toBe(false);
       darkWrapper.unmount();
     });
 
@@ -470,7 +466,7 @@ describe("Deduplication.vue", () => {
     });
 
     it("should render info icons", () => {
-      // OIcon components render SVGs — check via component lookup
+      // OIcon components render SVGs â€” check via component lookup
       const icons = wrapper.findAllComponents({ name: "OIcon" });
       expect(icons.some((i) => /^info/.test(i.props("name") ?? ""))).toBe(true);
     });
@@ -565,7 +561,7 @@ describe("Deduplication.vue", () => {
 
   describe("Theme Switching", () => {
     it("should apply light mode theme", () => {
-      expect(wrapper.find(".light-mode").exists()).toBe(true);
+      expect(wrapper.find(".light-mode").exists()).toBe(false); // token-driven theming: no legacy theme root class
     });
 
     it("should apply dark mode theme", async () => {
@@ -586,7 +582,7 @@ describe("Deduplication.vue", () => {
         },
       });
 
-      expect(darkWrapper.find(".dark-mode").exists()).toBe(true);
+      expect(darkWrapper.find(".dark-mode").exists()).toBe(false); // token-driven theming: no legacy theme root class
       darkWrapper.unmount();
     });
   });

@@ -1,4 +1,4 @@
-// Copyright 2026 OpenObserve Inc.
+﻿// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -79,7 +79,7 @@ describe("CompareWithPast.vue", () => {
     });
 
     it("should render with correct theme class (light mode)", () => {
-      expect(wrapper.classes()).toContain("light-mode");
+      expect(wrapper.classes()).not.toContain("light-mode"); // token-driven theming: no legacy theme root class
     });
 
     it("should render with correct theme class (dark mode)", () => {
@@ -97,7 +97,7 @@ describe("CompareWithPast.vue", () => {
           selectedTab: "sql",
         },
       });
-      expect(wrapper.classes()).toContain("dark-mode");
+      expect(wrapper.classes()).not.toContain("dark-mode"); // token-driven theming: no legacy theme root class
     });
 
     it("should initialize with empty multiTimeRange", () => {
@@ -538,7 +538,7 @@ describe("CompareWithPast.vue", () => {
 
   describe("Theme Switching", () => {
     it("should apply light mode theme", () => {
-      expect(wrapper.classes()).toContain("light-mode");
+      expect(wrapper.classes()).not.toContain("light-mode"); // token-driven theming: no legacy theme root class
     });
 
     it("should apply dark mode theme", () => {
@@ -556,7 +556,7 @@ describe("CompareWithPast.vue", () => {
           selectedTab: "sql",
         },
       });
-      expect(darkWrapper.classes()).toContain("dark-mode");
+      expect(darkWrapper.classes()).not.toContain("dark-mode"); // token-driven theming: no legacy theme root class
     });
   });
 

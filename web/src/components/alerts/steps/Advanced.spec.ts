@@ -69,11 +69,15 @@ describe("Advanced.vue", () => {
       expect(wrapper.vm).toBeTruthy();
     });
 
-    it("should render with correct theme class (light mode)", () => {
-      expect(wrapper.classes()).toContain("light-mode");
+    // Theming is token-driven (.dark on <html> + --color-* tokens); components
+    // no longer carry per-theme root classes. Guard against the legacy
+    // mechanism reappearing (O2_STYLE_MIGRATION_PLAN.md §3.R).
+    it("does not carry legacy theme classes (light mode)", () => {
+      expect(wrapper.classes()).not.toContain("light-mode");
+      expect(wrapper.classes()).not.toContain("dark-mode");
     });
 
-    it("should render with correct theme class (dark mode)", async () => {
+    it("renders and carries no legacy theme classes in dark mode", async () => {
       mockStore = createMockStore({ theme: "dark" });
       wrapper = mount(Advanced, {
         global: {
@@ -88,7 +92,8 @@ describe("Advanced.vue", () => {
           rowTemplateType: "String",
         },
       });
-      expect(wrapper.classes()).toContain("dark-mode");
+      expect(wrapper.exists()).toBe(true);
+      expect(wrapper.classes()).not.toContain("dark-mode");
     });
 
     it("should initialize with empty variables", () => {
@@ -601,12 +606,15 @@ describe("Advanced.vue", () => {
     });
   });
 
-  describe("Theme Switching", () => {
-    it("should apply light mode theme", () => {
-      expect(wrapper.classes()).toContain("light-mode");
+  // Theming is token-driven (.dark on <html> + --color-* tokens); components no
+  // longer carry per-theme root classes (O2_STYLE_MIGRATION_PLAN.md §3.R). These
+  // guard against the legacy .light-mode/.dark-mode mechanism reappearing.
+  describe("Theme handling (token-driven)", () => {
+    it("does not apply a legacy light-mode class", () => {
+      expect(wrapper.classes()).not.toContain("light-mode");
     });
 
-    it("should apply dark mode theme", async () => {
+    it("does not apply a legacy dark-mode class in dark theme", async () => {
       mockStore = createMockStore({ theme: "dark" });
       const darkWrapper = mount(Advanced, {
         global: {
@@ -621,14 +629,13 @@ describe("Advanced.vue", () => {
           rowTemplateType: "String",
         },
       });
-      expect(darkWrapper.classes()).toContain("dark-mode");
+      expect(darkWrapper.exists()).toBe(true);
+      expect(darkWrapper.classes()).not.toContain("dark-mode");
     });
 
-    it("should toggle between themes", async () => {
-      // Light mode
-      expect(wrapper.classes()).toContain("light-mode");
+    it("carries no legacy theme classes across theme values", async () => {
+      expect(wrapper.classes()).not.toContain("light-mode");
 
-      // Dark mode
       mockStore = createMockStore({ theme: "dark" });
       const darkWrapper = mount(Advanced, {
         global: {
@@ -643,9 +650,8 @@ describe("Advanced.vue", () => {
           rowTemplateType: "String",
         },
       });
-      expect(darkWrapper.classes()).toContain("dark-mode");
+      expect(darkWrapper.classes()).not.toContain("dark-mode");
 
-      // Back to light mode
       mockStore = createMockStore({ theme: "light" });
       const lightWrapper = mount(Advanced, {
         global: {
@@ -660,7 +666,7 @@ describe("Advanced.vue", () => {
           rowTemplateType: "String",
         },
       });
-      expect(lightWrapper.classes()).toContain("light-mode");
+      expect(lightWrapper.classes()).not.toContain("light-mode");
     });
   });
 
