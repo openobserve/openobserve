@@ -271,12 +271,13 @@ const visiblePages = computed(() => {
 });
 </script>
 
-<style>
-.schema-field-toggle [role="group"] {
+<style scoped>
+/* keep(complex-state): :deep overrides of the child toggle-group's [role=group] internals */
+.schema-field-toggle :deep([role="group"]) {
   gap: 0.125rem;
 }
 
-.schema-field-toggle [role="group"] > * {
+.schema-field-toggle :deep([role="group"]) > * {
   gap: 0.25rem;
   height: 1.375rem;
   min-height: unset;

@@ -214,8 +214,8 @@ export default defineComponent({
 });
 </script>
 
-<style>
-/* Deep override for empty-state image spacing */
+<style scoped>
+/* keep(complex-state): :deep override of a child empty-state image's spacing */
 :deep(.no-data-image) {
   margin-bottom: 0.5rem;
 }

@@ -21,7 +21,7 @@
                 <OButton
                   variant="outline"
                   size="icon-chip"
-                  class="drag-handle cursor-grab"
+                  class="drag-handle cursor-grab active:cursor-grabbing"
                   :data-test="`promql-operation-drag-${index}`"
                 >
                   <template #icon-left>
@@ -289,10 +289,3 @@ defineExpose({
   availableLabels,
 });
 </script>
-
-<style>
-/* drag-handle :active state — compound pseudo-class selector, keep in CSS */
-.drag-handle:active {
-  cursor: grabbing;
-}
-</style>

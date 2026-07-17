@@ -163,12 +163,3 @@ export default defineComponent({
 });
 </script>
 
-<style>
-.lastRefreshedAt::after {
-  content: "";
-}
-
-.lastRefreshedAt::before {
-  content: "";
-}
-</style>

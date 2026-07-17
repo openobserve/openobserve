@@ -3,7 +3,7 @@
     "rawPalette": 53,
     "arbPx": 173,
     "arbRadius": 25,
-    "unscopedStyle": 162,
+    "unscopedStyle": 156,
     "arbZ": 48,
     "styleBlockHex": 469,
     "stylePxUnit": 977,
@@ -152,9 +152,6 @@
       "unscopedStyle": 1,
       "stylePxUnit": 1
     },
-    "components/common/FieldListPagination.vue": {
-      "unscopedStyle": 1
-    },
     "components/common/FieldTypeBadge.vue": {
       "arbRadius": 1
     },
@@ -249,7 +246,6 @@
     "components/dashboards/addPanel/ShowLegendsPopup.vue": {
       "inlineHexStyle": 1,
       "inlineHexBind": 1,
-      "unscopedStyle": 1,
       "arbPx": 1
     },
     "components/dashboards/ColorSwatchPicker.vue": {
@@ -266,9 +262,6 @@
       "rawPalette": 1,
       "unscopedStyle": 1,
       "stylePxUnit": 1
-    },
-    "components/dashboards/PanelErrorButtons.vue": {
-      "unscopedStyle": 1
     },
     "components/dashboards/panels/ChartRenderer.vue": {
       "unscopedStyle": 1,
@@ -408,7 +401,6 @@
       "unscopedStyle": 1
     },
     "components/logstream/AssociatedRegexPatterns.vue": {
-      "unscopedStyle": 1,
       "arbPx": 2
     },
     "components/logstream/explore/SearchBar.vue": {
@@ -466,16 +458,12 @@
       "stylePxUnit": 6
     },
     "components/promql/components/OperationsList.vue": {
-      "rawPalette": 1,
-      "unscopedStyle": 1
+      "rawPalette": 1
     },
     "components/queries/QueryList.vue": {
       "unscopedStyle": 1
     },
     "components/queries/RunningQueriesList.vue": {
-      "unscopedStyle": 1
-    },
-    "components/queries/SummaryList.vue": {
       "unscopedStyle": 1
     },
     "components/QueryPlanDialog.vue": {

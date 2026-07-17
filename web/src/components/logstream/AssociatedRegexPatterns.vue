@@ -885,8 +885,9 @@ export default defineComponent({
 });
 </script>
 
-<style>
-.regex-test-string-input > div > div > div > textarea {
+<style scoped>
+/* keep(complex-state): :deep override to disable resize on the child input's textarea */
+.regex-test-string-input :deep(textarea) {
   resize: none !important;
 }
 </style>

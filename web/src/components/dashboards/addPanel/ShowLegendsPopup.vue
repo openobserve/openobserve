@@ -53,7 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             v-for="(legend, index) in legends"
             :key="index"
-            class="legend-item px-2 py-1 last:border-b-0"
+            class="legend-item group px-2 py-1 last:border-b-0"
             :data-test="`dashboard-legend-item-${index}`"
           >
             <div class="flex items-center flex-nowrap w-full">
@@ -67,7 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OButton
                 variant="ghost"
                 size="icon"
-                class="ml-1"
+                class="ml-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity duration-200 ease-in-out"
                 data-test="dashboard-legend-copy-btn"
                 :data-copied="isLegendCopied(index) ? 'true' : undefined"
                 @click.stop="copyLegend(legend.name, index)"
@@ -275,14 +275,3 @@ export default defineComponent({
 });
 </script>
 
-<style>
-.legend-item [data-test="dashboard-legend-copy-btn"] {
-  opacity: 0;
-  transition: opacity 0.2s ease-in-out;
-  flex-shrink: 0;
-}
-
-.legend-item:hover [data-test="dashboard-legend-copy-btn"] {
-  opacity: 1;
-}
-</style>
