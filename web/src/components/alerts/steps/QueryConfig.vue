@@ -1539,9 +1539,13 @@ export default defineComponent({
       () => metricGroupByStore.value.filter((f: string) => f?.trim()).length > 0
     );
 
-    // name="trigger_condition.operator" already wrote the value; refresh preview.
-    const onTriggerOperatorChange = (_value: string) => {
-      emitTriggerUpdate();
+    // name="trigger_condition.operator" owns the value, but it is NOT written yet
+    // when this runs — field.handleChange commits after us — so the new operator
+    // must be passed to the emit explicitly (same fix as onLogMeasureColumnChange).
+    // Pre-migration mutated the prop before emitting, so the parent always saw the
+    // fresh operator; reading it back off the form here would emit the OLD one.
+    const onTriggerOperatorChange = (value: string) => {
+      emitTriggerUpdate({ operator: value });
     };
 
     // name="trigger_condition.threshold" wrote the raw (string) input; re-write the
@@ -1975,10 +1979,14 @@ export default defineComponent({
     // {frequency_type:'minutes', cron:''} straight back, leaving the cron input
     // empty with "Cron expression and timezone are required".
     // `fv` is form.getFieldValue — a synchronous, always-fresh read.
-    const emitTriggerUpdate = () => {
+    // `overrides` mirrors emitAggregationUpdate: a consumer @update:model-value
+    // handler runs BEFORE field.handleChange commits, so `fv("trigger_condition")`
+    // still holds the OLD value there. Callers that have the new value in hand must
+    // pass it, or the parent receives a stale object.
+    const emitTriggerUpdate = (overrides?: Record<string, any>) => {
       const tc = fv("trigger_condition");
       if (tc) {
-        emit("update:triggerCondition", { ...tc });
+        emit("update:triggerCondition", { ...tc, ...(overrides ?? {}) });
       }
     };
 
@@ -2112,20 +2120,40 @@ export default defineComponent({
       });
     };
 
-    // When condition operator changes. The value is already written by the name=
-    // binding (trigger_condition.operator in count mode, aggregation.having.operator
-    // in measure mode) — just refresh the relevant preview payload.
-    const onConditionOperatorChange = (_value: string) => {
+    // When condition operator changes. The name= binding OWNS the value
+    // (trigger_condition.operator in count mode, aggregation.having.operator in
+    // measure mode) but has NOT written it yet — field.handleChange commits after
+    // us — so pass it to the emit explicitly rather than reading back a stale one
+    // (same fix as onLogMeasureColumnChange, which overrides `having.column`).
+    const onConditionOperatorChange = (value: string) => {
       if (isEventBased.value && selectedFunction.value === 'total_events') {
-        emitTriggerUpdate();
+        emitTriggerUpdate({ operator: value });
       } else {
-        emitAggregationUpdate();
+        const aggregation = fv("query_condition.aggregation");
+        if (aggregation) {
+          emitAggregationUpdate({
+            having: { ...(aggregation.having ?? {}), operator: value },
+          });
+        }
       }
     };
 
-    // When condition value changes. The name= binding writes the raw (string)
-    // input; re-write the Number-coerced value through the form-backed computed so
-    // the payload stays numeric (mirrors the old `v-model.number`).
+    // When condition value changes.
+    //
+    // The write below is load-bearing for the EMIT, not for the payload: this
+    // handler runs BEFORE OFormInput's field.handleChange commits (the wrapper
+    // registers v-bind="$attrs" ahead of its own @update:model-value), so writing
+    // first is what lets emitAggregationUpdate/emitTriggerUpdate read the fresh
+    // value instead of a stale one. Do NOT delete it — that is the same stale-read
+    // trap that silently saved group_by as [""].
+    //
+    // Its Number() coercion, however, does NOT reach the payload on the else
+    // branch: handleChange commits the raw string to the SAME field afterwards and
+    // wins. `having.value` is therefore coerced at payload build (getAlertPayload),
+    // which also keeps form state a string so typing a decimal ("5." → "5.5")
+    // isn't fought mid-keystroke. The total_events branch targets a DIFFERENT
+    // field (trigger_condition.threshold) that handleChange never touches, so the
+    // Number() does survive there.
     const onConditionValueChange = (value: any) => {
       const parsed = value === '' || value === null || value === undefined ? null : Number(value);
       if (isEventBased.value && selectedFunction.value === 'total_events') {
@@ -2212,7 +2240,11 @@ export default defineComponent({
     };
     const onPromqlValueChange = (val: any) => {
       if (fv("query_condition.promql_condition")) {
-        // Zero-safe numeric coercion (mirrors the old `v-model.number`).
+        // Write-then-emit: this runs before field.handleChange commits, so the
+        // write is what makes emitPromqlConditionUpdate read the fresh value.
+        // The Number() does NOT reach the payload — handleChange overwrites this
+        // same field with the raw string right after. promql_condition.value is
+        // coerced at payload build (getAlertPayload); see the note there.
         setFV(
           "query_condition.promql_condition.value",
           val === "" || val === null || val === undefined ? val : Number(val),

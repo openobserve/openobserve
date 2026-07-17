@@ -118,6 +118,47 @@ describe("SemanticGroupItem - schema validation (real OForm)", () => {
   });
 });
 
+// The two tests above drive handleSubmit() directly — but NOTHING in the app
+// does: the row has no submit button and its only consumer wires @update/@delete
+// only. So they pass while the field stays silent for a real user. These drive
+// the actual blur, the way pre-migration `handleDisplayBlur` was reached.
+describe("SemanticGroupItem - required cue on blur (real user path)", () => {
+  const displayInput = (w: any) =>
+    w.find('[data-test="semantic-group-display-input"] input');
+
+  it("blurring an empty display shows 'Name is required'", async () => {
+    const w = await mountComp({ group: makeGroup({ display: "" }) });
+    expect(w.text()).not.toContain("Name is required");
+
+    await displayInput(w).trigger("blur");
+    await flushPromises();
+
+    expect(w.text()).toContain("Name is required");
+  });
+
+  it("typing after the error clears it", async () => {
+    const w = await mountComp({ group: makeGroup({ display: "" }) });
+    await displayInput(w).trigger("blur");
+    await flushPromises();
+    expect(w.text()).toContain("Name is required");
+
+    await displayInput(w).setValue("Infra");
+    await flushPromises();
+
+    expect(w.text()).not.toContain("Name is required");
+  });
+
+  it("blurring a filled display shows no error and still regenerates the id", async () => {
+    const w = await mountComp({ group: makeGroup({ display: "", id: "" }) });
+    await displayInput(w).setValue("My Group");
+    await displayInput(w).trigger("blur");
+    await flushPromises();
+
+    expect(w.text()).not.toContain("Name is required");
+    expect(w.text()).toContain("my-group");
+  });
+});
+
 describe("SemanticGroupItem - generateIdFromDisplay", () => {
   it("converts spaces to hyphens", async () => {
     const w = await mountComp();

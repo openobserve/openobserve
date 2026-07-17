@@ -135,7 +135,10 @@ const generateIdFromDisplay = (display: string): string => {
 const form = useOForm<SemanticGroupItemForm>({
   defaultValues: semanticGroupItemDefaults(props.group),
   schema: makeSemanticGroupItemSchema(t),
-  onSubmit: () => emitUpdate(),
+  // emitIfChanged, not emitUpdate: handleDisplayBlur submits on every blur to
+  // paint the required error, and the values watcher has usually emitted already
+  // — so an unconditional emit would fire a redundant "update" per blur.
+  onSubmit: () => emitIfChanged(),
 });
 
 // Assemble the emitted group from the outside-form context (id + category from
@@ -173,7 +176,15 @@ const emitIfChanged = () => {
 const formValues = form.useStore((s: any) => s.values);
 watch(formValues, () => emitIfChanged(), { deep: true });
 
-// Side-effect (NOT validation): regenerate the id from the display on blur.
+// Regenerate the id from the display, then surface the schema's "Name is
+// required" on the field — pre-migration `handleDisplayBlur` did BOTH.
+//
+// The submit is what paints it: useOForm wires revalidateLogic({mode:"submit"}),
+// so nothing validates until a first submit, and this inline row has no submit
+// button (its only consumer wires @update/@delete). Without this call the rule
+// exists but can never fire. `modeAfterSubmission:"change"` then re-validates on
+// every keystroke, which is what clears the message as the user types — matching
+// the old `handleDisplayChange` reset.
 const handleDisplayBlur = () => {
   const display = (form.state.values as SemanticGroupItemForm).display;
   if (display) {
@@ -183,6 +194,7 @@ const handleDisplayBlur = () => {
       emitUpdate();
     }
   }
+  form.handleSubmit();
 };
 
 // External changes to the group prop (import merge, category switch) reset the

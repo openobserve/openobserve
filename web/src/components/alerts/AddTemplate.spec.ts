@@ -53,11 +53,19 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 
 const ORG = store.state.selectedOrganization.identifier;
 
+// Counts editor CREATIONS. The real CodeQueryEditor reads `language` only at
+// monaco.editor.create() and never watches the prop, so asserting the prop
+// changed proves nothing — only a remount actually re-languages the editor.
+let editorMounts = 0;
+
 const editorStub = {
   name: "QueryEditor",
   template: '<div class="stub-editor"></div>',
   props: ["query", "editorId", "language"],
   emits: ["update:query"],
+  mounted() {
+    editorMounts += 1;
+  },
 };
 
 const appTabsStub = {
@@ -94,6 +102,72 @@ async function submit(wrapper: any) {
   await getForm(wrapper).handleSubmit();
   await flushPromises();
 }
+
+describe("AddTemplate - body editor language", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    editorMounts = 0;
+  });
+
+  // Pre-migration rendered TWO <query-editor> under v-if/v-else with hardcoded
+  // language="markdown"/"json", so flipping the type destroyed one and created
+  // the other. The migration collapsed them into one editor with a reactive
+  // :language — which the editor never watches. Without the :key the mount-time
+  // language sticks and a markdown body renders with JSON syntax errors.
+  it("remounts the body editor when the type flips (http → email)", async () => {
+    const w = await mountComp();
+    const mountsAfterInitial = editorMounts;
+    expect(w.findComponent({ name: "QueryEditor" }).props("language")).toBe(
+      "json",
+    );
+
+    await w
+      .findComponent({ name: "AppTabs" })
+      .vm.$emit("update:activeTab", "email");
+    await flushPromises();
+
+    expect(w.findComponent({ name: "QueryEditor" }).props("language")).toBe(
+      "markdown",
+    );
+    expect(editorMounts).toBe(mountsAfterInitial + 1);
+  });
+
+  it("remounts the body editor when the type flips back (email → http)", async () => {
+    const w = await mountComp();
+    await w
+      .findComponent({ name: "AppTabs" })
+      .vm.$emit("update:activeTab", "email");
+    await flushPromises();
+    const mountsAfterEmail = editorMounts;
+
+    await w
+      .findComponent({ name: "AppTabs" })
+      .vm.$emit("update:activeTab", "http");
+    await flushPromises();
+
+    expect(w.findComponent({ name: "QueryEditor" }).props("language")).toBe(
+      "json",
+    );
+    expect(editorMounts).toBe(mountsAfterEmail + 1);
+  });
+
+  // The remount must not cost the user their draft: monaco is recreated with
+  // `value: props.query`, so the form-owned body has to survive the swap.
+  it("preserves the typed body across the remount", async () => {
+    const w = await mountComp();
+    getForm(w).setFieldValue("body", "# hello");
+    await flushPromises();
+
+    await w
+      .findComponent({ name: "AppTabs" })
+      .vm.$emit("update:activeTab", "email");
+    await flushPromises();
+
+    expect(w.findComponent({ name: "QueryEditor" }).props("query")).toBe(
+      "# hello",
+    );
+  });
+});
 
 describe("AddTemplate - rendering (create mode)", () => {
   beforeEach(() => vi.clearAllMocks());

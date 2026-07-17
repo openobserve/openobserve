@@ -217,7 +217,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t("alerts.detectionFunction") }}
               <span class="text-red-500 ml-1">*</span>
             </div>
-            <div class="flex items-center gap-2">
+            <!-- items-start, not items-center: the field select renders its
+                 validation message inside its own column (OSelect's root is
+                 flex-col), so on error that column grows and centering would
+                 shove the function select down out of line with it. Matches the
+                 "Alert if" rows in QueryConfig.vue. -->
+            <div class="flex items-start gap-2">
               <OFormSelect
                 name="detection_function"
                 :options="detectionFunctions"

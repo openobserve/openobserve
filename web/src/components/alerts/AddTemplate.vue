@@ -78,7 +78,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span>{{ t("alert_templates.body") }}</span>
               <span aria-hidden="true" class="select-none">*</span>
             </div>
+            <!-- `:key` forces a remount when the type flips. CodeQueryEditor
+                 reads `language` only at monaco.editor.create() — it never
+                 watches the prop, and setModelLanguage is used nowhere — so
+                 without this the editor keeps its mount-time language and paints
+                 a markdown body with JSON errors (pre-migration got the remount
+                 for free from two v-if/v-else editors). -->
             <query-editor
+              :key="bodyLanguage"
               data-test="template-body-editor"
               editor-id="template-body-editor"
               class="w-full min-h-[310px]! rounded-[5px] border border-(--o2-border-color) resize-y overflow-auto mb-3"

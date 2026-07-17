@@ -191,6 +191,81 @@ describe('alertPayload', () => {
       expect(payload.query_condition.aggregation).toBeNull();
     });
 
+    // having.value / promql_condition.value reach getAlertPayload as the RAW
+    // STRING the input produced (OFormInput's field.handleChange commits after
+    // QueryConfig's Number()-coercing handler and overwrites it). Pre-migration
+    // both went out as numbers, and nothing else rescues them — so these assert
+    // the TYPE, not just the value. Verified live: before the fix the POST body
+    // carried "value":"5".
+    describe('numeric value types (string-vs-number parity with main)', () => {
+      const aggFormData = (havingValue: any) => {
+        const f = createBaseFormData();
+        f.query_condition.type = 'custom';
+        f.query_condition.aggregation = {
+          function: 'avg',
+          group_by: ['cloud_provider'],
+          having: { column: 'cpu_usage_percent', operator: '>=', value: havingValue },
+        } as any;
+        return f;
+      };
+      const aggContext = () =>
+        createBaseContext({
+          isAggregationEnabled: { value: true },
+          getSelectedTab: { value: 'custom' },
+        });
+
+      it('coerces aggregation.having.value from the input string to a number', () => {
+        const payload = getAlertPayload(aggFormData('5'), aggContext());
+        expect(payload.query_condition.aggregation.having.value).toBe(5);
+        expect(typeof payload.query_condition.aggregation.having.value).toBe('number');
+      });
+
+      it('keeps having.value zero-safe (0 must not become null/omitted)', () => {
+        const payload = getAlertPayload(aggFormData('0'), aggContext());
+        expect(payload.query_condition.aggregation.having.value).toBe(0);
+      });
+
+      it('passes an empty having.value through untouched (no silent 0)', () => {
+        const payload = getAlertPayload(aggFormData(''), aggContext());
+        expect(payload.query_condition.aggregation.having.value).toBe('');
+      });
+
+      it('coerces promql_condition.value from the input string to a number', () => {
+        const formData = createBaseFormData();
+        formData.query_condition.promql_condition = {
+          column: 'value',
+          operator: '>=',
+          value: '5',
+        } as any;
+        const context = createBaseContext({ getSelectedTab: { value: 'promql' } });
+
+        const payload = getAlertPayload(formData, context);
+
+        expect(payload.query_condition.promql_condition.value).toBe(5);
+        expect(typeof payload.query_condition.promql_condition.value).toBe('number');
+      });
+
+      it('keeps promql_condition.value zero-safe', () => {
+        const formData = createBaseFormData();
+        formData.query_condition.promql_condition = {
+          column: 'value',
+          operator: '>=',
+          value: '0',
+        } as any;
+        const context = createBaseContext({ getSelectedTab: { value: 'promql' } });
+
+        const payload = getAlertPayload(formData, context);
+
+        expect(payload.query_condition.promql_condition.value).toBe(0);
+      });
+
+      // NaN would JSON-serialize to null and the backend would reject it.
+      it('passes a non-numeric value through rather than shipping NaN', () => {
+        const payload = getAlertPayload(aggFormData('abc'), aggContext());
+        expect(payload.query_condition.aggregation.having.value).toBe('abc');
+      });
+    });
+
     it('should clear conditions for sql tab', () => {
       const formData = createBaseFormData();
       formData.query_condition.conditions = [{ field: 'level', operator: '=', value: 'error' }];

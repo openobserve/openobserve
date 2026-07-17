@@ -1166,6 +1166,69 @@ describe("QueryConfig.vue", () => {
       const last = emits![emits!.length - 1][0] as any;
       expect(last.having.column).toBe("old_column");
     });
+
+    // The two OPERATOR handlers have the identical shape but were left without the
+    // `overrides` fix, so they emitted the stale operator. Same driving convention
+    // as the column test above: call the handler with the $event value and WITHOUT
+    // writing the form first — that models the real pre-commit ordering, because
+    // field.handleChange runs after the consumer's listener.
+    it("emits update:aggregation carrying the NEW having.operator (measure mode)", async () => {
+      await seedAggregation();
+
+      wrapper.vm.onConditionOperatorChange("<");
+      await nextTick();
+
+      const emits = wrapper.emitted("update:aggregation");
+      const last = emits![emits!.length - 1][0] as any;
+      expect(last.having.operator).toBe("<");
+      // Siblings must survive the override.
+      expect(last.having.column).toBe("old_column");
+      expect(last.having.value).toBe("5");
+      expect(last.function).toBe("avg");
+    });
+
+    it("emits update:triggerCondition carrying the NEW operator", async () => {
+      await seedAggregation();
+      hostForm().setFieldValue("trigger_condition", {
+        period: 10,
+        operator: ">=",
+        frequency: 10,
+        cron: "",
+        threshold: 3,
+        silence: 10,
+        frequency_type: "minutes",
+        timezone: "UTC",
+      });
+      await nextTick();
+
+      wrapper.vm.onTriggerOperatorChange("<");
+      await nextTick();
+
+      const emits = wrapper.emitted("update:triggerCondition");
+      const last = emits![emits!.length - 1][0] as any;
+      expect(last.operator).toBe("<");
+      // The rest of trigger_condition must ride along untouched.
+      expect(last.threshold).toBe(3);
+      expect(last.period).toBe(10);
+      expect(last.frequency_type).toBe("minutes");
+    });
+
+    it("emitTriggerUpdate with no overrides still emits the plain form value", async () => {
+      await seedAggregation();
+      hostForm().setFieldValue("trigger_condition", {
+        period: 10,
+        operator: ">=",
+        threshold: 3,
+      });
+      await nextTick();
+
+      wrapper.vm.emitTriggerUpdate();
+      await nextTick();
+
+      const emits = wrapper.emitted("update:triggerCondition");
+      const last = emits![emits!.length - 1][0] as any;
+      expect(last.operator).toBe(">=");
+    });
   });
 
   describe("Issue #4: Metrics → Logs stream type switch", () => {

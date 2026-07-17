@@ -132,6 +132,40 @@ export const getAlertPayload = (
     payload.query_condition.sql = "";
   }
 
+  // `having.value` and `promql_condition.value` arrive here as the RAW STRING the
+  // input produced. Both are name=-owned OFormInputs, and OFormInput registers
+  // `v-bind="$attrs"` BEFORE its own @update:model-value="field.handleChange" — so
+  // QueryConfig's Number()-coercing consumer handler runs FIRST and handleChange
+  // commits the raw string LAST, overwriting it. Pre-migration both went out as
+  // numbers (promql via `v-model.number`; having via a direct Number() write onto
+  // inputData), so without this the saved type silently drifts string-vs-number.
+  //
+  // Coerced HERE rather than in the form, for two reasons:
+  //   • it is the same last-mile rescue threshold/period/frequency/silence already
+  //     get above — one place owns payload numerics;
+  //   • form state must stay the raw string while typing. Coercing on each
+  //     keystroke would fight the user: "5." (mid-way to "5.5") is Number-ed to 5,
+  //     snapping the field back and eating the decimal point.
+  const toNumericValue = (v: unknown) => {
+    if (v === "" || v === null || v === undefined) return v;
+    const n = Number(v);
+    // Zero-safe (Number("0") === 0). A non-numeric value is passed through
+    // untouched rather than shipped as NaN (which JSON-serializes to null).
+    return Number.isNaN(n) ? v : n;
+  };
+
+  if (payload.query_condition.aggregation?.having) {
+    payload.query_condition.aggregation.having.value = toNumericValue(
+      payload.query_condition.aggregation.having.value,
+    );
+  }
+
+  if (payload.query_condition.promql_condition) {
+    payload.query_condition.promql_condition.value = toNumericValue(
+      payload.query_condition.promql_condition.value,
+    );
+  }
+
   if (formData.query_condition.vrl_function) {
     payload.query_condition.vrl_function = b64EncodeUnicode(
       formData.query_condition.vrl_function.trim(),
