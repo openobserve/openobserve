@@ -150,6 +150,34 @@
   --shadow-sm: var(--shadow-sm);
   --shadow-md: var(--shadow-md);
   --shadow-lg: var(--shadow-lg);
+
+  /* Code-syntax family (D6). Registered so bg-syntax-bg / text-syntax-keyword
+     compile: these were defined in :root but never registered, so components
+     had to reach for var() in a style block instead of using a utility. */
+  --color-syntax-bg:          var(--color-syntax-bg);
+  --color-syntax-text:        var(--color-syntax-text);
+  --color-syntax-keyword:     var(--color-syntax-keyword);
+  --color-syntax-function:    var(--color-syntax-function);
+  --color-syntax-number:      var(--color-syntax-number);
+  --color-syntax-string:      var(--color-syntax-string);
+  --color-syntax-builtin:     var(--color-syntax-builtin);
+  --color-syntax-comment:     var(--color-syntax-comment);
+  --color-syntax-tag:         var(--color-syntax-tag);
+  --color-syntax-bullet:      var(--color-syntax-bullet);
+  --color-syntax-addition-fg: var(--color-syntax-addition-fg);
+  --color-syntax-addition-bg: var(--color-syntax-addition-bg);
+  --color-syntax-deletion-fg: var(--color-syntax-deletion-fg);
+  --color-syntax-deletion-bg: var(--color-syntax-deletion-bg);
+
+  /* Brand gradients (D14). Registered so bg-gradient-ai works as a utility
+     instead of an [image:var(--color-gradient-ai)] arbitrary property. */
+  --color-gradient-ai:            var(--color-gradient-ai);
+  --color-gradient-ai-subtle:     var(--color-gradient-ai-subtle);
+  --color-gradient-ai-faint:      var(--color-gradient-ai-faint);
+  --color-gradient-brand-ribbon:  var(--color-gradient-brand-ribbon);
+  --color-gradient-notification:  var(--color-gradient-notification);
+  --color-gradient-danger:        var(--color-gradient-danger);
+  --color-gradient-danger-hover:  var(--color-gradient-danger-hover);
 }
 
 /* â”€â”€ Theme-driven runtime tokens (set inline by utils/theme.ts) â”€â”€
