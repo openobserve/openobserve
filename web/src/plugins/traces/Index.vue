@@ -418,6 +418,8 @@ const {
   setServiceColors,
   loadLocalLogFilterField,
   updatedLocalLogFilterField,
+  loadTracesParser,
+  tracesParser,
 } = useTraces();
 const { fnParsedSQL } = logsUtils();
 
@@ -440,7 +442,6 @@ const searchBarRef = ref(null);
 const serviceGraphRef = ref<any>(null);
 const servicesCatalogRef = ref<any>(null);
 const splitterModel = ref(90);
-let parser: any;
 const fieldValues = ref({});
 const { showErrorNotification } = useNotifications();
 const disableMoreErrorDetails = ref(false);
@@ -489,12 +490,6 @@ const selectedStreamName = computed(
 );
 
 const isLLMSpanPresent = ref(false);
-
-const importSqlParser = async () => {
-  const useSqlParser: any = await import("@/composables/useParser");
-  const { sqlParser }: any = useSqlParser.default();
-  parser = await sqlParser();
-};
 
 function getQueryTransform() {
   try {
@@ -773,7 +768,7 @@ function buildSearch() {
       // Convert human-readable duration suffixes (e.g. '1.50ms') to raw µs.
       const durationParseResult = parseDurationWhereClause(
         whereClause,
-        parser,
+        tracesParser.value,
         searchObj.data.stream.selectedStream.value,
       );
       if (typeof durationParseResult === "string") {
@@ -783,7 +778,7 @@ function buildSearch() {
       // Convert span_kind display labels (e.g. 'Server') to numeric OTEL keys (e.g. '2').
       whereClause = parseSpanKindWhereClause(
         whereClause,
-        parser,
+        tracesParser.value,
         searchObj.data.stream.selectedStream.value,
       );
 
@@ -992,7 +987,7 @@ async function getQueryData(
     ).trim();
     const filterParseResult = parseDurationWhereClause(
       filter,
-      parser,
+      tracesParser.value,
       searchObj.data.stream.selectedStream.value,
     );
     if (typeof filterParseResult === "string") {
@@ -1002,7 +997,7 @@ async function getQueryData(
     // Convert span_kind display labels (e.g. 'Server') to numeric OTEL keys (e.g. '2').
     filter = parseSpanKindWhereClause(
       filter,
-      parser,
+      tracesParser.value,
       searchObj.data.stream.selectedStream.value,
     );
 
@@ -1606,7 +1601,7 @@ onBeforeMount(async () => {
   }
   setupContextProvider();
   restoreUrlQueryParams();
-  await importSqlParser();
+  await loadTracesParser();
   if (!searchObj.loading) {
     await loadPageData();
   }
@@ -1741,7 +1736,7 @@ const restoreFilters = (query: string) => {
 
   const defaultQuery = `SELECT * FROM "${selectedStreamName.value}" WHERE `;
 
-  const parsedQuery = parser.astify(defaultQuery + query);
+  const parsedQuery = tracesParser.value.astify(defaultQuery + query);
 
   restoreFiltersFromQuery(parsedQuery.where);
 };
