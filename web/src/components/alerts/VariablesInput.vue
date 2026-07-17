@@ -27,14 +27,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div class="pb-1 custom-input-label font-bold">
       <span>
-        Variable
+        {{ t("alerts.variables.label") }}
       </span>
           <OButton
           variant="ghost-muted"
               size="icon-sm"
             >
               <OIcon name="info-outline" size="sm" />
-              <OTooltip content="Variables are used to pass data from the alert to the destination." />
+              <OTooltip :content="t('alerts.advanced.variablesTooltip')" />
           </OButton>
         </div>
     <template v-if="!formRows.length">
@@ -47,7 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="addFormRow"
         >
         <OIcon name="add" size="sm" />
-        <span>Add Variable</span>
+        <span>{{ t("alerts.advanced.addVariable") }}</span>
       </OButton>
       </div>
     </template>
@@ -115,14 +115,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div class="pb-1 custom-input-label font-bold">
       <span>
-        Variable
+        {{ t("alerts.variables.label") }}
       </span>
           <OButton
           variant="ghost-muted"
               size="icon-sm"
             >
               <OIcon name="info-outline" size="sm" />
-              <OTooltip content="Variables are used to pass data from the alert to the destination." />
+              <OTooltip :content="t('alerts.advanced.variablesTooltip')" />
           </OButton>
         </div>
     <template v-if="!variables.length">
@@ -135,7 +135,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="addVariable"
         >
         <OIcon name="add" size="sm" />
-        <span>Add Variable</span>
+        <span>{{ t("alerts.advanced.addVariable") }}</span>
       </OButton>
       </div>
     </template>

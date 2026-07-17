@@ -5,7 +5,7 @@
       <div class="flex items-center justify-center mt-1 min-w-[60px]">
         <!-- First condition in root group -->
         <template v-if="index === 0 && depth === 0">
-          <span class="text-sm">if</span>
+          <span class="text-sm">{{ t('alerts.filters.if') }}</span>
         </template>
 
         <!-- First condition in nested groups: empty space for alignment -->
@@ -31,7 +31,7 @@
             @click="toggleOperator"
           >
             <OIcon name="restart-alt" size="sm" />
-            <OTooltip content="Toggle between and/or" />
+            <OTooltip :content="t('alerts.filters.toggleOperatorTooltip')" />
           </OButton>
         </template>
       </div>
@@ -253,13 +253,13 @@ const operatorError = ref('');
 const valueError = ref('');
 
 const validateColumn = () => {
-  columnError.value = !props.condition.column ? 'Field is required!' : '';
+  columnError.value = !props.condition.column ? t('alerts.validation.fieldRequired') : '';
 };
 const validateOperator = () => {
-  operatorError.value = !props.condition.operator ? 'Field is required!' : '';
+  operatorError.value = !props.condition.operator ? t('alerts.validation.fieldRequired') : '';
 };
 const validateValue = () => {
-  valueError.value = !props.condition.value ? 'Field is required!' : '';
+  valueError.value = !props.condition.value ? t('alerts.validation.fieldRequired') : '';
 };
 
 defineExpose({

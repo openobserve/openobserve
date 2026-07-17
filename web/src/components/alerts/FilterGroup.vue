@@ -6,7 +6,7 @@
       <div class="flex items-start gap-1 min-w-0">
         <span class="font-medium text-xs flex-shrink-0 leading-[1.3]"
               :class="store.state.theme === 'dark' ? 'text-gray-300' : 'text-gray-700'">
-          Preview:
+          {{ t('alerts.filters.previewLabel') }}
         </span>
         <span class="text-[10px] font-mono leading-[1.3] min-w-0 break-words"
               :class="store.state.theme === 'dark' ? 'text-gray-400' : 'text-gray-600'">
@@ -104,7 +104,7 @@
             @click="addCondition(props.group.groupId)"
             >
             <OIcon class="mr-1 font-bold" size="xs" style="border-radius: 50%; border: 1px solid;" name="add" />
-            <span class="text-[0.75rem] font-bold">Condition</span>
+            <span class="text-[0.75rem] font-bold">{{ t('alerts.conditions.condition') }}</span>
             <OTooltip :delay="300" :content="t('alerts.conditions.addConditionTooltip')" />
         </OButton>
         <OButton
@@ -128,8 +128,8 @@
             @click="reorderItems()"
             >
             <OIcon class="mr-1 font-bold" size="xs" name="swap-vert" />
-            <span class="text-[0.75rem] font-bold">Reorder</span>
-            <OTooltip :delay="300" content="Reorder items: Conditions first, then Groups" />
+            <span class="text-[0.75rem] font-bold">{{ t('alerts.filters.reorder') }}</span>
+            <OTooltip :delay="300" :content="t('alerts.filters.reorderTooltip')" />
         </OButton>
      </div>
         </div>
@@ -403,9 +403,17 @@
     if (!hasConditionsAfterRemoval && subGroupCount > 0) {
       confirmDialog.value = {
         show: true,
-        title: 'Delete Condition',
-        message: 'Deleting this condition will remove the entire condition group.',
-        warningMessage: `This will also delete ${subGroupCount} sub-group${subGroupCount > 1 ? 's' : ''} nested under this group. This action cannot be undone.`,
+        title: t('alerts.filters.deleteConditionTitle'),
+        message: t('alerts.filters.deleteConditionMessage'),
+        // Pluralized by vue-i18n (`one | other`). This branch is guarded by
+        // `subGroupCount > 0`, so n is always >= 1 and vue-i18n's default rule
+        // (1 -> one, >=2 -> other) reproduces the previous hand-rolled
+        // `subGroupCount > 1 ? 's' : ''` output exactly.
+        warningMessage: t(
+          'alerts.filters.deleteConditionSubGroupWarning',
+          { count: subGroupCount },
+          subGroupCount,
+        ),
         okCallback: () => {
           // User confirmed, proceed with deletion
           performRemoveCondition(id);

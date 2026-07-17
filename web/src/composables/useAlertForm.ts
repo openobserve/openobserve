@@ -327,6 +327,11 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
   let editorobj: any = null;
   const sqlAST: any = ref(null);
   const selectedRelativeValue = ref("1");
+  // NOT i18n: "Minutes" here is DATA, not a label. It is the period *identifier*
+  // that loadPanelData compares against ("Hours"/"Days"/"Weeks") to convert a
+  // panel's relative range into minutes, and utils/date.ts keys off the very same
+  // literal (`periodLabel === "Minutes"`) when building the `period` URL param.
+  // Translating it would silently break that conversion.
   const selectedRelativePeriod = ref("Minutes");
   const relativePeriods: any = ref(["Minutes"]);
   const triggerCols: any = ref([]);
@@ -374,11 +379,14 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
         store.state.selectedOrganization.identifier,
         anomalyId,
       );
-      toast({ variant: "success", message: "Training triggered." });
+      toast({
+        variant: "success",
+        message: t("alerts.messages.trainingTriggered"),
+      });
     } catch {
       toast({
         variant: "error",
-        message: "Failed to trigger training.",
+        message: t("alerts.messages.trainingTriggerFailed"),
       });
     } finally {
       anomalyRetraining.value = false;
@@ -406,7 +414,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
   const anomalyPreviewSql = computed(() => {
     const c = anomalyConfig.value;
     if (c.query_mode === "custom_sql") {
-      return c.custom_sql || "-- Enter your SQL in Detection Config step";
+      return c.custom_sql || t("alerts.messages.sqlPreviewPlaceholder");
     }
     const stream = c.stream_name || "<stream>";
     const interval = anomalyHistogramInterval.value || "5m";
@@ -479,9 +487,12 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
   const showVrlFunction = ref(false);
   const isFetchingStreams = ref(false);
   const streamTypes = ["logs", "metrics", "traces"];
+  // `value` is LOAD-BEARING data ("String" / "Json" are the values persisted in
+  // `row_template_type` and compared against below) — only `label` is display
+  // text, so only `label` is translated.
   const rowTemplateTypeOptions = [
-    { label: "String", value: "String" },
-    { label: "JSON", value: "Json" },
+    { label: t("alerts.advanced.templateTypeString"), value: "String" },
+    { label: t("alerts.advanced.templateTypeJson"), value: "Json" },
   ];
 
   const focusManager = new AlertFocusManager();
@@ -546,6 +557,9 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
   const previewDateTimeValue = ref({
     tab: "relative",
     relative: {
+      // NOT i18n: utils/date.ts reads `period.label` back as an identifier
+      // (`periodLabel === "Minutes"` → unit "m") when turning this object into
+      // query params, so the label is load-bearing data here, not display text.
       period: { label: "Minutes", value: "Minutes" },
       value: 15,
     },
@@ -577,10 +591,14 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     return formData.value.stream_type && formData.value.stream_name;
   });
 
+  // The `{name}` / `{timestamp}` braces are LITERAL template syntax shown to the
+  // user, so the locale values escape them for vue-i18n (`{'{'}` … `{'}'}`) and
+  // render byte-identical to the pre-i18n literals. Same keys as Advanced.vue,
+  // which owns the rendered placeholder.
   const rowTemplatePlaceholder = computed(() => {
     return formData.value.row_template_type === "Json"
-      ? 'e.g - {"user": "{name}", "timestamp": "{timestamp}"}'
-      : "e.g - Alert was triggered at {timestamp}";
+      ? t("alerts.advanced.rowTemplatePlaceholderJson")
+      : t("alerts.advanced.rowTemplatePlaceholderString");
   });
 
   const decodedVrlFunction = computed(() => {
@@ -626,7 +644,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       data: [
         {
           yAxis: formData.value.trigger_condition.threshold,
-          label: { formatter: "Threshold" },
+          label: { formatter: t("alerts.messages.thresholdMarkLine") },
         },
       ],
       lineStyle: { color: "#ff4444", type: "dashed", width: 2 },
@@ -1009,6 +1027,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
   const validateInputs = (input: any, notify: boolean = true) => {
     const validationContext: ValidationContext = {
       store,
+      t,
       validateSqlQueryPromise,
       sqlQueryErrorMsg,
       vrlFunctionError,
@@ -1021,6 +1040,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
   const validateSqlQuery = async () => {
     const validationContext: ValidationContext = {
       store,
+      t,
       validateSqlQueryPromise,
       sqlQueryErrorMsg,
       sqlErrorRanges,
@@ -1254,7 +1274,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       if (!anomalyConfig.value.name?.trim()) {
         toast({
           variant: "error",
-          message: "Anomaly detection name is required.",
+          message: t("alerts.messages.anomalyDetectionNameRequired"),
         });
         focusTopbarField(anomalyNameRef);
         return false;
@@ -1526,6 +1546,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
 
     const jsonValidationContext: JsonValidationContext = {
       store,
+      t,
       streams,
       getStreams,
       getParser,
@@ -1790,7 +1811,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
         console.error("Error loading panel data:", error);
         toast({
           variant: "error",
-          message: "Failed to load panel data",
+          message: t("alerts.messages.failedToLoadPanelData"),
         });
       } finally {
         isLoadingPanelData.value = false;
@@ -1865,7 +1886,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     if (!anomalyConfig.value.name?.trim()) {
       toast({
         variant: "error",
-        message: "Anomaly name is required.",
+        message: t("alerts.messages.anomalyNameRequired"),
       });
       return;
     }
@@ -1882,7 +1903,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
         activeTab.value = "anomaly-config";
         toast({
           variant: "error",
-          message: "Please fix the highlighted fields before saving.",
+          message: t("alerts.messages.fixHighlightedFields"),
         });
         return;
       }
@@ -1895,7 +1916,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       activeTab.value = "anomaly-alerting";
       toast({
         variant: "error",
-        message: "At least one destination is required.",
+        message: t("alerts.validation.destinationRequired"),
       });
       return;
     }
@@ -1908,7 +1929,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       if (!c.custom_sql?.trim()) {
         toast({
           variant: "error",
-          message: "Custom SQL is required in custom SQL mode.",
+          message: t("alerts.messages.customSqlRequired"),
         });
         wizardStep.value = 2;
         anomalySaving.value = false;
@@ -1930,10 +1951,11 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
         });
       } catch (sqlErr: any) {
         const msg =
-          sqlErr?.response?.data?.message || "Invalid SQL query";
+          sqlErr?.response?.data?.message ||
+          t("alerts.messages.invalidSqlQueryLower");
         toast({
           variant: "error",
-          message: `SQL validation error: ${msg}`,
+          message: t("alerts.validation.sqlValidationError", { error: msg }),
         });
         wizardStep.value = 2;
         anomalySaving.value = false;
@@ -1979,15 +2001,13 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
         await anomalyDetectionService.update(orgId, routeAnomalyId, payload);
         toast({
           variant: "success",
-          message: "Anomaly detection config updated.",
+          message: t("alerts.messages.anomalyConfigUpdated"),
         });
       } else {
         await anomalyDetectionService.create(orgId, payload);
         toast({
           variant: "success",
-          message:
-            t("alerts.anomalyCreated") ||
-            "Anomaly detection config created. Training will start shortly.",
+          message: t("alerts.anomalyCreated"),
         });
       }
 
@@ -1996,7 +2016,8 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       toast({
         variant: "error",
         message:
-          err?.response?.data?.message || "Failed to save anomaly config.",
+          err?.response?.data?.message ||
+          t("alerts.messages.anomalyConfigSaveFailed"),
       });
     } finally {
       anomalySaving.value = false;
@@ -2023,7 +2044,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       focusOnFirstError();
       toast({
         variant: "error",
-        message: "Please fix the highlighted fields before saving.",
+        message: t("alerts.messages.fixHighlightedFields"),
       });
     }
   };
@@ -2065,13 +2086,18 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
           activeTab.value = "condition";
           toast({
             variant: "error",
-            message: `Frequency should be greater than ${minInterval - 1} seconds.`,
+            message: t("alerts.queryConfig.frequencyGreaterThanSeconds", {
+              seconds: minInterval - 1,
+            }),
           });
           return false;
         }
       } catch {
         activeTab.value = "condition";
-        toast({ variant: "error", message: "Invalid cron expression" });
+        toast({
+          variant: "error",
+          message: t("alerts.queryConfig.invalidCronExpression"),
+        });
         return false;
       }
     }
@@ -2081,21 +2107,27 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     if (tab === "sql") {
       if (!qc.sql || String(qc.sql).trim() === "") {
         activeTab.value = "condition";
-        toast({ variant: "error", message: "SQL query cannot be empty." });
+        toast({
+          variant: "error",
+          message: t("alerts.messages.sqlQueryEmpty"),
+        });
         return false;
       }
       if (sqlQueryErrorMsg.value && sqlQueryErrorMsg.value.trim() !== "") {
         activeTab.value = "condition";
         toast({
           variant: "error",
-          message: "Please fix the SQL error before saving.",
+          message: t("alerts.messages.fixSqlErrorBeforeSaving"),
         });
         return false;
       }
     } else if (tab === "promql") {
       if (!qc.promql || String(qc.promql).trim() === "") {
         activeTab.value = "condition";
-        toast({ variant: "error", message: "PromQL query cannot be empty." });
+        toast({
+          variant: "error",
+          message: t("alerts.messages.promqlQueryEmpty"),
+        });
         return false;
       }
     }
@@ -2128,7 +2160,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       activeTab.value = "condition";
       toast({
         variant: "error",
-        message: "Selecting all Columns in SQL query is not allowed.",
+        message: t("alerts.messages.selectAllColumnsNotAllowed"),
         timeout: 1500,
       });
       return false;
@@ -2161,17 +2193,31 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       const invalidCount = udsValidation.invalidFields.length;
       let message = "";
 
+      // Three DISTINCT sentence shapes (singular / short list / truncated list),
+      // not one pluralised message — vue-i18n plural forms can't reproduce the
+      // third branch's extra params, so the hand-rolled branching stays and each
+      // shape gets its own key.
       if (invalidCount === 1) {
-        message = `Field "${udsValidation.invalidFields[0]}" is not available. Please use only the available fields in your conditions.`;
+        message = t("alerts.messages.udsFieldNotAvailable", {
+          field: udsValidation.invalidFields[0],
+        });
       } else if (invalidCount <= 3) {
-        message = `Fields ${udsValidation.invalidFields.map((f: string) => `"${f}"`).join(", ")} are not available. Please use only the available fields in your conditions.`;
+        message = t("alerts.messages.udsFieldsNotAvailable", {
+          fields: udsValidation.invalidFields
+            .map((f: string) => `"${f}"`)
+            .join(", "),
+        });
       } else {
         const firstThree = udsValidation.invalidFields
           .slice(0, 3)
           .map((f: string) => `"${f}"`)
           .join(", ");
         const remaining = invalidCount - 3;
-        message = `${invalidCount} fields are not available (${firstThree} and ${remaining} more). Please use only the available fields in your conditions.`;
+        message = t("alerts.messages.udsFieldsNotAvailableTruncated", {
+          count: invalidCount,
+          fields: firstThree,
+          remaining,
+        });
       }
 
       toast({
@@ -2188,7 +2234,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
 
     const dismiss = toast({
       variant: "loading",
-      message: "Please wait...",
+      message: t("common.pleaseWait"),
       timeout: 0,
     });
 
@@ -2202,8 +2248,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
         dismiss();
         toast({
           variant: "error",
-          message:
-            "Error while validating sql query. Please check the query and try again.",
+          message: t("alerts.messages.sqlValidationRequestFailed"),
           timeout: 1500,
         });
         console.error("Error while validating sql query", error);
@@ -2233,7 +2278,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
           dismiss();
           toast({
             variant: "success",
-            message: `Alert updated successfully.`,
+            message: t("alerts.messages.alertUpdated"),
           });
         })
         .catch((err: any) => {
@@ -2269,7 +2314,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
           dismiss();
           toast({
             variant: "success",
-            message: `Alert saved successfully.`,
+            message: t("alerts.messages.alertSaved"),
           });
         })
         .catch((err: any) => {
@@ -2882,7 +2927,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       } catch {
         toast({
           variant: "error",
-          message: "Failed to load anomaly detection config.",
+          message: t("alerts.messages.anomalyConfigLoadFailed"),
         });
       }
     }

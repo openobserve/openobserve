@@ -188,11 +188,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="text-xs text-input-error-text pt-1"
               data-test="anomaly-custom-sql-timestamp-alias-error"
             >
-              <code>{{
-                store.state.zoConfig.timestamp_column || "_timestamp"
-              }}</code>
-              cannot be used as a column alias. Use
-              <code>time_bucket</code> instead.
+              <!-- The literal `<code>` spans are why this can't reuse
+                   alerts.validation.timestampAliasBanned (which bakes
+                   `time_bucket` into its text): the slotted variant needs both
+                   the column AND time_bucket as params. Same rendered English. -->
+              <i18n-t keypath="alerts.anomaly.timestampAliasBanned" tag="span">
+                <template #column>
+                  <code>{{
+                    store.state.zoConfig.timestamp_column || "_timestamp"
+                  }}</code>
+                </template>
+                <template #timeBucket><code>time_bucket</code></template>
+              </i18n-t>
             </div>
             <div
               class="text-xs mt-1"
@@ -200,8 +207,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 store.state.theme === 'dark' ? 'text-gray-400' : 'text-gray-400'
               "
             >
-              Query must return two columns: <code>time_bucket</code> and
-              <code>value</code>.
+              <i18n-t keypath="alerts.anomaly.sqlColumnsHint" tag="span">
+                <template #timeBucket><code>time_bucket</code></template>
+                <template #valueColumn><code>value</code></template>
+              </i18n-t>
             </div>
           </div>
         </div>
@@ -316,7 +325,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="font-semibold flex items-center"
             style="width: 190px; height: 36px"
           >
-            Detection Resolution <span class="text-red-500 ml-1">*</span>
+            {{ t("alerts.anomaly.detectionResolution") }}
+            <span class="text-red-500 ml-1">*</span>
             <OIcon
               name="info"
               size="sm"
@@ -487,11 +497,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="ml-1 cursor-pointer text-gray-400"
               >
                 <OTooltip side="right" align="center" max-width="300px">
-                  <template #content><span style="font-size: 14px">
-                    How many days of historical data to use for training. Min 1
-                    day. Seasonality is auto-detected: &lt;7 days → hour-of-day;
-                    ≥7 days → hour-of-day + day-of-week.
-                  </span></template>
+                  <!-- Kept as a #content slot (not :content) so the 14px span
+                       survives; only the text moves to i18n. -->
+                  <template #content><span style="font-size: 14px">{{
+                    t("alerts.anomaly.trainingWindowTooltip")
+                  }}</span></template>
                 </OTooltip>
               </OIcon>
             </div>
@@ -510,12 +520,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   store.state.theme === 'dark' ? 'text-gray-400' : 'text-gray-400'
                 "
               >
-                days (seasonality:
                 {{
-                  Number(trainingWindowDays) >= 7
-                    ? t("alerts.anomaly.seasonalityWeekly")
-                    : t("alerts.anomaly.seasonalityDaily")
-                }})
+                  t("alerts.anomaly.trainingWindowSeasonality", {
+                    seasonality:
+                      Number(trainingWindowDays) >= 7
+                        ? t("alerts.anomaly.seasonalityWeekly")
+                        : t("alerts.anomaly.seasonalityDaily"),
+                  })
+                }}
               </span>
             </div>
           </div>
@@ -735,10 +747,13 @@ export default defineComponent({
     const { t } = useI18n();
     const store = useStore();
 
-    const queryTabOptions = [
-      { label: "Builder", value: "filters" },
+    // Option labels go through t() inside a computed so they re-resolve on a
+    // locale change (a plain const would freeze them at mount locale).
+    // "SQL" stays a literal — a proper noun, not translatable copy.
+    const queryTabOptions = computed(() => [
+      { label: t("alerts.queryBuilder"), value: "filters" },
       { label: "SQL", value: "custom_sql" },
-    ];
+    ]);
 
     const filterOperators = ANOMALY_FILTER_OPERATORS;
     const detectionFunctions = [
@@ -751,16 +766,17 @@ export default defineComponent({
       "p95",
       "p99",
     ];
-    const intervalUnits = [
-      { label: "Minutes", value: "m" },
-      { label: "Hours", value: "h" },
-    ];
-    const retrainIntervalOptions = [
-      { label: "Never", value: 0 },
-      { label: "1 day", value: 1 },
-      { label: "7 days", value: 7 },
-      { label: "14 days", value: 14 },
-    ];
+    const intervalUnits = computed(() => [
+      { label: t("common.minutes"), value: "m" },
+      { label: t("common.hours"), value: "h" },
+    ]);
+    // Fixed enum labels, not dynamic counts — plain keys, no pluralization.
+    const retrainIntervalOptions = computed(() => [
+      { label: t("alerts.anomaly.retrainNever"), value: 0 },
+      { label: t("alerts.anomaly.retrainOneDay"), value: 1 },
+      { label: t("alerts.anomaly.retrainSevenDays"), value: 7 },
+      { label: t("alerts.anomaly.retrainFourteenDays"), value: 14 },
+    ]);
 
     const getTimestampColumn = () =>
       store.state.zoConfig.timestamp_column || "_timestamp";
@@ -1212,12 +1228,12 @@ export default defineComponent({
           },
           mark_line: [
             {
-              name: "max threshold",
+              name: t("alerts.anomaly.maxThresholdMarkLine"),
               type: "yAxis",
               value: String(thresholdRange.value.max),
             },
             {
-              name: "min threshold",
+              name: t("alerts.anomaly.minThresholdMarkLine"),
               type: "yAxis",
               value: String(thresholdRange.value.min),
             },

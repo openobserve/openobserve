@@ -141,7 +141,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
             <div v-else-if="isUpdatingDestination" class="p-3 text-center">
               <OSpinner size="md" data-test="add-destination-loading-indicator" />
-              <div class="mt-2 text-gray-400">Loading destination data...</div>
+              <div class="mt-2 text-gray-400">{{ t("alert_destinations.loadingData") }}</div>
             </div>
 
             <!-- Template selector for prebuilt destinations -->
@@ -266,10 +266,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="flex items-center w-full mb-3"
           >
             <div class="text-sm font-medium mr-2">
-              It looks like you haven't created any Email Templates yet.
+              {{ t("alert_destinations.noEmailTemplates") }}
             </div>
             <OButton variant="outline" size="sm" @click="createEmailTemplate"
-              >Create Email Template</OButton
+              >{{ t("alert_destinations.createEmailTemplate") }}</OButton
             >
           </div>
           <!-- Name + Template row for custom alert destinations -->
@@ -357,7 +357,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
             <div class="w-full py-2">
-              <div class="font-bold py-1">Headers</div>
+              <div class="font-bold py-1">{{ t("alert_destinations.headers") }}</div>
               <div
                 v-for="(header, index) in apiHeaders"
                 :key="index"
@@ -655,7 +655,7 @@ const onSaveClick = () => {
   if (props.isAlerts && !props.destination && !dtVal.value) {
     toast({
       variant: "error",
-      message: "Please fill required fields",
+      message: t("common.fillRequiredFields"),
       timeout: 1500,
     });
   }
@@ -1112,7 +1112,7 @@ const showPreview = async () => {
     console.error("Failed to generate preview:", error);
     toast({
       variant: "error",
-      message: "Failed to generate preview",
+      message: t("alert_destinations.previewError"),
     });
   }
 };
@@ -1178,7 +1178,7 @@ async function handlePrebuiltSave(value: AddDestinationForm) {
 function saveCustomDestination(value: AddDestinationForm) {
   const dismiss = toast({
     variant: "loading",
-    message: "Please wait...",
+    message: t("common.pleaseWait"),
     timeout: 0,
   });
   const headers: Headers = {};

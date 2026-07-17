@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span
           class="section-header-title text-[13px] font-semibold text-[var(--color-text-primary)]"
         >{{
-          t("alerts.additional_settings") || "Additional Settings"
+          t("alerts.additional_settings")
         }}</span>
       </div>
 
@@ -200,11 +200,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <OToggleGroupItem value="String" size="sm">
                   <template #icon-left><OIcon name="title" size="sm" /></template>
-                  String
+                  {{ t("alerts.advanced.templateTypeString") }}
                 </OToggleGroupItem>
                 <OToggleGroupItem value="Json" size="sm">
                   <template #icon-left><OIcon name="data-object" size="sm" /></template>
-                  JSON
+                  {{ t("alerts.advanced.templateTypeJson") }}
                 </OToggleGroupItem>
               </OFormToggleGroup>
             </div>
@@ -367,10 +367,14 @@ export default defineComponent({
       props.templates.map((tpl: any) => tpl.name),
     );
 
+    // NOTE: these two messages contain `{name}` / `{timestamp}` — END-USER row
+    // template syntax, NOT i18n params. Their braces are escaped in en.json
+    // (`{'{'}` / `{'}'}`) so vue-i18n emits them verbatim instead of trying to
+    // interpolate them. Advanced.spec.ts asserts the rendered strings.
     const rowTemplatePlaceholder = computed(() => {
       return rowTemplateTypeValue.value === "Json"
-        ? 'e.g - {"user": "{name}", "timestamp": "{timestamp}"}'
-        : "e.g - Alert was triggered at {timestamp}";
+        ? t("alerts.advanced.rowTemplatePlaceholderJson")
+        : t("alerts.advanced.rowTemplatePlaceholderString");
     });
 
     // ── Field-array add/remove — mutate the form (Rule ①), never a local ref.

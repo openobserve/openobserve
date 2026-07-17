@@ -192,6 +192,8 @@ export type ConditionsTree = z.infer<typeof conditionGroupNodeSchema>;
 //    resolved via the injected `t` inside `makeQueryConfigSchema`. Parity map:
 //      threshold ≥ 1   → alerts.validation.thresholdPositive
 //      frequency ≥ 1   → alerts.validation.frequencyPositive
+//      org min-freq    → alerts.validation.minimumFrequency ({minutes} = the
+//                        ceil(min_auto_refresh_interval / 60) floor)
 //      "value is"      → alerts.validation.fieldRequired
 //      promql operator → alerts.validation.fieldRequired
 //      promql value    → alerts.validation.fieldRequired
@@ -376,7 +378,9 @@ export const makeQueryConfigSchema = (t: Translator) =>
             ctx.addIssue({
               code: z.ZodIssueCode.custom,
               path: ["_ui", "checkEvery"],
-              message: "Minimum frequency should be " + floorMins + " minutes",
+              message: t("alerts.validation.minimumFrequency", {
+                minutes: floorMins,
+              }),
             });
           }
         }

@@ -18,6 +18,7 @@ import { shallowMount } from "@vue/test-utils";
 import ImportDestination from "./ImportDestination.vue";
 import { createStore } from "vuex";
 import { createI18n } from "vue-i18n";
+import enMessages from "@/locales/languages/en.json";
 import { ref } from "vue";
 
 // ─── Service mocks ───────────────────────────────────────────────────────────
@@ -74,9 +75,12 @@ const mockStore = createStore({
   },
 });
 
+// Mount the REAL en.json messages (not a hand-written stub): the component's
+// user-facing strings are i18n keys, so a stub would make every t() fall back to
+// its raw key path and silently weaken the text assertions below.
 const mockI18n = createI18n({
   locale: "en",
-  messages: { en: { alert_destinations: { skip_tls_verify: "Skip TLS Verify" } } },
+  messages: { en: enMessages },
 });
 
 // ─── BaseImport stub ─────────────────────────────────────────────────────────

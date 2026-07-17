@@ -134,9 +134,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               alert_trigger_time, alert_trigger_time_millis,
               alert_trigger_time_seconds, alert_trigger_time_str
             </div>
-            <div><b>rows</b> multiple lines of row template</div>
-            <div><b>All of the stream fields are variables.</b></div>
-            <div>{rows:N} {var:N} used to limit rows or string length.</div>
+            <div><b>rows</b> {{ t("alert_templates.variableRowsDescription") }}</div>
+            <div><b>{{ t("alert_templates.variableStreamFields") }}</b></div>
+            <div>{{ t("alert_templates.variableLimits") }}</div>
           </div>
           <div class="pb-3 px-1">
             <div class="font-bold text-body-1 pb-2">
@@ -271,7 +271,7 @@ const handleSave = async () => {
   if (!form.state.isValid) {
     toast({
       variant: "error",
-      message: "Please fill required fields",
+      message: t("common.fillRequiredFields"),
       timeout: 1500,
     });
   }
@@ -312,13 +312,13 @@ const sampleTemplates = [
 
 const tabs = computed(() => [
   {
-    label: "Web Hook",
+    label: t("alerts.webhook"),
     value: "http",
     style: {},
     icon: "webhook",
   },
   {
-    label: "Email",
+    label: t("alerts.email"),
     value: "email",
     style: {},
     icon: "mail",
@@ -380,7 +380,7 @@ async function saveTemplate(value: AddTemplateForm) {
 
   const dismiss = toast({
     variant: "loading",
-    message: "Please wait...",
+    message: t("common.pleaseWait"),
     timeout: 0,
   });
 
@@ -399,7 +399,7 @@ async function saveTemplate(value: AddTemplateForm) {
     emit("cancel:hideform");
     toast({
       variant: "success",
-      message: `Template Saved Successfully.`,
+      message: t("alert_templates.savedSuccessfully"),
     });
   };
 
@@ -447,7 +447,7 @@ async function saveTemplate(value: AddTemplateForm) {
 
 const copyTemplateBody = (text: any) => {
   copyToClipboard(JSON.parse(JSON.stringify(text)), {
-    successMessage: "Content Copied Successfully!",
+    successMessage: t("alert_templates.contentCopied"),
     timeout: 1000,
   });
 };

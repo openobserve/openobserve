@@ -12,8 +12,12 @@
 // Per credential field (byte-for-byte the pre-migration `validate()` semantics):
 //   • required + empty            → `${label} is required`   (validator NOT run)
 //   • required/optional + present → run `field.validator` (if any); its returned
-//                                    string becomes the field's error message
+//                                    i18n message becomes the field's error
 //   • optional + empty            → OK (no issue)
+//
+// The config modules are Vue-less and cannot translate, so they carry i18n KEYS
+// (`labelKey`, and a `{ key, params }` from each validator). This factory is one
+// of the two sites that owns a `t` and resolves them — see `CredentialField`.
 //
 // Validation TIMING is owned by OForm (submit-then-change via revalidateLogic);
 // this file only describes WHAT is valid.
@@ -85,21 +89,21 @@ export const makePrebuiltDestinationSchema = (
           code: z.ZodIssueCode.custom,
           path: [field.key],
           message: t("alerts.validation.credentialFieldRequired", {
-            field: field.label,
+            field: t(field.labelKey),
           }),
         });
         continue;
       }
       // Optional + empty → nothing to validate.
       if (!field.required && isEmpty) continue;
-      // Present → run the per-type validator (if any); its string is the message.
+      // Present → run the per-type validator (if any); resolve its i18n message.
       if (field.validator && value) {
         const result = field.validator(value.toString());
         if (result !== true) {
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
             path: [field.key],
-            message: result as string,
+            message: t(result.key, result.params),
           });
         }
       }

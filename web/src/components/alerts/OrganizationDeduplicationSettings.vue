@@ -251,7 +251,7 @@ const saveSettings = async (value: OrgDedupSettingsForm) => {
 
     toast({
       variant: "success",
-      message: "Organization deduplication settings saved successfully",
+      message: t("alerts.correlation.settingsSaved"),
     });
 
     emit("saved");
@@ -259,7 +259,7 @@ const saveSettings = async (value: OrgDedupSettingsForm) => {
     console.error("Error saving deduplication settings:", error);
     toast({
       variant: "error",
-      message: error?.message || "Failed to save settings",
+      message: error?.message || t("alerts.correlation.settingsSaveError"),
     });
   }
 };

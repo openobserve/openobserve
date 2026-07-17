@@ -3,6 +3,7 @@ import { mount, flushPromises } from '@vue/test-utils';
 import FilterGroup from './FilterGroup.vue';
 import { createStore } from 'vuex';
 import { createI18n } from 'vue-i18n';
+import enMessages from '@/locales/languages/en.json';
 import { nextTick, defineComponent, reactive, ref } from 'vue';
 import { z } from 'zod';
 import OForm from '@/lib/forms/Form/OForm.vue';
@@ -27,18 +28,12 @@ const mockStore = createStore({
   },
 });
 
+// Mount the REAL en.json messages (not a hand-written stub): the component's
+// user-facing strings are i18n keys, so a stub would make every t() fall back to
+// its raw key path and silently weaken the text assertions below.
 const mockI18n = createI18n({
   locale: 'en',
-  messages: {
-    en: {
-      alerts: {
-        column: 'Column',
-      },
-      common: {
-        value: 'Value',
-      },
-    },
-  },
+  messages: { en: enMessages },
 });
 
 

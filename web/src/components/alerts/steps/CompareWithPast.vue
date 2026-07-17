@@ -309,23 +309,27 @@ export default defineComponent({
       commit();
     };
 
-    const getDisplayValue = (value: string) => {
-      const relativePeriods = [
-        { label: "Second(s)", value: "s" },
-        { label: "Minute(s)", value: "m" },
-        { label: "Hour(s)", value: "h" },
-        { label: "Day(s)", value: "d" },
-        { label: "Week(s)", value: "w" },
-        { label: "Month(s)", value: "M" },
-      ];
+    // Static unit labels for the offset display ("15m" → "15 Minute(s)"). These
+    // are NOT counted nouns — the literal "(s)" is part of the label — so they
+    // stay plain keys and are deliberately NOT pluralized (unlike the *Count
+    // keys used by convertMinutesToDisplayValue below).
+    const relativePeriods = computed(() => [
+      { label: t("alerts.compareWithPast.periodSeconds"), value: "s" },
+      { label: t("alerts.compareWithPast.periodMinutes"), value: "m" },
+      { label: t("alerts.compareWithPast.periodHours"), value: "h" },
+      { label: t("alerts.compareWithPast.periodDays"), value: "d" },
+      { label: t("alerts.compareWithPast.periodWeeks"), value: "w" },
+      { label: t("alerts.compareWithPast.periodMonths"), value: "M" },
+    ]);
 
+    const getDisplayValue = (value: string) => {
       if (typeof value !== 'string') return value;
 
       const match = value.match(/^(\d+)([smhdwM])$/);
       if (!match) return value;
 
       const [, numberPart, unitPart] = match;
-      const period = relativePeriods.find((p) => p.value === unitPart);
+      const period = relativePeriods.value.find((p) => p.value === unitPart);
 
       if (period) {
         return `${numberPart} ${period.label}`;
@@ -334,21 +338,22 @@ export default defineComponent({
       return value;
     };
 
+    // Counted nouns → real vue-i18n plural forms ("{n} Minute | {n} Minutes"),
+    // called as t(key, n). This replaces the hand-rolled `+ 's'` English
+    // pluralization; output is byte-identical for every n the UI can produce
+    // (vue-i18n picks the singular form only for n === 1, matching the old
+    // `n !== 1 ? 's' : ''`, including n === 0 → "0 Minutes").
     const convertMinutesToDisplayValue = (minutes: number) => {
       if (minutes < 60) {
-        return `${minutes} Minute${minutes !== 1 ? 's' : ''}`;
+        return t("alerts.compareWithPast.minuteCount", minutes);
       } else if (minutes < 1440) {
-        const hours = Math.floor(minutes / 60);
-        return `${hours} Hour${hours !== 1 ? 's' : ''}`;
+        return t("alerts.compareWithPast.hourCount", Math.floor(minutes / 60));
       } else if (minutes < 10080) {
-        const days = Math.floor(minutes / 1440);
-        return `${days} Day${days !== 1 ? 's' : ''}`;
+        return t("alerts.compareWithPast.dayCount", Math.floor(minutes / 1440));
       } else if (minutes < 43200) {
-        const weeks = Math.floor(minutes / 10080);
-        return `${weeks} Week${weeks !== 1 ? 's' : ''}`;
+        return t("alerts.compareWithPast.weekCount", Math.floor(minutes / 10080));
       } else {
-        const months = Math.floor(minutes / 43200);
-        return `${months} Month${months !== 1 ? 's' : ''}`;
+        return t("alerts.compareWithPast.monthCount", Math.floor(minutes / 43200));
       }
     };
 

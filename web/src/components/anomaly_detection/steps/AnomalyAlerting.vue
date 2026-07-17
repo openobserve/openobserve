@@ -80,7 +80,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <template #trailing>
                     <button
                       type="button"
-                      aria-label="Remove"
+                      :aria-label="t('common.remove')"
                       class="inline-flex items-center justify-center cursor-pointer hover:opacity-70"
                       @click="removeAtIndex(index)"
                     >

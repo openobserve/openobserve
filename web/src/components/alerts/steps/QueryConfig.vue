@@ -433,7 +433,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="flex items-start
              gap-3 py-2 px-3 rounded-md text-[13px]">
               <span class="condition-label font-bold text-[13px] whitespace-nowrap min-w-[90px] shrink-0" style="line-height: 28px;">
-                Check every *
+                {{ t('alerts.queryConfig.checkEvery') }} *
                 <OTooltip :content="t('alerts.howOftenCheckTooltip')" :delay="300" side="top" />
               </span>
               <div class="flex flex-col gap-1">
@@ -457,7 +457,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <template v-else>
                     <OFormInput
                       name="trigger_condition.cron"
-                      placeholder="0 */10 * * * *"
+                      :placeholder="t('alerts.queryConfig.cronExpressionPlaceholder')"
                       style="min-width: 100px; max-width: 100px;"
                       @update:model-value="onCronExpressionChange"
                     />
@@ -481,7 +481,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         name="trigger_condition.timezone"
                         :options="filteredTimezones"
                         searchable
-                        placeholder="timezone"
+                        :placeholder="t('alerts.queryConfig.timezonePlaceholder')"
                         style="min-width: 150px; max-width: 150px;"
                         @update:model-value="onCronTimezoneChange"
                       />
@@ -494,7 +494,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </span>
                   </template>
 
-                  <span class="condition-text font-semibold text-[13px] whitespace-nowrap">on these</span>
+                  <span class="condition-text font-semibold text-[13px] whitespace-nowrap">{{ t('alerts.queryConfig.onThese') }}</span>
                   <div
                     class="flex items-center gap-1 cursor-pointer select-none filters-inline-toggle px-2 py-0.5 rounded-md transition-colors bg-surface-panel hover:bg-primary-50"
                     @click="toggleFilters"
@@ -510,7 +510,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           :class="filterCount > 0
                             ? 'text-[var(--q-primary)]'
                             : (store.state.theme === 'dark' ? 'text-gray-300' : 'text-gray-600')">
-                      filters
+                      {{ t('alerts.queryConfig.filters') }}
                     </span>
                     <span v-if="filterCount > 0"
                           class="text-[11px] px-1.5 py-0 rounded-full font-bold leading-5"
@@ -526,7 +526,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <span v-if="generatedSqlQuery && !showFilters"
                           class="text-xs italic ml-1 whitespace-nowrap cursor-help underline decoration-dotted underline-offset-[2px]"
                           :class="store.state.theme === 'dark' ? 'text-gray-500' : 'text-gray-400'">
-                      view the alert query
+                      {{ t('alerts.queryConfig.viewAlertQuery') }}
                       <OTooltip :delay="200" side="bottom">
                         <template #content>
                           <pre class="hljs text-xs m-0 whitespace-pre-wrap font-mono p-2 rounded" v-html="highlightedSqlQuery" />
@@ -594,7 +594,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :class="filterCount > 0
                         ? 'text-[var(--q-primary)]'
                         : (store.state.theme === 'dark' ? 'text-gray-300' : 'text-gray-600')">
-                  filters
+                  {{ t('alerts.queryConfig.filters') }}
                 </span>
                 <span v-if="filterCount > 0"
                       class="text-[11px] px-1.5 py-0 rounded-full font-bold leading-5"
@@ -610,7 +610,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <span v-if="generatedSqlQuery && !showFilters"
                       class="text-xs italic ml-1 whitespace-nowrap cursor-help underline decoration-dotted underline-offset-[2px]"
                       :class="store.state.theme === 'dark' ? 'text-gray-500' : 'text-gray-400'">
-                  view the alert query
+                  {{ t('alerts.queryConfig.viewAlertQuery') }}
                   <OTooltip :delay="200" side="bottom">
                     <template #content>
                       <pre class="hljs text-xs m-0 whitespace-pre-wrap font-mono p-2 rounded" v-html="highlightedSqlQuery" />
@@ -662,7 +662,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-if="localTab === 'sql' && !showVrl"
                     v-model="showVrl"
                   >
-                    <OTooltip content="Show VRL editor" :delay="300" />
+                    <OTooltip :content="t('alerts.queryConfig.showVrlEditor')" :delay="300" />
                   </OSwitch>
                 </div>
                 <div style="position: relative; flex: 1; min-height: 0;">
@@ -699,7 +699,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :class="store.state.theme === 'dark' ? 'bg-white/4 border-b border-[#2d3748]' : 'bg-gray-100 border-b border-[#e5e7eb]'">
                   <div class="flex items-center gap-2">
                     <div class="w-0.75 h-3.5 rounded-sm shrink-0 bg-(--q-secondary)" />
-                    <span class="text-xs font-semibold">VRL Editor</span>
+                    <span class="text-xs font-semibold">{{ t('alerts.queryConfig.vrlEditor') }}</span>
                   </div>
                   <div class="flex items-center gap-1">
                     <OSelect
@@ -717,7 +717,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </template>
                     </OSelect>
                     <OSwitch v-model="showVrl">
-                      <OTooltip content="Hide VRL editor" :delay="300" />
+                      <OTooltip :content="t('alerts.queryConfig.hideVrlEditor')" :delay="300" />
                     </OSwitch>
                   </div>
                 </div>
@@ -777,7 +777,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Check every -->
             <div class="flex items-start gap-3 py-2 px-3 rounded-md text-[13px]">
               <span class="condition-label font-bold text-[13px] whitespace-nowrap min-w-[160px] w-[160px] shrink-0" style="line-height: 28px;">
-                Check every *
+                {{ t('alerts.queryConfig.checkEvery') }} *
                 <OTooltip :content="t('alerts.howOftenCheckTooltip')" :delay="300" side="top" />
               </span>
               <div class="flex flex-col gap-1">
@@ -798,7 +798,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <template v-else>
                     <OFormInput
                       name="trigger_condition.cron"
-                      placeholder="0 */10 * * * *"
+                      :placeholder="t('alerts.queryConfig.cronExpressionPlaceholder')"
                       style="min-width: 100px; max-width: 100px;"
                       @update:model-value="onCronExpressionChange"
                     />
@@ -818,7 +818,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         name="trigger_condition.timezone"
                         :options="filteredTimezones"
                         searchable
-                        placeholder="timezone"
+                        :placeholder="t('alerts.queryConfig.timezonePlaceholder')"
                         style="min-width: 150px; max-width: 150px;"
                         @update:model-value="onCronTimezoneChange"
                       />
@@ -892,7 +892,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template v-if="localTab === 'promql' && promqlCondition">
               <div class="flex items-start gap-3 py-2 px-3 rounded-md text-[13px]">
                 <span class="condition-label font-bold text-[13px] whitespace-nowrap min-w-[160px] w-[160px] shrink-0 leading-8.5">{{ t('alerts.alertIfValueIs') }} *
-                  <OTooltip content="Alert when the PromQL expression evaluates to this condition for a time series. Example: &gt;= 100 triggers when the result is 100 or more." :delay="300" side="top" />
+                  <OTooltip :content="t('alerts.queryConfig.alertIfValueIsTooltip')" :delay="300" side="top" />
                 </span>
                 <div class="flex items-start gap-2">
                   <OFormSelect
@@ -927,7 +927,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div class="flex items-start gap-3 py-2 px-3 rounded-md text-[13px]">
                 <span class="condition-label font-bold text-[13px] whitespace-nowrap min-w-[160px] w-[160px] shrink-0 leading-8.5">{{ t('alerts.havingSeries') }} *
-                  <OTooltip content="Minimum number of time series that must satisfy the condition above to trigger the alert." :delay="300" side="top" />
+                  <OTooltip :content="t('alerts.queryConfig.havingSeriesTooltip')" :delay="300" side="top" />
                 </span>
                 <div class="flex items-start gap-2">
                   <OFormSelect
@@ -991,7 +991,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <CustomConfirmDialog
       v-model="showMultiWindowDialog"
       :title="t('alerts.clearMultiWindowsTitle')"
-      :message="`Multi-windows are configured. To enable ${pendingTab === 'custom' ? 'Custom' : 'PromQL'} mode, we need to clear them. Do you want to proceed?`"
+      :message="t('alerts.queryConfig.clearMultiWindowsMessage', { mode: pendingTab === 'custom' ? t('alerts.queryConfig.customMode') : 'PromQL' })"
       @confirm="handleConfirmClearMultiWindows"
       @cancel="handleCancelClearMultiWindows"
     />
@@ -1373,21 +1373,23 @@ export default defineComponent({
       localIsAggregationEnabled.value = false;
     }
 
-    // Log function options — count (default) and measure functions
-    const logFunctionOptions = [
-      { label: 'total events', value: 'total_events', tooltip: 'Count the total number of log events matching your filters (COUNT(*))' },
-      { label: 'count', value: 'count', tooltip: 'Count non-null values of a specific field (COUNT(field))' },
-      { label: 'avg', value: 'avg', tooltip: 'Average value of a numeric field' },
-      { label: 'min', value: 'min', tooltip: 'Minimum value of a numeric field' },
-      { label: 'max', value: 'max', tooltip: 'Maximum value of a numeric field' },
-      { label: 'sum', value: 'sum', tooltip: 'Sum of values of a numeric field' },
-      { label: 'median', value: 'median', tooltip: 'Median value of a numeric field' },
-      { label: 'p50', value: 'p50', tooltip: '50th percentile of a numeric field' },
-      { label: 'p75', value: 'p75', tooltip: '75th percentile of a numeric field' },
-      { label: 'p90', value: 'p90', tooltip: '90th percentile of a numeric field' },
-      { label: 'p95', value: 'p95', tooltip: '95th percentile of a numeric field' },
-      { label: 'p99', value: 'p99', tooltip: '99th percentile of a numeric field' },
-    ];
+    // Log function options — count (default) and measure functions.
+    // computed() (not a module/setup const) so the labels + tooltips re-resolve
+    // if the locale changes; the `value`s are payload identifiers and stay literal.
+    const logFunctionOptions = computed(() => [
+      { label: t('alerts.queryConfig.functions.totalEvents'), value: 'total_events', tooltip: t('alerts.queryConfig.functionTooltips.totalEvents') },
+      { label: t('alerts.queryConfig.functions.count'), value: 'count', tooltip: t('alerts.queryConfig.functionTooltips.count') },
+      { label: t('alerts.queryConfig.functions.avg'), value: 'avg', tooltip: t('alerts.queryConfig.functionTooltips.avg') },
+      { label: t('alerts.queryConfig.functions.min'), value: 'min', tooltip: t('alerts.queryConfig.functionTooltips.min') },
+      { label: t('alerts.queryConfig.functions.max'), value: 'max', tooltip: t('alerts.queryConfig.functionTooltips.max') },
+      { label: t('alerts.queryConfig.functions.sum'), value: 'sum', tooltip: t('alerts.queryConfig.functionTooltips.sum') },
+      { label: t('alerts.queryConfig.functions.median'), value: 'median', tooltip: t('alerts.queryConfig.functionTooltips.median') },
+      { label: t('alerts.queryConfig.functions.p50'), value: 'p50', tooltip: t('alerts.queryConfig.functionTooltips.p50') },
+      { label: t('alerts.queryConfig.functions.p75'), value: 'p75', tooltip: t('alerts.queryConfig.functionTooltips.p75') },
+      { label: t('alerts.queryConfig.functions.p90'), value: 'p90', tooltip: t('alerts.queryConfig.functionTooltips.p90') },
+      { label: t('alerts.queryConfig.functions.p95'), value: 'p95', tooltip: t('alerts.queryConfig.functionTooltips.p95') },
+      { label: t('alerts.queryConfig.functions.p99'), value: 'p99', tooltip: t('alerts.queryConfig.functionTooltips.p99') },
+    ]);
 
     // Numeric-only operators (no Contains/NotContains for thresholds)
     const numericOperators = ["=", "!=", ">=", ">", "<=", "<"];
@@ -1653,25 +1655,29 @@ export default defineComponent({
       cronError.value = '';
       if (frequencyMode.value !== 'cron') return;
       if (!cronExpression.value || !cronTimezone.value) {
-        cronError.value = 'Cron expression and timezone are required';
+        cronError.value = t('alerts.queryConfig.cronExpressionTimezoneRequired');
         return;
       }
       try {
         const intervalInSecs = getCronIntervalDifferenceInSeconds(cronExpression.value);
         if (typeof intervalInSecs === 'number' && !isAboveMinRefreshInterval(intervalInSecs, store.state?.zoConfig)) {
           const minInterval = Number(store.state?.zoConfig?.min_auto_refresh_interval) || 1;
-          cronError.value = `Frequency should be greater than ${minInterval - 1} seconds.`;
+          cronError.value = t('alerts.queryConfig.frequencyGreaterThanSeconds', {
+            seconds: minInterval - 1,
+          });
         }
       } catch {
-        cronError.value = 'Invalid cron expression';
+        cronError.value = t('alerts.queryConfig.invalidCronExpression');
       }
     };
 
-    const frequencyUnitOptions = [
-      { label: 'Minutes', value: 'minutes' },
-      { label: 'Hours', value: 'hours' },
-      { label: 'Cron', value: 'cron' },
-    ];
+    // computed() so the labels re-resolve on a locale change; the `value`s are
+    // the frequency-mode identifiers and stay literal.
+    const frequencyUnitOptions = computed(() => [
+      { label: t('common.minutes'), value: 'minutes' },
+      { label: t('common.hours'), value: 'hours' },
+      { label: t('alerts.queryConfig.cron'), value: 'cron' },
+    ]);
 
     const onFrequencyUnitChange = (unit: string) => {
       const prevMode = frequencyMode.value;
@@ -1833,7 +1839,7 @@ export default defineComponent({
       // For logs and traces, show only Builder and SQL
       return [
         {
-          label: "Builder",
+          label: t('alerts.queryBuilder'),
           value: "custom",
         },
         {

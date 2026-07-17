@@ -27,9 +27,9 @@ limitations under the License.
         <OFormInput
           name="credentials.webhookUrl"
           data-test="slack-webhook-url-input"
-          label="Slack Webhook URL"
+          :label="t('alerts.prebuiltDestinations.slackWebhookUrl')"
           required
-          helpText="Get your webhook URL from Slack App settings"
+          :helpText="t('alerts.prebuiltDestinations.slackWebhookUrlHelp')"
           tabindex="0"
         />
       </div>
@@ -37,8 +37,8 @@ limitations under the License.
         <OFormInput
           name="credentials.channel"
           data-test="slack-channel-input"
-          label="Channel (optional)"
-          helpText="e.g., #alerts"
+          :label="t('alerts.prebuiltDestinations.slackChannel')"
+          :helpText="t('alerts.prebuiltDestinations.slackChannelHelp')"
           tabindex="0"
         />
       </div>
@@ -50,9 +50,9 @@ limitations under the License.
         <OFormInput
           name="credentials.webhookUrl"
           data-test="discord-webhook-url-input"
-          label="Discord Webhook URL"
+          :label="t('alerts.prebuiltDestinations.discordWebhookUrl')"
           required
-          helpText="Get your webhook URL from Discord channel settings"
+          :helpText="t('alerts.prebuiltDestinations.discordWebhookUrlHelp')"
           tabindex="0"
         />
       </div>
@@ -60,8 +60,8 @@ limitations under the License.
         <OFormInput
           name="credentials.username"
           data-test="discord-username-input"
-          label="Bot Username (optional)"
-          helpText="Custom username for the webhook bot"
+          :label="t('alerts.prebuiltDestinations.discordUsername')"
+          :helpText="t('alerts.prebuiltDestinations.discordUsernameHelp')"
           tabindex="0"
         />
       </div>
@@ -73,9 +73,9 @@ limitations under the License.
         <OFormInput
           name="credentials.webhookUrl"
           data-test="msteams-webhook-url-input"
-          label="Microsoft Teams Webhook URL"
+          :label="t('alerts.prebuiltDestinations.msteamsWebhookUrl')"
           required
-          helpText="Get your webhook URL from Teams channel connectors"
+          :helpText="t('alerts.prebuiltDestinations.msteamsWebhookUrlHelp')"
           tabindex="0"
         />
       </div>
@@ -87,10 +87,10 @@ limitations under the License.
         <OFormInput
           name="credentials.integrationKey"
           data-test="pagerduty-integration-key-input"
-          label="Integration Key"
+          :label="t('alerts.prebuiltDestinations.pagerdutyIntegrationKey')"
           required
           type="password"
-          helpText="Get your integration key from PagerDuty service settings"
+          :helpText="t('alerts.prebuiltDestinations.pagerdutyIntegrationKeyHelp')"
           tabindex="0"
         />
       </div>
@@ -99,11 +99,11 @@ limitations under the License.
           name="credentials.severity"
           data-test="pagerduty-severity-select"
           :options="severityOptions"
-          label="Default Severity"
+          :label="t('alerts.prebuiltDestinations.pagerdutySeverity')"
           required
           labelKey="label"
           valueKey="value"
-          helpText="Select the default severity for PagerDuty incidents"
+          :helpText="t('alerts.prebuiltDestinations.pagerdutySeverityHelp')"
           tabindex="0"
         />
       </div>
@@ -115,9 +115,9 @@ limitations under the License.
         <OFormInput
           name="credentials.instanceUrl"
           data-test="servicenow-instance-url-input"
-          label="ServiceNow Instance URL"
+          :label="t('alerts.prebuiltDestinations.servicenowInstanceUrl')"
           required
-          helpText="https://your-instance.service-now.com/api/now/table/incident"
+          :helpText="t('alerts.prebuiltDestinations.servicenowInstanceUrlHelp')"
           tabindex="0"
         />
       </div>
@@ -125,9 +125,9 @@ limitations under the License.
         <OFormInput
           name="credentials.username"
           data-test="servicenow-username-input"
-          label="Username"
+          :label="t('common.username')"
           required
-          helpText="ServiceNow username with incident creation permissions"
+          :helpText="t('alerts.prebuiltDestinations.servicenowUsernameHelp')"
           tabindex="0"
         />
       </div>
@@ -135,10 +135,10 @@ limitations under the License.
         <OFormInput
           name="credentials.password"
           data-test="servicenow-password-input"
-          label="Password"
+          :label="t('common.password')"
           required
           type="password"
-          helpText="ServiceNow password or API token"
+          :helpText="t('alerts.prebuiltDestinations.servicenowPasswordHelp')"
           tabindex="0"
         />
       </div>
@@ -146,8 +146,8 @@ limitations under the License.
         <OFormInput
           name="credentials.assignmentGroup"
           data-test="servicenow-assignment-group-input"
-          label="Assignment Group (optional)"
-          helpText="Group to assign incidents to (e.g., IT Operations)"
+          :label="t('alerts.prebuiltDestinations.servicenowAssignmentGroup')"
+          :helpText="t('alerts.prebuiltDestinations.servicenowAssignmentGroupHelp')"
           tabindex="0"
         />
       </div>
@@ -159,9 +159,9 @@ limitations under the License.
         <OFormInput
           name="credentials.recipients"
           data-test="email-recipients-input"
-          label="Recipient Email Addresses"
+          :label="t('alerts.prebuiltDestinations.emailRecipients')"
           required
-          helpText="Comma-separated email addresses"
+          :helpText="t('alerts.prebuiltDestinations.emailRecipientsHelp')"
           tabindex="0"
         />
       </div>
@@ -174,10 +174,10 @@ limitations under the License.
         <OFormInput
           name="credentials.apiKey"
           data-test="opsgenie-api-key-input"
-          label="Opsgenie API Key"
+          :label="t('alerts.prebuiltDestinations.opsgenieApiKey')"
           required
           type="password"
-          helpText="Get your API key from Opsgenie integration settings"
+          :helpText="t('alerts.prebuiltDestinations.opsgenieApiKeyHelp')"
           tabindex="0"
         />
       </div>
@@ -186,10 +186,10 @@ limitations under the License.
           name="credentials.priority"
           data-test="opsgenie-priority-select"
           :options="priorityOptions"
-          label="Default Priority"
+          :label="t('alerts.prebuiltDestinations.opsgeniePriority')"
           labelKey="label"
           valueKey="value"
-          helpText="Select the default priority for Opsgenie alerts"
+          :helpText="t('alerts.prebuiltDestinations.opsgeniePriorityHelp')"
           tabindex="0"
         />
       </div>
@@ -197,10 +197,10 @@ limitations under the License.
         <OFormSwitch
           name="credentials.euRegion"
           data-test="opsgenie-eu-region-toggle"
-          label="EU Region"
+          :label="t('alerts.prebuiltDestinations.opsgenieEuRegion')"
         />
         <span class="text-xs text-gray-400">
-          Enable for EU-based Opsgenie instances
+          {{ t('alerts.prebuiltDestinations.opsgenieEuRegionHelp') }}
         </span>
       </div>
     </template>
@@ -215,7 +215,7 @@ limitations under the License.
           @click="$emit('preview')"
           icon-left="preview"
         >
-          Preview
+          {{ t('alerts.preview') }}
         </OButton>
         <OButton
           data-test="destination-test-button"
@@ -225,7 +225,7 @@ limitations under the License.
           @click="$emit('test')"
           icon-left="send"
         >
-          Test
+          {{ t('common.test') }}
         </OButton>
       </div>
     </div>
@@ -233,6 +233,8 @@ limitations under the License.
 </template>
 
 <script lang="ts" setup>
+import { computed } from 'vue';
+import { useI18n } from 'vue-i18n';
 import OButton from '@/lib/core/Button/OButton.vue';
 import OFormInput from '@/lib/forms/Input/OFormInput.vue';
 import OFormSelect from '@/lib/forms/Select/OFormSelect.vue';
@@ -261,20 +263,22 @@ defineProps({
 
 defineEmits(['preview', 'test']);
 
-// PagerDuty severity options
-const severityOptions = [
-  { label: 'Critical', value: 'critical' },
-  { label: 'Error', value: 'error' },
-  { label: 'Warning', value: 'warning' },
-  { label: 'Info', value: 'info' }
-];
+const { t } = useI18n();
 
-// Opsgenie priority options
-const priorityOptions = [
-  { label: 'P1 (Critical)', value: 'P1' },
-  { label: 'P2 (High)', value: 'P2' },
-  { label: 'P3 (Moderate)', value: 'P3' },
-  { label: 'P4 (Low)', value: 'P4' },
-  { label: 'P5 (Informational)', value: 'P5' }
-];
+// PagerDuty severity options — computed so the labels re-resolve on locale change.
+const severityOptions = computed(() => [
+  { label: t('alerts.prebuiltDestinations.severityCritical'), value: 'critical' },
+  { label: t('alerts.prebuiltDestinations.severityError'), value: 'error' },
+  { label: t('alerts.prebuiltDestinations.severityWarning'), value: 'warning' },
+  { label: t('alerts.prebuiltDestinations.severityInfo'), value: 'info' }
+]);
+
+// Opsgenie priority options — computed so the labels re-resolve on locale change.
+const priorityOptions = computed(() => [
+  { label: t('alerts.prebuiltDestinations.priorityP1'), value: 'P1' },
+  { label: t('alerts.prebuiltDestinations.priorityP2'), value: 'P2' },
+  { label: t('alerts.prebuiltDestinations.priorityP3'), value: 'P3' },
+  { label: t('alerts.prebuiltDestinations.priorityP4'), value: 'P4' },
+  { label: t('alerts.prebuiltDestinations.priorityP5'), value: 'P5' }
+]);
 </script>

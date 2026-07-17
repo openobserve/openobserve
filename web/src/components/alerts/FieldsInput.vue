@@ -23,8 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          error refs — the consuming form's schema owns validation (Rule ②). -->
     <template v-if="formMode">
       <div data-test="alert-conditions-text" class="font-bold">
-        Conditions * (AND operator is used by default to evaluate multiple
-        conditions)
+        {{ t('alerts.filters.conditions') + ' *' }} {{ t('alerts.filters.conditionsHint') }}
       </div>
       <template v-if="!formRows.length">
         <OButton
@@ -113,8 +112,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          permanent pattern (see START-HERE 🔀). Do NOT delete. -->
     <template v-else>
     <div data-test="alert-conditions-text" class="font-bold">
-      Conditions * (AND operator is used by default to evaluate multiple
-      conditions)
+      {{ t('alerts.filters.conditions') + ' *' }} {{ t('alerts.filters.conditionsHint') }}
     </div>
     <template v-if="!fields.length">
       <OButton
@@ -147,7 +145,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             style="min-width: 220px"
             data-test="alert-conditions-select-column"
             @create="(val: string) => { field.column = val; emits('input:update', 'conditions', field); }"
-            @update:model-value="(v: any) => { fieldErrors[`${field.uuid}-column`] = v ? '' : 'Field is required!'; emits('input:update', 'conditions', field); }"
+            @update:model-value="(v: any) => { fieldErrors[`${field.uuid}-column`] = v ? '' : t('alerts.validation.fieldRequired'); emits('input:update', 'conditions', field); }"
           />
         </div>
         <div class="ml-0 o2-input">
@@ -159,7 +157,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :error-message="fieldErrors[`${field.uuid}-operator`] || ''"
             style="min-width: 120px"
             data-test="alert-conditions-operator-select"
-            @update:model-value="(v: any) => { fieldErrors[`${field.uuid}-operator`] = v ? '' : 'Field is required!'; emits('input:update', 'conditions', field); }"
+            @update:model-value="(v: any) => { fieldErrors[`${field.uuid}-operator`] = v ? '' : t('alerts.validation.fieldRequired'); emits('input:update', 'conditions', field); }"
           />
         </div>
         <div class="ml-0 flex items-end o2-input">
@@ -171,7 +169,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :error-message="fieldErrors[`${field.uuid}-value`] || ''"
             style="min-width: 150px"
             data-test="alert-conditions-value-input"
-            @update:model-value="(v: any) => { fieldErrors[`${field.uuid}-value`] = v ? '' : 'Field is required!'; emits('input:update', 'conditions', field); }"
+            @update:model-value="(v: any) => { fieldErrors[`${field.uuid}-value`] = v ? '' : t('alerts.validation.fieldRequired'); emits('input:update', 'conditions', field); }"
           />
         </div>
         <div

@@ -73,7 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               creatable
               data-test="alert-dedup-fingerprint-fields"
               class="max-w-[600px] min-w-[300px]"
-              helpText="Leave empty to auto-detect based on query (SQL: GROUP BY columns, PromQL: labels, Custom: condition fields)"
+              :helpText="t('alerts.deduplication.fingerprintFieldsHelp')"
               @update:model-value="onFingerprintChange"
               @create="addFingerprintField"
             />

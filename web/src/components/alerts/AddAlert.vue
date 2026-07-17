@@ -70,7 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="anomalyConfig.last_detection_run && anomalyConfig.last_detection_run > 0"
               class="text-[11px] whitespace-nowrap text-text-secondary"
             >
-              Last run: {{ anomalyFormatTs(anomalyConfig.last_detection_run) }}
+              {{ t('alerts.lastRun', { time: anomalyFormatTs(anomalyConfig.last_detection_run) }) }}
             </span>
             <OButton v-if="anomalyConfig.status === 'failed'" variant="ghost-destructive" size="xs" :loading="anomalyRetraining" @click="anomalyTriggerRetrain" icon-left="replay">
               {{ t('alerts.retry') }}
@@ -169,7 +169,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Alert Type -->
         <div class="flex items-center gap-1.5">
-          <div class="text-xs font-semibold whitespace-nowrap" :class="store.state.theme === 'dark' ? 'text-[rgba(255,255,255,0.7)]' : 'text-[rgba(0,0,0,0.72)]'">{{ t("alerts.alertType") || 'Alert Type' }}</div>
+          <div class="text-xs font-semibold whitespace-nowrap" :class="store.state.theme === 'dark' ? 'text-[rgba(255,255,255,0.7)]' : 'text-[rgba(0,0,0,0.72)]'">{{ t("alerts.alertType") }}</div>
           <OFormSelect
             data-test="add-alert-type-select-dropdown"
             name="is_real_time"
@@ -367,7 +367,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             class="flex items-center px-3 py-[0.625rem] select-none border-b border-border-default shrink-0 gap-2"
           >
-            <span class="text-sm font-medium">{{ isAnomalyMode ? t('alerts.sqlPreview') : (t('alerts.preview') || 'Preview') }}</span>
+            <span class="text-sm font-medium">{{ isAnomalyMode ? t('alerts.sqlPreview') : t('alerts.preview') }}</span>
             <template v-if="!isAnomalyMode && activeEvaluationStatus">
               <div class="w-px h-4 bg-border-default" />
               <OIcon :name="activeEvaluationStatus.wouldTrigger ? 'check-circle' : 'cancel'" :class="activeEvaluationStatus.wouldTrigger ? 'text-[var(--o2-positive)]' : 'text-[var(--o2-gray)]'" size="sm" />
@@ -409,7 +409,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             class="flex items-center px-3 py-[0.625rem] select-none border-b border-border-default shrink-0"
           >
-            <span class="text-sm font-medium">{{ t('alerts.summary.title') || 'Summary' }}</span>
+            <span class="text-sm font-medium">{{ t('alerts.summary.title') }}</span>
           </div>
           <div class="flex-1 min-h-0" style="overflow: auto;">
             <AnomalySummary
@@ -582,7 +582,7 @@ export default defineComponent({
       const tabs = alertForm.isAnomalyMode.value
         ? [
             { key: "anomaly-config", label: alertForm.t("alerts.anomalyDetectionConfig"), required: true },
-            { key: "anomaly-alerting", label: alertForm.t("alerts.alerting") || "Alerting", required: alertForm.anomalyConfig.value.alert_enabled },
+            { key: "anomaly-alerting", label: alertForm.t("alerts.alerting"), required: alertForm.anomalyConfig.value.alert_enabled },
           ]
         : [
             { key: "condition", label: alertForm.t("alerts.alertRules"), required: true },
