@@ -71,7 +71,6 @@ jsonwebtoken.workspace = true
 log.workspace = true
 maxminddb.workspace = true
 md5.workspace = true
-memchr.workspace = true
 o2_dex = { workspace = true, optional = true }
 o2_enterprise = { workspace = true, optional = true, default-features = false }
 o2_openfga = { workspace = true, optional = true }
@@ -86,7 +85,6 @@ proto.workspace = true
 rand.workspace = true
 rayon.workspace = true
 regex.workspace = true
-regex-syntax.workspace = true
 reqwest.workspace = true
 rquickjs.workspace = true
 rustls.workspace = true
@@ -126,9 +124,7 @@ tantivy.workspace = true
 tantivy_utils.workspace = true
 zip.workspace = true
 futures-util.workspace = true
-tokio-stream.workspace = true
 flight.workspace = true
-async-stream.workspace = true
 sourcemap.workspace = true
 
 [dev-dependencies]
