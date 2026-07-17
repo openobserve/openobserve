@@ -371,6 +371,3 @@ const variableColumns = computed<OTableColumnDef[]>(() => [
 ]);
 </script>
 
-<style>
-@import "@/assets/styles/log-highlighting.css";
-</style>

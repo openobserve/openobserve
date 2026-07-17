@@ -228,8 +228,9 @@ export default defineComponent({
 });
 </script>
 
-<style>
-#logsStreamQueryEditor {
-  height: calc(100% - 20px) !important;
+<style scoped>
+/* keep(lib-override:monaco): sizes the query editor's own container by id (rendered by the editor lib) */
+:deep(#logsStreamQueryEditor) {
+  height: calc(100% - 1.25rem) !important;
 }
 </style>

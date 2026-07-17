@@ -212,6 +212,3 @@ function highlightLevels(text: string): HighlightSegment[] {
 }
 </script>
 
-<style>
-@import "@/assets/styles/log-highlighting.css";
-</style>

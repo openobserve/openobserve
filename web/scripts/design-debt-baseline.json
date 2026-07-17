@@ -3,10 +3,10 @@
     "rawPalette": 53,
     "arbPx": 173,
     "arbRadius": 25,
-    "unscopedStyle": 156,
+    "unscopedStyle": 148,
     "arbZ": 48,
     "styleBlockHex": 469,
-    "stylePxUnit": 977,
+    "stylePxUnit": 975,
     "inlineHexStyle": 21,
     "tsHex": 471,
     "inlineHexBind": 6,
@@ -330,10 +330,6 @@
       "unscopedStyle": 1,
       "arbZ": 2
     },
-    "components/iam/roles/PermissionsTable.vue": {
-      "unscopedStyle": 1,
-      "stylePxUnit": 1
-    },
     "components/iam/users/User.vue": {
       "unscopedStyle": 1,
       "stylePxUnit": 4
@@ -397,15 +393,8 @@
       "styleBlockHex": 38,
       "stylePxUnit": 86
     },
-    "components/logs/LogsHighLighting.vue": {
-      "unscopedStyle": 1
-    },
     "components/logstream/AssociatedRegexPatterns.vue": {
       "arbPx": 2
-    },
-    "components/logstream/explore/SearchBar.vue": {
-      "unscopedStyle": 1,
-      "stylePxUnit": 1
     },
     "components/logstream/schema.vue": {
       "unscopedStyle": 1,
@@ -488,9 +477,6 @@
       "stylePxUnit": 1
     },
     "components/rum/errorTracking/view/PrettyStackTrace.vue": {
-      "unscopedStyle": 1
-    },
-    "components/rum/EventDetailDrawerContent.vue": {
       "unscopedStyle": 1
     },
     "components/rum/PlayerTracesTab.vue": {
@@ -870,18 +856,9 @@
     "plugins/correlation/TimeRangeEditor.vue": {
       "rawPalette": 1
     },
-    "plugins/logs/DetailTable.vue": {
-      "unscopedStyle": 1
-    },
     "plugins/logs/Index.vue": {
       "unscopedStyle": 1,
       "stylePxUnit": 2
-    },
-    "plugins/logs/patterns/PatternCard.vue": {
-      "unscopedStyle": 1
-    },
-    "plugins/logs/patterns/PatternDetailsDialog.vue": {
-      "unscopedStyle": 1
     },
     "plugins/logs/patterns/PatternList.vue": {
       "unscopedStyle": 1,
@@ -1183,9 +1160,6 @@
     },
     "views/Error404.vue": {
       "arbTextSize": 1
-    },
-    "views/HomeChatHistory.vue": {
-      "unscopedStyle": 1
     },
     "views/HomeView.vue": {
       "unscopedStyle": 1,

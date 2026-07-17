@@ -912,8 +912,9 @@ export default defineComponent({
 });
 </script>
 
-<style>
-.full-height-panels .o-tab-panel {
+<style scoped>
+/* keep(complex-state): :deep override of the child tab component's panel to fill height */
+.full-height-panels :deep(.o-tab-panel) {
   flex: 1;
   display: flex;
   flex-direction: column;

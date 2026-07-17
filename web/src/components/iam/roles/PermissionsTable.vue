@@ -358,10 +358,11 @@ defineExpose({
 });
 </script>
 
-<style>
+<style scoped>
+/* keep(complex-state): :deep override of the OTable header cell height */
 .iam-permissions-table {
-  th{
-    height: 48px !important;
+  :deep(th) {
+    height: 3rem !important;
   }
 }
 </style>

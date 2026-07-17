@@ -138,7 +138,7 @@ function formatTime(ts: string): string {
         </svg>
         <input
           v-model="searchTerm"
-          class="hch-search-input flex-1 min-w-0 border-0 bg-transparent outline-none text-[0.8125em] text-text-primary py-[0.375em]"
+          class="hch-search-input flex-1 min-w-0 border-0 bg-transparent outline-none text-[0.8125em] text-text-primary py-[0.375em] placeholder:text-text-muted placeholder:opacity-70"
           :placeholder="t('chatHistory.search')"
           type="text"
         />
@@ -234,11 +234,3 @@ function formatTime(ts: string): string {
     </div>
   </div>
 </template>
-
-<style>
-/* placeholder pseudo-element — cannot be inlined */
-.hch-search-input::placeholder {
-  color: var(--color-text-muted);
-  opacity: 0.7;
-}
-</style>
