@@ -62,13 +62,8 @@ export default defineComponent({
       return `${t("common.switchTo")} ${mode}`;
     });
 
-    // Click origin of the toggle button, consumed by the next setTheme call so
-    // the circular reveal expands from the button (absent for mount/store syncs).
-    let pendingOrigin: { x: number; y: number } | null = null;
-
     watch(darkMode, () => {
-      setTheme(darkMode.value ? "dark" : "light", pendingOrigin ?? undefined);
-      pendingOrigin = null;
+      setTheme(darkMode.value ? "dark" : "light");
     });
 
     // Watch store.state.theme for external changes
@@ -83,7 +78,7 @@ export default defineComponent({
       }
     );
 
-    const setTheme = (theme: any, origin?: { x: number; y: number }) => {
+    const setTheme = (theme: any) => {
       try {
         localStorage.setItem("theme", theme);
       } catch (error) {
@@ -91,28 +86,15 @@ export default defineComponent({
         console.warn("localStorage not available for theme storage:", error);
       }
       // Toggle .dark on <html> for the O2 component library (Tailwind dark variant).
-      // Wrapped in switchThemeMode so the mode flip animates as one frame —
-      // circular reveal from `origin` when given, whole-page cross-fade otherwise.
+      // Wrapped in switchThemeMode so the mode flip animates as one frame
+      // (soft curtain sweep, defined in styles/tailwind.css).
       switchThemeMode(theme === 'dark' ? 'dark' : 'light', () => {
         document.documentElement.classList.toggle('dark', theme === 'dark');
         store.dispatch("appTheme", theme);
-      }, origin);
+      });
     };
 
-    const toggleDarkMode = (event?: MouseEvent) => {
-      const el =
-        event?.currentTarget instanceof HTMLElement
-          ? event.currentTarget
-          : event?.target instanceof HTMLElement
-            ? event.target
-            : null;
-      if (el) {
-        const rect = el.getBoundingClientRect();
-        pendingOrigin = {
-          x: rect.left + rect.width / 2,
-          y: rect.top + rect.height / 2,
-        };
-      }
+    const toggleDarkMode = () => {
       darkMode.value = !darkMode.value;
     };
 

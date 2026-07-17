@@ -37,13 +37,11 @@ import { invalidateChartTheme } from "@/utils/chartTheme";
 export const switchThemeMode = (
   mode: "light" | "dark",
   applyChanges: () => void,
-  origin?: { x: number; y: number },
 ): void => {
   const root = document.documentElement;
   const alreadyApplied = root.classList.contains("dark") === (mode === "dark");
   const doc = document as Document & {
     startViewTransition?: (callback: () => void) => {
-      ready: Promise<void>;
       finished: Promise<void>;
     };
   };
@@ -55,8 +53,8 @@ export const switchThemeMode = (
 
   // Freeze per-element CSS transitions (inputs, buttons carry their own
   // `transition-colors`) while the switch is in flight, so every element snaps
-  // to its final color inside the cross-fade instead of animating a beat
-  // behind the rest of the page. The matching CSS lives in styles/tailwind.css.
+  // to its final color inside the sweep instead of animating a beat behind the
+  // rest of the page. The matching CSS lives in styles/tailwind.css.
   const freeze = () => root.classList.add("theme-switching");
   const unfreeze = () => root.classList.remove("theme-switching");
 
@@ -71,49 +69,13 @@ export const switchThemeMode = (
     return;
   }
 
-  // With a click origin (the navbar toggle), the new theme expands as a circle
-  // from that point instead of the whole-page cross-fade. `theme-reveal` on
-  // <html> disables the built-in fade so the circle edge stays crisp.
-  if (origin) root.classList.add("theme-reveal");
-
+  // The visual itself (soft top→bottom curtain sweep) is defined entirely in
+  // CSS on the ::view-transition pseudos in styles/tailwind.css.
   const transition = doc.startViewTransition(() => {
     freeze();
     applyChanges();
   });
-
-  if (origin) {
-    const { x, y } = origin;
-    // Radius to the farthest viewport corner so the circle always covers the page.
-    const radius = Math.hypot(
-      Math.max(x, window.innerWidth - x),
-      Math.max(y, window.innerHeight - y),
-    );
-    transition.ready.then(
-      () => {
-        root.animate(
-          {
-            clipPath: [
-              `circle(0px at ${x}px ${y}px)`,
-              `circle(${radius}px at ${x}px ${y}px)`,
-            ],
-          },
-          {
-            duration: 450,
-            easing: "ease-out",
-            pseudoElement: "::view-transition-new(root)",
-          },
-        );
-      },
-      // A skipped transition rejects `ready` — nothing to animate then.
-      () => {},
-    );
-  }
-
-  const cleanup = () => {
-    unfreeze();
-    root.classList.remove("theme-reveal");
-  };
-  transition.finished.then(cleanup, cleanup);
+  transition.finished.then(unfreeze, unfreeze);
 };
 
 /**
