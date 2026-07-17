@@ -1058,6 +1058,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       ].query = query;
       return query;
     }
+    return;
   };
   const { checkTimestampAlias } = logsUtils();
   // Replace the existing validatePanel function with a wrapper that calls the generic function
@@ -1264,6 +1265,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         }
       }
     }
+    return;
   };
 
   // Get or initialize per-query field cache in meta (never in data)

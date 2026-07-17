@@ -68,6 +68,7 @@ export function useReo() {
     }
 
     reoInstance.identify(identity);
+    return undefined;
   };
 
   const track = (eventName: string, payload?: Record<string, any>) => {

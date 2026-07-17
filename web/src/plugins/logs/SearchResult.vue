@@ -895,6 +895,7 @@ export default defineComponent({
         this.$emit("update:scroll");
         this.scrollTableToTop(0);
       }
+      return undefined;
     },
     closeColumn(col: any) {
       // Explicit user action — clear the system-pick marker so the result persists.

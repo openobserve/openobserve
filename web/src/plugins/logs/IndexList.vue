@@ -1965,6 +1965,7 @@ export default defineComponent({
       } catch (err) {
         console.error("Failed to fetch field values:", err);
         fieldValues.value[name].errMsg = "Failed to fetch field values";
+        return undefined;
       }
     };
 

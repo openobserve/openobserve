@@ -704,6 +704,7 @@ export const usePagination = () => {
       notificationMsg.value = "Error while refreshing partition pagination.";
       return false;
     }
+    return;
   };
 
   /**
@@ -830,6 +831,7 @@ export const usePagination = () => {
       notificationMsg.value = "Error while refreshing pagination.";
       return false;
     }
+    return;
   };
 
   // Convert timestamp to microseconds

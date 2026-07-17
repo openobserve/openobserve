@@ -747,6 +747,7 @@ function parseCondition(condition: any) {
         };
       }
     }
+    return undefined;
   } catch (error) {
     return {
       filterType: "group",

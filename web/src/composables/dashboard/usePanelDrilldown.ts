@@ -1157,6 +1157,7 @@ export function usePanelDrilldown({
         }
       }
     }
+    return;
   };
 
   // Cross-linking: fetch cross-links when the executed query (with variables resolved) changes

@@ -426,6 +426,7 @@ export const usePanelVariableSubstitution = ({
       log("Step4: 4: variables values has changed, returning true");
       return true;
     }
+    return;
   };
 
   // Query substitution

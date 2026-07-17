@@ -74,6 +74,7 @@ export const useSearchPagination = () => {
       notificationMsg.value = "Error while refreshing partition pagination.";
       return false;
     }
+    return;
   };
 
   const updateResult = async (

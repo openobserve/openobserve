@@ -2102,6 +2102,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
         page: "Add/Update Alert",
       });
     }
+    return;
   };
 
   // ── Data Initialization (replaces created() hook) ───────────────────────

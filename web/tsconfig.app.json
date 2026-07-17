@@ -12,6 +12,7 @@
   "compilerOptions": {
     "composite": true,
     "strict": true,
+    "noImplicitReturns": true,
     "baseUrl": ".",
     "target": "esnext",
     "module": "esnext",

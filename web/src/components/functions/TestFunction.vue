@@ -791,6 +791,7 @@ function getLineRanges(object: any) {
   } catch (e) {
     console.log("Error in getLineRanges", e);
   }
+  return undefined;
 }
 
 function highlightSpecificEvent() {

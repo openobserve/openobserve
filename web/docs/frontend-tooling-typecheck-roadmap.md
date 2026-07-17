@@ -175,25 +175,25 @@ Origin tags map back to the source docs: `[A#]` = audit task, `[P#]` = PRD phase
 
 #### C1. Enable `strict` sub-flags one PR at a time `[A2]`
 - **Goal:** the app builds under `strict: true`.
-- **Status:** ❌ not started — `tsconfig.app.json` has no strict key; root `tsconfig.json` only sets
-  `strictPropertyInitialization: false`.
-- **Depends on:** A2, B2.
-- **How:** add to `tsconfig.app.json` in this order, one flag per PR, fixing/baselining fallout each
-  time: `noImplicitThis` → `alwaysStrict` → `strictBindCallApply` → `strictFunctionTypes` →
-  `noImplicitAny` (biggest) → `strictNullChecks` (second biggest) → `strictPropertyInitialization`
-  (remove the root override) → finally replace all with `"strict": true`.
-- **Verify:** `type-check:app` at 0 (or baseline-clean) before moving to the next flag.
-- **Risk:** high volume, low per-PR risk if ratcheted.
+- **Status:** ✅ **DONE** — `tsconfig.app.json` has `"strict": true`; all ~1,134 fallout errors were
+  fixed to **actual 0** (no baseline). Done in one sweep rather than flag-by-flag.
+- **Verify:** `type-check:app` at 0. ✔
+- **Risk:** realized as high volume, low per-fix risk.
 
 #### C2. Add extra compiler-strictness flags `[A7]`
-- **Goal:** catch unused/return/switch/index bugs the strict set does not.
-- **Status:** ❌ not started.
-- **Depends on:** C1 (in particular `strictNullChecks`, or `noUncheckedIndexedAccess` is a no-op).
-- **How:** one PR each — `noImplicitReturns` → `noFallthroughCasesInSwitch` →
-  `noUnusedLocals` + `noUnusedParameters` (decide TS vs ESLint as the single source for unused) →
-  `noUncheckedIndexedAccess` (most fallout; do last).
-- **Verify:** `type-check:app` at 0/baseline-clean after each.
-- **Risk:** `noUncheckedIndexedAccess` warrants its own multi-PR effort.
+- **Goal:** catch return/switch/unused/index bugs the strict set does not.
+- **Status:** 🟡 **partial** — decisions made per flag:
+  - `noImplicitReturns` — ✅ **enabled** (`tsconfig.app.json`). 34 fallout errors fixed to 0 by making
+    each implicit fall-off `undefined` explicit (pure no-op; no behavior change).
+  - `noFallthroughCasesInSwitch` — ❌ **rejected.** All 8 fallthroughs are intentional cumulative
+    migrations already marked `// falls through`; the TS flag has no comment escape hatch, so enabling
+    it would force behavior-risky refactors for zero real benefit. ESLint's comment-aware
+    `no-fallthrough` is the guard instead. (See SKILL §6.)
+  - `noUnusedLocals` + `noUnusedParameters` — ⏭️ **deferred to ESLint.** `@typescript-eslint/no-unused-vars`
+    is already `error` and green; enabling the TS equivalents adds ~164 redundant errors with a
+    different `_`-prefix convention. ESLint stays the single source of truth for unused.
+  - `noUncheckedIndexedAccess` — ⏭️ **deferred** — 962 errors; warrants its own multi-PR effort.
+- **Verify:** `type-check:app` at 0 with the enabled flags. ✔
 
 ---
 

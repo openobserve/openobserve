@@ -220,6 +220,7 @@ export const getConsumableRelativeTime = (period: string) => {
       endTime: endTimeStamp.getTime() * 1000,
     };
   }
+  return undefined;
 };
 
 export const getRelativePeriod = (period: string) => {

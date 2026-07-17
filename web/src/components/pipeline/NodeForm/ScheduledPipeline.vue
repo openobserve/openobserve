@@ -2548,6 +2548,7 @@ const runQuery = async () => {
       previewPromqlQueryRef.value.refreshData();
     }
   }
+  return undefined;
 };
 
 const isFullscreen = ref(false);

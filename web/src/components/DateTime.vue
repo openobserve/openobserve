@@ -1180,6 +1180,7 @@ export default defineComponent({
           if (relativePeriodsMaxValue.value[period.value] > -1) {
             return period;
           }
+          return undefined;
         });
 
         if (props.queryRangeRestrictionInHour > 0) {

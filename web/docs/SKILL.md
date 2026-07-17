@@ -296,16 +296,25 @@ new Promise(async (res) => { … });    // ❌
 
 ## 6. TypeScript compiler errors (`type-check:app`)
 
+Enabled compiler flags (`tsconfig.app.json`): `strict: true` **+ `noImplicitReturns: true`**.
+The gate is a hard **0**.
+
 ```ts
-// TS7030 noImplicitReturns — add an explicit return on the fall-off path (no-op)
+// TS7030 noImplicitReturns — make the IMPLICIT fall-off `undefined` explicit (pure no-op).
+// The added return must equal today's runtime value — never invent a value, never add `break`.
 function f(x: number) { if (x > 0) return "a"; }          // ❌
 function f(x: number) { if (x > 0) return "a"; return undefined; } // ✅
-
-// TS7029 noFallthroughCasesInSwitch — for INTENTIONAL migration cascades,
-// convert to an if-chain (each step bumps the version → identical behavior).
-switch (v) { case 1: {…; v=2;} case 2: {…; v=3;} }        // ❌ (flagged)
-if (v === 1) {…; v = 2;} if (v === 2) {…; v = 3;}          // ✅
+// If a declared return type forbids undefined but a path legitimately falls off,
+// widen it at the DECLARATION site (`: string` → `: string | undefined`) — not a cast.
 ```
+
+**`noFallthroughCasesInSwitch` is intentionally OFF.** Unlike ESLint's `no-fallthrough`, the TS
+flag has **no `// falls through` comment escape hatch**, so it cannot express deliberate
+cascades (e.g. the cumulative dashboard schema-version migrations in
+`convertDashboardSchemaVersion.ts`) without a behavior-risky refactor. ESLint's comment-aware
+`no-fallthrough` already guards new code — keep intentional fallthrough marked `// falls through`.
+(A version-bumping `if`-chain is the only behavior-preserving way to satisfy the TS flag; don't
+retrofit it onto existing migration switches.)
 
 ### Cast anti-patterns → declaration-site
 

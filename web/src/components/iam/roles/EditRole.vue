@@ -597,6 +597,7 @@ const getResourceByName = (
   }
 
   if (!level) return null;
+  return undefined;
 };
 
 const setPermission = (resource: any, visited: Set<string>) => {

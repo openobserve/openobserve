@@ -499,6 +499,7 @@ export default {
         case "histogramInterval":
           return "bar-chart";
       }
+      return undefined;
     };
 
     const getParameterLabel = (functionName: string, argIndex: number) => {

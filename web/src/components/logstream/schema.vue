@@ -1887,6 +1887,7 @@ export default defineComponent({
         // the return value; tests await it).
         return onSubmit();
       }
+      return undefined;
     };
 
     const showPartitionColumn = computed(() => {

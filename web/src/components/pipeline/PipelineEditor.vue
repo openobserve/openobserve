@@ -1043,6 +1043,7 @@ const beforeUnloadHandler = (e: any) => {
     e.returnValue = confirmMessage;
     return confirmMessage;
   }
+  return undefined;
 };
 
 const openJsonEditor = () => {

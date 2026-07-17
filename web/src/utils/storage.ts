@@ -54,6 +54,7 @@ const useLocalStorage = (
     console.log(
       `Error: Error in UseLocalStorage for key: ${key}, error-message : ${e}`,
     );
+    return undefined;
   }
 };
 
@@ -62,6 +63,7 @@ export const getSessionStorageVal = (key: string) => {
     return window.sessionStorage.getItem(key);
   } catch (e) {
     console.log(`Error: Error while pull sessionstorage value ${key}`);
+    return undefined;
   }
 };
 

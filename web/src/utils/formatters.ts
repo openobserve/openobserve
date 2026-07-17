@@ -31,6 +31,7 @@ export const b64DecodeUnicode = (str: string) => {
     );
   } catch (e) {
     console.log("Error: getBase64Decode: error while decoding.");
+    return undefined;
   }
 };
 
@@ -88,6 +89,7 @@ export const b64EncodeStandard = (str: string) => {
     );
   } catch (e) {
     console.log("Error: getBase64Encode: error while encoding.");
+    return undefined;
   }
 };
 
@@ -102,6 +104,7 @@ export const b64DecodeStandard = (str: string) => {
     );
   } catch (e) {
     console.log("Error: getBase64Decode: error while decoding.");
+    return undefined;
   }
 };
 

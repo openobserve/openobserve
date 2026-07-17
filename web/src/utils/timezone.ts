@@ -103,6 +103,7 @@ export const getLocalTime = (datetime: string) => {
     }
   } catch (e) {
     console.log(`Error: Error while covert localtime ${datetime}`);
+    return undefined;
   }
 };
 

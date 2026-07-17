@@ -530,6 +530,7 @@ const saveQueryData = async () => {
   // All validations passed - add node and close dialog
   addNode(queryPayload);
   emit("cancel:hideform");
+  return undefined;
 };
 
 const openDeleteDialog = () => {

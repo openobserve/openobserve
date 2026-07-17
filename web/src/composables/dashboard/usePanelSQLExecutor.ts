@@ -703,6 +703,7 @@ export const usePanelSQLExecutor = (ctx: {
 
       log("logaData: state.data", state.data);
       log("logaData: state.metadata", state.metadata);
+      return;
     } finally {
       // abort on done
       if (abortControllerRef) {

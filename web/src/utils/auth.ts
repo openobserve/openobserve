@@ -100,6 +100,7 @@ export const getDecodedUserInfo = () => {
     }
   } catch (e) {
     console.log("Error: Error while pull sessionstorage value.");
+    return undefined;
   }
 };
 

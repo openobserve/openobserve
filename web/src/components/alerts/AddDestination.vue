@@ -991,6 +991,7 @@ const getFormattedTemplates = computed(() =>
       if (formData.value.type === "email" && template.type === "email")
         return true;
       else if (formData.value.type !== "email") return true;
+      return undefined;
     })
     .map((template: any) => template.name),
 );
