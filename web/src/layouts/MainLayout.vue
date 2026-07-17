@@ -350,7 +350,10 @@ export default defineComponent({
       );
     });
 
-    const orgOptions = ref([{ label: Number, value: String }]);
+    // Real entries carry `identifier`; the placeholder literal only sets label/value.
+    const orgOptions = ref<Array<{ identifier?: string; [key: string]: unknown }>>(
+      [{ label: Number, value: String }],
+    );
     let slackURL = "https://short.openobserve.ai/community";
     if (
       config.isEnterprise == "true" &&

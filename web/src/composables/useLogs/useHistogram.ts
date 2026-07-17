@@ -17,7 +17,7 @@ import { useStore } from "vuex";
 
 import { searchState } from "@/composables/useLogs/searchState";
 
-import { INTERVAL_MAP } from "@/utils/logs/constants";
+import { INTERVAL_MAP, type IntervalMapKey } from "@/utils/logs/constants";
 
 // Severity-aware sort order for stacked histogram breakdown categories.
 // Lower index = bottom of stack (least severe), higher = top (most severe).
@@ -380,8 +380,10 @@ export const useHistogram = () => {
     ) {
       histogramResults.value = [];
       histogramMappedData = [];
-      const intervalMs: any =
-        INTERVAL_MAP[searchObj.meta.resultGrid.chartInterval];
+      const intervalMs: number =
+        INTERVAL_MAP[
+          searchObj.meta.resultGrid.chartInterval as IntervalMapKey
+        ];
       if (!intervalMs) {
         throw new Error("Invalid interval");
       }

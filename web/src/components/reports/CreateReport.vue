@@ -1282,7 +1282,7 @@ const allDashboardsArePdf = computed(
 
 // Returns the available attachment type options for a given report type.
 // Inline is disabled for PDF since the report server does not support it.
-const attachmentTypeOptions = (rType: string) => [
+const attachmentTypeOptions = (rType: string | undefined) => [
   { label: "Standard — downloadable attachment (default)", value: "standard" },
   {
     label: "Inline — embedded in email body",

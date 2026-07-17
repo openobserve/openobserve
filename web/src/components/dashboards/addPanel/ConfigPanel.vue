@@ -510,7 +510,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           min="0"
           max="100"
           @update:model-value="
-            (val: number) => {
+            (val: string | number) => {
               if (typeof val === 'number' && (val < 0 || val > 100)) {
                 decimalsTouched = true;
               }
@@ -1822,6 +1822,7 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import OTextarea from "@/lib/forms/Input/OTextarea.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
+import { type SwitchValue } from "@/lib/forms/Switch/OSwitch.types";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 import { getUnitOptions } from "@/composables/dashboard/useColumnFormatting";
 import { computed, defineComponent, inject, onBeforeMount, ref } from "vue";
@@ -2509,7 +2510,9 @@ export default defineComponent({
     const showTimePicker = ref(false);
 
     // Ref to the DateTimePickerDashboard component
-    const panelTimePickerRef = ref(null);
+    const panelTimePickerRef = ref<{
+      dateTimePicker?: { getDisplayValue: string };
+    } | null>(null);
 
     // Format picker value for tooltip display using the DateTime component's display value
     const formattedPickerValue = computed(() => {
@@ -2520,7 +2523,8 @@ export default defineComponent({
     });
 
     // Toggle on/off
-    const onToggleDefaultTime = (enabled: boolean) => {
+    const onToggleDefaultTime = (value: SwitchValue) => {
+      const enabled = value as boolean;
       dashboardPanelData.data.config.panel_time_enabled = enabled;
 
       if (!enabled) {

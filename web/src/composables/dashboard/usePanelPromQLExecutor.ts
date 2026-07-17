@@ -101,7 +101,14 @@ export const usePanelPromQLExecutor = (ctx: {
       // Process each query using streaming
       // Process all queries in parallel using Promise.all
       await Promise.all(
-        panelSchema.value.queries.map(async (it, queryIndex) => {
+        panelSchema.value.queries.map(async (
+          it: {
+            query: string;
+            tabName?: string;
+            config: { step_value?: string; query_type?: string };
+          },
+          queryIndex: number,
+        ) => {
           const { query: query1, metadata: metadata1 } = replaceQueryValue(
             it.query,
             startISOTimestamp,

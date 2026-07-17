@@ -579,14 +579,15 @@ export default defineComponent({
         window.history.replaceState({}, document.title, url.toString());
 
         await loadLicenseData();
-      } catch (error) {
+      } catch (error: unknown) {
         console.error("Error updating license:", error);
+        const err = error as { response?: { data?: { message?: string } } };
         toast({
           variant: "error",
           message:
             t("about.failed_to_update_license") +
             " : " +
-            (error?.response?.data?.message || "unexpected error"),
+            (err?.response?.data?.message || "unexpected error"),
         });
       }
     };
@@ -610,15 +611,16 @@ export default defineComponent({
           variant: "success",
           message: t("about.license_refresh_success"),
         });
-      }catch(error){
+      }catch(error: unknown){
         console.error("Error refreshing license:", error);
+        const err = error as { response?: { data?: { message?: string } } };
         toast({
           variant: "error",
           message:
             t("about.failed_to_refresh_license") +
             " : " +
-            (error?.response?.data?.message || "unexpected error"),
-        }); 
+            (err?.response?.data?.message || "unexpected error"),
+        });
       }
     }
 

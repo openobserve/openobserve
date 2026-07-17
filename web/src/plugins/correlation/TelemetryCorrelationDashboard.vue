@@ -2344,8 +2344,9 @@ const loadDashboard = async () => {
     }
   } catch (err: any) {
     // console.error("[TelemetryCorrelationDashboard] Error loading correlation dashboard:", err);
-    error.value = err.message || t("correlation.failedToLoad");
-    showErrorNotification(error.value);
+    const message: string = err.message || t("correlation.failedToLoad");
+    error.value = message;
+    showErrorNotification(message);
   } finally {
     loading.value = false;
   }
@@ -2753,7 +2754,9 @@ const extractTraceIdFromLog = (): string | null => {
 
   // 4. Fallback: Scan ALL string fields for embedded trace_id patterns
   // This catches cases where trace_id is embedded in non-FTS fields
-  const scannedFields = new Set(ftsFieldsToScan.map((f) => f.toLowerCase()));
+  const scannedFields = new Set(
+    ftsFieldsToScan.map((f: string) => f.toLowerCase()),
+  );
 
   for (const [key, val] of Object.entries(logRecord)) {
     // Skip fields we already scanned and non-string values
@@ -2965,8 +2968,17 @@ const fetchTracesByDimensions = (): Promise<any[]> => {
  * Open traces screen in new window with trace_id filter
  * @param traceIdOrEvent - trace_id string to use, or event object (when called from @click without args)
  */
-const openTraceInNewWindow = (trace) => {
+const openTraceInNewWindow = (
+  trace:
+    | string
+    | {
+        trace_id?: string;
+        trace_start_time?: number;
+        trace_end_time?: number;
+      },
+) => {
   // Handle case where event object is passed instead of trace_id (e.g., from @click without args)
+  const traceObj = typeof trace === "string" ? undefined : trace;
   const traceId = typeof trace === "string" ? trace : trace.trace_id;
   const targetTraceId = traceId || extractedTraceId.value;
   if (!targetTraceId) return;
@@ -2978,11 +2990,11 @@ const openTraceInNewWindow = (trace) => {
   const queryParams: any = {
     stream: traceStream,
     trace_id: targetTraceId,
-    from: trace?.trace_start_time
-      ? trace.trace_start_time - 10000000
+    from: traceObj?.trace_start_time
+      ? traceObj.trace_start_time - 10000000
       : props.timeRange.startTime.toString(),
-    to: trace?.trace_end_time
-      ? trace.trace_end_time + 10000000
+    to: traceObj?.trace_end_time
+      ? traceObj.trace_end_time + 10000000
       : props.timeRange.endTime.toString(),
     org_identifier: org,
   };
@@ -3073,8 +3085,9 @@ const loadCorrelatedTraces = async () => {
       tracesForDimensions.value = await fetchTracesByDimensions();
     }
   } catch (err: any) {
-    tracesError.value = err.message || t("correlation.tracesError");
-    showErrorNotification(tracesError.value);
+    const message: string = err.message || t("correlation.tracesError");
+    tracesError.value = message;
+    showErrorNotification(message);
   } finally {
     tracesLoading.value = false;
   }

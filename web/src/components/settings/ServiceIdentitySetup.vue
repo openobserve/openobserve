@@ -1330,18 +1330,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OTag
               type="cardinalityClass"
               :value="
-                dimensionAnalytics[primaryDim?.group_id]?.cardinality_class ||
-                'Unknown'
+                dimensionAnalytics[primaryDim?.group_id ?? '']
+                  ?.cardinality_class || 'Unknown'
               "
             >
-              {{ dimensionAnalytics[primaryDim?.group_id]?.cardinality || 0 }}
+              {{
+                dimensionAnalytics[primaryDim?.group_id ?? '']?.cardinality || 0
+              }}
               unique values
             </OTag>
             <OTag
               type="cardinalityClass"
               :value="
-                dimensionAnalytics[primaryDim?.group_id]?.cardinality_class ||
-                'Unknown'
+                dimensionAnalytics[primaryDim?.group_id ?? '']
+                  ?.cardinality_class || 'Unknown'
               "
             />
           </div>
@@ -1369,7 +1371,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <span>{{
                   selectedStreamType ||
                   ["logs", "metrics", "traces"].find(
-                    (t) => selectedFieldAnalytics.sample_values[t],
+                    (t) => selectedFieldAnalytics?.sample_values[t],
                   )
                 }}</span>
                 <span class="text-gray-400">Streams</span>
@@ -1381,12 +1383,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <template
                   v-if="
                     selectedStreamType &&
-                    selectedFieldAnalytics.sample_values[selectedStreamType]
+                    selectedFieldAnalytics?.sample_values[selectedStreamType]
                   "
                 >
                   <div
                     v-for="streamName in Object.keys(
-                      selectedFieldAnalytics.sample_values[selectedStreamType],
+                      selectedFieldAnalytics?.sample_values[selectedStreamType] ?? {},
                     )"
                     :key="streamName"
                     class="px-4 py-3 cursor-pointer transition-colors text-sm font-mono truncate hover:bg-primary/10"
@@ -1407,7 +1409,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       'logs',
                       'metrics',
                       'traces',
-                    ].filter((t) => selectedFieldAnalytics.sample_values[t])"
+                    ].filter((t) => selectedFieldAnalytics?.sample_values[t])"
                     :key="typeName"
                   >
                     <div
@@ -1422,7 +1424,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                     <div
                       v-for="streamName in Object.keys(
-                        selectedFieldAnalytics.sample_values[typeName],
+                        selectedFieldAnalytics?.sample_values[typeName] ?? {},
                       )"
                       :key="typeName + '-' + streamName"
                       class="px-4 py-3 cursor-pointer transition-colors text-sm font-mono truncate hover:bg-primary/10"

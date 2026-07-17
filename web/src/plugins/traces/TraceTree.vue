@@ -244,16 +244,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       />
 
                       <img
-                        v-if="
-                          spanTechIconUrlMap.get(
-                            getSpanTech((spans as any[])[virtualRow.index]),
-                          )
-                        "
-                        :src="
-                          spanTechIconUrlMap.get(
-                            getSpanTech((spans as any[])[virtualRow.index]),
-                          )
-                        "
+                        v-if="getSpanTechIcon((spans as any[])[virtualRow.index])"
+                        :src="getSpanTechIcon((spans as any[])[virtualRow.index])"
                         :title="getSpanTech((spans as any[])[virtualRow.index])"
                         class="mr-1 shrink-0 w-[0.875rem] h-[0.875rem] inline-block opacity-60"
                         aria-hidden="true"
@@ -316,10 +308,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :style="{
                         backgroundColor: getHttpStatusVars(
                           (spans as any[])[virtualRow.index],
-                        ).bg,
+                        )?.bg,
                         color: getHttpStatusVars(
                           (spans as any[])[virtualRow.index],
-                        ).text,
+                        )?.text,
                       }"
                       :title="`HTTP ${getHttpStatus((spans as any[])[virtualRow.index])}`"
                       :data-test="`trace-tree-span-http-status-${(spans as any[])[virtualRow.index].spanId}`"
@@ -402,6 +394,7 @@ import {
   computed,
   onMounted,
   onBeforeUnmount,
+  type PropType,
 } from "vue";
 import useTraces from "@/composables/useTraces";
 import { useStore } from "vuex";
@@ -446,7 +439,11 @@ export default defineComponent({
       default: 0,
     },
     spanDimensions: {
-      type: Object,
+      type: Object as PropType<{
+        height: number;
+        collapseWidth: number;
+        gap: number;
+      }>,
       default: () => {},
     },
     spanMap: {
@@ -774,7 +771,7 @@ export default defineComponent({
       return cache;
     });
 
-    const getSpanTech = (span: any): string | null => {
+    const getSpanTech = (span: any): string | undefined => {
       const attrs = span || {};
       return (
         attrs["db_system"] ||
@@ -783,8 +780,14 @@ export default defineComponent({
         (span.spanKind?.toUpperCase() === "CLIENT" && attrs["http_url"]
           ? "http"
           : null) ||
-        null
+        undefined
       );
+    };
+
+    // Resolve the tech icon URL for a span; undefined when no tech/icon.
+    const getSpanTechIcon = (span: any): string | undefined => {
+      const tech = getSpanTech(span);
+      return tech ? spanTechIconUrlMap.value.get(tech) : undefined;
     };
 
     const spanTechIconUrlMap = computed(() => {
@@ -864,6 +867,7 @@ export default defineComponent({
       spanServiceIconUrlMap,
       spanTechIconUrlMap,
       getSpanTech,
+      getSpanTechIcon,
       getKindIcon,
       getHttpStatus,
       getHttpStatusVars,

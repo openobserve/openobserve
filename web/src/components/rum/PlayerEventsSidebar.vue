@@ -169,7 +169,12 @@ const props = defineProps({
 });
 
 const activeTab = ref<string>("breadcrumbs");
-const tabs = [
+const tabs: Array<{
+  label: string;
+  value: string;
+  icon: string;
+  style: Record<string, string>;
+}> = [
   {
     label: t("rum.breadcrumbs"),
     value: "breadcrumbs",

@@ -23,6 +23,7 @@ import searchService from "@/services/search";
 import { arraysMatch } from "@/utils/zincutils";
 
 import { logsUtils } from "@/composables/useLogs/logsUtils";
+import type { ExtendedParsedSQLResult } from "@/composables/useLogs/logsUtils";
 
 import useActions from "@/composables/useActions";
 import useFunctions from "@/composables/useFunctions";
@@ -153,6 +154,7 @@ export const useSearchBar = () => {
       const parsedSQL = fnParsedSQL();
 
       if (
+        !parsedSQL ||
         !Object.hasOwn(parsedSQL, "from") ||
         parsedSQL?.from == null ||
         parsedSQL?.from?.length == 0
@@ -231,7 +233,8 @@ export const useSearchBar = () => {
             return stream.table;
           }),
         );
-        let nextTable = parsedSQL._next;
+        let nextTable: ExtendedParsedSQLResult | null | undefined =
+          parsedSQL._next;
         //this will handle the union queries
         while (nextTable) {
           // Map through each "from" array in the _next object, as it can contain multiple tables

@@ -10,6 +10,10 @@ import type { IconName } from '@/lib/core/Icon/OIcon.types'
 /** Layout direction of the stepper */
 export type StepperOrientation = 'horizontal' | 'vertical'
 
+/** Step indicator icon: a registered icon name, a component, or none.
+ * Named alias so `withDefaults` doesn't expand the large IconName union. */
+export type StepIcon = IconName | Component | null
+
 export interface OStepperProps {
   /** Currently active step number ΓÇö required, drives v-model */
   modelValue: number
@@ -43,7 +47,7 @@ export interface OStepperSlots {
 export interface StepRegistration {
   name: number
   title: string
-  icon: IconName | Component | null
+  icon: StepIcon
   done: boolean
   error: boolean
   description: string | undefined

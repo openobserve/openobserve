@@ -143,9 +143,9 @@ const defaultEvent = {
   displayTime: "",
   loading_time: "",
   loading_type: "",
-  user: {},
-  frustration_type: null,
-  frustration_types: [],
+  user: {} as Record<string, any>,
+  frustration_type: null as string | null,
+  frustration_types: [] as string[],
 };
 
 const sessionId = ref("1");

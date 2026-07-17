@@ -302,7 +302,7 @@ const getCurrentTime = (): string => {
 
 // Get destination type display name
 const getDestinationTypeName = (type: string): string => {
-  const typeNames = {
+  const typeNames: Record<string, string> = {
     slack: 'Slack',
     msteams: 'Microsoft Teams',
     email: 'Email',

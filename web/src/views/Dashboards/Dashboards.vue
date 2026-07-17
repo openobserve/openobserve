@@ -398,11 +398,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             form-id="add-dashboard-form"
             @click:secondary="showAddDashboardDialog = false"
           >
+            <!-- activeFolderId ref is transiently null before init; child prop is string|undefined -->
             <AddDashboard
               ref="addDashboardRef"
               @close="showAddDashboardDialog = false"
               @updated="updateDashboardList"
-              :activeFolderId="activeFolderId"
+              :activeFolderId="(activeFolderId as string | undefined)"
             />
           </ODialog>
 
@@ -436,10 +437,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </ODialog>
 
           <!-- move dashboard to another folder -->
+          <!-- ids ref is null until a row is selected; child prop is unknown[]|undefined -->
           <MoveDashboardToAnotherFolder
             v-model:open="showMoveDashboardDialog"
             @updated="handleDashboardMoved"
-            :dashboard-ids="selectedDashboardIdToMove"
+            :dashboard-ids="(selectedDashboardIdToMove as unknown[] | undefined)"
             :activeFolderId="activeFolderToMove"
             data-test="dashboard-move-to-another-folder-dialog"
           />
@@ -563,6 +565,18 @@ interface DashboardListItem {
   owner: string;
   created: string;
 }
+
+// Minimal shape of an axios-style error the catch blocks read from.
+interface CaughtError {
+  message?: string;
+  response?: { status?: number; data?: { message?: string } };
+  status?: number;
+  name?: string;
+}
+
+// Narrow an unknown caught value to the fields the error handlers read.
+const asCaughtError = (e: unknown): CaughtError =>
+  e && typeof e === "object" ? (e as CaughtError) : {};
 
 export default defineComponent({
   name: "Dashboards",
@@ -837,10 +851,10 @@ export default defineComponent({
           );
 
           dashboardList.value = response || [];
-        } catch (error) {
+        } catch (error: unknown) {
           console.error("Error loading dashboards:", error);
           showErrorNotification(
-            error?.message ||
+            asCaughtError(error).message ||
               "Failed to load dashboards for the selected folder.",
           );
         } finally {
@@ -1020,14 +1034,16 @@ export default defineComponent({
         await getDashboards();
 
         showPositiveNotification("Dashboard Duplicated Successfully.");
-      } catch (err) {
-        showErrorNotification(err?.message ?? "Dashboard duplication failed");
+      } catch (err: unknown) {
+        showErrorNotification(
+          asCaughtError(err).message ?? "Dashboard duplication failed",
+        );
       }
 
       dismiss();
     };
 
-    const routeToViewD = (row) => {
+    const routeToViewD = (row: Record<string, any>) => {
       return router.push({
         path: "/dashboards/view",
         query: {
@@ -1060,8 +1076,10 @@ export default defineComponent({
         // is always undefined, so reflect the empty result on this write-only ref.
         void response;
         dashboardList.value = [];
-      } catch (err) {
-        showErrorNotification(err?.message || "Failed to load dashboards.");
+      } catch (err: unknown) {
+        showErrorNotification(
+          asCaughtError(err).message || "Failed to load dashboards.",
+        );
       } finally {
         dismiss();
         loading.value = false;
@@ -1098,7 +1116,7 @@ export default defineComponent({
             activeFolderId.value ?? "default"
           ] ?? [],
         );
-        return dashboardList.map((board: any, index) =>
+        return dashboardList.map((board: any, index: number) =>
           mapDashboard(board, index),
         );
       } else {
@@ -1152,9 +1170,11 @@ export default defineComponent({
             const org = store.state.selectedOrganization?.identifier;
             if (org) useHomeDashboard().load(org);
           }
-        } catch (err) {
-          showErrorNotification(err?.message ?? "Dashboard deletion failed", {
-          });
+        } catch (err: unknown) {
+          showErrorNotification(
+            asCaughtError(err).message ?? "Dashboard deletion failed",
+            {},
+          );
         }
       }
     };
@@ -1203,13 +1223,13 @@ export default defineComponent({
 
           showPositiveNotification("Folder deleted successfully.", {
           });
-        } catch (err) {
+        } catch (err: unknown) {
+          const e = asCaughtError(err);
           showErrorNotification(
-            err?.response?.data?.message ||
-              err?.message ||
+            e.response?.data?.message ||
+              e.message ||
               "Folder deletion failed",
-            {
-            },
+            {},
           );
         } finally {
           confirmDeleteFolderDialog.value = false;
@@ -1232,7 +1252,7 @@ export default defineComponent({
       },
     });
 
-    const fetchSearchResults = useLoading(async (query) => {
+    const fetchSearchResults = useLoading(async (query: string) => {
       //this is used for showing search msg when user tries to toggle every time before searching across folders
       try {
         //here we are directly calling the dashboard service to get the search results
@@ -1262,9 +1282,9 @@ export default defineComponent({
         );
 
         return migratedDashboards;
-      } catch (error) {
+      } catch (error: unknown) {
         showErrorNotification(
-          error?.message ?? "Error fetching search results",
+          asCaughtError(error).message ?? "Error fetching search results",
         );
       }
     });
@@ -1334,8 +1354,10 @@ export default defineComponent({
           `${cleanedDashboards.length} Dashboards exported successfully.`,
         );
         selectedIds.value = [];
-      } catch (error) {
-        showErrorNotification(error?.message ?? "Error exporting dashboards");
+      } catch (error: unknown) {
+        showErrorNotification(
+          asCaughtError(error).message ?? "Error exporting dashboards",
+        );
       }
     };
 
@@ -1558,7 +1580,7 @@ export default defineComponent({
         },
       });
     },
-    onRowClick(row) {
+    onRowClick(row: Record<string, any>) {
       this.routeToViewD(row);
     },
     ownerInitials(name: string) {

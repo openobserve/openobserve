@@ -85,7 +85,7 @@ export default defineComponent({
       const params = new URLSearchParams(hash);
       const invited_org_id = params.get("org_id");
       await organizationsService
-        .process_subscription(s, action, invited_org_id)
+        .process_subscription(s, action, invited_org_id ?? "")
         .then((res) => {
           this.status = "completed";
           toast({

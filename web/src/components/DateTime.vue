@@ -290,6 +290,16 @@ import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import { toZonedTime } from "date-fns-tz";
 
+interface ConsumableDateTime {
+  startTime: number;
+  endTime: number;
+  relativeTimePeriod: string | null;
+  selectedDate?: unknown;
+  selectedTime?: unknown;
+  valueType?: string;
+  userChangedValue?: boolean;
+}
+
 export default defineComponent({
   components: {
     OSeparator,
@@ -322,6 +332,7 @@ export default defineComponent({
       default: false,
     },
     initialTimezone: {
+      type: String as PropType<string | null>,
       required: false,
       default: null,
     },
@@ -451,7 +462,7 @@ export default defineComponent({
       { label: t("common.months"), value: "M" },
     ]);
 
-    const relativeDates = {
+    const relativeDates: Record<string, number[]> = {
       s: [1, 5, 10, 15, 30, 45],
       m: [1, 5, 10, 15, 30, 45],
       h: [1, 2, 3, 6, 8, 12],
@@ -460,7 +471,7 @@ export default defineComponent({
       M: [1, 2, 3, 4, 5, 6],
     };
 
-    const relativeDatesInHour = {
+    const relativeDatesInHour: Record<string, number[]> = {
       s: [1, 1, 1, 1, 1, 1],
       m: [1, 1, 1, 1, 1, 1],
       h: [1, 2, 3, 6, 8, 12],
@@ -584,7 +595,7 @@ export default defineComponent({
       },
     );
 
-    const setRelativeDate = (period, value) => {
+    const setRelativeDate = (period: string, value: number) => {
       selectedType.value = "relative";
       relativePeriod.value = period;
       relativeValue.value = value;
@@ -610,7 +621,7 @@ export default defineComponent({
       if (props.autoApply) saveDate("relative-custom");
     };
 
-    const setRelativeTime = (period) => {
+    const setRelativeTime = (period: string) => {
       const periodString = period?.match(/(\d+)([smhdwM])/);
 
       if (periodString) {
@@ -627,7 +638,7 @@ export default defineComponent({
       }
     };
 
-    const resetTime = (startTime, endTime) => {
+    const resetTime = (startTime: string, endTime: string) => {
       if (!startTime || !endTime) {
         var dateString = new Date().toLocaleDateString("en-ZA");
 
@@ -651,7 +662,7 @@ export default defineComponent({
       return;
     };
 
-    const setAbsoluteTime = (startTime, endTime) => {
+    const setAbsoluteTime = (startTime: number, endTime: number) => {
       // Parent-invoked setter — the resulting auto-apply emit is programmatic.
       markProgrammaticDateChange();
       if (!startTime || !endTime) {
@@ -671,7 +682,7 @@ export default defineComponent({
       selectedTime.value.endTime = endDateTime.time;
     };
 
-    function convertUnixTime(unixTimeMicros) {
+    function convertUnixTime(unixTimeMicros: number) {
       // Convert microseconds to milliseconds and create a new Date object
       var date = toZonedTime(unixTimeMicros / 1000, store.state.timezone);
 
@@ -722,7 +733,7 @@ export default defineComponent({
       appliedDisplayValue.value = getDisplayValue.value;
     };
 
-    const saveDate = (dateType?: string) => {
+    const saveDate = (dateType?: string | null) => {
       markApplied();
       const date = getConsumableDateTime();
       // if (isNaN(date.endTime) || isNaN(date.startTime)) {
@@ -737,7 +748,7 @@ export default defineComponent({
       }
     };
 
-    function formatDate(d) {
+    function formatDate(d: Date) {
       var year = d.getFullYear();
       var month = ("0" + (d.getMonth() + 1)).slice(-2); // Months are zero-based
       var day = ("0" + d.getDate()).slice(-2);
@@ -751,7 +762,10 @@ export default defineComponent({
       };
     }
 
-    const setCustomDate = (dateType, dateobj) => {
+    const setCustomDate = (
+      dateType: string,
+      dateobj: { start: number; end: number },
+    ) => {
       // Parent-invoked setter (e.g. metrics-brush time range) — programmatic.
       var start_date = new Date(Math.floor(dateobj.start));
       const startObj = formatDate(start_date);
@@ -781,7 +795,7 @@ export default defineComponent({
     };
 
     const getPeriodLabel = computed(() => {
-      const periodMapping = {
+      const periodMapping: Record<string, string> = {
         s: "Seconds",
         m: "Minutes",
         h: "Hours",
@@ -796,7 +810,7 @@ export default defineComponent({
       return !isNaN(Date.parse(`${dateStr} ${timeStr}`));
     }
 
-    const getConsumableDateTime = () => {
+    const getConsumableDateTime = (): ConsumableDateTime => {
       if (selectedType.value == "relative") {
         let period = getPeriodLabel.value.toLowerCase();
         let periodValue = relativeValue.value;
@@ -807,7 +821,7 @@ export default defineComponent({
           periodValue = periodValue * 7;
         }
 
-        const subtractObject = {};
+        const subtractObject: Record<string, number> = {};
 
         if (period && periodValue) subtractObject[period] = periodValue;
         else {
@@ -975,7 +989,7 @@ export default defineComponent({
       }
     });
 
-    const timezoneFilterFn = (val, update) => {
+    const timezoneFilterFn = (val: string, update: (cb: () => void) => void) => {
       filteredTimezone.value = filterColumns(timezoneOptions, val, update);
     };
 
@@ -996,7 +1010,7 @@ export default defineComponent({
       return filteredOptions;
     };
 
-    const optionsFn = (date) => {
+    const optionsFn = (date: string) => {
       const formattedDate = timestampToTimezoneDate(
         new Date().getTime(),
         store.state.timezone,
@@ -1008,7 +1022,7 @@ export default defineComponent({
       return date >= "1999/01/01" && date <= formattedDate;
     };
 
-    const setDateType = (type) => {
+    const setDateType = (type: string) => {
       selectedType.value = type;
       // displayValue.value = getDisplayValue();
       if (props.autoApply)

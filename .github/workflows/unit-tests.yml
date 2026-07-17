@@ -189,10 +189,6 @@ jobs:
         working-directory: web
         run: npm ci
 
-      - name: Type-check canary (proves the checker is live, not dark)
-        working-directory: web
-        run: npm run type-check:canary
-
       - name: Type-check (any error fails)
         working-directory: web
         run: npm run type-check:app

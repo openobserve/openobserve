@@ -574,7 +574,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :stream-type="searchObj.data.stream.streamType"
           :correlation-props="correlationDashboardProps"
           :correlation-loading="correlationLoading"
-          :correlation-error="correlationError"
+          :correlation-error="correlationError ?? undefined"
           :initial-tab="detailTableInitialTab"
           class="detail-table-dialog"
           :currentIndex="searchObj.meta.resultGrid.navigation.currentRowIndex"
@@ -776,12 +776,16 @@ export default defineComponent({
   },
   methods: {
     handleColumnSizesUpdate(newColSizes: any) {
+      // colSizes entries are arrays of size-maps keyed by joined stream name.
+      const colSizes = this.searchObj.data.resultGrid?.colSizes as Record<
+        string,
+        Record<string, unknown>[]
+      >;
       const prevColSizes =
-        this.searchObj.data.resultGrid?.colSizes[
-          this.searchObj.data.stream.selectedStream
-        ]?.[0] || {};
+        colSizes?.[this.searchObj.data.stream.selectedStream.join(",")]?.[0] ||
+        {};
       this.searchObj.data.resultGrid.colSizes[
-        this.searchObj.data.stream.selectedStream
+        this.searchObj.data.stream.selectedStream.join(",")
       ] = [
         {
           ...prevColSizes,
@@ -796,11 +800,11 @@ export default defineComponent({
       // If you store the colOrder it will create issue when you save the view and load it again
       if (!this.searchObj.data.stream.selectedFields.length) {
         this.searchObj.data.resultGrid.colOrder[
-          this.searchObj.data.stream.selectedStream
+          this.searchObj.data.stream.selectedStream.join(",")
         ] = [];
       } else {
         this.searchObj.data.resultGrid.colOrder[
-          this.searchObj.data.stream.selectedStream
+          this.searchObj.data.stream.selectedStream.join(",")
         ] = [...newColOrder];
 
         if (newColOrder.length > 0) {
@@ -1064,7 +1068,12 @@ export default defineComponent({
     // Volume Analysis state
     const showVolumeAnalysisDashboard = ref(false);
     const hasHistogramSelection = ref(false);
-    const histogramSelectionRange = ref({
+    const histogramSelectionRange = ref<{
+      start: number;
+      end: number;
+      timeStart: number | undefined;
+      timeEnd: number | undefined;
+    }>({
       start: 0,
       end: 0,
       timeStart: undefined,
@@ -1076,7 +1085,7 @@ export default defineComponent({
     } | null>(null);
 
     const searchTableRef: any = ref(null);
-    const scrollContainerRef = ref(null);
+    const scrollContainerRef = ref<HTMLElement | null>(null);
     const histogramRef = ref(null);
 
     // Correlation dashboard state

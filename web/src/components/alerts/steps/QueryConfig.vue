@@ -901,6 +901,7 @@ import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import { type SelectModelValue } from "@/lib/forms/Select/OSelect.types";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -1315,7 +1316,8 @@ export default defineComponent({
       () => (props.inputData.aggregation?.group_by || []).filter((f: string) => f?.trim()).length > 0
     );
 
-    const onTriggerOperatorChange = (value: string) => {
+    const onTriggerOperatorChange = (_value: SelectModelValue) => {
+      const value = _value as string;
       triggerOperator.value = value;
       if (props.triggerCondition) {
         triggerConditionModel.value.operator = value;
@@ -1404,7 +1406,8 @@ export default defineComponent({
       { label: 'Cron', value: 'cron' },
     ];
 
-    const onFrequencyUnitChange = (unit: string) => {
+    const onFrequencyUnitChange = (_unit: SelectModelValue) => {
+      const unit = _unit as string;
       const prevMode = frequencyMode.value;
       isUserTriggerChange.value = true;
       frequencyMode.value = unit as 'minutes' | 'hours' | 'cron';
@@ -1689,7 +1692,8 @@ export default defineComponent({
     };
 
     // When metric function dropdown changes — handles count vs aggregation modes
-    const onMetricFunctionChange = (value: string) => {
+    const onMetricFunctionChange = (_value: SelectModelValue) => {
+      const value = _value as string;
       if (value === 'total_events') {
         // total_events (COUNT(*)) — no aggregation, trigger threshold shown inline
         localIsAggregationEnabled.value = false;
@@ -1734,7 +1738,8 @@ export default defineComponent({
     };
 
     // When log function mode changes (count / unique_count / avg / etc.)
-    const onLogFunctionChange = (value: string) => {
+    const onLogFunctionChange = (_value: SelectModelValue) => {
+      const value = _value as string;
       if (value === 'total_events') {
         // total_events (COUNT(*)) — no aggregation, trigger threshold shown inline
         localIsAggregationEnabled.value = false;
@@ -1782,7 +1787,8 @@ export default defineComponent({
     };
 
     // When log measure column changes (for unique count / measure modes)
-    const onLogMeasureColumnChange = (value: string) => {
+    const onLogMeasureColumnChange = (_value: SelectModelValue) => {
+      const value = _value as string;
       if (props.inputData.aggregation) {
         inputDataModel.value.aggregation.having.column = value;
         emitAggregationUpdate();
@@ -1815,7 +1821,8 @@ export default defineComponent({
     };
 
     // When condition operator changes
-    const onConditionOperatorChange = (value: string) => {
+    const onConditionOperatorChange = (_value: SelectModelValue) => {
+      const value = _value as string;
       if (isEventBased.value && selectedFunction.value === 'total_events') {
         // Logs count mode: maps to trigger_condition
         if (props.triggerCondition) {

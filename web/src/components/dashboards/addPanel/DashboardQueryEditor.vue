@@ -90,7 +90,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       : 'visibility'
                   "
                   class="ml-1 opacity-[0.7] transition-all duration-150 hover:opacity-100 hover:bg-[var(--o2-hover-gray)] hover:rounded-full"
-                  @click.stop="toggleQueryVisibility(index)"
+                  @click.stop="toggleQueryVisibility(Number(index))"
                   @mousedown.stop.prevent
                   @pointerdown.stop.prevent
                   style="cursor: pointer"
@@ -118,7 +118,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 name="close"
                 size="sm"
                 class="opacity-60 transition-all duration-150 hover:opacity-100 hover:bg-[var(--o2-hover-gray)] hover:rounded-full"
-                @click.stop.prevent="removeTab(index)"
+                @click.stop.prevent="removeTab(Number(index))"
                 @mousedown.stop.prevent
                 @pointerdown.stop.prevent
                 style="cursor: pointer"
@@ -272,7 +272,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OSelect
                       v-model="selectedFunction"
                       :label="t('dashboard.useSavedFunction')"
-                      :options="functionOptions"
+                      :options="functionSelectOptions"
                       label-position="inside"
                       data-test="dashboard-use-saved-vrl-function"
                       labelKey="name"
@@ -341,11 +341,30 @@ import { isQueryVrlEnabled } from "@/composables/dashboard/useVrlFunction";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import type {
+  SelectModelValue,
+  SelectOptionInput,
+} from "@/lib/forms/Select/OSelect.types";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+
+// Minimal surface of UnifiedQueryEditor's exposed methods used here.
+interface QueryEditorInstance {
+  getCursorIndex: () => number;
+  triggerAutoComplete: (_val: string) => void;
+  disableSuggestionPopup: (_val: string) => void;
+  getValue?: () => string;
+  setValue: (_value: string) => void;
+  resetEditorLayout: () => void;
+}
+
+interface FunctionListItem {
+  name: string;
+  function: string;
+}
 
 export default defineComponent({
   name: "DashboardQueryEditor",
@@ -381,8 +400,13 @@ export default defineComponent({
     );
 
     const { getAllFunctions } = useFunctions();
-    const functionList = ref([]);
-    const functionOptions = ref([]);
+    const functionList = ref<FunctionListItem[]>([]);
+    const functionOptions = ref<FunctionListItem[]>([]);
+    // Options are keyed via labelKey="name"/valueKey="function", so they carry
+    // no `label` field; the cast bridges that to OSelect's option shape.
+    const functionSelectOptions = computed(
+      () => functionOptions.value as unknown as SelectOptionInput[],
+    );
     const selectedFunction = ref<string | undefined>(undefined);
 
     const getFunctions = async () => {
@@ -426,12 +450,13 @@ export default defineComponent({
       });
     };
 
-    const onFunctionSelect = (fnCode: string | null | undefined) => {
-      if (!fnCode) return;
+    const onFunctionSelect = (fnCode: SelectModelValue) => {
+      // valueKey="function" yields string codes; ignore anything else.
+      if (typeof fnCode !== "string" || !fnCode) return;
       // assign selected vrl function
       vrlFnEditorRef.value?.setValue(fnCode);
       // find function name for notification
-      const fn = functionList.value.find((f: any) => f.function === fnCode);
+      const fn = functionList.value.find((f) => f.function === fnCode);
       // clear v-model
       selectedFunction.value = undefined;
 
@@ -479,7 +504,7 @@ export default defineComponent({
       updateStreamKeywords: sqlUpdateStreamKeywords,
     } = useSqlSuggestions();
 
-    const queryEditorRef = ref(null);
+    const queryEditorRef = ref<QueryEditorInstance | null>(null);
 
     // Server-error highlight ranges, provided by AddPanel.vue where the panel
     // search runs. The composable forwards these to the editor.
@@ -516,7 +541,7 @@ export default defineComponent({
     });
 
     const functionEditorPlaceholderFlag = ref(true);
-    const vrlFnEditorRef = ref(null);
+    const vrlFnEditorRef = ref<QueryEditorInstance | null>(null);
     const { placeholder: vrlPlaceholder } = useVrlPlaceholder();
 
 
@@ -550,7 +575,7 @@ export default defineComponent({
         dashboardPanelData.data.queries.length - 1;
     };
 
-    const updatePromQLQuery = async (value, _event?: unknown) => {
+    const updatePromQLQuery = async (value: string, _event?: unknown) => {
       promqlAutoCompleteData.value.query = value;
       // promqlAutoCompleteData.value.text = event.changes[0].text;
 
@@ -565,27 +590,29 @@ export default defineComponent({
         };
       }
 
-      promqlAutoCompleteData.value.position.cursorIndex =
-        queryEditorRef.value.getCursorIndex();
-      promqlAutoCompleteData.value.popup.open =
-        queryEditorRef.value.triggerAutoComplete;
-      promqlAutoCompleteData.value.popup.close =
-        queryEditorRef.value.disableSuggestionPopup;
+      const editor = queryEditorRef.value;
+      if (editor) {
+        promqlAutoCompleteData.value.position.cursorIndex =
+          editor.getCursorIndex();
+        promqlAutoCompleteData.value.popup.open = editor.triggerAutoComplete;
+        promqlAutoCompleteData.value.popup.close =
+          editor.disableSuggestionPopup;
+      }
 
       promqlGetSuggestions();
     };
 
-    const updateQuery = (query, event) => {
+    const updateQuery = (query: string, event: unknown) => {
       if (dashboardPanelData.data.queryType === "promql") {
         updatePromQLQuery(query, event);
       } else {
         sqlAutoCompleteData.value.query = query;
-        sqlAutoCompleteData.value.cursorIndex =
-          queryEditorRef.value?.getCursorIndex();
-        sqlAutoCompleteData.value.popup.open =
-          queryEditorRef.value?.triggerAutoComplete;
-        sqlAutoCompleteData.value.popup.close =
-          queryEditorRef.value?.disableSuggestionPopup;
+        const editor = queryEditorRef.value;
+        if (editor) {
+          sqlAutoCompleteData.value.cursorIndex = editor.getCursorIndex();
+          sqlAutoCompleteData.value.popup.open = editor.triggerAutoComplete;
+          sqlAutoCompleteData.value.popup.close = editor.disableSuggestionPopup;
+        }
         sqlGetSuggestions();
       }
     };
@@ -685,7 +712,7 @@ export default defineComponent({
       { immediate: true },
     );
 
-    const removeTab = async (index) => {
+    const removeTab = async (index: number) => {
       if (
         dashboardPanelData.layout.currentQueryIndex >=
         dashboardPanelData.data.queries.length - 1
@@ -694,7 +721,7 @@ export default defineComponent({
       removeQuery(index);
     };
 
-    const toggleQueryVisibility = (index) => {
+    const toggleQueryVisibility = (index: number) => {
       // Lazy-init for layouts loaded from saved dashboards that predate the multi-SQL feature.
       if (!Array.isArray(dashboardPanelData.layout.hiddenQueries)) {
         dashboardPanelData.layout.hiddenQueries = [];
@@ -803,7 +830,7 @@ export default defineComponent({
     };
 
     // Unified Query Editor: Handle query update
-    const handleQueryUpdate = (newQuery) => {
+    const handleQueryUpdate = (newQuery: string) => {
       _sqlOnQueryChange();
       dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
@@ -840,7 +867,11 @@ export default defineComponent({
     );
 
     // Unified Query Editor: Handle language change
-    const handleLanguageChange = (newLanguage: "sql" | "promql") => {
+    const handleLanguageChange = (
+      newLanguage: "sql" | "promql" | "vrl" | "javascript",
+    ) => {
+      // Only sql/promql are offered here; ignore any other emitted language.
+      if (newLanguage !== "sql" && newLanguage !== "promql") return;
       dashboardPanelData.data.queryType = newLanguage;
 
       // Explicitly sync the editor with the correct query after language change
@@ -957,6 +988,7 @@ export default defineComponent({
       getImageURL,
       onFunctionToggle,
       functionOptions,
+      functionSelectOptions,
       selectedFunction,
       filterFunctionOptions,
       onFunctionSearch,

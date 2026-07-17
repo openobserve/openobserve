@@ -109,7 +109,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         type="single"
         size="xs"
         class="h-7!"
-        @update:model-value="(v: string | undefined) => emit('update:activeSubject', v ?? null)"
+        @update:model-value="(v: boolean | AcceptableValue | AcceptableValue[]) => emit('update:activeSubject', typeof v === 'string' ? v : null)"
       >
         <OToggleGroupItem
           v-for="chip in subjectChips"
@@ -158,6 +158,7 @@ import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
+import type { AcceptableValue } from "reka-ui";
 import {
   convertTimeFromNsToMs,
   convertTimeFromMicroToMilli,

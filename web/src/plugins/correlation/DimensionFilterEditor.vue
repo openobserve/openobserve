@@ -69,7 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Additional Dimensions (Unstable) -->
-        <div v-if="Object.keys(additionalDimensions).length > 0" class="mb-4">
+        <div v-if="Object.keys(additionalDimensions ?? {}).length > 0" class="mb-4">
           <div class="flex items-center gap-2 mb-3">
             <h3 class="text-base font-semibold m-0">
               {{ t('correlation.logs.filters.additionalDimensions') }}

@@ -361,7 +361,7 @@ const selectedLabels = computed(() => {
       if (selectedValue === null) return null;
       return String(selectedValue);
     })
-    .filter(Boolean);
+    .filter((label): label is string => Boolean(label));
 });
 
 const triggerDisplayLabel = computed(() => {

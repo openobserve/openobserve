@@ -129,13 +129,14 @@ export function extractCorrelationFilters(
   const conditionRegex = /(\w+)\s*=\s*'((?:[^']|'')*)'/gi;
   let m: RegExpExecArray | null;
   while ((m = conditionRegex.exec(whereClause)) !== null) {
-    if (trackedSet.has(m[1])) {
+    const field = m[1];
+    if (trackedSet.has(field)) {
       const value = m[2].replace(/''/g, "'");
-      const existing = filters.findIndex((f) => f.field === m[1]);
+      const existing = filters.findIndex((f) => f.field === field);
       if (existing >= 0) {
         filters[existing].value = value;
       } else {
-        filters.push({ field: m[1], value });
+        filters.push({ field, value });
       }
     }
   }

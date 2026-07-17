@@ -1135,7 +1135,9 @@ const handleQueryUpdate = (newQuery: string) => {
   getSuggestions();
 };
 
-const handleLanguageChange = (newLanguage: 'sql' | 'promql') => {
+const handleLanguageChange = (language: 'sql' | 'promql' | 'vrl' | 'javascript') => {
+  // Alert editor only offers sql/promql
+  const newLanguage = language as 'sql' | 'promql';
   localTab.value = newLanguage;
 
   // Explicitly sync the editor with the correct query after language change

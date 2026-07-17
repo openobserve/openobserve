@@ -797,9 +797,9 @@ const goToService = (svc: any, e?: MouseEvent) => {
   if (svc.errorFlag) filter += ` AND span_status = 'ERROR'`;
 
   const query: Record<string, string> = {
-    org_identifier: orgId.value,
+    org_identifier: orgId.value ?? "",
     tab: "spans",
-    query: b64EncodeUnicode(filter),
+    query: b64EncodeUnicode(filter) ?? "",
     stream: svc.stream_name ?? graphStream.value,
   };
 

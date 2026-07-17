@@ -115,7 +115,7 @@ export const useSearchQuery = () => {
     if (Number.isNaN(searchObj.data.datetime.startTime))
       searchObj.data.datetime.startTime = "Invalid Date";
 
-    const queryReq: SearchRequestPayload = buildSearch();
+    const queryReq: SearchRequestPayload | null = buildSearch();
 
     // Update highlight query on run-query
     if (searchObj.meta.sqlMode) {
@@ -297,7 +297,8 @@ export const useSearchQuery = () => {
             const msg = buildContextualSqlMessage(query, syntaxErr);
             searchObj.data.errorMsg = `SQL syntax error at line ${line}, column ${col}: ${msg}`;
             searchObj.data.sqlSyntaxErrorRanges = [
-              { startLine: line, endLine: line, column: col, error: msg },
+              // msg is string|null; `!` is compile-time only (null passes through unchanged).
+              { startLine: line, endLine: line, column: col, error: msg! },
             ];
           }
         }

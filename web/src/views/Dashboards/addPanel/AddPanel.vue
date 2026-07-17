@@ -454,7 +454,7 @@ export default defineComponent({
     });
     // ======= [END] default variable values
 
-    const metaData = ref(null);
+    const metaData = ref<Record<string, any> | null>(null);
     const showViewPanel = ref(false);
     const metaDataValue = (metadata: any) => {
       metaData.value = metadata;
@@ -953,7 +953,10 @@ export default defineComponent({
         panelEditorRef.value?.initChartData(dashboardPanelData.data);
       },
     );
-    const dateTimeForVariables = ref(null);
+    const dateTimeForVariables = ref<{
+      start_time: Date;
+      end_time: Date;
+    } | null>(null);
 
     const setTimeForVariables = () => {
       const date = dateTimePickerRef.value?.getConsumableDateTime();
@@ -1597,7 +1600,7 @@ export default defineComponent({
           return "";
         }
 
-        const payload = {};
+        const payload: Record<string, unknown> = {};
 
         const stream =
           dashboardPanelData.data.queries[

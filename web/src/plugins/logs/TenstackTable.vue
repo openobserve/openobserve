@@ -468,14 +468,14 @@ class="mr-1" />
                 </template>
                 <span
                   v-if="
-                    processedResults[
+                    processedResultsMap[
                       `${cell.column.id}_${calculateActualIndex(virtualRow.index)}`
                     ]
                   "
                   :key="`${cell.column.id}_${calculateActualIndex(virtualRow.index)}`"
                   :class="store.state.theme === 'dark' ? 'dark' : ''"
                   v-html="
-                    processedResults[
+                    processedResultsMap[
                       `${cell.column.id}_${calculateActualIndex(virtualRow.index)}`
                     ]
                   "
@@ -646,6 +646,11 @@ const sorting = ref<SortingState>([]);
 const store = useStore();
 useTextHighlighter();
 const { processedResults, processHitsInChunks } = useLogsHighlighter();
+
+// Typed view of the highlighter cache for indexed template lookups.
+const processedResultsMap = computed<Record<string, string>>(
+  () => processedResults.value,
+);
 
 const getSortingHandler = (e: Event, fn: any) => {
   return fn(e);

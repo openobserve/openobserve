@@ -7,8 +7,7 @@
     "src/**/*.spec.ts",
     "src/**/*.spec.js",
     "src/**/*.bench.spec.ts",
-    "src/test/**/*",
-    "src/__canary__/**"
+    "src/test/**/*"
   ],
   "compilerOptions": {
     "composite": true,

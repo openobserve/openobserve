@@ -174,15 +174,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                     >
                                       <span class="text-[0.7rem] w-[2rem] shrink-0">{{ p.label }}</span>
                                       <span class="text-[0.7rem] flex-1 text-right pr-[0.25rem]">
-                                        {{ formatTimeWithSuffix(durationPercentiles[p.key]) }}
+                                        {{ formatTimeWithSuffix(durationPercentiles[p.key] ?? 0) }}
                                       </span>
                                       <div class="flex w-[2.7rem]">
                                         <OButton
                                           v-if="p.key !== 'max'"
                                           variant="ghost"
                                           size="icon-xs-circle"
-                                          :title="`duration >= ${formatTimeWithSuffix(durationPercentiles[p.key])}`"
-                                          @click.stop="addFieldSearchTerm(`duration>='${formatTimeWithSuffix(durationPercentiles[p.key])}'`)"
+                                          :title="`duration >= ${formatTimeWithSuffix(durationPercentiles[p.key] ?? 0)}`"
+                                          @click.stop="addFieldSearchTerm(`duration>='${formatTimeWithSuffix(durationPercentiles[p.key] ?? 0)}'`)"
                                           class="ml-[0.125rem]! border! border-[var(--o2-border-color)]!"
                                         >
                                           <OIcon name="arrow-forward-ios" size="sm" class="h-[0.4rem]! w-[0.4rem]!" />
@@ -190,8 +190,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                         <OButton
                                           variant="ghost"
                                           size="icon-xs-circle"
-                                          :title="`duration <= ${formatTimeWithSuffix(durationPercentiles[p.key])}`"
-                                          @click.stop="addFieldSearchTerm(`duration<='${formatTimeWithSuffix(durationPercentiles[p.key])}'`)"
+                                          :title="`duration <= ${formatTimeWithSuffix(durationPercentiles[p.key] ?? 0)}`"
+                                          @click.stop="addFieldSearchTerm(`duration<='${formatTimeWithSuffix(durationPercentiles[p.key] ?? 0)}'`)"
                                           class="ml-auto! mr-[0.5rem]! border! border-[var(--o2-border-color)]!"
                                         >
                                           <OIcon name="arrow-back-ios" size="sm" class="h-[0.4rem]! w-[0.4rem]!" />
@@ -1309,7 +1309,12 @@ const expandedLogs = ref<any[]>([]);
 const cursorPosition = ref(-1);
 const splitterModel = ref(30);
 const step = ref(1);
-const dateTime = ref({
+const dateTime = ref<{
+  startTime: number | null;
+  endTime: number | null;
+  relativeTimePeriod: string | null;
+  valueType: string;
+}>({
   startTime: null,
   endTime: null,
   relativeTimePeriod: null,

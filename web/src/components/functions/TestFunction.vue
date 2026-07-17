@@ -550,7 +550,9 @@ watch(inputQuery, (value) => {
   autoCompleteData.value.query = value;
   autoCompleteData.value.cursorIndex =
     queryEditorRef.value?.getCursorIndex() ?? -1;
-  autoCompleteData.value.popup.open = queryEditorRef.value?.triggerAutoComplete;
+  // Ref may be unmounted; fall back to a no-op to match popup.open's non-optional type.
+  autoCompleteData.value.popup.open =
+    queryEditorRef.value?.triggerAutoComplete ?? (() => {});
   autoCompleteData.value.org = store.state.selectedOrganization.identifier;
   autoCompleteData.value.streamType = selectedStream.value.type;
   autoCompleteData.value.streamName = selectedStream.value.name;

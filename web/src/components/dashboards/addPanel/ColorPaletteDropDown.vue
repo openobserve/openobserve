@@ -157,6 +157,17 @@ import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OSelectItem from "@/lib/forms/Select/OSelectItem.vue";
 import OSelectGroup from "@/lib/forms/Select/OSelectGroup.vue";
+import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
+
+interface ColorOption {
+  label: string;
+  value?: string;
+  subLabel?: string;
+  colorPalette?: string[];
+  header?: boolean;
+}
+// A ColorOption guaranteed to carry a selectable `value` (headers filtered out).
+type SelectableColorOption = ColorOption & { value: string };
 
 export default defineComponent({
   name: "ColorPaletteDropdown",
@@ -184,7 +195,7 @@ export default defineComponent({
 
     const store = useStore();
 
-    const colorOptions = [
+    const colorOptions: ColorOption[] = [
       {
         label: t("dashboard.colorBySeries"),
         header: true,
@@ -274,9 +285,12 @@ export default defineComponent({
 
     const colorOptionsByGroup = computed(() => ({
       bySeries: colorOptions.filter(
-        (o) => !o.header && !o.value?.startsWith("continuous") && o.value !== "fixed" && o.value !== "shades",
+        (o): o is SelectableColorOption =>
+          !o.header && !!o.value && !o.value.startsWith("continuous") && o.value !== "fixed" && o.value !== "shades",
       ),
-      byValue: colorOptions.filter((o) => o.value?.startsWith("continuous")),
+      byValue: colorOptions.filter(
+        (o): o is SelectableColorOption => !!o.value && o.value.startsWith("continuous"),
+      ),
     }));
 
     const selectedOptionPalette = computed<string[]>(() => {
@@ -286,11 +300,13 @@ export default defineComponent({
         return fixed ? [fixed] : [];
       }
       const option = colorOptions.find((o) => o.value === mode);
-      return (option as any)?.colorPalette ?? [];
+      return option?.colorPalette ?? [];
     });
 
-    const onColorModeChange = (value: string) => {
-      const selectedOption = colorOptions.find((opt: any) => opt.value === value);
+    const onColorModeChange = (modelValue: SelectModelValue) => {
+      // Single-string select: OSelect always emits a string mode value here.
+      const value = modelValue as string;
+      const selectedOption = colorOptions.find((opt) => opt.value === value);
       // if value is fixed or shades, assign ["#53ca53"] to fixedcolor as a default
       if (["fixed", "shades"].includes(value)) {
         dashboardPanelData.data.config.color.fixedColor = ["#53ca53"];

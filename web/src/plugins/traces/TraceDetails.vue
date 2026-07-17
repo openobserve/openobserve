@@ -625,7 +625,7 @@ size="sm">
                         :spanDimensions="spanDimensions"
                         :spanMap="spanMap"
                         :leftWidth="leftWidth"
-                        :scrollContainer="traceScrollContainer"
+                        :scrollContainer="scrollContainerForTree"
                         ref="traceTreeRef"
                         class="bg-[var(--o2-card-bg)]!"
                         :search-query="searchQuery"
@@ -976,9 +976,13 @@ import { resolveSessionId } from "./traceDetails.utils";
 import { buildFilterTerm, applyFilterTerm } from "@/utils/traces/filterUtils";
 import { buildPatternConsolidatedTree } from "@/utils/traces/patternDetection";
 import { useTracePatternTree } from "@/composables/useTracePatternTree";
+import type { TreeNode as PatternTreeNode } from "@/composables/useTreeVisualization";
+import type { EnrichedSpan } from "@/ts/interfaces/traces/span.types";
+import type { AcceptableValue } from "reka-ui";
 import {
   createTreeVisualizationEngine,
   type TreeVisualizationData,
+  type TreeNode as EngineTreeNode,
 } from "@/utils/traces/treeVisualizationEngine";
 import {
   SPAN_KIND_MAP,
@@ -1203,13 +1207,28 @@ export default defineComponent({
     // Computed chart options that switches between pattern and span views
     const traceServiceMapChartOptions = computed(() => {
         // Pattern view - use new pattern-based visualization
+        // Engine TreeNode makes errorRate/children optional while the pattern
+        // callbacks (useTreeVisualization) require errorRate; adapt each call to
+        // a compatible node (errorRate defaults to 0 — pattern nodes read only
+        // name/value/metadata, never errorRate/children).
+        const toPatternNode = (node: EngineTreeNode): PatternTreeNode => ({
+          id: node.id,
+          name: node.name,
+          label: node.label,
+          value: node.value,
+          errorRate: node.errorRate ?? 0,
+          metadata: node.metadata,
+        });
         const chartOptions = generateEChartsOptions(
           {
             treeData: patternTreeData.value,
-            getNodeLabel: getPatternNodeLabel,
-            getNodeTooltip: getPatternNodeTooltip,
-            getNodeErrorRate: getPatternNodeErrorRate,
-            getNodeServiceColor: (node: any) =>
+            getNodeLabel: (node: EngineTreeNode) =>
+              getPatternNodeLabel(toPatternNode(node)),
+            getNodeTooltip: (node: EngineTreeNode) =>
+              getPatternNodeTooltip(toPatternNode(node)),
+            getNodeErrorRate: (node: EngineTreeNode) =>
+              getPatternNodeErrorRate(toPatternNode(node)),
+            getNodeServiceColor: (node: EngineTreeNode) =>
               searchObj.meta.serviceColors[node.name]
           },
           {
@@ -1243,6 +1262,12 @@ export default defineComponent({
     };
     const parentContainer = ref<HTMLElement | null>(null);
     const traceScrollContainer = ref<HTMLElement | null>(null);
+    // TraceTree's `scrollContainer` prop is under-declared (default: null, no
+    // type → vue-tsc infers null | undefined). Forward the real element through
+    // this boundary accessor; runtime value is unchanged.
+    const scrollContainerForTree = computed(
+      () => traceScrollContainer.value as unknown as null | undefined,
+    );
     let parentHeight = ref(0);
     let currentHeight = 0;
     const updateHeight = async () => {
@@ -1258,9 +1283,9 @@ export default defineComponent({
 
     const { showErrorNotification } = useNotifications();
 
-    const logStreams = ref([]);
+    const logStreams = ref<string[]>([]);
 
-    const filteredStreamOptions = ref([]);
+    const filteredStreamOptions = ref<string[]>([]);
 
     const streamSearchValue = ref<string>("");
 
@@ -1481,7 +1506,7 @@ export default defineComponent({
     // Use trace processing composable for FlameGraph
     // Pass traceTree (nested) instead of flat span list
     const treeForFlameGraph = computed(() => traceTree.value || []);
-    const flatSpans = ref([]);
+    const flatSpans = ref<EnrichedSpan[]>([]);
 
     // Calculate trace metadata for FlameGraph
     const traceMetadata = computed(() => {
@@ -1591,7 +1616,9 @@ export default defineComponent({
       () => props.spanListProp,
       (newSpanList) => {
         if (props.mode === "embedded" && newSpanList.length > 0) {
-          searchObj.data.traceDetails.spanList = newSpanList;
+          // spanList is never[] in useTraces state; widen container to accept spans.
+          (searchObj.data.traceDetails as { spanList: unknown[] }).spanList =
+            newSpanList;
           updateServiceColors();
           buildTracesTree();
         }
@@ -1610,7 +1637,10 @@ export default defineComponent({
       },
     );
 
-    const updateActiveTab = (tab: string) => {
+    const updateActiveTab = (
+      value: boolean | AcceptableValue | AcceptableValue[],
+    ) => {
+      const tab = String(value);
       activeTab.value = tab;
       if(tab === 'map') {
         setupTooltips();
@@ -1720,7 +1750,9 @@ export default defineComponent({
       // If embedded mode with span list provided, skip fetching
       if (props.mode === "embedded" && props.spanListProp.length > 0) {
         // Use provided span list directly
-        searchObj.data.traceDetails.spanList = props.spanListProp;
+        // spanList is never[] in useTraces state; widen container to accept spans.
+        (searchObj.data.traceDetails as { spanList: unknown[] }).spanList =
+          props.spanListProp;
 
         // Set up minimal trace metadata from span list
         if (props.spanListProp.length > 0) {
@@ -1796,8 +1828,10 @@ export default defineComponent({
       return searchObj.data.traceDetails.showSpanDetails;
     });
 
-    const selectedSpanId = computed(() => {
-      return searchObj.data.traceDetails.selectedSpanId;
+    const selectedSpanId = computed<string | undefined>(() => {
+      // Child props declare String (string | undefined); the store keeps null —
+      // normalize null → undefined (truthy/equality checks are unchanged).
+      return searchObj.data.traceDetails.selectedSpanId ?? undefined;
     });
 
     const hoveredSpanId = ref("");
@@ -1994,7 +2028,8 @@ export default defineComponent({
             const deduplicatedTraceSpans = traceSpans.filter(
               (s: any) => !rumSpanIds.has(s.span_id),
             );
-            searchObj.data.traceDetails.spanList = [
+            // spanList is never[] in useTraces state; widen container to accept spans.
+            (searchObj.data.traceDetails as { spanList: unknown[] }).spanList = [
               ...rumSpans,
               ...deduplicatedTraceSpans,
             ];
@@ -2079,7 +2114,7 @@ export default defineComponent({
     }
 
     const calculateTracePosition = () => {
-      const tics = [];
+      const tics: { value: number; label: string; left: string }[] = [];
       baseTracePosition.value["durationMs"] = timeRange.value.end;
       baseTracePosition.value["durationUs"] = timeRange.value.end * 1000;
       baseTracePosition.value["startTimeUs"] =
@@ -2839,6 +2874,7 @@ export default defineComponent({
       searchResults,
       parentContainer,
       traceScrollContainer,
+      scrollContainerForTree,
       parentHeight,
       updateHeight,
       getSpanKind,

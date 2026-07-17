@@ -613,6 +613,9 @@ const formData: Ref<DestinationFormData> = ref({
   destination_type: "", // For prebuilt destinations
 });
 const isUpdatingDestination = ref(false);
+// Original destination name, captured when the destination is loaded (kept in
+// sync by the setupDestinationData watcher) — used as the update key on save.
+const originalDestinationName = ref("");
 
 const isLoadingActions = ref(false);
 
@@ -746,6 +749,7 @@ watch(
 const setupDestinationData = () => {
   if (props.destination) {
     isUpdatingDestination.value = true;
+    originalDestinationName.value = props.destination.name;
     formData.value.name = props.destination.name;
     formData.value.url = props.destination.url;
     formData.value.method = props.destination.method;
@@ -1157,7 +1161,7 @@ const saveDestination = async () => {
         // Update existing prebuilt destination
         await updateDestination(
           formData.value.destination_type as PrebuiltTypeId,
-          props.destination.name, // original name
+          originalDestinationName.value, // original name (captured when the destination loaded)
           formData.value.name, // potentially new name
           prebuiltCredentials.value,
           customHeaders, // custom headers

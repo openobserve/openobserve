@@ -176,10 +176,12 @@ export default defineComponent({
   setup(props, { expose }) {
     const store = useStore();
     const { t } = useI18n();
-    const previewAlertRef = ref(null);
+    // Shape mirrors PreviewAlert's exposed evaluationStatus ref.
+    type EvaluationStatus = { wouldTrigger: boolean; reason: string } | null;
+    const previewAlertRef = ref<{ evaluationStatus: EvaluationStatus } | null>(null);
 
     // Reactive ref for evaluation status; shape mirrors PreviewAlert's exposed ref.
-    const evaluationStatus = ref<{ wouldTrigger: boolean; reason: string } | null>(null);
+    const evaluationStatus = ref<EvaluationStatus>(null);
 
     // Watch the child component's evaluation status
     watch(

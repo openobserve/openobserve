@@ -86,10 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Function Definition Display -->
           <div
-            v-if="
-              selectedFunction &&
-              pipelineObj.functions[selectedFunction]
-            "
+            v-if="selectedFunction && selectedFunctionDefinition"
             data-test="associate-function-definition-section"
             class="mt-4 mb-4"
           >
@@ -103,7 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OCardSection class="p-0 function-definition-content">
                 <div class="function-code-container bg-[#fafbfc] dark:bg-[#0d1117] dark:border dark:border-[#21262d] rounded-none max-w-[584px] max-h-[250px] overflow-y-auto relative">
                   <pre class="function-code text-[#2d3748] dark:text-[#f7fafc] bg-transparent m-0 p-4 font-[JetBrains_Mono,Fira_Code,Monaco,Menlo,Ubuntu_Mono,monospace] text-[13px] leading-normal whitespace-pre-wrap break-words border-0 font-normal cursor-default select-text">{{
-                    pipelineObj.functions[selectedFunction]?.function ||
+                    selectedFunctionDefinition?.function ||
                     "No definition available"
                   }}</pre>
                 </div>
@@ -299,6 +296,18 @@ const form = useOForm<AssociateFunctionForm>({
 });
 
 const selectedFunction = form.useStore((s: any) => s.values.selectedFunction);
+
+// Typed lookup for the selected function's definition (pipelineObj.functions
+// is an untyped record keyed by function name).
+const selectedFunctionDefinition = computed(() => {
+  const name = selectedFunction.value;
+  if (!name) return undefined;
+  const functions = pipelineObj.functions as Record<
+    string,
+    { function?: string }
+  >;
+  return functions[name];
+});
 
 const dialog = ref({
   show: false,

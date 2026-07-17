@@ -99,15 +99,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       <span class="text-[0.75rem] w-[2rem] shrink-0">{{ p.label }}</span>
                       <span class="text-[0.75rem] flex-1 text-right pr-[0.25rem]">
-                        {{ formatTimeWithSuffix(durationPercentiles[p.key]) }}
+                        {{ formatTimeWithSuffix(durationPercentiles[p.key] ?? 0) }}
                       </span>
                       <div class="flex w-[3rem]">
                         <OButton
                           v-if="p.key !== 'max'"
                           variant="ghost"
                           size="icon-xs-circle"
-                          :title="`duration >= ${formatTimeWithSuffix(durationPercentiles[p.key])}`"
-                          @click.stop="addSearchTerm(`duration>='${formatTimeWithSuffix(durationPercentiles[p.key])}'`)"
+                          :title="`duration >= ${formatTimeWithSuffix(durationPercentiles[p.key] ?? 0)}`"
+                          @click.stop="addSearchTerm(`duration>='${formatTimeWithSuffix(durationPercentiles[p.key] ?? 0)}'`)"
                           class="o2-custom-button-hover ml-[0.25rem]! border! border-[var(--o2-border-color)]!"
                         >
                           <OIcon name="arrow-forward-ios" size="sm" class="h-[0.5rem]! w-[0.5rem]!" />
@@ -115,8 +115,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <OButton
                           variant="ghost"
                           size="icon-xs-circle"
-                          :title="`duration <= ${formatTimeWithSuffix(durationPercentiles[p.key])}`"
-                          @click.stop="addSearchTerm(`duration<='${formatTimeWithSuffix(durationPercentiles[p.key])}'`)"
+                          :title="`duration <= ${formatTimeWithSuffix(durationPercentiles[p.key] ?? 0)}`"
+                          @click.stop="addSearchTerm(`duration<='${formatTimeWithSuffix(durationPercentiles[p.key] ?? 0)}'`)"
                           class="o2-custom-button-hover mr-[0.625rem]! border! border-[var(--o2-border-color)]! ml-auto!"
                         >
                           <OIcon name="arrow-back-ios" size="sm" class="h-[0.5rem]! w-[0.5rem]!" />
@@ -176,6 +176,7 @@ import FieldRow from "@/components/common/FieldRow.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import useFieldValuesStream from "@/composables/useFieldValuesStream";
 import useDurationPercentiles, { parseDurationWhereClause } from "@/composables/useDurationPercentiles";
@@ -288,11 +289,14 @@ export default defineComponent({
       );
     };
 
-    const onStreamChange = (selectedValue: string | null) => {
-      const stream = selectedValue
-        ? searchObj.data.stream.streamLists.find((s: any) => s.value === selectedValue) ?? null
+    const onStreamChange = (selectedValue: SelectModelValue) => {
+      const streamValue = typeof selectedValue === "string" ? selectedValue : null;
+      const stream = streamValue
+        ? searchObj.data.stream.streamLists.find((s: any) => s.value === streamValue) ?? null
         : null;
-      searchObj.data.stream.selectedStream = stream;
+      // Runtime clears the selection to null (read via optional-chaining); useTraces types the
+      // field non-null, so cast to preserve the existing null-clearing behavior.
+      searchObj.data.stream.selectedStream = stream as { label: string; value: string };
       searchObj.data.query = "";
       searchObj.data.editorValue = "";
       searchObj.data.resultGrid.currentPage = 0;
@@ -474,7 +478,8 @@ export default defineComponent({
       expandedFields.value[field.name] = true;
 
       if (field.name === "duration") {
-        const decodedSql = b64DecodeUnicode(buildFieldValuesSql(field.name));
+        // buildFieldValuesSql emits valid base64, so the decode never hits its catch (undefined) path.
+        const decodedSql = b64DecodeUnicode(buildFieldValuesSql(field.name))!;
         const whereMatch = decodedSql.match(/\bWHERE\b\s+([\s\S]+)$/i);
         fetchPercentiles({
           streamName: searchObj.data.stream.selectedStream.value,

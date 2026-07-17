@@ -159,7 +159,8 @@ export default defineComponent({
       );
     });
 
-    const navigateToIntegration = (routeName: string) => {
+    const navigateToIntegration = (value: string | number) => {
+      const routeName = value as string;
       router.replace({
         name: routeName,
         query: {

@@ -629,7 +629,7 @@ export const buildCondition = (condition: any, dashboardPanelData: any) => {
 
   if (condition.filterType === "group") {
     const groupConditions = condition.conditions
-      .map((condition) => buildCondition(condition, dashboardPanelData))
+      .map((condition: any) => buildCondition(condition, dashboardPanelData))
       .filter(Boolean);
     const logicalOperators = condition.conditions
       .map((c: any) => c.logicalOperator)
@@ -764,7 +764,7 @@ export const buildCondition = (condition: any, dashboardPanelData: any) => {
  */
 const buildWhereClause = (filterData: any, dashboardPanelData: any) => {
   const whereConditions = filterData
-    ?.map((condition) => buildCondition(condition, dashboardPanelData))
+    ?.map((condition: any) => buildCondition(condition, dashboardPanelData))
     ?.filter(Boolean);
 
   const logicalOperators = filterData.map((it: any) => it.logicalOperator);

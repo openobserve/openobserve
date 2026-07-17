@@ -264,7 +264,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="outline"
               size="sm"
               data-test="pattern-detail-previous-btn"
-              :disabled="selectedPattern.index === 0"
+              :disabled="selectedPattern?.index === 0"
               @click="$emit('navigate', false, true)"
               icon-left="chevron-left"
             >
@@ -273,7 +273,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div class="col-auto text-center">
             <span class="text-xs text-gray-400">
-              {{ t("search.patternXofYShort", { index: selectedPattern.index + 1, total: totalPatterns }) }}
+              {{ t("search.patternXofYShort", { index: (selectedPattern?.index ?? 0) + 1, total: totalPatterns }) }}
             </span>
           </div>
           <div class="col-auto">
@@ -281,7 +281,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="outline"
               size="sm"
               data-test="pattern-detail-next-btn"
-              :disabled="selectedPattern.index >= totalPatterns - 1"
+              :disabled="(selectedPattern?.index ?? 0) >= totalPatterns - 1"
               @click="$emit('navigate', true, false)"
               icon-right="chevron-right"
             >

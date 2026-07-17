@@ -1006,14 +1006,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <!-- Logs: FTS-highlighted text -->
                         <span
                           v-else-if="
-                            processedResults[
+                            highlightedResults[
                               `${cell.column.id}_${calculateActualIndex(virtualRow.index)}`
                             ]
                           "
                           :key="`${cell.column.id}_${calculateActualIndex(virtualRow.index)}`"
                           :class="store.state.theme === 'dark' ? 'dark' : ''"
                           v-html="
-                            processedResults[
+                            highlightedResults[
                               `${cell.column.id}_${calculateActualIndex(virtualRow.index)}`
                             ]
                           "
@@ -1197,7 +1197,7 @@ import {
   onBeforeUnmount,
   ComputedRef,
 } from "vue";
-import type { PropType } from "vue";
+import type { PropType, Ref } from "vue";
 import { useVirtualizer } from "@tanstack/vue-virtual";
 import {
   FlexRender,
@@ -1505,6 +1505,9 @@ const sanitizeCssId = (id: string) => id.replace(/[^a-zA-Z0-9_-]/g, "_");
 const store = useStore();
 useTextHighlighter();
 const { processedResults, processHitsInChunks } = useLogsHighlighter();
+// Explicit alias so the template resolves the map's index signature (vue-tsc
+// otherwise infers `{}` for the destructured ref and rejects string keys).
+const highlightedResults: Ref<Record<string, string>> = processedResults;
 
 // ── Dashboard: sticky columns composable ─────────────────────────────────────
 // useStickyColumns reads props.columns (legacy column format when useVirtualScroll=false).

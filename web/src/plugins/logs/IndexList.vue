@@ -303,6 +303,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { captureFromValuesApi } from "@/composables/useFieldValueStore";
@@ -340,7 +341,7 @@ export default defineComponent({
   },
   emits: ["setInterestingFieldInSQLQuery"],
   methods: {
-    handleStreamSelection(value: string | string[] | null) {
+    handleStreamSelection(value: SelectModelValue) {
       if (this.selectionMode === "single") {
         this.searchObj.data.stream.selectedStream = value ? [value as string] : [];
       } else {
@@ -1985,7 +1986,7 @@ export default defineComponent({
       pagination.value = newPagination;
     };
 
-    const setPage = (page) => {
+    const setPage = (page: number) => {
       pagination.value = { ...pagination.value, page };
     };
 

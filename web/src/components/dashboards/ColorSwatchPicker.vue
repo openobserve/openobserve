@@ -55,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <label
       class="swatch swatch--custom"
       :class="{ 'swatch--active': isCustomActive }"
-      :style="isCustomActive ? { background: modelValue } : {}"
+      :style="isCustomActive ? { background: modelValue ?? undefined } : {}"
       :title="t('dashboard.customColor')"
     >
       <OIcon
@@ -68,7 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-else
         name="check"
         size="xs"
-        :class="isDark(modelValue) ? 'text-white' : 'text-black'"
+        :class="isDark(modelValue ?? '') ? 'text-white' : 'text-black'"
       />
       <input
         type="color"

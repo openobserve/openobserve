@@ -689,7 +689,10 @@ export default defineComponent({
       isVariablesChanged.value = true;
     });
 
-    const dateTimeForVariables = ref(null);
+    const dateTimeForVariables = ref<{
+      start_time: Date;
+      end_time: Date;
+    } | null>(null);
 
     const setTimeForVariables = () => {
       const date = dateTimePickerRef.value?.getConsumableDateTime();

@@ -665,6 +665,7 @@ import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import ORange from "@/lib/forms/Range/ORange.vue";
 
@@ -817,7 +818,8 @@ export default defineComponent({
       }
     };
 
-    const onDetectionFunctionChange = (fn: string) => {
+    const onDetectionFunctionChange = (fn: SelectModelValue) => {
+      if (typeof fn !== "string") return;
       if (fn === "count") {
         configModel.value.detection_function_field = "";
       }

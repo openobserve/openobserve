@@ -29,6 +29,7 @@ import { searchState } from "@/composables/useLogs/searchState";
 import { useSearchStream } from "@/composables/useLogs/useSearchStream";
 import { DEFAULT_LOGS_CONFIG } from "@/utils/logs/constants";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
+import type { ExtendedParsedSQLResult } from "@/composables/useLogs/logsUtils";
 import { usePagination } from "@/composables/useLogs/usePagination";
 
 import useStreamFields from "@/composables/useLogs/useStreamFields";
@@ -388,8 +389,11 @@ const useLogs = () => {
       // If value of sqlMode is changed, watcher gets called which resets the editor and query value
       // The editor value and query value assigned below, is overrided by the watcher
       await nextTick();
-      searchObj.data.editorValue = b64DecodeUnicode(queryParams.query);
-      searchObj.data.query = b64DecodeUnicode(queryParams.query);
+      // b64DecodeUnicode is string|undefined only on its decode-error path; the
+      // guard above ensures a valid encoded query, so decode yields a string.
+      const decodedQuery = b64DecodeUnicode(queryParams.query)!;
+      searchObj.data.editorValue = decodedQuery;
+      searchObj.data.query = decodedQuery;
     }
 
     if (
@@ -665,10 +669,12 @@ const useLogs = () => {
         newParsedSQL.where = parsedSQL.where;
 
         query = fnUnparsedSQL(newParsedSQL).replace(/`/g, '"');
-        outputQueries[parsedSQL.from[0].table] = query.replace(
-          "INDEX_NAME",
-          "[INDEX_NAME]",
-        );
+        const tableName = parsedSQL.from[0]?.table;
+        if (tableName)
+          outputQueries[tableName] = query.replace(
+            "INDEX_NAME",
+            "[INDEX_NAME]",
+          );
       } else {
         // parse join queries & union queries
         if (Object.hasOwn(parsedSQL, "from") && parsedSQL.from.length > 1) {
@@ -689,13 +695,16 @@ const useLogs = () => {
             newParsedSQL.where = parsedSQL.where;
 
             query = fnUnparsedSQL(newParsedSQL).replace(/`/g, '"');
-            outputQueries[parsedSQL.from[0].table] = query.replace(
-              "INDEX_NAME",
-              "[INDEX_NAME]",
-            );
+            const tableName = parsedSQL.from[0]?.table;
+            if (tableName)
+              outputQueries[tableName] = query.replace(
+                "INDEX_NAME",
+                "[INDEX_NAME]",
+              );
           }
 
-          let nextTable = parsedSQL._next;
+          let nextTable: ExtendedParsedSQLResult | null | undefined =
+            parsedSQL._next;
           let depth = 0;
           const MAX_DEPTH = 100;
           while (nextTable && depth++ < MAX_DEPTH) {
@@ -707,10 +716,12 @@ const useLogs = () => {
               newParsedSQL.where = nextTable.where;
 
               query = fnUnparsedSQL(newParsedSQL).replace(/`/g, '"');
-              outputQueries[nextTable.from[0].table] = query.replace(
-                "INDEX_NAME",
-                "[INDEX_NAME]",
-              );
+              const tableName = nextTable.from[0]?.table;
+              if (tableName)
+                outputQueries[tableName] = query.replace(
+                  "INDEX_NAME",
+                  "[INDEX_NAME]",
+                );
             }
             nextTable = nextTable._next;
           }

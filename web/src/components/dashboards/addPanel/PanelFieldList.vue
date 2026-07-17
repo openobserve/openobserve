@@ -61,7 +61,7 @@
             searchable
             label-position="inside"
             :disabled="dashboardPanelDataPageKey === 'logs'"
-            :title="currentStream"
+            :title="currentStream ?? undefined"
             option-tooltip
             @search="onStreamSearch"
             @update:model-value="onStreamChange"
@@ -459,6 +459,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
 import OFieldList from "@/lib/lists/FieldList/OFieldList.vue";
 import OFieldRow from "@/lib/lists/FieldList/OFieldRow.vue";
 import OFieldLabel from "@/lib/lists/FieldList/OFieldLabel.vue";
@@ -560,7 +561,7 @@ const currentStream = computed(
       ?.fields?.stream,
 );
 
-function onStreamTypeChange(val: string) {
+function onStreamTypeChange(val: SelectModelValue) {
   const fields =
     dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
       .fields;
@@ -568,7 +569,7 @@ function onStreamTypeChange(val: string) {
   fields.stream_type = val;
 }
 
-function onStreamChange(val: string) {
+function onStreamChange(val: SelectModelValue) {
   dashboardPanelData.data.queries[
     dashboardPanelData.layout.currentQueryIndex
   ].fields.stream = val;
@@ -803,7 +804,8 @@ watch(
 
             if (isAutoSeededQuery(slot?.query, metricName, streams, seedOpts)) {
               applyPromqlSeed(dashboardPanelData, streamName, {
-                previousStream: metricName,
+                // callee uses `?? `, so null and undefined behave identically
+                previousStream: metricName ?? undefined,
               });
             }
           }

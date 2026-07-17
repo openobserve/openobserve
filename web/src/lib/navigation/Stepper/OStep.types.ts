@@ -3,8 +3,7 @@
  * OStep represents a single step within an OStepper.
  */
 
-import type { Component } from 'vue'
-import type { IconName } from '@/lib/core/Icon/OIcon.types'
+import type { StepIcon } from './OStepper.types'
 
 export interface OStepProps {
   /** Step identifier ΓÇö unique within the stepper, matched against OStepper's v-model */
@@ -12,7 +11,7 @@ export interface OStepProps {
   /** Step header label shown in the indicator row */
   title: string
   /** OIcon name string or Lucide component shown in the step indicator (replaced by checkmark when done) */
-  icon?: IconName | Component | null
+  icon?: StepIcon
   /** Marks this step as completed ΓÇö shows a checkmark. Typically :done="step > N". Default: false */
   done?: boolean
   /**

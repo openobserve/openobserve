@@ -215,6 +215,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
 import OPagination from "@/lib/navigation/Pagination/OPagination.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 
@@ -411,9 +412,10 @@ export default defineComponent({
       emit("update:scroll");
     }
 
-    function changeRowsPerPage(val: number) {
+    function changeRowsPerPage(val: SelectModelValue) {
       if (searchObj.loading) return;
-      searchObj.meta.resultGrid.rowsPerPage = val;
+      // rowsPerPageOptions are all numbers, so val is always a number here
+      searchObj.meta.resultGrid.rowsPerPage = val as number;
       searchObj.data.resultGrid.currentPage = 0;
       emit("update:scroll");
     }

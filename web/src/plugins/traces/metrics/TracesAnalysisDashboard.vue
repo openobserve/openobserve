@@ -59,17 +59,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span class="uppercase tracking-wide opacity-70"
             >Selected:</span
           >
+          <!-- Non-null: guarded by v-if="hasSelectedTimeRange". -->
           <span class="whitespace-nowrap text-[0.7rem]">{{
             formatSmartTimestamp(
-              selectedTimeRangeDisplay.startTime,
-              selectedTimeRangeDisplay.endTime,
+              selectedTimeRangeDisplay!.startTime,
+              selectedTimeRangeDisplay!.endTime,
             ).start
           }}</span>
           <span class="opacity-70 text-[0.65rem]">→</span>
           <span class="whitespace-nowrap text-[0.7rem]">{{
             formatSmartTimestamp(
-              selectedTimeRangeDisplay.startTime,
-              selectedTimeRangeDisplay.endTime,
+              selectedTimeRangeDisplay!.startTime,
+              selectedTimeRangeDisplay!.endTime,
             ).end
           }}</span>
         </div>
@@ -400,7 +401,13 @@ const { generateDashboard } = useLatencyInsightsDashboard();
 
 // Variables manager will be initialized by RenderDashboardCharts
 // and we'll receive a reference to it via the @variablesManagerReady event
-const variablesManager = ref(null);
+interface VariablesManager {
+  hasUncommittedChanges?: boolean | { value: boolean };
+  committedVariablesData?: {
+    global?: Array<{ name: string; value?: string }>;
+  };
+}
+const variablesManager = ref<VariablesManager | null>(null);
 
 const isOpen = ref(true);
 
@@ -796,7 +803,7 @@ const getCurrentPercentile = (): string => {
     // committedVariablesData has structure: { global: [], tabs: {}, panels: {} }
     // Percentile is likely a global variable
     const percentileVar = manager.committedVariablesData.global?.find(
-      (v: any) => v.name === "percentile",
+      (v: { name: string; value?: string }) => v.name === "percentile",
     );
     if (percentileVar && percentileVar.value !== undefined) {
       return percentileVar.value;

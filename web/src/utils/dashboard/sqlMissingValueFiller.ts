@@ -186,11 +186,15 @@ export const fillMissingValues = (
     // RTL streaming: no clamping — the fill extends from chunkStart to
     // userEnd so the "newer" (right) side gets noValue entries.
     if (isLTR) {
-      if (actualMinTime && actualMinTime > formatUtc(binnedFillStart)) {
-        binnedFillStart = new Date(actualMinTime + "Z");
+      // Read into locals so control-flow keeps the declared string|null type
+      // (closure assignments don't narrow the outer let for the compiler).
+      const minTime: string | null = actualMinTime;
+      const maxTime: string | null = actualMaxTime;
+      if (minTime && minTime > formatUtc(binnedFillStart)) {
+        binnedFillStart = new Date(minTime + "Z");
       }
-      if (actualMaxTime && actualMaxTime < endTimeForFill) {
-        endTimeForFill = actualMaxTime;
+      if (maxTime && maxTime < endTimeForFill) {
+        endTimeForFill = maxTime;
       }
     }
 

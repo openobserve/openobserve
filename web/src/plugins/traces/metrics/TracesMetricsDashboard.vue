@@ -279,7 +279,7 @@ const loadDashboard = async () => {
 
     const isSpansMode = searchObj.meta.searchMode === "spans";
     const baseFilters: string[] = getBaseFilters();
-    convertedDashboard.tabs[0].panels.forEach((panel, index) => {
+    convertedDashboard.tabs[0].panels.forEach((panel: { title?: string; queries: { query: string }[] }, index: number) => {
       // Build WHERE clause based on filters
       let whereClause = "";
 
@@ -352,8 +352,9 @@ const loadDashboard = async () => {
     updateLayout();
   } catch (err: any) {
     console.error("Error loading dashboard:", err);
-    error.value = err.message || "Failed to load metrics dashboard";
-    showErrorNotification(error.value);
+    const message: string = err.message || "Failed to load metrics dashboard";
+    error.value = message;
+    showErrorNotification(message);
   }
 };
 
@@ -368,11 +369,11 @@ const refreshDashboard = () => {
 };
 
 const createRangeFilter = (
-  data,
-  start = null,
-  end = null,
-  timeStart = null,
-  timeEnd = null,
+  data: { id?: string; title?: string } | undefined,
+  start: number | null = null,
+  end: number | null = null,
+  timeStart: number | null = null,
+  timeEnd: number | null = null,
 ) => {
   const panelId = data?.id;
   const panelTitle = data?.title || "Chart";

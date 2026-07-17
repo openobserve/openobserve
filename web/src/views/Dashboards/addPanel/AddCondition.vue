@@ -125,6 +125,7 @@ import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
 import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import { type SelectModelValue } from "@/lib/forms/Select/OSelect.types";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import { defineComponent, ref, computed, toRef, watch, inject } from "vue";
 import OCombobox from "@/lib/forms/Combobox/OCombobox.vue";
@@ -239,7 +240,7 @@ export default defineComponent({
           : builtCondition;
     };
 
-    const emitLogicalOperatorChange = (newOperator: string) => {
+    const emitLogicalOperatorChange = (newOperator: SelectModelValue) => {
       emit("logical-operator-change", newOperator);
     };
 

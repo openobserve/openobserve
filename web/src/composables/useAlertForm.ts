@@ -1430,9 +1430,10 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       router,
       isAggregationEnabled,
       activeFolderId: {
-        value: Array.isArray(activeFolderId.value)
-          ? activeFolderId.value[0]
-          : activeFolderId.value,
+        value:
+          (Array.isArray(activeFolderId.value)
+            ? activeFolderId.value[0]
+            : activeFolderId.value) ?? "default",
       },
       handleAlertError,
     };
@@ -2028,8 +2029,10 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     };
 
     if (beingUpdated.value) {
+      const folderQuery = router.currentRoute.value.query.folder;
       payload.folder_id =
-        router.currentRoute.value.query.folder || "default";
+        (Array.isArray(folderQuery) ? folderQuery[0] : folderQuery) ||
+        "default";
       callAlert = alertsService.update_by_alert_id(
         store.state.selectedOrganization.identifier,
         payload,

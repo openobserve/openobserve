@@ -122,7 +122,7 @@ export default createStore({
     // GitHub dashboard gallery cache
     githubDashboardGallery: {
       dashboards: [],
-      lastFetched: null,
+      lastFetched: null as number | null,
       cacheExpiry: 10 * 60 * 1000, // 10 minutes in milliseconds
       dashboardJsonCache: {} as Record<string, unknown>, // Cache for individual dashboard JSON content: { folderPath/fileName: jsonContent }
     },
@@ -315,7 +315,10 @@ export default createStore({
      * @param payload - { mode: 'light' | 'dark', color: '#hexcolor' }
      * Example: { mode: 'light', color: '#FF0000' }
      */
-    setTempThemeColor(state, payload) {
+    setTempThemeColor(
+      state,
+      payload: { mode: "light" | "dark"; color: string | null },
+    ) {
       state.tempThemeColors[payload.mode] = payload.color;
     },
     /**

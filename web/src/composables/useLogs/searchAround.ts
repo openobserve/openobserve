@@ -78,7 +78,7 @@ export const useSearchAround = () => {
         const parsedSQL = fnParsedSQL(query);
         parsedSQL.where = null;
         sqlContext.push(
-          b64EncodeUnicode(fnUnparsedSQL(parsedSQL).replace(/`/g, '"')),
+          b64EncodeUnicode(fnUnparsedSQL(parsedSQL).replace(/`/g, '"')) ?? "",
         );
       } else {
         const parseQuery = [query];
@@ -126,13 +126,13 @@ export const useSearchAround = () => {
             "[FIELD_LIST]",
             `'${streamName}' as _stream_name` + queryFieldList,
           );
-          sqlContext.push(b64EncodeUnicode(finalQuery));
+          sqlContext.push(b64EncodeUnicode(finalQuery) ?? "");
         });
       }
 
       let queryFunction = "";
       if (shouldAddFunctionToSearch()) {
-        queryFunction = b64EncodeUnicode(searchObj.data.tempFunctionContent);
+        queryFunction = b64EncodeUnicode(searchObj.data.tempFunctionContent) ?? "";
       }
 
       let actionId = "";
@@ -213,7 +213,7 @@ export const useSearchAround = () => {
 
           if (error.response !== undefined) {
             searchObj.data.errorMsg = error.response.data.error;
-            searchObj.data.errorDetail = error.response.data.error_detail;
+            searchObj.data.errorDetail = error.response.data.error_detail ?? "";
             if (
               Object.prototype.hasOwnProperty.call(
                 error.response.data,

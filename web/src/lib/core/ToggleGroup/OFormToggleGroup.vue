@@ -42,7 +42,7 @@ if (import.meta.env.DEV && !form) {
           :label-position="props.labelPosition"
           :model-value="field.state.value"
           @update:model-value="
-            (v: AcceptableValue | AcceptableValue[]) => {
+            (v: boolean | AcceptableValue | AcceptableValue[]) => {
               field.handleChange(v);
               field.handleBlur();
             }
