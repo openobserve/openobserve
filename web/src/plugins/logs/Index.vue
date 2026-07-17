@@ -395,6 +395,7 @@ import SearchBar from "@/plugins/logs/SearchBar.vue";
 import { type ActivationState, PageType } from "@/ts/interfaces/logs.ts";
 import { isWebSocketEnabled, isStreamingEnabled } from "@/utils/zincutils";
 import { allSelectionFieldsHaveAlias } from "@/utils/query/visualizationUtils";
+import { shouldReloadStreamFieldsForVisualize } from "@/utils/logs/visualizeStreamFields";
 import useAiChat from "@/composables/useAiChat";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 import { searchState } from "@/composables/useLogs/searchState";
@@ -1028,8 +1029,14 @@ export default defineComponent({
       if (
         Object.hasOwn(router.currentRoute.value?.query, "logs_visualize_toggle")
       ) {
-        searchObj.meta.logsVisualizeToggle =
-          router.currentRoute.value.query.logs_visualize_toggle;
+        const urlToggle = router.currentRoute.value.query.logs_visualize_toggle;
+        // Restoring directly onto the Timechart tab: setupLogsTab() will run the
+        // visualization once fields are ready, so tell the toggle watcher to skip
+        // the page-load fire it is about to receive from the assignment below.
+        if (urlToggle === "visualize") {
+          isInitialVisualizeRestore.value = true;
+        }
+        searchObj.meta.logsVisualizeToggle = urlToggle;
       }
 
       // Always setup logs tab on mount
@@ -1139,8 +1146,27 @@ export default defineComponent({
             await loadPatternsData();
             await extractPatternsForCurrentQuery();
           } else {
-            loadVisualizeData();
+            await loadVisualizeData();
             searchObj.loading = false;
+            // The visualize toggle watcher bails out during page load because it
+            // fires before URL restoration completes. Now that the
+            // stream and its fields are restored, mirror the watcher's setup,
+            // restore the saved chart type/config from the URL, and run the
+            // visualization. Scoped to the visualize tab — the build tab loads
+            // through BuildQueryPage and must not auto-run here.
+            if (
+              searchObj.meta.logsVisualizeToggle === "visualize" &&
+              searchObj.data.stream.selectedStream?.length
+            ) {
+              prepareVisualizeMode();
+              // Suppress the chart-type watcher while restoring (it would
+              // trigger a duplicate updateVisualization for the type change).
+              isRestoringFromUrl.value = true;
+              restoreVisualizationFromUrlOnLoad();
+              await nextTick();
+              isRestoringFromUrl.value = false;
+              handleVisualizeTab();
+            }
           }
 
           store.dispatch("logs/setIsInitialized", true);
@@ -1863,6 +1889,120 @@ export default defineComponent({
     // Used to restore chart type from URL only on first toggle (for shared links)
     const isFirstBuildToggle = ref(true);
 
+    // On page load with the Timechart tab in the URL, handleBeforeMount() sets
+    // the visualize toggle, which fires the toggle watcher before setupLogsTab()
+    // has restored the stream and extracted fields. That early fire would build
+    // a stale `select *` and show a spurious error. setupLogsTab() owns the
+    // page-load restoration (it calls handleVisualizeTab() once fields are
+    // ready), so the watcher skips its work exactly once on that initial fire.
+    const isInitialVisualizeRestore = ref(false);
+
+    // Chart types the logs Timechart supports restoring from a shared URL
+    const validLogsChartTypes = [
+      "area",
+      "bar",
+      "h-bar",
+      "line",
+      "scatter",
+      "table",
+    ];
+
+    // Shared setup for entering visualize (Timechart) mode. Used by the
+    // logsVisualizeToggle watcher (manual toggle) and by setupLogsTab on
+    // page load, so both entry paths behave identically.
+    function prepareVisualizeMode() {
+      // Enable quick mode automatically when switching to visualization if:
+      // 1. SQL mode is disabled OR
+      // 2. Query is "SELECT * FROM some_stream" (simple select all query)
+      // 3. Default quick mode config is true
+      const shouldEnableQuickMode =
+        !searchObj.meta.sqlMode ||
+        isSimpleSelectAllQuery(searchObj.data.query);
+
+      const isQuickModeDisabled = !searchObj.meta.quickMode;
+      const isQuickModeConfigEnabled =
+        store.state.zoConfig.quick_mode_enabled === true;
+
+      if (
+        shouldEnableQuickMode &&
+        isQuickModeDisabled &&
+        isQuickModeConfigEnabled
+      ) {
+        searchObj.meta.quickMode = true;
+        handleQuickModeChange();
+      }
+
+      // close field list and splitter
+      dashboardPanelData.layout.splitter = 0;
+      dashboardPanelData.layout.showFieldList = false;
+
+      dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].customQuery = true;
+
+      // Copy VRL function query if present
+      if (
+        searchObj.data.tempFunctionContent &&
+        searchObj.data.transformType === "function"
+      ) {
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].vrlFunctionQuery = searchObj.data.tempFunctionContent;
+      } else {
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].vrlFunctionQuery = "";
+      }
+    }
+
+    // Restore the chart type and panel config saved in the URL
+    // (visualization_data) when the page loads directly on the Timechart tab.
+    // The visualize toggle watcher normally does this, but on page load it
+    // bails out before restoring because it fires ahead of URL/stream
+    // restoration.
+    function restoreVisualizationFromUrlOnLoad() {
+      const visualizationDataParam =
+        router.currentRoute.value.query.visualization_data;
+      if (
+        !visualizationDataParam ||
+        typeof visualizationDataParam !== "string"
+      ) {
+        return;
+      }
+
+      let restoredData = null;
+      try {
+        restoredData = decodeVisualizationConfig(visualizationDataParam);
+      } catch (error) {
+        console.warn(
+          "Failed to restore visualization config from URL:",
+          error,
+        );
+        return;
+      }
+      if (!restoredData || typeof restoredData !== "object") return;
+
+      if (
+        isFirstVisualizationToggle.value &&
+        restoredData.type &&
+        typeof restoredData.type === "string" &&
+        validLogsChartTypes.includes(restoredData.type)
+      ) {
+        dashboardPanelData.data.type = restoredData.type;
+      }
+
+      if (restoredData.config && typeof restoredData.config === "object") {
+        dashboardPanelData.data.config = {
+          ...dashboardPanelData.data.config,
+          connect_nulls: true,
+          ...restoredData.config,
+        };
+      }
+
+      // The URL restore counts as the first-toggle restoration.
+      isFirstVisualizationToggle.value = false;
+    }
+
     watch(
       () => [searchObj?.meta?.logsVisualizeToggle],
       async () => {
@@ -1887,48 +2027,23 @@ export default defineComponent({
           }
 
           if (searchObj.meta.logsVisualizeToggle == "visualize") {
-            // Enable quick mode automatically when switching to visualization if:
-            // 1. SQL mode is disabled OR
-            // 2. Query is "SELECT * FROM some_stream" (simple select all query)
-            // 3. Default quick mode config is true
-            const shouldEnableQuickMode =
-              !searchObj.meta.sqlMode ||
-              isSimpleSelectAllQuery(searchObj.data.query);
-
-            const isQuickModeDisabled = !searchObj.meta.quickMode;
-            const isQuickModeConfigEnabled =
-              store.state.zoConfig.quick_mode_enabled === true;
-
-            if (
-              shouldEnableQuickMode &&
-              isQuickModeDisabled &&
-              isQuickModeConfigEnabled
-            ) {
-              searchObj.meta.quickMode = true;
-              handleQuickModeChange();
+            // Skip the initial page-load fire (see isInitialVisualizeRestore).
+            // setupLogsTab() restores the stream, extracts fields, and then runs
+            // the visualization via handleVisualizeTab(). Running here too would
+            // race that flow with stale/empty fields and build a spurious
+            // `select *` (which shows the "not supported" error). Genuine user
+            // toggles after mount have the flag unset and fall through normally.
+            if (isInitialVisualizeRestore.value) {
+              isInitialVisualizeRestore.value = false;
+              return;
             }
 
-            // close field list and splitter
-            dashboardPanelData.layout.splitter = 0;
-            dashboardPanelData.layout.showFieldList = false;
-
-            dashboardPanelData.data.queries[
-              dashboardPanelData.layout.currentQueryIndex
-            ].customQuery = true;
-
-            // Copy VRL function query if present
-            if (
-              searchObj.data.tempFunctionContent &&
-              searchObj.data.transformType === "function"
-            ) {
-              dashboardPanelData.data.queries[
-                dashboardPanelData.layout.currentQueryIndex
-              ].vrlFunctionQuery = searchObj.data.tempFunctionContent;
-            } else {
-              dashboardPanelData.data.queries[
-                dashboardPanelData.layout.currentQueryIndex
-              ].vrlFunctionQuery = "";
+            // Defensive: no stream selected yet — nothing to visualize.
+            if (!searchObj.data.stream.selectedStream?.length) {
+              return;
             }
+
+            prepareVisualizeMode();
 
             // Store current config and chart type to preserve them during rebuild
             const queryParams = router.currentRoute.value.query;
@@ -1978,14 +2093,6 @@ export default defineComponent({
                 restoredData.type &&
                 typeof restoredData.type === "string"
               ) {
-                const validLogsChartTypes = [
-                  "area",
-                  "bar",
-                  "h-bar",
-                  "line",
-                  "scatter",
-                  "table",
-                ];
                 if (validLogsChartTypes.includes(restoredData.type)) {
                   // Valid chart type found - set it and disable auto-selection
                   dashboardPanelData.data.type = restoredData.type;
@@ -2004,8 +2111,12 @@ export default defineComponent({
             // finished populating interestingFieldList yet. Without fields,
             // buildSearch() produces SELECT * which is invalid for visualization.
             if (
-              searchObj.data.stream.selectedStream?.length > 0 &&
-              searchObj.data.stream.selectedStreamFields?.length === 0
+              shouldReloadStreamFieldsForVisualize({
+                selectedStream: searchObj.data.stream.selectedStream,
+                selectedStreamFields: searchObj.data.stream.selectedStreamFields,
+                interestingFieldList: searchObj.data.stream.interestingFieldList,
+                quickMode: searchObj.meta.quickMode,
+              })
             ) {
               await getStreamList();
               await extractFields();
@@ -2500,8 +2611,12 @@ export default defineComponent({
           // finished populating interestingFieldList yet. Without fields,
           // buildSearch() produces SELECT * which is invalid for visualization.
           if (
-            searchObj.data.stream.selectedStream?.length > 0 &&
-            searchObj.data.stream.selectedStreamFields?.length === 0
+            shouldReloadStreamFieldsForVisualize({
+              selectedStream: searchObj.data.stream.selectedStream,
+              selectedStreamFields: searchObj.data.stream.selectedStreamFields,
+              interestingFieldList: searchObj.data.stream.interestingFieldList,
+              quickMode: searchObj.meta.quickMode,
+            })
           ) {
             await getStreamList();
             await extractFields();

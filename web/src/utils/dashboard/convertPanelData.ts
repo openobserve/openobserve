@@ -59,13 +59,15 @@ export const convertPanelData = async (
     case "scatter":
     case "metric":
     case "gauge": {
-      // NOTE: on logs to visualize toggle, it shows below error because breakdown field is not required for all the charts
       // Skip conversion if no fields are selected in builder mode
       // (prevents echarts errors like "axis.getAxesOnZeroOf is not a function")
-      // PromQL queries don't use builder fields, so skip this check for them
+      // PromQL queries don't use builder fields, so skip this check for them.
+      // Custom-query panels (e.g. logs Timechart) derive axes from the
+      // SQL result asynchronously, so empty x/y is a valid transient state there.
       const query = panelSchema?.queries?.[0];
       if (
         panelSchema?.queryType !== "promql" &&
+        !query?.customQuery &&
         !query?.fields?.x?.length &&
         !query?.fields?.y?.length
       ) {

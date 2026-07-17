@@ -532,6 +532,88 @@ describe("convertPanelData", () => {
     });
   });
 
+  describe("Required fields validation", () => {
+    const emptyFields = { x: [], y: [], breakdown: [] };
+
+    it("should not throw for custom-query panels with empty x/y fields (logs Timechart)", async () => {
+      // The logs Timechart drives a customQuery panel whose x/y fields are
+      // populated asynchronously — they are legitimately empty during and
+      // after extraction early-exits. Rendering must not be blocked.
+      const panelSchema = {
+        type: "line",
+        queryType: "sql",
+        queries: [
+          {
+            query:
+              "SELECT histogram(_timestamp) AS zo_sql_key, count(*) AS zo_sql_num FROM test GROUP BY zo_sql_key",
+            customQuery: true,
+            fields: emptyFields,
+          },
+        ],
+      };
+
+      const result = await convertPanelData(
+        panelSchema,
+        mockData,
+        mockStore,
+        mockChartPanelRef,
+        mockHoveredSeriesState,
+        mockResultMetaData,
+        mockMetadata,
+        mockChartPanelStyle,
+        mockAnnotations
+      );
+
+      expect(result.chartType).toBe("line");
+    });
+
+    it("should throw for builder-mode panels with empty x/y fields", async () => {
+      const panelSchema = {
+        type: "line",
+        queryType: "sql",
+        queries: [
+          { query: "", customQuery: false, fields: emptyFields },
+        ],
+      };
+
+      await expect(
+        convertPanelData(
+          panelSchema,
+          mockData,
+          mockStore,
+          mockChartPanelRef,
+          mockHoveredSeriesState,
+          mockResultMetaData,
+          mockMetadata,
+          mockChartPanelStyle,
+          mockAnnotations
+        )
+      ).rejects.toThrow("Please select required fields to render the chart");
+    });
+
+    it("should not throw for promql panels with empty x/y fields", async () => {
+      const panelSchema = {
+        type: "line",
+        queryType: "promql",
+        queries: [{ query: "up", fields: emptyFields }],
+      };
+
+      const result = await convertPanelData(
+        panelSchema,
+        mockData,
+        mockStore,
+        mockChartPanelRef,
+        mockHoveredSeriesState,
+        mockResultMetaData,
+        mockMetadata,
+        mockChartPanelStyle,
+        mockAnnotations
+      );
+
+      expect(result.chartType).toBe("line");
+    });
+  });
+
   describe("Error Handling", () => {
     it("should handle SQL conversion errors gracefully", async () => {
       const panelSchema = {
