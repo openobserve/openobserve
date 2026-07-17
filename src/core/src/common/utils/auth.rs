@@ -29,13 +29,9 @@ use config::{
 use regex::Regex;
 #[cfg(feature = "enterprise")]
 use {
-    crate::{common::meta::ingestion::INGESTION_EP, service::users::get_user},
-    jsonwebtoken::TokenData,
-    o2_dex::service::auth::get_dex_jwks,
-    o2_openfga::config::get_config as get_openfga_config,
-    o2_openfga::meta::mapping::OFGA_MODELS,
-    serde_json::Value,
-    std::str::FromStr,
+    crate::service::users::get_user, jsonwebtoken::TokenData, o2_dex::service::auth::get_dex_jwks,
+    o2_openfga::config::get_config as get_openfga_config, o2_openfga::meta::mapping::OFGA_MODELS,
+    serde_json::Value, std::str::FromStr,
 };
 
 #[cfg(feature = "enterprise")]
@@ -386,8 +382,11 @@ where
         };
 
         // This is case for ingestion endpoints where we need to check
-        // permissions on the stream
-        if method.eq("POST") && INGESTION_EP.contains(&path_columns[url_len - 1]) {
+        // permissions on the stream. Classified against the authoritative
+        // ingestion-route table (method + exact path shape) rather than
+        // substring-matching an ingestion word, so only real writes take the
+        // stream-level bypass.
+        if crate::common::meta::ingestion_routes::is_ingestion_write(&parts.method, path) {
             if let Some(auth_header) = parts.headers.get("Authorization")
                 && let Ok(auth_str) = auth_header.to_str()
             {

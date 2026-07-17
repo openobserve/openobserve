@@ -330,26 +330,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <template #empty>
-          <div
-            class="w-full flex flex-col items-center justify-center gap-y-3"
-          >
-            <OIcon name="monetization-on" style="width: 48px; height: 48px; opacity: 0.2;" class="text-gray-400" />
-            <div class="text-base font-medium text-gray-400 mt-2">
-              {{ t("modelPricing.noModels") }}
-            </div>
-            <div class="text-xs text-gray-400">
-              {{ t("modelPricing.noModelsDesc") }}
-            </div>
-            <OButton
-              variant="primary"
-              size="sm"
-              class="self-center"
-              @click="openEditor(null)"
-              data-test="model-pricing-empty-add-btn"
-            >
-              {{ t("modelPricing.newModel") }}
-            </OButton>
-          </div>
+          <OEmptyState
+            size="hero"
+            preset="no-model-pricing"
+            :filtered="isFiltered"
+            data-test="model-pricing-empty-state"
+            @action="(id) => id === 'clear-filters' ? clearFilters() : openEditor(null)"
+          />
         </template>
 
         <template #bottom>
@@ -517,6 +504,7 @@ import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import ODimensionChip from "@/lib/core/Badge/ODimensionChip.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
@@ -662,6 +650,18 @@ function getSource(model: any): string {
 /** True when a model entry is read-only (built-in or from another org). */
 function isReadOnly(model: any): boolean {
   return model.source === "built_in" || model.org_id !== orgIdentifier.value;
+}
+
+// True when the search box or a non-"all" tab is narrowing the list. Drives
+// OEmptyState's `:filtered` so an empty result reads as "No model pricing found"
+// (with Clear filters) rather than the first-run "create your first" card.
+const isFiltered = computed(
+  () => !!filterQuery.value.trim() || selectedTab.value !== "all",
+);
+
+function clearFilters() {
+  filterQuery.value = "";
+  selectedTab.value = "all";
 }
 
 const filteredModels = computed(() => {

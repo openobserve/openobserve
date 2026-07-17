@@ -15,6 +15,7 @@
 
 pub mod bytes_cache;
 pub mod file_data;
+pub mod file_downloader;
 pub mod meta;
 pub mod stats;
 pub mod storage;

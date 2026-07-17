@@ -451,7 +451,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, type PropType, onMounted } from "vue";
+import {
+  ref,
+  computed,
+  watch,
+  type PropType,
+  onMounted,
+  inject,
+  type Ref,
+} from "vue";
+import { type SqlErrorRange } from "@/utils/query/sqlDiagnostics";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import OButton from '@/lib/core/Button/OButton.vue';
@@ -994,12 +1003,19 @@ const runPromqlQuery = async () => {
 // Unified Query Editor ref
 const queryEditorRef = ref<any>(null);
 
+// Server SQL-validation squiggle ranges, provided by AddAlert.vue.
+const alertSqlErrorRanges = inject<Ref<SqlErrorRange[]>>(
+  "alertSqlErrorRanges",
+  ref<SqlErrorRange[]>([]),
+);
+
 const { onFocus: _sqlOnFocus, onBlur: _sqlOnBlur, onQueryChange: _sqlOnQueryChange } =
   useSqlEditorDiagnostics({
     queryEditorRef,
     sqlMode: computed(() => localTab.value === 'sql'),
     query: computed(() => localSqlQuery.value ?? ""),
     streamName: computed(() => props.streamName),
+    externalErrors: alertSqlErrorRanges,
   });
 
 const onQueryEditorFocus = () => {

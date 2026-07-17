@@ -2168,7 +2168,7 @@ export default defineComponent({
   padding: 0.375rem 0.2rem !important;
 }
 
-.traces-correlated-logs-container .logs-table-container .container {
+.traces-correlated-logs-container .logs-table-container .o2-scroll-container {
   height: 100% !important;
 }
 

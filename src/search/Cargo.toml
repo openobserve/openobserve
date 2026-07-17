@@ -1,0 +1,70 @@
+[package]
+name = "search"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[features]
+default = []
+enterprise = ["dep:o2_enterprise"]
+vectorscan = ["dep:o2_enterprise", "o2_enterprise/vectorscan"]
+vortex = [
+    "dep:vortex",
+    "dep:vortex-datafusion",
+    "config/vortex",
+    "o2_enterprise?/vortex",
+]
+
+[dependencies]
+anyhow.workspace = true
+arrow.workspace = true
+arrow-flight.workspace = true
+arrow-schema.workspace = true
+async-stream.workspace = true
+async-trait.workspace = true
+bytes.workspace = true
+chrono.workspace = true
+config.workspace = true
+dashmap.workspace = true
+datafusion.workspace = true
+datafusion-functions-json.workspace = true
+datafusion-proto.workspace = true
+flight.workspace = true
+futures.workspace = true
+futures-util.workspace = true
+hashbrown.workspace = true
+infra.workspace = true
+itertools.workspace = true
+log.workspace = true
+md5.workspace = true
+memchr.workspace = true
+object_store.workspace = true
+openobserve-vrl.workspace = true
+o2_enterprise = { workspace = true, optional = true, default-features = false }
+opentelemetry.workspace = true
+parking_lot.workspace = true
+parquet.workspace = true
+prost.workspace = true
+proto.workspace = true
+rand.workspace = true
+rayon.workspace = true
+regex.workspace = true
+regex-syntax.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sqlparser.workspace = true
+tantivy.workspace = true
+tantivy_utils.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+tokio-stream.workspace = true
+tonic.workspace = true
+tracing.workspace = true
+tracing-opentelemetry.workspace = true
+url.workspace = true
+utoipa.workspace = true
+vector-enrichment.workspace = true
+vortex = { workspace = true, optional = true }
+vortex-datafusion = { workspace = true, optional = true }
+vrl.workspace = true

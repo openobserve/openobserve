@@ -44,10 +44,12 @@ use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 use crate::service::search::{
     SEARCH_SERVER, SearchResult,
-    cluster::flight::{SearchContextBuilder, register_table},
-    datafusion::optimizer::{
-        context::{PhysicalOptimizerContext, RemoteScanContext, StreamingAggregationContext},
-        create_physical_plan,
+    datafusion::{
+        context::{SearchContextBuilder, register_table},
+        optimizer::{
+            context::{PhysicalOptimizerContext, RemoteScanContext, StreamingAggregationContext},
+            create_physical_plan,
+        },
     },
     inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
     sql::Sql,

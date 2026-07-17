@@ -326,9 +326,10 @@ import { useRouter } from "vue-router";
 import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
 import QueryTypeSelector from "../addPanel/QueryTypeSelector.vue";
 import usePromqlSuggestions from "@/composables/usePromqlSuggestions";
-import { inject } from "vue";
+import { inject, type Ref } from "vue";
 import { onBeforeMount } from "vue";
 import { getImageURL } from "@/utils/zincutils";
+import { type SqlErrorRange } from "@/utils/query/sqlDiagnostics";
 import useNotifications from "@/composables/useNotifications";
 import { useStore } from "vuex";
 import useFunctions from "@/composables/useFunctions";
@@ -480,6 +481,13 @@ export default defineComponent({
 
     const queryEditorRef = ref(null);
 
+    // Server-error highlight ranges, provided by AddPanel.vue where the panel
+    // search runs. The composable forwards these to the editor.
+    const dashboardSqlErrorRanges = inject<Ref<SqlErrorRange[]>>(
+      "dashboardSqlErrorRanges",
+      ref<SqlErrorRange[]>([]),
+    );
+
     const { onFocus: _sqlOnFocus, onBlur: _sqlOnBlur, onQueryChange: _sqlOnQueryChange } =
       useSqlEditorDiagnostics({
         queryEditorRef,
@@ -490,6 +498,7 @@ export default defineComponent({
               dashboardPanelData.layout.currentQueryIndex
             ]?.query ?? "",
         ),
+        externalErrors: dashboardSqlErrorRanges,
       });
 
     const currentEditorKeywords = computed(() => {

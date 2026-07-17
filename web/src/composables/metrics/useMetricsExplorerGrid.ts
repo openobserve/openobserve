@@ -533,7 +533,7 @@ export function useMetricsExplorerGrid() {
    * variant reads carries that label.
    *
    * The PromQL engine silently ignores a matcher on a stream that lacks the
-   * label (`apply_matchers` in src/service/promql/utils.rs), so an ineligible
+   * label (`apply_matchers` in src/promql/src/utils.rs), so an ineligible
    * card would quietly render unfiltered data. Narrowing the grid — rather than
    * charting a lie — is what makes the chips safe.
    */

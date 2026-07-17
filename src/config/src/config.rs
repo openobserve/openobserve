@@ -61,6 +61,7 @@ pub static COMMIT_HASH: &str = env!("GIT_COMMIT_HASH");
 pub static BUILD_DATE: &str = env!("GIT_BUILD_DATE");
 
 pub const META_ORG_ID: &str = "_meta";
+pub const DEFAULT_ORG: &str = "default";
 
 pub const MMDB_CITY_FILE_NAME: &str = "GeoLite2-City.mmdb";
 pub const MMDB_ASN_FILE_NAME: &str = "GeoLite2-ASN.mmdb";
@@ -2160,6 +2161,10 @@ pub struct MemoryCache {
     pub gc_size: usize,
     #[env_config(name = "ZO_MEMORY_CACHE_GC_INTERVAL", default = 60)] // seconds
     pub gc_interval: u64,
+    // Days, files with data older than this will not be downloaded into the cache,
+    // queries read them directly from object storage. default 0 means no limit
+    #[env_config(name = "ZO_MEMORY_CACHE_MAX_AGE_DAYS", default = 0)]
+    pub max_age_days: i64,
     #[env_config(name = "ZO_MEMORY_CACHE_SKIP_DISK_CHECK", default = false)]
     pub skip_disk_check: bool,
     // MB, default is 50% of system memory
@@ -2198,6 +2203,10 @@ pub struct DiskCache {
     pub gc_size: usize,
     #[env_config(name = "ZO_DISK_CACHE_GC_INTERVAL", default = 60)] // seconds
     pub gc_interval: u64,
+    // Days, files with data older than this will not be downloaded into the cache,
+    // queries read them directly from object storage. default 0 means no limit
+    #[env_config(name = "ZO_DISK_CACHE_MAX_AGE_DAYS", default = 0)]
+    pub max_age_days: i64,
     #[env_config(name = "ZO_DISK_CACHE_MULTI_DIR", default = "")] // dir1,dir2,dir3...
     pub multi_dir: String,
 }

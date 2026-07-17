@@ -173,6 +173,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         searchObj.loading == false &&
                         searchObj.meta.searchApplied == true
                       "
+                      class="h-full"
                       data-test="logs-search-no-events-found-text"
                     >
                       <LogsNoEventsState

@@ -109,6 +109,14 @@ const defaultObject = {
     errorMsg: "",
     errorCode: 0,
     errorDetail: "",
+    // Server-error highlight ranges forwarded to the query editor (mirrors Logs).
+    sqlSyntaxErrorRanges: [] as Array<{
+      startLine: number;
+      endLine: number;
+      column?: number;
+      endColumn?: number;
+      error: string;
+    }>,
     additionalErrorMsg: "",
     stream: {
       streamLists: [],
@@ -203,6 +211,7 @@ const useTraces = () => {
     // delete searchObj.data;
     searchObj.data.errorMsg = "";
     searchObj.data.errorDetail = "";
+    searchObj.data.sqlSyntaxErrorRanges = [];
     searchObj.data.stream.streamLists = [];
     searchObj.data.stream.selectedStream = { label: "", value: "" };
     searchObj.data.stream.selectedStreamFields = [];

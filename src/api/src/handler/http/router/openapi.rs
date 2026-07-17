@@ -63,6 +63,7 @@ use crate::{common::meta, handler::http::request};
         request::traces::traces_write,
         request::traces::get_latest_traces,
         request::traces::session::get_latest_sessions,
+        request::traces::session::get_session_details,
         request::traces::user::get_latest_users,
         request::traces::dag::get_trace_dag,
         request::metrics::ingest::json,

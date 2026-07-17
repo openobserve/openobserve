@@ -18,6 +18,7 @@ use std::{
     sync::Arc,
 };
 
+use ::promql::{DEFAULT_LOOKBACK, DEFAULT_MAX_POINTS_PER_SERIES, adjust_start_end, micros};
 use config::{
     get_config,
     meta::{
@@ -49,11 +50,7 @@ use {
 };
 
 use crate::service::{
-    promql::{
-        DEFAULT_LOOKBACK, DEFAULT_MAX_POINTS_PER_SERIES, MetricsQueryRequest, adjust_start_end,
-        micros,
-    },
-    search::server_internal_error,
+    promql::MetricsQueryRequest, search::server_internal_error,
     self_reporting::report_request_usage_stats,
 };
 

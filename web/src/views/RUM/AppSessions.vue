@@ -419,6 +419,10 @@ import {
 import { useQueryPlaceholder } from "@/components/logs/useQueryPlaceholder";
 import useSqlSuggestions from "@/composables/useSuggestions";
 import { useSqlEditorDiagnostics } from "@/composables/useSqlEditorDiagnostics";
+import {
+  rangesFromServerError,
+  type SqlErrorRange,
+} from "@/utils/query/sqlDiagnostics";
 import { useI18n } from "vue-i18n";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTableColumnToggle from "@/lib/core/Table/sub-components/OTableColumnToggle.vue";
@@ -552,6 +556,9 @@ const isMounted = ref(false);
 const editorFocused = ref(false);
 const sessionQueryEditorRef = ref<any>(null);
 
+// Server-error highlight ranges, forwarded to the filter editor by the composable.
+const sqlErrorRanges = ref<SqlErrorRange[]>([]);
+
 const {
   onFocus: _sqlOnFocus,
   onBlur: _sqlOnBlur,
@@ -561,6 +568,7 @@ const {
   sqlMode: computed(() => false),
   query: computed(() => sessionState.data.editorValue ?? ""),
   streamName: computed(() => rumSessionStreamName),
+  externalErrors: sqlErrorRanges,
 });
 
 const onQueryEditorFocus = () => {
@@ -787,6 +795,7 @@ const getStreamFields = () => {
 
 const getSessions = () => {
   sessionState.data.sessions = {};
+  sqlErrorRanges.value = [];
 
   const interval = getTimeInterval(
     dateTime.value.startTime,
@@ -912,6 +921,18 @@ const getSessions = () => {
       toast({
         message: err.response?.data?.message || "Error while fetching sessions",
         variant: "error",
+      });
+
+      // Locate the offending field in the filter and squiggle it in the editor.
+      rangesFromServerError({
+        code: err.response?.data?.code,
+        message: err.response?.data?.message,
+        errorDetail: err.response?.data?.error_detail,
+        sqlMode: false,
+        query: sessionState.data.editorValue,
+        streamName: rumSessionStreamName,
+      }).then((ranges) => {
+        sqlErrorRanges.value = ranges;
       });
     })
     .finally(() => {

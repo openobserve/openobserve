@@ -343,6 +343,7 @@ import useHttpStreaming from "@/composables/useStreamingSearch";
 import segment from "@/services/segment_analytics";
 import config from "@/aws-exports";
 import { logsErrorMessage } from "@/utils/common";
+import { rangesFromServerError } from "@/utils/query/sqlDiagnostics";
 import useNotifications from "@/composables/useNotifications";
 import { getConsumableRelativeTime } from "@/utils/date";
 import { cloneDeep } from "lodash-es";
@@ -844,6 +845,7 @@ async function getQueryData(
     }
     searchObj.data.errorMsg = "";
     searchObj.data.errorDetail = "";
+    searchObj.data.sqlSyntaxErrorRanges = [];
 
     searchObj.searchApplied = true;
     searchObj.loading = true;
@@ -1097,6 +1099,20 @@ async function getQueryData(
           }
           searchObj.data.errorMsg = errorMsg;
           searchObj.data.errorDetail = error_detail || "";
+
+          // Locate the offending token in the query and squiggle it in the
+          // editor (shares the central engine + externalErrors ref with Logs).
+          rangesFromServerError({
+            code,
+            message,
+            errorDetail: error_detail,
+            sqlMode: searchObj.meta.sqlMode,
+            query: searchObj.data.editorValue,
+            streamName: searchObj.data.stream.selectedStream?.value,
+          }).then((ranges) => {
+            searchObj.data.sqlSyntaxErrorRanges = ranges;
+          });
+
           currentSearchTraceId = null;
           delete tracesPartitionMap[searchTraceId];
         },

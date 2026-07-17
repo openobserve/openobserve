@@ -32,7 +32,7 @@ use hashbrown::HashSet;
 use infra::storage;
 use tantivy_utils::puffin_directory::{PROP_ROW_GROUP_SIZE, writer::PuffinDirWriter};
 
-pub(crate) async fn create_tantivy_index(
+pub async fn create_tantivy_index(
     caller: &str,
     org_id: &str,
     parquet_file_name: &str,

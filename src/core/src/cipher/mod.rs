@@ -13,11 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+pub use ::search::cipher::registry;
 use o2_enterprise::enterprise::cipher::http_repr::HttpKey;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
-
-pub mod registry;
 
 #[derive(Clone, Debug, Deserialize, ToSchema)]
 pub struct KeyAddRequest {

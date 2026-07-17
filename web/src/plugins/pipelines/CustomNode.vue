@@ -425,7 +425,7 @@ function getIcon(data, ioType) {
       <OSeparator vertical class="mr-2" />
 
       <!-- Label -->
-      <div class="container">
+      <div class="o2-scroll-container">
         <div
           class="flex text-[15px]! font-bold! leading-[1.4]!"
           align="left"
@@ -531,7 +531,7 @@ function getIcon(data, ioType) {
       <OSeparator vertical class="mr-2" />
 
       <!-- Label -->
-      <div class="container">
+      <div class="o2-scroll-container">
         <div
           v-if="data.stream_name && Object.prototype.hasOwnProperty.call(data.stream_name, 'label')"
           class="flex text-[15px]! font-bold! leading-[1.4]!"
@@ -616,7 +616,7 @@ function getIcon(data, ioType) {
       <OSeparator vertical class="mr-2" />
 
       <!-- Label -->
-      <div class="container">
+      <div class="o2-scroll-container">
         <div
           class="flex text-[15px]! font-bold! leading-[1.4]!"
           style="
@@ -689,7 +689,7 @@ function getIcon(data, ioType) {
       <OSeparator vertical class="mr-2" />
 
       <!-- Label -->
-      <div class="container">
+      <div class="o2-scroll-container">
         <div
           class="flex text-[15px]! font-bold! leading-[1.4]!"
           style="
@@ -762,7 +762,7 @@ function getIcon(data, ioType) {
       <OSeparator vertical class="mr-2" />
 
       <!-- Label -->
-      <div class="container">
+      <div class="o2-scroll-container">
         <div
           class="text-[15px]! font-bold! leading-[1.4]!"
           style="
@@ -836,7 +836,7 @@ function getIcon(data, ioType) {
       <OSeparator vertical class="mr-2" />
 
       <!-- Label -->
-      <div class="container">
+      <div class="o2-scroll-container">
         <div
           class="text-[15px]! font-bold! leading-[1.4]!"
           style="

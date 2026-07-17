@@ -17,17 +17,23 @@ enterprise = [
     "dep:o2_enterprise",
     "dep:o2_openfga",
     "config/enterprise",
+    "promql/enterprise",
+    "search/enterprise",
 ]
 cloud = ["infra/cloud", "enterprise", "o2_enterprise/cloud"]
-vectorscan = ["o2_enterprise/vectorscan"]
+vectorscan = ["o2_enterprise/vectorscan", "search/vectorscan"]
 vortex = [
     "dep:vortex",
     "dep:vortex-datafusion",
     "config/vortex",
     "o2_enterprise?/vortex",
+    "search/vortex",
 ]
 
 [dependencies]
+openobserve-vrl.workspace = true
+promql.workspace = true
+search.workspace = true
 axum.workspace = true
 http.workspace = true
 http-body.workspace = true
@@ -67,7 +73,6 @@ jsonwebtoken.workspace = true
 log.workspace = true
 maxminddb.workspace = true
 md5.workspace = true
-memchr.workspace = true
 o2_dex = { workspace = true, optional = true }
 o2_enterprise = { workspace = true, optional = true, default-features = false }
 o2_openfga = { workspace = true, optional = true }
@@ -82,7 +87,6 @@ proto.workspace = true
 rand.workspace = true
 rayon.workspace = true
 regex.workspace = true
-regex-syntax.workspace = true
 reqwest.workspace = true
 rquickjs.workspace = true
 rustls.workspace = true
@@ -122,9 +126,7 @@ tantivy.workspace = true
 tantivy_utils.workspace = true
 zip.workspace = true
 futures-util.workspace = true
-tokio-stream.workspace = true
 flight.workspace = true
-async-stream.workspace = true
 sourcemap.workspace = true
 
 [dev-dependencies]

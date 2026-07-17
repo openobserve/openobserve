@@ -55,6 +55,7 @@ import {
   type ValidationContext,
   type JsonValidationContext,
 } from "@/utils/alerts/alertValidation";
+import { type SqlErrorRange } from "@/utils/query/sqlDiagnostics";
 import {
   getAlertPayload as getAlertPayloadUtil,
   prepareAndSaveAlert as prepareAndSaveAlertUtil,
@@ -382,6 +383,9 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
   const previewQuery = ref("");
   const isUsingBackendSql = ref(false);
   const sqlQueryErrorMsg = ref("");
+  // Editor squiggle ranges for server SQL-validation errors (shared with editors
+  // via provide/inject from AddAlert.vue).
+  const sqlErrorRanges = ref<SqlErrorRange[]>([]);
   const validateSqlQueryPromise = ref<Promise<unknown>>();
   const addAlertFormRef = ref(null);
   const viewSqlEditorDialog = ref(false);
@@ -927,6 +931,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       store,
       validateSqlQueryPromise,
       sqlQueryErrorMsg,
+      sqlErrorRanges,
       vrlFunctionError,
       buildQueryPayload,
       getParser,
@@ -2770,6 +2775,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     previewQuery,
     isUsingBackendSql,
     sqlQueryErrorMsg,
+    sqlErrorRanges,
     validateSqlQueryPromise,
     addAlertFormRef,
     viewSqlEditorDialog,

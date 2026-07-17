@@ -248,6 +248,7 @@ the Free Software Foundation, either version 3 of the License, or
             @activate="(row: EvalJob) => activateJob(row)"
             @pause="(row: EvalJob) => pauseJob(row)"
             @delete="(row: EvalJob) => deleteRow(row)"
+            @delete-bulk="(ids: string[]) => deleteJobsBulk(ids)"
             @refresh="loadAll(orgId)"
           />
         </div>
@@ -346,12 +347,8 @@ the Free Software Foundation, either version 3 of the License, or
 
       <ConfirmDialog
         v-model="confirmDeleteOpen"
-        :title="pendingDeleteLabel"
-        :message="
-          t('onlineEvals.deleteConfirmMessage', {
-            name: pendingDeleteRow?.name ?? '',
-          })
-        "
+        :title="deleteDialogTitle"
+        :message="deleteDialogMessage"
         @update:ok="performDelete"
         @update:cancel="cancelDelete"
       />
@@ -372,13 +369,15 @@ import onlineEvalsService, {
   type ScorerType,
 } from "@/services/online-evals.service";
 import { useOnlineEvalsData } from "./onlineEvals/composables/useOnlineEvalsData";
-import { entityId } from "./onlineEvals/utils/evalEntity";
+import { entityId, statusOf } from "./onlineEvals/utils/evalEntity";
 import { showError } from "./onlineEvals/utils/evalFormat";
 import {
   buildCrossNavigationQuery,
   computeViewState,
+  findRowById as findRowByIdPure,
   parseTabFromRoute,
   rowIdOf as rowIdOfPure,
+  VALID_TABS,
   type ActiveTab,
   type AnyRow,
   type FullPageEntity,
@@ -414,6 +413,7 @@ import {
   useAiDateRange,
   resolveAiDateWindow,
 } from "@/enterprise/composables/useAiDateRange";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
 import genAiAgentMappingService from "@/services/gen-ai-agent-mapping.service";
 import { downloadFile } from "@/utils/dom";
 import {
@@ -477,6 +477,10 @@ const pendingJobStatusId = ref<string | null>(null);
 const confirmDeleteOpen = ref(false);
 const pendingDeleteRow = ref<AnyRow | null>(null);
 const pendingDeleteTab = ref<ActiveTab | null>(null);
+// Ids for a pending bulk delete (jobs tab). Non-empty => the confirm dialog and
+// performDelete operate on the whole batch instead of a single `pendingDeleteRow`.
+const pendingBulkDeleteIds = ref<string[]>([]);
+const catalogOpenTab = ref<ActiveTab | null>(null);
 const showScoreConfigLibrary = ref(false);
 const scoreConfigLibrarySelectedCount = ref(0);
 const scoreConfigLibraryImporting = ref(false);
@@ -773,6 +777,10 @@ watch(qualityRefreshing, (isLoading, wasLoading) => {
   if (wasLoading && !isLoading) qualityLastRunAt.value = Date.now();
 });
 
+const currentSingularLabel = computed(() =>
+  t(`onlineEvals.singular.${activeTab.value}`),
+);
+
 const pendingDeleteLabel = computed(() => {
   const tab = pendingDeleteTab.value;
   if (!tab || tab === "quality") return t("onlineEvals.actions.delete");
@@ -780,6 +788,24 @@ const pendingDeleteLabel = computed(() => {
     label: t(`onlineEvals.singular.${tab}`),
   });
 });
+
+const isBulkDelete = computed(() => pendingBulkDeleteIds.value.length > 0);
+
+const deleteDialogTitle = computed(() =>
+  isBulkDelete.value
+    ? t("onlineEvals.job.deleteBulkTitle")
+    : pendingDeleteLabel.value,
+);
+
+const deleteDialogMessage = computed(() =>
+  isBulkDelete.value
+    ? t("onlineEvals.job.deleteBulkConfirm", {
+        count: pendingBulkDeleteIds.value.length,
+      })
+    : t("onlineEvals.deleteConfirmMessage", {
+        name: pendingDeleteRow.value?.name ?? "",
+      }),
+);
 
 watch(activeTab, (next) => {
   filterQuery.value = "";
@@ -808,6 +834,10 @@ onBeforeMount(async () => {
 
 function rowIdOf(row: AnyRow): string {
   return rowIdOfPure(row, activeTab.value);
+}
+
+function findRowById(tab: ActiveTab, id: string): AnyRow | null {
+  return findRowByIdPure(tab, id, rowsByTab.value);
 }
 
 function pushRouteAction(extra: Record<string, string | undefined>) {
@@ -933,6 +963,11 @@ async function pauseJob(row: EvalJob) {
   }
 }
 
+function openFormPage(entity: FullPageEntity, mode: "create" | "edit") {
+  activeTab.value = entity;
+  formPage.value = { entity, mode };
+}
+
 function closeFormPage() {
   formPage.value = null;
   dialog.value = { open: false, mode: "create", row: null };
@@ -955,6 +990,14 @@ async function handleSaved() {
   scorerTypeDialog.value = false;
   clearRouteAction();
   await loadAll(orgId.value);
+}
+
+async function handleCatalogImported() {
+  await loadAll(orgId.value);
+}
+
+function toggleCatalog(tab: ActiveTab) {
+  catalogOpenTab.value = catalogOpenTab.value === tab ? null : tab;
 }
 
 function goToImportScoreConfig() {
@@ -1169,13 +1212,25 @@ function deleteRow(row: AnyRow) {
   confirmDeleteOpen.value = true;
 }
 
+function deleteJobsBulk(ids: string[]) {
+  if (ids.length === 0) return;
+  pendingBulkDeleteIds.value = [...ids];
+  pendingDeleteTab.value = "jobs";
+  confirmDeleteOpen.value = true;
+}
+
 function cancelDelete() {
   confirmDeleteOpen.value = false;
   pendingDeleteRow.value = null;
   pendingDeleteTab.value = null;
+  pendingBulkDeleteIds.value = [];
 }
 
 async function performDelete() {
+  if (pendingBulkDeleteIds.value.length > 0) {
+    await performBulkJobsDelete();
+    return;
+  }
   const row = pendingDeleteRow.value;
   const tab = pendingDeleteTab.value;
   if (!row || !tab) return;
@@ -1206,6 +1261,37 @@ async function performDelete() {
     );
   } finally {
     pendingDeleteRow.value = null;
+    pendingDeleteTab.value = null;
+  }
+}
+
+// Bulk-delete the selected eval jobs. Deletions run in parallel; if any fail we
+// surface an error but still reload so the successfully deleted rows disappear.
+async function performBulkJobsDelete() {
+  const ids = [...pendingBulkDeleteIds.value];
+  if (ids.length === 0) return;
+  try {
+    const results = await Promise.allSettled(
+      ids.map((id) => onlineEvalsService.jobs.delete(orgId.value, id)),
+    );
+    const failed = results.filter((r) => r.status === "rejected").length;
+    if (failed > 0) {
+      showError(
+        (results.find((r) => r.status === "rejected") as PromiseRejectedResult)
+          ?.reason,
+        t("onlineEvals.deleteError", {
+          label: t("onlineEvals.singular.jobs").toLowerCase(),
+        }),
+      );
+    } else {
+      toast({
+        variant: "success",
+        message: t("onlineEvals.job.deletedBulk", { count: ids.length }),
+      });
+    }
+    await loadAll(orgId.value);
+  } finally {
+    pendingBulkDeleteIds.value = [];
     pendingDeleteTab.value = null;
   }
 }
