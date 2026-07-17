@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         type="fieldTag"
         value="primarysm"
         shape="rounded"
-        class="max-w-[250px]"
+        class="max-w-[15.625rem]"
       >
         <span class="font-mono text-xs truncate"
           >{{ filter.label }} {{ filter.operator || "=" }}
@@ -62,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            who wanted OR and now knows they did not get it. -->
       <span
         v-if="i > 0"
-        class="text-[10px] uppercase tracking-wide text-text-secondary shrink-0 select-none"
+        class="text-[0.625rem] uppercase tracking-wide text-text-secondary shrink-0 select-none"
         :title="t('metrics.explorer.labels.andSeparatorTitle')"
         data-test="metrics-explorer-label-and"
         >{{ t("metrics.explorer.labels.andSeparator") }}</span
@@ -71,7 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         type="fieldTag"
         value="primarysm"
         shape="rounded"
-        class="min-w-0 max-w-[250px]"
+        class="min-w-0 max-w-[15.625rem]"
         :data-test="`metrics-explorer-label-chip-${filter.label}`"
       >
         <!-- The chip truncates its value; the tooltip is where the whole matcher

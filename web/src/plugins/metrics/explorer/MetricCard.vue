@@ -221,7 +221,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            editor icon still works, so the metric stays explorable. -->
       <div
         v-if="card.unsupported"
-        class="flex flex-col items-center justify-center gap-1.5 h-full text-[11px] opacity-65 text-text-secondary"
+        class="flex flex-col items-center justify-center gap-1.5 h-full text-[0.6875rem] opacity-65 text-text-secondary"
         :data-test="`metrics-explorer-card-unsupported-${card.name}`"
       >
         <OIcon name="help-outline" size="sm" />
@@ -235,7 +235,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            to load. The drill-in works: the editor renders the table properly. -->
       <div
         v-else-if="preview?.status === 'unavailable'"
-        class="flex flex-col items-center justify-center gap-1.5 h-full text-[11px] opacity-65 text-text-secondary"
+        class="flex flex-col items-center justify-center gap-1.5 h-full text-[0.6875rem] opacity-65 text-text-secondary"
         :data-test="`metrics-explorer-card-nopreview-${card.name}`"
       >
         <OIcon name="table-chart" size="sm" />
@@ -244,7 +244,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <div
         v-else-if="preview?.status === 'error'"
-        class="flex flex-col items-center justify-center gap-1.5 h-full text-[11px] opacity-65 text-text-secondary"
+        class="flex flex-col items-center justify-center gap-1.5 h-full text-[0.6875rem] opacity-65 text-text-secondary"
         :data-test="`metrics-explorer-card-error-${card.name}`"
       >
         <!-- The backend's message is the only thing that distinguishes a
@@ -363,7 +363,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            region with no message and no way out. -->
       <div
         v-else-if="renderError"
-        class="flex flex-col items-center justify-center gap-1.5 h-full text-[11px] text-text-secondary"
+        class="flex flex-col items-center justify-center gap-1.5 h-full text-[0.6875rem] text-text-secondary"
         :data-test="`metrics-explorer-card-render-error-${card.name}`"
       >
         <span class="inline-flex items-center gap-1 cursor-help">
@@ -454,7 +454,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- The footer pads itself now that the frame is flush, mirroring how the
          panel bar pads itself. -->
-    <div class="flex items-center justify-between gap-2 text-[10px] px-2 py-1">
+    <div class="flex items-center justify-between gap-2 text-[0.625rem] px-2 py-1">
       <!-- The function actually in effect, so a ⚙ override is visible on the
            card rather than silently identical to the default. -->
       <span class="opacity-70 text-text-secondary truncate">{{

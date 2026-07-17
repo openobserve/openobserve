@@ -3917,6 +3917,21 @@
     "awsStsSelfHostedInfo": "This uses AWS sts to assume role and perform operations. Make sure you have configured aws credentials in the installation env that have access to this role."
   },
   "metrics": {
+    "syntaxGuide": {
+      "instantVector": "For instant vector selectors, use",
+      "rangeVector": "For range vector selectors, use",
+      "aggregate": "To aggregate data, use",
+      "or": "or",
+      "rate": "For rate calculations over a range vector, use",
+      "sqlTitle": "Syntax Guide: SQL Mode",
+      "sqlFullText": "For full text search of value 'error' use",
+      "sqlColumn": "For column search of value 'error' use",
+      "sqlCode": "To search value 200 for code column use",
+      "sqlStream": "To search value 'stderr' for stream column use",
+      "sqlFunction": "To search and use query function {fn} on column log use",
+      "sqlMoreExamples": "For additional examples,",
+      "sqlClickHere": "click here"
+    },
     "searchMetric": "Search for a Metric",
     "searchLabel": "Search metric label",
     "add": "Add",
