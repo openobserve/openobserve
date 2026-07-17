@@ -19,15 +19,10 @@ use crate::{
     },
 };
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 pub enum WorkflowTriggerType {
+    #[default]
     AlertFired,
-}
-
-impl Default for WorkflowTriggerType {
-    fn default() -> Self {
-        Self::AlertFired
-    }
 }
 
 impl From<&str> for WorkflowTriggerType {

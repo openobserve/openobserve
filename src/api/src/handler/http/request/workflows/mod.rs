@@ -461,10 +461,7 @@ pub async fn enable_workflow(
         None => "true",
     };
 
-    let value: bool = match value.parse() {
-        Ok(v) => v,
-        Err(_) => true,
-    };
+    let value: bool = value.parse().unwrap_or(true);
 
     match workflows::enable_disable_workflow(&org_id, &workflow_id, value).await {
         Ok(_) => MetaHttpResponse::ok("updated"),
@@ -584,7 +581,7 @@ pub async fn get_workflow_history(
     let results = search_result.hits;
     let parsed_results = match results
         .into_iter()
-        .map(|v| serde_json::from_value::<WorkflowHistoryRow>(v))
+        .map(serde_json::from_value::<WorkflowHistoryRow>)
         .collect::<Result<Vec<_>, _>>()
     {
         Ok(v) => v,

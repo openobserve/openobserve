@@ -36,10 +36,10 @@ pub async fn get_workflow(
     let lock = CACHE.read().await;
     let temp = lock.get(workflow_id);
 
-    if let Some(w) = temp {
-        if w.org_id == org_id {
-            return Ok(Some(w.clone()));
-        }
+    if let Some(w) = temp
+        && w.org_id == org_id
+    {
+        return Ok(Some(w.clone()));
     }
     drop(lock);
 
@@ -139,7 +139,7 @@ pub async fn update_workflow(workflow: Workflow) -> Result<(), anyhow::Error> {
 
 pub async fn delete_workflow(org_id: &str, id: &str) -> Result<(), anyhow::Error> {
     infra::table::workflows::delete_workflow(id).await?;
-    remove_ownership(&org_id, "workflows", Authz::new(id)).await;
+    remove_ownership(org_id, "workflows", Authz::new(id)).await;
     // trigger watch event by putting value to cluster coordinator
     let cluster_coordinator = get_coordinator().await;
     cluster_coordinator
@@ -356,19 +356,16 @@ pub async fn watch_workflow_triggers() -> Result<(), anyhow::Error> {
             }
         };
 
-        match ev {
-            Event::Put(ev) => {
-                let Some(item_v) = ev.value else {
-                    log::error!("watch_workflow_triggers : missing value for put");
-                    continue;
-                };
-                let Ok(entry) = serde_json::from_slice::<WorkflowTrigger>(&item_v) else {
-                    log::error!("watch_workflow_triggers : invalid json value for put");
-                    continue;
-                };
-                handle_workflow_trigger(entry).await;
-            }
-            _ => {}
+        if let Event::Put(ev) = ev {
+            let Some(item_v) = ev.value else {
+                log::error!("watch_workflow_triggers : missing value for put");
+                continue;
+            };
+            let Ok(entry) = serde_json::from_slice::<WorkflowTrigger>(&item_v) else {
+                log::error!("watch_workflow_triggers : invalid json value for put");
+                continue;
+            };
+            handle_workflow_trigger(entry).await;
         }
     }
 }

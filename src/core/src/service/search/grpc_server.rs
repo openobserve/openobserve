@@ -453,12 +453,14 @@ impl Search for Searcher {
                         log::error!(
                             "workflow errors input data for {org_id}/{w_id}/{r_id} not present in the cluster"
                         );
-                        return Err(Status::internal(format!("workflow error data not stored")));
+                        return Err(Status::internal(
+                            "workflow error data not stored".to_string(),
+                        ));
                     }
                 }
                 None => {
                     log::error!("workflow errors for {org_id}/{w_id}/{r_id} not found");
-                    return Err(Status::internal(format!("workflow error not found")));
+                    return Err(Status::internal("workflow error not found".to_string()));
                 }
             }
         } else {
@@ -472,7 +474,7 @@ impl Search for Searcher {
                 Some(v) => v,
                 None => {
                     log::error!("workflow run data for {org_id}/{w_id}/{r_id} not found");
-                    return Err(Status::internal(format!("workflow run data not found")));
+                    return Err(Status::internal("workflow run data not found".to_string()));
                 }
             }
         };
