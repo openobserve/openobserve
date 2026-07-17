@@ -2442,12 +2442,4 @@ export default defineComponent({
   margin-bottom: 0;
 }
 
-/* keep(third-party): chrome of RenderDashboardCharts' internal .card-container. */
-.red-charts-section :deep(.card-container) {
-  box-shadow: none;
-}
-
-.red-charts-section :deep(.card-container :first-child) {
-  padding: 0 0.0625rem !important;
-}
 </style>

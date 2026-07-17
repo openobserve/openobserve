@@ -2300,10 +2300,6 @@ export default defineComponent({
 }
 
 .traces-correlated-metrics-container {
-  :deep(.card-container) {
-    box-shadow: none !important;
-  }
-
   :deep(.dimension-sidebar) {
     padding-left: 0.25rem;
   }

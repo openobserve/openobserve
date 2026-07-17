@@ -722,16 +722,8 @@ defineExpose({
 
 <style scoped>
 /* keep(lib-override:render-dashboard-charts): RenderDashboardCharts renders its
-   own .bg-card-glass-bg / .render-dashboard-charts-container DOM that we can only
-   reach through :deep to flatten the card shadow and tighten the chart padding. */
-.traces-metrics-dashboard :deep(.card-container) {
-  box-shadow: none;
-}
-
-.traces-metrics-dashboard :deep(.card-container :first-child) {
-  padding: 0 0.0625rem !important;
-}
-
+   own .render-dashboard-charts-container DOM that we can only reach through
+   :deep to tighten the chart padding. */
 .charts-wrapper :deep(.render-dashboard-charts-container) {
   padding-left: 0.2rem;
   padding-right: 0.2rem;
