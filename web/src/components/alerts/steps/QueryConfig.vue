@@ -77,9 +77,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- LOGS/TRACES -->
             <template v-if="isEventBased">
               <!-- Alert if row -->
-              <div class="flex items-center gap-3 py-2 px-3 rounded-md text-[13px]" data-test="alert-if-row-logs">
-                <span class="condition-label font-bold text-[13px] whitespace-nowrap min-w-[90px] shrink-0">{{ t('alerts.threshold') }}*</span>
-                <div class="flex flex-nowrap items-center gap-2">
+              <div class="flex items-start gap-3 py-2 px-3 rounded-md text-[13px]" data-test="alert-if-row-logs">
+                <span class="condition-label font-bold text-[13px] whitespace-nowrap min-w-[90px] shrink-0 leading-8.5">{{ t('alerts.threshold') }}*</span>
+                <div class="flex flex-nowrap items-start gap-2">
                   <div class="min-w-[130px] max-w-[180px]">
                     <OSelect
                       v-model="selectedFunction"
@@ -92,7 +92,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                   <!-- "of [field]" shown for measure modes -->
                   <template v-if="selectedFunction !== 'total_events'">
-                    <span class="condition-text font-semibold text-[13px] whitespace-nowrap">{{ t('alerts.conditionOf') }}</span>
+                    <span class="condition-text font-semibold text-[13px] whitespace-nowrap leading-8.5">{{ t('alerts.conditionOf') }}</span>
                     <OFormSelect
                       name="query_condition.aggregation.having.column"
                       :options="numericColumns"
@@ -113,21 +113,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :searchable="false"
                       @update:model-value="onTriggerOperatorChange"
                     />
-                    <OFormInput
-                      name="trigger_condition.threshold"
-                      type="number"
-                      data-test="alert-trigger-threshold-input"
-                      @blur="restoreDefaultThreshold"
-                      class="min-w-[60px] max-w-[80px]"
-                      min="1"
-                      @update:model-value="onTriggerThresholdChange($event)"
-                    />
-                    <span v-if="streamName" class="condition-text font-semibold text-[13px] whitespace-nowrap">{{ t('alerts.matchingTypeFound', { type: streamType === 'traces' ? 'traces' : 'logs' }) }}</span>
+                    <!-- Message hangs under the threshold field it describes. -->
+                    <div class="flex flex-col gap-1 min-w-15 max-w-20">
+                      <OFormInput
+                        name="trigger_condition.threshold"
+                        type="number"
+                        data-test="alert-trigger-threshold-input"
+                        @blur="restoreDefaultThreshold"
+                        min="1"
+                        @update:model-value="onTriggerThresholdChange($event)"
+                      >
+                        <template #error />
+                      </OFormInput>
+                      <div
+                        v-if="thresholdError"
+                        class="text-xs text-input-error-text whitespace-nowrap"
+                        data-test="alert-if-row-logs-error"
+                        role="alert"
+                      >
+                        {{ thresholdError }}
+                      </div>
+                    </div>
+                    <span v-if="streamName" class="condition-text font-semibold text-[13px] whitespace-nowrap leading-8.5">{{ t('alerts.matchingTypeFound', { type: streamType === 'traces' ? 'traces' : 'logs' }) }}</span>
                   </template>
 
                   <!-- MEASURE mode -->
                   <template v-else>
-                    <span class="condition-text font-semibold text-[13px] whitespace-nowrap">{{ t('alerts.conditionIs') }}</span>
+                    <span class="condition-text font-semibold text-[13px] whitespace-nowrap leading-8.5">{{ t('alerts.conditionIs') }}</span>
                     <OFormSelect
                       name="query_condition.aggregation.having.operator"
                       :options="numericOperators"
@@ -136,13 +148,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       data-test="alert-condition-operator-select"
                       @update:model-value="onConditionOperatorChange"
                     />
-                    <OFormInput
-                      name="query_condition.aggregation.having.value"
-                      type="number"
-                      :placeholder="t('alerts.placeholders.value')"
-                      class="min-w-[80px] max-w-[120px]"
-                      @update:model-value="onConditionValueChange($event)"
-                    />
+                    <!-- Message hangs under the value field it describes. -->
+                    <div class="flex flex-col gap-1 min-w-20 max-w-30">
+                      <OFormInput
+                        name="query_condition.aggregation.having.value"
+                        type="number"
+                        :placeholder="t('alerts.placeholders.value')"
+                        @update:model-value="onConditionValueChange($event)"
+                      >
+                        <template #error />
+                      </OFormInput>
+                      <div
+                        v-if="havingValueError"
+                        class="text-xs text-input-error-text whitespace-nowrap"
+                        data-test="alert-if-row-logs-value-error"
+                        role="alert"
+                      >
+                        {{ havingValueError }}
+                      </div>
+                    </div>
                   </template>
                 </div>
               </div>
@@ -191,12 +215,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
               <!-- no. of groups row — visible only when group-by fields are added -->
-              <div v-if="selectedFunction !== 'total_events' && hasLogGroupByFields" class="flex items-center gap-3 py-2 px-3 rounded-md text-[13px]" data-test="alert-having-groups-row">
-                <span class="condition-label font-bold text-[13px] whitespace-nowrap min-w-[90px] shrink-0">
+              <div v-if="selectedFunction !== 'total_events' && hasLogGroupByFields" class="flex items-start gap-3 py-2 px-3 rounded-md text-[13px]" data-test="alert-having-groups-row">
+                <span class="condition-label font-bold text-[13px] whitespace-nowrap min-w-[90px] shrink-0 leading-8.5">
                   {{ t('alerts.queryConfig.havingGroups') }}
                   <OTooltip :content="t('alerts.queryConfig.havingGroupsTooltip')" :delay="300" side="top" />
                 </span>
-                <div class="flex flex-nowrap items-center gap-2">
+                <div class="flex flex-nowrap items-start gap-2">
                   <OFormSelect
                     name="trigger_condition.operator"
                     :options="numericOperators"
@@ -204,14 +228,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="min-w-[70px] max-w-[120px]"
                     @update:model-value="onTriggerOperatorChange"
                   />
-                  <OFormInput
-                    name="trigger_condition.threshold"
-                    type="number"
-                    class="min-w-[60px] max-w-[80px]"
-                    min="1"
-                    @update:model-value="onTriggerThresholdChange($event)"
-                    @blur="restoreDefaultThreshold"
-                  />
+                  <!-- Message hangs under the threshold field it describes. -->
+                  <div class="flex flex-col gap-1 min-w-15 max-w-20">
+                    <OFormInput
+                      name="trigger_condition.threshold"
+                      type="number"
+                      min="1"
+                      @update:model-value="onTriggerThresholdChange($event)"
+                      @blur="restoreDefaultThreshold"
+                    >
+                      <template #error />
+                    </OFormInput>
+                    <div
+                      v-if="thresholdError"
+                      class="text-xs text-input-error-text whitespace-nowrap"
+                      data-test="alert-having-groups-threshold-error"
+                      role="alert"
+                    >
+                      {{ thresholdError }}
+                    </div>
+                  </div>
                 </div>
               </div>
             </template>
@@ -219,9 +255,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- METRICS -->
             <template v-else>
               <!-- Alert if row -->
-              <div class="flex items-center gap-3 py-2 px-3 rounded-md text-[13px]">
-                <span class="condition-label font-bold text-[13px] whitespace-nowrap min-w-[90px] shrink-0">{{ t('alerts.threshold') }}*</span>
-                <div class="flex flex-nowrap items-center gap-2">
+              <div class="flex items-start gap-3 py-2 px-3 rounded-md text-[13px]">
+                <span class="condition-label font-bold text-[13px] whitespace-nowrap min-w-[90px] shrink-0 leading-8.5">{{ t('alerts.threshold') }}*</span>
+                <div class="flex flex-nowrap items-start gap-2">
                   <div class="min-w-[130px] max-w-[180px]">
                     <OSelect
                       v-model="selectedFunction"
@@ -235,7 +271,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                   <!-- "of [field]" hidden for count mode -->
                   <template v-if="selectedFunction !== 'total_events'">
-                    <span class="condition-text font-semibold text-[13px] whitespace-nowrap">{{ t('alerts.conditionOf') }}</span>
+                    <span class="condition-text font-semibold text-[13px] whitespace-nowrap leading-8.5">{{ t('alerts.conditionOf') }}</span>
                     <div style="position: relative; display: inline-flex;">
                       <OFormSelect
                         name="query_condition.aggregation.having.column"
@@ -249,7 +285,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       />
                       <OTooltip v-if="inputData.aggregation?.having?.column === 'value' && columns.some((c: any) => (typeof c === 'string' ? c : c.value) === 'value')" :content="t('alerts.metricsValueFieldTooltip')" :delay="300" side="bottom" />
                     </div>
-                    <span class="condition-text font-semibold text-[13px] whitespace-nowrap">{{ t('alerts.conditionIs') }}</span>
+                    <span class="condition-text font-semibold text-[13px] whitespace-nowrap leading-8.5">{{ t('alerts.conditionIs') }}</span>
                   </template>
 
                   <!-- Count mode for metrics -->
@@ -261,13 +297,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       style="min-width: 70px; max-width: 120px;"
                       @update:model-value="onTriggerOperatorChange"
                     />
-                    <OFormInput
-                      name="trigger_condition.threshold"
-                      type="number"
-                      style="min-width: 80px; max-width: 120px;"
-                      @update:model-value="onTriggerThresholdChange($event)"
-                    />
-                    <span class="condition-text font-semibold text-[13px] whitespace-nowrap">{{ t('alerts.matchingMetricsFound') }}</span>
+                    <!-- Message hangs under the threshold field it describes. -->
+                    <div class="flex flex-col gap-1 min-w-20 max-w-30">
+                      <OFormInput
+                        name="trigger_condition.threshold"
+                        type="number"
+                        @update:model-value="onTriggerThresholdChange($event)"
+                      >
+                        <template #error />
+                      </OFormInput>
+                      <div
+                        v-if="thresholdError"
+                        class="text-xs text-input-error-text whitespace-nowrap"
+                        data-test="alert-if-row-metrics-error"
+                        role="alert"
+                      >
+                        {{ thresholdError }}
+                      </div>
+                    </div>
+                    <span class="condition-text font-semibold text-[13px] whitespace-nowrap leading-8.5">{{ t('alerts.matchingMetricsFound') }}</span>
                   </template>
 
                   <!-- Measure mode for metrics -->
@@ -279,13 +327,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       style="min-width: 70px; max-width: 120px;"
                       @update:model-value="onConditionOperatorChange"
                     />
-                    <OFormInput
-                      name="query_condition.aggregation.having.value"
-                      type="number"
-                      :placeholder="t('alerts.placeholders.value')"
-                      style="min-width: 80px; max-width: 120px;"
-                      @update:model-value="onConditionValueChange($event)"
-                    />
+                    <!-- Message hangs under the value field it describes. -->
+                    <div class="flex flex-col gap-1 min-w-20 max-w-30">
+                      <OFormInput
+                        name="query_condition.aggregation.having.value"
+                        type="number"
+                        :placeholder="t('alerts.placeholders.value')"
+                        @update:model-value="onConditionValueChange($event)"
+                      >
+                        <template #error />
+                      </OFormInput>
+                      <div
+                        v-if="havingValueError"
+                        class="text-xs text-input-error-text whitespace-nowrap"
+                        data-test="alert-if-row-metrics-value-error"
+                        role="alert"
+                      >
+                        {{ havingValueError }}
+                      </div>
+                    </div>
                   </template>
                 </div>
               </div>
@@ -332,12 +392,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
               <!-- no. of groups row — visible only when group-by fields are added -->
-              <div v-if="selectedFunction !== 'total_events' && hasMetricGroupByFields" class="flex items-center gap-3 py-2 px-3 rounded-md text-[13px]">
-                <span class="condition-label font-bold text-[13px] whitespace-nowrap min-w-[90px] shrink-0">
+              <div v-if="selectedFunction !== 'total_events' && hasMetricGroupByFields" class="flex items-start gap-3 py-2 px-3 rounded-md text-[13px]">
+                <span class="condition-label font-bold text-[13px] whitespace-nowrap min-w-[90px] shrink-0 leading-8.5">
                   {{ t('alerts.queryConfig.havingGroups') }}
                   <OTooltip :content="t('alerts.queryConfig.havingGroupsTooltip')" :delay="300" side="top" />
                 </span>
-                <div class="flex flex-nowrap items-center gap-2">
+                <div class="flex flex-nowrap items-start gap-2">
                   <OFormSelect
                     name="trigger_condition.operator"
                     :options="numericOperators"
@@ -345,20 +405,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="min-w-[70px] max-w-[120px]"
                     @update:model-value="onTriggerOperatorChange"
                   />
-                  <OFormInput
-                    name="trigger_condition.threshold"
-                    type="number"
-                    class="min-w-[60px] max-w-[80px]"
-                    min="1"
-                    @update:model-value="onTriggerThresholdChange($event)"
-                    @blur="restoreDefaultThreshold"
-                  />
+                  <!-- Message hangs under the threshold field it describes. -->
+                  <div class="flex flex-col gap-1 min-w-15 max-w-20">
+                    <OFormInput
+                      name="trigger_condition.threshold"
+                      type="number"
+                      min="1"
+                      @update:model-value="onTriggerThresholdChange($event)"
+                      @blur="restoreDefaultThreshold"
+                    >
+                      <template #error />
+                    </OFormInput>
+                    <div
+                      v-if="thresholdError"
+                      class="text-xs text-input-error-text whitespace-nowrap"
+                      data-test="alert-metric-having-groups-threshold-error"
+                      role="alert"
+                    >
+                      {{ thresholdError }}
+                    </div>
+                  </div>
                 </div>
               </div>
             </template>
 
             <!-- Check every row -->
-            <div class="flex items-center
+            <div class="flex items-start
              gap-3 py-2 px-3 rounded-md text-[13px]">
               <span class="condition-label font-bold text-[13px] whitespace-nowrap min-w-[90px] shrink-0" style="line-height: 28px;">
                 Check every *
@@ -375,7 +447,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       min="1"
                       @update:model-value="onCheckEveryChange($event)"
                       @blur="restoreDefaultFrequency"
-                    />
+                    >
+                      <!-- Message rendered below at row width — see checkEveryError. -->
+                      <template #error />
+                    </OFormInput>
                   </template>
                   <!-- Cron mode: expression input + timezone (Rule ②: form-owned
                        by `name=`, no v-model mirror). -->
@@ -462,6 +537,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
 
                 <!-- Cron description + error -->
+                <div
+                  v-if="frequencyMode !== 'cron' && checkEveryError"
+                  class="text-xs text-input-error-text"
+                  data-test="alert-check-every-error"
+                  role="alert"
+                >
+                  {{ checkEveryError }}
+                </div>
                 <div v-if="frequencyMode === 'cron' && cronDescription && !cronError" class="text-[11px] ml-0 italic"
                      :class="store.state.theme === 'dark' ? 'text-gray-400' : 'text-gray-500'">
                   {{ cronDescription }}
@@ -707,7 +790,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       min="1"
                       @update:model-value="onCheckEveryChange($event)"
                       @blur="restoreDefaultFrequency"
-                    />
+                    >
+                      <!-- Message rendered below at row width — see checkEveryError. -->
+                      <template #error />
+                    </OFormInput>
                   </template>
                   <template v-else>
                     <OFormInput
@@ -745,6 +831,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </span>
                   </template>
                 </div>
+                <div
+                  v-if="frequencyMode !== 'cron' && checkEveryError"
+                  class="text-xs text-input-error-text"
+                  data-test="alert-check-every-error"
+                  role="alert"
+                >
+                  {{ checkEveryError }}
+                </div>
                 <div v-if="frequencyMode === 'cron' && cronDescription && !cronError" class="text-[11px] italic"
                      :class="store.state.theme === 'dark' ? 'text-gray-400' : 'text-gray-500'">
                   {{ cronDescription }}
@@ -756,9 +850,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <!-- SQL: Alert if No. of events -->
-            <div v-if="localTab === 'sql'" class="flex items-center gap-3 py-2 px-3 rounded-md text-[13px]">
-              <span class="condition-label font-bold text-[13px] whitespace-nowrap min-w-[160px] w-[160px] shrink-0">{{ t('alerts.alertIfNoOfEvents') }} *</span>
-              <div class="flex items-center gap-2">
+            <div v-if="localTab === 'sql'" class="flex items-start gap-3 py-2 px-3 rounded-md text-[13px]">
+              <span class="condition-label font-bold text-[13px] whitespace-nowrap min-w-[160px] w-[160px] shrink-0 leading-8.5">{{ t('alerts.alertIfNoOfEvents') }} *</span>
+              <div class="flex items-start gap-2">
                 <OFormSelect
                   name="trigger_condition.operator"
                   :options="numericOperators"
@@ -767,25 +861,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   style="min-width: 70px; max-width: 120px;"
                   @update:model-value="onTriggerOperatorChange"
                 />
-                <OFormInput
-                  name="trigger_condition.threshold"
-                  type="number"
-                  data-test="alert-trigger-threshold-input"
-                  style="min-width: 60px; max-width: 80px;"
-                  min="1"
-                  @update:model-value="onTriggerThresholdChange($event)"
-                  @blur="restoreDefaultThreshold"
-                />
+                <!-- The message belongs to the threshold, so it hangs under the
+                     threshold — not at the row's left edge. The column is capped
+                     to the field's width and the message is nowrap, so it spills
+                     right into empty space instead of widening the row. -->
+                <div class="flex flex-col gap-1 min-w-15 max-w-20">
+                  <OFormInput
+                    name="trigger_condition.threshold"
+                    type="number"
+                    data-test="alert-trigger-threshold-input"
+                    min="1"
+                    @update:model-value="onTriggerThresholdChange($event)"
+                    @blur="restoreDefaultThreshold"
+                  >
+                    <template #error />
+                  </OFormInput>
+                  <div
+                    v-if="thresholdError"
+                    class="text-xs text-input-error-text whitespace-nowrap"
+                    data-test="alert-trigger-threshold-error"
+                    role="alert"
+                  >
+                    {{ thresholdError }}
+                  </div>
+                </div>
               </div>
             </div>
 
             <!-- PromQL: Alert if the value is + Having series -->
             <template v-if="localTab === 'promql' && promqlCondition">
-              <div class="flex items-center gap-3 py-2 px-3 rounded-md text-[13px]">
-                <span class="condition-label font-bold text-[13px] whitespace-nowrap min-w-[160px] w-[160px] shrink-0">{{ t('alerts.alertIfValueIs') }} *
+              <div class="flex items-start gap-3 py-2 px-3 rounded-md text-[13px]">
+                <span class="condition-label font-bold text-[13px] whitespace-nowrap min-w-[160px] w-[160px] shrink-0 leading-8.5">{{ t('alerts.alertIfValueIs') }} *
                   <OTooltip content="Alert when the PromQL expression evaluates to this condition for a time series. Example: &gt;= 100 triggers when the result is 100 or more." :delay="300" side="top" />
                 </span>
-                <div class="flex items-center gap-2">
+                <div class="flex items-start gap-2">
                   <OFormSelect
                     name="query_condition.promql_condition.operator"
                     :options="numericOperators"
@@ -794,21 +903,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     style="min-width: 70px; max-width: 120px;"
                     @update:model-value="onPromqlOperatorChange"
                   />
-                  <OFormInput
-                    name="query_condition.promql_condition.value"
-                    type="number"
-                    data-test="alert-threshold-value-input"
-                    style="min-width: 60px; max-width: 120px;"
-                    :debounce="300"
-                    @update:model-value="onPromqlValueChange"
-                  />
+                  <!-- Message hangs under the value field it describes. -->
+                  <div class="flex flex-col gap-1 min-w-15 max-w-30">
+                    <OFormInput
+                      name="query_condition.promql_condition.value"
+                      type="number"
+                      data-test="alert-threshold-value-input"
+                      :debounce="300"
+                      @update:model-value="onPromqlValueChange"
+                    >
+                      <template #error />
+                    </OFormInput>
+                    <div
+                      v-if="promqlValueError"
+                      class="text-xs text-input-error-text whitespace-nowrap"
+                      data-test="alert-threshold-value-error"
+                      role="alert"
+                    >
+                      {{ promqlValueError }}
+                    </div>
+                  </div>
                 </div>
               </div>
-              <div class="flex items-center gap-3 py-2 px-3 rounded-md text-[13px]">
-                <span class="condition-label font-bold text-[13px] whitespace-nowrap min-w-[160px] w-[160px] shrink-0">{{ t('alerts.havingSeries') }} *
+              <div class="flex items-start gap-3 py-2 px-3 rounded-md text-[13px]">
+                <span class="condition-label font-bold text-[13px] whitespace-nowrap min-w-[160px] w-[160px] shrink-0 leading-8.5">{{ t('alerts.havingSeries') }} *
                   <OTooltip content="Minimum number of time series that must satisfy the condition above to trigger the alert." :delay="300" side="top" />
                 </span>
-                <div class="flex items-center gap-2">
+                <div class="flex items-start gap-2">
                   <OFormSelect
                     name="trigger_condition.operator"
                     :options="numericOperators"
@@ -816,14 +937,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     style="min-width: 70px; max-width: 120px;"
                     @update:model-value="onTriggerOperatorChange"
                   />
-                  <OFormInput
-                    name="trigger_condition.threshold"
-                    type="number"
-                    style="min-width: 60px; max-width: 80px;"
-                    min="1"
-                    @update:model-value="onTriggerThresholdChange($event)"
-                    @blur="restoreDefaultThreshold"
-                  />
+                  <!-- Message hangs under the threshold field it describes. -->
+                  <div class="flex flex-col gap-1 min-w-15 max-w-20">
+                    <OFormInput
+                      name="trigger_condition.threshold"
+                      type="number"
+                      min="1"
+                      @update:model-value="onTriggerThresholdChange($event)"
+                      @blur="restoreDefaultThreshold"
+                    >
+                      <template #error />
+                    </OFormInput>
+                    <div
+                      v-if="thresholdError"
+                      class="text-xs text-input-error-text whitespace-nowrap"
+                      data-test="alert-having-series-threshold-error"
+                      role="alert"
+                    >
+                      {{ thresholdError }}
+                    </div>
+                  </div>
                 </div>
               </div>
             </template>
@@ -894,6 +1027,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
+import { firstFieldError } from "@/lib/forms/Form/fieldError";
 import { type QueryConfigMeta } from "./QueryConfig.schema";
 
 const QueryEditor = defineAsyncComponent(
@@ -1029,7 +1163,25 @@ export default defineComponent({
     // Field get/set helpers — the form is the single source of truth for the
     // validated scalars; props.* stay a write-through copy for the SQL-gen path
     // (mutated in place at each handler + emitted, unchanged from pre-migration).
-    const fv = (name: string): any => form?.getFieldValue?.(name);
+    //
+    // `fv` must be BOTH fresh AND reactive:
+    //  • `getFieldValue` is a synchronous read straight off TanStack's store, so a
+    //    handler that just wrote a field reads its own write back in the same tick.
+    //  • but `getFieldValue` is NOT a Vue reactive source. A `computed()` whose
+    //    getter only calls it therefore tracks NO dependency, so Vue caches the
+    //    FIRST result and never re-evaluates it. That silently broke every
+    //    fv-backed computed below: `cronExpression` cached "" at mount, so
+    //    `validateCron()` always saw an empty expression and pinned "Cron
+    //    expression and timezone are required" on screen — and `cronDescription`
+    //    stayed blank — even though the form held the seeded `0 */10 * * * *`.
+    // Touching the reactive values snapshot registers the dependency (so the
+    // computeds invalidate on any form write); the value still comes from the
+    // fresh synchronous read, so same-tick read-after-write stays correct.
+    const formValuesSnapshot: any = form?.useStore?.((s: any) => s.values);
+    const fv = (name: string): any => {
+      void formValuesSnapshot?.value;
+      return form?.getFieldValue?.(name);
+    };
     const setFV = (name: string, value: any): void => {
       form?.setFieldValue?.(name, value);
     };
@@ -1269,6 +1421,17 @@ export default defineComponent({
       set: (v) => setFV("query_condition.aggregation.having.value", v),
     });
 
+    // Pre-migration, `conditionValue` was a plain ref seeded ONCE at setup from
+    // trigger_condition.threshold for logs/traces (metrics seeded from having.value).
+    // That snapshot is why the measure row opens on the threshold default of 3 rather
+    // than having.value's own default of 1. having.value is form-owned now, so carry
+    // the seed explicitly. Snapshot the threshold HERE: onLogFunctionChange resets the
+    // live threshold to 1 before it writes having.value, so it can't be read at switch
+    // time. One-shot, and only when no saved aggregation is being loaded — a saved
+    // measure alert must keep its own having.value.
+    const initialThresholdSeed = fv("trigger_condition.threshold");
+    let measureSeedPending = isEventBasedInit && !props.isAggregationEnabled;
+
     // Watch stream type changes to restore saved state or set new-alert defaults.
     // Fires when stream type prop changes (e.g. async load on edit, or user switching stream type).
     watch(isEventBased, (eventBased, oldEventBased) => {
@@ -1332,6 +1495,31 @@ export default defineComponent({
     // logged a warning. The measure-mode "reset to >= 1 when group-by is empty"
     // rule is enforced by the function-change handlers and the trigger_condition
     // watcher; count mode keeps its default threshold of 3.)
+
+    // The threshold / PromQL-value controls are narrow numeric fields sitting in
+    // a "sentence" row next to an operator select. OFormInput renders its message
+    // INSIDE the field's own width, so a ~5rem field wraps the message into a
+    // ragged column and grows the row, knocking the label and the operator out of
+    // line. Same fix as ScheduledPipeline's composite fields: an empty #error slot
+    // suppresses the built-in message and we render it in a full-width sibling
+    // below the row. These read the same R3-timed field errors OFormInput would
+    // have surfaced — single source of truth, just displayed at column width.
+    const thresholdError = form.useStore((s: any) =>
+      firstFieldError(s.fieldMeta?.["trigger_condition.threshold"]?.errors ?? []),
+    );
+    const promqlValueError = form.useStore((s: any) =>
+      firstFieldError(
+        s.fieldMeta?.["query_condition.promql_condition.value"]?.errors ?? [],
+      ),
+    );
+    const checkEveryError = form.useStore((s: any) =>
+      firstFieldError(s.fieldMeta?.["_ui.checkEvery"]?.errors ?? []),
+    );
+    const havingValueError = form.useStore((s: any) =>
+      firstFieldError(
+        s.fieldMeta?.["query_condition.aggregation.having.value"]?.errors ?? [],
+      ),
+    );
 
     // Reactive views of the two group-by field arrays (form store) so the
     // template v-if / schema `_meta` stay live.
@@ -1773,10 +1961,24 @@ export default defineComponent({
       emit("validate-sql");
     };
 
-    // Emit trigger condition update (for non-aggregation mode)
+    // Emit trigger condition update (for non-aggregation mode).
+    //
+    // Emit the CURRENT FORM value, never `props.triggerCondition`. The prop is
+    // `formData.trigger_condition` — a `form.useStore` read-view that only
+    // refreshes on the next render. Every caller here is a handler that JUST
+    // wrote fields via setFV in the same tick, so the prop still holds the
+    // PRE-write snapshot. The parent's `update:triggerCondition` handler does
+    // `setFieldValue("trigger_condition", value)` — a WHOLE-OBJECT write — so
+    // emitting the stale prop round-tripped it back and CLOBBERED those writes.
+    // That is what silently ate the cron seed: onFrequencyUnitChange wrote
+    // frequency_type='cron' + cron='0 */10 * * * *', then this emit put
+    // {frequency_type:'minutes', cron:''} straight back, leaving the cron input
+    // empty with "Cron expression and timezone are required".
+    // `fv` is form.getFieldValue — a synchronous, always-fresh read.
     const emitTriggerUpdate = () => {
-      if (props.triggerCondition) {
-        emit("update:triggerCondition", { ...props.triggerCondition });
+      const tc = fv("trigger_condition");
+      if (tc) {
+        emit("update:triggerCondition", { ...tc });
       }
     };
 
@@ -1830,10 +2032,21 @@ export default defineComponent({
         triggerThreshold.value = 1;
         triggerOperator.value = '>=';
         emit("update:isAggregationEnabled", true);
+        // First entry into measure mode opens on the loaded threshold (3 for a new
+        // alert), matching the pre-migration setup seed; afterwards having.value
+        // holds real loaded/user state and wins.
+        const seedThisSwitch =
+          measureSeedPending &&
+          initialThresholdSeed !== undefined &&
+          initialThresholdSeed !== null &&
+          initialThresholdSeed !== "";
+        measureSeedPending = false;
         writeAggregation((agg) => {
           agg.function = value;
           agg.having.operator = conditionOperator.value || ">=";
-          agg.having.value = conditionValue.value ?? "";
+          agg.having.value = seedThisSwitch
+            ? initialThresholdSeed
+            : (conditionValue.value ?? "");
           agg.having.column = logMeasureColumn.value || "";
           agg.group_by = logGroupBy.value.length ? [...logGroupBy.value] : [];
         });
@@ -2318,6 +2531,10 @@ export default defineComponent({
       cronTimezone,
       cronError,
       cronDescription,
+      thresholdError,
+      promqlValueError,
+      checkEveryError,
+      havingValueError,
       filteredTimezones,
       onFrequencyUnitChange,
       frequencyUnitOptions,

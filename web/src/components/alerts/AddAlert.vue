@@ -94,10 +94,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :placeholder="t('alerts.alertNamePlaceholder')"
                 class="topbar-name-input text-sm h-[28px]! min-h-[28px]! min-w-[120px] max-w-[150px]"
               />
-              <OInput
+              <!-- Anomaly name binds the SAME `name` field as the alert name, not
+                   `anomalyConfig.name`: a bare OInput has no field for the schema
+                   to paint, so a blank name could only ever toast. useAlertForm's
+                   formData.name → anomalyConfig.name watcher still feeds the value
+                   saveAnomalyDetection reads, and anomaly edit-load already seeds
+                   it via setF("name", data.name). -->
+              <OFormInput
                 v-else
                 ref="anomalyNameRef"
-                v-model="anomalyConfig.name"
+                name="name"
+                data-test="add-anomaly-name-input"
                 :placeholder="t('alerts.anomalyNamePlaceholder')"
                 class="topbar-name-input text-sm h-[28px]! min-h-[28px]! min-w-[120px] max-w-[150px]"
               />
@@ -203,7 +210,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Tab Content -->
         <div class="flex-1 overflow-auto">
           <!-- Alert Rules Tab (Conditions + Alert Settings merged) -->
-          <div v-show="activeTab === 'condition'" class="flex flex-col gap-4">
+          <!-- data-tab-pane: lets focusOnFirstError find the tab owning an
+               invalid field and bring it forward before focusing it. -->
+          <div v-show="activeTab === 'condition'" data-tab-pane="condition" class="flex flex-col gap-4">
             <div>
               <QueryConfig
               ref="step2Ref"
@@ -261,7 +270,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
 
-          <div v-show="activeTab === 'advanced'" class="flex flex-col gap-4">
+          <div v-show="activeTab === 'advanced'" data-tab-pane="advanced" class="flex flex-col gap-4">
 
             <!-- Additional Settings (first) -->
             <div>
@@ -312,14 +321,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
 
-          <div v-show="activeTab === 'anomaly-config'">
+          <div v-show="activeTab === 'anomaly-config'" data-tab-pane="anomaly-config">
             <AnomalyDetectionConfig
               ref="anomalyStep2Ref"
               :config="anomalyConfig"
             />
           </div>
 
-          <div v-show="activeTab === 'anomaly-alerting'">
+          <div v-show="activeTab === 'anomaly-alerting'" data-tab-pane="anomaly-alerting">
             <AnomalyAlerting
               :config="anomalyConfig"
               :destinations="destinations"

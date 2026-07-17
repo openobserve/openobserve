@@ -179,13 +179,40 @@ describe("addAlertSchema (composed orchestrator schema)", () => {
     ).toBeGreaterThan(0);
   });
 
-  // ── Anomaly branch pass-through ─────────────────────────────────────────────
-  it("does NOT validate topbar/query/settings in anomaly mode", () => {
+  // ── Anomaly branch: near-pass-through — `name` ONLY ─────────────────────────
+  // The detection-config fields live on AnomalyDetectionConfig's own form, so
+  // this schema still ignores stream/query/settings in anomaly mode. `name` is
+  // the exception: it is the one topbar field this form holds, and its blank
+  // rule is re-homed here from saveAnomalyDetection's toast so the field can
+  // actually highlight.
+  it("does NOT validate stream/query/settings in anomaly mode", () => {
+    const base = validScheduled({
+      name: "my_anomaly",
+      stream_type: "",
+      stream_name: "",
+      destinations: [],
+      is_real_time: "anomaly",
+    });
+    expect(addAlertSchema.safeParse(base).success).toBe(true);
+  });
+
+  it("requires name in anomaly mode", () => {
     const base = validScheduled({
       name: "",
       stream_type: "",
       stream_name: "",
       destinations: [],
+      is_real_time: "anomaly",
+    });
+    const m = issuesByPath(base);
+    expect(m["name"]).toEqual(["Anomaly name is required."]);
+    // Still the ONLY issue — nothing else tightened alongside it.
+    expect(Object.keys(m)).toEqual(["name"]);
+  });
+
+  it("does NOT apply the alert special-chars rule to an anomaly name", () => {
+    const base = validScheduled({
+      name: "has space:and#chars",
       is_real_time: "anomaly",
     });
     expect(addAlertSchema.safeParse(base).success).toBe(true);

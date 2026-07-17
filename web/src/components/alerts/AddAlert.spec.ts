@@ -20,7 +20,8 @@
 // composed schema still validates from the seeded form values + default `_meta`.
 
 import { flushPromises, mount } from "@vue/test-utils";
-import { describe, it, expect, vi, afterEach } from "vitest";
+import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
+import { nextTick } from "vue";
 import AddAlert from "@/components/alerts/AddAlert.vue";
 import alertsService from "@/services/alerts";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -120,10 +121,14 @@ const stubs = {
   AppPageHeader: true,
 };
 
-const mountAlert = (props: Record<string, any> = {}) =>
+const mountAlert = (
+  props: Record<string, any> = {},
+  options: Record<string, any> = {},
+) =>
   mount(AddAlert, {
     global: { provide: { store }, plugins: [i18n, router], stubs },
     props,
+    ...options,
   });
 
 /** Seed a complete, valid scheduled-custom alert into the ONE form. */
@@ -283,28 +288,58 @@ describe("AddAlert (OForm owner)", () => {
       );
     });
 
+    // The measure-column rule is SCHEMA-owned (QueryConfig.schema.ts), not an
+    // imperative toast — that is what lets the name-bound <OFormSelect> paint
+    // itself red (it derives `:error` from the field's own errors). So these
+    // assert the FIELD ERROR, not a toast, and must seed `_meta` (QueryConfig is
+    // stubbed here, so nothing bridges the discriminators in).
+    const seedMeasureAggregation = (form: any, column: string) => {
+      form.setFieldValue("query_condition.type", "custom");
+      form.setFieldValue("query_condition.aggregation", {
+        function: "avg",
+        group_by: [],
+        having: { column, operator: ">=", value: 10 },
+      });
+      form.setFieldValue("_meta.selectedFunction", "avg");
+      form.setFieldValue("_meta.aggregationEnabled", true);
+    };
+
     it("blocks a custom measure save when the aggregation column is empty", async () => {
       wrapper = mountAlert();
       await flushPromises();
       const form = wrapper.vm.form;
       seedValidScheduled(form);
-      form.setFieldValue("query_condition.type", "custom");
-      form.setFieldValue("query_condition.aggregation", {
-        function: "avg",
-        group_by: [],
-        having: { column: "", operator: ">=", value: 10 },
-      });
+      seedMeasureAggregation(form, "");
       wrapper.vm.isAggregationEnabled = true;
 
       await form.handleSubmit();
       await flushPromises();
 
       expect(alertsService.create_by_alert_id).not.toHaveBeenCalled();
-      expect(toast).toHaveBeenCalledWith(
-        expect.objectContaining({
-          message: "Column is required when using an aggregate function.",
-        }),
+      expect(form.state.isValid).toBe(false);
+      // The error lands on the exact path both the logs and the metrics
+      // <OFormSelect> bind, so the field renders it (red border + message).
+      const errors =
+        form.getFieldMeta("query_condition.aggregation.having.column")?.errors ??
+        [];
+      expect(errors.map((e: any) => e?.message ?? e)).toContain(
+        "Column is required when using an aggregate function.",
       );
+    });
+
+    it("blocks a custom measure save when the aggregation column is only whitespace", async () => {
+      wrapper = mountAlert();
+      await flushPromises();
+      const form = wrapper.vm.form;
+      seedValidScheduled(form);
+      seedMeasureAggregation(form, "   ");
+      wrapper.vm.isAggregationEnabled = true;
+
+      await form.handleSubmit();
+      await flushPromises();
+
+      expect(alertsService.create_by_alert_id).not.toHaveBeenCalled();
+      expect(form.state.isValid).toBe(false);
     });
 
     it("does NOT block a custom measure save when the aggregation column is set", async () => {
@@ -312,22 +347,16 @@ describe("AddAlert (OForm owner)", () => {
       await flushPromises();
       const form = wrapper.vm.form;
       seedValidScheduled(form);
-      form.setFieldValue("query_condition.type", "custom");
-      form.setFieldValue("query_condition.aggregation", {
-        function: "avg",
-        group_by: [],
-        having: { column: "field2", operator: ">=", value: 10 },
-      });
+      seedMeasureAggregation(form, "field2");
       wrapper.vm.isAggregationEnabled = true;
 
       await form.handleSubmit();
       await flushPromises();
 
-      expect(toast).not.toHaveBeenCalledWith(
-        expect.objectContaining({
-          message: "Column is required when using an aggregate function.",
-        }),
-      );
+      const errors =
+        form.getFieldMeta("query_condition.aggregation.having.column")?.errors ??
+        [];
+      expect(errors).toHaveLength(0);
       expect(alertsService.create_by_alert_id).toHaveBeenCalledTimes(1);
     });
   });
@@ -637,9 +666,16 @@ describe("AddAlert (OForm owner)", () => {
       // anomalyConfig from formData, so set the anomaly fields AFTER it settles.
       form.setFieldValue("is_real_time", "anomaly");
       await flushPromises();
-      wrapper.vm.anomalyConfig.name = "anom_alert";
-      wrapper.vm.anomalyConfig.stream_name = "_rundata";
-      wrapper.vm.anomalyConfig.stream_type = "logs";
+      // name/stream_type/stream_name are FORM fields in anomaly mode too (the
+      // topbar binds all three), and useAlertForm's watcher copies them into
+      // anomalyConfig for the payload. Drive them through the form like the real
+      // UI does — writing anomalyConfig directly is the pre-migration dual-source
+      // path, and that watcher fires on any of the three and rewrites all three,
+      // so a direct write gets clobbered by the next form edit anyway.
+      form.setFieldValue("name", "anom_alert");
+      form.setFieldValue("stream_type", "logs");
+      form.setFieldValue("stream_name", "_rundata");
+      await flushPromises();
       wrapper.vm.anomalyConfig.alert_enabled = false; // no destination requirement
       wrapper.vm.anomalyConfig.query_mode = "filters";
 
@@ -664,13 +700,129 @@ describe("AddAlert (OForm owner)", () => {
       const form = wrapper.vm.form;
 
       form.setFieldValue("is_real_time", "anomaly");
-      wrapper.vm.anomalyConfig.name = "";
+      form.setFieldValue("name", "");
       await flushPromises();
 
       await wrapper.vm.handleSave();
       await flushPromises();
 
       expect(anomalyDetectionService.create).not.toHaveBeenCalled();
+    });
+
+    // The blank name used to be an imperative toast inside saveAnomalyDetection,
+    // which cannot paint a field — so the topbar stayed unhighlighted while the
+    // toast said to fix the highlighted fields. The rule now lives in the schema
+    // and routes to the topbar `name` field.
+    it("surfaces the empty anomaly name on the name FIELD, not just a toast", async () => {
+      wrapper = mountAlert();
+      await flushPromises();
+      const form = wrapper.vm.form;
+
+      form.setFieldValue("is_real_time", "anomaly");
+      form.setFieldValue("name", "");
+      await flushPromises();
+
+      await wrapper.vm.handleSave();
+      await flushPromises();
+
+      expect(form.state.isValid).toBe(false);
+      expect(
+        form.state.fieldMeta.name.errors.map((e: any) =>
+          typeof e === "string" ? e : e?.message,
+        ),
+      ).toContain("Anomaly name is required.");
+      expect(anomalyDetectionService.create).not.toHaveBeenCalled();
+    });
+  });
+
+  // ── Cross-tab error focus ──────────────────────────────────────────────────
+  // Regression: leave a required field blank on the Alert Rules tab, switch to
+  // Advanced, hit Save → "Please fix the highlighted fields" fired while the
+  // highlighted field sat on a v-show'd-off tab the user could not see, and
+  // nothing steered them back. focusOnFirstError skips messages with a null
+  // offsetParent (correct on its own — focusing a display:none control no-ops),
+  // so every message on the inactive pane was filtered out and it focused
+  // nothing. It must bring the tab OWNING the error forward first.
+  describe("focusOnFirstError (cross-tab)", () => {
+    let offsetParent: any;
+
+    beforeEach(() => {
+      // jsdom has no layout, so offsetParent is null for EVERYTHING — which would
+      // make an already-visible message look hidden and mask which branch runs.
+      // Model just the rule this code leans on: display:none has no offsetParent.
+      offsetParent = vi
+        .spyOn(HTMLElement.prototype, "offsetParent", "get")
+        .mockImplementation(function (this: HTMLElement) {
+          let node: HTMLElement | null = this;
+          while (node) {
+            if (node.style?.display === "none") return null;
+            node = node.parentElement;
+          }
+          return document.body;
+        });
+      // Not implemented in jsdom.
+      (Element.prototype as any).scrollIntoView = vi.fn();
+    });
+
+    afterEach(() => offsetParent?.mockRestore());
+
+    /** Stand in for the error an OForm* field renders once the schema fails —
+     *  the step children are stubbed here, so inject the same shape they emit
+     *  (a [role="alert"] message beside its control) into the real pane. */
+    const seedFieldError = (tab: string): HTMLInputElement => {
+      const pane = wrapper.find(`[data-tab-pane="${tab}"]`).element;
+      const field = document.createElement("div");
+      field.innerHTML =
+        '<span role="alert">At least one destination is required.</span><input />';
+      pane.appendChild(field);
+      return field.querySelector("input") as HTMLInputElement;
+    };
+
+    it("brings the tab owning the error forward and focuses the field", async () => {
+      // Attached: focusOnFirstError reaches for the live document (the real
+      // <form> + focus()), which a detached wrapper has no place in.
+      wrapper = mountAlert({}, { attachTo: document.body });
+      await flushPromises();
+      const input = seedFieldError("condition");
+      wrapper.vm.activeTab = "advanced";
+      await nextTick();
+
+      wrapper.vm.focusOnFirstError();
+      await flushPromises();
+
+      expect(wrapper.vm.activeTab).toBe("condition");
+      expect(document.activeElement).toBe(input);
+    });
+
+    it("stays put when the error is already on the visible tab", async () => {
+      wrapper = mountAlert({}, { attachTo: document.body });
+      await flushPromises();
+      const input = seedFieldError("condition");
+      wrapper.vm.activeTab = "condition";
+      await nextTick();
+
+      wrapper.vm.focusOnFirstError();
+      await flushPromises();
+
+      expect(wrapper.vm.activeTab).toBe("condition");
+      expect(document.activeElement).toBe(input);
+    });
+
+    // Anomaly mode swaps the tab headers wholesale, but every pane stays in the
+    // DOM (v-show). Hopping onto a pane with no header would strand the user on
+    // a tab the toggle group cannot show or leave.
+    it("never hops to a tab that has no header in the current mode", async () => {
+      wrapper = mountAlert({}, { attachTo: document.body });
+      await flushPromises();
+      wrapper.vm.form.setFieldValue("is_real_time", "anomaly");
+      await flushPromises();
+      expect(wrapper.vm.activeTab).toBe("anomaly-config");
+
+      seedFieldError("condition"); // stale message on the now-headerless pane
+      wrapper.vm.focusOnFirstError();
+      await flushPromises();
+
+      expect(wrapper.vm.activeTab).toBe("anomaly-config");
     });
   });
 

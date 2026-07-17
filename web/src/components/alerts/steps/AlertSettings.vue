@@ -54,23 +54,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 side="right"
               />
             </div>
-            <div class="flex items-center mr-2" style="width: fit-content">
-              <div style="width: 87px">
-                <OFormInput
-                  name="trigger_condition.silence"
-                  type="number"
-                  min="0"
-                  data-test="alert-settings-silence-duration-input"
-                />
+            <div class="flex flex-col gap-1 mr-2" style="width: fit-content">
+              <div class="flex items-center">
+                <div style="width: 87px">
+                  <OFormInput
+                    name="trigger_condition.silence"
+                    type="number"
+                    min="0"
+                    data-test="alert-settings-silence-duration-input"
+                  >
+                    <!-- Message rendered below at pair width — see silenceError. -->
+                    <template #error />
+                  </OFormInput>
+                </div>
+                <div
+                  style="min-width: 90px; height: 2.125rem; font-size: 13px"
+                  :class="
+                    store.state.theme === 'dark' ? 'bg-gray-700' : 'bg-gray-100'
+                  "
+                  class="flex justify-center items-center bg-input-addon-bg text-input-addon-text"
+                >
+                  {{ t("alerts.minutes") }}
+                </div>
               </div>
               <div
-                style="min-width: 90px; height: 2.125rem; font-size: 13px"
-                :class="
-                  store.state.theme === 'dark' ? 'bg-gray-700' : 'bg-gray-100'
-                "
-                class="flex justify-center items-center bg-input-addon-bg text-input-addon-text"
+                v-if="silenceError"
+                class="text-xs text-input-error-text whitespace-nowrap"
+                data-test="alert-settings-silence-error"
+                role="alert"
               >
-                {{ t("alerts.minutes") }}
+                {{ silenceError }}
               </div>
             </div>
           </div>
@@ -140,25 +153,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 side="right"
               />
             </div>
-            <div class="flex items-center mr-2" style="width: fit-content">
-              <div style="width: 87px">
-                <OFormInput
-                  name="trigger_condition.period"
-                  type="number"
-                  min="1"
-                  :debounce="300"
-                  data-test="alert-settings-period-input"
-                  @update:model-value="handlePeriodChange"
-                />
+            <div class="flex flex-col gap-1 mr-2" style="width: fit-content">
+              <div class="flex items-center">
+                <div style="width: 87px">
+                  <OFormInput
+                    name="trigger_condition.period"
+                    type="number"
+                    min="1"
+                    :debounce="300"
+                    data-test="alert-settings-period-input"
+                    @update:model-value="handlePeriodChange"
+                  >
+                    <!-- Message rendered below at pair width — see periodError. -->
+                    <template #error />
+                  </OFormInput>
+                </div>
+                <div
+                  style="min-width: 90px; height: 2.125rem; font-size: 13px"
+                  :class="
+                    store.state.theme === 'dark' ? 'bg-gray-700' : 'bg-gray-100'
+                  "
+                  class="flex justify-center items-center bg-input-addon-bg text-input-addon-text"
+                >
+                  {{ t("alerts.minutes") }}
+                </div>
               </div>
               <div
-                style="min-width: 90px; height: 2.125rem; font-size: 13px"
-                :class="
-                  store.state.theme === 'dark' ? 'bg-gray-700' : 'bg-gray-100'
-                "
-                class="flex justify-center items-center bg-input-addon-bg text-input-addon-text"
+                v-if="periodError"
+                class="text-xs text-input-error-text whitespace-nowrap"
+                data-test="alert-settings-period-error"
+                role="alert"
               >
-                {{ t("alerts.minutes") }}
+                {{ periodError }}
               </div>
             </div>
           </div>
@@ -176,24 +202,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 side="right"
               />
             </div>
-            <div class="flex items-center mr-2" style="width: fit-content">
-              <div style="width: 87px">
-                <OFormInput
-                  name="trigger_condition.silence"
-                  type="number"
-                  min="0"
-                  :debounce="300"
-                  data-test="alert-settings-silence-duration-input"
-                />
+            <div class="flex flex-col gap-1 mr-2" style="width: fit-content">
+              <div class="flex items-center">
+                <div style="width: 87px">
+                  <OFormInput
+                    name="trigger_condition.silence"
+                    type="number"
+                    min="0"
+                    :debounce="300"
+                    data-test="alert-settings-silence-duration-input"
+                  >
+                    <!-- Message rendered below at pair width — see silenceError. -->
+                    <template #error />
+                  </OFormInput>
+                </div>
+                <div
+                  style="min-width: 90px; height: 2.125rem; font-size: 13px"
+                  :class="
+                    store.state.theme === 'dark' ? 'bg-gray-700' : 'bg-gray-100'
+                  "
+                  class="flex justify-center items-center bg-input-addon-bg text-input-addon-text"
+                >
+                  {{ t("alerts.minutes") }}
+                </div>
               </div>
               <div
-                style="min-width: 90px; height: 2.125rem; font-size: 13px"
-                :class="
-                  store.state.theme === 'dark' ? 'bg-gray-700' : 'bg-gray-100'
-                "
-                class="flex justify-center items-center bg-input-addon-bg text-input-addon-text"
+                v-if="silenceError"
+                class="text-xs text-input-error-text whitespace-nowrap"
+                data-test="alert-settings-silence-error"
+                role="alert"
               >
-                {{ t("alerts.minutes") }}
+                {{ silenceError }}
               </div>
             </div>
           </div>
@@ -272,7 +311,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, type PropType } from "vue";
+import { computed, defineComponent, inject, ref, type PropType } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -282,6 +321,8 @@ import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OFormSwitch from "@/lib/forms/Switch/OFormSwitch.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
+import { firstFieldError } from "@/lib/forms/Form/fieldError";
 import { convertMinutesToCron } from "@/utils/zincutils";
 
 export default defineComponent({
@@ -340,6 +381,23 @@ export default defineComponent({
     const silenceFieldRef = ref<any>(null);
     const destinationsFieldRef = ref<any>(null);
 
+    // Period / silence are composite "number + Minutes addon" fields: a 5.4rem
+    // OFormInput glued to a unit block. OFormInput renders its message INSIDE
+    // that narrow width, wrapping it into a ragged column and growing the field,
+    // which pushes the addon out of line. Empty #error slot suppresses the inline
+    // text (the field keeps its red border) and we render the message in a
+    // full-width sibling below the pair. Reads the same R3-timed field errors
+    // OFormInput would have surfaced — single source of truth, wider display.
+    const form: any = inject(FORM_CONTEXT_KEY, null);
+    const fieldError = (path: string) =>
+      form
+        ? form.useStore((s: any) =>
+            firstFieldError(s.fieldMeta?.[path]?.errors ?? []),
+          )
+        : computed(() => undefined);
+    const periodError = fieldError("trigger_condition.period");
+    const silenceError = fieldError("trigger_condition.silence");
+
     const getBrowserTimezone = (): string => {
       try {
         return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
@@ -357,8 +415,20 @@ export default defineComponent({
     // parent write does not revert it.
     const handlePeriodChange = (val: unknown) => {
       const periodValue = Number(val);
+      // Spread the FRESH form value, not `props.formData.trigger_condition`.
+      // The prop is a `form.useStore` read-view that only refreshes on the next
+      // render, and the parent's @update:trigger handler is a WHOLE-OBJECT
+      // `setFieldValue("trigger_condition", …)` — so spreading the stale prop
+      // round-trips a pre-write snapshot and silently clobbers any field written
+      // earlier in the same tick. Today only `period` is written in this tick and
+      // line below re-sets it, so nothing was lost; reading fresh makes that
+      // structural instead of an invariant someone has to remember to maintain.
+      // (Same bug, same fix as QueryConfig's emitTriggerUpdate.)
+      const currentTrigger =
+        form?.getFieldValue?.("trigger_condition") ??
+        props.formData.trigger_condition;
       const nextTrigger: Record<string, any> = {
-        ...props.formData.trigger_condition,
+        ...currentTrigger,
         period: val,
       };
       if (periodValue && periodValue > 0) {
@@ -392,6 +462,8 @@ export default defineComponent({
       periodFieldRef,
       silenceFieldRef,
       destinationsFieldRef,
+      periodError,
+      silenceError,
     };
   },
 });

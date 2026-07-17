@@ -36,13 +36,25 @@
 //  "anomaly". The QueryConfig sub-schema already self-gates realtime-vs-scheduled
 //  via `_meta.isRealTime`; AlertSettings' period rule is applied scheduled-only
 //  by choosing createAlertSettingsSchema(isRealTime). The ANOMALY branch is a
-//  PASS-THROUGH: AnomalyDetectionConfig OWNS its OWN <OForm>+schema+validate()
+//  NEAR-pass-through: AnomalyDetectionConfig OWNS its OWN <OForm>+schema+validate()
 //  (verified live — it calls useOForm unconditionally, re-provides its own
 //  context, and writes back to props.config), and the anomaly SAVE path
 //  (saveAnomalyDetection) bypasses this form entirely and reads `anomalyConfig`.
-//  Composing the anomaly fields here would be dead code (this form never holds
-//  them), so the anomaly branch enforces nothing. See the report's OPEN
-//  DECISION 7 note.
+//  Composing the DETECTION-CONFIG fields here would be dead code (this form never
+//  holds them), so the anomaly branch enforces only `name` — which this form DOES
+//  hold (the topbar OFormInput binds `name` in both modes, and the
+//  formData.name → anomalyConfig.name watcher in useAlertForm feeds the value
+//  saveAnomalyDetection reads).
+//
+//  `name` here is a RE-HOME, not a new rule (Rule ④): saveAnomalyDetection has
+//  always blocked a blank anomaly name, but only as an imperative toast — and a
+//  toast cannot paint a field, so the topbar highlighted nothing while the toast
+//  said "highlighted fields". Same rule, same message, now on the field. The
+//  blank check is deliberately the ONLY rule: the special-chars refine below is
+//  alert-only and adding it here would tighten anomaly vs. BEFORE.
+//  `stream_type`/`stream_name` stay unenforced in anomaly — unlike `name` those
+//  have NO pre-existing rule anywhere, so requiring them would be a real
+//  behavior change. Still OPEN (see the report's OPEN DECISION 7 note).
 //
 //  Rule ④ — the composition reuses the step schemas VERBATIM (import, never
 //  re-declare) so the step and the orchestrator can never drift. Numbers still
@@ -175,9 +187,21 @@ export const makeAddAlertSchema = (t: Translator) =>
   .superRefine((val: any, ctx) => {
     const mode = val.is_real_time;
 
-    // ── ANOMALY branch: pass-through (validated by AnomalyDetectionConfig's own
-    // OForm + saveAnomalyDetection). This form is bypassed on the anomaly save.
-    if (mode === "anomaly") return;
+    // ── ANOMALY branch: the detection-config fields are validated by
+    // AnomalyDetectionConfig's own OForm; only `name` lives on THIS form. Blank
+    // check re-homed from saveAnomalyDetection's toast (same message) so the
+    // topbar field actually highlights. No special-chars refine here — that rule
+    // is alert-only and would tighten anomaly vs. BEFORE.
+    if (mode === "anomaly") {
+      if (isBlank(val.name)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["name"],
+          message: t("alerts.anomalyNameRequired"),
+        });
+      }
+      return;
+    }
 
     // ── Topbar: name required + no special chars (§4), stream type/name required.
     if (isBlank(val.name)) {

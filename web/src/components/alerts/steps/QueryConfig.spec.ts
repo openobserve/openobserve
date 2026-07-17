@@ -1853,4 +1853,100 @@ describe("QueryConfig.vue", () => {
       h.unmount();
     });
   });
+
+  /** The measure row ("count of <col> is >= __") renders
+   *  query_condition.aggregation.having.value, NOT trigger_condition.threshold.
+   *  Pre-migration, `conditionValue` was a ref seeded once at setup from the
+   *  threshold, so the row opened on 3 rather than having.value's default of 1.
+   *  These pin that seed — a live read of having.value regresses to 1. */
+  describe("measure-mode value seed (parity with pre-migration conditionValue)", () => {
+    const havingValue = (h: any) =>
+      (h.findComponent({ name: "OForm" }).vm as any).form.getFieldValue(
+        "query_condition.aggregation.having.value",
+      );
+
+    it("logs: first switch to a measure fn opens on the threshold (3), not 1", async () => {
+      const { h } = mountHost();
+      await flushPromises();
+      h.findComponent(QueryConfig).vm.onLogFunctionChange("count");
+      await flushPromises();
+      expect(havingValue(h)).toBe(3);
+      h.unmount();
+    });
+
+    it("logs: seeds from the LOADED threshold, not the hardcoded default", async () => {
+      const { h } = mountHost(
+        {},
+        { trigger_condition: { ...hostDefaults().trigger_condition, threshold: 7 } },
+      );
+      await flushPromises();
+      h.findComponent(QueryConfig).vm.onLogFunctionChange("min");
+      await flushPromises();
+      expect(havingValue(h)).toBe(7);
+      h.unmount();
+    });
+
+    it("logs: seed is one-shot — a later fn switch keeps the user's value", async () => {
+      const { h } = mountHost();
+      await flushPromises();
+      const qc = h.findComponent(QueryConfig).vm;
+      qc.onLogFunctionChange("count");
+      await flushPromises();
+      (h.findComponent({ name: "OForm" }).vm as any).form.setFieldValue(
+        "query_condition.aggregation.having.value",
+        42,
+      );
+      await flushPromises();
+      qc.onLogFunctionChange("max");
+      await flushPromises();
+      expect(havingValue(h)).toBe(42);
+      h.unmount();
+    });
+
+    it("logs: editing a SAVED measure alert keeps its own having.value", async () => {
+      const saved = {
+        group_by: [],
+        function: "avg",
+        having: { column: "field2", operator: ">=", value: 5 },
+      };
+      const { h } = mountHost(
+        { isAggregationEnabled: true, inputData: { ...mockInputData, aggregation: saved } },
+        {
+          query_condition: {
+            ...hostDefaults().query_condition,
+            aggregation: saved,
+          },
+        },
+      );
+      await flushPromises();
+      h.findComponent(QueryConfig).vm.onLogFunctionChange("sum");
+      await flushPromises();
+      expect(havingValue(h)).toBe(5);
+      h.unmount();
+    });
+
+    it("metrics: NOT seeded from the threshold — keeps having.value (1)", async () => {
+      const agg = {
+        group_by: [],
+        function: "avg",
+        having: { column: "value", operator: ">=", value: 1 },
+      };
+      const { h } = mountHost(
+        {
+          streamType: "metrics",
+          isAggregationEnabled: true,
+          inputData: { ...mockInputData, aggregation: agg },
+        },
+        {
+          stream_type: "metrics",
+          query_condition: { ...hostDefaults().query_condition, aggregation: agg },
+        },
+      );
+      await flushPromises();
+      h.findComponent(QueryConfig).vm.onMetricFunctionChange("max");
+      await flushPromises();
+      expect(havingValue(h)).toBe(1);
+      h.unmount();
+    });
+  });
 });

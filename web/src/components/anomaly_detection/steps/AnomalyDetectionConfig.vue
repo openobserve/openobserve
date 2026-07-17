@@ -142,11 +142,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div style="width: calc(100% - 190px)">
             <div
-              class="custom-sql-editor-wrapper h-[140px] rounded overflow-hidden"
+              class="custom-sql-editor-wrapper h-[140px] rounded overflow-hidden border"
               :class="
-                store.state.theme === 'dark'
-                  ? 'border border-white/[0.18]'
-                  : 'border border-black/[0.12]'
+                hasSqlError
+                  ? 'border-input-border-error'
+                  : store.state.theme === 'dark'
+                    ? 'border-white/18'
+                    : 'border-black/12'
               "
             >
               <!-- Bare Monaco (sanctioned): value bridged into the form from
@@ -176,16 +178,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                  alone let " " reject the save while rendering nothing at all. -->
             <div
               v-if="showSqlErrors && !customSql?.trim()"
-              class="text-red-8 pt-1"
-              style="font-size: 11px; line-height: 12px"
+              class="text-xs text-input-error-text pt-1"
+              data-test="anomaly-custom-sql-required-error"
             >
               {{ t("alerts.anomaly.sqlRequired") }}
             </div>
             <div
               v-if="showSqlErrors && hasTimestampAlias"
-              class="text-red-8 pt-1"
+              class="text-xs text-input-error-text pt-1"
               data-test="anomaly-custom-sql-timestamp-alias-error"
-              style="font-size: 11px; line-height: 12px"
             >
               <code>{{
                 store.state.zoConfig.timestamp_column || "_timestamp"
@@ -278,7 +279,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="alert-v3-input"
                   style="width: 87px"
                   data-test="anomaly-histogram-interval-value"
-                />
+                >
+                  <!-- Message rendered below at pair width — see histogramIntervalError. -->
+                  <template #error />
+                </OFormInput>
                 <OFormSelect
                   name="histogram_interval_unit"
                   :options="intervalUnits"
@@ -288,6 +292,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   style="min-width: 100px"
                   data-test="anomaly-histogram-interval-unit"
                 />
+              </div>
+              <div
+                v-if="histogramIntervalError"
+                class="text-xs text-input-error-text pt-1"
+                data-test="anomaly-histogram-interval-error"
+                role="alert"
+              >
+                {{ histogramIntervalError }}
               </div>
             </div>
           </div>
@@ -322,7 +334,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="alert-v3-input"
                 style="width: 87px"
                 data-test="anomaly-histogram-interval-value"
-              />
+              >
+                <!-- Message rendered below at pair width — see histogramIntervalError. -->
+                <template #error />
+              </OFormInput>
               <OFormSelect
                 name="histogram_interval_unit"
                 :options="intervalUnits"
@@ -332,6 +347,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 style="min-width: 100px"
                 data-test="anomaly-histogram-interval-unit"
               />
+            </div>
+            <div
+              v-if="histogramIntervalError"
+              class="text-xs text-input-error-text pt-1"
+              data-test="anomaly-histogram-interval-error"
+              role="alert"
+            >
+              {{ histogramIntervalError }}
             </div>
           </div>
         </div>
@@ -365,7 +388,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="alert-v3-input"
                   style="width: 87px"
                   data-test="anomaly-schedule-interval-value"
-                />
+                >
+                  <!-- Message rendered below at pair width — see scheduleIntervalError. -->
+                  <template #error />
+                </OFormInput>
                 <OFormSelect
                   name="schedule_interval_unit"
                   :options="intervalUnits"
@@ -375,6 +401,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   style="min-width: 100px"
                   data-test="anomaly-schedule-interval-unit"
                 />
+              </div>
+              <div
+                v-if="scheduleIntervalError"
+                class="text-xs text-input-error-text pt-1"
+                data-test="anomaly-schedule-interval-error"
+                role="alert"
+              >
+                {{ scheduleIntervalError }}
               </div>
             </div>
           </div>
@@ -405,7 +439,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="alert-v3-input"
                   style="width: 87px"
                   data-test="anomaly-detection-window-value"
-                />
+                >
+                  <!-- Message rendered below at pair width — see detectionWindowError. -->
+                  <template #error />
+                </OFormInput>
                 <OFormSelect
                   name="detection_window_unit"
                   :options="intervalUnits"
@@ -416,19 +453,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="anomaly-detection-window-unit"
                 />
               </div>
-              <!-- Kept for its e2e data-test (never delete a data-test); now
-                   submission-gated like every other error (R3). The OFormInput
-                   wrapper shows the same schema error on the field itself. -->
+              <!-- Keeps the pre-migration e2e data-test (never delete a
+                   data-test). It used to duplicate the OFormInput's own inline
+                   message with a hand-rolled copy; now it IS the single message
+                   for this field, reading the same R3-timed schema error. -->
               <div
-                v-if="
-                  showSqlErrors &&
-                  (!detectionWindowValue || Number(detectionWindowValue) < 1)
-                "
-                class="text-red-8 pt-1"
-                style="font-size: 11px; line-height: 12px"
+                v-if="detectionWindowError"
+                class="text-xs text-input-error-text pt-1"
                 data-test="anomaly-detection-window-error"
+                role="alert"
               >
-                Field is required!
+                {{ detectionWindowError }}
               </div>
             </div>
           </div>
@@ -658,6 +693,7 @@ import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OFormRange from "@/lib/forms/Range/OFormRange.vue";
 import { useOForm } from "@/lib/forms/Form/useOForm";
+import { firstFieldError } from "@/lib/forms/Form/fieldError";
 import {
   createAnomalyDetectionConfigSchema,
   anomalyDetectionConfigDefaults,
@@ -768,6 +804,22 @@ export default defineComponent({
       (s: any) => s.submissionAttempts > 0,
     );
 
+    // The interval controls are composite "number + unit" fields: a ~5.5rem
+    // OFormInput glued to a unit OFormSelect. OFormInput renders its message
+    // INSIDE the number field's own width, which wraps it into a ragged column
+    // and grows the field, pushing the unit select out of line. Same fix as
+    // ScheduledPipeline's composite fields: an empty #error slot suppresses the
+    // built-in message and we render it in a full-width sibling below the pair.
+    // These read the same R3-timed field errors OFormInput would have surfaced —
+    // single source of truth, just displayed at column width.
+    const fieldError = (path: string) =>
+      form.useStore((s: any) =>
+        firstFieldError(s.fieldMeta?.[path]?.errors ?? []),
+      );
+    const histogramIntervalError = fieldError("histogram_interval_value");
+    const scheduleIntervalError = fieldError("schedule_interval_value");
+    const detectionWindowError = fieldError("detection_window_value");
+
     // ── Egress: write-back deep watch (form → props.config) ────────────────
     // OPEN DESIGN DECISION 4: the parent reads props.config directly (live
     // anomalyPreviewSql computed + saveAnomalyDetection payload), and AddAlert/
@@ -832,6 +884,18 @@ export default defineComponent({
       () =>
         queryMode.value === "custom_sql" &&
         hasTimestampAliasInSql(customSql.value || "", getTimestampColumn()),
+    );
+
+    // Bare Monaco has no field binding, so it never gets the red border OForm*
+    // wrappers paint from field state. Without it a rejected save highlighted
+    // nothing: the two error divs below the editor were the only surface, and
+    // they sit directly above a same-size hint line, so they read as more hint
+    // text. Mirror the wrappers' R3 timing (post-submit only) over the same
+    // conditions those two divs render on.
+    const hasSqlError = computed(
+      () =>
+        showSqlErrors.value &&
+        (!customSql.value?.trim() || hasTimestampAlias.value),
     );
 
     // Bridge the bare Monaco editor's value into the form so the schema
@@ -1304,6 +1368,7 @@ export default defineComponent({
       removeFilter,
       validate,
       hasTimestampAlias,
+      hasSqlError,
       queryMode,
       customSql,
       filterRows,
@@ -1312,6 +1377,9 @@ export default defineComponent({
       detectionWindowValue,
       trainingWindowDays,
       showSqlErrors,
+      histogramIntervalError,
+      scheduleIntervalError,
+      detectionWindowError,
       onCustomSqlChange,
       thresholdRange,
       previewActive,

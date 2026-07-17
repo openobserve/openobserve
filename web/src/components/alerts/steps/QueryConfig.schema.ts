@@ -407,6 +407,44 @@ export const makeQueryConfigSchema = (t: Translator) =>
     // conditionValueError) ────────────────────────────────────────────────────
     if (isCustom && isMeasure) {
       const having = (qc.aggregation?.having ?? {}) as Record<string, unknown>;
+
+      // ── Measure column — required (RESTORE of main's red highlight) ─────────
+      // Pre-migration BOTH halves of this rule lived in QueryConfig.validate():
+      // it set a local `columnSelectError` ref (which fed `:error` on a bare
+      // <OSelect> and drew the red border) AND toasted. The migration re-homed
+      // only the toast, into useAlertForm.runImperativeQueryChecks, and dropped
+      // the ref — so save was still blocked but the field stayed grey.
+      //
+      // It has to live HERE, not in an imperative gate: the two selects are now
+      // name-bound <OFormSelect>, which derives `:error` from
+      // `field.state.meta.errors` and OMITS `error` from its props (a
+      // parent-passed `:error` is clobbered by the field-driven binding). Form
+      // state is the ONLY thing that can paint the field.
+      //
+      // ONE path covers BOTH branches — the logs select and the metrics select
+      // bind the same `query_condition.aggregation.having.column` name.
+      //
+      // The predicate mirrors the imperative gate verbatim (aggregation ON + an
+      // aggregation object carrying a non-count function) so nothing tightens
+      // (Rule ④). `aggregation.function` is re-checked against `total_events`
+      // even though `isMeasure` already read `_meta.selectedFunction`: they are
+      // two views of the same choice, and requiring both means a stale bridge
+      // can only ever under-fire, never block a save that used to pass.
+      const aggregation = qc.aggregation;
+      const fn = aggregation?.function;
+      if (meta.aggregationEnabled && aggregation && fn && fn !== "total_events") {
+        // Trim-aware (the old check was `!col || col.trim() === ''`) — a
+        // whitespace-only column is not a column.
+        const column = having.column;
+        if (column == null || String(column).trim() === "") {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["query_condition", "aggregation", "having", "column"],
+            message: t("alerts.validation.aggregationColumnRequired"),
+          });
+        }
+      }
+
       // "value is" field — required (non-empty).
       if (isBlank(having.value)) {
         ctx.addIssue({
@@ -449,12 +487,6 @@ export const makeQueryConfigSchema = (t: Translator) =>
         }
       }
     }
-
-    // NOTE: `aggregation.having.column` (the measure column) is intentionally
-    // NOT enforced here — the imperative pre-save toast ("Column is required
-    // when using an aggregate function.") lives in useAlertForm's
-    // runImperativeQueryChecks (the onSubmit gate) for BOTH logs and metrics
-    // (brief item 6). Enforcing it here too would double-block.
   });
 
 export type QueryConfigForm = z.infer<ReturnType<typeof makeQueryConfigSchema>>;

@@ -28,6 +28,9 @@ const CONDITION_REQUIRED_MESSAGE = t("alerts.validation.fieldRequired");
 const THRESHOLD_REQUIRED_MESSAGE = t("alerts.validation.thresholdPositive");
 const FREQUENCY_REQUIRED_MESSAGE = t("alerts.validation.frequencyPositive");
 const CONDITION_VALUE_REQUIRED_MESSAGE = t("alerts.validation.fieldRequired");
+const AGGREGATION_COLUMN_REQUIRED_MESSAGE = t(
+  "alerts.validation.aggregationColumnRequired",
+);
 const PROMQL_OPERATOR_REQUIRED_MESSAGE = t("alerts.validation.fieldRequired");
 const PROMQL_VALUE_REQUIRED_MESSAGE = t("alerts.validation.fieldRequired");
 
@@ -394,6 +397,109 @@ describe("QueryConfig.schema — conditions tree", () => {
       expect(paths(r)).not.toContain(
         "query_condition.promql_condition.operator",
       );
+    });
+
+    // ── Measure column (RESTORE of the red highlight main drew via
+    // QueryConfig's `columnSelectError` ref). The rule is SCHEMA-owned so the
+    // name-bound <OFormSelect> renders it; the issue path is what paints the
+    // field, so assert the path, not just the failure. ──────────────────────
+    const measureAgg = (overrides: Record<string, any> = {}) => ({
+      _meta: { selectedFunction: "avg", aggregationEnabled: true },
+      query_condition: {
+        aggregation: {
+          function: "avg",
+          group_by: [],
+          having: { column: "field2", operator: ">=", value: 5 },
+          ...(overrides.aggregation || {}),
+        },
+      },
+      ...(overrides.rest || {}),
+    });
+
+    const withColumn = (column: unknown) =>
+      measureAgg({
+        aggregation: { having: { column, operator: ">=", value: 5 } },
+      });
+
+    it("custom measure: blocks an empty aggregation column", () => {
+      const r = parse(withColumn(""));
+      expect(paths(r)).toContain("query_condition.aggregation.having.column");
+      expect(
+        r.error!.issues.find((i: any) => i.path.join(".").endsWith("column"))!
+          .message,
+      ).toBe(AGGREGATION_COLUMN_REQUIRED_MESSAGE);
+    });
+
+    // Parity with the old `!col || col.trim() === ''` predicate.
+    it("custom measure: blocks a whitespace-only aggregation column", () => {
+      expect(paths(parse(withColumn("   ")))).toContain(
+        "query_condition.aggregation.having.column",
+      );
+    });
+
+    it("custom measure: blocks a missing aggregation column", () => {
+      expect(paths(parse(withColumn(undefined)))).toContain(
+        "query_condition.aggregation.having.column",
+      );
+    });
+
+    it("custom measure: a set aggregation column is VALID", () => {
+      expect(paths(parse(withColumn("field2")))).not.toContain(
+        "query_condition.aggregation.having.column",
+      );
+    });
+
+    // ── Gate parity (Rule ④ — the rule must fire in EXACTLY the states the old
+    // imperative check did: aggregation ON + an aggregation object carrying a
+    // non-count function). Each of these used to save and must still save. ───
+    it("count mode (total_events): an empty column is VALID", () => {
+      const r = parse({
+        _meta: { selectedFunction: "total_events", aggregationEnabled: true },
+        query_condition: {
+          aggregation: {
+            function: "total_events",
+            group_by: [],
+            having: { column: "", operator: ">=", value: 5 },
+          },
+        },
+      });
+      expect(paths(r)).not.toContain("query_condition.aggregation.having.column");
+    });
+
+    it("aggregation OFF: an empty column is VALID", () => {
+      const r = parse({
+        _meta: { selectedFunction: "avg", aggregationEnabled: false },
+        query_condition: {
+          aggregation: {
+            function: "avg",
+            group_by: [],
+            having: { column: "", operator: ">=", value: 5 },
+          },
+        },
+      });
+      expect(paths(r)).not.toContain("query_condition.aggregation.having.column");
+    });
+
+    it("no aggregation object: an empty column is VALID", () => {
+      const r = parse({
+        _meta: { selectedFunction: "avg", aggregationEnabled: true },
+        query_condition: { aggregation: null },
+      });
+      expect(paths(r)).not.toContain("query_condition.aggregation.having.column");
+    });
+
+    it("sql tab: the measure column rule does not apply", () => {
+      const r = parse({
+        _meta: { tab: "sql", selectedFunction: "avg", aggregationEnabled: true },
+        query_condition: {
+          aggregation: {
+            function: "avg",
+            group_by: [],
+            having: { column: "", operator: ">=", value: 5 },
+          },
+        },
+      });
+      expect(paths(r)).not.toContain("query_condition.aggregation.having.column");
     });
 
     // ── Measure aggregation (REHOMED + conditionValue) ──────────────────────

@@ -1181,29 +1181,65 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
   // Scoped to the <form>: toasts are also role="alert" and would otherwise win.
   // Invisible messages are skipped — a v-show'd tab has no offsetParent, and
   // focusing a display:none control does nothing.
+  const focusVisibleError = (form: HTMLElement): boolean => {
+    const messages = Array.from(
+      form.querySelectorAll<HTMLElement>('[role="alert"]'),
+    ).filter((el) => el.offsetParent !== null && el.textContent?.trim());
+
+    for (const message of messages) {
+      let node: HTMLElement | null = message.parentElement;
+      while (node && node !== form) {
+        const control = node.querySelector<HTMLElement>(
+          'input:not([type="hidden"]), textarea, [role="combobox"], button[aria-haspopup]',
+        );
+        if (control) {
+          control.focus();
+          control.scrollIntoView({ behavior: "smooth", block: "center" });
+          return true;
+        }
+        node = node.parentElement;
+      }
+    }
+    return false;
+  };
+
   const focusOnFirstError = () => {
-    nextTick(() => {
+    nextTick(async () => {
       const form = document.querySelector("form");
       if (!form) return;
 
-      const messages = Array.from(
-        form.querySelectorAll<HTMLElement>('[role="alert"]'),
-      ).filter((el) => el.offsetParent !== null && el.textContent?.trim());
+      // The offending field is on the tab the user is already looking at.
+      if (focusVisibleError(form)) return;
 
-      for (const message of messages) {
-        let node: HTMLElement | null = message.parentElement;
-        while (node && node !== form) {
-          const control = node.querySelector<HTMLElement>(
-            'input:not([type="hidden"]), textarea, [role="combobox"], button[aria-haspopup]',
-          );
-          if (control) {
-            control.focus();
-            control.scrollIntoView({ behavior: "smooth", block: "center" });
-            return;
-          }
-          node = node.parentElement;
-        }
-      }
+      // Nothing VISIBLE is erroring, but the form is still invalid — so the
+      // offending field lives on a tab the user isn't looking at. That pane is
+      // v-show'd off, so every message inside it has a null offsetParent and the
+      // scan above skips it: the toast fires, points at nothing, and the user is
+      // told to fix a field they cannot see. Bring the owning tab forward first,
+      // then focus for real (this is what the pre-migration save gate did by
+      // hardcoding `activeTab = "condition"` before focusing).
+      // Only hop to a tab that is REACHABLE in the current mode. Every pane stays
+      // in the DOM in both modes (v-show, not v-if) while `alertTabs` swaps the
+      // headers wholesale between anomaly and alert — so a stale message on a
+      // pane whose header isn't rendered would strand the user on a tab the
+      // toggle group cannot show or leave.
+      const stranded = Array.from(
+        form.querySelectorAll<HTMLElement>('[role="alert"]'),
+      ).find((el) => {
+        if (!el.textContent?.trim()) return false;
+        const key = el.closest<HTMLElement>("[data-tab-pane]")?.dataset.tabPane;
+        return !!key && !!form.querySelector(`[data-test="add-alert-tab-${key}"]`);
+      });
+      const pane = stranded?.closest<HTMLElement>("[data-tab-pane]");
+      const tab = pane?.dataset.tabPane;
+      if (!tab || tab === activeTab.value) return;
+
+      activeTab.value = tab;
+      await nextTick();
+      // Re-scan with the visibility filter intact: now that the pane is shown,
+      // its messages have an offsetParent. Anything still hidden (a collapsed
+      // section) is correctly skipped rather than focused into the void.
+      focusVisibleError(form);
     });
   };
 
@@ -1244,8 +1280,9 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     if (!runImperativeQueryChecks()) return false;
     const parsed = addAlertSchema.safeParse(form.state.values);
     if (!parsed.success) {
-      activeTab.value = "condition";
-      await nextTick();
+      // No hardcoded tab switch: focusOnFirstError now walks to the pane that
+      // actually owns the first error, so a topbar error (name/stream) no longer
+      // yanks the user onto the condition tab to look at a field that isn't there.
       focusOnFirstError();
       return false;
     }
@@ -1974,11 +2011,18 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
   // composed schema now owns name/stream + the step field rules, so
   // `useOForm({ onSubmit: performSave })` runs the actual save ONLY when the
   // schema passes. handleSave adds the block-on-invalid + focus + toast that the
-  // old validateAndFocus() gave (anomaly is schema-pass-through and validated
-  // inside saveAnomalyDetection).
+  // old validateAndFocus() gave.
+  //
+  // Anomaly runs this too. It used to be excluded because the anomaly branch was
+  // a pure pass-through — the schema could never fail, so the block was dead code
+  // and saveAnomalyDetection's own toasts were the only feedback. Now that the
+  // branch enforces `name`, excluding anomaly would make a blank name fail
+  // SILENTLY: handleSubmit rejects, performSave never runs, and nothing tells the
+  // user why. The anomaly branch's ONLY rule is the blank name, so this can only
+  // fire for that.
   const handleSave = async () => {
     await form.handleSubmit();
-    if (!isAnomalyMode.value && !form.state.isValid) {
+    if (!form.state.isValid) {
       focusOnFirstError();
       toast({
         variant: "error",
@@ -2057,23 +2101,15 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
         toast({ variant: "error", message: "PromQL query cannot be empty." });
         return false;
       }
-    } else if (tab === "custom") {
-      // Measure alert (aggregation on, a non-count-of-events function) needs a
-      // column. Approximates QueryConfig's selectedFunction!=='total_events'.
-      const agg = qc.aggregation;
-      const fn = agg?.function;
-      if (isAggregationEnabled.value && agg && fn && fn !== "total_events") {
-        const col = agg?.having?.column;
-        if (!col || String(col).trim() === "") {
-          activeTab.value = "condition";
-          toast({
-            variant: "error",
-            message: "Column is required when using an aggregate function.",
-          });
-          return false;
-        }
-      }
     }
+    // NOTE: the custom/measure "Column is required when using an aggregate
+    // function." gate USED to live here as a toast-only check. It moved into the
+    // composed schema (QueryConfig.schema.ts, the isCustom && isMeasure block)
+    // so the name-bound <OFormSelect> actually renders the error — an imperative
+    // toast can never paint a field, which is why the red highlight main drew
+    // (via QueryConfig's `columnSelectError` ref) went missing. Save stays
+    // blocked: a schema issue fails handleSubmit before onSubmit runs, so this
+    // function is never even reached in that state.
     return true;
   };
 
