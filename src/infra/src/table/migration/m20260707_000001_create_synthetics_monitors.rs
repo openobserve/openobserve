@@ -310,6 +310,7 @@ mod tests {
                 "enabled" boolean NOT NULL DEFAULT TRUE,
                 "destinations" json_text NOT NULL,
                 "settings" json_text NOT NULL,
+                "secrets" text NOT NULL DEFAULT '{}',
                 "next_run_at" bigint NOT NULL DEFAULT 0,
                 "last_triggered_at" bigint NOT NULL DEFAULT 0,
                 "last_check_status" integer NOT NULL DEFAULT 0,

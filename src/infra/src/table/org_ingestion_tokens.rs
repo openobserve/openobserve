@@ -387,7 +387,6 @@ mod tests {
             created_by: "system".to_string(),
             created_at: 5000,
             updated_at: 6000,
-            token_type: "ingest".to_string(),
         };
         let record = OrgIngestionTokenRecord::from(model);
         assert_eq!(record.id, "id-2");

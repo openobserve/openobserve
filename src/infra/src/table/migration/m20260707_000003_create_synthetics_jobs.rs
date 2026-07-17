@@ -271,16 +271,16 @@ mod tests {
                 "scheduled_ts" bigint NOT NULL,
                 "valid_until" bigint NOT NULL,
                 "status" integer NOT NULL DEFAULT 0,
-                "claimed_by" varchar(256),
-                "claimed_at" bigint,
-                "lease_expires_at" bigint,
+                "claimed_by" varchar(256) NULL,
+                "claimed_at" bigint NULL,
+                "lease_expires_at" bigint NULL,
                 "dispatch_attempts" integer NOT NULL DEFAULT 0,
                 "run_id" varchar(27) NOT NULL DEFAULT '',
-                "browser_devices" text,
+                "browser_devices" text NULL,
                 "metadata" text NOT NULL DEFAULT '{}',
-                "result" text,
-                "started_at" bigint,
-                "completed_at" bigint,
+                "result" text NULL,
+                "started_at" bigint NULL,
+                "completed_at" bigint NULL,
                 CONSTRAINT "fk_synthetics_jobs_run_id" FOREIGN KEY ("run_id") REFERENCES "synthetics_runs" ("id") ON DELETE CASCADE
             )"#
         );
@@ -321,17 +321,17 @@ mod tests {
                 "scheduled_ts" bigint NOT NULL,
                 "valid_until" bigint NOT NULL,
                 "status" integer NOT NULL DEFAULT 0,
-                "claimed_by" varchar(256),
-                "claimed_at" bigint,
-                "lease_expires_at" bigint,
+                "claimed_by" varchar(256) NULL,
+                "claimed_at" bigint NULL,
+                "lease_expires_at" bigint NULL,
                 "dispatch_attempts" integer NOT NULL DEFAULT 0,
                 "run_id" varchar(27) NOT NULL DEFAULT '',
-                "browser_devices" text,
+                "browser_devices" text NULL,
                 "metadata" text NOT NULL DEFAULT '{}',
-                "result" text,
-                "started_at" bigint,
-                "completed_at" bigint,
-                CONSTRAINT "fk_synthetics_jobs_run_id" FOREIGN KEY ("run_id") REFERENCES "synthetics_runs" ("id") ON DELETE CASCADE
+                "result" text NULL,
+                "started_at" bigint NULL,
+                "completed_at" bigint NULL,
+                FOREIGN KEY ("run_id") REFERENCES "synthetics_runs" ("id") ON DELETE CASCADE
             )"#
         );
     }

@@ -569,6 +569,7 @@ mod tests {
             id: "mon-1".to_string(),
             org_id: "org1".to_string(),
             folder_id: "folder-1".to_string(),
+            tz_offset: 0,
             name: "Login Flow".to_string(),
             synthetics_type: "browser".to_string(),
             target: "https://app.example.com".to_string(),
@@ -635,6 +636,6 @@ mod tests {
         let monitor = Synthetic::try_from(m).unwrap();
         assert_eq!(monitor.next_run_at, 1750000001000000);
         assert_eq!(monitor.last_triggered_at, 1750000000500000);
-        assert_eq!(monitor.last_check_status, SyntheticStatus::Up);
+        assert_eq!(monitor.last_check_status, SyntheticStatus::Passed);
     }
 }

@@ -159,9 +159,9 @@ mod tests {
                 "trigger_type" varchar(64) NOT NULL DEFAULT 'schedule',
                 "job_count" integer NOT NULL DEFAULT 0,
                 "jobs_done" integer NOT NULL DEFAULT 0,
-                "run_result" integer,
+                "run_result" integer NULL,
                 "created_at" bigint NOT NULL,
-                "completed_at" bigint,
+                "completed_at" bigint NULL,
                 CONSTRAINT "fk_synthetics_runs_synthetics_id" FOREIGN KEY ("synthetics_id") REFERENCES "synthetics" ("id") ON DELETE CASCADE
             )"#
         );
@@ -184,10 +184,10 @@ mod tests {
                 "trigger_type" varchar(64) NOT NULL DEFAULT 'schedule',
                 "job_count" integer NOT NULL DEFAULT 0,
                 "jobs_done" integer NOT NULL DEFAULT 0,
-                "run_result" integer,
+                "run_result" integer NULL,
                 "created_at" bigint NOT NULL,
-                "completed_at" bigint,
-                CONSTRAINT "fk_synthetics_runs_synthetics_id" FOREIGN KEY ("synthetics_id") REFERENCES "synthetics" ("id") ON DELETE CASCADE
+                "completed_at" bigint NULL,
+                FOREIGN KEY ("synthetics_id") REFERENCES "synthetics" ("id") ON DELETE CASCADE
             )"#
         );
     }
