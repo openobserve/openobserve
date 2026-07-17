@@ -225,7 +225,7 @@ struct ConfigResponse<'a> {
     #[cfg(feature = "cloud")]
     billing_group_allowed_orgs: String,
     #[cfg(feature = "enterprise")]
-    workflows_enabled: String,
+    workflows_enabled: bool,
 }
 
 #[derive(Serialize, serde::Deserialize)]
