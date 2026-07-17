@@ -192,6 +192,22 @@ export const emptyStatePresets = {
     ],
   },
 
+  // --- no synthetic monitors -------------------------------------------------
+  "no-synthetic-monitors": {
+    illustration: "browser-check",
+    variant: "create",
+    titleKey: "emptyState.noMonitors.title",
+    descriptionKey: "emptyState.noMonitors.description",
+    actions: [
+      {
+        id: "create",
+        icon: "add",
+        titleKey: "emptyState.noMonitors.action",
+        descriptionKey: "emptyState.noMonitors.actionDesc",
+      },
+    ],
+  },
+
   // --- all caught up -------------------------------------------------------
   "no-alerts": {
     illustration: "alert",
@@ -751,5 +767,6 @@ export const presetNouns: Partial<Record<EmptyStatePresetName, string>> = {
   "no-eval-jobs": "emptyState.nouns.evalJobs",
   "no-score-configs": "emptyState.nouns.scoreConfigs",
   "no-pipeline-history": "emptyState.nouns.pipelineHistory",
+  "no-synthetic-monitors": "emptyState.nouns.monitors",
   "no-model-pricing": "emptyState.nouns.modelPricing",
 };

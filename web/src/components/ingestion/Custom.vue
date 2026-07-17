@@ -99,6 +99,7 @@ export default defineComponent({
     );
     const metricRoutes = [
       "prometheus",
+      "vmagent",
       "otelCollector",
       "telegraf",
       "cloudwatchMetrics",

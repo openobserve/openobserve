@@ -475,11 +475,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
 
                 <template #bottom>
-                  <div class="flex w-full justify-between items-center h-[48px]">
+                  <div class="flex w-full justify-between items-center h-12 gap-1">
                     <div
-                      class="o2-table-footer-title flex items-center w-[200px] mr-md"
+                      class="o2-table-footer-title flex items-center min-w-25"
                     >
-                      {{ resultTotal }} {{ t("alerts.header") }}
+                      <template v-if="selectedAlerts.length > 0">{{ selectedAlerts.length }} of {{ resultTotal }} selected</template>
+                      <template v-else>{{ resultTotal }} {{ t("alerts.header") }}</template>
                     </div>
 
                     <OButton
@@ -487,56 +488,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       data-test="alert-list-move-across-folders-btn"
                       variant="outline"
                       size="sm"
-                      class="mr-2"
+                      icon-left="drive-file-move"
                       @click="moveMultipleAlerts"
-                    >
-                      <OIcon name="drive-file-move" size="sm" />
-                      <span class="ml-2">Move</span>
-                    </OButton>
+                    >Move</OButton>
                     <OButton
                       v-if="selectedAlerts.length > 0"
                       data-test="alert-list-export-alerts-btn"
                       variant="outline"
                       size="sm"
-                      class="mr-2"
+                      icon-left="download"
                       @click="multipleExportAlert"
-                    >
-                      <OIcon name="download" size="sm" />
-                      <span class="ml-2">Export</span>
-                    </OButton>
+                    >Export</OButton>
                     <OButton
                       v-if="selectedAlerts.length > 0"
                       data-test="alert-list-pause-alerts-btn"
                       variant="outline"
                       size="sm"
-                      class="mr-2"
+                      icon-left="pause"
                       @click="bulkToggleAlerts('pause')"
-                    >
-                      <OIcon name="pause" size="sm" class="text-button-ghost-destructive-text" />
-                      <span class="ml-2">Pause</span>
-                    </OButton>
+                    >Pause</OButton>
                     <OButton
                       v-if="selectedAlerts.length > 0"
                       data-test="alert-list-unpause-alerts-btn"
                       variant="outline"
                       size="sm"
-                      class="mr-2"
+                      icon-left="play-arrow"
                       @click="bulkToggleAlerts('resume')"
-                    >
-                      <OIcon name="play-arrow" size="sm" class="text-button-ghost-success-text" />
-                      <span class="ml-2">Resume</span>
-                    </OButton>
+                    >Resume</OButton>
                     <OButton
                       v-if="selectedAlerts.length > 0"
                       data-test="alert-list-delete-alerts-btn"
                       variant="outline-destructive"
                       size="sm"
-                      class="mr-2"
+                      icon-left="delete"
                       @click="openBulkDeleteDialog"
-                    >
-                      <OIcon name="delete" size="sm" />
-                      <span class="ml-2">Delete</span>
-                    </OButton>
+                    >Delete</OButton>
                   </div>
                 </template>
               </OTable>

@@ -39,6 +39,7 @@ const props = withDefaults(defineProps<OTableProps<TData>>(), {
   enableColumnResize: false,
   enableColumnReorder: false,
   enableColumnPin: false,
+  enableRowReorder: false,
   persistColumns: false,
   loading: false,
   streaming: false,
@@ -302,7 +303,7 @@ const selection = useTableSelection(table, {
 const expansion = useTableExpansion<TData>(
   {
     expansion: props.expansion,
-    expandedIds: props.expandedIds,
+    expandedIds: () => props.expandedIds,
     rowKey: props.rowKey,
     getSubRows: props.getSubRows,
   },
@@ -906,6 +907,7 @@ defineExpose({
           :is-all-selected="selection.isAllSelected()"
           :is-indeterminate="selection.isIndeterminate()"
           :expansion-enabled="expansion.isEnabled.value"
+          :enable-row-reorder="props.enableRowReorder"
           :enable-column-reorder="props.enableColumnReorder"
           :enable-column-resize="props.enableColumnResize"
           :is-resizing="columnMgmt.isResizing.value"
@@ -935,6 +937,7 @@ defineExpose({
           :table-columns="table.getVisibleLeafColumns()"
           :selection-enabled="selection.isEnabled.value"
           :expansion-enabled="expansion.isEnabled.value"
+          :enable-row-reorder="props.enableRowReorder"
         />
 
         <!-- ── Body ─────────────────────────────────────────── -->
@@ -963,6 +966,10 @@ defineExpose({
           :enable-cell-copy="props.enableCellCopy"
           :loading="props.loading"
           :get-cell-style="(props.getCellStyle as any)"
+          :enable-row-reorder="props.enableRowReorder"
+          :disable-row-reorder="props.disableRowReorder"
+          :global-filter-active="!!globalFilterLocal"
+          :row-key="props.rowKey"
           :virtual-rows="isVirtual ? virtualRows : undefined"
           :total-size="isVirtual ? totalSize : undefined"
           :base-offset="isVirtual ? baseOffset : undefined"
@@ -976,6 +983,7 @@ defineExpose({
             if (canExpand) expansion.toggleRow(row);
             emit('row-click', row, evt);
           }"
+          @row-reorder="(data: TData[]) => emit('row-reorder', data)"
           @row-dblclick="(row: TData, evt: MouseEvent) => emit('row-dblclick', row, evt)"
           @row-mouseenter="(row: TData, evt: MouseEvent) => emit('row-mouseenter', row, evt)"
           @row-mouseleave="(row: TData) => emit('row-mouseleave', row)"
@@ -1027,6 +1035,11 @@ defineExpose({
             <th
               v-if="selection.isMultiple.value"
               class="w-0"
+            />
+            <!-- Drag handle placeholder -->
+            <th
+              v-if="props.enableRowReorder"
+              class="w-0 px-0"
             />
             <th
               v-for="header in footerGroup.headers"

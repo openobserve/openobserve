@@ -308,6 +308,22 @@ fn init_gcp_config(
     builder.build()
 }
 
+pub fn build_signer(
+    config: StorageConfig,
+) -> object_store::Result<Box<dyn object_store::signer::Signer + Send + Sync>> {
+    let provider = config.provider.to_lowercase();
+    match provider.as_str() {
+        "aws" | "s3" | "" => init_aws_config(config)
+            .map(|s| Box::new(s) as Box<dyn object_store::signer::Signer + Send + Sync>),
+        "gcs" | "gcp" => init_gcp_config(config)
+            .map(|s| Box::new(s) as Box<dyn object_store::signer::Signer + Send + Sync>),
+        "azure" => init_azure_config(config)
+            .map(|s| Box::new(s) as Box<dyn object_store::signer::Signer + Send + Sync>),
+        _ => init_aws_config(config)
+            .map(|s| Box::new(s) as Box<dyn object_store::signer::Signer + Send + Sync>),
+    }
+}
+
 fn init_client(config: StorageConfig) -> Box<dyn object_store::ObjectStore> {
     if get_config().common.print_key_config {
         log::info!("s3 init config: {config:?}");

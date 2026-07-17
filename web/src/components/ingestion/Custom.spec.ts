@@ -42,6 +42,7 @@ vi.mock("vue-router", () => ({
   useRoute: () => mockRouter.currentRoute.value,
 }));
 
+
 describe("Custom Component", () => {
   let wrapper: any = null;
 
@@ -102,7 +103,8 @@ describe("Custom Component", () => {
       
       expect(wrapper.vm.metricRoutes).toEqual([
         "prometheus",
-        "otelCollector", 
+        "vmagent",
+        "otelCollector",
         "telegraf",
         "cloudwatchMetrics"
       ]);
@@ -375,7 +377,30 @@ describe("Custom Component", () => {
           }
         },
       });
-      
+
+      expect(testWrapper.vm.tabs).toBe("ingestMetrics");
+      testWrapper.unmount();
+    });
+
+    it("should handle vmagent metric route", () => {
+      mockRouter.currentRoute.value.name = "vmagent";
+
+      const testWrapper = mount(Custom, {
+        props: { currOrgIdentifier: "test-org" },
+        global: {
+          plugins: [i18n],
+          provide: { store },
+          stubs: {
+            'OSplitter': {
+              template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
+            },
+            'OTabs': true,
+            'ORouteTab': true,
+            'router-view': true
+          }
+        },
+      });
+
       expect(testWrapper.vm.tabs).toBe("ingestMetrics");
       testWrapper.unmount();
     });

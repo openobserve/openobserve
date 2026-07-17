@@ -83,12 +83,53 @@ export class JobSchedulerPage {
       // Instead: register a waitForResponse listener BEFORE clicking Get Jobs, then
       // find the trace_id's position in the API response — that position equals the
       // row's data-test index.
+      /**
+       * Re-open the search-scheduler list view from scratch. The scheduler list is
+       * rendered under `v-show="showSearchScheduler"` (logs Index.vue), and that flag is
+       * driven purely by the `action=search_scheduler` URL query param. Navigating to the
+       * scheduler-list URL re-sets the param → showSearchScheduler=true → the list (and
+       * its Get-Jobs button) becomes visible again.
+       */
+      async _navigateToSchedulerList() {
+        const base = process.env["ZO_BASE_URL_SC_UI"] || process.env["ZO_BASE_URL"];
+        const orgId = getOrgIdentifier();
+        await this.page.goto(
+            `${base}/web/logs?action=search_scheduler&org_identifier=${orgId}&type=search_scheduler_list`,
+        );
+        await this.page.waitForLoadState('domcontentloaded');
+      }
+
       async _getJobRowIndex(trace_id, timeout = 15000) {
+        // GRACEFUL WORKAROUND for an app-side flake (origin/fix/search-scheduler-job-issue):
+        // the scheduler list lives under `v-show="showSearchScheduler"`, and Index.vue
+        // resets that flag to false whenever the logs page rewrites the URL query WITHOUT
+        // the `action=search_scheduler` param (updateUrlQueryParams strips it after a
+        // search). The Get-Jobs button is then present in the DOM but display:none, and it
+        // never recovers on its own — so waiting alone times out. Recover by re-navigating
+        // to the scheduler-list URL (which restores the param → re-shows the list) and
+        // retrying. Remove once the app preserves the scheduler view across URL updates.
+        const getJobsBtn = this.page.locator('[data-test="search-scheduler-get-jobs-btn"]');
+        let visible = await getJobsBtn
+            .waitFor({ state: 'visible', timeout: 15000 })
+            .then(() => true)
+            .catch(() => false);
+        for (let attempt = 0; attempt < 3 && !visible; attempt++) {
+            testLogger.warn(
+                `_getJobRowIndex: Get-Jobs button hidden (scheduler view reset) — re-opening scheduler list (attempt ${attempt + 1}/3)`,
+            );
+            await this._navigateToSchedulerList();
+            visible = await getJobsBtn
+                .waitFor({ state: 'visible', timeout: 15000 })
+                .then(() => true)
+                .catch(() => false);
+        }
+        // Final gate — if it is still hidden, surface a clear failure.
+        await getJobsBtn.waitFor({ state: 'visible', timeout: 10000 });
         const responsePromise = this.page.waitForResponse(
             resp => resp.url().includes('/search_jobs') && resp.request().method() === 'GET',
             { timeout }
         );
-        await this.page.locator('[data-test="search-scheduler-get-jobs-btn"]').click();
+        await getJobsBtn.click();
         const response = await responsePromise;
         const jobs = await response.json();
         return jobs.findIndex(job => job.trace_id === trace_id);

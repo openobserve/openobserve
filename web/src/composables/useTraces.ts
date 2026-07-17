@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { reactive, computed, nextTick } from "vue";
+import { reactive, computed, nextTick, shallowRef } from "vue";
 import {
   b64EncodeStandard,
   b64EncodeUnicode,
@@ -199,6 +199,27 @@ export const DEFAULT_TRACE_COLUMNS: Record<"traces" | "spans", string[]> = {
     "status",
     "service_latency",
   ],
+};
+
+// Shared SQL parser singleton — loaded once by Index.vue in onBeforeMount,
+// then reused across all child components (SearchBar, IndexList, TracesMetricsDashboard).
+// This avoids redundant WASM loads and prevents timing issues where a component's
+// onMounted calls loadDashboard before its own parser finishes loading.
+const tracesParser = shallowRef<any>(null);
+let _loadTracesParserPromise: Promise<void> | null = null;
+
+const loadTracesParser = async (): Promise<void> => {
+  if (tracesParser.value) return;
+  if (_loadTracesParserPromise) {
+    await _loadTracesParserPromise;
+    return;
+  }
+  _loadTracesParserPromise = (async () => {
+    const useSqlParser: any = await import("@/composables/useParser");
+    const { sqlParser }: any = useSqlParser.default();
+    tracesParser.value = await sqlParser();
+  })();
+  await _loadTracesParserPromise;
 };
 
 const useTraces = () => {
@@ -543,6 +564,8 @@ const useTraces = () => {
     formatTracesMetaData,
     setServiceColors,
     getOrSetServiceColor,
+    tracesParser,
+    loadTracesParser,
   };
 };
 

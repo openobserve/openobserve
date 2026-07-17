@@ -5032,6 +5032,7 @@ dependencies = [
  "tonic",
  "tracing",
  "tracing-opentelemetry",
+ "url",
  "zstd",
 ]
 

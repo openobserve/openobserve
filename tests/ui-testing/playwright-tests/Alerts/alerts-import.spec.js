@@ -1,8 +1,9 @@
 const { test, expect } = require('../utils/enhanced-baseFixtures.js');
+const fs = require('fs');
 const logData = require("../../fixtures/log.json");
 const PageManager = require('../../pages/page-manager.js');
 const testLogger = require('../utils/test-logger.js');
-const { getOrgIdentifier } = require('../utils/cloud-auth.js');
+const { getOrgIdentifier, isCloudEnvironment } = require('../utils/cloud-auth.js');
 
 // Test timeout constants (in milliseconds)
 const FIVE_MINUTES_MS = 300000;
@@ -98,18 +99,25 @@ test.describe("Alerts Import/Export", () => {
       { intervals: [2000, 3000, 5000, 5000, 5000, 5000, 5000], timeout: ALERT_REGISTRATION_WAIT_MS }
     ).toBe(true);
 
-    // Trigger and validate alert fires (self-referential destination approach)
-    const triggerResult = await pm.alertsPage.verifyAlertTrigger(
-      pm,
-      alertName,
-      triggerStreamName,
-      column,
-      value,
-      ALERT_TRIGGER_TIMEOUT_MS,
-      validationInfra.streamName
-    );
-    expect(triggerResult.found, `Alert ${alertName} should fire and appear in validation stream`).toBe(true);
-    testLogger.info('Alert trigger validation PASSED', { alertName, triggerResult });
+    // Trigger and validate alert fires (self-referential destination approach).
+    // On cloud the SSRF guard blocks self-referencing destinations, so the validation
+    // destination points at an external sink there and this round-trip check cannot
+    // work — skip it and keep the import/export coverage below.
+    if (!isCloudEnvironment()) {
+      const triggerResult = await pm.alertsPage.verifyAlertTrigger(
+        pm,
+        alertName,
+        triggerStreamName,
+        column,
+        value,
+        ALERT_TRIGGER_TIMEOUT_MS,
+        validationInfra.streamName
+      );
+      expect(triggerResult.found, `Alert ${alertName} should fire and appear in validation stream`).toBe(true);
+      testLogger.info('Alert trigger validation PASSED', { alertName, triggerResult });
+    } else {
+      testLogger.info('Skipping trigger round-trip validation on cloud (SSRF guard blocks self-referencing destination)');
+    }
 
     await pm.commonActions.navigateToAlerts();
     await pm.alertsPage.navigateToFolder(folderName);
@@ -118,6 +126,19 @@ test.describe("Alerts Import/Export", () => {
     const download = await pm.alertsPage.exportAlerts();
     const downloadPath = `./alerts-${new Date().toISOString().split('T')[0]}-${triggerStreamName}.json`;
     await download.saveAs(downloadPath);
+
+    // Explicit export assertion — the one that runs on BOTH cloud and non-cloud.
+    // On cloud the trigger round-trip above is skipped, so without this the test
+    // would carry no in-body assertion; verify the exported file is present, is
+    // valid JSON, and actually contains the alert we just exported.
+    const exportedRaw = fs.readFileSync(downloadPath, 'utf8');
+    expect(exportedRaw.length, 'Exported alerts file should not be empty').toBeGreaterThan(0);
+    const exportedJson = JSON.parse(exportedRaw);
+    expect(
+      JSON.stringify(exportedJson).includes(alertName),
+      `Exported alerts file should contain alert ${alertName}`
+    ).toBe(true);
+    testLogger.info('Alert export artifact validated', { alertName, downloadPath });
 
     // Delete the original alert before importing to avoid duplicate ID/name conflicts.
     // The import API (POST /api/v2/{org}/alerts) creates a new alert — if the same

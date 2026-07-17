@@ -78,6 +78,21 @@ pub fn generate_token() -> String {
     format!("{}{}", ORG_INGESTION_TOKEN_PREFIX, random_part)
 }
 
+/// Find an org ingestion token by value only (global — no org_id filter).
+/// Used for paths that have no org_id in the URL (e.g. synthetics job API).
+pub async fn find_enabled_token_global(
+    token: &str,
+) -> Result<Option<OrgIngestionTokenRecord>, errors::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let record = Entity::find()
+        .filter(Column::Token.eq(token))
+        .filter(Column::Enabled.eq(true))
+        .one(client)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+    Ok(record.map(OrgIngestionTokenRecord::from))
+}
+
 /// Insert a new org ingestion token row.
 pub async fn add(record: &OrgIngestionTokenRecord) -> Result<(), errors::Error> {
     let _lock = get_lock().await;

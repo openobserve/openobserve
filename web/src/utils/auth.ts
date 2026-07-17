@@ -182,7 +182,7 @@ export const routeGuard = async (to: any, from: any, next: any) => {
 export const verifyOrganizationStatus = (_Organizations: any, _Router: any) => {};
 
 export const generateTraceContext = () => {
-  const traceId = getUUIDv7().replace(/-/g, "");
+  const traceId = getUUIDv7(true);
   const spanId = getUUID().replace(/-/g, "").slice(0, 16);
 
   return {
