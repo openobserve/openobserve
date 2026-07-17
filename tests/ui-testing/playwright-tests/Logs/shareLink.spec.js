@@ -133,22 +133,11 @@ test.describe("Share Link Test Cases", () => {
     await pm.logsPage.selectStream(TEST_STREAM);
     await page.waitForTimeout(2000);
 
-    // Step 2: Enable SQL mode and wait for the auto-filled SELECT query to land in the
-    // editor. SQL mode is auto-detected from editor content, and the auto-fill lags the
-    // toggle under load — asserting immediately read the editor as empty on CI.
-    await pm.logsPage.enableSqlModeIfNeeded();
-    await pm.logsPage.waitForQueryEditorContent('SELECT');
-
-    // Step 3: Commit the query WITHOUT cancelling the SQL-mode auto-search. A bare refresh
-    // click cancels the in-flight search (the button is in "Cancel query" mode while the
-    // enable-SQL auto-search runs), which reverts sqlMode and leaves the short URL with
-    // sql_mode=false / no query — the root cause of the CI flake. runQueryAndWaitForResults
-    // waits for the Cancel state to clear before clicking, then waits for completion.
-    await pm.logsPage.runQueryAndWaitForResults();
-
-    // Step 4: Verify SQL mode is committed to the URL (authoritative) before sharing, so
-    // the generated short URL captures sql_mode=true + the query.
-    await pm.logsPage.waitForUrlParam('sql_mode', 'true');
+    // Step 2-4: Deterministically enable SQL mode, set the query, run it (without cancelling
+    // the auto-search), and confirm sql_mode committed to the URL — retries once then
+    // strict-asserts, so the generated short URL reliably captures sql_mode=true + the query
+    // (previously enableSqlModeIfNeeded didn't stick on CI, leaving sql_mode=false).
+    await pm.logsPage.setupSqlQueryForShare(`SELECT * FROM "${TEST_STREAM}"`);
     testLogger.info('SQL mode enabled before sharing');
 
     // Step 5: Click share link and get URL

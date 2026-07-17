@@ -1659,8 +1659,11 @@ export class LogsPage {
         const isInline = await inlineBtn.isVisible({ timeout: 2000 }).catch(() => false);
         if (isInline) {
             // Normal viewport: the OSwitch inner button carries data-state="unchecked" when OFF.
+            // The Reka OSwitch animates the checked→unchecked transition, and under CI load the
+            // settled state can appear >5s after the toggle+execute — poll longer (still asserts
+            // the real end-state, not an arbitrary sleep) to avoid the flaky 5s ceiling.
             const switchUnchecked = inlineBtn.locator('[data-state="unchecked"]');
-            await expect(switchUnchecked).toBeVisible({ timeout: 5000 });
+            await expect(switchUnchecked).toBeVisible({ timeout: 15000 });
             return;
         }
         // Narrow-viewport fallback: check state via the utilities menu item.
@@ -1669,7 +1672,7 @@ export class LogsPage {
         const isMenuVisible = await histogramMenuItem.isVisible({ timeout: 2000 }).catch(() => false);
         if (isMenuVisible) {
             const switchEl = this.page.locator(`[data-test="logs-search-bar-menu-histogram-btn"] [data-state="unchecked"]`).first();
-            await expect(switchEl).toBeVisible({ timeout: 5000 });
+            await expect(switchEl).toBeVisible({ timeout: 15000 });
         }
         await this.page.keyboard.press('Escape').catch(() => {});
     }
@@ -7432,9 +7435,13 @@ export class LogsPage {
      * @param {string} key - the query param name, e.g. 'show_histogram'
      * @param {string|null} expectedValue - if provided, wait until the value equals this
      * @param {number} timeout
+     * @param {boolean} required - when true, THROW if the param never appears/matches within
+     *   the budget (use before an action that must observe a committed state, e.g. requiring
+     *   sql_mode=true before sharing so the short URL can't capture a non-SQL state). When
+     *   false (default) it is best-effort: it logs a warning and returns the current value.
      * @returns {Promise<string|null>} the param value once present (null if it never appears)
      */
-    async waitForUrlParam(key, expectedValue = null, timeout = 20000) {
+    async waitForUrlParam(key, expectedValue = null, timeout = 20000, required = false) {
         try {
             await expect.poll(
                 async () => {
@@ -7446,10 +7453,50 @@ export class LogsPage {
                 { timeout, intervals: [200, 500, 1000] }
             ).toBe(true);
         } catch (e) {
+            if (required) {
+                const actual = this.parseUrlParams(await this.getCurrentUrl())[key] ?? null;
+                throw new Error(
+                    `Required URL param "${key}"${expectedValue !== null ? `="${expectedValue}"` : ''} never appeared within ${timeout}ms (actual: ${actual})`
+                );
+            }
             testLogger.warn('URL param did not appear within budget', { key, expectedValue });
         }
         const params = this.parseUrlParams(await this.getCurrentUrl());
         return params[key] ?? null;
+    }
+
+    /**
+     * Deterministically set up SQL mode + an exact query and COMMIT it to the URL, so a
+     * subsequent share captures sql_mode=true + the query in the short URL.
+     *
+     * Combines the two mechanisms that each alone were flaky on CI:
+     *  - enableSqlModeIfNeeded() sets searchObj.meta.sqlMode=true via Vue (this — not editor
+     *    content — is what the app writes to the URL as sql_mode; writing SELECT text alone
+     *    does NOT reliably flip the flag).
+     *  - setQueryEditorContent() writes the exact query via Monaco executeEdits with a verify
+     *    poll (reliable, unlike clearAndFillQueryEditor whose focus-sensitive Ctrl+A select-all
+     *    silently appended → a doubled query on CI).
+     * Then runQueryAndWaitForResults() commits without cancelling the in-flight auto-search,
+     * and we confirm sql_mode landed in the URL. The whole sequence retries once if the flag
+     * didn't commit (the occasional Vue-mutation miss under load), then strict-asserts.
+     * @param {string} query - the SQL query to set (must be a SELECT ... FROM ...)
+     */
+    async setupSqlQueryForShare(query) {
+        for (let attempt = 1; attempt <= 2; attempt++) {
+            await this.enableSqlModeIfNeeded();
+            await this.setQueryEditorContent(query);
+            await this.waitForQueryEditorContent(query.split(/\s+/)[0]); // first token, e.g. SELECT
+            await this.runQueryAndWaitForResults();
+            const committed = await this.waitForUrlParam('sql_mode', 'true', 15000, false);
+            if (committed === 'true') {
+                testLogger.info('setupSqlQueryForShare: sql_mode committed to URL', { attempt });
+                return;
+            }
+            testLogger.warn(`setupSqlQueryForShare: sql_mode not committed (attempt ${attempt}) — retrying`);
+        }
+        // Still not committed after the retry — fail fast with a clear message rather than
+        // sharing a non-SQL state that would fail confusingly at the post-redirect editor read.
+        await this.waitForUrlParam('sql_mode', 'true', 5000, true);
     }
 
     /**

@@ -91,21 +91,13 @@ test.describe("Monaco Editor Query Pre-fill Tests", () => {
     await pm.logsPage.selectStream(TEST_STREAM);
     await page.waitForTimeout(2000);
 
-    // Step 3: Enable SQL mode
-    await pm.logsPage.enableSqlModeIfNeeded();
-
-    // Step 4: Enter a specific SQL query
+    // Step 3-5: Deterministically enable SQL mode, set the exact query, run it, and confirm
+    // sql_mode committed to the URL (retries once, then strict-asserts). This replaces the
+    // flaky enableSqlModeIfNeeded + clearAndFillQueryEditor combo that let the share capture
+    // a non-SQL state, so the short URL lacked sql_mode/query and the redirect landed on an
+    // empty editor — the root cause of the CI flake on this P0 test.
     const testQuery = `SELECT * FROM "${TEST_STREAM}" WHERE code = 200 LIMIT 50`;
-    await pm.logsPage.clearAndFillQueryEditor(testQuery);
-    await pm.logsPage.waitForQueryEditorContent('WHERE');
-
-    // Step 5: Execute WITHOUT cancelling the in-flight auto-search. A bare refresh click
-    // cancels it (button is in "Cancel query" mode), so the query never commits to the URL
-    // and the generated short URL lacks it — the redirect then lands on an empty editor.
-    // runQueryAndWaitForResults waits for the Cancel state to clear before clicking.
-    await pm.logsPage.runQueryAndWaitForResults();
-    // Ensure the query is committed to the URL before sharing so the short URL captures it.
-    await pm.logsPage.waitForUrlParam('sql_mode', 'true');
+    await pm.logsPage.setupSqlQueryForShare(testQuery);
 
     // Step 6: Click share link and get URL
     const sharedUrl = await pm.logsPage.clickShareLinkAndGetUrl();
@@ -297,19 +289,10 @@ test.describe("Monaco Editor Query Pre-fill Tests", () => {
     // Step 3: Set specific time range (1 hour)
     await pm.logsPage.clickRelativeTimeButton('1-h');
 
-    // Step 4: Enable SQL mode
-    await pm.logsPage.enableSqlModeIfNeeded();
-
-    // Step 5: Enter a query
+    // Step 4-6: Deterministically enable SQL mode + set the query + commit sql_mode to the
+    // URL (retries once, then strict-asserts) so the share captures it reliably.
     const testQuery = `SELECT * FROM "${TEST_STREAM}" LIMIT 100`;
-    await pm.logsPage.clearAndFillQueryEditor(testQuery);
-    await pm.logsPage.waitForQueryEditorContent('LIMIT');
-
-    // Step 6: Execute WITHOUT cancelling the in-flight auto-search (a bare refresh click
-    // cancels it, so the query never commits to the URL / short URL). runQueryAndWaitForResults
-    // waits for the Cancel state to clear before clicking.
-    await pm.logsPage.runQueryAndWaitForResults();
-    await pm.logsPage.waitForUrlParam('sql_mode', 'true');
+    await pm.logsPage.setupSqlQueryForShare(testQuery);
 
     // Step 7: Capture state before sharing
     const originalState = await pm.logsPage.captureCurrentState();
