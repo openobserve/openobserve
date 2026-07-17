@@ -78,12 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <!-- Hold a picker-shaped skeleton until the stream list lands, so
                    the selector doesn't flash an empty dropdown then populate. -->
-              <SkeletonBox
-                v-if="!streamsLoaded"
-                width="100%"
-                height="2.125rem"
-                rounded-sm
-              />
+              <OSkeleton type="text" v-if="!streamsLoaded" class="w-full h-8.5" />
               <OSelect
                 v-else
                 v-model="activeStream"
@@ -104,12 +99,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Same treatment for agents: toggling to Agent mode kicks off the
                    listAgents fetch, so show the skeleton until it resolves
                    instead of an empty agent picker. -->
-              <SkeletonBox
-                v-if="!agentsLoaded"
-                width="100%"
-                height="2.125rem"
-                rounded-sm
-              />
+              <OSkeleton type="text" v-if="!agentsLoaded" class="w-full h-8.5" />
               <OSelect
                 v-else
                 v-model="activeAgent"
@@ -262,7 +252,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
-import SkeletonBox from "@/components/shared/SkeletonBox.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import genAiAgentMappingService, {

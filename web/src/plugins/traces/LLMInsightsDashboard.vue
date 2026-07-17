@@ -70,12 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Hold a picker-shaped skeleton until the agents list lands the first
              time, so the dropdown doesn't flash an empty "Agent" picker before
              its options exist. -->
-        <SkeletonBox
-          v-if="!agentsLoaded"
-          width="100%"
-          height="2.125rem"
-          rounded-sm
-        />
+        <OSkeleton type="text" v-if="!agentsLoaded" class="w-full h-8.5" />
         <OSelect
           v-else
           v-model="activeAgent"
@@ -180,17 +175,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                showing a chart before the number reads as ready, so we hold both. -->
           <template v-if="card.loading">
             <div class="flex flex-col gap-[0.25rem]">
-              <SkeletonBox width="60%" height="12px" rounded-sm />
-              <SkeletonBox width="55%" height="22px" rounded-sm />
+              <OSkeleton type="text" class="w-[60%] h-3" />
+              <OSkeleton type="text" class="w-[55%] h-5.5" />
             </div>
             <div class="flex items-end gap-[0.15rem] h-8 mt-auto">
-              <SkeletonBox
-                v-for="bar in 16"
-                :key="bar"
-                width="100%"
-                :height="`${30 + ((bar * 23) % 65)}%`"
-                rounded-sm
-              />
+              <OSkeleton type="text" v-for="bar in 16" :key="bar" :style="{ height: `${30 + ((bar * 23) % 65)}%` }" class="w-full" />
             </div>
           </template>
           <template v-else>
@@ -285,7 +274,7 @@ import KpiSparkline from "./KpiSparkline.vue";
 import LLMSchemaPanel from "./LLMSchemaPanel.vue";
 import LLMErrorTable from "./LLMErrorTable.vue";
 import LLMInsightsSkeleton from "./LLMInsightsSkeleton.vue";
-import SkeletonBox from "@/components/shared/SkeletonBox.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";

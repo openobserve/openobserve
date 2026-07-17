@@ -10,13 +10,7 @@
         <!-- While the agent list is loading we swap the select for a skeleton
              of the same height so the control reads as "loading" (and can't be
              opened on an empty list) instead of showing an empty dropdown. -->
-        <SkeletonBox
-          v-if="agentsLoading"
-          width="100%"
-          height="2.125rem"
-          rounded-sm
-          data-test="quality-agent-filter-skeleton"
-        />
+        <OSkeleton type="text" v-if="agentsLoading" data-test="quality-agent-filter-skeleton" class="w-full h-8.5" />
         <OSelect
           v-else
           v-model="agentModel"
@@ -128,7 +122,7 @@ import QualityDetailPanel from "./quality/QualityDetailPanel.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
-import SkeletonBox from "@/components/shared/SkeletonBox.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import type { AgentFilterSelection } from "./utils/agentFilterSql";
 
 const props = defineProps<{

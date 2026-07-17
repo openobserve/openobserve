@@ -17,7 +17,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { mount } from "@vue/test-utils";
 import HomeViewSkeleton from "./HomeViewSkeleton.vue";
 import { createStore } from "vuex";
-import SkeletonBox from "./SkeletonBox.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 
 
 describe("HomeViewSkeleton", () => {
@@ -36,7 +36,7 @@ describe("HomeViewSkeleton", () => {
       global: {
         plugins: [store],
         stubs: {
-          SkeletonBox: true,
+          OSkeleton: true,
         },
       },
     });
@@ -49,7 +49,7 @@ describe("HomeViewSkeleton", () => {
       global: {
         plugins: [store],
         stubs: {
-          SkeletonBox: true,
+          OSkeleton: true,
         },
       },
     });
@@ -71,7 +71,7 @@ describe("HomeViewSkeleton", () => {
       global: {
         plugins: [darkStore],
         stubs: {
-          SkeletonBox: true,
+          OSkeleton: true,
         },
       },
     });
@@ -88,7 +88,7 @@ describe("HomeViewSkeleton", () => {
       global: {
         plugins: [store],
         stubs: {
-          SkeletonBox: true,
+          OSkeleton: true,
         },
       },
     });
@@ -102,7 +102,7 @@ describe("HomeViewSkeleton", () => {
       global: {
         plugins: [store],
         stubs: {
-          SkeletonBox: true,
+          OSkeleton: true,
         },
       },
     });
@@ -119,7 +119,7 @@ describe("HomeViewSkeleton", () => {
       global: {
         plugins: [store],
         stubs: {
-          SkeletonBox: true,
+          OSkeleton: true,
         },
       },
     });
@@ -136,7 +136,7 @@ describe("HomeViewSkeleton", () => {
       global: {
         plugins: [store],
         stubs: {
-          SkeletonBox: true,
+          OSkeleton: true,
         },
       },
     });
@@ -150,7 +150,7 @@ describe("HomeViewSkeleton", () => {
       global: {
         plugins: [store],
         stubs: {
-          SkeletonBox: true,
+          OSkeleton: true,
         },
       },
     });
@@ -164,7 +164,7 @@ describe("HomeViewSkeleton", () => {
       global: {
         plugins: [store],
         stubs: {
-          SkeletonBox: true,
+          OSkeleton: true,
         },
       },
     });
@@ -178,7 +178,7 @@ describe("HomeViewSkeleton", () => {
       global: {
         plugins: [store],
         stubs: {
-          SkeletonBox: true,
+          OSkeleton: true,
         },
       },
     });
@@ -192,7 +192,7 @@ describe("HomeViewSkeleton", () => {
       global: {
         plugins: [store],
         stubs: {
-          SkeletonBox: true,
+          OSkeleton: true,
         },
       },
     });
@@ -201,17 +201,17 @@ describe("HomeViewSkeleton", () => {
     expect(secondChart.exists()).toBe(true);
   });
 
-  it("should render SkeletonBox components", () => {
+  it("should render OSkeleton components", () => {
     const wrapper = mount(HomeViewSkeleton, {
       global: {
         plugins: [store],
         components: {
-          SkeletonBox,
+          OSkeleton,
         },
       },
     });
 
-    const skeletonBoxes = wrapper.findAllComponents(SkeletonBox);
+    const skeletonBoxes = wrapper.findAllComponents(OSkeleton);
     expect(skeletonBoxes.length).toBeGreaterThan(0);
   });
 
@@ -220,7 +220,7 @@ describe("HomeViewSkeleton", () => {
       global: {
         plugins: [store],
         stubs: {
-          SkeletonBox: true,
+          OSkeleton: true,
         },
       },
     });
@@ -237,7 +237,7 @@ describe("HomeViewSkeleton", () => {
       global: {
         plugins: [store],
         stubs: {
-          SkeletonBox: true,
+          OSkeleton: true,
         },
       },
     });
@@ -251,7 +251,7 @@ describe("HomeViewSkeleton", () => {
       global: {
         plugins: [store],
         stubs: {
-          SkeletonBox: true,
+          OSkeleton: true,
         },
       },
     });

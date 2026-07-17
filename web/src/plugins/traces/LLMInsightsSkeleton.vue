@@ -26,8 +26,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="!kpiOnly && !hideToolbar"
       class="flex items-center justify-end gap-[0.5rem] py-[0.5rem]"
     >
-      <SkeletonBox width="116px" height="32px" rounded-sm />
-      <SkeletonBox width="14rem" height="36px" rounded-sm />
+      <OSkeleton type="text" class="w-29 h-8" />
+      <OSkeleton type="text" class="w-56 h-9" />
     </div>
 
     <!-- Row 1: 5 KPI cards -->
@@ -37,17 +37,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :key="n"
         class="bg-(--tile-bg) border border-(--tile-border) text-(--text-primary) rounded-lg py-[0.625rem] px-[0.875rem] flex flex-col gap-2 h-32.5 tile-content"
       >
-        <SkeletonBox width="60%" height="12px" rounded-sm />
-        <SkeletonBox width="55%" height="22px" rounded-sm />
-        <SkeletonBox width="40%" height="10px" rounded-sm />
+        <OSkeleton type="text" class="w-[60%] h-3" />
+        <OSkeleton type="text" class="w-[55%] h-5.5" />
+        <OSkeleton type="text" class="w-[40%] h-2.5" />
         <div class="flex items-end gap-[0.15rem] h-8 mt-auto">
-          <SkeletonBox
-            v-for="bar in 16"
-            :key="bar"
-            width="100%"
-            :height="`${30 + ((bar * 23) % 65)}%`"
-            rounded-sm
-          />
+          <OSkeleton type="text" v-for="bar in 16" :key="bar" :style="{ height: `${30 + ((bar * 23) % 65)}%` }" class="w-full" />
         </div>
       </div>
     </div>
@@ -59,8 +53,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :key="n"
         class="bg-(--tile-bg) border border-(--tile-border) text-(--text-primary) rounded-lg p-4 flex flex-col gap-[0.4rem] tile-content"
       >
-        <SkeletonBox width="120px" height="16px" rounded-sm />
-        <SkeletonBox width="160px" height="10px" rounded-sm />
+        <OSkeleton type="text" class="w-30 h-4" />
+        <OSkeleton type="text" class="w-40 h-2.5" />
         <div class="relative h-55 mt-2 overflow-hidden">
           <svg
             class="w-full h-full block"
@@ -87,20 +81,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="!kpiOnly"
       class="bg-(--tile-bg) border border-(--tile-border) text-(--text-primary) rounded-lg p-4 flex flex-col gap-[0.4rem] tile-content"
     >
-      <SkeletonBox width="120px" height="16px" rounded-sm />
-      <SkeletonBox width="160px" height="10px" rounded-sm />
+      <OSkeleton type="text" class="w-30 h-4" />
+      <OSkeleton type="text" class="w-40 h-2.5" />
       <div class="flex flex-col gap-2 mt-2">
         <div
           v-for="row in 5"
           :key="row"
           class="panel-tile__row flex items-center gap-3 py-1 border-t first:border-t-0 border-(--tile-border)"
         >
-          <SkeletonBox width="70px" height="14px" rounded-sm />
-          <SkeletonBox width="90px" height="20px" rounded-sm />
-          <SkeletonBox width="180px" height="14px" rounded-sm />
-          <SkeletonBox width="110px" height="14px" rounded-sm />
-          <SkeletonBox width="60px" height="14px" rounded-sm />
-          <SkeletonBox width="50px" height="14px" rounded-sm />
+          <OSkeleton type="text" class="w-17.5 h-3.5" />
+          <OSkeleton type="text" class="w-22.5 h-5" />
+          <OSkeleton type="text" class="w-45 h-3.5" />
+          <OSkeleton type="text" class="w-27.5 h-3.5" />
+          <OSkeleton type="text" class="w-15 h-3.5" />
+          <OSkeleton type="text" class="w-12.5 h-3.5" />
         </div>
       </div>
     </div>
@@ -108,29 +102,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { useStore } from "vuex";
-import SkeletonBox from "@/components/shared/SkeletonBox.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 
 // kpiOnly: render just the KPI tiles row. Used when the trend/table panels
 // render live underneath (firing their own queries) while only the KPI strip
 // is still loading — so the panels aren't blocked behind the KPI fetch.
 defineProps<{ kpiOnly?: boolean; hideToolbar?: boolean }>();
-
-const store = useStore();
 </script>
 
 <style scoped>
-/* keep(keyframes): the `.skeleton-box` gradient overrides below re-skin the root
-   of the SkeletonBox child component per theme and pair with the `o2-skel-wave`
-   animation. Kept as CSS rather than utilities on each <SkeletonBox> because the
-   `background` shorthand has to beat the child's own `bg-skeleton-base` utility
-   (class order does not guarantee that) and because `.dark` / `:root:not(.dark)`
-   ancestor pairs have no utility form here.
-   Scoping IS safe: Vue puts this component's scope id on a child component's
-   root element, and `o2-skel-wave` still lives in styles/keyframes.css — the
-   scoped compiler only renames names *declared* in this block, so a reference to
-   a global keyframe passes through untouched and still resolves.
-   keep(keyframes): `line-pulse` below is this component's alone, so it is
+/* keep(keyframes): `line-pulse` below is this component's alone, so it is
    declared here. Its `animation` moved out of the template `[animation:…]`
    utilities on the two <path>s and into the rules below — the scoped compiler
    renames a keyframe and its `animation:` together only within this block, and
@@ -138,46 +119,14 @@ const store = useStore();
    `.tile-content` publishes the --tile-* contract for this component's own
    tiles; it is scoped now because the other `.tile-content` users
    (HomeViewSkeleton, logstream/schema) set their own bg/border/text utilities
-   and never depended on these values. */
+   and never depended on these values.
+   The per-theme `.skeleton-box` gradient re-skins that used to live here are
+   gone: OSkeleton owns its own theme-aware shimmer, so re-skinning a child
+   primitive's internals from the outside is no longer needed (or possible). */
 .tile-content {
   --tile-bg: var(--color-surface-base);
   --tile-border: var(--color-border-default);
   --text-primary: var(--color-text-heading);
-}
-
-/* Skeleton overrides — same pattern as HomeViewSkeleton. Redefines the
-   SkeletonBox child component's gradient for proper per-theme contrast. */
-.skeleton-box {
-  background: linear-gradient(
-    90deg,
-    transparent,
-    color-mix(in srgb, var(--color-white) 15%, transparent),
-    transparent
-  );
-  background-size: 200% 100%;
-  animation: o2-skel-wave 1.5s ease-in-out infinite;
-  position: relative;
-  overflow: hidden;
-}
-
-.dark .tile-content .skeleton-box {
-  background: linear-gradient(
-    90deg,
-    color-mix(in srgb, var(--color-white) 4%, transparent),
-    color-mix(in srgb, var(--color-white) 12%, transparent),
-    color-mix(in srgb, var(--color-white) 4%, transparent)
-  );
-  background-size: 200% 100%;
-}
-
-:root:not(.dark) .tile-content .skeleton-box {
-  background: linear-gradient(
-    90deg,
-    color-mix(in srgb, var(--color-black) 4%, transparent),
-    color-mix(in srgb, var(--color-black) 10%, transparent),
-    color-mix(in srgb, var(--color-black) 4%, transparent)
-  );
-  background-size: 200% 100%;
 }
 
 /* Breathing sparkline placeholder — the area fill and the line stroke pulse in

@@ -59,22 +59,3 @@
     transform: translateY(0);
   }
 }
-
-/* ── Skeleton wave — SHARED by QualityKpiSkeleton.vue (was `qkpi-skel-wave`)
-      and LLMInsightsSkeleton.vue (was `llm-skel-wave`); identical bodies.
-      Sweeps background-position the opposite way to o2-skel-shimmer.
-      Both consumers already reuse the SkeletonBox component and deliberately
-      re-skin its `.skeleton-box` root with a background-position sweep (each
-      with its own gradient) instead of SkeletonBox's translateX beam — so the
-      sharing is of the motion only, and there is no component left to collapse.
-      Both reference this from scoped CSS, not a template utility; the scoped
-      compiler only renames names *declared* in a block, so a reference to this
-      global name passes through untouched and still resolves. ─────────────── */
-@keyframes o2-skel-wave {
-  0% {
-    background-position: -200% 0;
-  }
-  100% {
-    background-position: 200% 0;
-  }
-}

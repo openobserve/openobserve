@@ -14,10 +14,10 @@
       <!-- Header -->
       <div data-test="home-view-skeleton-streams-header" class="flex justify-between items-center mb-4">
         <div class="flex items-center gap-2">
-          <SkeletonBox variant="avatar" width="40px" height="40px" />
-          <SkeletonBox variant="title" width="100px" />
+          <OSkeleton type="circle" class="w-10" />
+          <OSkeleton type="text" class="w-25" />
         </div>
-        <SkeletonBox variant="button" width="40px" height="40px" />
+        <OSkeleton class="w-10 h-10" />
       </div>
 
       <!-- Tiles using same grid as HomeView -->
@@ -30,14 +30,14 @@
             <div class="flex flex-col justify-between">
               <!-- Title row -->
               <div class="flex justify-between">
-                <SkeletonBox variant="text" width="100px" height="20px" />
-                <SkeletonBox variant="avatar" width="40px" height="40px" />
+                <OSkeleton type="text" class="w-25 h-5" />
+                <OSkeleton type="circle" class="w-10" />
               </div>
             </div>
 
             <!-- Bottom Section (40%) -->
             <div class="data-to-display flex items-end text-3xl font-semibold leading-8">
-              <SkeletonBox variant="title" width="80px" height="32px" />
+              <OSkeleton type="text" class="w-20 h-8" />
             </div>
           </div>
         </div>
@@ -57,13 +57,13 @@
               <div
                 class="flex items-center gap-2 flex-nowrap w-full"
               >
-                <SkeletonBox variant="avatar" width="40px" height="40px" />
-                <SkeletonBox variant="text" width="100px" height="20px" />
-                <SkeletonBox variant="button" width="40px" height="40px" />
+                <OSkeleton type="circle" class="w-10" />
+                <OSkeleton type="text" class="w-25 h-5" />
+                <OSkeleton class="w-10 h-10" />
               </div>
             </div>
             <div class="data-to-display flex items-end text-3xl font-semibold leading-8">
-              <SkeletonBox variant="title" width="60px" height="32px" />
+              <OSkeleton type="text" class="w-15 h-8" />
             </div>
           </div>
         </div>
@@ -77,13 +77,13 @@
               <div
                 class="flex items-center gap-2 flex-nowrap w-full"
               >
-                <SkeletonBox variant="avatar" width="40px" height="40px" />
-                <SkeletonBox variant="text" width="100px" height="20px" />
-                <SkeletonBox variant="button" width="40px" height="40px" />
+                <OSkeleton type="circle" class="w-10" />
+                <OSkeleton type="text" class="w-25 h-5" />
+                <OSkeleton class="w-10 h-10" />
               </div>
             </div>
             <div class="data-to-display flex items-end text-3xl font-semibold leading-8">
-              <SkeletonBox variant="title" width="60px" height="32px" />
+              <OSkeleton type="text" class="w-15 h-8" />
             </div>
           </div>
         </div>
@@ -97,31 +97,21 @@
           <!-- Header -->
           <div class="flex justify-between items-center">
             <span class="text-title flex items-center gap-2 text-lg font-medium leading-5">
-              <SkeletonBox variant="avatar" width="40px" height="40px" />
-              <SkeletonBox variant="text" width="120px" height="20px" />
+              <OSkeleton type="circle" class="w-10" />
+              <OSkeleton type="text" class="w-30 h-5" />
             </span>
-            <SkeletonBox variant="button" width="40px" height="40px" />
+            <OSkeleton class="w-10 h-10" />
           </div>
           <!-- Stats row -->
           <div class="flex pt-2" style="gap: 16px">
             <div class="flex flex-col">
-              <SkeletonBox
-                variant="text"
-                width="100px"
-                height="14px"
-                class="mb-1"
-              />
-              <SkeletonBox variant="text" width="40px" height="20px" />
+              <OSkeleton type="text" class="w-25 h-3.5 mb-1" />
+              <OSkeleton type="text" class="w-10 h-5" />
             </div>
             <OSeparator vertical />
             <div class="flex flex-col">
-              <SkeletonBox
-                variant="text"
-                width="80px"
-                height="14px"
-                class="mb-1"
-              />
-              <SkeletonBox variant="text" width="40px" height="20px" />
+              <OSkeleton type="text" class="w-20 h-3.5 mb-1" />
+              <OSkeleton type="text" class="w-10 h-5" />
             </div>
           </div>
         </div>
@@ -130,14 +120,10 @@
           class="custom-first-chart my-auto xl:min-h-50 h-[calc(100vh-500px)] md:h-[calc(100vh-500px)] lg:h-[calc(100vh-550px)] xl:h-[calc(100vh-645px)] w-full"
         >
           <!-- custom-radius, not the boolean radius prop, is what actually lands
-               lg corners here: SkeletonBox's base `rounded-sm` class beats
+               lg corners here: OSkeleton type="text" base `rounded-sm` beats
                `rounded-lg` on Tailwind's alphabetical emit order, while this
                inline binding beats both. -->
-          <SkeletonBox
-            width="100%"
-            height="100%"
-            custom-radius="var(--radius-lg)"
-          />
+          <OSkeleton type="text" custom-radius="var(--radius-lg)" class="w-full h-full" />
         </div>
       </div>
 
@@ -149,31 +135,21 @@
           <!-- Header -->
           <div class="flex justify-between items-center">
             <span class="text-title flex items-center gap-2 text-lg font-medium leading-5">
-              <SkeletonBox variant="avatar" width="40px" height="40px" />
-              <SkeletonBox variant="text" width="140px" height="20px" />
+              <OSkeleton type="circle" class="w-10" />
+              <OSkeleton type="text" class="w-35 h-5" />
             </span>
-            <SkeletonBox variant="button" width="40px" height="40px" />
+            <OSkeleton class="w-10 h-10" />
           </div>
           <!-- Stats row -->
           <div class="flex pt-2" style="gap: 16px">
             <div class="flex flex-col">
-              <SkeletonBox
-                variant="text"
-                width="120px"
-                height="14px"
-                class="mb-1"
-              />
-              <SkeletonBox variant="text" width="40px" height="20px" />
+              <OSkeleton type="text" class="w-30 h-3.5 mb-1" />
+              <OSkeleton type="text" class="w-10 h-5" />
             </div>
             <OSeparator vertical />
             <div class="flex flex-col">
-              <SkeletonBox
-                variant="text"
-                width="100px"
-                height="14px"
-                class="mb-1"
-              />
-              <SkeletonBox variant="text" width="40px" height="20px" />
+              <OSkeleton type="text" class="w-25 h-3.5 mb-1" />
+              <OSkeleton type="text" class="w-10 h-5" />
             </div>
           </div>
         </div>
@@ -182,14 +158,10 @@
           class="custom-second-chart my-auto xl:min-h-50 h-[calc(100vh-500px)] md:h-[calc(100vh-500px)] lg:h-[calc(100vh-550px)] xl:h-[calc(100vh-645px)]"
         >
           <!-- custom-radius, not the boolean radius prop, is what actually lands
-               lg corners here: SkeletonBox's base `rounded-sm` class beats
+               lg corners here: OSkeleton type="text" base `rounded-sm` beats
                `rounded-lg` on Tailwind's alphabetical emit order, while this
                inline binding beats both. -->
-          <SkeletonBox
-            width="100%"
-            height="100%"
-            custom-radius="var(--radius-lg)"
-          />
+          <OSkeleton type="text" custom-radius="var(--radius-lg)" class="w-full h-full" />
         </div>
       </div>
     </div>
@@ -197,6 +169,6 @@
 </template>
 
 <script setup lang="ts">
-import SkeletonBox from "./SkeletonBox.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 </script>

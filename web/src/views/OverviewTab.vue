@@ -41,12 +41,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <section
       v-if="isIncidentsEnabled && incidents.length > 0"
       class="mb-5"
+      data-test="overview-incidents-section"
     >
       <div class="flex items-center justify-between mb-2 pl-1">
         <div class="text-sm font-medium tracking-[0.01em] text-text-heading">
           {{ t('overview.activeIncidents') }}
           <OTag type="countChip" value="warning">{{ incidentsTotal }}</OTag>
-          <span v-if="incidentsTotal > incidents.length" class="ml-2 text-xs font-normal text-text-muted align-middle">{{ t('overview.showingOf', { shown: incidents.length, total: incidentsTotal }) }}</span>
+          <span v-if="incidentsTotal > incidents.length" class="ml-2 text-xs font-normal text-text-secondary align-middle">{{ t('overview.showingOf', { shown: incidents.length, total: incidentsTotal }) }}</span>
         </div>
         <button class="text-xs font-medium text-primary-600 bg-none border-none p-0 cursor-pointer whitespace-nowrap transition-opacity duration-150 opacity-80 hover:opacity-100 hover:underline" @click="goToIncidentList">{{ t('overview.viewAll') }} →</button>
       </div>
@@ -80,8 +81,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
           <div class="flex items-center shrink-0 gap-[0.3rem] whitespace-nowrap w-48">
-            <span class="text-xs text-text-muted min-w-[4.5rem]">{{ relativeTime_(inc.first_alert_at) }}</span>
-            <span class="text-xs text-text-muted">·</span>
+            <span class="text-xs text-text-secondary min-w-[4.5rem]">{{ relativeTime_(inc.first_alert_at) }}</span>
+            <span class="text-xs text-text-secondary">·</span>
             <span class="text-xs font-normal text-text-secondary">{{ inc.alert_count }} alerts</span>
           </div>
           <span class="invisible group-hover:visible shrink-0 whitespace-nowrap">
@@ -96,14 +97,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </section>
+    <OverviewSkeleton v-else-if="isIncidentsEnabled && isSectionPending('incidents')" section="incidents" />
 
     <!-- SERVICES (enterprise only — needs service graph data) -->
-    <section v-if="isEnterpriseOrCloud && services.length > 0" class="mb-5">
+    <section
+      v-if="isEnterpriseOrCloud && services.length > 0"
+      class="mb-5"
+      data-test="overview-services-section"
+    >
       <div class="flex items-center justify-between mb-2 pl-1">
         <div class="text-sm font-medium tracking-[0.01em] text-text-heading">
           {{ t('overview.services') }}
           <OTag type="countChip" value="warning">{{ services.length }}</OTag>
-          <span v-if="servicePanelVisible && selectedService" class="text-xs font-normal text-text-muted ml-1">
+          <span v-if="servicePanelVisible && selectedService" class="text-xs font-normal text-text-secondary ml-1">
             — viewing <strong class="font-semibold text-text-heading">{{ selectedService.label ?? selectedService.id }}</strong>
           </span>
         </div>
@@ -174,6 +180,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </button>
       </div>
     </section>
+    <OverviewSkeleton v-else-if="isEnterpriseOrCloud && isSectionPending('services')" section="services" />
 
     <!-- Service node side panel (latency / RED charts) -->
     <template v-if="isEnterpriseOrCloud && selectedService">
@@ -194,7 +201,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
 
     <!-- ACTIVE ANOMALIES -->
-    <section v-if="anomalies.length > 0" class="mb-5">
+    <section
+      v-if="anomalies.length > 0"
+      class="mb-5"
+      data-test="overview-anomalies-section"
+    >
       <div class="flex items-center justify-between mb-2 pl-1">
         <div class="text-sm font-medium tracking-[0.01em] text-text-heading">
           {{ t('overview.activeAnomalies') }}
@@ -217,8 +228,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="flex-1 min-w-0">
             <div class="text-sm font-medium text-text-heading flex items-center flex-wrap gap-1 [row-gap:0.25rem]">
               {{ item.title }}
-              <span class="text-xs text-text-muted font-normal mx-[0.1rem]">·</span>
-              <span class="text-xs text-text-muted font-normal">{{ item.description }}</span>
+              <span class="text-xs text-text-secondary font-normal mx-[0.1rem]">·</span>
+              <span class="text-xs text-text-secondary font-normal">{{ item.description }}</span>
             </div>
           </div>
           <span class="invisible group-hover:visible shrink-0 whitespace-nowrap">
@@ -233,9 +244,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </section>
+    <OverviewSkeleton v-else-if="isSectionPending('anomalies')" section="anomalies" />
 
     <!-- RECENT EVENTS (alert firing feed) -->
-    <section v-if="recentEvents.length > 0" class="mb-5">
+    <section
+      v-if="recentEvents.length > 0"
+      class="mb-5"
+      data-test="overview-recent-events-section"
+    >
       <div class="flex items-center justify-between mb-2 pl-1">
         <div class="text-sm font-medium tracking-[0.01em] text-text-heading">
           {{ t('overview.recentEvents') }}
@@ -251,7 +267,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <OTag type="eventStatus" :value="ev.typeLabel" class="shrink-0" />
           <span class="font-medium text-text-heading whitespace-nowrap min-w-[7.5em] max-w-[12.5em] overflow-hidden text-ellipsis">{{ ev.service }}</span>
-          <span class="flex-1 text-text-muted truncate">{{ ev.description }}</span>
+          <span class="flex-1 text-text-secondary truncate">{{ ev.description }}</span>
           <OTag
             v-if="ev.failCount > 1"
             type="countChip"
@@ -259,14 +275,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="shrink-0"
             :title="`Failed ${ev.failCount} times in this window`"
           >×{{ ev.failCount }}</OTag>
-          <span class="shrink-0 text-text-muted text-xs whitespace-nowrap">{{ ev.timeAgo }}</span>
+          <span class="shrink-0 text-text-secondary text-xs whitespace-nowrap">{{ ev.timeAgo }}</span>
         </div>
       </div>
     </section>
+    <OverviewSkeleton v-else-if="isSectionPending('recentEvents')" section="recentEvents" />
 
     <!-- Empty state — everything is healthy or no data yet -->
     <OEmptyState
-      v-if="!isLoading && anomalies.length === 0 && incidents.length === 0 && services.length === 0 && recentEvents.length === 0"
+      v-if="!isLoading && !hasAnyData"
       illustration="check"
       size="hero"
       :hide-action="true"
@@ -311,10 +328,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
     </OEmptyState>
 
-    <!-- Loading skeleton (standard O2 wave shimmer) -->
-    <div v-if="isLoading" class="flex flex-col gap-2 py-2 px-0">
-      <OSkeleton v-for="i in 3" :key="i" class="h-[3.25em]" />
-    </div>
 
     <!-- Alert History Drawer — opened from anomaly Investigate button -->
     <AlertHistoryDrawer
@@ -328,7 +341,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { ref, computed, defineAsyncComponent, onMounted, watch, nextTick } from "vue";
+import { ref, reactive, computed, defineAsyncComponent, onMounted, watch, nextTick } from "vue";
 
 // Module-level cache for anomaly history — survives re-renders, cleared on org change
 const ANOMALY_CACHE_TTL_MS = 2 * 60 * 1000; // 2 minutes
@@ -349,7 +362,7 @@ import DateTime from "@/components/DateTime.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import OverviewSkeleton from "./OverviewSkeleton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import ODimensionChip from "@/lib/core/Badge/ODimensionChip.vue";
@@ -434,6 +447,54 @@ const incidentsTotal = ref(0);
 const services = ref<any[]>([]);
 const recentEvents = ref<any[]>([]);
 
+// True once any section has something to show. Gates the skeleton and the empty
+// state so the three are mutually exclusive with the content: the skeleton is a
+// first-load placeholder, not a refresh indicator (ORefreshButton already spins
+// via :loading). Without this, refreshing with data on screen appends the
+// skeleton *below* the rows instead of standing in for them.
+const hasAnyData = computed(
+  () =>
+    anomalies.value.length > 0 ||
+    incidents.value.length > 0 ||
+    services.value.length > 0 ||
+    recentEvents.value.length > 0,
+);
+
+/* Per-section load state. The four datasets are fetched concurrently and land at
+   different times, so a single `isLoading` can't gate their placeholders: the
+   first dataset to arrive would clear the skeleton for the three still in
+   flight, and those would then pop in with no placeholder. Each section tracks
+   its own request instead.
+
+   `loaded` (has completed at least once) is what separates a first load from a
+   refresh. A section shows its skeleton only while `loading && !loaded`, so:
+     - first load  -> each section holds its own placeholder until ITS data lands
+     - refresh     -> nothing flashes; ORefreshButton carries the loading state
+     - empty result-> `loaded` stays true, so it never re-skeletons */
+type SectionKey = "incidents" | "services" | "anomalies" | "recentEvents";
+const sectionState = reactive<Record<SectionKey, { loading: boolean; loaded: boolean }>>({
+  incidents: { loading: false, loaded: false },
+  services: { loading: false, loaded: false },
+  anomalies: { loading: false, loaded: false },
+  recentEvents: { loading: false, loaded: false },
+});
+
+const isSectionPending = (key: SectionKey) =>
+  sectionState[key].loading && !sectionState[key].loaded;
+
+/* Wraps a loader with its section's state. The loaders swallow their own errors,
+   and `finally` also covers the early `return` in the enterprise-gated ones, so
+   a section can never be left stuck pending. */
+const runSection = async (key: SectionKey, load: () => Promise<void>) => {
+  sectionState[key].loading = true;
+  try {
+    await load();
+  } finally {
+    sectionState[key].loading = false;
+    sectionState[key].loaded = true;
+  }
+};
+
 // Alert history drawer state
 const showAlertHistoryDrawer = ref(false);
 const selectedAlertForHistory = ref<any>(null);
@@ -472,10 +533,10 @@ const loadAll = async () => {
   if (!orgId.value) return;
   isLoading.value = true;
   await Promise.allSettled([
-    loadHistoryAndSplit(),
-    loadAnomalies(),
-    loadIncidents(),
-    loadServiceGraph(),
+    runSection("recentEvents", loadHistoryAndSplit),
+    runSection("anomalies", loadAnomalies),
+    runSection("incidents", loadIncidents),
+    runSection("services", loadServiceGraph),
   ]);
   isLoading.value = false;
   lastFetched.value = new Date();
