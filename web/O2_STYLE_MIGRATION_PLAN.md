@@ -729,6 +729,10 @@ unstyled · logs + EmptyState + alerts suites pass.
 > Performed from scratch against every phase's definition-of-done (not from the logs above), after commits
 > through `aacbd776c5 "migrated component style"`. Where this section disagrees with §10–§12 the live
 > measurement wins.
+>
+> ⚠ **Superseded in part by §14** — the CI-unblock and stale-spec items below were LANDED
+> 2026-07-16/17 (commits `5b1ef8dd8c`, `3d47148a60`). §13.3's "RED" state is now GREEN. See §14 for
+> the current head-of-branch status and the session-limit note that stalled the W2.a/W2.c batch wave.
 
 ### 13.1 Phase scoreboard
 
@@ -780,3 +784,74 @@ into `IncidentRCAAnalysis.vue`/`SearchResult.vue` (deliberate deferral, §11.2).
 5. **W2.c** — hard-tier files (O2AIChat ~1,349-line block first among equals); D6 light code-bg pick still the only open design call.
 6. **W2.d** — flips: `unscopedStyle`/`styleBlockHex` → zero-tolerance, `enforce-style-attribute` → error, add the `styleKeepComment` category (30 keep-comments already in the wild, format matches §3.1).
 7. **Deferred/open** — `ODialog`/`ODrawer` `clearBodyValidation()` dead path (§11.1, needs its own PR); 4 stale spec files (§11.4); D19/D20 final sweep (parked; `darkMechanism` already down to 33).
+
+---
+
+## 14. Execution log — CI unblock + specs; W2 batch wave stalled on session limit (2026-07-16/17)
+
+### 14.1 Landed (2 commits)
+
+**`5b1ef8dd8c` — CI unblocked (§13.3 fully resolved, NOT via baseline entries — everything fixed properly):**
+- `IncidentRCAAnalysis.vue` (F9 RCA report): the private `--rca-*` vocabulary now **aliases global
+  tokens** (`--color-info-*`, `--color-surface-*`, `--color-text-*`, `--color-blue-*`,
+  `--color-status-error-text`, `--shadow-*`); the `.dark` block keeps only the entries whose dark value
+  genuinely differs from what the aliased token flips to (the info-blue washes → neutral/deep-blue,
+  accents brighten). px → rem/tokens (`--text-3xs`, `--text-compact`, `--radius-lg`). Zero hex remains.
+- `SearchResult.vue` (F11 pin tooltip): theme twins collapsed onto flipping tokens; include/exclude
+  actions on `--color-status-info-text` / `--color-status-error-text` via `color-mix`; px → rem/tokens.
+  Zero hex remains.
+- `OverrideConfigPopup.vue`: `text-[0.5625rem]` → `text-3xs` (×3). `General.vue`: bare `rounded` →
+  `rounded-sm` + canonical `border-banner-error-soft-*`. `TableRenderer.vue`: reworded comment (regex
+  false-positive). `AddFunction.vue`: `min-w-[75px]` → `min-w-19`.
+- **Baseline re-committed** — locks in the branch's accumulated gains: `styleBlockHex` 535→**469**,
+  `stylePxUnit`→**977**, `arbTextSize`→**3**, plus the earlier themeTernary/darkMechanism/hexClass drops.
+  `npm run lint:design` is **GREEN**. Gate check: `lint:token-purity` green, `type-check` clean, unit
+  tests for all 6 touched files pass.
+
+**`3d47148a60` — the 4 stale specs (§11.4) fixed:**
+- `IncidentTimeline.spec.ts`: 9 assertions on hex (`#059669`…) → the component's actual
+  `var(--color-*)` return values; the "hex color string" regex test → a `var(--color-…)` matcher.
+- `Advanced` / `CompareWithPast` / `Deduplication` `.spec.ts`: 13 assertions on legacy
+  `.light-mode`/`.dark-mode` root classes **inverted** to assert their ABSENCE — turning stale failures
+  into guards that the legacy mechanism can't return (matches §3.R). All 4 files green.
+
+### 14.2 🔴 Blocker — W2.a + W2.c batch wave could not land this session
+
+The plan's parallelisation (§5.3/§9) was executed: **9 W2.a directory-batch agents + 7 W2.c hard-file
+agents** were dispatched. **All hit the account-wide session token limit** (`resets 4:30am
+Asia/Calcutta`) and terminated **during their read/investigate phase — before writing any edits.**
+Verified: `git status` clean except the 2 commits above; **no partial file damage.** The working tree
+is consistent and every gate is green.
+
+Consequence: **W2.a is still at 162 unscoped blocks and W2.c is still at 0 hard files done** — the
+scoreboard §13.1 is unchanged for those two rows. This was a throughput stall, not a correctness
+problem.
+
+### 14.3 Ready-to-run plan for the next session (resume here)
+
+The agent prompts are proven and the batching is fixed; re-dispatch after the limit resets. Batches
+(directory → files), each an independent commit, ratchet-verified, SFC-tag-balance-checked:
+
+**W2.a (155 files with unscoped blocks), 9 batches:**
+1. alerts (13) + anomaly_detection + logs/LogsHighLighting  · 2. dashboards (11) + views/Dashboards (5)
+· 3. enterprise/onlineEvals (14)  · 4. traces (12) + correlation (2) + metrics/MetricList
+· 5. logs (7) + common (7) + shared (2)  · 6. lib/core+forms+data+feedback+lists (17)
+· 7. settings (6) + functions (6) + queries (3) + iam (3)  · 8. rum (5) + views/RUM (2) + logstream (3)
++ ingestion (2) + promql + ai-assistant (2) + cross-linking + cipherkeys  · 9. pipeline (6) + singles
+(AutoRefreshInterval, DateTime, DateTimePicker, EnterpriseUpgradeDialog, O2AIConfirmDialog,
+QueryPlanDialog, TelemetryCorrelationPanel, WebinarBanner) + views (CorrelationDemo, HomeChatHistory,
+HomeView).
+
+**W2.c (12 hard files), by token-family so the D6/D8/D9/D14 tokens are reused not reinvented (all already
+registered):** O2AIChat (D6 syntax + D8 chat + D14 gradient; biggest) · TraceDetailsSidebar (D11: JSON
+printer → `--color-json-*` classes) · ThreadView + ThreadToolCalls (D9 role accents) · TraceErrorTab +
+OCodeBlock reference (D6 `--color-syntax-*`) · CodeQueryEditor + RichTextInput (Monaco/contenteditable
+keepers) · TenstackTable ×2 (table tokens) · PipelineEditor + ServiceGraphNodeSidePanel (D7 always-dark)
++ SetupCardRenderer (D10 private-var → global-token rename).
+
+**Then:** W2.b.2 scrollbar dedup (19 files → base-elements global) → utilities.css legacy ladder pass
+(164 selectors) → W2.d enforcement flips (`unscopedStyle`/`styleBlockHex` → 0/zero-tolerance,
+`enforce-style-attribute` → error, add `styleKeepComment` category) → resolve the one open design call
+(D6 light code-bg `#ffffff` vs `#f6f8fa`) and the deferred `clearBodyValidation()` dead path (§11.1).
+
+Only D6's code-bg pick blocks a subset of W2.c; everything else is unblocked and mechanical.
