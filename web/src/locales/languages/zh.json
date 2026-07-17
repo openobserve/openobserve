@@ -19,7 +19,7 @@
     },
     "noStreamSelected": {
       "title": "选择数据流开始",
-      "description": "选择一个直播，然后运行查询来浏览其数据。使用筛选条件和自定义时间范围优化结果。"
+      "description": "选择一个数据流，然后运行查询来浏览其数据。使用筛选条件和自定义时间范围优化结果。"
     },
     "noQueryApplied": {
       "title": "运行查询以查看日志",
@@ -186,12 +186,12 @@
       "actionDesc": "写一个新的 VRL 函数"
     },
     "noStreams": {
-      "title": "连接源来创建你的第一个直播",
+      "title": "连接源来创建你的第一个数据流",
       "description": "数据到达的那一刻就会自动创建流。开始使用您的应用程序、代理或收集器进行提取。",
       "action": "设置摄取",
       "actionDesc": "连接数据源",
-      "createAction": "新直播",
-      "createActionDesc": "手动定义直播架构"
+      "createAction": "新数据流",
+      "createActionDesc": "手动定义数据流架构"
     },
     "noAlerts": {
       "title": "创建您的第一个提醒",
@@ -257,7 +257,7 @@
     },
     "noServicesCatalog": {
       "title": "未找到任何服务",
-      "description": "在所选时间范围内未检测到任何服务。尝试更大的范围或不同的直播。"
+      "description": "在所选时间范围内未检测到任何服务。尝试更大的范围或不同的数据流。"
     },
     "noSearchHistory": {
       "title": "尚无搜索记录",
@@ -649,7 +649,7 @@
     "streamNotExist": "未找到以下 [STREAM_NAME] 流。请验证数据流是否存在。",
     "noFieldFound": "未找到所选数据流的字段",
     "noFieldFoundInStream": "在所选数据流中找不到字段。",
-    "quickPickStreamsLabel": "最近活跃的直播",
+    "quickPickStreamsLabel": "最近活跃的数据流",
     "quickPickMoreStreams": "在上方搜索更多 {count}",
     "regionTitle": "选择地区",
     "userDefinedSchemaLabel": "用户定义的架构",
@@ -1682,7 +1682,7 @@
     "confirmBatchDeleteHead": "删除数据流",
     "confirmDeleteMsg": "你确定要删除这个数据流吗？",
     "confirmBatchDeleteMsg": "您确定要删除选定的数据流吗？",
-    "deleteAssociatedAlertsPipelines": "删除与该直播相关的所有管道和警报",
+    "deleteAssociatedAlertsPipelines": "删除与该数据流相关的所有管道和警报",
     "cancel": "取消",
     "ok": "确定",
     "docsCount": "数据量",
@@ -3157,7 +3157,7 @@
     "subtitle": "警报规则和通知渠道",
     "searchThisFolder": "这个文件夹",
     "searchAllFolders": "所有文件夹",
-    "streamConfig": "直播配置",
+    "streamConfig": "数据流配置",
     "alertRules": "警报规则",
     "noTemplatesMsg": "要创建警报，您至少需要一个模板和一个目的地。模板定义通知消息的格式——首先创建一个。",
     "createTemplateBtn": "创建模板",
@@ -3692,7 +3692,7 @@
       "helpVariablesExplain": "变量是你自己的值，你可以放到通知消息中。在此处为每个人指定一个名称和一个值，然后在模板的任意位置写上 {'{'} your_name {'}'} ——警报触发时会填写。",
       "helpBuiltInHeading": "浏览内置变量",
       "helpBuiltInIntro": "OpenObserve 会自动填写这些信息，点击一个即可将其复制。",
-      "helpBuiltInFooter": "您的直播中的字段也可以用作变量。高级：{'{'} rows: n {'}'} 限制显示的行数；{'{'} var: n {'} 缩短一个值。",
+      "helpBuiltInFooter": "您的数据流中的字段也可以用作变量。高级：{'{'} rows: n {'}'} 限制显示的行数；{'{'} var: n {'} 缩短一个值。",
       "helpYourVariablesHeading": "你添加的变量",
       "helpYourVariablesEmpty": "你还没有添加任何变量。",
       "helpRowTemplateExplain": "警报可以匹配多行。行模板决定单行的外观。然后，您的主模板中的 {'{'} rows {'} 会删除所有已格式化的匹配行。",
@@ -4389,7 +4389,7 @@
   "traces": {
     "serviceGraph": {
       "searchPlaceholder": "搜索服务",
-      "noStreamsDetected": "未检测到任何直播。确保服务图表指标包含 stream_name 标签。",
+      "noStreamsDetected": "未检测到任何数据流。确保服务图表指标包含 stream_name 标签。",
       "streamOnlyInfo": "服务图使用纯流架构，内存状态为零",
       "borderColor": "边框颜色",
       "borderColorMetric": "错误",
@@ -6394,7 +6394,7 @@
       "metrics": "指标",
       "traces": "痕迹",
       "alerts": "警报",
-      "streams": "直播",
+      "streams": "数据流",
       "pipelines": "管道",
       "functions": "函数",
       "reports": "报告",
@@ -6415,7 +6415,7 @@
       "metrics": "指标",
       "traces": "痕迹",
       "alerts": "警报",
-      "streams": "直播",
+      "streams": "数据流",
       "pipelines": "管道",
       "functions": "函数",
       "reports": "报告",
@@ -6493,7 +6493,7 @@
       "alertsCreate": "创建新警报",
       "alertsRefresh": "刷新警报列表",
       "alertsClose": "关闭警报详细信息抽屉",
-      "streamsAdd": "添加新直播",
+      "streamsAdd": "添加新数据流",
       "streamsRefresh": "刷新清单",
       "pipelinesAdd": "创建新管道",
       "pipelinesImport": "导入管道",

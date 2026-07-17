@@ -264,6 +264,7 @@ export default defineComponent({
     const activeTab = ref("recommended");
     const metricRoutes = [
       "prometheus",
+      "vmagent",
       "otelCollector",
       "telegraf",
       "cloudwatchMetrics",
