@@ -148,7 +148,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :chart-type="variant.chartType || defaults.chartType"
             :unit="unitOf(variant).unit"
             :unit-custom="unitOf(variant).unitCustom ?? undefined"
-            :bucket-unit="bucketUnitOf(variant).unit"
+            :bucket-unit="bucketUnitOf(variant).unit ?? undefined"
             :bucket-unit-custom="bucketUnitOf(variant).unitCustom ?? undefined"
             :color="color"
             :data-test="`metrics-fn-chart-${variant.id}`"

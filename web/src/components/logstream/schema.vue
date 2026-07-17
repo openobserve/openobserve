@@ -1426,7 +1426,7 @@ export default defineComponent({
         if (partition.types === "value") fieldIndices.push("keyPartition");
         if (partition.types === "prefix") fieldIndices.push("prefixPartition");
 
-        if (partition.types?.hash)
+        if (typeof partition.types === "object" && partition.types.hash)
           fieldIndices.push(`hashPartition_${partition.types.hash}`);
       }
 

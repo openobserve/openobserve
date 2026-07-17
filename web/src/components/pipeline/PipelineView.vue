@@ -48,7 +48,7 @@
     import { getImageURL } from "@/utils/zincutils";
 import DropzoneBackground from "@/plugins/pipelines/DropzoneBackground.vue";
   import { defineComponent, computed, watch, type PropType } from 'vue';
-  import { VueFlow } from "@vue-flow/core";
+  import { VueFlow, type Node, type Edge } from "@vue-flow/core";
   import { ref, onMounted, nextTick } from "vue";
 import CustomNode from '@/plugins/pipelines/CustomNode.vue';
 import CustomEdge from "@/plugins/pipelines/CustomEdge.vue";
@@ -63,14 +63,11 @@ const externalOutputImage = getImageURL("images/pipeline/output_remote.png");
 const conditionImage = getImageURL("images/pipeline/transform_condition.png");
 const queryImage = getImageURL("images/pipeline/input_query.png");
 
-  interface PipelineNode {
+  interface PipelineNode extends Node {
     io_type?: string;
-    [key: string]: unknown;
   }
 
-  interface PipelineEdge {
-    [key: string]: unknown;
-  }
+  type PipelineEdge = Edge;
 
   interface Pipeline {
     name: string;

@@ -408,7 +408,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :chart-type="preview.chartType"
         :unit="o2Unit.unit"
         :unit-custom="o2Unit.unitCustom ?? undefined"
-        :bucket-unit="bucketO2Unit.unit"
+        :bucket-unit="bucketO2Unit.unit ?? undefined"
         :bucket-unit-custom="bucketO2Unit.unitCustom ?? undefined"
         :color="color"
         :time-range="timeRange"

@@ -123,7 +123,7 @@ export default defineComponent({
           return new Function(`return ${obj}`)(); // Convert string to function
         } catch (error: unknown) {
           const message = error instanceof Error ? error.message : String(error);
-          emit({
+          emit("error", {
             message: `Error while executing the code: ${message}`,
             code: "",
           });
@@ -193,7 +193,7 @@ export default defineComponent({
           }
         }
       } catch (e) {
-        emit({
+        emit("error", {
           message: "Error while executing the code",
           code: "",
         });
