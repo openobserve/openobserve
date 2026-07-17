@@ -41,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <div class="flex justify-between items-center mb-3">
           <div class="flex items-center gap-2">
-            <div class="bg-[rgba(57,126,246,0.2)] border border-[rgba(57,126,246,0.35)] opacity-80 flex items-center justify-center w-[2.5rem] h-[2.5rem] rounded-lg" aria-hidden="true">
+            <div class="inline-flex items-center justify-center shrink-0 w-10 h-10 rounded-lg bg-(--color-indigo-50) text-(--color-indigo-600) dark:bg-(--color-indigo-900) dark:text-(--color-indigo-300)" aria-hidden="true">
               <OIcon name="window" size="md" />
             </div>
             <div class="text-(length:--text-lg) font-semibold [line-height:1.4]">{{ t("home.streams") }}</div>
@@ -82,8 +82,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="flex flex-col justify-between">
                 <div class="flex justify-between">
                   <div class="text-(length:--text-base) font-medium [line-height:1.4] [letter-spacing:0%]">{{ t("home.streams") }}</div>
-                  <div class="bg-[rgba(57,126,246,0.2)] border border-[rgba(57,126,246,0.35)] opacity-80 flex items-center justify-center w-[2.5rem] h-[2.5rem] rounded-lg" aria-hidden="true">
-                    <img :src="streamsIcon" alt="" class="h-6 dark:[filter:brightness(1.5)]" />
+                  <div class="inline-flex items-center justify-center shrink-0 w-10 h-10 rounded-lg bg-(--color-indigo-50) text-(--color-indigo-600) dark:bg-(--color-indigo-900) dark:text-(--color-indigo-300)" aria-hidden="true">
+                    <OIcon name="code" size="md" />
                   </div>
                 </div>
                 <div
@@ -113,8 +113,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="flex flex-col justify-between">
                 <div class="flex justify-between">
                   <div class="text-(length:--text-base) font-medium [line-height:1.4] [letter-spacing:0%]">{{ t("home.docsCountLbl") }}</div>
-                  <div class="bg-[rgba(57,126,246,0.2)] border border-[rgba(57,126,246,0.35)] opacity-80 flex items-center justify-center w-[2.5rem] h-[2.5rem] rounded-lg" aria-hidden="true">
-                    <img :src="recordsIcon" alt="" class="h-6 dark:[filter:brightness(1.5)]" />
+                  <div class="inline-flex items-center justify-center shrink-0 w-10 h-10 rounded-lg bg-(--color-indigo-100) text-(--color-indigo-900) dark:bg-(--color-indigo-900) dark:text-(--color-indigo-200)" aria-hidden="true">
+                    <OIcon name="bar-chart" size="md" />
                   </div>
                 </div>
                 <div
@@ -146,8 +146,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div class="text-(length:--text-base) font-medium [line-height:1.4] [letter-spacing:0%]">
                     {{ t("home.totalDataIngested") }}
                   </div>
-                  <div class="bg-[rgba(57,126,246,0.2)] border border-[rgba(57,126,246,0.35)] opacity-80 flex items-center justify-center w-[2.5rem] h-[2.5rem] rounded-lg" aria-hidden="true">
-                    <img :src="ingestedSizeIcon" alt="" class="h-6 dark:[filter:brightness(1.5)]" />
+                  <div class="inline-flex items-center justify-center shrink-0 w-10 h-10 rounded-lg bg-(--color-orange-50) text-(--color-warning-900) dark:bg-(--color-orange-900) dark:text-(--color-orange-300)" aria-hidden="true">
+                    <OIcon name="download" size="md" />
                   </div>
                 </div>
                 <div
@@ -179,8 +179,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div class="text-(length:--text-base) font-medium [line-height:1.4] [letter-spacing:0%]">
                     {{ t("home.totalDataCompressed") }}
                   </div>
-                  <div class="bg-[rgba(57,126,246,0.2)] border border-[rgba(57,126,246,0.35)] opacity-80 flex items-center justify-center w-[2.5rem] h-[2.5rem] rounded-lg" aria-hidden="true">
-                    <img :src="compressedSizeIcon" alt="" class="h-6 dark:[filter:brightness(1.5)]" />
+                  <div class="inline-flex items-center justify-center shrink-0 w-10 h-10 rounded-lg bg-(--color-cyan-50) text-(--color-cyan-700) dark:bg-(--color-cyan-900) dark:text-(--color-cyan-300)" aria-hidden="true">
+                    <OIcon name="compress" size="md" />
                   </div>
                 </div>
                 <div
@@ -210,8 +210,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="flex flex-col justify-between">
                 <div class="flex justify-between">
                   <div class="text-(length:--text-base) font-medium [line-height:1.4] [letter-spacing:0%]">{{ t("home.indexSizeLbl") }}</div>
-                  <div class="bg-[rgba(57,126,246,0.2)] border border-[rgba(57,126,246,0.35)] opacity-80 flex items-center justify-center w-[2.5rem] h-[2.5rem] rounded-lg" aria-hidden="true">
-                    <img :src="indexSizeIcon" alt="" class="h-6 dark:[filter:brightness(1.5)]" />
+                  <div class="inline-flex items-center justify-center shrink-0 w-10 h-10 rounded-lg bg-(--color-warning-50) text-(--color-warning-700) dark:bg-(--color-warning-900) dark:text-(--color-warning-300)" aria-hidden="true">
+                    <OIcon name="save" size="md" />
                   </div>
                 </div>
                 <div
@@ -249,10 +249,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="flex items-center gap-2 flex-nowrap w-full"
                 >
                   <div
-                    class="bg-[rgba(238,95,38,0.2)] border border-[rgba(238,95,38,0.35)] opacity-80 flex items-center justify-center w-[2.5rem] h-[2.5rem] rounded-lg flex-shrink-0"
+                    class="inline-flex items-center justify-center shrink-0 w-10 h-10 rounded-lg bg-(--color-blue-50) text-(--color-blue-500) dark:bg-(--color-blue-900) dark:text-(--color-blue-300)"
                     aria-hidden="true"
                   >
-                    <img :src="functionsIcon" alt="" class="h-6 dark:[filter:brightness(1.5)]" />
+                    <OIcon name="function" size="md" />
                   </div>
                   <div
                     class="text-(length:--text-base) font-medium [line-height:1.4] [letter-spacing:0%] flex-1 text-left whitespace-nowrap overflow-hidden text-ellipsis"
@@ -305,10 +305,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="flex items-center gap-2 flex-nowrap w-full"
                 >
                   <div
-                    class="bg-[rgba(238,95,38,0.2)] border border-[rgba(238,95,38,0.35)] opacity-80 flex items-center justify-center w-[2.5rem] h-[2.5rem] rounded-lg flex-shrink-0"
+                    class="inline-flex items-center justify-center shrink-0 w-10 h-10 rounded-lg bg-(--color-orange-50) text-(--color-orange-600) dark:bg-(--color-orange-900) dark:text-(--color-orange-300)"
                     aria-hidden="true"
                   >
-                    <img :src="dashboardsIcon" alt="" class="h-6 dark:[filter:brightness(1.5)]" />
+                    <OIcon name="dashboard" size="md" />
                   </div>
                   <div
                     class="text-(length:--text-base) font-medium [line-height:1.4] [letter-spacing:0%] flex-1 text-left whitespace-nowrap overflow-hidden text-ellipsis"
@@ -360,8 +360,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="gap-2 mb-3">
             <div class="flex justify-between items-center">
               <span class="text-(length:--text-base) font-medium [line-height:1.4] [letter-spacing:0%] flex items-center gap-2">
-                <div class="bg-[rgba(57,126,246,0.2)] border border-[rgba(57,126,246,0.35)] flex items-center justify-center w-[2.5rem] h-[2.5rem] rounded-lg" aria-hidden="true">
-                  <img :src="alertsIcon" alt="" class="h-6 dark:[filter:brightness(1.5)]" />
+                <div class="inline-flex items-center justify-center shrink-0 w-10 h-10 rounded-lg bg-(--color-warning-50) text-(--color-warning-700) dark:bg-(--color-warning-900) dark:text-(--color-warning-300)" aria-hidden="true">
+                  <OIcon name="shield-alert-outline" size="md" />
                 </div>
                 {{ t("home.alertTitle") }}
               </span>
@@ -435,8 +435,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="gap-2 mb-3">
             <div class="flex justify-between items-center">
               <span class="text-(length:--text-base) font-medium [line-height:1.4] [letter-spacing:0%] flex items-center gap-2">
-                <div class="bg-[rgba(57,126,246,0.2)] border border-[rgba(57,126,246,0.35)] opacity-80 flex items-center justify-center w-[2.5rem] h-[2.5rem] rounded-lg" aria-hidden="true">
-                  <img :src="pipelinesIcon" alt="" class="h-6 dark:[filter:brightness(1.5)]" />
+                <div class="inline-flex items-center justify-center shrink-0 w-10 h-10 rounded-lg bg-(--color-purple-50) text-(--color-purple-600) dark:bg-(--color-purple-900) dark:text-(--color-purple-400)" aria-hidden="true">
+                  <OIcon name="lan" size="md" />
                 </div>
                 {{ t("home.pipelineTitle") }}
               </span>
@@ -531,9 +531,8 @@ import { useRouter } from "vue-router";
 import orgService from "@/services/organizations";
 import configService from "@/services/config";
 import config from "@/aws-exports";
-import { formatSizeFromMB, getImageURL } from "@/utils/zincutils";
+import { formatSizeFromMB } from "@/utils/zincutils";
 import { chartColor } from "@/utils/chartTheme";
-import useTheme from "@/composables/useTheme";
 import CustomChartRenderer from "@/components/dashboards/panels/CustomChartRenderer.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import TrialPeriod from "@/enterprise/components/billings/TrialPeriod.vue";
@@ -548,7 +547,6 @@ import HomeNoDataState from "@/views/HomeNoDataState.vue";
 
 const { t } = useI18n();
 const store = useStore();
-const { isDark } = useTheme();
 const router = useRouter();
 
 const summary = ref<any>([]);
@@ -934,69 +932,14 @@ const pipelinesPanelData = computed(() => {
   };
 });
 
-const compressedSizeIcon = computed(() => {
-  const icon =
-    isDark.value
-      ? "images/home/compressed_size_dark.svg"
-      : "images/home/compressed_size.svg";
-  return getImageURL(icon);
-});
 
-const ingestedSizeIcon = computed(() => {
-  const icon =
-    isDark.value
-      ? "images/home/ingested_size_dark.svg"
-      : "images/home/ingested_size.svg";
-  return getImageURL(icon);
-});
 
-const indexSizeIcon = computed(() => {
-  const icon =
-    isDark.value
-      ? "images/home/index_size_dark.svg"
-      : "images/home/index_size.svg";
-  return getImageURL(icon);
-});
 
-const recordsIcon = computed(() => {
-  const icon =
-    isDark.value
-      ? "images/home/records_dark.svg"
-      : "images/home/records.svg";
-  return getImageURL(icon);
-});
 
-const streamsIcon = computed(() => {
-  const icon =
-    isDark.value
-      ? "images/home/streams_dark.svg"
-      : "images/home/streams.svg";
-  return getImageURL(icon);
-});
 
-const functionsIcon = computed(() => {
-  const icon =
-    isDark.value
-      ? "images/home/function_tile_icon_dark.svg"
-      : "images/home/function_tile_icon.svg";
-  return getImageURL(icon);
-});
 
-const dashboardsIcon = computed(() => {
-  const icon =
-    isDark.value
-      ? "images/home/dashboards_tile_icon.svg"
-      : "images/home/dashboards_tile_icon.svg";
-  return getImageURL(icon);
-});
 
-const alertsIcon = computed(() => {
-  return getImageURL("images/home/alerts.svg");
-});
 
-const pipelinesIcon = computed(() => {
-  return getImageURL("images/home/pipeline.svg");
-});
 
 const goToLicensePage = () => {
   router.push({ name: "license" });
