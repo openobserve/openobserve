@@ -23,6 +23,10 @@ export interface FavoriteDashboard {
   label: string;
 }
 
+// Reserved pseudo-folder id for the folder-rail "Favorites" entry. Real folder
+// ids are generated identifiers, so the dunder name cannot collide.
+export const FAVORITES_FOLDER_ID = "__favorites__";
+
 const SETTING_KEY = "favorite_dashboards";
 const SETTING_CATEGORY = "ui";
 

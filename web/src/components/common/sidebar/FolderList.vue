@@ -52,7 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="dashboards-folder-tabs"
       >
           <OTab
-          v-for="(tab, index) in filteredTabs"
+          v-for="tab in filteredTabs"
           :key="tab.folderId"
           :name="tab.folderId"
           class="test-class min-h-[1.5rem]"
@@ -60,12 +60,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="onTabClick(tab.folderId)"
           >
           <div class="folder-item w-full flex items-center justify-between flex-nowrap gap-2 min-h-6 group/row" :data-test="`dashboard-folder-tab-name-${tab.name}`">
+              <OIcon
+                v-if="tab.folderId === FAVORITES_FOLDER_ID"
+                name="favorite"
+                size="xs"
+                class="shrink-0"
+              />
               <span class="folder-name flex-1 min-w-0 text-left truncate" :title="tab.name" :data-test="`dashboard-folder-name-${tab.name}`">{{
               tab.name
               }}</span>
               <div class="hidden group-hover/row:flex has-[[data-state=open]]:flex items-center shrink-0">
               <ODropdown
-                v-if="index || (searchQuery?.length > 0 && index ==  0 && tab.folderId.toLowerCase() != 'default') "
+                v-if="
+                  tab.folderId.toLowerCase() != 'default' &&
+                  tab.folderId !== FAVORITES_FOLDER_ID
+                "
                 side="bottom"
                 align="start"
               >
@@ -165,6 +174,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
   import AddFolder from "./AddFolder.vue";
   import useNotifications from "@/composables/useNotifications";
+  import { FAVORITES_FOLDER_ID } from "@/composables/useFavoriteDashboards";
   import { filter, forIn } from "lodash-es";
   import { convertDashboardSchemaVersion } from "@/utils/dashboard/convertDashboardSchemaVersion";
   import { useLoading } from "@/composables/useLoading";
@@ -200,6 +210,12 @@ export default defineComponent({
       type: {
         type: String,
         default: "alerts",
+      },
+      // Dashboards-only: prepends a fixed "Favorites" pseudo-folder entry at
+      // the top of the rail. Alerts/Reports keep the plain folder list.
+      showFavorites: {
+        type: Boolean,
+        default: false,
       },
     },
     emits: ['update:folders', 'update:activeFolderId'],
@@ -304,12 +320,22 @@ export default defineComponent({
     };
 
     const filteredTabs = computed(() => {
-      if(!searchQuery.value || searchQuery.value == ""){
-        return store.state.organizationData.foldersByType[props.type]
+      const folders =
+        store.state.organizationData.foldersByType[props.type] ?? [];
+      // The Favorites pseudo-folder sits above everything, including Default,
+      // and participates in the folder search like any other entry.
+      const tabs = props.showFavorites
+        ? [
+            { folderId: FAVORITES_FOLDER_ID, name: t("dashboard.favorites") },
+            ...folders,
+          ]
+        : folders;
+      if (!searchQuery.value || searchQuery.value == "") {
+        return tabs;
       }
-      return store.state.organizationData.foldersByType[props.type]?.filter(tab => {
-        return tab.name.toLowerCase().includes(searchQuery.value.toLowerCase());
-      });
+      return tabs.filter((tab) =>
+        tab.name.toLowerCase().includes(searchQuery.value.toLowerCase()),
+      );
     });
 
 
@@ -332,6 +358,7 @@ export default defineComponent({
         filteredTabs,
         searchQuery,
         onTabClick,
+        FAVORITES_FOLDER_ID,
 
       };
     },

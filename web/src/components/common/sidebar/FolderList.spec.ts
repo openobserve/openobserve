@@ -222,6 +222,33 @@ describe('FolderList.vue', () => {
       expect(events[events.length - 1]).toEqual(['default'])
     })
 
+    it('renders a Favorites entry FIRST when show-favorites is on', async () => {
+      const favWrapper = mount(FolderList, {
+        global: {
+          plugins: [i18n],
+          stubs: { AddFolder: AddFolderStub, ConfirmDialog: ConfirmDialogStub },
+          mocks: { $store: mockStore },
+          provide: { store: mockStore },
+        },
+        props: { type: 'dashboards', showFavorites: true },
+      })
+
+      expect(
+        favWrapper.find('[data-test="dashboard-folder-tab-__favorites__"]').exists(),
+      ).toBe(true)
+      // Above everything, including Default.
+      expect(favWrapper.vm.filteredTabs[0].folderId).toBe('__favorites__')
+      expect(favWrapper.vm.filteredTabs[1].folderId).toBe('default')
+      favWrapper.unmount()
+    })
+
+    it('does NOT render the Favorites entry without the prop (alerts/reports)', () => {
+      // The default wrapper is type=alerts with no show-favorites.
+      expect(
+        wrapper.find('[data-test="dashboard-folder-tab-__favorites__"]').exists(),
+      ).toBe(false)
+    })
+
     it('does not re-emit from a click on a NON-active tab (change path owns that)', async () => {
       // The click re-emit is only for the already-active tab; a different tab
       // emits via the v-model watcher (covered by the watcher tests below),
@@ -953,7 +980,9 @@ describe('FolderList.vue', () => {
         props: { type: 'alerts' }
       })
       
-      expect(missingWrapper.vm.filteredTabs).toBeUndefined()
+      // Missing foldersByType resolves to an empty rail, not undefined —
+      // the template's v-for never sees a non-iterable.
+      expect(missingWrapper.vm.filteredTabs).toEqual([])
       missingWrapper.unmount()
     })
 
