@@ -18,6 +18,7 @@ use std::{
     time::{Duration, UNIX_EPOCH},
 };
 
+use ::promql::{DEFAULT_LOOKBACK, PromqlContext, TableProvider, name_visitor};
 use async_trait::async_trait;
 use config::{
     meta::{
@@ -35,10 +36,7 @@ use proto::cluster_rpc;
 use rayon::slice::ParallelSliceMut;
 use tokio::sync::mpsc;
 
-use crate::service::{
-    promql::{DEFAULT_LOOKBACK, PromqlContext, TableProvider, name_visitor},
-    search,
-};
+use crate::service::search;
 
 mod storage;
 mod wal;
@@ -94,6 +92,30 @@ impl TableProvider for StorageProvider {
             }
         }
         Ok(ctxs)
+    }
+
+    #[cfg(feature = "enterprise")]
+    async fn register_cancellation(
+        &self,
+        trace_id: &str,
+    ) -> datafusion::error::Result<Option<tokio::sync::oneshot::Receiver<()>>> {
+        let (abort_sender, abort_receiver) = tokio::sync::oneshot::channel();
+        if crate::service::search::SEARCH_SERVER
+            .insert_sender(trace_id, abort_sender, true)
+            .await
+            .is_err()
+        {
+            log::info!("[trace_id {trace_id}] [PromQL] grpc search canceled before execution plan");
+            return Err(DataFusionError::Plan(
+                infra::errors::Error::ErrorCode(infra::errors::ErrorCodes::SearchCancelQuery(
+                    format!(
+                        "[trace_id {trace_id}] [PromQL] grpc search canceled before execution plan"
+                    ),
+                ))
+                .to_string(),
+            ));
+        }
+        Ok(Some(abort_receiver))
     }
 }
 
@@ -384,7 +406,7 @@ async fn get_max_file_list(
     let ast = parser::parse(query).map_err(DataFusionError::Execution)?;
     let mut visitor = name_visitor::MetricNameVisitor::default();
     promql_parser::util::walk_expr(&mut visitor, &ast).unwrap();
-    let metrics_name = visitor.name;
+    let metrics_name = visitor.into_names();
 
     // 2. get max records stream
     let mut file_list = Vec::new();

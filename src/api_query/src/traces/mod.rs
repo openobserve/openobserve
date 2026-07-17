@@ -196,6 +196,9 @@ pub async fn traces_write(
         })),
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"description": "List recent traces with summaries (trace_id, span count, service names, duration). Supports filter and sort by start_time/duration.", "category": "traces", "pinned": true}))
     )
 )]
 pub async fn get_latest_traces(
