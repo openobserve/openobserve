@@ -6649,6 +6649,17 @@ export class LogsPage {
      * Get severity colors from all visible log rows
      * Returns array of {severity, color} objects
      */
+    /**
+     * Count the per-row severity status-color bars currently rendered in the results
+     * table. Mirrors the selector getSeverityColors() reads, so callers can poll for the
+     * table to actually paint its rows before reading colors (avoids a fixed sleep).
+     */
+    async countSeverityColorBars() {
+        return await this.page
+            .locator('tbody tr[data-index] [data-test="log-table-row-status-color"]')
+            .count();
+    }
+
     async getSeverityColors() {
         return await this.page.evaluate(() => {
             const rows = document.querySelectorAll('tbody tr[data-index]');
