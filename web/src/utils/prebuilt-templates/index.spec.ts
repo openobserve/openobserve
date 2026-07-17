@@ -378,12 +378,12 @@ describe('Prebuilt Templates Index', () => {
       Object.values(PREBUILT_CONFIGS).forEach(config => {
         config.credentialFields.forEach(field => {
           expect(field).toHaveProperty('key');
-          expect(field).toHaveProperty('label');
+          expect(field).toHaveProperty('labelKey');
           expect(field).toHaveProperty('type');
           expect(field).toHaveProperty('required');
 
           expect(typeof field.key).toBe('string');
-          expect(typeof field.label).toBe('string');
+          expect(typeof field.labelKey).toBe('string');
           expect(['text', 'password', 'email', 'select', 'toggle']).toContain(field.type);
           expect(typeof field.required).toBe('boolean');
         });

@@ -3134,6 +3134,25 @@
     "SearchSQLCancelled": "Fout: Search SQL is geannuleerd."
   },
   "alerts": {
+    "validation": {
+      "streamTypeRequired": "Stream-type is vereist.",
+      "streamNameRequired": "Stream-naam is vereist.",
+      "fieldRequired": "Veld is vereist!",
+      "fieldRequiredPlain": "Veld is vereist",
+      "nameInvalidChars": "Tekens zoals :, ?, /, # en spaties zijn niet toegestaan.",
+      "templateRequired": "Sjabloon is vereist!",
+      "validEmails": "Voeg geldige e-mailadressen toe!",
+      "silenceNonNegative": "Meldingsdemping moet groter dan of gelijk aan 0 zijn",
+      "periodPositive": "Periode moet groter dan 0 zijn",
+      "destinationRequired": "Ten minste één bestemming is vereist.",
+      "thresholdPositive": "Drempelwaarde moet groter dan 0 zijn",
+      "frequencyPositive": "Frequentie moet groter dan 0 zijn",
+      "groupByRequired": "Ten minste één groeperingsveld is vereist",
+      "minimumOneDay": "Minimaal 1 dag",
+      "detectionFunctionRequired": "Detectiefunctie is vereist",
+      "timestampAliasBanned": "{column} kan niet als kolomalias worden gebruikt. Gebruik in plaats daarvan time_bucket.",
+      "credentialFieldRequired": "{field} is vereist"
+    },
     "header": "Alarmen",
     "subtitle": "Waarschuwingsregels en meldingskanalen",
     "searchThisFolder": "Deze map",

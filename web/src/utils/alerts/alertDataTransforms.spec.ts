@@ -666,6 +666,70 @@ describe('alertDataTransforms - OR Operator Pipeline Tests', () => {
     });
   });
 
+  describe('removeConditionGroup - root group', () => {
+    // FilterGroup at depth 0 is handed the root conditions object itself, so
+    // deleting its last condition emits remove-group with the ROOT's own id.
+    // The target is never an ITEM of the array being filtered, so this used to
+    // no-op: the confirm dialog's OK appeared to do nothing.
+    it('empties the root group when the root itself is the target', () => {
+      const context: TransformContext = {
+        formData: {
+          query_condition: {
+            conditions: {
+              filterType: 'group',
+              groupId: 'root-uuid',
+              logicalOperator: 'AND',
+              conditions: [
+                {
+                  filterType: 'group',
+                  groupId: 'sub-a',
+                  logicalOperator: 'OR',
+                  conditions: [
+                    { id: '2', column: 'f2', operator: '=', value: 'v2', ignore_case: false },
+                  ],
+                },
+                {
+                  filterType: 'group',
+                  groupId: 'sub-b',
+                  logicalOperator: 'OR',
+                  conditions: [
+                    { id: '3', column: 'f3', operator: '=', value: 'v3', ignore_case: false },
+                  ],
+                },
+              ],
+            },
+          },
+        },
+      };
+
+      removeConditionGroup('root-uuid', null, context);
+
+      // The dialog promises the whole group and its sub-groups go.
+      expect(context.formData.query_condition.conditions.conditions).toEqual([]);
+    });
+
+    it('does not touch the tree when the target id is empty', () => {
+      const context: TransformContext = {
+        formData: {
+          query_condition: {
+            conditions: {
+              filterType: 'group',
+              groupId: '',
+              logicalOperator: 'AND',
+              conditions: [
+                { id: '1', column: 'f1', operator: '=', value: 'v1', ignore_case: false },
+              ],
+            },
+          },
+        },
+      };
+
+      removeConditionGroup('', null, context);
+
+      expect(context.formData.query_condition.conditions.conditions).toHaveLength(1);
+    });
+  });
+
   describe('removeConditionGroup - OR Operator Context', () => {
     it('should remove OR group from root', () => {
       const context: TransformContext = {

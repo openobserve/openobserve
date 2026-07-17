@@ -3134,6 +3134,25 @@
     "SearchSQLCancelled": "错误：搜索 SQL 已取消。"
   },
   "alerts": {
+    "validation": {
+      "streamTypeRequired": "Stream 类型为必填项。",
+      "streamNameRequired": "Stream 名称为必填项。",
+      "fieldRequired": "此字段为必填项！",
+      "fieldRequiredPlain": "此字段为必填项",
+      "nameInvalidChars": "不允许使用 :, ?, /, # 和空格等字符。",
+      "templateRequired": "模板为必填项！",
+      "validEmails": "请添加有效的电子邮件！",
+      "silenceNonNegative": "通知静默应大于或等于 0",
+      "periodPositive": "周期应大于 0",
+      "destinationRequired": "至少需要一个目标。",
+      "thresholdPositive": "阈值应大于 0",
+      "frequencyPositive": "频率应大于 0",
+      "groupByRequired": "至少需要一个分组字段",
+      "minimumOneDay": "最少 1 天",
+      "detectionFunctionRequired": "检测函数为必填项",
+      "timestampAliasBanned": "{column} 不能用作列别名。请改用 time_bucket。",
+      "credentialFieldRequired": "{field} 为必填项"
+    },
     "header": "告警",
     "subtitle": "警报规则和通知渠道",
     "searchThisFolder": "这个文件夹",

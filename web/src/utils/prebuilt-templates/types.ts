@@ -20,16 +20,38 @@ import { Component } from 'vue';
 export type PrebuiltTypeId = 'slack' | 'discord' | 'msteams' | 'pagerduty' | 'servicenow' | 'email' | 'opsgenie';
 
 /**
+ * A user-facing validation message, expressed as an i18n KEY (+ optional
+ * interpolation params) rather than English copy.
+ *
+ * These config modules are plain, Vue-less objects: they have no `useI18n()` and
+ * therefore cannot translate anything themselves. So they describe WHAT is wrong
+ * and let the two consumers — both of which do have a `t` — render it:
+ *   • `PrebuiltDestinationForm.schema.ts` (`makePrebuiltDestinationSchema`)
+ *   • `usePrebuiltDestinations.ts` (`validateCredentials`)
+ */
+export interface ValidationMessage {
+  key: string;
+  params?: Record<string, unknown>;
+}
+
+/** `true` when valid; otherwise the i18n message describing the failure. */
+export type CredentialValidatorResult = true | ValidationMessage;
+
+/**
  * Credential field configuration
+ *
+ * `labelKey` is an i18n KEY (not English): it is interpolated into
+ * `alerts.validation.credentialFieldRequired` ("{field} is required") by the
+ * consumers above, so it must be resolved with `t()` before display.
  */
 export interface CredentialField {
   key: string;
-  label: string;
+  labelKey: string;
   type: 'text' | 'password' | 'email' | 'select' | 'toggle';
   required: boolean;
   hint?: string;
   options?: Array<{ label: string; value: string; description?: string }>;
-  validator?: (value: string) => boolean | string;
+  validator?: (value: string) => CredentialValidatorResult;
 }
 
 /**

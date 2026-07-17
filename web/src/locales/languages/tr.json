@@ -3134,6 +3134,25 @@
     "SearchSQLCancelled": "Hata: Search SQL iptal edildi."
   },
   "alerts": {
+    "validation": {
+      "streamTypeRequired": "Stream türü gereklidir.",
+      "streamNameRequired": "Stream adı gereklidir.",
+      "fieldRequired": "Alan gereklidir!",
+      "fieldRequiredPlain": "Alan gereklidir",
+      "nameInvalidChars": ":, ?, /, # ve boşluk gibi karakterlere izin verilmez.",
+      "templateRequired": "Şablon gereklidir!",
+      "validEmails": "Geçerli e-postalar ekleyin!",
+      "silenceNonNegative": "Bildirim susturması 0'a eşit veya 0'dan büyük olmalıdır",
+      "periodPositive": "Süre 0'dan büyük olmalıdır",
+      "destinationRequired": "En az bir hedef gereklidir.",
+      "thresholdPositive": "Eşik 0'dan büyük olmalıdır",
+      "frequencyPositive": "Sıklık 0'dan büyük olmalıdır",
+      "groupByRequired": "En az bir gruplama alanı gereklidir",
+      "minimumOneDay": "En az 1 gün",
+      "detectionFunctionRequired": "Algılama işlevi gereklidir",
+      "timestampAliasBanned": "{column} sütun takma adı olarak kullanılamaz. Bunun yerine time_bucket kullanın.",
+      "credentialFieldRequired": "{field} gereklidir"
+    },
     "header": "Uyarılar",
     "subtitle": "Uyarı kuralları ve bildirim kanalları",
     "searchThisFolder": "Bu klasör",
