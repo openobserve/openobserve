@@ -19,11 +19,14 @@ import { setBadgeTranslator } from "@/lib/core/Badge/badgeI18n";
 
 // Only the fallback locale (en-gb) is bundled into the main chunk. Every other
 // language is code-split and loaded on demand via loadLocaleMessages() so we
-// don't ship all 13 locale files (~3MB raw) to every user on first load.
+// don't ship all 12 locale files (~3.9MB raw) to every user on first load.
 import enLocale from "./languages/en.json";
 
 // Maps an i18n locale code to its source file name (without extension).
-const localeFileMap: Record<string, string> = {
+// Exported so tests can assert it stays in sync with the files on disk — an
+// unmapped file ships as a chunk nothing can load, and a mapping with no file
+// silently falls back to en-gb.
+export const localeFileMap: Record<string, string> = {
   "en-gb": "en",
   "zh-cn": "zh",
   "tr-turk": "tr",
