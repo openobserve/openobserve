@@ -76,6 +76,28 @@ function styleBlocks(text) {
   return out.join("\n");
 }
 
+// Every surviving <style> block must justify its own existence: it opens with
+//   /* keep(<tag>): <one line why this cannot be Tailwind> */
+// Both `keep(<tag>)` and `keep: <tag>` are accepted — the punctuation is not the
+// point, the stated reason is. Sanctioned tags: O2_STYLE_MIGRATION_PLAN.md §3.1
+// step 5. `lib-override:<lib>` takes a free-form library suffix, matched by prefix.
+const KEEP_TAG_NAMES =
+  "lib-override(?::[\\w.-]+)?|generated-content|keyframes|print|scrollbar|complex-state|brand|third-party";
+const KEEP_TAGS = new RegExp(`keep\\s*(?:\\(\\s*(?:${KEEP_TAG_NAMES})\\s*\\)|:\\s*(?:${KEEP_TAG_NAMES}))`);
+
+// Counts style blocks that carry no keep-comment. A block with no justification
+// is debt by definition — either it should have been migrated to utilities, or
+// its author owes one line saying why it could not be.
+function countUnjustifiedBlocks(text) {
+  let n = 0;
+  const re = /<style[^>]*>([\s\S]*?)<\/style>/g;
+  let m;
+  while ((m = re.exec(text)) !== null) {
+    if (!KEEP_TAGS.test(m[1])) n++;
+  }
+  return n;
+}
+
 function countFile(file, rel) {
   const text = readFileSync(file, "utf8");
   const counts = {};
@@ -92,6 +114,8 @@ function countFile(file, rel) {
       const n = (sb.match(re) || []).length;
       if (n) counts[k] = n;
     }
+    const unjustified = countUnjustifiedBlocks(text);
+    if (unjustified) counts.styleKeepComment = unjustified;
   } else {
     // .ts — only tsHex (non-spec, non-allowlisted) and darkMechanism apply.
     if (!isSpec && !TS_HEX_ALLOWLIST.some((p) => rel.endsWith(p))) {

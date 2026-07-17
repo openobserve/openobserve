@@ -1,4 +1,4 @@
-// Copyright 2026 OpenObserve Inc.
+﻿// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -84,6 +84,10 @@ describe("Header Component", () => {
 
     const globalConfig = {
       plugins: defaultGlobalConfig.plugins,
+      // Header renders useTheme(), whose useStore() resolves via vuex's `store`
+      // injection key â€” the store prop alone does not satisfy it. Provide the
+      // same per-test store so storeOverrides still drive theme-dependent logic.
+      provide: { store },
       stubs: {
         ...defaultGlobalConfig.stubs,
         ...stubsOverrides,
@@ -153,7 +157,7 @@ describe("Header Component", () => {
       zoBackendUrl: "http://localhost:5080",
       langList: [
         { code: "en-gb", label: "English" },
-        { code: "fr", label: "Français" },
+        { code: "fr", label: "FranÃ§ais" },
       ],
       selectedLanguage: { code: "en-gb", label: "English" },
       selectedOrg: { identifier: "test-org", label: "Test Organization" },
@@ -756,7 +760,7 @@ describe("Header Component", () => {
       const orgs = [{ identifier: "test-org", label: "Test Organization" }];
 
       wrapper = shallowMount(Header, {
-        global: { plugins: [i18n] },
+        global: { plugins: [i18n], provide: { store: mockStore } },
         props: {
           ...wrapper.props(),
           organizations: orgs,
@@ -768,7 +772,7 @@ describe("Header Component", () => {
 
     it("should display empty state when no organizations match search", () => {
       wrapper = shallowMount(Header, {
-        global: { plugins: [i18n] },
+        global: { plugins: [i18n], provide: { store: mockStore } },
         props: {
           ...wrapper.props(),
           organizations: [],
@@ -814,7 +818,7 @@ describe("Header Component", () => {
     });
 
     it("should emit changeLanguage with language object", () => {
-      const lang = { code: "fr", label: "Français" };
+      const lang = { code: "fr", label: "FranÃ§ais" };
       wrapper.vm.changeLanguage(lang);
 
       expect(wrapper.emitted("changeLanguage")).toBeTruthy();
@@ -847,7 +851,7 @@ describe("Header Component", () => {
       mockConfig.isEnterprise = "false";
 
       wrapper = shallowMount(Header, {
-        global: { plugins: [i18n] },
+        global: { plugins: [i18n], provide: { store: mockStore } },
         props: {
           ...wrapper.props(),
           config: mockConfig,
@@ -864,7 +868,7 @@ describe("Header Component", () => {
       mockConfig.isCloud = "true";
 
       wrapper = shallowMount(Header, {
-        global: { plugins: [i18n] },
+        global: { plugins: [i18n], provide: { store: mockStore } },
         props: {
           ...wrapper.props(),
           config: mockConfig,
@@ -878,7 +882,7 @@ describe("Header Component", () => {
       mockStore.state.zoConfig.custom_hide_menus = "openapi,settings";
 
       wrapper = shallowMount(Header, {
-        global: { plugins: [i18n] },
+        global: { plugins: [i18n], provide: { store: mockStore } },
         props: {
           ...wrapper.props(),
           store: mockStore,
@@ -898,7 +902,7 @@ describe("Header Component", () => {
 
     it("should attach an OTooltip to the profile button", () => {
       // The QTooltip with class="header-user-tooltip" was replaced by OTooltip
-      // (no class needed — OTooltip styles itself via Tailwind tokens).
+      // (no class needed â€” OTooltip styles itself via Tailwind tokens).
       // The test now verifies the OTooltip is co-located with the profile btn.
       const tooltipWrapper = createWrapper({
         mountType: "mount",
@@ -934,7 +938,7 @@ describe("Header Component", () => {
     });
 
     it("should emit changeLanguage event with correct language data", () => {
-      const newLang = { code: "fr", label: "Français" };
+      const newLang = { code: "fr", label: "FranÃ§ais" };
       wrapper.vm.changeLanguage(newLang);
 
       // Verify the event was emitted with the correct language object
@@ -946,7 +950,7 @@ describe("Header Component", () => {
       expect(emittedLang).toHaveProperty('code');
       expect(emittedLang).toHaveProperty('label');
       expect(emittedLang.code).toBe("fr");
-      expect(emittedLang.label).toBe("Français");
+      expect(emittedLang.label).toBe("FranÃ§ais");
 
       // Note: The actual cookie setting happens in MainLayout.vue
       // Header.vue only emits the event with the language data
@@ -955,7 +959,7 @@ describe("Header Component", () => {
     it("should emit changeLanguage for each language in langList", () => {
       const languages = [
         { code: "en-gb", label: "English" },
-        { code: "fr", label: "Français" },
+        { code: "fr", label: "FranÃ§ais" },
         { code: "de", label: "Deutsch" },
       ];
 
@@ -979,7 +983,7 @@ describe("Header Component", () => {
       // Clear previous mock calls
       vi.clearAllMocks();
 
-      const frenchLang = { code: "fr", label: "Français" };
+      const frenchLang = { code: "fr", label: "FranÃ§ais" };
 
       // User changes language in Header component
       wrapper.vm.changeLanguage(frenchLang);
@@ -1121,7 +1125,7 @@ describe("Header Component", () => {
       };
 
       wrapper = shallowMount(Header, {
-        global: { plugins: [i18n] },
+        global: { plugins: [i18n], provide: { store: mockStore } },
         props: {
           ...wrapper.props(),
           user: userWithoutName,
@@ -1251,7 +1255,7 @@ describe("Header Component", () => {
       const selectedOrg = { identifier: "test-org", label: "Test Organization" };
 
       wrapper = shallowMount(Header, {
-        global: { plugins: [i18n] },
+        global: { plugins: [i18n], provide: { store: mockStore } },
         props: {
           ...wrapper.props(),
           userClickedOrg: selectedOrg,
