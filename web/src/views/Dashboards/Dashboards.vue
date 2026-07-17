@@ -603,16 +603,17 @@ export default defineComponent({
     const route = useRoute();
     const orgData: any = ref(store.state.selectedOrganization);
     const confirmDeleteDialog = ref<boolean>(false);
-    const selectedDelete = ref(null);
-    const activeFolderId = ref(null);
+    // A mapped dashboard row (see mapDashboard) — the fields the delete/move flows read.
+    const selectedDelete = ref<Record<string, any> | null>(null);
+    const activeFolderId = ref<string | null>(null);
     const isFolderEditMode = ref(false);
-    const selectedFolderDelete = ref(null);
-    const selectedFolderToEdit = ref(null);
+    const selectedFolderDelete = ref<string | null>(null);
+    const selectedFolderToEdit = ref<string | null>(null);
     const searchQuery = ref("");
-    const filteredResults = ref([]);
+    const filteredResults = ref<Record<string, any>[]>([]);
     const confirmDeleteFolderDialog = ref<boolean>(false);
-    const selectedDashboardToMove = ref(null);
-    const selectedDashboardIdToMove = ref(null);
+    const selectedDashboardToMove = ref<Record<string, any> | null>(null);
+    const selectedDashboardIdToMove = ref<string[] | null>(null);
     const showMoveDashboardDialog = ref(false);
     const searchAcrossFolders = ref(false);
     const filterQuery = ref("");
@@ -709,7 +710,7 @@ export default defineComponent({
       offDashboardEvent(handleAiDashboardEvent);
     });
 
-    let currentSearchAbortController = null;
+    let currentSearchAbortController: AbortController | null = null;
     const columns = computed(() => {
       const baseColumns: OTableColumnDef<Record<string, any>>[] = [
         {
@@ -812,7 +813,7 @@ export default defineComponent({
           (it: any) => it.folderId === route.query.folder,
         )
       ) {
-        activeFolderId.value = route.query.folder;
+        activeFolderId.value = String(route.query.folder);
       } else {
         activeFolderId.value = "default";
       }
@@ -826,7 +827,9 @@ export default defineComponent({
         selectedIds.value = [];
         // skip the skeleton for already-cached folders so we don't flash it
         loading.value =
-          !store.state.organizationData.allDashboardList[activeFolderId.value];
+          !store.state.organizationData.allDashboardList[
+            activeFolderId.value ?? "default"
+          ];
         try {
           const response = await getAllDashboardsByFolderId(
             store,
@@ -847,7 +850,7 @@ export default defineComponent({
             path: "/dashboards",
             query: {
               org_identifier: store.state.selectedOrganization.identifier,
-              folder: activeFolderId.value,
+              folder: activeFolderId.value ?? undefined,
             },
           });
         }
@@ -1092,7 +1095,7 @@ export default defineComponent({
       if (!searchAcrossFolders.value || searchQuery.value === "") {
         const dashboardList = toRaw(
           store.state.organizationData?.allDashboardList[
-            activeFolderId.value
+            activeFolderId.value ?? "default"
           ] ?? [],
         );
         return dashboardList.map((board: any, index) =>
@@ -1116,7 +1119,7 @@ export default defineComponent({
     const resultTotal = computed(function () {
       if (!searchAcrossFolders.value || searchQuery.value == "") {
         return store.state.organizationData?.allDashboardList[
-          activeFolderId.value
+          activeFolderId.value ?? "default"
         ]?.length;
       } else {
         return filteredResults.value.length;
@@ -1381,7 +1384,7 @@ export default defineComponent({
         const response = await dashboardService.bulkDelete(
           store.state.selectedOrganization.identifier,
           payload,
-          activeFolderId.value,
+          activeFolderId.value ?? undefined,
         );
 
         dismiss();

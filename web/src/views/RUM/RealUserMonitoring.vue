@@ -342,7 +342,7 @@ const getQueryParams = (dateTime: any, editorValue: string) => {
   return query;
 };
 
-const changeTab = (tab: string) => {
+const changeTab = (tab: string | number) => {
   if (tab === "performance") {
     router.push({
       name: "rumPerformanceSummary",

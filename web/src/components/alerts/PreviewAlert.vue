@@ -1044,7 +1044,12 @@ const refreshData = () => {
     },
   ];
 
-  let yAxis = [];
+  let yAxis: Array<{
+    label: string;
+    alias: string;
+    column: string;
+    color: string | null;
+  }> = [];
 
   // Handle SQL mode and custom mode with aggregations - use result_schema API to intelligently determine chart type
   if (

@@ -29,8 +29,8 @@
             >
               <OCombobox
                 v-model="
-                  dashboardPanelData.data.queries[
-                    dashboardPanelData.layout.currentQueryIndex
+                  dashboardPanelDataModel.data.queries[
+                    dashboardPanelDataModel.layout.currentQueryIndex
                   ].config.promql_legend
                 "
                 :items="dashboardSelectfieldPromQlList"
@@ -68,8 +68,8 @@
             >{{ t("dashboard.stepValue") }}</span>
             <OInput
               v-model="
-                dashboardPanelData.data.queries[
-                  dashboardPanelData.layout.currentQueryIndex
+                dashboardPanelDataModel.data.queries[
+                  dashboardPanelDataModel.layout.currentQueryIndex
                 ].config.step_value
               "
               type="text"
@@ -105,8 +105,8 @@
             >{{ t("common.type") }}</span>
             <OSelect
               v-model="
-                dashboardPanelData.data.queries[
-                  dashboardPanelData.layout.currentQueryIndex
+                dashboardPanelDataModel.data.queries[
+                  dashboardPanelDataModel.layout.currentQueryIndex
                 ].config.query_type
               "
               :options="queryTypeOptions"
@@ -164,6 +164,9 @@ export default defineComponent({
   },
   setup(props) {
     const { t } = useI18n();
+
+    // Alias for the prop; same reference, mutation stays identical.
+    const dashboardPanelDataModel = computed(() => props.dashboardPanelData);
 
     // Initialize query_type if not set (default to "range")
     const currentQuery =
@@ -239,6 +242,7 @@ export default defineComponent({
 
     return {
       t,
+      dashboardPanelDataModel,
       queryTypeOptions,
       dashboardSelectfieldPromQlList,
       selectPromQlNameOption,

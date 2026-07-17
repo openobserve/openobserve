@@ -127,7 +127,7 @@ export function extractCorrelationFilters(
 
   // Match field = 'value' where value may contain SQL-escaped single quotes ('')
   const conditionRegex = /(\w+)\s*=\s*'((?:[^']|'')*)'/gi;
-  let m;
+  let m: RegExpExecArray | null;
   while ((m = conditionRegex.exec(whereClause)) !== null) {
     if (trackedSet.has(m[1])) {
       const value = m[2].replace(/''/g, "'");

@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <OTabs
-    :model-value="modelValue"
+    :model-value="modelValue ?? ''"
     orientation="vertical"
     :dense="dense"
     class="o2-secondary-nav h-full overflow-y-auto"

@@ -109,7 +109,7 @@ export default createStore({
     isAiChatEnabled: false,
     isAiChatExpanded: false,
     isWebinarBannerVisible: false,
-    currentChatTimestamp: null,
+    currentChatTimestamp: null as number | null,
     chatUpdated: false,
     // Default theme colors — derived from the default theme (O2 Signature) in the
     // theme registry so there is a single source of truth. Used as the fallback
@@ -124,7 +124,7 @@ export default createStore({
       dashboards: [],
       lastFetched: null,
       cacheExpiry: 10 * 60 * 1000, // 10 minutes in milliseconds
-      dashboardJsonCache: {}, // Cache for individual dashboard JSON content: { folderPath/fileName: jsonContent }
+      dashboardJsonCache: {} as Record<string, unknown>, // Cache for individual dashboard JSON content: { folderPath/fileName: jsonContent }
     },
     // Temporary theme colors for live preview in General Settings
     // These colors are stored here (instead of component state) so they persist
@@ -136,7 +136,7 @@ export default createStore({
     tempThemeColors: {
       light: null,  // Hex color string (e.g., "#FF0000") or null
       dark: null,   // Hex color string (e.g., "#0000FF") or null
-    },
+    } as Record<"light" | "dark", string | null>,
     // Share URL state for Safari-compatible clipboard copy
     // Polling mechanism checks this value and copies when available
     pendingShortURL: null,

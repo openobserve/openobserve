@@ -1,0 +1,514 @@
+src/components/CodeQueryEditor.vue	TS7006	Parameter 'model' implicitly has an 'any' type.
+src/components/CodeQueryEditor.vue	TS7006	Parameter 'position' implicitly has an 'any' type.
+src/components/CodeQueryEditor.vue	TS7016	Could not find a declaration file for module 'monaco-editor/esm/vs/editor/editor.all.js'. '/Users/ktx/Documents/Projects/openobserve.worktrees/ux-revamp/web/node_modules/monaco-editor/esm/vs/editor/editor.all.js' implicitly has an 'any' type.
+src/components/DateTime.vue	TS2339	Property 'toLowerCase' does not exist on type 'never'.
+src/components/DateTime.vue	TS2345	Argument of type 'null' is not assignable to parameter of type 'string | undefined'.
+src/components/DateTime.vue	TS7006	Parameter 'd' implicitly has an 'any' type.
+src/components/DateTime.vue	TS7006	Parameter 'date' implicitly has an 'any' type.
+src/components/DateTime.vue	TS7006	Parameter 'dateType' implicitly has an 'any' type.
+src/components/DateTime.vue	TS7006	Parameter 'dateobj' implicitly has an 'any' type.
+src/components/DateTime.vue	TS7006	Parameter 'endTime' implicitly has an 'any' type.
+src/components/DateTime.vue	TS7006	Parameter 'endTime' implicitly has an 'any' type.
+src/components/DateTime.vue	TS7006	Parameter 'period' implicitly has an 'any' type.
+src/components/DateTime.vue	TS7006	Parameter 'period' implicitly has an 'any' type.
+src/components/DateTime.vue	TS7006	Parameter 'startTime' implicitly has an 'any' type.
+src/components/DateTime.vue	TS7006	Parameter 'startTime' implicitly has an 'any' type.
+src/components/DateTime.vue	TS7006	Parameter 'type' implicitly has an 'any' type.
+src/components/DateTime.vue	TS7006	Parameter 'unixTimeMicros' implicitly has an 'any' type.
+src/components/DateTime.vue	TS7006	Parameter 'update' implicitly has an 'any' type.
+src/components/DateTime.vue	TS7006	Parameter 'val' implicitly has an 'any' type.
+src/components/DateTime.vue	TS7006	Parameter 'value' implicitly has an 'any' type.
+src/components/DateTime.vue	TS7053	Element implicitly has an 'any' type because expression of type '"Minutes"' can't be used to index type '{}'.
+src/components/DateTime.vue	TS7053	Element implicitly has an 'any' type because expression of type '"userChangedValue"' can't be used to index type '{ startTime: number; endTime: number; relativeTimePeriod: null; selectedDate: any; selectedTime: any; } | { startTime: number; endTime: number; relativeTimePeriod: string; }'.
+src/components/DateTime.vue	TS7053	Element implicitly has an 'any' type because expression of type '"valueType"' can't be used to index type '{ startTime: number; endTime: number; relativeTimePeriod: null; selectedDate: any; selectedTime: any; } | { startTime: number; endTime: number; relativeTimePeriod: string; }'.
+src/components/DateTime.vue	TS7053	Element implicitly has an 'any' type because expression of type 'any' can't be used to index type '{}'.
+src/components/DateTime.vue	TS7053	Element implicitly has an 'any' type because expression of type 'string' can't be used to index type '{ s: number[]; m: number[]; h: number[]; d: number[]; w: number[]; M: number[]; }'.
+src/components/DateTime.vue	TS7053	Element implicitly has an 'any' type because expression of type 'string' can't be used to index type '{ s: number[]; m: number[]; h: number[]; d: number[]; w: number[]; M: number[]; }'.
+src/components/DateTime.vue	TS7053	Element implicitly has an 'any' type because expression of type 'string' can't be used to index type '{ s: number[]; m: number[]; h: number[]; d: number[]; w: number[]; M: number[]; }'.
+src/components/DateTime.vue	TS7053	Element implicitly has an 'any' type because expression of type 'string' can't be used to index type '{ s: number[]; m: number[]; h: number[]; d: number[]; w: number[]; M: number[]; }'.
+src/components/DateTime.vue	TS7053	Element implicitly has an 'any' type because expression of type 'string' can't be used to index type '{ s: string; m: string; h: string; d: string; w: string; M: string; }'.
+src/components/EnterpriseUpgradeDialog.vue	TS7005	Variable 'dates' implicitly has an 'any[]' type.
+src/components/EnterpriseUpgradeDialog.vue	TS7005	Variable 'values' implicitly has an 'any[]' type.
+src/components/EnterpriseUpgradeDialog.vue	TS7005	Variable 'values' implicitly has an 'any[]' type.
+src/components/EnterpriseUpgradeDialog.vue	TS7034	Variable 'dates' implicitly has type 'any[]' in some locations where its type cannot be determined.
+src/components/EnterpriseUpgradeDialog.vue	TS7034	Variable 'values' implicitly has type 'any[]' in some locations where its type cannot be determined.
+src/components/RouteTabs.vue	TS2322	Type '(tab: string) => void' is not assignable to type '(value: string | number) => any'.
+src/components/TenstackTable.vue	TS7053	Element implicitly has an 'any' type because expression of type '`${any}_${number}`' can't be used to index type '{}'.
+src/components/TenstackTable.vue	TS7053	Element implicitly has an 'any' type because expression of type '`${any}_${number}`' can't be used to index type '{}'.
+src/components/actionScripts/EditScript.vue	TS2322	Type 'FormApi<{ name: string; description: string; type: string; service_account: string; timezone: string; cron: string; frequencyType: string; codeZip?: any; }, FormValidateOrFn<{ name: string; description: string; type: string; ... 4 more ...; codeZip?: any; }> | undefined, ... 9 more ..., unknown> & VueFormApi<...>' is not assignable to type '(FormApi<any, FormValidateOrFn<any> | undefined, FormValidateOrFn<any> | undefined, FormAsyncValidateOrFn<any> | undefined, ... 7 more ..., unknown> & VueFormApi<...>) | undefined'.
+src/components/ai_toolsets/AddAiToolset.vue	TS2322	Type 'FormApi<{ name: string; kind: string; mcp: { headers: { key?: string | undefined; value?: string | undefined; visible?: boolean | undefined; }[]; url?: string | undefined; timeout_seconds?: number | undefined; }; cli: { ...; }; skill: { ...; }; description?: string | undefined; }, ... 10 more ..., unknown> & VueForm...' is not assignable to type '(FormApi<any, FormValidateOrFn<any> | undefined, FormValidateOrFn<any> | undefined, FormAsyncValidateOrFn<any> | undefined, ... 7 more ..., unknown> & VueFormApi<...>) | undefined'.
+src/components/alerts/AddDestination.vue	TS18047	'props.destination' is possibly 'null'.
+src/components/alerts/AlertHistory.vue	TS7006	Parameter 'a' implicitly has an 'any' type.
+src/components/alerts/AlertHistory.vue	TS7006	Parameter 'b' implicitly has an 'any' type.
+src/components/alerts/AlertWizardRightColumn.vue	TS2339	Property 'evaluationStatus' does not exist on type 'never'.
+src/components/alerts/AlertWizardRightColumn.vue	TS2339	Property 'reason' does not exist on type 'never'.
+src/components/alerts/AlertWizardRightColumn.vue	TS2339	Property 'wouldTrigger' does not exist on type 'never'.
+src/components/alerts/AlertWizardRightColumn.vue	TS2339	Property 'wouldTrigger' does not exist on type 'never'.
+src/components/alerts/AlertWizardRightColumn.vue	TS2339	Property 'wouldTrigger' does not exist on type 'never'.
+src/components/alerts/AlertWizardRightColumn.vue	TS2339	Property 'wouldTrigger' does not exist on type 'never'.
+src/components/alerts/AlertWizardRightColumn.vue	TS2339	Property 'wouldTrigger' does not exist on type 'never'.
+src/components/alerts/AlertWizardRightColumn.vue	TS2339	Property 'wouldTrigger' does not exist on type 'never'.
+src/components/alerts/DestinationPreview.vue	TS7053	Element implicitly has an 'any' type because expression of type 'string' can't be used to index type '{ slack: string; msteams: string; email: string; pagerduty: string; servicenow: string; opsgenie: string; }'.
+src/components/alerts/ImportSemanticGroups.vue	TS2322	Type '(file: File | null) => Promise<void>' is not assignable to type '(_value: FileValue) => any'.
+src/components/alerts/ImportSemanticGroupsDrawer.vue	TS2322	Type '(file: File | null) => Promise<void>' is not assignable to type '(_value: FileValue) => any'.
+src/components/alerts/IncidentDetailDrawer.vue	TS18048	'__VLS_ctx.correlationData.traceStreams.length' is possibly 'undefined'.
+src/components/alerts/IncidentDetailDrawer.vue	TS18048	'__VLS_ctx.incidentDetails.title' is possibly 'undefined'.
+src/components/alerts/IncidentDetailDrawer.vue	TS18048	'incident.group_values' is possibly 'undefined'.
+src/components/alerts/IncidentDetailDrawer.vue	TS18048	'incident.group_values' is possibly 'undefined'.
+src/components/alerts/IncidentDetailDrawer.vue	TS2322	Type 'Record<string, string> | undefined' is not assignable to type 'Record<string, string>'.
+src/components/alerts/IncidentDetailDrawer.vue	TS2322	Type 'string | undefined' is not assignable to type 'string'.
+src/components/alerts/IncidentDetailDrawer.vue	TS2345	Argument of type 'string | undefined' is not assignable to parameter of type 'string'.
+src/components/alerts/IncidentDetailDrawer.vue	TS2345	Argument of type 'string | undefined' is not assignable to parameter of type 'string'.
+src/components/alerts/IncidentDetailDrawer.vue	TS2345	Argument of type 'string | undefined' is not assignable to parameter of type 'string'.
+src/components/alerts/IncidentDetailDrawer.vue	TS2769	No overload matches this call.
+src/components/alerts/IncidentDetailDrawer.vue	TS7016	Could not find a declaration file for module '@/components/dashboards/panels/CustomChartRenderer.vue'. '/Users/ktx/Documents/Projects/openobserve.worktrees/ux-revamp/web/src/components/dashboards/panels/CustomChartRenderer.vue' implicitly has an 'any' type.
+src/components/alerts/IncidentList.vue	TS2345	Argument of type 'Record<string, string> | undefined' is not assignable to parameter of type 'Record<string, string>'.
+src/components/alerts/IncidentList.vue	TS2345	Argument of type 'Record<string, string> | undefined' is not assignable to parameter of type 'Record<string, string>'.
+src/components/alerts/IncidentList.vue	TS2345	Argument of type 'Record<string, string> | undefined' is not assignable to parameter of type 'Record<string, string>'.
+src/components/alerts/IncidentList.vue	TS2345	Argument of type 'Record<string, string> | undefined' is not assignable to parameter of type 'Record<string, string>'.
+src/components/alerts/IncidentList.vue	TS2345	Argument of type 'Record<string, string> | undefined' is not assignable to parameter of type 'Record<string, string>'.
+src/components/alerts/IncidentList.vue	TS2345	Argument of type 'Record<string, string> | undefined' is not assignable to parameter of type 'Record<string, string>'.
+src/components/alerts/PreviewAlert.vue	TS7005	Variable 'yAxis' implicitly has an 'any[]' type.
+src/components/alerts/PreviewAlert.vue	TS7034	Variable 'yAxis' implicitly has type 'any[]' in some locations where its type cannot be determined.
+src/components/alerts/QueryEditorDialog.vue	TS2322	Type '(newLanguage: "sql" | "promql") => void' is not assignable to type '(language: Language) => void'.
+src/components/alerts/steps/CompareWithPast.vue	TS7016	Could not find a declaration file for module '@/components/CustomDateTimePicker.vue'. '/Users/ktx/Documents/Projects/openobserve.worktrees/ux-revamp/web/src/components/CustomDateTimePicker.vue' implicitly has an 'any' type.
+src/components/alerts/steps/QueryConfig.vue	TS2322	Type '(unit: string) => void' is not assignable to type '(_value: SelectModelValue) => any'.
+src/components/alerts/steps/QueryConfig.vue	TS2322	Type '(unit: string) => void' is not assignable to type '(_value: SelectModelValue) => any'.
+src/components/alerts/steps/QueryConfig.vue	TS2322	Type '(value: string) => void' is not assignable to type '(_value: SelectModelValue) => any'.
+src/components/alerts/steps/QueryConfig.vue	TS2322	Type '(value: string) => void' is not assignable to type '(_value: SelectModelValue) => any'.
+src/components/alerts/steps/QueryConfig.vue	TS2322	Type '(value: string) => void' is not assignable to type '(_value: SelectModelValue) => any'.
+src/components/alerts/steps/QueryConfig.vue	TS2322	Type '(value: string) => void' is not assignable to type '(_value: SelectModelValue) => any'.
+src/components/alerts/steps/QueryConfig.vue	TS2322	Type '(value: string) => void' is not assignable to type '(_value: SelectModelValue) => any'.
+src/components/alerts/steps/QueryConfig.vue	TS2322	Type '(value: string) => void' is not assignable to type '(_value: SelectModelValue) => any'.
+src/components/alerts/steps/QueryConfig.vue	TS2322	Type '(value: string) => void' is not assignable to type '(_value: SelectModelValue) => any'.
+src/components/alerts/steps/QueryConfig.vue	TS2322	Type '(value: string) => void' is not assignable to type '(_value: SelectModelValue) => any'.
+src/components/alerts/steps/QueryConfig.vue	TS2322	Type '(value: string) => void' is not assignable to type '(_value: SelectModelValue) => any'.
+src/components/alerts/steps/QueryConfig.vue	TS2322	Type '(value: string) => void' is not assignable to type '(_value: SelectModelValue) => any'.
+src/components/anomaly_detection/steps/AnomalyDetectionConfig.vue	TS2322	Type '(fn: string) => void' is not assignable to type '(_value: SelectModelValue) => any'.
+src/components/common/FieldValuesPanel.vue	TS2322	Type '(newValues: string[]) => void' is not assignable to type '(_value: CheckboxModelValue) => any'.
+src/components/common/FieldValuesPanel.vue	TS2322	Type 'boolean | undefined' is not assignable to type 'boolean'.
+src/components/common/SecondaryNav.vue	TS2322	Type 'string | undefined' is not assignable to type 'string | number'.
+src/components/common/sidebar/FolderList.vue	TS2339	Property 'message' does not exist on type '{}'.
+src/components/common/sidebar/FolderList.vue	TS2339	Property 'response' does not exist on type '{}'.
+src/components/common/sidebar/FolderList.vue	TS7006	Parameter 'tab' implicitly has an 'any' type.
+src/components/cross-linking/CrossLinkDialog.vue	TS2322	Type 'FormApi<{ name: string; url: string; fields: { name: string; }[]; newFieldName?: string | undefined; }, FormValidateOrFn<{ name: string; url: string; fields: { name: string; }[]; newFieldName?: string | undefined; }> | undefined, ... 9 more ..., unknown> & VueFormApi<...>' is not assignable to type '(FormApi<any, FormValidateOrFn<any> | undefined, FormValidateOrFn<any> | undefined, FormAsyncValidateOrFn<any> | undefined, ... 7 more ..., unknown> & VueFormApi<...>) | undefined'.
+src/components/dashboards/ColorSwatchPicker.vue	TS2345	Argument of type 'string | null' is not assignable to parameter of type 'string'.
+src/components/dashboards/ColorSwatchPicker.vue	TS2345	Argument of type '{ title: string; style: { background: string | null; } | {}; class: { 'swatch--active': boolean; }; }' is not assignable to parameter of type 'LabelHTMLAttributes & ReservedProps & Record<string, unknown>'.
+src/components/dashboards/ColumnFormatControls.vue	TS2322	Type 'string | null' is not assignable to type 'string | number | undefined'.
+src/components/dashboards/MoveDashboardToAnotherFolder.vue	TS7006	Parameter 'item' implicitly has an 'any' type.
+src/components/dashboards/PanelErrorButtons.vue	TS7016	Could not find a declaration file for module '@/components/common/RelativeTime.vue'. '/Users/ktx/Documents/Projects/openobserve.worktrees/ux-revamp/web/src/components/common/RelativeTime.vue' implicitly has an 'any' type.
+src/components/dashboards/PanelSchemaRenderer.vue	TS7016	Could not find a declaration file for module './addPanel/AddAnnotation.vue'. '/Users/ktx/Documents/Projects/openobserve.worktrees/ux-revamp/web/src/components/dashboards/addPanel/AddAnnotation.vue' implicitly has an 'any' type.
+src/components/dashboards/PanelSchemaRenderer.vue	TS7016	Could not find a declaration file for module './panels/CustomChartRenderer.vue'. '/Users/ktx/Documents/Projects/openobserve.worktrees/ux-revamp/web/src/components/dashboards/panels/CustomChartRenderer.vue' implicitly has an 'any' type.
+src/components/dashboards/VariablesValueSelector.vue	TS18046	'error' is of type 'unknown'.
+src/components/dashboards/VariablesValueSelector.vue	TS7006	Parameter 'v' implicitly has an 'any' type.
+src/components/dashboards/addPanel/ColorBySeriesPopUp.vue	TS2322	Type 'FormApi<{ series: { type: string; value: string; color?: string | null | undefined; }[]; }, FormValidateOrFn<{ series: { type: string; value: string; color?: string | null | undefined; }[]; }> | undefined, ... 9 more ..., unknown> & VueFormApi<...>' is not assignable to type '(FormApi<any, FormValidateOrFn<any> | undefined, FormValidateOrFn<any> | undefined, FormAsyncValidateOrFn<any> | undefined, ... 7 more ..., unknown> & VueFormApi<...>) | undefined'.
+src/components/dashboards/addPanel/ColorPaletteDropDown.vue	TS2322	Type '(value: string) => void' is not assignable to type '(_value: SelectModelValue) => any'.
+src/components/dashboards/addPanel/ColorPaletteDropDown.vue	TS2322	Type 'string | undefined' is not assignable to type 'SelectValue'.
+src/components/dashboards/addPanel/ColorPaletteDropDown.vue	TS2322	Type 'string | undefined' is not assignable to type 'SelectValue'.
+src/components/dashboards/addPanel/ConfigPanel.vue	TS2322	Type '(enabled: boolean) => void' is not assignable to type '(_value: SwitchValue) => any'.
+src/components/dashboards/addPanel/ConfigPanel.vue	TS2322	Type '(val: number) => void' is not assignable to type '(_value: string | number) => any'.
+src/components/dashboards/addPanel/ConfigPanel.vue	TS2339	Property 'dateTimePicker' does not exist on type 'never'.
+src/components/dashboards/addPanel/ConfigPanel.vue	TS2339	Property 'dateTimePicker' does not exist on type 'never'.
+src/components/dashboards/addPanel/ConfigPanel.vue	TS7016	Could not find a declaration file for module '@/components/CustomDateTimePicker.vue'. '/Users/ktx/Documents/Projects/openobserve.worktrees/ux-revamp/web/src/components/CustomDateTimePicker.vue' implicitly has an 'any' type.
+src/components/dashboards/addPanel/DashboardQueryEditor.vue	TS18047	'queryEditorRef.value' is possibly 'null'.
+src/components/dashboards/addPanel/DashboardQueryEditor.vue	TS18047	'queryEditorRef.value' is possibly 'null'.
+src/components/dashboards/addPanel/DashboardQueryEditor.vue	TS18047	'queryEditorRef.value' is possibly 'null'.
+src/components/dashboards/addPanel/DashboardQueryEditor.vue	TS2322	Type '(fnCode: string | null | undefined) => void' is not assignable to type '(_value: SelectModelValue) => any'.
+src/components/dashboards/addPanel/DashboardQueryEditor.vue	TS2322	Type '(newLanguage: "sql" | "promql") => void' is not assignable to type '(language: Language) => void'.
+src/components/dashboards/addPanel/DashboardQueryEditor.vue	TS2339	Property 'disableSuggestionPopup' does not exist on type 'never'.
+src/components/dashboards/addPanel/DashboardQueryEditor.vue	TS2339	Property 'getCursorIndex' does not exist on type 'never'.
+src/components/dashboards/addPanel/DashboardQueryEditor.vue	TS2339	Property 'getValue' does not exist on type 'never'.
+src/components/dashboards/addPanel/DashboardQueryEditor.vue	TS2339	Property 'name' does not exist on type 'never'.
+src/components/dashboards/addPanel/DashboardQueryEditor.vue	TS2339	Property 'resetEditorLayout' does not exist on type 'never'.
+src/components/dashboards/addPanel/DashboardQueryEditor.vue	TS2339	Property 'resetEditorLayout' does not exist on type 'never'.
+src/components/dashboards/addPanel/DashboardQueryEditor.vue	TS2339	Property 'setValue' does not exist on type 'never'.
+src/components/dashboards/addPanel/DashboardQueryEditor.vue	TS2339	Property 'setValue' does not exist on type 'never'.
+src/components/dashboards/addPanel/DashboardQueryEditor.vue	TS2339	Property 'setValue' does not exist on type 'never'.
+src/components/dashboards/addPanel/DashboardQueryEditor.vue	TS2339	Property 'triggerAutoComplete' does not exist on type 'never'.
+src/components/dashboards/addPanel/DashboardQueryEditor.vue	TS2345	Argument of type '{ name: any; function: any; }' is not assignable to parameter of type 'never'.
+src/components/dashboards/addPanel/DashboardQueryEditor.vue	TS7006	Parameter 'event' implicitly has an 'any' type.
+src/components/dashboards/addPanel/DashboardQueryEditor.vue	TS7006	Parameter 'index' implicitly has an 'any' type.
+src/components/dashboards/addPanel/DashboardQueryEditor.vue	TS7006	Parameter 'index' implicitly has an 'any' type.
+src/components/dashboards/addPanel/DashboardQueryEditor.vue	TS7006	Parameter 'newQuery' implicitly has an 'any' type.
+src/components/dashboards/addPanel/DashboardQueryEditor.vue	TS7006	Parameter 'query' implicitly has an 'any' type.
+src/components/dashboards/addPanel/DashboardQueryEditor.vue	TS7006	Parameter 'value' implicitly has an 'any' type.
+src/components/dashboards/addPanel/DrilldownPopUp.vue	TS2322	Type 'FormApi<{ name: string; type: string; targetBlank: boolean; findBy: string; data: { logsMode: string; logsQuery: string; url: string; folder: string; dashboard: string; tab: string; passAllVariables: boolean; variables: { ...; }[]; }; }, ... 10 more ..., unknown> & VueFormApi<...>' is not assignable to type '(FormApi<any, FormValidateOrFn<any> | undefined, FormValidateOrFn<any> | undefined, FormAsyncValidateOrFn<any> | undefined, ... 7 more ..., unknown> & VueFormApi<...>) | undefined'.
+src/components/dashboards/addPanel/PanelFieldList.vue	TS2322	Type '(val: string) => void' is not assignable to type '(_value: SelectModelValue) => any'.
+src/components/dashboards/addPanel/PanelFieldList.vue	TS2322	Type '(val: string) => void' is not assignable to type '(_value: SelectModelValue) => any'.
+src/components/dashboards/addPanel/PanelFieldList.vue	TS2322	Type 'string | null | undefined' is not assignable to type 'string | undefined'.
+src/components/dashboards/addPanel/StreamFieldSelect.vue	TS2322	Type '(key: string | null) => void' is not assignable to type '(_value: SelectModelValue) => any'.
+src/components/dashboards/addPanel/StreamFieldSelect.vue	TS2769	No overload matches this call.
+src/components/dashboards/addPanel/TablePaginationControls.vue	TS2322	Type '(val: number) => void' is not assignable to type '(_value: SelectModelValue) => any'.
+src/components/dashboards/settings/TabsSettings.vue	TS7016	Could not find a declaration file for module 'sortablejs'. '/Users/ktx/Documents/Projects/openobserve.worktrees/ux-revamp/web/node_modules/sortablejs/Sortable.min.js' implicitly has an 'any' type.
+src/components/dashboards/settings/VariableSettings.vue	TS7016	Could not find a declaration file for module 'sortablejs'. '/Users/ktx/Documents/Projects/openobserve.worktrees/ux-revamp/web/node_modules/sortablejs/Sortable.min.js' implicitly has an 'any' type.
+src/components/dashboards/viewPanel/ViewPanel.vue	TS2322	Type '{ start_time: Date; end_time: Date; }' is not assignable to type 'null'.
+src/components/dashboards/viewPanel/ViewPanel.vue	TS2322	Type '{ start_time: Date; end_time: Date; }' is not assignable to type 'null'.
+src/components/functions/AddEnrichmentTable.vue	TS2322	Type 'FormApi<{ name: string; source: "url" | "file"; append: boolean; updateMode: string; url: string; file?: any; }, FormValidateOrFn<{ name: string; source: "url" | "file"; append: boolean; updateMode: string; url: string; file?: any; }> | undefined, ... 9 more ..., unknown> & VueFormApi<...>' is not assignable to type '(FormApi<any, FormValidateOrFn<any> | undefined, FormValidateOrFn<any> | undefined, FormAsyncValidateOrFn<any> | undefined, ... 7 more ..., unknown> & VueFormApi<...>) | undefined'.
+src/components/functions/AddFunction.vue	TS2322	Type '(newLanguage: "vrl" | "javascript") => void' is not assignable to type '(language: Language) => void'.
+src/components/functions/TestFunction.vue	TS2322	Type '((value: string) => Promise<void>) | undefined' is not assignable to type '(_val: string) => void'.
+src/components/iam/serviceAccounts/AddServiceAccount.vue	TS2339	Property 'email' does not exist on type 'Record<string, any> | undefined'.
+src/components/iam/users/InvitationList.vue	TS18046	'error' is of type 'unknown'.
+src/components/iam/users/InvitationList.vue	TS18046	'error' is of type 'unknown'.
+src/components/iam/users/InvitationList.vue	TS18046	'error' is of type 'unknown'.
+src/components/iam/users/InvitationList.vue	TS18047	'selectedInvitation.value' is possibly 'null'.
+src/components/iam/users/InvitationList.vue	TS2339	Property 'org_id' does not exist on type 'never'.
+src/components/iam/users/InvitationList.vue	TS2339	Property 'org_id' does not exist on type 'never'.
+src/components/iam/users/InvitationList.vue	TS2339	Property 'org_name' does not exist on type 'never'.
+src/components/iam/users/InvitationList.vue	TS2339	Property 'org_name' does not exist on type 'never'.
+src/components/iam/users/InvitationList.vue	TS2339	Property 'org_name' does not exist on type 'never'.
+src/components/iam/users/InvitationList.vue	TS2339	Property 'token' does not exist on type 'never'.
+src/components/iam/users/InvitationList.vue	TS2339	Property 'token' does not exist on type 'never'.
+src/components/iam/users/User.vue	TS2322	Type 'any[]' is not assignable to type 'never[]'.
+src/components/ingestion/AIIntegrations.vue	TS2322	Type '(routeName: string) => void' is not assignable to type '(value: string | number) => any'.
+src/components/ingestion/setupCard/SetupCardRenderer.vue	TS2322	Type 'string | null' is not assignable to type 'string'.
+src/components/logstream/AssociatedRegexPatterns.vue	TS18046	'error' is of type 'unknown'.
+src/components/logstream/AssociatedRegexPatterns.vue	TS2339	Property 'data' does not exist on type '{}'.
+src/components/logstream/AssociatedRegexPatterns.vue	TS2339	Property 'response' does not exist on type '{}'.
+src/components/logstream/LlmEvaluationSettings.vue	TS2322	Type 'FormApi<{ enabled: boolean; spanIdentifier: string; enableSampling: boolean; samplingRate: number; outputStream: string; selectedTemplate?: any; }, FormValidateOrFn<{ enabled: boolean; spanIdentifier: string; enableSampling: boolean; samplingRate: number; outputStream: string; selectedTemplate?: any; }> | undefined,...' is not assignable to type '(FormApi<any, FormValidateOrFn<any> | undefined, FormValidateOrFn<any> | undefined, FormAsyncValidateOrFn<any> | undefined, ... 7 more ..., unknown> & VueFormApi<...>) | undefined'.
+src/components/logstream/schema.vue	TS18046	'partition' is of type 'unknown'.
+src/components/logstream/schema.vue	TS18048	'modelValue' is possibly 'undefined'.
+src/components/logstream/schema.vue	TS18048	'modelValue' is possibly 'undefined'.
+src/components/logstream/schema.vue	TS18048	'modelValue' is possibly 'undefined'.
+src/components/logstream/schema.vue	TS18048	'modelValue' is possibly 'undefined'.
+src/components/logstream/schema.vue	TS2322	Type 'any[]' is not assignable to type 'never[]'.
+src/components/logstream/schema.vue	TS2322	Type 'any[]' is not assignable to type 'never[]'.
+src/components/logstream/schema.vue	TS2322	Type 'any[]' is not assignable to type 'never[]'.
+src/components/logstream/schema.vue	TS2322	Type 'any[]' is not assignable to type 'never[]'.
+src/components/logstream/schema.vue	TS2322	Type 'any[]' is not assignable to type 'never[]'.
+src/components/logstream/schema.vue	TS2322	Type 'any[]' is not assignable to type 'never[]'.
+src/components/logstream/schema.vue	TS2322	Type 'null' is not assignable to type 'string | number | undefined'.
+src/components/logstream/schema.vue	TS2322	Type 'null' is not assignable to type 'string | undefined'.
+src/components/logstream/schema.vue	TS2322	Type 'string' is not assignable to type 'null'.
+src/components/logstream/schema.vue	TS2322	Type 'string[]' is not assignable to type 'never[]'.
+src/components/logstream/schema.vue	TS2322	Type '{ start: any; end: any; }[]' is not assignable to type 'never[]'.
+src/components/logstream/schema.vue	TS2339	Property 'end' does not exist on type 'never'.
+src/components/logstream/schema.vue	TS2339	Property 'end' does not exist on type 'never'.
+src/components/logstream/schema.vue	TS2339	Property 'name' does not exist on type 'never'.
+src/components/logstream/schema.vue	TS2339	Property 'name' does not exist on type 'never'.
+src/components/logstream/schema.vue	TS2339	Property 'name' does not exist on type 'never'.
+src/components/logstream/schema.vue	TS2339	Property 'original_end' does not exist on type 'never'.
+src/components/logstream/schema.vue	TS2339	Property 'original_start' does not exist on type 'never'.
+src/components/logstream/schema.vue	TS2339	Property 'start' does not exist on type 'never'.
+src/components/logstream/schema.vue	TS2339	Property 'start' does not exist on type 'never'.
+src/components/logstream/schema.vue	TS2345	Argument of type 'any' is not assignable to parameter of type 'never'.
+src/components/logstream/schema.vue	TS2345	Argument of type 'any' is not assignable to parameter of type 'never'.
+src/components/logstream/schema.vue	TS2345	Argument of type 'any' is not assignable to parameter of type 'never'.
+src/components/logstream/schema.vue	TS2345	Argument of type 'any' is not assignable to parameter of type 'never'.
+src/components/logstream/schema.vue	TS2345	Argument of type 'any' is not assignable to parameter of type 'never'.
+src/components/logstream/schema.vue	TS2345	Argument of type 'string | false' is not assignable to parameter of type 'string'.
+src/components/logstream/schema.vue	TS2345	Argument of type 'string | false' is not assignable to parameter of type 'string'.
+src/components/logstream/schema.vue	TS2345	Argument of type 'unknown' is not assignable to parameter of type 'never'.
+src/components/logstream/schema.vue	TS2345	Argument of type '{ field: any; types: string; }' is not assignable to parameter of type 'never'.
+src/components/logstream/schema.vue	TS2345	Argument of type '{ field: any; types: string; }' is not assignable to parameter of type 'never'.
+src/components/logstream/schema.vue	TS2345	Argument of type '{ field: any; types: { hash: number; }; }' is not assignable to parameter of type 'never'.
+src/components/logstream/schema.vue	TS2345	Argument of type '{ index: string; original_start: any; original_end: any; start: string; end: string; }' is not assignable to parameter of type 'never'.
+src/components/logstream/schema.vue	TS2345	Argument of type '{ start: number; end: number; }' is not assignable to parameter of type 'never'.
+src/components/logstream/schema.vue	TS2551	Property 'value' does not exist on type 'boolean'. Did you mean 'valueOf'?
+src/components/logstream/schema.vue	TS2769	No overload matches this call.
+src/components/logstream/schema.vue	TS7005	Variable 'added_part_keys' implicitly has an 'any[]' type.
+src/components/logstream/schema.vue	TS7005	Variable 'missingFields' implicitly has an 'any[]' type.
+src/components/logstream/schema.vue	TS7006	Parameter 'dateString' implicitly has an 'any' type.
+src/components/logstream/schema.vue	TS7006	Parameter 'field' implicitly has an 'any' type.
+src/components/logstream/schema.vue	TS7006	Parameter 'field' implicitly has an 'any' type.
+src/components/logstream/schema.vue	TS7006	Parameter 'field' implicitly has an 'any' type.
+src/components/logstream/schema.vue	TS7006	Parameter 'field' implicitly has an 'any' type.
+src/components/logstream/schema.vue	TS7006	Parameter 'field' implicitly has an 'any' type.
+src/components/logstream/schema.vue	TS7006	Parameter 'field' implicitly has an 'any' type.
+src/components/logstream/schema.vue	TS7006	Parameter 'field' implicitly has an 'any' type.
+src/components/logstream/schema.vue	TS7006	Parameter 'field' implicitly has an 'any' type.
+src/components/logstream/schema.vue	TS7006	Parameter 'field' implicitly has an 'any' type.
+src/components/logstream/schema.vue	TS7006	Parameter 'field' implicitly has an 'any' type.
+src/components/logstream/schema.vue	TS7006	Parameter 'field' implicitly has an 'any' type.
+src/components/logstream/schema.vue	TS7006	Parameter 'index' implicitly has an 'any' type.
+src/components/logstream/schema.vue	TS7006	Parameter 'item' implicitly has an 'any' type.
+src/components/logstream/schema.vue	TS7006	Parameter 'item' implicitly has an 'any' type.
+src/components/logstream/schema.vue	TS7006	Parameter 'key' implicitly has an 'any' type.
+src/components/logstream/schema.vue	TS7006	Parameter 'key' implicitly has an 'any' type.
+src/components/logstream/schema.vue	TS7006	Parameter 'name' implicitly has an 'any' type.
+src/components/logstream/schema.vue	TS7006	Parameter 'name' implicitly has an 'any' type.
+src/components/logstream/schema.vue	TS7006	Parameter 'name' implicitly has an 'any' type.
+src/components/logstream/schema.vue	TS7006	Parameter 'option' implicitly has an 'any' type.
+src/components/logstream/schema.vue	TS7006	Parameter 'option' implicitly has an 'any' type.
+src/components/logstream/schema.vue	TS7006	Parameter 'property' implicitly has an 'any' type.
+src/components/logstream/schema.vue	TS7006	Parameter 'props' implicitly has an 'any' type.
+src/components/logstream/schema.vue	TS7006	Parameter 'props' implicitly has an 'any' type.
+src/components/logstream/schema.vue	TS7006	Parameter 'props' implicitly has an 'any' type.
+src/components/logstream/schema.vue	TS7006	Parameter 'schema' implicitly has an 'any' type.
+src/components/logstream/schema.vue	TS7006	Parameter 'selectedFieldsSet' implicitly has an 'any' type.
+src/components/logstream/schema.vue	TS7006	Parameter 'selectedFieldsSet' implicitly has an 'any' type.
+src/components/logstream/schema.vue	TS7006	Parameter 'settings' implicitly has an 'any' type.
+src/components/logstream/schema.vue	TS7006	Parameter 'streamResponse' implicitly has an 'any' type.
+src/components/logstream/schema.vue	TS7006	Parameter 'streamResponse' implicitly has an 'any' type.
+src/components/logstream/schema.vue	TS7006	Parameter 'streamResponse' implicitly has an 'any' type.
+src/components/logstream/schema.vue	TS7006	Parameter 't' implicitly has an 'any' type.
+src/components/logstream/schema.vue	TS7006	Parameter 't' implicitly has an 'any' type.
+src/components/logstream/schema.vue	TS7006	Parameter 'tab' implicitly has an 'any' type.
+src/components/logstream/schema.vue	TS7006	Parameter 'tab' implicitly has an 'any' type.
+src/components/logstream/schema.vue	TS7006	Parameter 'value' implicitly has an 'any' type.
+src/components/logstream/schema.vue	TS7006	Parameter 'value' implicitly has an 'any' type.
+src/components/logstream/schema.vue	TS7006	Parameter 'value' implicitly has an 'any' type.
+src/components/logstream/schema.vue	TS7034	Variable 'added_part_keys' implicitly has type 'any[]' in some locations where its type cannot be determined.
+src/components/logstream/schema.vue	TS7034	Variable 'missingFields' implicitly has type 'any[]' in some locations where its type cannot be determined.
+src/components/logstream/schema.vue	TS7053	Element implicitly has an 'any' type because expression of type '"approx_partition"' can't be used to index type '{ fields: never[]; partition_keys: never[]; index_fields: never[]; full_text_search_keys: never[]; bloom_filter_fields: never[]; defined_schema_fields: any[]; extended_retention_days: any[]; pattern_associations: any[]; }'.
+src/components/logstream/schema.vue	TS7053	Element implicitly has an 'any' type because expression of type '"data_retention"' can't be used to index type '{ fields: never[]; partition_keys: never[]; index_fields: never[]; full_text_search_keys: never[]; bloom_filter_fields: never[]; defined_schema_fields: any[]; extended_retention_days: any[]; pattern_associations: any[]; }'.
+src/components/logstream/schema.vue	TS7053	Element implicitly has an 'any' type because expression of type '"enable_distinct_fields"' can't be used to index type '{ fields: never[]; partition_keys: never[]; index_fields: never[]; full_text_search_keys: never[]; bloom_filter_fields: never[]; defined_schema_fields: any[]; extended_retention_days: any[]; pattern_associations: any[]; }'.
+src/components/logstream/schema.vue	TS7053	Element implicitly has an 'any' type because expression of type '"flatten_level"' can't be used to index type '{ fields: never[]; partition_keys: never[]; index_fields: never[]; full_text_search_keys: never[]; bloom_filter_fields: never[]; defined_schema_fields: any[]; extended_retention_days: any[]; pattern_associations: any[]; }'.
+src/components/logstream/schema.vue	TS7053	Element implicitly has an 'any' type because expression of type '"max_query_range"' can't be used to index type '{ fields: never[]; partition_keys: never[]; index_fields: never[]; full_text_search_keys: never[]; bloom_filter_fields: never[]; defined_schema_fields: any[]; extended_retention_days: any[]; pattern_associations: any[]; }'.
+src/components/logstream/schema.vue	TS7053	Element implicitly has an 'any' type because expression of type '"max_query_range"' can't be used to index type '{ fields: never[]; partition_keys: never[]; index_fields: never[]; full_text_search_keys: never[]; bloom_filter_fields: never[]; defined_schema_fields: any[]; extended_retention_days: any[]; pattern_associations: any[]; }'.
+src/components/logstream/schema.vue	TS7053	Element implicitly has an 'any' type because expression of type '"store_original_data"' can't be used to index type '{ fields: never[]; partition_keys: never[]; index_fields: never[]; full_text_search_keys: never[]; bloom_filter_fields: never[]; defined_schema_fields: any[]; extended_retention_days: any[]; pattern_associations: any[]; }'.
+src/components/logstream/schema.vue	TS7053	Element implicitly has an 'any' type because expression of type 'any' can't be used to index type '{}'.
+src/components/logstream/schema.vue	TS7053	Element implicitly has an 'any' type because expression of type 'any' can't be used to index type '{}'.
+src/components/logstream/schema.vue	TS7053	Element implicitly has an 'any' type because expression of type 'string' can't be used to index type '{}'.
+src/components/pipeline/ImportPipeline.vue	TS2322	Type '(val: string) => void' is not assignable to type '(_value: string | number) => any'.
+src/components/pipeline/NodeForm/AssociateFunction.vue	TS7053	Element implicitly has an 'any' type because expression of type 'any' can't be used to index type '{}'.
+src/components/pipeline/NodeForm/AssociateFunction.vue	TS7053	Element implicitly has an 'any' type because expression of type 'any' can't be used to index type '{}'.
+src/components/pipeline/NodeForm/Condition.vue	TS2322	Type 'FormApi<{ conditions: any; }, FormValidateOrFn<{ conditions: any; }> | undefined, FormValidateOrFn<{ conditions: any; }> | undefined, FormAsyncValidateOrFn<{ conditions: any; }> | undefined, ... 7 more ..., unknown> & VueFormApi<...>' is not assignable to type '(FormApi<any, FormValidateOrFn<any> | undefined, FormValidateOrFn<any> | undefined, FormAsyncValidateOrFn<any> | undefined, ... 7 more ..., unknown> & VueFormApi<...>) | undefined'.
+src/components/pipeline/NodeForm/CreateDestinationForm.vue	TS2322	Type 'FormApi<{ name: string; url: string; skip_tls_verify: boolean; headers: { key: string; value: string; }[]; destination_type: string; url_endpoint: string; method: string; output_format: string; esbulk_index: string; separator: string; org: string; stream: string; metadata?: { ...; } | undefined; }, ... 10 more ..., ...' is not assignable to type '(FormApi<any, FormValidateOrFn<any> | undefined, FormValidateOrFn<any> | undefined, FormAsyncValidateOrFn<any> | undefined, ... 7 more ..., unknown> & VueFormApi<...>) | undefined'.
+src/components/pipeline/NodeForm/Query.vue	TS2322	Type 'FormApi<{ [x: string]: unknown; trigger_condition: { [x: string]: unknown; period: number; frequency_type?: string | undefined; frequency?: any; cron?: string | null | undefined; timezone?: any; operator?: any; threshold?: any; }; query_condition: { ...; }; }, ... 10 more ..., unknown> & VueFormApi<...>' is not assignable to type '(FormApi<any, FormValidateOrFn<any> | undefined, FormValidateOrFn<any> | undefined, FormAsyncValidateOrFn<any> | undefined, ... 7 more ..., unknown> & VueFormApi<...>) | undefined'.
+src/components/pipeline/NodeForm/ScheduledPipeline.vue	TS2345	Argument of type 'number | null' is not assignable to parameter of type 'number'.
+src/components/pipeline/NodeForm/ScheduledPipeline.vue	TS2345	Argument of type 'number | null' is not assignable to parameter of type 'number'.
+src/components/pipeline/NodeForm/ScheduledPipeline.vue	TS2345	Argument of type 'number | null' is not assignable to parameter of type 'number'.
+src/components/pipeline/NodeForm/ScheduledPipeline.vue	TS2345	Argument of type 'number | null' is not assignable to parameter of type 'number'.
+src/components/pipeline/NodeForm/ScheduledPipeline.vue	TS2345	Argument of type 'number | null' is not assignable to parameter of type 'number'.
+src/components/pipeline/PipelineEditor.vue	TS7006	Parameter 'event' implicitly has an 'any' type.
+src/components/pipeline/PipelineEditor.vue	TS7016	Could not find a declaration file for module '@/components/pipeline/NodeSidebar.vue'. '/Users/ktx/Documents/Projects/openobserve.worktrees/ux-revamp/web/src/components/pipeline/NodeSidebar.vue' implicitly has an 'any' type.
+src/components/pipeline/PipelineEditor.vue	TS7016	Could not find a declaration file for module '@/plugins/pipelines/PipelineFlow.vue'. '/Users/ktx/Documents/Projects/openobserve.worktrees/ux-revamp/web/src/plugins/pipelines/PipelineFlow.vue' implicitly has an 'any' type.
+src/components/pipeline/PipelinesList.vue	TS7016	Could not find a declaration file for module './PipelineView.vue'. '/Users/ktx/Documents/Projects/openobserve.worktrees/ux-revamp/web/src/components/pipeline/PipelineView.vue' implicitly has an 'any' type.
+src/components/pipeline/StreamSelection.vue	TS2322	Type 'any[]' is not assignable to type 'never[]'.
+src/components/pipelines/PipelineHistory.vue	TS7006	Parameter 'a' implicitly has an 'any' type.
+src/components/pipelines/PipelineHistory.vue	TS7006	Parameter 'b' implicitly has an 'any' type.
+src/components/promql/components/LabelFilterEditor.vue	TS7006	Parameter 'label' implicitly has an 'any' type.
+src/components/promql/components/MetricSelector.vue	TS2322	Type '(value: string | null) => void' is not assignable to type '(_value: SelectModelValue) => any'.
+src/components/reports/CreateReport.vue	TS2322	Type 'FormApi<{ name: string; description: string; isCachedReport: boolean; imagePreview: boolean; dashboards: { folder: string; dashboard: string; tabs: string; report_type?: string | undefined; email_attachment_type?: string | undefined; attachmentWidth?: number | undefined; attachmentHeight?: number | undefined; timera...' is not assignable to type '(FormApi<any, FormValidateOrFn<any> | undefined, FormValidateOrFn<any> | undefined, FormAsyncValidateOrFn<any> | undefined, ... 7 more ..., unknown> & VueFormApi<...>) | undefined'.
+src/components/reports/CreateReport.vue	TS2345	Argument of type 'string | undefined' is not assignable to parameter of type 'string'.
+src/components/rum/PlayerEventsSidebar.vue	TS2322	Type '({ label: string; value: string; icon: string; style: { width: string; padding: string; "margin-right": string; }; } | { label: string; value: string; icon: string; style: { width: string; padding: string; "margin-right"?: undefined; }; })[]' is not assignable to type 'Tab[]'.
+src/components/rum/PlayerTracesTab.vue	TS18046	'metadata' is of type 'unknown'.
+src/components/rum/PlayerTracesTab.vue	TS18046	'metadata' is of type 'unknown'.
+src/components/rum/PlayerTracesTab.vue	TS2322	Type 'unknown' is not assignable to type 'Record<string, any>'.
+src/components/rum/VideoPlayer.vue	TS2322	Type '(speed: number) => void' is not assignable to type '(_value: SelectModelValue) => any'.
+src/components/settings/AddRegexPattern.vue	TS18046	'error' is of type 'unknown'.
+src/components/settings/AddRegexPattern.vue	TS18046	'error' is of type 'unknown'.
+src/components/settings/AddRegexPattern.vue	TS18046	'error' is of type 'unknown'.
+src/components/settings/BuiltInPatternsTab.vue	TS18047	'__VLS_ctx.previewedPattern' is possibly 'null'.
+src/components/settings/BuiltInPatternsTab.vue	TS18048	'__VLS_ctx.previewedPattern.examples.Valid.length' is possibly 'undefined'.
+src/components/settings/CorrelationSettings.vue	TS2322	Type '(tab: string) => Promise<void>' is not assignable to type '(value: string | number) => any'.
+src/components/settings/DomainManagement.vue	TS7005	Variable 'existingDomains' implicitly has an 'any[]' type.
+src/components/settings/DomainManagement.vue	TS7034	Variable 'existingDomains' implicitly has type 'any[]' in some locations where its type cannot be determined.
+src/components/settings/License.vue	TS2339	Property 'response' does not exist on type '{}'.
+src/components/settings/License.vue	TS2339	Property 'response' does not exist on type '{}'.
+src/components/settings/ModelPricingEditor.vue	TS2322	Type 'FormApi<{ name: string; match_pattern: string; tiers: { name: string; prices: { key: string; value: number; }[]; draftKey: string; draftValue: number; condition?: { usage_key: string; operator: string; value: number; } | null | undefined; }[]; }, ... 10 more ..., unknown> & VueFormApi<...>' is not assignable to type '(FormApi<any, FormValidateOrFn<any> | undefined, FormValidateOrFn<any> | undefined, FormAsyncValidateOrFn<any> | undefined, ... 7 more ..., unknown> & VueFormApi<...>) | undefined'.
+src/components/settings/ServiceIdentitySetup.vue	TS18047	'__VLS_ctx.selectedFieldAnalytics' is possibly 'null'.
+src/components/settings/ServiceIdentitySetup.vue	TS18047	'__VLS_ctx.selectedFieldAnalytics' is possibly 'null'.
+src/components/settings/ServiceIdentitySetup.vue	TS2538	Type 'undefined' cannot be used as an index type.
+src/components/settings/ServiceIdentitySetup.vue	TS2538	Type 'undefined' cannot be used as an index type.
+src/components/settings/ServiceIdentitySetup.vue	TS2538	Type 'undefined' cannot be used as an index type.
+src/components/settings/ServiceIdentitySetup.vue	TS7016	Could not find a declaration file for module '@/components/dashboards/panels/CustomChartRenderer.vue'. '/Users/ktx/Documents/Projects/openobserve.worktrees/ux-revamp/web/src/components/dashboards/panels/CustomChartRenderer.vue' implicitly has an 'any' type.
+src/composables/dashboard/usePanelPromQLExecutor.ts	TS7006	Parameter 'it' implicitly has an 'any' type.
+src/composables/dashboard/usePanelPromQLExecutor.ts	TS7006	Parameter 'queryIndex' implicitly has an 'any' type.
+src/composables/dashboard/usePanelPromQLExecutor.ts	TS7016	Could not find a declaration file for module '@/utils/metrics/metricDefaults'. '/Users/ktx/Documents/Projects/openobserve.worktrees/ux-revamp/web/src/utils/metrics/metricDefaults.js' implicitly has an 'any' type.
+src/composables/metrics/useMetricsExplorerGrid.ts	TS7016	Could not find a declaration file for module '@/utils/metrics/metricDefaults'. '/Users/ktx/Documents/Projects/openobserve.worktrees/ux-revamp/web/src/utils/metrics/metricDefaults.js' implicitly has an 'any' type.
+src/composables/useAlertForm.ts	TS2322	Type 'LocationQueryValue' is not assignable to type 'string'.
+src/composables/useCorrelationDefaultSlug.ts	TS7005	Variable 'm' implicitly has an 'any' type.
+src/composables/useCorrelationDefaultSlug.ts	TS7034	Variable 'm' implicitly has type 'any' in some locations where its type cannot be determined.
+src/composables/useLatencyInsightsAnalysis.ts	TS2345	Argument of type '{ start: number; end: number; timeStart?: number | undefined; timeEnd?: number | undefined; } | undefined' is not assignable to parameter of type '{ start: number; end: number; } | null'.
+src/composables/useLatencyInsightsAnalysis.ts	TS2345	Argument of type '{ start: number; end: number; timeStart?: number | undefined; timeEnd?: number | undefined; } | undefined' is not assignable to parameter of type '{ start: number; end: number; } | null'.
+src/composables/useLatencyInsightsAnalysis.ts	TS2345	Argument of type '{ start: number; end: number; timeStart?: number | undefined; timeEnd?: number | undefined; } | undefined' is not assignable to parameter of type '{ start: number; end: number; } | null'.
+src/composables/useLatencyInsightsAnalysis.ts	TS2345	Argument of type '{ start: number; end: number; timeStart?: number | undefined; timeEnd?: number | undefined; } | undefined' is not assignable to parameter of type '{ start: number; end: number; } | null'.
+src/composables/useLogs.ts	TS2322	Type 'ExtendedParsedSQLResult | null | undefined' is not assignable to type 'ExtendedParsedSQLResult'.
+src/composables/useLogs.ts	TS2322	Type 'string | undefined' is not assignable to type 'string'.
+src/composables/useLogs.ts	TS2322	Type 'string | undefined' is not assignable to type 'string'.
+src/composables/useLogs/searchAround.ts	TS2322	Type 'string | null' is not assignable to type 'string'.
+src/composables/useLogs/searchAround.ts	TS2322	Type 'string | undefined' is not assignable to type 'string'.
+src/composables/useLogs/searchAround.ts	TS2345	Argument of type 'string | null' is not assignable to parameter of type 'string'.
+src/composables/useLogs/searchAround.ts	TS2345	Argument of type 'string | null' is not assignable to parameter of type 'string'.
+src/composables/useLogs/useHistogram.ts	TS7053	Element implicitly has an 'any' type because expression of type 'any' can't be used to index type '{ readonly "10 second": number; readonly "15 second": number; readonly "30 second": number; readonly "1 minute": number; readonly "5 minute": number; readonly "30 minute": number; readonly "1 hour": number; readonly "1 day": number; }'.
+src/composables/useLogs/usePatterns.ts	TS18048	'patternsState.value.patterns.patterns.length' is possibly 'undefined'.
+src/composables/useLogs/useSearchBar.ts	TS2322	Type 'ExtendedParsedSQLResult | null | undefined' is not assignable to type 'ExtendedParsedSQLResult'.
+src/composables/useLogs/useSearchHistogramManager.ts	TS18047	'searchObj.data.histogramInterval' is possibly 'null'.
+src/composables/useLogs/useSearchQuery.ts	TS2322	Type 'null' is not assignable to type 'SearchRequestPayload'.
+src/composables/useLogs/useSearchQuery.ts	TS2322	Type 'null' is not assignable to type 'SearchRequestPayload'.
+src/composables/useLogs/useSearchQuery.ts	TS2322	Type 'null' is not assignable to type 'SearchRequestPayload'.
+src/composables/useLogs/useSearchQuery.ts	TS2322	Type 'null' is not assignable to type 'SearchRequestPayload'.
+src/composables/useLogs/useSearchQuery.ts	TS2322	Type 'null' is not assignable to type 'SearchRequestPayload'.
+src/composables/useLogs/useSearchQuery.ts	TS2322	Type 'null' is not assignable to type 'SearchRequestPayload'.
+src/composables/useLogs/useSearchQuery.ts	TS2322	Type 'null' is not assignable to type 'SearchRequestPayload'.
+src/composables/useLogs/useSearchQuery.ts	TS2322	Type 'string | null' is not assignable to type 'string'.
+src/composables/useLogs/useSearchResponseHandler.ts	TS18047	'searchObj.data.histogramInterval' is possibly 'null'.
+src/composables/useLogsHighlighter.ts	TS7053	Element implicitly has an 'any' type because expression of type 'string' can't be used to index type '{}'.
+src/composables/useTraces.ts	TS7006	Parameter 'field' implicitly has an 'any' type.
+src/composables/useTraces.ts	TS7053	Element implicitly has an 'any' type because expression of type 'string' can't be used to index type '{}'.
+src/enterprise/components/EvalTemplateEditor.vue	TS2322	Type 'FormApi<{ name: string; description: string; response_type: string; dimensions: string[]; content: string; }, FormValidateOrFn<{ name: string; description: string; response_type: string; dimensions: string[]; content: string; }> | undefined, ... 9 more ..., unknown> & VueFormApi<...>' is not assignable to type '(FormApi<any, FormValidateOrFn<any> | undefined, FormValidateOrFn<any> | undefined, FormAsyncValidateOrFn<any> | undefined, ... 7 more ..., unknown> & VueFormApi<...>) | undefined'.
+src/enterprise/components/billings/invoiceTable.vue	TS7006	Parameter 'index' implicitly has an 'any' type.
+src/enterprise/components/billings/invoiceTable.vue	TS7006	Parameter 'invoice' implicitly has an 'any' type.
+src/enterprise/components/onlineEvals/forms/JobFormPage.vue	TS2322	Type 'FormApi<{ name: string; stream: string; description: string; streamType: string; scorerIds: string[]; samplingMode: string; samplingValue: string; }, FormValidateOrFn<{ name: string; stream: string; description: string; streamType: string; scorerIds: string[]; samplingMode: string; samplingValue: string; }> | undefi...' is not assignable to type '(FormApi<any, FormValidateOrFn<any> | undefined, FormValidateOrFn<any> | undefined, FormAsyncValidateOrFn<any> | undefined, ... 7 more ..., unknown> & VueFormApi<...>) | undefined'.
+src/enterprise/components/onlineEvals/forms/ScoreConfigDialog.vue	TS2322	Type 'FormApi<{ name: string; description: string; dataType: "boolean" | "categorical" | "numeric"; min: any; max: any; categories: string[]; healthyDirection: "gte" | "lte"; healthyCategories: string[]; healthyBool: boolean | null; healthyGteValue?: number | undefined; healthyLteValue?: number | undefined; }, ... 10 more...' is not assignable to type '(FormApi<any, FormValidateOrFn<any> | undefined, FormValidateOrFn<any> | undefined, FormAsyncValidateOrFn<any> | undefined, ... 7 more ..., unknown> & VueFormApi<...>) | undefined'.
+src/enterprise/components/onlineEvals/forms/ScorerFormPage.vue	TS2322	Type 'FormApi<{ name: string; scorerType: "remote" | "llm_judge"; description: string; producesScoreConfigId: string; producesScoreConfigVersion: string; pinScoreConfigVersion: boolean; providerId: string; ... 15 more ...; customHeaders: { ...; }[]; }, ... 10 more ..., unknown> & VueFormApi<...>' is not assignable to type '(FormApi<any, FormValidateOrFn<any> | undefined, FormValidateOrFn<any> | undefined, FormAsyncValidateOrFn<any> | undefined, ... 7 more ..., unknown> & VueFormApi<...>) | undefined'.
+src/enterprise/components/onlineEvals/quality/QualityConfigSidebar.vue	TS2345	Argument of type 'number | null | undefined' is not assignable to parameter of type 'number | null'.
+src/layouts/MainLayout.vue	TS2339	Property 'identifier' does not exist on type '{ label: NumberConstructor; value: StringConstructor; }'.
+src/layouts/MainLayout.vue	TS7016	Could not find a declaration file for module '@/components/login/GetStarted.vue'. '/Users/ktx/Documents/Projects/openobserve.worktrees/ux-revamp/web/src/components/login/GetStarted.vue' implicitly has an 'any' type.
+src/lib/core/Table/sub-components/OTableHeader.vue	TS2722	Cannot invoke an object which is possibly 'undefined'.
+src/lib/core/Table/sub-components/OTableHeader.vue	TS2722	Cannot invoke an object which is possibly 'undefined'.
+src/lib/core/Table/sub-components/OTableHeader.vue	TS2722	Cannot invoke an object which is possibly 'undefined'.
+src/lib/core/Table/sub-components/OTableHeader.vue	TS2722	Cannot invoke an object which is possibly 'undefined'.
+src/lib/core/ToggleGroup/OFormToggleGroup.vue	TS2322	Type '(v: AcceptableValue | AcceptableValue[]) => void' is not assignable to type '(value: boolean | AcceptableValue | AcceptableValue[]) => any'.
+src/lib/feedback/Toast/OToast.vue	TS18048	'__VLS_ctx.timeout' is possibly 'undefined'.
+src/lib/forms/Radio/ORadioGroup.vue	TS2322	Type '(value: string) => void' is not assignable to type '(payload: AcceptableValue) => any'.
+src/lib/forms/Select/OSelect.vue	TS2345	Argument of type 'string | null' is not assignable to parameter of type 'string'.
+src/lib/forms/Select/OSelect.vue	TS7053	Element implicitly has an 'any' type because expression of type '"after-options"' can't be used to index type 'Readonly<SelectSlots> & SelectSlots'.
+src/lib/lists/FieldList/OFieldList.vue	TS2322	Type '(value: string) => void' is not assignable to type '(_value: string | number) => any'.
+src/lib/navigation/Stepper/OStep.vue	TS2590	Expression produces a union type that is too complex to represent.
+src/plugins/correlation/CorrelatedLogsTable.vue	TS2345	Argument of type '(s: SubjectButton) => string[]' is not assignable to parameter of type '(this: undefined, value: SubjectButtonSpec, index: number, array: SubjectButtonSpec[]) => string | readonly string[]'.
+src/plugins/correlation/CorrelatedLogsTable.vue	TS7005	Variable 'DEFAULT_LONG_TEXT_FIELDS' implicitly has an 'any[]' type.
+src/plugins/correlation/CorrelatedLogsTable.vue	TS7034	Variable 'DEFAULT_LONG_TEXT_FIELDS' implicitly has type 'any[]' in some locations where its type cannot be determined.
+src/plugins/correlation/CorrelationEventHeader.vue	TS2322	Type '(v: string | undefined) => void' is not assignable to type '(value: boolean | AcceptableValue | AcceptableValue[]) => any'.
+src/plugins/correlation/DimensionFilterEditor.vue	TS2769	No overload matches this call.
+src/plugins/correlation/TelemetryCorrelationDashboard.vue	TS2345	Argument of type 'string | null' is not assignable to parameter of type 'string'.
+src/plugins/correlation/TelemetryCorrelationDashboard.vue	TS2345	Argument of type 'string | null' is not assignable to parameter of type 'string'.
+src/plugins/correlation/TelemetryCorrelationDashboard.vue	TS7006	Parameter 'f' implicitly has an 'any' type.
+src/plugins/correlation/TelemetryCorrelationDashboard.vue	TS7006	Parameter 'trace' implicitly has an 'any' type.
+src/plugins/logs/IndexList.vue	TS2322	Type '(value: string | string[] | null) => void' is not assignable to type '(_value: SelectModelValue) => any'.
+src/plugins/logs/IndexList.vue	TS7006	Parameter 'page' implicitly has an 'any' type.
+src/plugins/logs/SearchResult.vue	TS2322	Type 'number' is not assignable to type 'undefined'.
+src/plugins/logs/SearchResult.vue	TS2322	Type 'number' is not assignable to type 'undefined'.
+src/plugins/logs/SearchResult.vue	TS2322	Type 'string | null' is not assignable to type 'string | undefined'.
+src/plugins/logs/SearchResult.vue	TS2339	Property 'scrollTo' does not exist on type 'never'.
+src/plugins/logs/SearchResult.vue	TS2538	Type 'string[]' cannot be used as an index type.
+src/plugins/logs/SearchResult.vue	TS2538	Type 'string[]' cannot be used as an index type.
+src/plugins/logs/SearchResult.vue	TS2538	Type 'string[]' cannot be used as an index type.
+src/plugins/logs/SearchResult.vue	TS2538	Type 'string[]' cannot be used as an index type.
+src/plugins/logs/TenstackTable.vue	TS7053	Element implicitly has an 'any' type because expression of type '`${any}_${number}`' can't be used to index type '{}'.
+src/plugins/logs/TenstackTable.vue	TS7053	Element implicitly has an 'any' type because expression of type '`${any}_${number}`' can't be used to index type '{}'.
+src/plugins/logs/patterns/PatternDetailsDialog.vue	TS18047	'__VLS_ctx.selectedPattern' is possibly 'null'.
+src/plugins/logs/patterns/PatternDetailsDialog.vue	TS18047	'__VLS_ctx.selectedPattern' is possibly 'null'.
+src/plugins/logs/patterns/PatternDetailsDialog.vue	TS18047	'__VLS_ctx.selectedPattern' is possibly 'null'.
+src/plugins/metrics/explorer/FunctionConfigDialog.vue	TS7016	Could not find a declaration file for module '@/utils/metrics/metricDefaults'. '/Users/ktx/Documents/Projects/openobserve.worktrees/ux-revamp/web/src/utils/metrics/metricDefaults.js' implicitly has an 'any' type.
+src/plugins/metrics/explorer/MetricCard.vue	TS7016	Could not find a declaration file for module '@/components/common/RelativeTime.vue'. '/Users/ktx/Documents/Projects/openobserve.worktrees/ux-revamp/web/src/components/common/RelativeTime.vue' implicitly has an 'any' type.
+src/plugins/metrics/explorer/MetricCard.vue	TS7016	Could not find a declaration file for module '@/utils/metrics/metricDefaults'. '/Users/ktx/Documents/Projects/openobserve.worktrees/ux-revamp/web/src/utils/metrics/metricDefaults.js' implicitly has an 'any' type.
+src/plugins/metrics/explorer/MetricsExplorer.vue	TS7016	Could not find a declaration file for module '@/utils/metrics/metricDefaults'. '/Users/ktx/Documents/Projects/openobserve.worktrees/ux-revamp/web/src/utils/metrics/metricDefaults.js' implicitly has an 'any' type.
+src/plugins/traces/IndexList.vue	TS18048	'decodedSql' is possibly 'undefined'.
+src/plugins/traces/IndexList.vue	TS2322	Type '(selectedValue: string | null) => void' is not assignable to type '(_value: SelectModelValue) => any'.
+src/plugins/traces/IndexList.vue	TS2322	Type 'null' is not assignable to type '{ label: string; value: string; }'.
+src/plugins/traces/IndexList.vue	TS2345	Argument of type 'number | null' is not assignable to parameter of type 'number'.
+src/plugins/traces/IndexList.vue	TS2345	Argument of type 'number | null' is not assignable to parameter of type 'number'.
+src/plugins/traces/IndexList.vue	TS2345	Argument of type 'number | null' is not assignable to parameter of type 'number'.
+src/plugins/traces/IndexList.vue	TS2345	Argument of type 'number | null' is not assignable to parameter of type 'number'.
+src/plugins/traces/IndexList.vue	TS2345	Argument of type 'number | null' is not assignable to parameter of type 'number'.
+src/plugins/traces/LLMInsightsDashboard.vue	TS2322	Type '(mode?: string | number | null | undefined) => void' is not assignable to type '(value: boolean | AcceptableValue | AcceptableValue[]) => any'.
+src/plugins/traces/SearchResult.vue	TS2322	Type '(val: number) => void' is not assignable to type '(_value: SelectModelValue) => any'.
+src/plugins/traces/ServiceGraph.vue	TS2322	Type '(stream: string) => void' is not assignable to type '(_value: SelectModelValue) => any'.
+src/plugins/traces/ServiceGraphNodeSidePanel.vue	TS2322	Type 'number | null' is not assignable to type 'number | undefined'.
+src/plugins/traces/ServiceGraphNodeSidePanel.vue	TS7006	Parameter 'index' implicitly has an 'any' type.
+src/plugins/traces/ServicesCatalog.vue	TS2322	Type '(stream: string) => void' is not assignable to type '(_value: SelectModelValue) => any'.
+src/plugins/traces/SessionsList.vue	TS2322	Type '(mode?: string | number | null | undefined) => void' is not assignable to type '(value: boolean | AcceptableValue | AcceptableValue[]) => any'.
+src/plugins/traces/TraceDetails.vue	TS2322	Type '(node: import("/Users/ktx/Documents/Projects/openobserve.worktrees/ux-revamp/web/src/composables/useTreeVisualization").TreeNode) => number' is not assignable to type '(node: import("/Users/ktx/Documents/Projects/openobserve.worktrees/ux-revamp/web/src/utils/traces/treeVisualizationEngine").TreeNode) => number'.
+src/plugins/traces/TraceDetails.vue	TS2322	Type '(node: import("/Users/ktx/Documents/Projects/openobserve.worktrees/ux-revamp/web/src/composables/useTreeVisualization").TreeNode) => string' is not assignable to type '(node: import("/Users/ktx/Documents/Projects/openobserve.worktrees/ux-revamp/web/src/utils/traces/treeVisualizationEngine").TreeNode) => string'.
+src/plugins/traces/TraceDetails.vue	TS2322	Type '(node: import("/Users/ktx/Documents/Projects/openobserve.worktrees/ux-revamp/web/src/composables/useTreeVisualization").TreeNode) => string' is not assignable to type '(node: import("/Users/ktx/Documents/Projects/openobserve.worktrees/ux-revamp/web/src/utils/traces/treeVisualizationEngine").TreeNode) => string'.
+src/plugins/traces/TraceDetails.vue	TS2322	Type '(tab: string) => void' is not assignable to type '(value: boolean | AcceptableValue | AcceptableValue[]) => any'.
+src/plugins/traces/TraceDetails.vue	TS2322	Type 'EnrichedSpan[]' is not assignable to type 'never[]'.
+src/plugins/traces/TraceDetails.vue	TS2322	Type 'HTMLElement | null' is not assignable to type 'null | undefined'.
+src/plugins/traces/TraceDetails.vue	TS2322	Type 'any[]' is not assignable to type 'never[]'.
+src/plugins/traces/TraceDetails.vue	TS2322	Type 'any[]' is not assignable to type 'never[]'.
+src/plugins/traces/TraceDetails.vue	TS2322	Type 'any[]' is not assignable to type 'never[]'.
+src/plugins/traces/TraceDetails.vue	TS2322	Type 'string | null' is not assignable to type 'string | undefined'.
+src/plugins/traces/TraceDetails.vue	TS2322	Type 'string | null' is not assignable to type 'string | undefined'.
+src/plugins/traces/TraceDetails.vue	TS2345	Argument of type 'string' is not assignable to parameter of type 'never'.
+src/plugins/traces/TraceDetailsSidebar.vue	TS7006	Parameter 'value' implicitly has an 'any' type.
+src/plugins/traces/TraceEvaluationsView.vue	TS2322	Type '(newTemplate: string | null) => void' is not assignable to type '(_value: SelectModelValue) => any'.
+src/plugins/traces/TraceTree.vue	TS2322	Type 'string | null' is not assignable to type 'string | undefined'.
+src/plugins/traces/TraceTree.vue	TS2345	Argument of type 'string | null' is not assignable to parameter of type 'string'.
+src/plugins/traces/TraceTree.vue	TS2345	Argument of type 'string | null' is not assignable to parameter of type 'string'.
+src/plugins/traces/TraceTree.vue	TS2531	Object is possibly 'null'.
+src/plugins/traces/TraceTree.vue	TS2531	Object is possibly 'null'.
+src/plugins/traces/components/TraceErrorTab.vue	TS2345	Argument of type 'string | undefined' is not assignable to parameter of type 'string'.
+src/plugins/traces/components/TracesSearchResultList.vue	TS7006	Parameter 'c' implicitly has an 'any' type.
+src/plugins/traces/metrics/TracesAnalysisDashboard.vue	TS18047	'__VLS_ctx.selectedTimeRangeDisplay' is possibly 'null'.
+src/plugins/traces/metrics/TracesAnalysisDashboard.vue	TS18047	'__VLS_ctx.selectedTimeRangeDisplay' is possibly 'null'.
+src/plugins/traces/metrics/TracesAnalysisDashboard.vue	TS18047	'__VLS_ctx.selectedTimeRangeDisplay' is possibly 'null'.
+src/plugins/traces/metrics/TracesAnalysisDashboard.vue	TS18047	'__VLS_ctx.selectedTimeRangeDisplay' is possibly 'null'.
+src/plugins/traces/metrics/TracesAnalysisDashboard.vue	TS2339	Property 'committedVariablesData' does not exist on type 'never'.
+src/plugins/traces/metrics/TracesAnalysisDashboard.vue	TS2339	Property 'committedVariablesData' does not exist on type 'never'.
+src/plugins/traces/metrics/TracesAnalysisDashboard.vue	TS2339	Property 'hasUncommittedChanges' does not exist on type 'never'.
+src/plugins/traces/metrics/TracesAnalysisDashboard.vue	TS2339	Property 'hasUncommittedChanges' does not exist on type 'never'.
+src/plugins/traces/metrics/TracesAnalysisDashboard.vue	TS2339	Property 'hasUncommittedChanges' does not exist on type 'never'.
+src/plugins/traces/metrics/TracesAnalysisDashboard.vue	TS2339	Property 'hasUncommittedChanges' does not exist on type 'never'.
+src/plugins/traces/metrics/TracesAnalysisDashboard.vue	TS2339	Property 'hasUncommittedChanges' does not exist on type 'never'.
+src/plugins/traces/metrics/TracesMetricsDashboard.vue	TS2345	Argument of type '-1' is not assignable to parameter of type 'null | undefined'.
+src/plugins/traces/metrics/TracesMetricsDashboard.vue	TS2345	Argument of type 'number | null' is not assignable to parameter of type 'null | undefined'.
+src/plugins/traces/metrics/TracesMetricsDashboard.vue	TS2345	Argument of type 'number' is not assignable to parameter of type 'null | undefined'.
+src/plugins/traces/metrics/TracesMetricsDashboard.vue	TS2345	Argument of type 'string | null' is not assignable to parameter of type 'string'.
+src/plugins/traces/metrics/TracesMetricsDashboard.vue	TS7006	Parameter 'data' implicitly has an 'any' type.
+src/plugins/traces/metrics/TracesMetricsDashboard.vue	TS7006	Parameter 'index' implicitly has an 'any' type.
+src/plugins/traces/metrics/TracesMetricsDashboard.vue	TS7006	Parameter 'panel' implicitly has an 'any' type.
+src/services/reodotdev_analytics.ts	TS7016	Could not find a declaration file for module 'reodotdev'. '/Users/ktx/Documents/Projects/openobserve.worktrees/ux-revamp/web/node_modules/reodotdev/index.js' implicitly has an 'any' type.
+src/stores/index.ts	TS2322	Type 'number' is not assignable to type 'null'.
+src/stores/index.ts	TS7053	Element implicitly has an 'any' type because expression of type 'any' can't be used to index type '{ light: null; dark: null; }'.
+src/stores/index.ts	TS7053	Element implicitly has an 'any' type because expression of type 'any' can't be used to index type '{}'.
+src/utils/alerts/alertPayload.ts	TS2322	Type 'string | null' is not assignable to type 'string | undefined'.
+src/utils/alerts/alertValidation.ts	TS7005	Variable 'destinationsList' implicitly has an 'any[]' type.
+src/utils/alerts/alertValidation.ts	TS7005	Variable 'streamList' implicitly has an 'any[]' type.
+src/utils/alerts/alertValidation.ts	TS7034	Variable 'destinationsList' implicitly has type 'any[]' in some locations where its type cannot be determined.
+src/utils/alerts/alertValidation.ts	TS7034	Variable 'streamList' implicitly has type 'any[]' in some locations where its type cannot be determined.
+src/utils/dashboard/colorPalette.ts	TS7006	Parameter 'value' implicitly has an 'any' type.
+src/utils/dashboard/convertPromQLData.ts	TS7006	Parameter 'axis' implicitly has an 'any' type.
+src/utils/dashboard/convertPromQLData.ts	TS7006	Parameter 'axis' implicitly has an 'any' type.
+src/utils/dashboard/dashboardAutoQueryBuilder.ts	TS7006	Parameter 'condition' implicitly has an 'any' type.
+src/utils/dashboard/dashboardAutoQueryBuilder.ts	TS7006	Parameter 'condition' implicitly has an 'any' type.
+src/utils/dashboard/promql/convertPromQLTableChart.ts	TS7006	Parameter 'key' implicitly has an 'any' type.
+src/utils/dashboard/sql/shared/contextBuilder.ts	TS7006	Parameter 'axis' implicitly has an 'any' type.
+src/utils/dashboard/sql/shared/contextBuilder.ts	TS7006	Parameter 'axis' implicitly has an 'any' type.
+src/utils/dashboard/sqlMissingValueFiller.ts	TS2365	Operator '<' cannot be applied to types 'never' and 'string'.
+src/utils/dashboard/sqlMissingValueFiller.ts	TS2365	Operator '>' cannot be applied to types 'never' and 'string'.
+src/utils/dashboard/tableConfigUtils.ts	TS2345	Argument of type 'string | null | undefined' is not assignable to parameter of type 'string'.
+src/utils/metrics/metricFamily.ts	TS7016	Could not find a declaration file for module './metricDefaults'. '/Users/ktx/Documents/Projects/openobserve.worktrees/ux-revamp/web/src/utils/metrics/metricDefaults.js' implicitly has an 'any' type.
+src/utils/metrics/metricPanelSeed.ts	TS7016	Could not find a declaration file for module './metricDefaults'. '/Users/ktx/Documents/Projects/openobserve.worktrees/ux-revamp/web/src/utils/metrics/metricDefaults.js' implicitly has an 'any' type.
+src/utils/metrics/metricsHandoff.ts	TS7016	Could not find a declaration file for module './metricDefaults'. '/Users/ktx/Documents/Projects/openobserve.worktrees/ux-revamp/web/src/utils/metrics/metricDefaults.js' implicitly has an 'any' type.
+src/utils/validatePipeline.ts	TS18048	'trigger.silence' is possibly 'undefined'.
+src/utils/validatePipeline.ts	TS18048	'trigger.threshold' is possibly 'undefined'.
+src/views/Dashboards/Dashboards.vue	TS2322	Type '"default"' is not assignable to type 'null'.
+src/views/Dashboards/Dashboards.vue	TS2322	Type '"default"' is not assignable to type 'null'.
+src/views/Dashboards/Dashboards.vue	TS2322	Type 'any[]' is not assignable to type 'null'.
+src/views/Dashboards/Dashboards.vue	TS2322	Type 'null' is not assignable to type 'string | undefined'.
+src/views/Dashboards/Dashboards.vue	TS2322	Type 'null' is not assignable to type 'unknown[] | undefined'.
+src/views/Dashboards/Dashboards.vue	TS2322	Type 'string | LocationQueryValue[]' is not assignable to type 'null'.
+src/views/Dashboards/Dashboards.vue	TS2322	Type 'string[]' is not assignable to type 'null'.
+src/views/Dashboards/Dashboards.vue	TS2339	Property 'folder_id' does not exist on type 'never'.
+src/views/Dashboards/Dashboards.vue	TS2339	Property 'folder_id' does not exist on type 'never'.
+src/views/Dashboards/Dashboards.vue	TS2339	Property 'folder_id' does not exist on type 'never'.
+src/views/Dashboards/Dashboards.vue	TS2339	Property 'folder_id' does not exist on type 'never'.
+src/views/Dashboards/Dashboards.vue	TS2339	Property 'id' does not exist on type 'never'.
+src/views/Dashboards/Dashboards.vue	TS2339	Property 'id' does not exist on type 'never'.
+src/views/Dashboards/Dashboards.vue	TS2339	Property 'message' does not exist on type '{}'.
+src/views/Dashboards/Dashboards.vue	TS2339	Property 'message' does not exist on type '{}'.
+src/views/Dashboards/Dashboards.vue	TS2339	Property 'message' does not exist on type '{}'.
+src/views/Dashboards/Dashboards.vue	TS2339	Property 'message' does not exist on type '{}'.
+src/views/Dashboards/Dashboards.vue	TS2339	Property 'message' does not exist on type '{}'.
+src/views/Dashboards/Dashboards.vue	TS2339	Property 'message' does not exist on type '{}'.
+src/views/Dashboards/Dashboards.vue	TS2339	Property 'message' does not exist on type '{}'.
+src/views/Dashboards/Dashboards.vue	TS2339	Property 'response' does not exist on type '{}'.
+src/views/Dashboards/Dashboards.vue	TS2345	Argument of type 'null' is not assignable to parameter of type 'string | undefined'.
+src/views/Dashboards/Dashboards.vue	TS2538	Type 'null' cannot be used as an index type.
+src/views/Dashboards/Dashboards.vue	TS2538	Type 'null' cannot be used as an index type.
+src/views/Dashboards/Dashboards.vue	TS2538	Type 'null' cannot be used as an index type.
+src/views/Dashboards/Dashboards.vue	TS7005	Variable 'currentSearchAbortController' implicitly has an 'any' type.
+src/views/Dashboards/Dashboards.vue	TS7005	Variable 'currentSearchAbortController' implicitly has an 'any' type.
+src/views/Dashboards/Dashboards.vue	TS7006	Parameter 'index' implicitly has an 'any' type.
+src/views/Dashboards/Dashboards.vue	TS7006	Parameter 'query' implicitly has an 'any' type.
+src/views/Dashboards/Dashboards.vue	TS7006	Parameter 'row' implicitly has an 'any' type.
+src/views/Dashboards/Dashboards.vue	TS7006	Parameter 'row' implicitly has an 'any' type.
+src/views/Dashboards/Dashboards.vue	TS7034	Variable 'currentSearchAbortController' implicitly has type 'any' in some locations where its type cannot be determined.
+src/views/Dashboards/addPanel/AddCondition.vue	TS2322	Type '(newOperator: string) => void' is not assignable to type '(_value: SelectModelValue) => any'.
+src/views/Dashboards/addPanel/AddPanel.vue	TS2322	Type 'null' is not assignable to type 'Record<string, any>'.
+src/views/Dashboards/addPanel/AddPanel.vue	TS2322	Type '{ start_time: Date; end_time: Date; }' is not assignable to type 'null'.
+src/views/Dashboards/addPanel/AddPanel.vue	TS2322	Type '{ start_time: Date; end_time: Date; }' is not assignable to type 'null'.
+src/views/Dashboards/addPanel/AddPanel.vue	TS7053	Element implicitly has an 'any' type because expression of type '"schema"' can't be used to index type '{}'.
+src/views/Dashboards/addPanel/AddPanel.vue	TS7053	Element implicitly has an 'any' type because expression of type '"stream_name"' can't be used to index type '{}'.
+src/views/Ingestion.vue	TS2322	Type '(name: string) => void' is not assignable to type '(_value: SelectModelValue) => any'.
+src/views/Ingestion.vue	TS7006	Parameter 'o' implicitly has an 'any' type.
+src/views/MemberSubscription.vue	TS2345	Argument of type 'string | null' is not assignable to parameter of type 'string'.
+src/views/OverviewTab.vue	TS2322	Type 'string | null' is not assignable to type 'string'.
+src/views/RUM/RealUserMonitoring.vue	TS2322	Type '(tab: string) => void' is not assignable to type '(value: string | number) => any'.
+src/views/RUM/SessionViewer.vue	TS2322	Type 'any' is not assignable to type 'never'.
+src/views/RUM/SessionViewer.vue	TS2322	Type 'any' is not assignable to type 'never'.
+src/views/RUM/SessionViewer.vue	TS2322	Type 'any[]' is not assignable to type 'never[]'.
+src/views/RUM/UploadSourceMaps.vue	TS2322	Type 'null' is not assignable to type 'File'.
+src/views/UsageTab.vue	TS7016	Could not find a declaration file for module '@/components/dashboards/panels/CustomChartRenderer.vue'. '/Users/ktx/Documents/Projects/openobserve.worktrees/ux-revamp/web/src/components/dashboards/panels/CustomChartRenderer.vue' implicitly has an 'any' type.

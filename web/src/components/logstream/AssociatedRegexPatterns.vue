@@ -576,9 +576,10 @@ export default defineComponent({
         );
         outputString.value = response.data.results[0];
       } catch (error) {
+        const e = error as { response?: { data?: { message?: string } } };
         toast({
           variant: "error",
-          message: error.response?.data?.message || t("regex_patterns.failed_to_test_string"),
+          message: e.response?.data?.message || t("regex_patterns.failed_to_test_string"),
         });
       } finally {
         testLoading.value = false;
@@ -721,11 +722,12 @@ export default defineComponent({
         }));
         store.dispatch("setRegexPatterns", allPatterns.value);
       } catch (error) {
+        const e = error as { response?: { data?: { message?: string } }; data?: { message?: string } };
         toast({
           variant: "error",
           message:
-            error?.response?.data?.message ||
-            error?.data?.message ||
+            e?.response?.data?.message ||
+            e?.data?.message ||
             "Error fetching regex patterns",
         });
       } finally {

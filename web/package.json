@@ -22,9 +22,12 @@
     "build-only-alpha1": "vite build --mode=alpha1",
     "build-only-cloud-prod": "vite build --mode=production",
     "type-check": "NODE_OPTIONS=--max-old-space-size=8192 vue-tsc --noEmit -p tsconfig.vitest.json --composite false",
-    "type-check:app": "NODE_OPTIONS=--max-old-space-size=8192 vue-tsc --noEmit -p tsconfig.app.json --composite false",
+    "type-check:app": "node scripts/type-check-baseline.mjs",
+    "type-check:app:baseline-update": "node scripts/type-check-baseline.mjs --update",
+    "type-check:canary": "node scripts/type-check-canary.mjs",
     "lint": "eslint . --ext .vue,.js,.jsx,.cjs,.mjs,.ts,.tsx,.cts,.mts --fix",
-    "lint:ci": "eslint \"src/**/*.{js,ts,vue}\" --no-fix --quiet"
+    "lint:ci": "node scripts/lint-canary.mjs && eslint \"src/**/*.{js,ts,vue}\" --no-fix --quiet --ignore-pattern \"src/__canary__/**\"",
+    "lint:canary": "node scripts/lint-canary.mjs"
   },
   "dependencies": {
     "@esbuild-plugins/node-globals-polyfill": "^0.2.3",

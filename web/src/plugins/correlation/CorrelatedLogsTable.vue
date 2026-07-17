@@ -294,7 +294,7 @@ import { ref, computed, onMounted, onBeforeUnmount, watch } from "vue";
 import {
   SUBJECT_BUTTONS_BY_SET,
   resolveSetId,
-  type SubjectButton,
+  type SubjectButtonSpec,
 } from "@/composables/useMetricSubjectButtons";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
@@ -750,7 +750,7 @@ const columnMaxCap = computed(() => {
     : Math.max(0, containerWidth.value - TIMESTAMP_COL_WIDTH - 30);
 });
 
-const DEFAULT_LONG_TEXT_FIELDS = [];
+const DEFAULT_LONG_TEXT_FIELDS: string[] = [];
 
 // Measures a field's content width and returns the capped size plus whether the
 // raw measurement exceeded maxCap (used to build the dynamic long-text list).
@@ -1234,7 +1234,7 @@ const subjectSemanticIds = computed<Set<string>>(() => {
   if (!props.matchedSetId) return new Set();
   const canonical = resolveSetId(props.matchedSetId);
   const specs = canonical ? SUBJECT_BUTTONS_BY_SET[canonical] : undefined;
-  return specs?.length ? new Set(specs.flatMap((s: SubjectButton) => s.semanticIds)) : new Set();
+  return specs?.length ? new Set(specs.flatMap((s: SubjectButtonSpec) => s.semanticIds)) : new Set();
 });
 
 const unifiedChips = computed<DimensionChip[]>(() =>

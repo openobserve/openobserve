@@ -459,6 +459,7 @@ import {
 import { getEffectiveTimeRange } from "@/utils/date";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
@@ -947,8 +948,9 @@ const loadAvailableStreams = async () => {
   }
 };
 
-const onStreamFilterChange = (stream: string) => {
-  emit("request:stream-change", stream);
+const onStreamFilterChange = (stream: SelectModelValue) => {
+  // Single-select stream picker → the emitted value is the stream name string.
+  emit("request:stream-change", String(stream ?? ""));
 };
 
 async function loadServicesCatalog() {

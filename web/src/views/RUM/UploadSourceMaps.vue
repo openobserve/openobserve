@@ -125,7 +125,8 @@ const uploadSourceMapsDefaults = computed((): UploadSourceMapsForm => ({
   service: (route.query.service as string) || "",
   version: (route.query.version as string) || "",
   environment: (route.query.environment as string) || "",
-  file: null,
+  // Empty file slot at init; schema is `.nullable()` so null is valid at runtime.
+  file: null as unknown as File,
 }));
 
 // Navigate back to source maps list

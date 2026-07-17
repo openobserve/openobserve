@@ -176,7 +176,7 @@ export default function usePatterns() {
    * Check if patterns exist
    */
   const hasPatterns = () => {
-    return patternsState.value.patterns?.patterns?.length > 0;
+    return (patternsState.value.patterns?.patterns?.length ?? 0) > 0;
   };
 
   return {

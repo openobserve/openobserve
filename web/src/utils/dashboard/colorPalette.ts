@@ -191,7 +191,7 @@ const getSeriesValueBasedOnSeriesBy = (
 ): number | null => {
   try {
     const validValues = values.filter(
-      (value) =>
+      (value: number | string) =>
         value != null &&
         value !== "" &&
         isNumber(value) &&

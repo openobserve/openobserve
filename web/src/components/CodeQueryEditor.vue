@@ -57,6 +57,8 @@ import {
   computed,
 } from "vue";
 
+import type * as MonacoEditor from "monaco-editor/esm/vs/editor/editor.api";
+
 // Lazy load Monaco Editor - only loaded when this component is rendered
 // This reduces initial bundle size by ~3.1MB
 let monaco: any = null;
@@ -925,7 +927,10 @@ export default defineComponent({
       provider.value = monaco.languages.registerCompletionItemProvider(
         props.language,
         {
-          provideCompletionItems: function (model, position) {
+          provideCompletionItems: function (
+            model: MonacoEditor.editor.ITextModel,
+            position: MonacoEditor.Position,
+          ) {
             // find out if we are completing a property in the 'dependencies' object.
             var textUntilPosition = model.getValueInRange({
               startLineNumber: 1,

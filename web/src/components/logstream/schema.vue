@@ -916,7 +916,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
-// @ts-nocheck
 import {
   computed,
   defineComponent,
@@ -1021,7 +1020,7 @@ export default defineComponent({
     OCardSection,
     OForm,
   },
-  setup({ modelValue }) {
+  setup({ modelValue }: { modelValue: Record<string, unknown> }) {
     type PatternAssociation = {
       field: string;
       pattern_name: string;
@@ -1038,7 +1037,7 @@ export default defineComponent({
     const storeOriginalData = ref(false);
     const enableDistinctFields = ref(false);
     const maxQueryRange = ref(0);
-    const flattenLevel = ref(null);
+    const flattenLevel = ref<number | null>(null);
     const confirmQueryModeChangeDialog = ref(false);
     const confirmDeleteDatesDialog = ref(false);
     const confirmAddPerformanceFieldsDialog = ref(false);
@@ -1049,10 +1048,17 @@ export default defineComponent({
     const rowsPerPage = ref(20);
     const filterField = ref("");
     const qTable = ref(null);
-    const minDate = ref(null);
+    const minDate = ref<string | null>(null);
     const selectedDateFields = ref([]);
     const IsdeleteBtnVisible = ref(false);
-    const redBtnRows = ref([]);
+    interface RedBtnRow {
+      index: string;
+      original_start: number;
+      original_end: number;
+      start: string;
+      end: string;
+    }
+    const redBtnRows = ref<RedBtnRow[]>([]);
 
     const patternIdToApplyAtMap = new Map();
 
@@ -1350,7 +1356,7 @@ export default defineComponent({
         });
     };
 
-    const getFieldIndices = (property, settings) => {
+    const getFieldIndices = (property: any, settings: any) => {
       const fieldIndices = [];
       if (
         settings.full_text_search_keys.length > 0 &&
@@ -1399,7 +1405,7 @@ export default defineComponent({
       return fieldIndices;
     };
 
-    const setSchema = (streamResponse) => {
+    const setSchema = (streamResponse: any) => {
       const schemaMapping = new Set([]);
 
       //here lets add the pattern associations to the streamResponse
@@ -1579,7 +1585,23 @@ export default defineComponent({
       patternAssociations.value = ungroupPatternAssociations(
         patternAssociations.value,
       );
-      let settings = {
+      interface StreamSettingsPayload {
+        fields: { name: string; type: string }[];
+        partition_keys: { field: string; types: string | { hash: number } }[];
+        index_fields: string[];
+        full_text_search_keys: string[];
+        bloom_filter_fields: string[];
+        defined_schema_fields: string[];
+        extended_retention_days: { start: number; end: number }[];
+        pattern_associations: PatternAssociation[];
+        max_query_range?: number;
+        data_retention?: number;
+        store_original_data?: boolean;
+        enable_distinct_fields?: boolean;
+        approx_partition?: boolean;
+        flatten_level?: number;
+      }
+      let settings: StreamSettingsPayload = {
         fields: [], // only used for add new fields
         partition_keys: [],
         index_fields: [],
@@ -1653,7 +1675,8 @@ export default defineComponent({
         });
       }
 
-      let added_part_keys = [];
+      let added_part_keys: { field: string; types: string | { hash: number } }[] =
+        [];
       for (var property of indexData.value.schema) {
         property.index_type?.forEach((index: string) => {
           if (index === "fullTextSearchKey") {
@@ -1850,7 +1873,7 @@ export default defineComponent({
         modelValue.stream_type !== "enrichment_tables",
     );
 
-    const disableOptions = (schema, option) => {
+    const disableOptions = (schema: any, option: any) => {
       let selectedHashPartition = "";
 
       let selectedIndices = "";
@@ -1909,11 +1932,11 @@ export default defineComponent({
     const filterFieldFn = (rows: any, terms: any) => {
       let [field, fieldType] = terms.split("@");
 
-      var filtered = [];
+      var filtered: any[] = [];
       const searchTerm = field?.toLowerCase() || "";
 
       // Map labels -> values for index types
-      const labelToValueMap = {};
+      const labelToValueMap: Record<string, string> = {};
       streamIndexType.forEach(({ label, value }) => {
         labelToValueMap[label.toLowerCase()] = value;
       });
@@ -1934,7 +1957,7 @@ export default defineComponent({
               }
               // Match by index_type (convert search label to value)
               else if (
-                row.index_type.some((t) => {
+                row.index_type.some((t: string) => {
                   // check if search is label
                   return (
                     t.toLowerCase().includes(searchTerm) || // direct match with stored value
@@ -2056,7 +2079,7 @@ export default defineComponent({
       }
     };
 
-    const updateActiveTab = (tab) => {
+    const updateActiveTab = (tab: string) => {
       activeTab.value = tab;
       if (tab === "schemaFields") {
         resultTotal.value = indexData.value.defined_schema_fields.length;
@@ -2065,7 +2088,7 @@ export default defineComponent({
       }
     };
 
-    const updateActiveMainTab = (tab) => {
+    const updateActiveMainTab = (tab: string) => {
       activeMainTab.value = tab;
     };
 

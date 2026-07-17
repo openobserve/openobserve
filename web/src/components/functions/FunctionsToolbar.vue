@@ -112,6 +112,7 @@
 import {
   ref,
   computed,
+  type PropType,
 } from "vue";
 import { inject } from "vue";
 import { useI18n } from "vue-i18n";
@@ -146,7 +147,7 @@ const props = defineProps({
     default: true,
   },
   transformTypeOptions: {
-    type: Array,
+    type: Array as PropType<{ label: string; value: string | number }[]>,
     default: () => [],
   },
   /** Drives the Save spinner + disables sibling actions while the form submits. */

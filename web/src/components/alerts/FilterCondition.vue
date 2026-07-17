@@ -37,7 +37,7 @@
       </div>
         <div class="ml-0">
           <OSelect
-            v-model="condition.column"
+            v-model="conditionModel.column"
             :options="filteredFields"
             :dropdownStyle="{ textTransform: 'lowercase' }"
             searchable
@@ -59,7 +59,7 @@
         </div>
         <div class="ml-0">
           <OSelect
-            v-model="condition.operator"
+            v-model="conditionModel.operator"
             :options="triggerOperators"
             :dropdownStyle="{ textTransform: 'capitalize' }"
             :class="[inputWidth ? inputWidth : (store.state.isAiChatEnabled ? 'w-[70px]' : computedInputWidth)]"
@@ -74,7 +74,7 @@
         </div>
         <div class="ml-0">
           <OInput
-            v-model="condition.value"
+            v-model="conditionModel.value"
             :placeholder="t('common.value')"
             :error="!!valueError"
             :error-message="valueError"
@@ -170,6 +170,9 @@ watch(
 
 const store = useStore();
 
+// Same reference as props.condition; used only at mutation sites.
+const conditionModel = computed(() => props.condition);
+
 const { t } = useI18n();
 
 // Inline error state
@@ -212,7 +215,7 @@ const computedLabel = computed(() => {
 // Toggle operator between AND/OR for this condition
 const toggleOperator = () => {
   if (props.condition.logicalOperator) {
-    props.condition.logicalOperator = props.condition.logicalOperator === 'AND' ? 'OR' : 'AND';
+    conditionModel.value.logicalOperator = props.condition.logicalOperator === 'AND' ? 'OR' : 'AND';
     emits('input:update', 'conditions', props.condition);
   }
 };

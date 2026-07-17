@@ -76,9 +76,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :error="touchedPipelineName[index] && !userSelectedPipelineName[index]"
                         :error-message="touchedPipelineName[index] && !userSelectedPipelineName[index] ? 'Name is required' : ''"
                         tabindex="0"
-                        @update:model-value="(val: string) => {
+                        @update:model-value="(val: string | number) => {
                           touchedPipelineName[index] = true;
-                          userSelectedPipelineName[index] = val;
+                          userSelectedPipelineName[index] = val as string;
                           updatePipelineName(val as string, index);
                         }"
                       />

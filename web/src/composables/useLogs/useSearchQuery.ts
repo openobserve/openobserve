@@ -266,7 +266,7 @@ export const useSearchQuery = () => {
   const buildSearch = (
     readOnly: boolean = false,
     ignoreQuickMode: boolean = false,
-  ): SearchRequestPayload => {
+  ): SearchRequestPayload | null => {
     try {
       let query = searchObj.data.query.trim();
 
@@ -475,7 +475,7 @@ export const useSearchQuery = () => {
     query: string,
     req: any,
     readOnly: boolean = false,
-  ): SearchRequestPayload => {
+  ): SearchRequestPayload | null => {
     // Only mutate query in normal mode
     if (!readOnly) {
       searchObj.data.query = query;
@@ -530,11 +530,14 @@ export const useSearchQuery = () => {
    * Convenience wrapper for read-only mode
    * Use this when you need the query payload without mutating searchObj
    */
-  const getSearchQueryPayload = (): SearchRequestPayload => {
+  const getSearchQueryPayload = (): SearchRequestPayload | null => {
     return buildSearch(true);
   };
 
-  const handleNonSqlMode = (query: string, req: any): SearchRequestPayload => {
+  const handleNonSqlMode = (
+    query: string,
+    req: any,
+  ): SearchRequestPayload | null => {
     const parseQuery = [query];
     let queryFunctions = "";
     let whereClause = "";
@@ -595,7 +598,7 @@ export const useSearchQuery = () => {
   const handleMultiStream = (
     req: any,
     whereClause: string,
-  ): SearchRequestPayload => {
+  ): SearchRequestPayload | null => {
     let streams: any = searchObj.data.stream.selectedStream;
 
     if (whereClause.trim() != "") {

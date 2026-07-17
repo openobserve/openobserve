@@ -1,0 +1,5 @@
+{
+  "extends": "./tsconfig.app.json",
+  "include": ["env.d.ts", "src/__canary__/**/*.ts"],
+  "exclude": ["node_modules", "dist"]
+}

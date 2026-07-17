@@ -610,8 +610,8 @@ describe("locateIdentifier", () => {
 describe("rangesFromServerError — semantic errors", () => {
   const tokenAt = (query: string, r: SqlErrorRange) =>
     query
-      .split("\n")
-      [r.startLine - 1].slice((r.column ?? 1) - 1, (r.endColumn ?? 1) - 1);
+      .split("\n")[r.startLine - 1]
+      .slice((r.column ?? 1) - 1, (r.endColumn ?? 1) - 1);
 
   interface Case {
     name: string;

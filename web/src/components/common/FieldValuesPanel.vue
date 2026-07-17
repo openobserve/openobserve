@@ -99,7 +99,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         style="height: 3.75rem"
       >
         <OInnerLoading
-          :showing="fieldValues?.isLoading && !displayValues.length"
+          :showing="!!fieldValues?.isLoading && !displayValues.length"
           label="Fetching values..."
           size="xs"
           data-test="field-values-panel-loading-indicator"
@@ -213,6 +213,7 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OInnerLoading from "@/lib/feedback/InnerLoading/OInnerLoading.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
+import type { CheckboxModelValue } from "@/lib/forms/Checkbox/OCheckbox.types";
 
 interface FieldValues {
   isLoading: boolean;
@@ -397,7 +398,9 @@ watch(
  * Immediately emits the updated selection with the current filter mode,
  * or emits remove-field-filter when all values are unchecked.
  */
-const handleUserCheckboxChange = (newValues: string[]) => {
+const handleUserCheckboxChange = (value: CheckboxModelValue) => {
+  // Array (group) mode: OCheckbox emits the current selection as primitives.
+  const newValues = Array.isArray(value) ? value.map(String) : [];
   selectedValues.value = newValues;
   if (newValues.length === 0) {
     emit("remove-field-filter", props.fieldName);

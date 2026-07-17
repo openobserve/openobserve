@@ -396,6 +396,6 @@ export const formatNumericValue = (
 
   // !Number.isNaN (not typeof number) so numeric strings format too.
   return !Number.isNaN(val)
-    ? `${formatUnitValue(getUnitValue(val, unit, customUnit, decimals)) ?? 0}`
+    ? `${formatUnitValue(getUnitValue(val, unit ?? "", customUnit ?? "", decimals)) ?? 0}`
     : val;
 };

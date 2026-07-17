@@ -178,8 +178,8 @@ export default defineComponent({
     const { t } = useI18n();
     const previewAlertRef = ref(null);
 
-    // Reactive ref for evaluation status
-    const evaluationStatus = ref(null);
+    // Reactive ref for evaluation status; shape mirrors PreviewAlert's exposed ref.
+    const evaluationStatus = ref<{ wouldTrigger: boolean; reason: string } | null>(null);
 
     // Watch the child component's evaluation status
     watch(

@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div class="flex items-center h-11">
           <OSwitch
-            v-model="config.alert_enabled"
+            v-model="configModel.alert_enabled"
             :label="config.alert_enabled ? t('alerts.anomaly.enabled') : t('alerts.anomaly.disabled')"
             data-test="anomaly-alert-enabled"
           />
@@ -61,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="flex flex-col">
           <div class="flex items-center">
             <OSelect
-              v-model="config.alert_destination_ids"
+              v-model="configModel.alert_destination_ids"
               :options="destinations"
               labelKey="name"
               valueKey="name"
@@ -184,6 +184,9 @@ export default defineComponent({
     const router = useRouter();
     const store = useStore();
 
+    // Alias for the config prop; same reference, mutation stays identical.
+    const configModel = computed(() => props.config);
+
     // Dynamically decide how many chips to show based on text length.
     // Restored from pre-refactor version; the template still depends on it.
     const MAX_CHARS = 42;
@@ -215,6 +218,7 @@ export default defineComponent({
     return {
       t,
       store,
+      configModel,
       openAddDestination,
       visibleChipCount,
     };

@@ -260,7 +260,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div class="font-bold mx-2 span_details_tabs ">
       <OTabs
-        v-model="activeTab"
+        :model-value="activeTab"
+        @update:model-value="$emit('update:activeTab', $event)"
         dense
         align="left"
         data-test="trace-details-sidebar-tabs"
@@ -344,7 +345,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <OSeparator class="w-full" />
     <div class="span_details_tab-panels h-[calc(100%-6rem)] overflow-hidden p-2">
-      <OTabPanels v-model="activeTab"
+      <OTabPanels :model-value="activeTab"
+@update:model-value="$emit('update:activeTab', $event)"
 grow
 class="h-full overflow-y-auto">
         <!-- LLM Preview Tab Panel -->
@@ -838,7 +840,7 @@ class="h-5! text-[0.75rem]!">
             :metric-group-definitions="metricGroupResources"
             :panelHeight="12"
             :panelWidth="96"
-            @close="activeTab = 'attributes'"
+            @close="$emit('update:activeTab', 'attributes')"
           />
           <!-- Loading/Empty state when no data -->
           <div
@@ -1106,7 +1108,7 @@ export default defineComponent({
       }
     };
 
-    const highlightedJSON = (value) => {
+    const highlightedJSON = (value: Record<string, unknown>) => {
       const colors = themeColors;
       const attrs = value;
       const query = props.searchQuery;

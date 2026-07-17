@@ -80,7 +80,10 @@ export function useLatencyInsightsAnalysis() {
     dimensionName: string,
     streamName: string,
     timeRange: { startTime: number; endTime: number },
-    durationFilter: { start: number; end: number } | null,
+    durationFilter:
+      | { start: number; end: number; timeStart?: number; timeEnd?: number }
+      | null
+      | undefined,
     baseFilter?: string,
     applyDurationFilter: boolean = true,
   ) => {
@@ -130,7 +133,10 @@ export function useLatencyInsightsAnalysis() {
     dimensionName: string,
     streamName: string,
     timeRange: { startTime: number; endTime: number },
-    durationFilter: { start: number; end: number } | null,
+    durationFilter:
+      | { start: number; end: number; timeStart?: number; timeEnd?: number }
+      | null
+      | undefined,
     baseFilter?: string,
     applyDurationFilter: boolean = true,
   ) => {

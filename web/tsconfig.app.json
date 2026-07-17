@@ -7,10 +7,12 @@
     "src/**/*.spec.ts",
     "src/**/*.spec.js",
     "src/**/*.bench.spec.ts",
-    "src/test/**/*"
+    "src/test/**/*",
+    "src/__canary__/**"
   ],
   "compilerOptions": {
     "composite": true,
+    "strict": true,
     "baseUrl": ".",
     "target": "esnext",
     "module": "esnext",
@@ -24,7 +26,8 @@
     "sourceMap": true,
     "resolveJsonModule": true,
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "vuex": ["./node_modules/vuex/types/index.d.ts"]
     }
   }
 }

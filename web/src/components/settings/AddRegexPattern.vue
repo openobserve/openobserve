@@ -530,11 +530,12 @@ export default defineComponent({
           emit("close");
           emit("update:list");
         }
-      } catch (error) {
-        if (error.response.status != 403) {
+      } catch (error: unknown) {
+        const err = error as { response?: { status?: number; data?: { message?: string } } };
+        if (err.response?.status != 403) {
           toast({
             message:
-              error.response?.data?.message ||
+              err.response?.data?.message ||
               (props.isEdit
                 ? "Failed to update regex pattern"
                 : "Failed to create regex pattern"),
@@ -563,9 +564,10 @@ export default defineComponent({
           "outputString",
           response.data.results[0],
         );
-      } catch (error) {
+      } catch (error: unknown) {
+        const err = error as { response?: { data?: { message?: string } } };
         toast({
-          message: error.response?.data?.message || "Failed to test string",
+          message: err.response?.data?.message || "Failed to test string",
           variant: "error",
         });
       } finally {

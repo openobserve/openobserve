@@ -74,7 +74,7 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref } from "vue";
+import { defineComponent, ref, computed } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
@@ -125,6 +125,9 @@ export default defineComponent({
   setup(props, { emit }) {
     const { t } = useI18n();
     const showAddMenu = ref(false);
+
+    // Same reference as props.group; mutation targets its nested fields only.
+    const groupModel = computed(() => props.group);
     const filterOptions = ["AND", "OR"];
 
     const emitAddCondition = () => {
@@ -138,7 +141,7 @@ export default defineComponent({
     };
 
     const removeConditionFromGroup = (index: number) => {
-      props.group.conditions.splice(index, 1);
+      groupModel.value.conditions.splice(index, 1);
     };
 
     const removeGroupFromNested = (groupIndex: number) => {

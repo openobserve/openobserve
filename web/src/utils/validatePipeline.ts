@@ -192,10 +192,10 @@ export function validatePipeline(pipeline: Pipeline, context?: ValidationContext
         }
 
         // Validate silence and threshold
-        if (trigger.silence < 0) {
+        if (trigger.silence !== undefined && trigger.silence < 0) {
           result.errors.push(`Query node ${node.id} has invalid silence value. Must be >= 0`);
         }
-        if (trigger.threshold < 0) {
+        if (trigger.threshold !== undefined && trigger.threshold < 0) {
           result.errors.push(`Query node ${node.id} has invalid threshold value. Must be >= 0`);
         }
 

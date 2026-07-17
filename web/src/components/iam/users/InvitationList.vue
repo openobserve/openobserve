@@ -165,6 +165,17 @@ import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 
+interface Invitation {
+  token: string;
+  org_id: string;
+  org_name: string;
+  role?: string;
+  inviter_id?: string;
+  expires_at: number;
+  expiry?: string;
+  "#"?: string | number;
+}
+
 export default defineComponent({
   name: "InvitationList",
   components: {
@@ -189,11 +200,17 @@ export default defineComponent({
   setup(props, { emit }) {
     const store = useStore();
     const { t } = useI18n();
-    const invitations = ref([]);
+
+    // Narrow an unknown catch value to the axios error message, if present.
+    const getErrorMessage = (error: unknown): string | undefined => {
+      const err = error as { response?: { data?: { message?: string } } };
+      return err?.response?.data?.message;
+    };
+    const invitations = ref<Invitation[]>([]);
     const filterQuery = ref("");
     const confirmAccept = ref(false);
     const confirmReject = ref(false);
-    const selectedInvitation = ref(null);
+    const selectedInvitation = ref<Invitation | null>(null);
 
     const columns: OTableColumnDef[] = [
       {
@@ -276,7 +293,7 @@ export default defineComponent({
         const response = await usersService.getPendingInvites();
 
         let counter = 1;
-        invitations.value = response.data.data.map((invitation: any) => ({
+        invitations.value = response.data.data.map((invitation: Invitation) => ({
           "#": counter <= 9 ? `0${counter++}` : counter++,
           ...invitation,
           expiry: formatExpiry(invitation.expires_at),
@@ -287,7 +304,7 @@ export default defineComponent({
         dismiss();
         toast({
           message:
-            error.response?.data?.message ||
+            getErrorMessage(error) ||
             "Failed to load pending invitations",
           variant: "error",
         });
@@ -317,12 +334,12 @@ export default defineComponent({
       }
     };
 
-    const acceptInvitation = (invitation: any) => {
+    const acceptInvitation = (invitation: Invitation) => {
       selectedInvitation.value = invitation;
       confirmAccept.value = true;
     };
 
-    const rejectInvitation = (invitation: any) => {
+    const rejectInvitation = (invitation: Invitation) => {
       selectedInvitation.value = invitation;
       confirmReject.value = true;
     };
@@ -369,7 +386,7 @@ export default defineComponent({
         dismiss();
         toast({
           message:
-            error.response?.data?.message || "Failed to accept invitation",
+            getErrorMessage(error) || "Failed to accept invitation",
           variant: "error",
         });
       }
@@ -395,9 +412,10 @@ export default defineComponent({
           variant: "success",
         });
 
-        // Remove from list
+        // Remove from list; guarded non-null: early return above ensures it is set.
+        const rejectedToken = selectedInvitation.value!.token;
         invitations.value = invitations.value.filter(
-          (inv: any) => inv.token !== selectedInvitation.value.token,
+          (inv: Invitation) => inv.token !== rejectedToken,
         );
 
         // If no more invitations, emit to parent
@@ -408,7 +426,7 @@ export default defineComponent({
         dismiss();
         toast({
           message:
-            error.response?.data?.message || "Failed to reject invitation",
+            getErrorMessage(error) || "Failed to reject invitation",
           variant: "error",
         });
       }

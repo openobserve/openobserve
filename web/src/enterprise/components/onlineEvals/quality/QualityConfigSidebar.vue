@@ -121,14 +121,14 @@ function shortType(type: ScoreConfigRow["dataType"]): string {
   return "—";
 }
 
-function formatCount(n: number | null): string {
+function formatCount(n: number | null | undefined): string {
   if (n == null) return "—";
   if (n >= 1000000) return `${(n / 1000000).toFixed(1)}M`;
   if (n >= 1000) return `${(n / 1000).toFixed(1)}k`;
   return String(Math.round(n));
 }
 
-function formatPct(n: number | null): string {
+function formatPct(n: number | null | undefined): string {
   if (n == null) return "—";
   if (n === 0) return "0%";
   if (n < 0.1) return "<0.1%";

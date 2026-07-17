@@ -360,7 +360,7 @@ const onCloseColumn = (columnDef: any) => {
     updatedLocalLogFilterField(mode as "traces" | "spans");
   }
   searchObj.data.resultGrid.columns = searchObj.data.resultGrid.columns.filter(
-    (c) => c.id !== columnDef.id,
+    (c: { id: string }) => c.id !== columnDef.id,
   );
 
   // If the closed column was the active sort column, reset to default

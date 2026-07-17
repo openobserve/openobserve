@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OToggleGroup
         class="cf-seg h-8"
         type="single"
-        v-model="col.fieldType"
+        v-model="colModel.fieldType"
       >
         <OToggleGroupItem
           v-for="ft in fieldTypeOptions"
@@ -44,14 +44,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ t("dashboard.sectionValueFormatting") }}
       </div>
       <OSelect
-        v-model="col.unit"
+        v-model="colModel.unit"
         :options="unitOptions"
         class="w-full max-w-[22.5rem]"
         :data-test="`o2-format-unit-${col.field}`"
       />
       <OInput
         v-if="col.unit === 'custom'"
-        v-model="col.customUnit"
+        :model-value="colModel.customUnit ?? ''"
+        @update:model-value="colModel.customUnit = String($event)"
         :label="t('dashboard.customunitLabel')"
         class="w-full max-w-[22.5rem] mt-2"
         :data-test="`o2-format-custom-unit-${col.field}`"
@@ -86,7 +87,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="flex items-center gap-2 mt-2 flex-wrap">
         <span class="o-input-label shrink-0 w-24">{{ t("dashboard.textColor") }}</span>
         <ColorSwatchPicker
-          v-model="col.textColor"
+          v-model="colModel.textColor"
           :swatches="TEXT_SWATCHES"
           :data-test="`o2-format-text-color-${col.field}`"
         />
@@ -94,7 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="flex items-center gap-2 mt-2 flex-wrap">
         <span class="o-input-label shrink-0 w-24">{{ t("dashboard.bgColor") }}</span>
         <ColorSwatchPicker
-          v-model="col.bgColor"
+          v-model="colModel.bgColor"
           :swatches="BG_SWATCHES"
           :data-test="`o2-format-bg-color-${col.field}`"
         />
@@ -104,7 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="inline-flex items-center gap-2 py-1.5 px-2.5 mt-3 rounded-md border border-[rgba(128,128,128,0.28)] bg-transparent cursor-pointer text-left transition-colors hover:border-[var(--color-primary-600)]"
         :class="{ 'cf-toggle-active': col.autoColor }"
         :data-test="`o2-format-unique-color-${col.field}`"
-        @click="col.autoColor = !col.autoColor"
+        @click="colModel.autoColor = !colModel.autoColor"
       >
         <OCheckbox :model-value="col.autoColor" size="sm" class="pointer-events-none" />
         <span class="o-input-label cursor-pointer">{{
@@ -152,7 +153,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             icon-left="close"
             :title="t('common.remove')"
             class="shrink-0 ml-auto"
-            @click="col.conditions.splice(ruleIdx, 1)"
+            @click="colModel.conditions.splice(ruleIdx, 1)"
           />
         </div>
         <div class="flex items-center gap-2 flex-wrap">
@@ -177,7 +178,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         size="sm"
         class="mt-1"
         :data-test="`o2-format-add-rule-${col.field}`"
-        @click="col.conditions.push(emptyConditionalRule())"
+        @click="colModel.conditions.push(emptyConditionalRule())"
       >
         {{ t("dashboard.conditionAddRule") }}
       </OButton>
@@ -223,16 +224,20 @@ export default defineComponent({
     const { unitOptions, fieldTypeOptions, alignOptions, conditionOperators } =
       useColumnFormattingOptions();
 
+    // Alias preserves the same prop reference for in-place mutation via v-model.
+    const colModel = computed(() => props.col);
+
     // Explicit "Auto" replaces tap-to-clear: null ⇄ the "auto" sentinel item.
     const alignmentModel = computed({
       get: () => props.col.alignment ?? "auto",
       set: (v: string) => {
-        props.col.alignment = v === "auto" ? null : v;
+        colModel.value.alignment = v === "auto" ? null : v;
       },
     });
 
     return {
       t,
+      colModel,
       unitOptions,
       fieldTypeOptions,
       alignOptions,

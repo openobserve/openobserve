@@ -163,6 +163,7 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
 import { createRecordConverter } from "@/utils/rum/sessionReplayChangeFormat";
 const props = defineProps({
   events: {
@@ -578,8 +579,9 @@ const pause = () => {
   player.value?.pause();
 };
 
-const setSpeed = (speed: number) => {
-  player.value?.setSpeed(speed);
+const setSpeed = (speed: SelectModelValue) => {
+  // speedOptions are numeric; ignore any non-numeric emission.
+  if (typeof speed === "number") player.value?.setSpeed(speed);
 };
 const toggleSkipInactive = () => {
   player.value?.toggleSkipInactive();

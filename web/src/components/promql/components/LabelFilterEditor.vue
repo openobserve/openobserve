@@ -159,7 +159,7 @@ const operatorOptions = ["=", "!=", "=~", "!~"];
 const availableLabelOptions = computed(() => {
   const selectedLabels = props.labels.map((l) => l.label);
   return availableLabels.value.filter(
-    (label) => !selectedLabels.includes(label),
+    (label: string) => !selectedLabels.includes(label),
   );
 });
 

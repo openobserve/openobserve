@@ -667,7 +667,7 @@ const loadDomainSettings = async () => {
     // If the API doesn't exist yet or returns an error, use example data
     console.warn("Domain restrictions API not available, using example data:", error);
 
-    const existingDomains = [];
+    const existingDomains: Domain[] = [];
 
     domains.splice(0, domains.length, ...existingDomains);
   }

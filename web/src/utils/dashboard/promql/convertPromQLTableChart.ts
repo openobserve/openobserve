@@ -67,7 +67,7 @@ export class TableConverter implements PromQLChartConverter {
     labelKeys: string[],
     config: any,
   ): string[] {
-    const columnOrder = config.column_order || [];
+    const columnOrder: string[] = config.column_order || [];
 
     // Apply custom ordering if specified
     if (columnOrder.length > 0) {

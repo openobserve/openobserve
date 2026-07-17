@@ -173,8 +173,10 @@ export const fillMissingValues = (
       ? `${timeVal}-${getDataValue(d, uniqueKey)}`
       : timeVal;
     searchDataMap.set(key, d);
-    if (!actualMinTime || timeVal < actualMinTime) actualMinTime = timeVal;
-    if (!actualMaxTime || timeVal > actualMaxTime) actualMaxTime = timeVal;
+    const minTime: string | null = actualMinTime;
+    const maxTime: string | null = actualMaxTime;
+    if (minTime === null || timeVal < minTime) actualMinTime = timeVal;
+    if (maxTime === null || timeVal > maxTime) actualMaxTime = timeVal;
   });
 
   if (loading) {

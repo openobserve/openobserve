@@ -124,9 +124,9 @@ export default [
       "no-empty": "error",
       "no-useless-catch": "error",
       "no-async-promise-executor": "error",
-      // Bucket 4 — Vue correctness. Still "warn": 228 left need genuine
-      // emit-refactors (behavior-sensitive), deferred to a focused pass.
-      "vue/no-mutating-props": "warn",
+      // Bucket 4 — Vue correctness. Driven to 0 via the behavior-preserving
+      // computed-alias pattern (see web/docs/SKILL.md); now enforced.
+      "vue/no-mutating-props": "error",
       "vue/no-unused-components": "error",
       "vue/no-unused-vars": "error",
 

@@ -225,9 +225,6 @@ export default defineComponent({
   components: {
     OSplitter,
     OForm,
-    QueryEditor: defineAsyncComponent(
-      () => import("@/components/CodeQueryEditor.vue"),
-    ),
     UnifiedQueryEditor: defineAsyncComponent(
       () => import("@/components/QueryEditor.vue"),
     ),
@@ -532,7 +529,9 @@ export default defineComponent({
     };
 
     // Unified Query Editor: Handle language change
-    const handleLanguageChange = (newLanguage: 'vrl' | 'javascript') => {
+    const handleLanguageChange = (
+      newLanguage: 'sql' | 'promql' | 'vrl' | 'javascript',
+    ) => {
       // transType is form-owned — write it straight to the ONE form; the
       // useStore reads above make the editor + tooltip react (no mirror).
       const tt = newLanguage === 'javascript' ? '1' : '0';

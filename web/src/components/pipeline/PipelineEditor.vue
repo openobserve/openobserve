@@ -511,7 +511,7 @@ onMounted(async () => {
   window.addEventListener("beforeunload", beforeUnloadHandler);
 
   // Add keyboard handler for edge deletion
-  const handleKeydown = (event) => {
+  const handleKeydown = (event: KeyboardEvent) => {
     if (event.key === 'Delete' || event.key === 'Backspace') {
       const selectedEdges = getSelectedEdges.value
 

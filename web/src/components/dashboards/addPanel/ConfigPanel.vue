@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ t("dashboard.description") }}
       </div>
       <OTextarea
-        v-model="dashboardPanelData.data.description"
+        v-model="dashboardPanelDataModel.data.description"
         autogrow
         data-test="dashboard-config-description"
       />
@@ -84,7 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("dashboard.description") }}
           </div>
           <OTextarea
-            v-model="dashboardPanelData.data.description"
+            v-model="dashboardPanelDataModel.data.description"
             autogrow
             data-test="dashboard-config-description"
           />
@@ -93,7 +93,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OInput
           v-if="promqlMode"
           v-show="isConfigOptionVisible('general', 'step')"
-          v-model="dashboardPanelData.data.config.step_value"
+          v-model="dashboardPanelDataModel.data.config.step_value"
           type="text"
           :label="t('dashboard.stepValue')"
           :placeholder="t('dashboard.intervalInputPlaceholder')"
@@ -258,7 +258,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OSwitch
           v-if="shouldShowLegendsToggle(dashboardPanelData)"
           v-show="isConfigOptionVisible('legend', 'show-legends')"
-          v-model="dashboardPanelData.data.config.show_legends"
+          v-model="dashboardPanelDataModel.data.config.show_legends"
           :label="t('dashboard.showLegendsLabel')"
           data-test="dashboard-config-show-legend"
           size="lg"
@@ -267,7 +267,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OSelect
           v-if="shouldShowLegendPosition(dashboardPanelData)"
           v-show="isConfigOptionVisible('legend', 'legend-position')"
-          v-model="dashboardPanelData.data.config.legends_position"
+          v-model="dashboardPanelDataModel.data.config.legends_position"
           :options="legendsPositionOptions"
           :label="t('dashboard.legendsPositionLabel')"
           :valueKey="'value'"
@@ -278,7 +278,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OSelect
           v-if="shouldShowLegendType(dashboardPanelData)"
           v-show="isConfigOptionVisible('legend', 'legend-type')"
-          v-model="dashboardPanelData.data.config.legends_type"
+          v-model="dashboardPanelDataModel.data.config.legends_type"
           :options="legendTypeOptions"
           :label="t('dashboard.legendsType')"
           :valueKey="'value'"
@@ -398,7 +398,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OSelect
           v-if="shouldApplyChartAlign(dashboardPanelData)"
           v-show="isConfigOptionVisible('legend', 'chart-align')"
-          v-model="dashboardPanelData.data.config.chart_align"
+          v-model="dashboardPanelDataModel.data.config.chart_align"
           :options="chartAlignOptions"
           :label="t('dashboard.chartAlign')"
           :valueKey="'value'"
@@ -418,7 +418,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           {{ t("dashboard.query") }}
           <OTabs
-            v-model="dashboardPanelData.layout.currentQueryIndex"
+            v-model="dashboardPanelDataModel.layout.currentQueryIndex"
             dense
             mobile-arrows
             data-test="dashboard-config-query-tab"
@@ -443,7 +443,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-show="isConfigOptionVisible('legend', 'promql-legend-label')"
           :label="t('common.legend')"
           v-model="
-            dashboardPanelData.data.queries[
+            dashboardPanelDataModel.data.queries[
               dashboardPanelData.layout.currentQueryIndex
             ].config.promql_legend
           "
@@ -487,7 +487,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="o2-input flex flex-col gap-3 p-2 ml-3 overflow-x-hidden box-border">
         <OSelect
           v-show="isConfigOptionVisible('data', 'unit')"
-          v-model="dashboardPanelData.data.config.unit"
+          v-model="dashboardPanelDataModel.data.config.unit"
           :options="unitOptions"
           :label="t('dashboard.unitLabel')"
           :valueKey="'value'"
@@ -498,7 +498,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OInput
           v-if="dashboardPanelData.data.config.unit == 'custom'"
           v-show="isConfigOptionVisible('data', 'custom-unit')"
-          v-model="dashboardPanelData.data.config.unit_custom"
+          v-model="dashboardPanelDataModel.data.config.unit_custom"
           :label="t('dashboard.customunitLabel')"
           data-test="dashboard-config-custom-unit"
         />
@@ -506,7 +506,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OInput
           v-show="isConfigOptionVisible('data', 'decimals')"
           type="number"
-          v-model.number="dashboardPanelData.data.config.decimals"
+          v-model.number="dashboardPanelDataModel.data.config.decimals"
           min="0"
           max="100"
           @update:model-value="
@@ -522,7 +522,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               const val = dashboardPanelData.data.config.decimals;
               // Empty field → silently reset to default 2
               if (val == null || val === '') {
-                dashboardPanelData.data.config.decimals = 2;
+                dashboardPanelDataModel.data.config.decimals = 2;
               }
               // Invalid value (out of range) → keep it and show error
             }
@@ -548,7 +548,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           {{ t("dashboard.query") }}
           <OTabs
-            v-model="dashboardPanelData.layout.currentQueryIndex"
+            v-model="dashboardPanelDataModel.layout.currentQueryIndex"
             dense
             mobile-arrows
             data-test="dashboard-config-query-tab"
@@ -587,7 +587,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <OInput
             v-model="
-              dashboardPanelData.data.queries[
+              dashboardPanelDataModel.data.queries[
                 dashboardPanelData.layout.currentQueryIndex
               ].config.query_label
             "
@@ -611,7 +611,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
           v-show="isConfigOptionVisible('data', 'limit')"
           v-model.number="
-            dashboardPanelData.data.queries[
+            dashboardPanelDataModel.data.queries[
               dashboardPanelData.layout.currentQueryIndex
             ].config.limit
           "
@@ -619,11 +619,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :min="0"
           @update:model-value="
             (value: any) =>
-              (dashboardPanelData.data.queries[
+              (dashboardPanelDataModel.data.queries[
                 dashboardPanelData.layout.currentQueryIndex
               ].config.limit = typeof value === 'number' ? value : null)
           "
-          @blur="() => dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].config.limit == null && (dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].config.limit = 0)"
+          @blur="() => dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].config.limit == null && (dashboardPanelDataModel.data.queries[dashboardPanelData.layout.currentQueryIndex].config.limit = 0)"
           placeholder="0"
           :label="t('dashboard.queryLimit')"
           data-test="dashboard-config-limit"
@@ -636,12 +636,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OInput
           v-if="shouldShowTopResultsConfig(dashboardPanelData, promqlMode)"
           v-show="isConfigOptionVisible('data', 'top-results')"
-          v-model.number="dashboardPanelData.data.config.top_results"
+          v-model.number="dashboardPanelDataModel.data.config.top_results"
           type="number"
           :min="0"
           @update:model-value="
             (value: any) =>
-              (dashboardPanelData.data.config.top_results = value
+              (dashboardPanelDataModel.data.config.top_results = value
                 ? value
                 : null)
           "
@@ -668,7 +668,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OSwitch
           v-if="shouldShowTopResultsConfig(dashboardPanelData, promqlMode)"
           v-show="isConfigOptionVisible('data', 'top-results-others')"
-          v-model="dashboardPanelData.data.config.top_results_others"
+          v-model="dashboardPanelDataModel.data.config.top_results_others"
           :label="t('dashboard.addOthersSeries')"
           data-test="dashboard-config-top_results_others"
           :disabled="
@@ -689,7 +689,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OSwitch
           v-if="shouldShowAreaLineStyleConfig(dashboardPanelData)"
           v-show="isConfigOptionVisible('data', 'connect-nulls')"
-          v-model="dashboardPanelData.data.config.connect_nulls"
+          v-model="dashboardPanelDataModel.data.config.connect_nulls"
           :label="t('dashboard.connectNullValues')"
           data-test="dashboard-config-connect-null-values"
           size="lg"
@@ -705,7 +705,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OInput
           v-if="shouldShowNoValueReplacement(dashboardPanelData, promqlMode)"
           v-show="isConfigOptionVisible('data', 'no-value-replacement')"
-          v-model="dashboardPanelData.data.config.no_value_replacement"
+          v-model="dashboardPanelDataModel.data.config.no_value_replacement"
           placeholder="-"
           :label="t('dashboard.noValueReplacement')"
           data-test="dashboard-config-no-value-replacement"
@@ -734,13 +734,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OInput
           v-if="shouldShowAxisConfig(dashboardPanelData)"
           v-show="isConfigOptionVisible('axis', 'axis-width')"
-          v-model.number="dashboardPanelData.data.config.axis_width"
+          v-model.number="dashboardPanelDataModel.data.config.axis_width"
           :label="t('common.axisWidth')"
           type="number"
           :placeholder="t('dashboard.auto')"
           @update:model-value="
             (value: any) =>
-              (dashboardPanelData.data.config.axis_width =
+              (dashboardPanelDataModel.data.config.axis_width =
                 value !== '' ? value : null)
           "
           data-test="dashboard-config-axis-width"
@@ -749,7 +749,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OSwitch
           v-if="shouldShowAxisConfig(dashboardPanelData)"
           v-show="isConfigOptionVisible('axis', 'axis-border')"
-          v-model="dashboardPanelData.data.config.axis_border_show"
+          v-model="dashboardPanelDataModel.data.config.axis_border_show"
           :label="t('dashboard.showBorder')"
           data-test="dashboard-config-axis-border"
           size="lg"
@@ -762,13 +762,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <OInput
             class="flex-1 min-w-0"
-            v-model.number="dashboardPanelData.data.config.y_axis_min"
+            v-model.number="dashboardPanelDataModel.data.config.y_axis_min"
             type="number"
             :placeholder="t('dashboard.auto')"
             :label="t('common.yAxisMin')"
             @update:model-value="
               (value: any) =>
-                (dashboardPanelData.data.config.y_axis_min =
+                (dashboardPanelDataModel.data.config.y_axis_min =
                   value !== '' ? value : null)
             "
             data-test="dashboard-config-y_axis_min"
@@ -785,13 +785,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OInput>
           <OInput
             class="flex-1 min-w-0"
-            v-model.number="dashboardPanelData.data.config.y_axis_max"
+            v-model.number="dashboardPanelDataModel.data.config.y_axis_max"
             type="number"
             :placeholder="t('dashboard.auto')"
             :label="t('common.yAxisMax')"
             @update:model-value="
               (value: any) =>
-                (dashboardPanelData.data.config.y_axis_max =
+                (dashboardPanelDataModel.data.config.y_axis_max =
                   value !== '' ? value : null)
             "
             data-test="dashboard-config-y_axis_max"
@@ -811,7 +811,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OSwitch
           v-if="shouldShowGridlines(dashboardPanelData)"
           v-show="isConfigOptionVisible('axis', 'gridlines')"
-          v-model="dashboardPanelData.data.config.show_gridlines"
+          v-model="dashboardPanelDataModel.data.config.show_gridlines"
           :label="t('dashboard.showGridlines')"
           data-test="dashboard-config-show-gridlines"
           size="lg"
@@ -836,7 +836,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OSelect
           v-if="shouldShowCartesianAxisConfig(dashboardPanelData)"
           v-show="isConfigOptionVisible('labels', 'label-position')"
-          v-model="dashboardPanelData.data.config.label_option.position"
+          v-model="dashboardPanelDataModel.data.config.label_option.position"
           :options="labelPositionOptions"
           :label="t('dashboard.labelPosition')"
           :valueKey="'value'"
@@ -847,19 +847,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OInput
           v-if="shouldShowCartesianAxisConfig(dashboardPanelData)"
           v-show="isConfigOptionVisible('labels', 'label-rotate')"
-          v-model.number="dashboardPanelData.data.config.label_option.rotate"
+          v-model.number="dashboardPanelDataModel.data.config.label_option.rotate"
           :label="t('dashboard.labelRotate')"
           type="number"
           placeholder="0"
           @update:model-value="
             (value: any) =>
-              (dashboardPanelData.data.config.label_option.rotate =
+              (dashboardPanelDataModel.data.config.label_option.rotate =
                 typeof value === 'number' ? value : null)
           "
           @blur="
             () => {
               if (dashboardPanelData.data.config.label_option.rotate == null)
-                dashboardPanelData.data.config.label_option.rotate = 0
+                dashboardPanelDataModel.data.config.label_option.rotate = 0
             }
           "
           data-test="dashboard-config-label-rotate"
@@ -872,16 +872,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <OInput
             class="flex-1 min-w-0"
-            v-model.number="dashboardPanelData.data.config.axis_label_rotate"
+            v-model.number="dashboardPanelDataModel.data.config.axis_label_rotate"
             type="number"
             placeholder="0"
             :label="t('dashboard.axisLabelRotate')"
             @update:model-value="
               (value: any) =>
-                (dashboardPanelData.data.config.axis_label_rotate =
+                (dashboardPanelDataModel.data.config.axis_label_rotate =
                   typeof value === 'number' ? value : null)
             "
-            @blur="() => dashboardPanelData.data.config.axis_label_rotate == null && (dashboardPanelData.data.config.axis_label_rotate = 0)"
+            @blur="() => dashboardPanelData.data.config.axis_label_rotate == null && (dashboardPanelDataModel.data.config.axis_label_rotate = 0)"
             data-test="dashboard-config-axis-label-rotate"
           >
             <template #tooltip>
@@ -900,14 +900,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OInput
             class="flex-1 min-w-0"
             v-model.number="
-              dashboardPanelData.data.config.axis_label_truncate_width
+              dashboardPanelDataModel.data.config.axis_label_truncate_width
             "
             type="number"
             placeholder="0"
             :label="t('dashboard.axisLabelTruncate')"
             @update:model-value="
               (value: any) =>
-                (dashboardPanelData.data.config.axis_label_truncate_width =
+                (dashboardPanelDataModel.data.config.axis_label_truncate_width =
                   value !== '' ? value : null)
             "
             data-test="dashboard-config-axis-label-truncate"
@@ -948,7 +948,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OSelect
           v-if="shouldShowAreaLineStyleConfig(dashboardPanelData)"
           v-show="isConfigOptionVisible('lineStyle', 'symbol')"
-          v-model="dashboardPanelData.data.config.show_symbol"
+          v-model="dashboardPanelDataModel.data.config.show_symbol"
           :options="showSymbol"
           :label="t('dashboard.showSymbol')"
           :valueKey="'value'"
@@ -959,7 +959,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OSelect
           v-if="shouldShowAreaLineStyleConfig(dashboardPanelData)"
           v-show="isConfigOptionVisible('lineStyle', 'interpolation')"
-          v-model="dashboardPanelData.data.config.line_interpolation"
+          v-model="dashboardPanelDataModel.data.config.line_interpolation"
           :options="lineInterpolationOptions"
           :label="t('dashboard.lineInterpolation')"
           :valueKey="'value'"
@@ -970,18 +970,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OInput
           v-if="shouldShowLineThickness(dashboardPanelData, promqlMode)"
           v-show="isConfigOptionVisible('lineStyle', 'line-thickness')"
-          v-model.number="dashboardPanelData.data.config.line_thickness"
+          v-model.number="dashboardPanelDataModel.data.config.line_thickness"
           type="number"
           :min="0"
           @update:model-value="
             (value: any) =>
-              (dashboardPanelData.data.config.line_thickness =
+              (dashboardPanelDataModel.data.config.line_thickness =
                 typeof value == 'number' && value >= 0 ? value : null)
           "
           @blur="
             () => {
               if (dashboardPanelData.data.config.line_thickness == null)
-                dashboardPanelData.data.config.line_thickness = 1.5
+                dashboardPanelDataModel.data.config.line_thickness = 1.5
             }
           "
           :label="t('dashboard.lineThickness')"
@@ -1008,7 +1008,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="flex flex-col gap-3 p-2 ml-3 overflow-x-hidden box-border">
         <OSwitch
           v-show="isConfigOptionVisible('table', 'wrap')"
-          v-model="dashboardPanelData.data.config.wrap_table_cells"
+          v-model="dashboardPanelDataModel.data.config.wrap_table_cells"
           :label="t('dashboard.wraptext')"
           data-test="dashboard-config-wrap-table-cells"
           size="lg"
@@ -1017,7 +1017,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OSwitch
           v-if="!promqlMode"
           v-show="isConfigOptionVisible('table', 'transpose')"
-          v-model="dashboardPanelData.data.config.table_transpose"
+          v-model="dashboardPanelDataModel.data.config.table_transpose"
           :label="t('dashboard.tableTranspose')"
           data-test="dashboard-config-table_transpose"
           :disabled="isPivotMode"
@@ -1027,7 +1027,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OSwitch
           v-if="!promqlMode"
           v-show="isConfigOptionVisible('table', 'dynamic-columns')"
-          v-model="dashboardPanelData.data.config.table_dynamic_columns"
+          v-model="dashboardPanelDataModel.data.config.table_dynamic_columns"
           :label="t('dashboard.tableDynamicColumns')"
           data-test="dashboard-config-table_dynamic_columns"
           :disabled="isPivotMode"
@@ -1036,7 +1036,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <OSwitch
           v-show="isConfigOptionVisible('table', 'filtering')"
-          v-model="dashboardPanelData.data.config.table_filtering"
+          v-model="dashboardPanelDataModel.data.config.table_filtering"
           :label="t('dashboard.tableFiltering')"
           data-test="dashboard-config-table-filtering"
           size="lg"
@@ -1044,7 +1044,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <OSwitch
           v-show="isConfigOptionVisible('table', 'pagination')"
-          v-model="dashboardPanelData.data.config.table_pagination"
+          v-model="dashboardPanelDataModel.data.config.table_pagination"
           :label="t('dashboard.pagination')"
           data-test="dashboard-config-show-pagination"
           size="lg"
@@ -1054,7 +1054,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="dashboardPanelData.data.config.table_pagination"
           v-show="isConfigOptionVisible('table', 'rows-per-page')"
           v-model.number="
-            dashboardPanelData.data.config.table_pagination_rows_per_page
+            dashboardPanelDataModel.data.config.table_pagination_rows_per_page
           "
           type="number"
           :placeholder="t('dashboard.auto')"
@@ -1089,7 +1089,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OSwitch
           v-if="!promqlMode && isPivotMode"
           v-show="isConfigOptionVisible('pivotTable', 'pivot-show-row-totals')"
-          v-model="dashboardPanelData.data.config.table_pivot_show_row_totals"
+          v-model="dashboardPanelDataModel.data.config.table_pivot_show_row_totals"
           data-test="dashboard-config-pivot-row-totals"
           size="lg"
         >
@@ -1118,7 +1118,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-show="
             isConfigOptionVisible('pivotTable', 'pivot-sticky-col-totals')
           "
-          v-model="dashboardPanelData.data.config.table_pivot_sticky_col_totals"
+          v-model="dashboardPanelDataModel.data.config.table_pivot_sticky_col_totals"
           data-test="dashboard-config-pivot-sticky-col-totals"
           size="lg"
         >
@@ -1141,7 +1141,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OSwitch
           v-if="!promqlMode && isPivotMode"
           v-show="isConfigOptionVisible('pivotTable', 'pivot-show-col-totals')"
-          v-model="dashboardPanelData.data.config.table_pivot_show_col_totals"
+          v-model="dashboardPanelDataModel.data.config.table_pivot_show_col_totals"
           data-test="dashboard-config-pivot-col-totals"
           size="lg"
         >
@@ -1170,7 +1170,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-show="
             isConfigOptionVisible('pivotTable', 'pivot-sticky-row-totals')
           "
-          v-model="dashboardPanelData.data.config.table_pivot_sticky_row_totals"
+          v-model="dashboardPanelDataModel.data.config.table_pivot_sticky_row_totals"
           data-test="dashboard-config-pivot-sticky-row-totals"
           size="lg"
         >
@@ -1271,7 +1271,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="o2-input flex flex-col gap-3 p-2 ml-3 overflow-x-hidden box-border">
         <div v-if="dashboardPanelData.data.type == 'maps'">
           <OSelect
-            v-model="dashboardPanelData.data.config.map_type.type"
+            v-model="dashboardPanelDataModel.data.config.map_type.type"
             :options="mapTypeOptions"
             :valueKey="'value'"
             :labelKey="'label'"
@@ -1289,7 +1289,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <OSelect
           v-if="dashboardPanelData.data.type == 'geomap'"
-          v-model="dashboardPanelData.data.config.base_map.type"
+          v-model="dashboardPanelDataModel.data.config.base_map.type"
           :options="basemapTypeOptions"
           :valueKey="'value'"
           :labelKey="'label'"
@@ -1302,7 +1302,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="flex gap-2">
             <OInput
               class="flex-1 min-w-0"
-              v-model.number="dashboardPanelData.data.config.map_view.lat"
+              v-model.number="dashboardPanelDataModel.data.config.map_view.lat"
               :label="t('dashboard.latitudeLabel')"
               type="number"
               @blur="
@@ -1312,7 +1312,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
             <OInput
               class="flex-1 min-w-0"
-              v-model.number="dashboardPanelData.data.config.map_view.lng"
+              v-model.number="dashboardPanelDataModel.data.config.map_view.lng"
               :label="t('dashboard.longitudeLabel')"
               type="number"
               @blur="
@@ -1322,7 +1322,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </div>
           <OInput
-            v-model.number="dashboardPanelData.data.config.map_view.zoom"
+            v-model.number="dashboardPanelDataModel.data.config.map_view.zoom"
             :label="t('dashboard.zoomLabel')"
             type="number"
             @blur="
@@ -1332,7 +1332,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
 
           <OSelect
-            v-model="dashboardPanelData.data.config.map_symbol_style.size"
+            v-model="dashboardPanelDataModel.data.config.map_symbol_style.size"
             :label="t('dashboard.symbolsize')"
             :options="symbolOptions"
             :valueKey="'value'"
@@ -1348,7 +1348,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 'by Value'
               "
               v-model.number="
-                dashboardPanelData.data.config.map_symbol_style.size_by_value
+                dashboardPanelDataModel.data.config.map_symbol_style.size_by_value
                   .min
               "
               :label="t('dashboard.minimum')"
@@ -1370,7 +1370,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 'by Value'
               "
               v-model.number="
-                dashboardPanelData.data.config.map_symbol_style.size_by_value
+                dashboardPanelDataModel.data.config.map_symbol_style.size_by_value
                   .max
               "
               :label="t('dashboard.maximum')"
@@ -1392,7 +1392,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               dashboardPanelData.data.config.map_symbol_style.size === 'fixed'
             "
             v-model.number="
-              dashboardPanelData.data.config.map_symbol_style.size_fixed
+              dashboardPanelDataModel.data.config.map_symbol_style.size_fixed
             "
             :label="t('dashboard.fixedValue')"
             type="number"
@@ -1408,7 +1408,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <OSelect
             v-model="
-              dashboardPanelData.data.queries[
+              dashboardPanelDataModel.data.queries[
                 dashboardPanelData.layout.currentQueryIndex
               ].config.layer_type
             "
@@ -1422,7 +1422,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OInput
             v-if="!isWeightFieldPresent"
             v-model.number="
-              dashboardPanelData.data.queries[
+              dashboardPanelDataModel.data.queries[
                 dashboardPanelData.layout.currentQueryIndex
               ].config.weight_fixed
             "
@@ -1461,7 +1461,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OInput
           v-show="isConfigOptionVisible('gauge', 'gauge-min')"
           v-model.number="
-            dashboardPanelData.data.queries[
+            dashboardPanelDataModel.data.queries[
               dashboardPanelData.layout.currentQueryIndex
             ].config.min
           "
@@ -1469,14 +1469,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :label="t('dashboard.gaugeMinValue')"
           @update:model-value="
             (value: any) =>
-              (dashboardPanelData.data.queries[
+              (dashboardPanelDataModel.data.queries[
                 dashboardPanelData.layout.currentQueryIndex
               ].config.min = typeof value === 'number' ? value : null)
           "
           @blur="
             () => {
               if (dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].config.min == null)
-                dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].config.min = 0
+                dashboardPanelDataModel.data.queries[dashboardPanelDataModel.layout.currentQueryIndex].config.min = 0
             }
           "
           data-test="dashboard-config-gauge-min"
@@ -1484,7 +1484,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OInput
           v-show="isConfigOptionVisible('gauge', 'gauge-max')"
           v-model.number="
-            dashboardPanelData.data.queries[
+            dashboardPanelDataModel.data.queries[
               dashboardPanelData.layout.currentQueryIndex
             ].config.max
           "
@@ -1493,14 +1493,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           placeholder="100"
           @update:model-value="
             (value: any) =>
-              (dashboardPanelData.data.queries[
+              (dashboardPanelDataModel.data.queries[
                 dashboardPanelData.layout.currentQueryIndex
               ].config.max = typeof value === 'number' ? value : null)
           "
           @blur="
             () => {
               if (dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].config.max == null)
-                dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].config.max = 100
+                dashboardPanelDataModel.data.queries[dashboardPanelDataModel.layout.currentQueryIndex].config.max = 100
             }
           "
           data-test="dashboard-config-gauge-max"
@@ -1527,7 +1527,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OSelect
             :label="t('dashboard.trellisLayout')"
             data-test="dashboard-trellis-chart"
-            v-model="dashboardPanelData.data.config.trellis.layout"
+            v-model="dashboardPanelDataModel.data.config.trellis.layout"
             :options="trellisOptions"
             :valueKey="'value'"
             :labelKey="'label'"
@@ -1553,7 +1553,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <OInput
             v-model.number="
-              dashboardPanelData.data.config.trellis.num_of_columns
+              dashboardPanelDataModel.data.config.trellis.num_of_columns
             "
             type="number"
             :placeholder="t('dashboard.auto')"
@@ -1565,7 +1565,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @update:model-value="
               (value: any) =>
                 dashboardPanelData.data.config.trellis.num_of_columns > 16
-                  ? (dashboardPanelData.data.config.trellis.num_of_columns = 16)
+                  ? (dashboardPanelDataModel.data.config.trellis.num_of_columns = 16)
                   : value
             "
           >
@@ -1592,7 +1592,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="flex items-center"
         >
           <OSwitch
-            v-model="dashboardPanelData.data.config.trellis.group_by_y_axis"
+            v-model="dashboardPanelDataModel.data.config.trellis.group_by_y_axis"
             :label="t('dashboard.groupMultiYAxisTrellis')"
             data-test="dashboard-config-trellis-group-by-y-axis"
             size="lg"
@@ -1910,6 +1910,9 @@ export default defineComponent({
     );
     const { dashboardPanelData, promqlMode, isPivotMode } =
       useDashboardPanelData(dashboardPanelDataPageKey);
+
+    // Alias for template v-model mutation sites; same reference, no behavior change.
+    const dashboardPanelDataModel = computed(() => dashboardPanelData);
 
     const { t } = useI18n();
     const store = useStore();
@@ -2646,6 +2649,7 @@ export default defineComponent({
     return {
       t,
       dashboardPanelData,
+      dashboardPanelDataModel,
       promqlMode,
       basemapTypeOptions,
       mapTypeOptions,

@@ -488,8 +488,8 @@ export default defineComponent({
     const isBuiltinRole = (r: string) =>
       BUILTIN_ROLES.has(String(r ?? "").toLowerCase());
     const userEmail: any = ref("");
-    const options = ref([]);
-    const customRoles = ref([]);
+    const options = ref<{ label: string; value: string }[]>([]);
+    const customRoles = ref<string[]>([]);
     const selectedRole = ref();
     const currentUserRole = ref("");
     let deleteUserEmail = "";

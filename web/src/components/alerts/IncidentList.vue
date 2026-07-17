@@ -497,7 +497,9 @@ export default defineComponent({
       return formatToReadable(timestamp);
     };
 
-    const formatDimensions = (dimensions: Record<string, string>) => {
+    const formatDimensions = (
+      dimensions: Record<string, string> | undefined,
+    ) => {
       if (!dimensions || Object.keys(dimensions).length === 0) {
         return "Unknown";
       }
@@ -506,7 +508,9 @@ export default defineComponent({
         .join(", ");
     };
 
-    const getSortedDimensions = (dimensions: Record<string, string>) => {
+    const getSortedDimensions = (
+      dimensions: Record<string, string> | undefined,
+    ) => {
       if (!dimensions || Object.keys(dimensions).length === 0) return [];
       return Object.keys(dimensions)
         .sort()

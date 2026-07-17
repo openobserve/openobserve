@@ -2,7 +2,7 @@
   <div class="condition flex items-center gap-2">
     <OSelect
       v-if="conditionIndex !== 0"
-      v-model="condition.logicalOperator"
+      v-model="conditionModel.logicalOperator"
       :options="filterOptions"
       @update:model-value="emitLogicalOperatorChange"
       class="condition-logical-operator w-fit max-w-[8rem]"
@@ -27,7 +27,7 @@
             <StreamFieldSelect
               class="w-full"
               :streams="getAllSelectedStreams()"
-              v-model="condition.column"
+              v-model="conditionModel.column"
               :data-test="`dashboard-add-condition-column-${conditionIndex}`"
             />
             <OButton
@@ -42,7 +42,7 @@
           <div>
             <div class="p-1">
               <div class="gap-1">
-                <OTabs v-model="condition.type" dense>
+                <OTabs v-model="conditionModel.type" dense>
                   <OTab
                     name="list"
                     :label="t('common.list')"
@@ -58,11 +58,11 @@
                 </OTabs>
                 <OSeparator />
                 <div>
-                  <OTabPanels v-model="condition.type" animated>
+                  <OTabPanels v-model="conditionModel.type" animated>
                     <OTabPanel name="condition">
                       <div class="flex flex-col gap-2">
                         <OSelect
-                          v-model="condition.operator"
+                          v-model="conditionModel.operator"
                           :options="operators"
                           :label="t('common.operator')"
                           style="width: 100%"
@@ -76,7 +76,7 @@
                             )
                           "
                           :label="t('common.value')"
-                          v-model="condition.value"
+                          v-model="conditionModel.value"
                           :items="dashboardVariablesFilterItems"
                           search-regex="(?:^|[^$])\$?(\w+)"
                           data-test="dashboard-add-condition-value"
@@ -85,7 +85,7 @@
                     </OTabPanel>
                     <OTabPanel name="list">
                       <OSelect
-                        v-model="condition.values"
+                        v-model="conditionModel.values"
                         :options="sortedFilteredListOptions"
                         :label="t('common.selectFilter')"
                         multiple
@@ -171,6 +171,9 @@ export default defineComponent({
     } = useDashboardPanelData(dashboardPanelDataPageKey);
     const { t } = useI18n();
     const searchTerm = ref("");
+
+    // Same reference as props.condition; mutation targets its nested fields only.
+    const conditionModel = computed(() => props.condition);
     const { filterFn: filterStreamFn, filteredOptions: filteredSchemaOptions } =
       useSelectAutoComplete(toRef(props, "schemaOptions"), "label");
 
@@ -245,14 +248,14 @@ export default defineComponent({
     };
 
     const removeColumnName = () => {
-      props.condition.column = {};
+      conditionModel.value.column = {};
     };
 
     watch(
       () => props.condition.column,
       (newColumn, oldColumn) => {
         if (newColumn !== oldColumn) {
-          props.condition.values = [];
+          conditionModel.value.values = [];
         }
       },
     );
@@ -274,6 +277,7 @@ export default defineComponent({
       emitLogicalOperatorChange,
       handleFieldChange,
       removeColumnName,
+      conditionModel,
       filteredSchemaOptions,
       sortedFilteredListOptions: filteredListOptions,
       getAllSelectedStreams,

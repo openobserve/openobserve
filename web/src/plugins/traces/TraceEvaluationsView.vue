@@ -991,8 +991,9 @@ export default defineComponent({
     watch(() => props.evalData, triggerLoad);
 
     // Handle template selection change
-    const onTemplateChange = (newTemplate: string | null) => {
-      if (newTemplate) {
+    const onTemplateChange = (newTemplate: SelectModelValue) => {
+      // Single-select template id: a string when set, otherwise null/empty.
+      if (typeof newTemplate === "string" && newTemplate) {
         const matched = availableTemplates.value.find((t: any) => t.id === newTemplate);
         selectedTemplateData.value = matched || null;
       } else {

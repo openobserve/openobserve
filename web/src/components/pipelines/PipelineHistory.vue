@@ -702,7 +702,9 @@ const fetchPipelinesList = async () => {
           label: pipeline.name,
           value: pipeline.pipeline_id,
         }))
-        .sort((a, b) => a.label.localeCompare(b.label));
+        .sort((a: { label: string; value: string }, b: { label: string; value: string }) =>
+          a.label.localeCompare(b.label),
+        );
       filteredPipelineOptions.value = [...allPipelines.value];
     }
   } catch (error: any) {

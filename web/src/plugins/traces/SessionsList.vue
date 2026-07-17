@@ -264,6 +264,7 @@ import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 import SkeletonBox from "@/components/shared/SkeletonBox.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
+import type { AcceptableValue } from "reka-ui";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import genAiAgentMappingService, {
   type GenAiAgentListItem,
@@ -662,7 +663,9 @@ function onStreamChange() {
   loadSessions(undefined, undefined, true);
 }
 
-function onFilterModeChange(mode?: string | number | null) {
+function onFilterModeChange(
+  mode?: AcceptableValue | AcceptableValue[] | boolean,
+) {
   const next = mode === "agent" ? "agent" : "stream";
   if (next === filterMode.value) return;
   filterMode.value = next;

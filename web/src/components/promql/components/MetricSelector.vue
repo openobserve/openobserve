@@ -31,6 +31,7 @@ import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import streamService from "@/services/stream";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
 
 const props = defineProps<{
   metric: string;
@@ -77,8 +78,9 @@ const loadMetrics = async () => {
   }
 };
 
-const onMetricSelect = (value: string | null) => {
-  selectedMetric.value = value || "";
+const onMetricSelect = (value: SelectModelValue) => {
+  // Single-select of metric names: value is a string or null/empty at runtime.
+  selectedMetric.value = typeof value === "string" ? value : "";
   emit("update:metric", selectedMetric.value);
 };
 </script>

@@ -958,7 +958,7 @@ export default defineComponent({
       );
       const serviceFilter = `${serviceNameField.value} = '${serviceName}'`;
 
-      convertedDashboard.tabs[0].panels.forEach((panel: any, index) => {
+      convertedDashboard.tabs[0].panels.forEach((panel: any, index: number) => {
         let whereClause: string;
 
         if (panel.title === "Errors") {
@@ -1079,7 +1079,7 @@ export default defineComponent({
         if (f.panelTitle === "Errors") errorsOnly = true;
         if (f.panelTitle === "Duration" && f.start !== null && f.start > 0) {
           minDurationMicros = f.start;
-          maxDurationMicros = f.end;
+          maxDurationMicros = f.end ?? undefined;
         }
       });
 

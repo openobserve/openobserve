@@ -596,11 +596,11 @@ export const saveAlertJson = async (
   } = context;
 
   let jsonPayload = JSON.parse(json);
-  let destinationsList = [];
+  let destinationsList: string[] = [];
   props.destinations.forEach((destination: any) => {
     destinationsList.push(destination.name);
   });
-  let streamList = [];
+  let streamList: string[] = [];
 
   if (!streams.value[jsonPayload.stream_type]) {
     try {

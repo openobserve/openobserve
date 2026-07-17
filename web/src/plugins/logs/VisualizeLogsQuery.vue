@@ -123,6 +123,9 @@ export default defineComponent({
     // Logs visualization has no dashboard variables; keep the runtime `{}` value.
     const emptyVariablesData = {} as PanelEditorVariablesData;
 
+    // Same reference as props.errorData; mutation targets its nested fields only.
+    const errorDataModel = computed(() => props.errorData);
+
     const regionClusterParams = computed(() => {
       if (store.state.zoConfig?.super_cluster_enabled) {
         return {
@@ -202,7 +205,7 @@ export default defineComponent({
         const errorList = props.errorData.errors ?? [];
         errorList.splice(0);
         errorList.push(errorMsg.message);
-        props.errorData.value = errorMsg?.message ?? "";
+        errorDataModel.value.value = errorMsg?.message ?? "";
       }
 
       emit("handleChartApiError", errorMsg);
@@ -275,7 +278,7 @@ export default defineComponent({
 
       if (errors.length) {
         // set errors into errorData
-        props.errorData.errors = errors;
+        errorDataModel.value.errors = errors;
         showErrorNotification(
           "There are some errors, please fix them and try again",
         );

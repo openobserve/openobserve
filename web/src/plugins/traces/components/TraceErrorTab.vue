@@ -313,7 +313,7 @@ watch(
 );
 
 
-const highlightTextMatch = (text: string, query: string): string => {
+const highlightTextMatch = (text: string, query: string | undefined): string => {
   if (!query) return escapeHtml(text);
   try {
     const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");

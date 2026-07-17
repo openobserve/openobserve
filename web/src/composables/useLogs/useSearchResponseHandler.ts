@@ -419,7 +419,7 @@ export const useSearchResponseHandler = () => {
       const dateToBePassed = `${day}-${month}-${year}`;
       const hours = String(now.getHours()).padStart(2, "0");
       let minutes = String(now.getMinutes()).padStart(2, "0");
-      if (searchObj.data.histogramInterval / 1000 <= 9999) {
+      if ((searchObj.data.histogramInterval ?? 0) / 1000 <= 9999) {
         minutes = String(now.getMinutes() + 1).padStart(2, "0");
       }
       const time = `${hours}:${minutes}`;

@@ -29,7 +29,7 @@ import { useStore } from "vuex";
 import { searchState } from "@/composables/useLogs/searchState";
 
 export function useLogsHighlighter() {
-  const processedResults = ref({});
+  const processedResults = ref<Record<string, string>>({});
 
   const store = useStore();
   const currentColors = ref(getThemeColors(store.state.theme === "dark"));

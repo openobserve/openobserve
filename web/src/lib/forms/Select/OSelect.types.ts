@@ -165,6 +165,8 @@ export interface SelectSlots {
   empty?: () => unknown;
   /** Content before the options list */
   "before-options"?: () => unknown;
+  /** Content after the options list */
+  "after-options"?: () => unknown;
   /** Icon content inside the trigger on the left — matches OButton's `#icon-left` pattern */
   "icon-left"?: () => unknown;
   /**

@@ -41,7 +41,7 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, watch, type Ref } from "vue";
+import { defineComponent, ref, watch, computed, type Ref } from "vue";
 import { useStore } from "vuex";
 import { getImageURL } from "@/utils/zincutils";
 import { useI18n } from "vue-i18n";
@@ -88,6 +88,9 @@ export default defineComponent({
     const activeFolderId = ref("default");
     const activeTabId: any = ref(null);
     const { t } = useI18n();
+
+    // Same reference as props.dashboardPanelData; mutation targets nested fields only.
+    const dashboardPanelDataModel = computed(() => props.dashboardPanelData);
 
     const {
       showErrorNotification,
@@ -139,9 +142,9 @@ export default defineComponent({
           variant: "loading",
           timeout: 0,
         });
-        props.dashboardPanelData.data.id = getPanelId();
+        dashboardPanelDataModel.value.data.id = getPanelId();
         // panel name will come from add to dashboard component
-        props.dashboardPanelData.data.title = panelTitle;
+        dashboardPanelDataModel.value.data.title = panelTitle;
         // to create panel dashboard id, paneldata and folderId is required
         await addPanel(
           store,

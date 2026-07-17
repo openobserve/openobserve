@@ -237,9 +237,10 @@ export default defineComponent({
             timeout: 2000,
           });
         } catch (err) {
+          const e = err as { response?: { data?: { message?: string } }; message?: string };
           showErrorNotification(
-            err?.response?.data?.message ||
-              err?.message ||
+            e?.response?.data?.message ||
+              e?.message ||
               "Folder deletion failed",
             {
               timeout: 2000,
@@ -265,7 +266,7 @@ export default defineComponent({
       if(!searchQuery.value || searchQuery.value == ""){
         return store.state.organizationData.foldersByType[props.type]
       }
-      return store.state.organizationData.foldersByType[props.type]?.filter(tab => {
+      return store.state.organizationData.foldersByType[props.type]?.filter((tab: { name: string }) => {
         return tab.name.toLowerCase().includes(searchQuery.value.toLowerCase());
       });
     });

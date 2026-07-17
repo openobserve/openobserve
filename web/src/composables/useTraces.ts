@@ -260,14 +260,15 @@ const useTraces = () => {
   ): void => {
     const identifier: string = searchObj.organizationIdentifier || "default";
     const key = `${identifier}_${searchObj.data.stream.selectedStream.value}`;
-    const saved = useLocalTraceFilterField()?.value?.[key];
+    const saved: Record<string, string[]> | undefined =
+      useLocalTraceFilterField()?.value?.[key];
 
-    let fields = [];
+    let fields: string[] = [];
     fields = saved?.[searchMode]?.length
       ? saved?.[searchMode]
       : [...DEFAULT_TRACE_COLUMNS[searchMode]];
 
-    fields = fields.map((field) => {
+    fields = fields.map((field: string) => {
       if (field === "status" && searchMode === "spans") {
         return "span_status";
       } else {

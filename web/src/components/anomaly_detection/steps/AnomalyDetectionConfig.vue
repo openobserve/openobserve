@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :model-value="
               config.query_mode === 'custom_sql' ? 'custom_sql' : 'filters'
             "
-            @update:model-value="config.query_mode = $event as string"
+            @update:model-value="configModel.query_mode = $event as string"
             data-test="anomaly-query-tabs"
           >
             <OToggleGroupItem
@@ -144,7 +144,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 "
                 editor-height="100%"
                 data-test="anomaly-custom-sql"
-                @update:query="config.custom_sql = $event"
+                @update:query="configModel.custom_sql = $event"
               />
             </div>
             <div
@@ -191,7 +191,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <div class="flex items-center gap-2">
               <OSelect
-                v-model="config.detection_function"
+                v-model="configModel.detection_function"
                 :options="detectionFunctions"
                 data-test="anomaly-detection-function"
                 class="alert-v3-select"
@@ -203,7 +203,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   config.detection_function &&
                   config.detection_function !== 'count'
                 "
-                v-model="config.detection_function_field"
+                v-model="configModel.detection_function_field"
                 :options="filteredDetectionFields"
                 :placeholder="
                   config.detection_function_field
@@ -248,7 +248,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div>
               <div class="flex items-center gap-0">
                 <OInput
-                  v-model.number="config.histogram_interval_value"
+                  v-model.number="configModel.histogram_interval_value"
                   type="number"
                   min="1"
                   class="alert-v3-input"
@@ -256,7 +256,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="anomaly-histogram-interval-value"
                 />
                 <OSelect
-                  v-model="config.histogram_interval_unit"
+                  v-model="configModel.histogram_interval_unit"
                   :options="intervalUnits"
                   label-key="label"
                   value-key="value"
@@ -302,7 +302,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div>
             <div class="flex items-center gap-0">
               <OInput
-                v-model.number="config.histogram_interval_value"
+                v-model.number="configModel.histogram_interval_value"
                 type="number"
                 min="1"
                 class="alert-v3-input"
@@ -310,7 +310,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="anomaly-histogram-interval-value"
               />
               <OSelect
-                v-model="config.histogram_interval_unit"
+                v-model="configModel.histogram_interval_unit"
                 :options="intervalUnits"
                 label-key="label"
                 value-key="value"
@@ -355,7 +355,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div>
               <div class="flex items-center gap-0">
                 <OInput
-                  v-model.number="config.schedule_interval_value"
+                  v-model.number="configModel.schedule_interval_value"
                   type="number"
                   min="1"
                   class="alert-v3-input"
@@ -363,7 +363,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="anomaly-schedule-interval-value"
                 />
                 <OSelect
-                  v-model="config.schedule_interval_unit"
+                  v-model="configModel.schedule_interval_unit"
                   :options="intervalUnits"
                   label-key="label"
                   value-key="value"
@@ -405,7 +405,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div>
               <div class="flex items-center gap-0">
                 <OInput
-                  v-model.number="config.detection_window_value"
+                  v-model.number="configModel.detection_window_value"
                   type="number"
                   min="1"
                   class="alert-v3-input"
@@ -413,7 +413,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="anomaly-detection-window-value"
                 />
                 <OSelect
-                  v-model="config.detection_window_unit"
+                  v-model="configModel.detection_window_unit"
                   :options="intervalUnits"
                   label-key="label"
                   value-key="value"
@@ -460,7 +460,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <div class="flex flex-col">
               <OInput
-                v-model.number="config.training_window_days"
+                v-model.number="configModel.training_window_days"
                 type="number"
                 :min="1"
                 data-test="anomaly-training-window"
@@ -500,7 +500,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OIcon>
             </div>
             <OSelect
-              v-model="config.retrain_interval_days"
+              v-model="configModel.retrain_interval_days"
               :options="retrainIntervalOptions"
               label-key="label"
               value-key="value"
@@ -697,6 +697,9 @@ export default defineComponent({
     const store = useStore();
     const formRef = ref<any>(null);
 
+    // Alias for the config prop; same reference, mutation stays identical.
+    const configModel = computed(() => props.config);
+
     const queryTabOptions = [
       { label: "Builder", value: "filters" },
       { label: "SQL", value: "custom_sql" },
@@ -816,7 +819,7 @@ export default defineComponent({
 
     const onDetectionFunctionChange = (fn: string) => {
       if (fn === "count") {
-        props.config.detection_function_field = "";
+        configModel.value.detection_function_field = "";
       }
       // Refresh available fields based on whether the new function needs numeric fields.
       const base = requiresNumericField(fn)
@@ -831,7 +834,7 @@ export default defineComponent({
           props.config.detection_function_field,
         )
       ) {
-        props.config.detection_function_field = "";
+        configModel.value.detection_function_field = "";
       }
     };
 
@@ -845,7 +848,7 @@ export default defineComponent({
           streamName &&
           !props.config.custom_sql
         ) {
-          props.config.custom_sql = buildDefaultSql(
+          configModel.value.custom_sql = buildDefaultSql(
             streamName as string,
             props.config.histogram_interval_value ?? 5,
             props.config.histogram_interval_unit ?? "m",
@@ -864,7 +867,7 @@ export default defineComponent({
           props.config.stream_name &&
           !props.config.custom_sql
         ) {
-          props.config.custom_sql = buildDefaultSql(
+          configModel.value.custom_sql = buildDefaultSql(
             props.config.stream_name,
             props.config.histogram_interval_value ?? 5,
             props.config.histogram_interval_unit ?? "m",
@@ -885,7 +888,7 @@ export default defineComponent({
           !props.config.custom_sql
         )
           return;
-        props.config.custom_sql = props.config.custom_sql.replace(
+        configModel.value.custom_sql = props.config.custom_sql.replace(
           /histogram\(\s*_timestamp\s*,\s*'[^']+'\s*\)/gi,
           `histogram(_timestamp, '${newValue}${newUnit}')`,
         );
@@ -893,11 +896,11 @@ export default defineComponent({
     );
 
     const addFilter = () => {
-      props.config.filters.push({ field: "", operator: "=", value: "" });
+      configModel.value.filters.push({ field: "", operator: "=", value: "" });
     };
 
     const removeFilter = (idx: number) => {
-      props.config.filters.splice(idx, 1);
+      configModel.value.filters.splice(idx, 1);
     };
 
     const validate = async (): Promise<boolean> => {
@@ -1139,8 +1142,8 @@ export default defineComponent({
     });
 
     const onThresholdRangeChange = (val: { min: number; max: number }) => {
-      props.config.threshold_min = val.min;
-      props.config.threshold = val.max;
+      configModel.value.threshold_min = val.min;
+      configModel.value.threshold = val.max;
     };
 
     // sync range when config changes externally
@@ -1209,6 +1212,7 @@ export default defineComponent({
       t,
       store,
       formRef,
+      configModel,
       queryTabOptions,
       filterOperators,
       operatorNeedsValue,

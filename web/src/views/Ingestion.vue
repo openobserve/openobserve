@@ -203,6 +203,7 @@ import { getImageURL } from "@/utils/zincutils";
 import apiKeysService from "@/services/api_keys";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
 import { searchIngestionItems } from "@/utils/ingestionSearchIndex";
 import { awsIntegrations } from "@/utils/awsIntegrations";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -242,7 +243,7 @@ export default defineComponent({
     watch(
       tokenOptions,
       (opts) => {
-        if (opts.length > 0 && !opts.find((o) => o.value === selectedTokenName.value)) {
+        if (opts.length > 0 && !opts.find((o: { value: string }) => o.value === selectedTokenName.value)) {
           selectedTokenName.value = opts[0].value;
           const tokens = store.state.organizationData.orgTokens || [];
           const token = tokens.find((t: any) => t.name === opts[0].value);
@@ -253,7 +254,7 @@ export default defineComponent({
       },
       { immediate: true },
     );
-    const onTokenSelected = (name: string) => {
+    const onTokenSelected = (name: SelectModelValue) => {
       const tokens = store.state.organizationData.orgTokens || [];
       const token = tokens.find((t: any) => t.name === name);
       if (token?.token) {

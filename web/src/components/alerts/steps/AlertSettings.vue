@@ -55,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="silence-notification-input"
                 >
                   <OInput
-                    v-model="formData.trigger_condition.silence"
+                    v-model="formDataModel.trigger_condition.silence"
                     type="number"
                     min="0"
                     data-test="alert-settings-silence-duration-input"
@@ -175,7 +175,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="period-input-container"
                 >
                   <OInput
-                    v-model="formData.trigger_condition.period"
+                    v-model="formDataModel.trigger_condition.period"
                     type="number"
                     min="1"
                     :debounce="300"
@@ -230,7 +230,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <div style="width: 87px; margin-left: 0 !important">
                   <OInput
-                    v-model="formData.trigger_condition.silence"
+                    v-model="formDataModel.trigger_condition.silence"
                     type="number"
                     min="0"
                     :debounce="300"
@@ -347,7 +347,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
           </div>
           <OSwitch
-            v-model="formData.creates_incident"
+            v-model="formDataModel.creates_incident"
             data-test="alert-creates-incident-toggle"
           />
         </div>
@@ -430,6 +430,8 @@ export default defineComponent({
 
     // Local state for aggregation toggle
     // Only enable aggregation when query type is "custom" (not "sql" or "promql")
+    // Same object reference as props.formData; only mutation sites use this.
+    const formDataModel = computed(() => props.formData);
     const queryType = computed(
       () => props.formData.query_condition?.type || "custom",
     );
@@ -460,7 +462,7 @@ export default defineComponent({
           props.formData.trigger_condition.frequency_type === "cron" &&
           !props.formData.trigger_condition.timezone
         ) {
-          props.formData.trigger_condition.timezone = detectedTimezone;
+          formDataModel.value.trigger_condition.timezone = detectedTimezone;
           showTimezoneWarning.value = true;
         }
 
@@ -633,11 +635,11 @@ export default defineComponent({
         ) {
           // Convert minutes to cron expression (6-field format: second minute hour day month dayOfWeek)
           const cronExpression = convertMinutesToCron(frequencyMinutes);
-          props.formData.trigger_condition.cron = cronExpression;
+          formDataModel.value.trigger_condition.cron = cronExpression;
 
           // Set timezone if not already set
           if (!props.formData.trigger_condition.timezone) {
-            props.formData.trigger_condition.timezone =
+            formDataModel.value.trigger_condition.timezone =
               browserTimezone.value ||
               Intl.DateTimeFormat().resolvedOptions().timeZone;
           }
@@ -645,7 +647,7 @@ export default defineComponent({
       }
 
       // Update the frequency type
-      props.formData.trigger_condition.frequency_type = type;
+      formDataModel.value.trigger_condition.frequency_type = type;
       emitTriggerUpdate();
     };
 
@@ -703,23 +705,23 @@ export default defineComponent({
           Math.ceil(store.state?.zoConfig?.min_auto_refresh_interval / 60) ||
           10;
         if (periodValue >= minFrequency) {
-          props.formData.trigger_condition.frequency = periodValue;
+          formDataModel.value.trigger_condition.frequency = periodValue;
         }
 
         // Always sync cron expression, regardless of current mode
         // This ensures cron is up-to-date when user switches to cron mode
         const cronExpression = convertMinutesToCron(periodValue);
-        props.formData.trigger_condition.cron = cronExpression;
+        formDataModel.value.trigger_condition.cron = cronExpression;
 
         // Ensure timezone is set
         if (!props.formData.trigger_condition.timezone) {
-          props.formData.trigger_condition.timezone =
+          formDataModel.value.trigger_condition.timezone =
             browserTimezone.value ||
             Intl.DateTimeFormat().resolvedOptions().timeZone;
         }
 
         // Always sync silence notification
-        props.formData.trigger_condition.silence = periodValue;
+        formDataModel.value.trigger_condition.silence = periodValue;
       }
 
       emitTriggerUpdate();
@@ -948,6 +950,7 @@ export default defineComponent({
     return {
       t,
       store,
+      formDataModel,
       queryType,
       localIsAggregationEnabled,
       localDestinations,

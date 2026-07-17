@@ -652,7 +652,7 @@ const fetchAlertsList = async () => {
           label: alert.name,
           value: alert.alert_id,
         }))
-        .sort((a, b) => a.label.localeCompare(b.label));
+        .sort((a: { label: string }, b: { label: string }) => a.label.localeCompare(b.label));
       filteredAlertOptions.value = [...allAlerts.value];
     }
   } catch (error: any) {

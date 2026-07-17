@@ -237,7 +237,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <span class="condition-text font-semibold text-[13px] whitespace-nowrap">{{ t('alerts.conditionOf') }}</span>
                     <div style="position: relative; display: inline-flex;">
                       <OSelect
-                        v-model="inputData.aggregation.having.column"
+                        v-model="inputDataModel.aggregation.having.column"
                         :options="columns"
                         searchable
                         :placeholder="t('alerts.placeholders.selectColumn')"
@@ -307,7 +307,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     <div class="flex items-center gap-1">
                       <OSelect
-                        v-model="inputData.aggregation.group_by[index]"
+                        v-model="inputDataModel.aggregation.group_by[index]"
                         :options="columns"
                         searchable
                         :placeholder="t('alerts.placeholders.selectColumn')"
@@ -794,7 +794,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </span>
                 <div class="flex items-center gap-2">
                   <OSelect
-                    v-model="promqlCondition.operator"
+                    v-model="promqlConditionModel.operator"
                     :options="numericOperators"
                     :searchable="false"
                     data-test="alert-threshold-operator-select"
@@ -804,7 +804,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     @update:model-value="promqlOperatorError = ''; emitPromqlConditionUpdate()"
                   />
                   <OInput
-                    v-model.number="promqlCondition.value"
+                    v-model.number="promqlConditionModel.value"
                     type="number"
                     data-test="alert-threshold-value-input"
                     style="min-width: 60px; max-width: 120px;"
@@ -1001,6 +1001,11 @@ export default defineComponent({
     const { t } = useI18n();
     const store = useStore();
 
+    // Same object references as the props; only mutation sites use these.
+    const inputDataModel = computed(() => props.inputData);
+    const promqlConditionModel = computed(() => props.promqlCondition);
+    const triggerConditionModel = computed(() => props.triggerCondition);
+
     const localTab = ref(props.tab);
     const columnSelectError = ref(false);
     const viewSqlEditor = ref(false);
@@ -1159,7 +1164,7 @@ export default defineComponent({
         localIsAggregationEnabled.value = true;
         // Initialize aggregation object if missing
         if (!props.inputData.aggregation) {
-          props.inputData.aggregation = {
+          inputDataModel.value.aggregation = {
             group_by: [],
             function: "avg",
             having: { column: "", operator: ">=", value: "" },
@@ -1169,7 +1174,7 @@ export default defineComponent({
         if (!props.inputData.aggregation?.having?.column) {
           const hasValueField = props.columns.some((c: any) => (typeof c === 'string' ? c : c.value) === 'value');
           if (hasValueField && props.inputData.aggregation?.having) {
-            props.inputData.aggregation.having.column = 'value';
+            inputDataModel.value.aggregation.having.column = 'value';
           }
         }
       }
@@ -1268,17 +1273,17 @@ export default defineComponent({
           localIsAggregationEnabled.value = true;
           emit("update:isAggregationEnabled", true);
           if (!props.inputData.aggregation) {
-            props.inputData.aggregation = {
+            inputDataModel.value.aggregation = {
               group_by: [],
               function: "avg",
               having: { column: "", operator: ">=", value: "" },
             };
           } else {
-            props.inputData.aggregation.function = 'avg';
+            inputDataModel.value.aggregation.function = 'avg';
             if (!props.inputData.aggregation.having?.column) {
               const hasValueField = props.columns.some((c: any) => (typeof c === 'string' ? c : c.value) === 'value');
               if (hasValueField) {
-                props.inputData.aggregation.having.column = 'value';
+                inputDataModel.value.aggregation.having.column = 'value';
               }
             }
           }
@@ -1295,8 +1300,8 @@ export default defineComponent({
     const triggerThreshold = ref(hasInitialGroupBy ? (props.triggerCondition?.threshold || 1) : 1);
     // Sync reset to parent so saving also persists the corrected value
     if (!hasInitialGroupBy && props.triggerCondition) {
-      props.triggerCondition.threshold = 1;
-      props.triggerCondition.operator = '>=';
+      triggerConditionModel.value.threshold = 1;
+      triggerConditionModel.value.operator = '>=';
       emit("update:triggerCondition", { ...props.triggerCondition });
     }
 
@@ -1313,7 +1318,7 @@ export default defineComponent({
     const onTriggerOperatorChange = (value: string) => {
       triggerOperator.value = value;
       if (props.triggerCondition) {
-        props.triggerCondition.operator = value;
+        triggerConditionModel.value.operator = value;
         emit("update:triggerCondition", { ...props.triggerCondition });
       }
     };
@@ -1322,7 +1327,7 @@ export default defineComponent({
       isUserTriggerChange.value = true;
       triggerThreshold.value = value === '' || value === null || value === undefined ? null : Number(value);
       if (props.triggerCondition) {
-        props.triggerCondition.threshold = triggerThreshold.value;
+        triggerConditionModel.value.threshold = triggerThreshold.value;
         emit("update:triggerCondition", { ...props.triggerCondition });
       }
     };
@@ -1331,7 +1336,7 @@ export default defineComponent({
       if (triggerThreshold.value === null || triggerThreshold.value === '' || triggerThreshold.value === undefined || Number.isNaN(Number(triggerThreshold.value))) {
         triggerThreshold.value = 3;
         if (props.triggerCondition) {
-          props.triggerCondition.threshold = 3;
+          triggerConditionModel.value.threshold = 3;
           emit("update:triggerCondition", { ...props.triggerCondition });
         }
       }
@@ -1407,41 +1412,41 @@ export default defineComponent({
       if (!props.triggerCondition) return;
 
       if (unit === 'cron') {
-        props.triggerCondition.frequency_type = 'cron';
+        triggerConditionModel.value.frequency_type = 'cron';
         // Auto-convert current frequency to cron if no expression yet
         if (!cronExpression.value) {
           let mins = Number(checkEveryFrequency.value);
           if (prevMode === 'hours') mins = mins * 60;
           if (mins > 0) {
             cronExpression.value = convertMinutesToCron(mins);
-            props.triggerCondition.cron = cronExpression.value;
+            triggerConditionModel.value.cron = cronExpression.value;
           }
           if (!cronTimezone.value) {
             cronTimezone.value = Intl.DateTimeFormat().resolvedOptions().timeZone;
           }
-          props.triggerCondition.timezone = cronTimezone.value;
+          triggerConditionModel.value.timezone = cronTimezone.value;
         }
         validateCron();
       } else {
-        props.triggerCondition.frequency_type = 'minutes';
+        triggerConditionModel.value.frequency_type = 'minutes';
         // Convert between minutes and hours
         if (unit === 'hours' && prevMode === 'minutes') {
           // Converting minutes to hours: round up
           const hrs = Math.max(1, Math.round(Number(checkEveryFrequency.value) / 60));
           checkEveryFrequency.value = hrs;
-          props.triggerCondition.frequency = hrs * 60;
+          triggerConditionModel.value.frequency = hrs * 60;
         } else if (unit === 'minutes' && prevMode === 'hours') {
           // Converting hours to minutes
           const mins = Number(checkEveryFrequency.value) * 60;
           checkEveryFrequency.value = mins;
-          props.triggerCondition.frequency = mins;
+          triggerConditionModel.value.frequency = mins;
         } else if (unit === 'minutes' && prevMode === 'cron') {
           // Coming back from cron, restore sensible default
           checkEveryFrequency.value = props.triggerCondition.frequency || 10;
         } else if (unit === 'hours' && prevMode === 'cron') {
           const mins = props.triggerCondition.frequency || 60;
           checkEveryFrequency.value = Math.max(1, Math.round(mins / 60));
-          props.triggerCondition.frequency = checkEveryFrequency.value * 60;
+          triggerConditionModel.value.frequency = checkEveryFrequency.value * 60;
         }
       }
       emit("update:triggerCondition", { ...props.triggerCondition });
@@ -1451,7 +1456,7 @@ export default defineComponent({
       isUserTriggerChange.value = true;
       cronExpression.value = value;
       if (props.triggerCondition) {
-        props.triggerCondition.cron = value;
+        triggerConditionModel.value.cron = value;
         validateCron();
         emit("update:triggerCondition", { ...props.triggerCondition });
       }
@@ -1461,7 +1466,7 @@ export default defineComponent({
       isUserTriggerChange.value = true;
       cronTimezone.value = value;
       if (props.triggerCondition) {
-        props.triggerCondition.timezone = value;
+        triggerConditionModel.value.timezone = value;
         validateCron();
         emit("update:triggerCondition", { ...props.triggerCondition });
       }
@@ -1474,7 +1479,7 @@ export default defineComponent({
       if (props.triggerCondition) {
         // Store as minutes internally (hours mode: multiply by 60)
         const mins = parsed != null ? (frequencyMode.value === 'hours' ? parsed * 60 : parsed) : null;
-        props.triggerCondition.frequency = mins;
+        triggerConditionModel.value.frequency = mins;
         emit("update:triggerCondition", { ...props.triggerCondition });
       }
     };
@@ -1484,7 +1489,7 @@ export default defineComponent({
         const defaultVal = frequencyMode.value === 'hours' ? 1 : 10;
         checkEveryFrequency.value = defaultVal;
         if (props.triggerCondition) {
-          props.triggerCondition.frequency = frequencyMode.value === 'hours' ? 60 : 10;
+          triggerConditionModel.value.frequency = frequencyMode.value === 'hours' ? 60 : 10;
           emit("update:triggerCondition", { ...props.triggerCondition });
         }
       }
@@ -1695,8 +1700,8 @@ export default defineComponent({
         triggerThreshold.value = 1;
         triggerOperator.value = '>=';
         if (props.triggerCondition) {
-          props.triggerCondition.threshold = 1;
-          props.triggerCondition.operator = '>=';
+          triggerConditionModel.value.threshold = 1;
+          triggerConditionModel.value.operator = '>=';
           emit("update:triggerCondition", { ...props.triggerCondition });
         }
         emit("update:isAggregationEnabled", true);
@@ -1711,7 +1716,7 @@ export default defineComponent({
 
       // Initialize aggregation object if needed
       if (!props.inputData.aggregation) {
-        props.inputData.aggregation = {
+        inputDataModel.value.aggregation = {
           group_by: [],
           function: value,
           having: {
@@ -1721,9 +1726,9 @@ export default defineComponent({
           },
         };
       } else {
-        props.inputData.aggregation.function = value;
-        props.inputData.aggregation.having.operator = conditionOperator.value;
-        props.inputData.aggregation.having.value = conditionValue.value;
+        inputDataModel.value.aggregation.function = value;
+        inputDataModel.value.aggregation.having.operator = conditionOperator.value;
+        inputDataModel.value.aggregation.having.value = conditionValue.value;
       }
       emitAggregationUpdate();
     };
@@ -1739,8 +1744,8 @@ export default defineComponent({
         triggerThreshold.value = 3;
         triggerOperator.value = '>=';
         if (props.triggerCondition) {
-          props.triggerCondition.threshold = 3;
-          props.triggerCondition.operator = '>=';
+          triggerConditionModel.value.threshold = 3;
+          triggerConditionModel.value.operator = '>=';
           emit("update:triggerCondition", { ...props.triggerCondition });
         }
       } else {
@@ -1749,14 +1754,14 @@ export default defineComponent({
         triggerThreshold.value = 1;
         triggerOperator.value = '>=';
         if (props.triggerCondition) {
-          props.triggerCondition.threshold = 1;
-          props.triggerCondition.operator = '>=';
+          triggerConditionModel.value.threshold = 1;
+          triggerConditionModel.value.operator = '>=';
           emit("update:triggerCondition", { ...props.triggerCondition });
         }
         emit("update:isAggregationEnabled", true);
         const aggFunction = value;
         if (!props.inputData.aggregation) {
-          props.inputData.aggregation = {
+          inputDataModel.value.aggregation = {
             group_by: logGroupBy.value.length ? [...logGroupBy.value] : [],
             function: aggFunction,
             having: {
@@ -1766,11 +1771,11 @@ export default defineComponent({
             },
           };
         } else {
-          props.inputData.aggregation.function = aggFunction;
-          props.inputData.aggregation.having.operator = conditionOperator.value;
-          props.inputData.aggregation.having.value = conditionValue.value;
-          props.inputData.aggregation.having.column = logMeasureColumn.value || "";
-          props.inputData.aggregation.group_by = logGroupBy.value.length ? [...logGroupBy.value] : [];
+          inputDataModel.value.aggregation.function = aggFunction;
+          inputDataModel.value.aggregation.having.operator = conditionOperator.value;
+          inputDataModel.value.aggregation.having.value = conditionValue.value;
+          inputDataModel.value.aggregation.having.column = logMeasureColumn.value || "";
+          inputDataModel.value.aggregation.group_by = logGroupBy.value.length ? [...logGroupBy.value] : [];
         }
         emitAggregationUpdate();
       }
@@ -1779,7 +1784,7 @@ export default defineComponent({
     // When log measure column changes (for unique count / measure modes)
     const onLogMeasureColumnChange = (value: string) => {
       if (props.inputData.aggregation) {
-        props.inputData.aggregation.having.column = value;
+        inputDataModel.value.aggregation.having.column = value;
         emitAggregationUpdate();
       }
     };
@@ -1796,15 +1801,15 @@ export default defineComponent({
         triggerThreshold.value = 1;
         triggerOperator.value = '>=';
         if (props.triggerCondition) {
-          props.triggerCondition.threshold = 1;
-          props.triggerCondition.operator = '>=';
+          triggerConditionModel.value.threshold = 1;
+          triggerConditionModel.value.operator = '>=';
           emit("update:triggerCondition", { ...props.triggerCondition });
         }
       }
     };
     const onLogGroupByChange = () => {
       if (props.inputData.aggregation) {
-        props.inputData.aggregation.group_by = [...logGroupBy.value];
+        inputDataModel.value.aggregation.group_by = [...logGroupBy.value];
         emitAggregationUpdate();
       }
     };
@@ -1814,13 +1819,13 @@ export default defineComponent({
       if (isEventBased.value && selectedFunction.value === 'total_events') {
         // Logs count mode: maps to trigger_condition
         if (props.triggerCondition) {
-          props.triggerCondition.operator = value;
+          triggerConditionModel.value.operator = value;
           emitTriggerUpdate();
         }
       } else {
         // Metrics or logs measure/unique count: maps to aggregation.having
         if (props.inputData.aggregation) {
-          props.inputData.aggregation.having.operator = value;
+          inputDataModel.value.aggregation.having.operator = value;
           emitAggregationUpdate();
         }
       }
@@ -1833,13 +1838,13 @@ export default defineComponent({
         // Logs count mode: maps to trigger_condition
         if (props.triggerCondition) {
           isUserTriggerChange.value = true;
-          props.triggerCondition.threshold = parsed;
+          triggerConditionModel.value.threshold = parsed;
           emitTriggerUpdate();
         }
       } else {
         // Metrics or logs measure/unique count: maps to aggregation.having
         if (props.inputData.aggregation) {
-          props.inputData.aggregation.having.value = parsed;
+          inputDataModel.value.aggregation.having.value = parsed;
           emitAggregationUpdate();
         }
       }
@@ -1853,7 +1858,7 @@ export default defineComponent({
     // Add group by column
     const addGroupByColumn = () => {
       if (props.inputData.aggregation) {
-        props.inputData.aggregation.group_by.push("");
+        inputDataModel.value.aggregation.group_by.push("");
         emitAggregationUpdate();
       }
     };
@@ -1862,7 +1867,7 @@ export default defineComponent({
     const deleteGroupByColumn = (index: string | number) => {
       const idx = typeof index === 'string' ? parseInt(index) : index;
       if (props.inputData.aggregation) {
-        props.inputData.aggregation.group_by.splice(idx, 1);
+        inputDataModel.value.aggregation.group_by.splice(idx, 1);
         emitAggregationUpdate();
         // Reset threshold to 1 when last group-by field is removed
         const remaining = (props.inputData.aggregation.group_by || []).filter((f: string) => f?.trim()).length;
@@ -1870,8 +1875,8 @@ export default defineComponent({
           triggerThreshold.value = 1;
           triggerOperator.value = '>=';
           if (props.triggerCondition) {
-            props.triggerCondition.threshold = 1;
-            props.triggerCondition.operator = '>=';
+            triggerConditionModel.value.threshold = 1;
+            triggerConditionModel.value.operator = '>=';
             emit("update:triggerCondition", { ...props.triggerCondition });
           }
         }
@@ -1951,13 +1956,13 @@ export default defineComponent({
             // Stream changed — previously selected column is no longer valid, clear it
             // and auto-set to "value" only if the new stream has it
             const hasValue = newCols.some((c: any) => (typeof c === 'string' ? c : c.value) === 'value');
-            props.inputData.aggregation.having.column = hasValue ? 'value' : '';
+            inputDataModel.value.aggregation.having.column = hasValue ? 'value' : '';
             emitAggregationUpdate();
           } else if (!currentCol) {
             // Column not set yet — auto-set to "value" if new stream has it
             const hasValue = newCols.some((c: any) => (typeof c === 'string' ? c : c.value) === 'value');
             if (hasValue) {
-              props.inputData.aggregation.having.column = 'value';
+              inputDataModel.value.aggregation.having.column = 'value';
               emitAggregationUpdate();
             }
           }
@@ -2063,8 +2068,8 @@ export default defineComponent({
         triggerThreshold.value = 1;
         triggerOperator.value = '>=';
         if (props.triggerCondition) {
-          props.triggerCondition.threshold = 1;
-          props.triggerCondition.operator = '>=';
+          triggerConditionModel.value.threshold = 1;
+          triggerConditionModel.value.operator = '>=';
           emit("update:triggerCondition", { ...props.triggerCondition });
         }
       }
@@ -2170,6 +2175,8 @@ export default defineComponent({
     return {
       t,
       store,
+      inputDataModel,
+      promqlConditionModel,
       highlightedSqlQuery,
       localTab,
       tabOptions,

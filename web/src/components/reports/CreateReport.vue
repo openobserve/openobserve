@@ -853,6 +853,10 @@ const form = useOForm<CreateReportForm>({
   onSubmit: (value) => saveReport(value),
 });
 
+// The form's field-name (DeepKeys) union — used to type helpers that call
+// form.validateField/getFieldMeta/setFieldMeta so no per-call cast is needed.
+type ReportFieldName = Parameters<typeof form.validateField>[0];
+
 const originalReportData: Ref<string> = ref("");
 
 const step = ref(1);
@@ -902,7 +906,9 @@ const selectedTimeTab = form.useStore(
 );
 // The dashboards field-array — the row v-for + per-row conditionals render from
 // this reactive view; the controls bind by `dashboards[i].*` name.
-const dashboardRows = form.useStore((s: any) => s.values?.dashboards ?? []);
+const dashboardRows = form.useStore(
+  (s: any): CreateReportForm["dashboards"] => s.values?.dashboards ?? [],
+);
 
 // The dashboard's `variables` stay component-owned (VariablesInput is a composite
 // with no OForm* equivalent + carries no validation); merged into the payload at
@@ -1074,7 +1080,9 @@ watch(submissionAttempts, (n, o) => {
 // put (clearing them made a later Continue wipe the errors Save had just surfaced
 // on other steps). We simply don't READ the out-of-step fields when deciding
 // whether to advance.
-const validateStepFields = async (fields: string[]): Promise<boolean> => {
+const validateStepFields = async (
+  fields: ReportFieldName[],
+): Promise<boolean> => {
   let valid = true;
   for (const name of fields) {
     await form.validateField(name, "submit");
@@ -1085,20 +1093,20 @@ const validateStepFields = async (fields: string[]): Promise<boolean> => {
 };
 
 // Validate the given fields; only advance to `next` when they all pass.
-const goToStep = async (fields: string[], next: number) => {
+const goToStep = async (fields: ReportFieldName[], next: number) => {
   if (await validateStepFields(fields)) step.value = next;
 };
 
 // Map a Zod issue path to its OForm field name so we can match issues to the
 // field that owns them: ["dashboards", 0, "folder"] → "dashboards[0].folder",
 // ["cron"] → "cron".
-const issuePathToName = (path: readonly (string | number)[]): string =>
+const issuePathToName = (path: readonly PropertyKey[]): string =>
   path.reduce<string>(
     (acc, seg) =>
       typeof seg === "number"
         ? `${acc}[${seg}]`
         : acc
-          ? `${acc}.${seg}`
+          ? `${acc}.${String(seg)}`
           : String(seg),
     "",
   );
@@ -1118,7 +1126,9 @@ watch(
     const invalidNames = new Set(
       res.success ? [] : res.error.issues.map((i) => issuePathToName(i.path)),
     );
-    for (const name of Object.keys(form.state.fieldMeta ?? {})) {
+    for (const name of Object.keys(
+      form.state.fieldMeta ?? {},
+    ) as ReportFieldName[]) {
       const meta = form.getFieldMeta(name);
       if (!meta) continue;
       const hasError = (meta.errors?.length ?? 0) > 0;

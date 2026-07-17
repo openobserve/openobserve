@@ -618,7 +618,7 @@ export const convertPromQLData = async (
   // Ensure gridlines visibility is set for all xAxis and yAxis (handles both array and object cases)
   if (options.xAxis) {
     (Array.isArray(options.xAxis) ? options.xAxis : [options.xAxis]).forEach(
-      (axis) => {
+      (axis: { splitLine: { show: boolean; lineStyle: unknown } }) => {
         // if (!axis.splitLine) axis.splitLine = {};
         axis.splitLine.show = showGridlines;
         axis.splitLine.lineStyle = gridLineStyle;
@@ -627,7 +627,7 @@ export const convertPromQLData = async (
   }
   if (options.yAxis) {
     (Array.isArray(options.yAxis) ? options.yAxis : [options.yAxis]).forEach(
-      (axis) => {
+      (axis: { splitLine: { show: boolean; lineStyle: unknown } }) => {
         // if (!axis.splitLine) axis.splitLine = {};
         axis.splitLine.show = showGridlines;
         axis.splitLine.lineStyle = gridLineStyle;

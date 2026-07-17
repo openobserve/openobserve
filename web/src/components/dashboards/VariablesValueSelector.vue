@@ -189,6 +189,8 @@ export default defineComponent({
   setup(props: any, { emit }) {
     const store = useStore();
     const { t } = useI18n();
+    // Alias preserves the same prop reference for in-place mutation.
+    const initialVariableValuesModel = computed(() => props.initialVariableValues);
     // Try to inject variablesManager from parent (for backward compatibility)
 
     // Try to inject variablesManager from parent (for backward compatibility)
@@ -1269,7 +1271,7 @@ export default defineComponent({
       resetVariablesData();
 
       // set initial variables values
-      props.initialVariableValues.value = newInitialVariableValues;
+      initialVariableValuesModel.value.value = newInitialVariableValues;
 
       // make list of variables using variables config list
       initializeVariablesData();
@@ -2247,10 +2249,11 @@ export default defineComponent({
 
       try {
         await loadSingleVariableDataByName(variableObject);
-      } catch (error) {
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : String(error);
         variableLog(
           variableObject.name,
-          `Error loading variable options for ${variableObject.name}: ${error.message}`,
+          `Error loading variable options for ${variableObject.name}: ${message}`,
         );
       }
     };
@@ -2397,7 +2400,7 @@ export default defineComponent({
 
         const merged = [
           ...filtered,
-          ...customTypedValues.filter((v) => !filtered.includes(v)),
+          ...customTypedValues.filter((v: unknown) => !filtered.includes(v)),
         ];
 
         if (merged.length !== currentVariable.value.length) {

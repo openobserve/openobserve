@@ -416,7 +416,12 @@ const stringValue = computed(() =>
     : undefined,
 );
 
-function handleUpdate(value: string) {
+function handleUpdate(value: string | null) {
+  // Reka's SelectRoot types the value as nullable; null means no selection here.
+  if (value === null) {
+    emit("update:modelValue", undefined);
+    return;
+  }
   // Recover the original type: prefer props.options, then the slot-item registry
   const opt = normalizedOptions.value.find((o) => String(o.value) === value);
   let resolved: SelectPrimitiveValue;

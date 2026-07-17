@@ -828,8 +828,8 @@ export default defineComponent({
           return;
         }
 
-        const dates = [];
-        let values = [];
+        const dates: string[] = [];
+        let values: number[] = [];
         let dataUnit = 'GB'; // Default unit
         let unitDivisor = 1024; // Default: MB to GB
 

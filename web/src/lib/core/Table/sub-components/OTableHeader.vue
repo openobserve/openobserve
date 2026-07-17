@@ -345,7 +345,7 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
               class="flex items-center shrink-0"
             >
               <OIcon
-                v-if="getSortIcon(header.id) === 'asc'"
+                v-if="getSortIcon?.(header.id) === 'asc'"
                 name="arrow-upward"
                 size="sm"
                 class="text-[var(--color-table-sort-icon-active)]"
@@ -353,7 +353,7 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
                 data-test-sort-direction="asc"
               />
               <OIcon
-                v-else-if="getSortIcon(header.id) === 'desc'"
+                v-else-if="getSortIcon?.(header.id) === 'desc'"
                 name="arrow-downward"
                 size="sm"
                 class="text-[var(--color-table-sort-icon-active)]"
@@ -483,7 +483,7 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
             </span>
             <template v-if="sortingEnabled && (header.column.columnDef.meta as any)?.sortable">
               <OIcon
-                v-if="getSortIcon(header.id) === 'asc'"
+                v-if="getSortIcon?.(header.id) === 'asc'"
                 name="arrow-upward"
                 size="sm"
                 class="shrink-0 text-[var(--color-table-sort-icon-active)]"
@@ -491,7 +491,7 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
                 data-test-sort-direction="asc"
               />
               <OIcon
-                v-else-if="getSortIcon(header.id) === 'desc'"
+                v-else-if="getSortIcon?.(header.id) === 'desc'"
                 name="arrow-downward"
                 size="sm"
                 class="shrink-0 text-[var(--color-table-sort-icon-active)]"

@@ -50,8 +50,8 @@ const setActiveTab = async (value: string) => {
   activeTab.value = value;
 };
 
-const handleTabChange = (tab: string) => {
-  activeTab.value = tab;
+const handleTabChange = (tab: string | number) => {
+  activeTab.value = String(tab);
   emits("update:activeTab", tab);
 };
 

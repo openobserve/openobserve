@@ -182,8 +182,8 @@ const streamTypes = ref([
   { label: "Traces", value: "traces" },
 ]);
 
-const indexOptions = ref([]);
-const filteredStreams = ref([]);
+const indexOptions = ref<string[]>([]);
+const filteredStreams = ref<string[]>([]);
 
 // Refetch the stream list (+ reset the dependent stream_name) for a stream_type.
 // Reads/writes the FORM-owned values (the select is form-owned now).

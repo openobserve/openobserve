@@ -259,7 +259,8 @@ export default defineComponent({
       });
     };
 
-    const onTabChange = async (tab: string) => {
+    const onTabChange = async (value: string | number) => {
+      const tab = String(value);
       if (activeTab.value === "field-aliases" && tab !== "field-aliases") {
         const proceed = await confirmDiscardUnsaved();
         if (!proceed) return;

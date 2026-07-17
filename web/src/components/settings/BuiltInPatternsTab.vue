@@ -199,7 +199,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <div
-          v-if="previewedPattern?.examples?.Valid?.length > 0"
+          v-if="(previewedPattern?.examples?.Valid?.length ?? 0) > 0"
           class="mb-3"
         >
           <div class="text-weight-bold mb-1">
@@ -207,7 +207,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <ul class="flex flex-col divide-y divide-border border rounded-md">
             <li
-              v-for="(example, idx) in previewedPattern.examples.Valid.slice(0, 3)"
+              v-for="(example, idx) in previewedPattern?.examples?.Valid?.slice(0, 3)"
               :key="idx"
               class="flex items-center gap-2 px-3 py-1"
             >
