@@ -132,8 +132,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             v-if="isFrameExpanded(traceIndex, 0) && stackTrace.stack[0].source_info"
             data-test="rum-pretty-stack-trace-source-context"
-            class="source-context !px-4 !pb-4 !pt-0"
-            :style="{ 'background-color': 'var(--color-code-block-bg)' }"
+            class="source-context !px-4 !pb-4 !pt-0 bg-code-block-bg"
           >
             <!-- File location -->
             <div class="source-location-header text-text-secondary text-xs !mb-2.5 text-2xs font-semibold [letter-spacing:0.02em] opacity-80">
@@ -220,8 +219,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Expandable source code context -->
               <div
                 v-if="isFrameExpanded(traceIndex, frameIndex + 1) && frame.source_info"
-                class="source-context !px-4 !pb-4 !pt-0"
-                :style="{ 'background-color': 'var(--color-code-block-bg)' }"
+                class="source-context !px-4 !pb-4 !pt-0 bg-code-block-bg"
               >
                 <div class="source-location-header text-text-secondary text-xs !mb-2.5 ml-4 text-2xs font-semibold [letter-spacing:0.02em] opacity-80">
                   Line {{ frame.source_info.stack_line }}:{{ frame.source_info.stack_col }}

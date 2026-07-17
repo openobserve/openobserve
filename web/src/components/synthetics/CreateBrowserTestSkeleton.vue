@@ -17,7 +17,7 @@ withDefaults(defineProps<{
     role="status"
     :aria-label="t('synthetics.createBrowserTest.loading')"
     aria-live="polite"
-    style="flex: 1; display: flex; flex-direction: column; min-height: 0; background: var(--color-surface-base)"
+    class="flex-1 flex flex-col min-h-0 bg-surface-base"
     data-test="synthetics-createBrowserTest-skeleton"
   >
     <!--
@@ -43,7 +43,7 @@ withDefaults(defineProps<{
       </div>
       <!-- Connector line (mt-5.5=1.375rem) -->
       <div
-        style="flex: 1; height: 0.0625rem; background: var(--color-border-default); margin: 1.375rem 0.25rem 0; min-width: 0.5rem; flex-shrink: 1"
+        class="flex-1 h-px bg-border-default mt-5.5 mx-1 mb-0 min-w-2 shrink"
       ></div>
       <!-- Step 2: Configure (inactive) -->
       <div style="display: flex; align-items: center; gap: 0.5rem; padding: 0.375rem 0.5rem; flex-shrink: 0">
@@ -109,7 +109,7 @@ withDefaults(defineProps<{
         <div
           v-for="i in rows"
           :key="i"
-          style="display: flex; align-items: center; gap: 0.5rem; padding: 0.375rem 0.75rem; border-bottom: 0.0625rem solid var(--color-border-default)"
+          class="flex items-center gap-2 py-1.5 px-3 border-b border-border-default"
         >
           <!-- OTable expand toggle (built-in) -->
           <div style="width: 1rem; height: 1rem; flex-shrink: 0">
@@ -157,7 +157,7 @@ withDefaults(defineProps<{
       Journey tab: Cancel(ghost) | spacer | Continue(primary + chevron-right)
     -->
     <div
-      style="display: flex; align-items: center; padding: 0.625rem 0.75rem; gap: 0.5rem; border-top: 0.0625rem solid var(--color-border-default); flex-shrink: 0; background: var(--color-surface-base)"
+      class="flex items-center py-2.5 px-3 gap-2 border-t border-border-default shrink-0 bg-surface-base"
     >
       <div style="flex: 1"></div>
       <!-- Cancel button (ghost, sm) -->

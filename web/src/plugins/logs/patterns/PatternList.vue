@@ -20,8 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div v-if="!loading && patterns?.length > 0" class="flex flex-col">
       <!-- Table Header -->
       <div
-        class="flex items-center border-b border-card-glass-border"
-        style="background: var(--color-theme-table-header-bg); min-width: 100%"
+        class="flex items-center border-b border-card-glass-border bg-theme-table-header-bg min-w-full"
       >
         <!-- Pattern Column Header -->
         <div
@@ -99,8 +98,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <!-- Header skeleton -->
       <div
-        class="min-h-8 flex items-center border-b border-card-glass-border"
-        style="background: var(--color-theme-table-header-bg); min-width: 100%"
+        class="min-h-8 flex items-center border-b border-card-glass-border bg-theme-table-header-bg min-w-full"
       >
         <div class="flex-1 min-w-0 px-2">
           <span class="pattern-skel-pill inline-block h-3 w-16 rounded-sm" aria-hidden="true" />

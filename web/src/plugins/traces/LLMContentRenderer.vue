@@ -92,8 +92,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div
                 v-if="isMessageJson(msg.content)"
-                class="message-content-json p-2 h-full text-compact"
-                style="background-color: var(--color-code-bg)"
+                class="message-content-json p-2 h-full text-compact bg-code-bg"
               >
                 <CodeQueryEditor
                   :editor-id="`${editorIdPrefix}msg-json-editor-${idx}`"
@@ -108,8 +107,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div
                 v-else
-                class="message-content markdown-body p-2 overflow-x-auto"
-                style="background-color: var(--color-code-bg)"
+                class="message-content markdown-body p-2 overflow-x-auto bg-code-bg"
                 v-html="renderMarkdown(msg.content)"
               />
             </div>
@@ -193,8 +191,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div
                 v-if="isMessageJson(msg.content)"
-                class="message-content-json p-2 h-full text-compact"
-                style="background-color: var(--color-code-bg)"
+                class="message-content-json p-2 h-full text-compact bg-code-bg"
               >
                 <CodeQueryEditor
                   :editor-id="`${editorIdPrefix}msg-json-editor-full-${idx}`"
@@ -209,8 +206,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div
                 v-else
-                class="message-content markdown-body p-2 overflow-x-auto"
-                style="background-color: var(--color-code-bg)"
+                class="message-content markdown-body p-2 overflow-x-auto bg-code-bg"
                 v-html="renderMarkdown(msg.content)"
               />
             </div>

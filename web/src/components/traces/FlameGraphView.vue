@@ -424,18 +424,18 @@ const chartOptions = computed(() => {
             <div style="font-weight: bold; margin-bottom: 6px;">${escapeHtml(span.operationName)}</div>
             <div style="font-size: 11px; line-height: 1.6;">
               <div style="display: flex; justify-content: space-between; gap: 16px;">
-                <span style="color: #cbd5e1;">Service:</span>
+                <span style="color: var(--color-flame-tooltip-label);">Service:</span>
                 <span>${escapeHtml(span.serviceName)}</span>
               </div>
               <div style="display: flex; justify-content: space-between; gap: 16px;">
-                <span style="color: #cbd5e1;">Duration:</span>
+                <span style="color: var(--color-flame-tooltip-label);">Duration:</span>
                 <span>${formatDuration(span.durationMs)}</span>
               </div>
               <div style="display: flex; justify-content: space-between; gap: 16px;">
-                <span style="color: #cbd5e1;">% of trace:</span>
+                <span style="color: var(--color-flame-tooltip-label);">% of trace:</span>
                 <span>${percentage}%</span>
               </div>
-              ${span.hasError ? '<div style="color: #f87171; margin-top: 4px;">⚠ Has errors</div>' : ""}
+              ${span.hasError ? '<div style="color: var(--color-flame-tooltip-error); margin-top: 4px;">⚠ Has errors</div>' : ""}
             </div>
           </div>
         `;

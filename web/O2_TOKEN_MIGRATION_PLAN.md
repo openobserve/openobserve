@@ -1,5 +1,12 @@
 # O2 Design-Token Consolidation — Plan & Consistency Audit
 
+> ⚠️ **CURRENCY NOTICE (2026-07-18).** The **counts** in Part II's snapshot (2026-07-15) are
+> stale — the phases have since been executed far past them (see `O2_TOKEN_SYSTEM_AUDIT.md` §9
+> for the live re-measurement and `DESIGN_TOKEN_STANDARD.md` for the canonical standard +
+> execution status). Keep using this document for **policy** (§4 consumption ladder, §7 mapping
+> tables); do **not** trust its numbers. The companion residue list
+> `O2_TOKEN_MIGRATION_PENDING.md` was deleted — its items were completed or superseded.
+
 > **Part I** (below, condensed): the original `--o2-*` removal plan — **SHIPPED**. `grep -r 'var(--o2-' src` = 0, definitions = 0, theme.ts emits only `--color-*`, stylelint + `check-css-tokens.mjs` guards are live.
 >
 > **Part II** (the bulk of this document): full design-consistency audit of `web/src` (2026-07-15) — every remaining way components bypass the token system, with counts, concrete evidence, root causes, and a phased remediation plan. **The `--o2-*` problem is gone; the "raw colors everywhere" problem is not.** Changing a semantic token today (e.g. secondary text color, default radius) does NOT propagate to most of the app, because ~3,000+ call sites hardcode palette classes, hex values, or hand-rolled dark-mode ternaries.

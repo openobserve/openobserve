@@ -392,6 +392,11 @@
      is the readable label colour (flips lighter in dark, see dark.css). */
   --color-tool-thread-accent:        #4caf50;
   --color-tool-thread-accent-text:   #2f7a31;
+  /* Flame-graph tooltip (traces) — the tooltip is a FIXED dark glass
+     (rgba(30,41,59,.95), white text) in both themes, so its label/error colours
+     are deliberately theme-independent, like the brand replicas. */
+  --color-flame-tooltip-label: #cbd5e1;
+  --color-flame-tooltip-error: #f87171;
   /* Global scrollbar treatment (consumed by styles/base-elements.css). Semantic
      names for what were raw palette refs; values are unchanged. Dark steps in dark.css. */
   --color-scrollbar-thumb:       var(--color-grey-300);

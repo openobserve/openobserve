@@ -100,6 +100,40 @@ gone; `--color-primary-950` now JS-generated under a custom theme).
   and unaffected by Phase G; converting them to `chartColor()` changes rendered chart palettes and
   needs a human visual pass per chart, not a codemod.
 
+**✅ Final pass — every remaining AUDIT §11 item closed (2026-07-18):**
+- **Item 3 (stale docs)** — deleted `O2_TOKEN_MIGRATION_PENDING.md` (its residue items were
+  completed or superseded — verified against the live tree); prepended a currency notice to
+  `O2_TOKEN_MIGRATION_PLAN.md` (policy sections stay authoritative, counts do not).
+- **Item 12 (brand architecture)** — **DECIDED and documented** at both source-of-truth sites
+  (`base.css` primary ramp + this doc): the runtime engine is the authority — `constants/themes.ts`
+  defines themes, `theme.ts#generatePrimaryPalette` derives the full 50–950 ramp and writes it as
+  inline styles; `base.css` holds the DEFAULT O2 theme only (applies when theme.ts clears its
+  overrides). Coherent since the Tier-0 `primary-950` fix removed the only ramp desync.
+- **Item 14 (overlay/soft mix tokens)** — verified **moot**: the ~360 rgba style-block sites the
+  audit measured no longer exist (`styleBlockHex` = 0 in the live baseline; prior style-block
+  elimination removed them). Minting the tokens now would create zero-consumer tokens (D18).
+- **Item 19 (raw-var burn-down)** — the audit's numbers were stale (91 inline sites → **34** live).
+  Converted **all 21 static template `style="…var(--color-*)…"` sites** to registered utilities
+  (DbSpanDetails, LLMContentRenderer, PrettyStackTrace, ColorPaletteDropDown, CellActions,
+  CrossLinkManager/Dialog, PatternList, CreateBrowserTestSkeleton — value-preserving 1:1 class
+  merges). The 13 remaining sites are **sanctioned**: JS-generated ECharts tooltip HTML
+  (IncidentServiceGraph — already token-based) and one dynamic severity-computed style
+  (IncidentTimeline). Tokenized the 4 `inlineHexStyle` sites (FlameGraph's fixed dark-glass
+  tooltip → `--color-flame-tooltip-label/-error`) → **inlineHexStyle now 0**. The style-block
+  var() refs that remain live exclusively in **keep()-justified blocks** (`styleKeepComment` = 0
+  unjustified) — i.e. the consumption ladder's rule-3 sanctioned residue, ratcheted monotonically
+  by `rawVarInComponent`.
+- **Item 5 (radius registration)** — superseded by this standard's A5 (measured usage: standardise
+  on `sm/md/lg/full`, retire `xs/2xl/3xl` via codemod) — done in Tier 0.4.
+- **Items 13/16 (brand dark overrides / traceColors arrays)** — closed as **decided-intentional**,
+  recorded above: the brand replicas and the flame/service-colour arrays are deliberately
+  theme-independent / behaviour-preserved; the concrete bugs the audit found in them (primary-950,
+  the lying docstring) were fixed.
+
+With that, **all 20 recommendations in AUDIT §11 are closed** — 17 implemented, 3 closed by an
+explicit recorded decision (5→superseded-by-standard, 13→intentional brand replicas,
+16→behaviour-preservation) rather than silence.
+
 Correction found during execution: `--text-3xl` (7 uses) and `--text-4xl` (3 uses) are **not**
 dead (the audit's §8.1 "0 uses" was stale) — kept.
 

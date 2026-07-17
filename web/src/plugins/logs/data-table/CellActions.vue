@@ -50,7 +50,7 @@
     <O2AIContextAddBtn
       v-if="!hideAi"
       @send-to-ai-chat="sendToAiChat(JSON.stringify(row[column.id]))"
-      :style="'border: 1px solid var(--color-white);'"
+      class="border border-solid border-white"
       :size="'6px'"
       :imageHeight="'16px'"
       :imageWidth="'16px'"

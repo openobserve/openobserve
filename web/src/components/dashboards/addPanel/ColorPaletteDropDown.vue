@@ -41,8 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </span>
             <span
-              class="flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-sm"
-              :style="{ color: 'var(--color-text-heading)' }"
+              class="flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-sm text-text-heading"
             >{{ selectedOptionLabel }}</span
             >
           </div>

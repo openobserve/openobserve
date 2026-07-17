@@ -4,8 +4,7 @@
     "arbZ": 40,
     "darkMechanism": 22,
     "unscopedStyle": 8,
-    "stylePxUnit": 90,
-    "inlineHexStyle": 4
+    "stylePxUnit": 90
   },
   "files": {
     "components/CodeQueryEditor.vue": {
@@ -147,9 +146,6 @@
     },
     "components/settings/OrgStorageEditor.vue": {
       "arbZ": 1
-    },
-    "components/traces/FlameGraphView.vue": {
-      "inlineHexStyle": 4
     },
     "enterprise/components/onlineEvals/forms/ScoreConfigDetail.vue": {
       "rawVarInComponent": 4

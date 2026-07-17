@@ -542,7 +542,15 @@
   --font-medium: 500;
   --font-semibold: 600;
   --font-bold: 700;
-  /* --- Primary palette — blue-teal #3F7994 --- */
+  /* --- Primary palette — blue-teal #3F7994 ---
+     BRAND ARCHITECTURE (decided — AUDIT §5.D / STANDARD C.4): the runtime theme
+     engine is the AUTHORITY for brand colour. `constants/themes.ts` defines the
+     selectable themes; `utils/theme.ts#generatePrimaryPalette` derives the full
+     50–950 ramp from the chosen base and writes it as inline styles on <html>,
+     which beat this stylesheet. The values below are the DEFAULT O2 theme only —
+     theme.ts removes its inline overrides when the default theme is active, so
+     these then apply. To change the brand: edit constants/themes.ts (or pick a
+     theme in the UI) — do NOT edit this ramp and expect custom themes to follow. */
   --color-primary-50:  #f5f8fa;
   --color-primary-100: #e2ebef;
   --color-primary-200: #c5d7df;

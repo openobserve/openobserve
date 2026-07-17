@@ -106,7 +106,7 @@ const metadataRows = computed(() =>
               color: var(--color-text-heading);
             "
           >
-            <span style="color: var(--color-text-secondary)"
+            <span class="text-text-secondary"
               >{{ row.label }}:</span
             >
             <span class="break-all">{{ row.value }}</span>
@@ -135,8 +135,7 @@ const metadataRows = computed(() =>
         <div
           v-else
           data-test="traces-db-span-details-no-query"
-          class="p-4 text-sm"
-          style="color: var(--color-text-secondary)"
+          class="p-4 text-sm text-text-secondary"
         >
           No query text recorded for this span.
         </div>
@@ -152,30 +151,29 @@ const metadataRows = computed(() =>
       <div class="py-2 px-3">
           <div class="grid grid-cols-2 gap-x-4 gap-y-1">
             <template v-if="span.db_response_returned_rows">
-              <div class="text-xs" style="color: var(--color-text-secondary)">
+              <div class="text-xs text-text-secondary">
                 Rows Returned
               </div>
               <div class="text-xs">{{ span.db_response_returned_rows }}</div>
             </template>
             <template v-if="span.db_operation_batch_size">
-              <div class="text-xs" style="color: var(--color-text-secondary)">
+              <div class="text-xs text-text-secondary">
                 Batch Size
               </div>
               <div class="text-xs">{{ span.db_operation_batch_size }}</div>
             </template>
             <template v-if="span.db_query_summary">
-              <div class="text-xs" style="color: var(--color-text-secondary)">
+              <div class="text-xs text-text-secondary">
                 Query Summary
               </div>
               <div class="text-xs">{{ span.db_query_summary }}</div>
             </template>
             <template v-if="span.db_response_status_code">
-              <div class="text-xs" style="color: var(--color-text-secondary)">
+              <div class="text-xs text-text-secondary">
                 Response Status
               </div>
               <div
-                class="text-xs"
-                style="color: var(--color-status-error-text)"
+                class="text-xs text-status-error-text"
               >
                 {{ span.db_response_status_code }}
               </div>
