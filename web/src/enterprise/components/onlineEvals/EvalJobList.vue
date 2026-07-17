@@ -96,11 +96,11 @@
         </template>
 
         <template #cell-stream="{ row }">
-          <span class="font-mono text-xs">{{ row.stream }}</span>
+          {{ row.stream }}
         </template>
 
         <template #cell-scorers="{ row }">
-          <span class="font-mono text-xs">{{ scorerCountText(row) }}</span>
+          <span class="tabular-nums">{{ scorerCountText(row) }}</span>
         </template>
 
         <template #cell-created="{ row }">

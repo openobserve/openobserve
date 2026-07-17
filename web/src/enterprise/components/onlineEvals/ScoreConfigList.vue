@@ -79,21 +79,21 @@
         </template>
 
         <template #cell-rangeValues="{ row }">
-          <span class="font-[ui-monospace,SFMono-Regular,Menlo,monospace] text-xs">{{ rangeOrValues(row) }}</span>
+          <span class="tabular-nums">{{ rangeOrValues(row) }}</span>
         </template>
 
         <template #cell-healthy="{ row }">
-          <span class="font-[ui-monospace,SFMono-Regular,Menlo,monospace] text-xs font-semibold">{{ healthyDisplay(row) }}</span>
+          <span class="font-semibold">{{ healthyDisplay(row) }}</span>
         </template>
 
         <template #cell-version="{ row }">
-          <span class="inline-flex items-center gap-1.5 font-[ui-monospace,SFMono-Regular,Menlo,monospace] text-xs">
+          <span class="inline-flex items-center gap-1.5 tabular-nums">
             <span class="w-1.5 h-1.5 rounded-full bg-status-positive inline-block" />v{{ row.version }}
           </span>
         </template>
 
         <template #cell-usedBy="{ row }">
-          <span class="font-[ui-monospace,SFMono-Regular,Menlo,monospace] text-xs">{{ usedByText(row) }}</span>
+          <span class="tabular-nums">{{ usedByText(row) }}</span>
         </template>
 
         <template #cell-created="{ row }">
