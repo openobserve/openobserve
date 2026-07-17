@@ -91,7 +91,10 @@
             </template>
 
             <template #expansion="{ row }">
-              <div class="app-tabs-container w-fit my-1">
+              <!-- px-4 matches the SQL/Function/More-Details blocks below so the
+                   tabs line up with the query content instead of sitting flush
+                   to the cell edge (same inset the scheduler list uses). -->
+              <div class="app-tabs-container w-fit my-1 px-4">
                 <app-tabs
                   data-test="expanded-list-tabs"
                   class="tabs-selection-container"
@@ -213,16 +216,19 @@
                   </div>
                 </div>
               </div>
-              <query-editor
-                v-show="activeTab === 'more_details'"
-                style="height: 200px"
-                :ref="`QueryEditorRef${row.trace_id + row.sql}`"
-                :editor-id="`search-query-editor${row.trace_id + row.sql}`"
-                :debounceTime="600"
-                v-model:query="moreDetailsToDisplay"
-                language="json"
-                read-only
-              />
+              <!-- px-4 keeps the More Details editor aligned with the tabs and
+                   the query blocks above. -->
+              <div v-show="activeTab === 'more_details'" class="px-4">
+                <query-editor
+                  style="height: 200px"
+                  :ref="`QueryEditorRef${row.trace_id + row.sql}`"
+                  :editor-id="`search-query-editor${row.trace_id + row.sql}`"
+                  :debounceTime="600"
+                  v-model:query="moreDetailsToDisplay"
+                  language="json"
+                  read-only
+                />
+              </div>
             </template>
 
             <template #empty>
