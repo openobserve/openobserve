@@ -116,6 +116,11 @@ const baseStubs = {
       "hasFilters",
     ],
   },
+  CheckTypePicker: {
+    template: '<div data-test="check-type-picker-stub"><slot /></div>',
+    props: ["variant", "layout", "disabledTypes", "comingSoonTypes"],
+    emits: ["select"],
+  },
   MoveAcrossFolders: {
     template: '<div data-test="synthetic-monitoring-move-dialog" />',
     props: ["type", "moduleId", "activeFolderId", "open"],
@@ -139,6 +144,7 @@ const baseStubs = {
       "open",
       "size",
       "title",
+      "subTitle",
       "primaryButtonLabel",
       "secondaryButtonLabel",
       "primaryButtonDisabled",
@@ -197,11 +203,11 @@ describe("SyntheticMonitoring", () => {
   });
 
   describe("initial render", () => {
-    it("should render the page shell with the new check dropdown", () => {
+    it("should render the page shell with the new check button", () => {
       wrapper = mountPage();
       expect(wrapper.exists()).toBe(true);
       expect(
-        wrapper.find('[data-test="synthetic-monitoring-new-check-dropdown"]').exists(),
+        wrapper.find('[data-test="synthetic-monitoring-new-check-btn"]').exists(),
       ).toBe(true);
     });
 

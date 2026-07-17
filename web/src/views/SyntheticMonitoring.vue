@@ -9,23 +9,14 @@
       icon="radar"
     >
       <template #actions>
-        <ODropdown align="end">
-          <template #trigger>
-            <OButton size="sm" variant="primary" data-test="synthetic-monitoring-new-check-dropdown">
-              {{ t('synthetics.newCheck.button') }}
-              <template #icon-right><OIcon name="keyboard-arrow-down" size="xs" /></template>
-            </OButton>
-          </template>
-          <ODropdownItem
-            v-for="ct in SYNTHETIC_CHECK_TYPES"
-            :key="ct"
-            :icon-left="checkTypeIcons[ct]"
-            :data-test="`synthetic-monitoring-new-check-${ct}`"
-            @select="openCreate(ct)"
-          >
-            {{ t(`synthetics.newCheck.${ct}`) }}
-          </ODropdownItem>
-        </ODropdown>
+        <OButton
+          size="sm"
+          variant="primary"
+          data-test="synthetic-monitoring-new-check-btn"
+          @click="showTypePicker = true"
+        >
+          {{ t('synthetics.newCheck.button') }}
+        </OButton>
       </template>
     </AppPageHeader>
 
@@ -194,6 +185,29 @@
       @updated="onMoveUpdated"
       @update:open="showMoveDialog = $event"
     />
+
+    <!-- Check type picker modal -->
+    <ODialog
+      v-model:open="showTypePicker"
+      :title="t('synthetics.newCheck.modalTitle')"
+      size="sm"
+      data-test="synthetic-monitoring-check-type-picker-dialog"
+    >
+      <div class="flex flex-col gap-4">
+        <div class="flex items-center gap-1.5 pl-3">
+          <OIcon name="folder-outline" size="sm" class="text-text-secondary" />
+          <OText variant="meta">
+            {{ t('synthetics.newCheck.willBeCreatedIn') }} <strong>{{ activeFolderName }}</strong> {{ t('synthetics.newCheck.folder') }}
+          </OText>
+        </div>
+        <CheckTypePicker
+          variant="modal"
+          layout="row"
+          data-test="synthetic-monitoring-check-type-picker-modal"
+          @select="onTypeSelected"
+        />
+      </div>
+    </ODialog>
   </div>
 </template>
 
@@ -209,14 +223,13 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
-import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
-import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+import OText from "@/lib/core/Typography/OText.vue";
 import MonitorTable from "@/components/synthetic-monitoring/MonitorTable.vue";
+import CheckTypePicker from "@/components/synthetics/CheckTypePicker.vue";
 import FolderList from "@/components/common/sidebar/FolderList.vue";
 import MoveAcrossFolders from "@/components/common/sidebar/MoveAcrossFolders.vue";
 import { mapResponseToBrowserCheck, buildCreateBrowserTestPayload } from '@/utils/synthetics/buildPayload'
 import { SYNTHETIC_CHECK_TYPES, type SyntheticCheckType } from '@/types/synthetics'
-import type { IconName } from '@/lib/core/Icon/OIcon.icons'
 import { useI18n } from 'vue-i18n'
 import syntheticsService from '@/services/synthetics'
 import { getFoldersListByType } from '@/utils/commons'
@@ -227,14 +240,6 @@ const router  = useRouter();
 const route   = useRoute();
 const store   = useStore();
 const { t }   = useI18n();
-
-const checkTypeIcons: Record<SyntheticCheckType, IconName> = {
-  browser: 'open-in-browser',
-  http: 'network-check',
-  tcp: 'bolt',
-  tls: 'shield',
-  ssh: 'keyboard',
-}
 
 // ── API types ──────────────────────────────────────────────────────────
 interface ApiMonitorFrequency {
@@ -386,6 +391,7 @@ const statusFilter   = ref("all");
 const typeFilter     = ref("all");
 const locationFilter = ref("all");
 const search         = ref("");
+const showTypePicker = ref(false);
 
 // ── Folder state ───────────────────────────────────────────────────────
 const activeFolderId      = ref<string>((route.query.folder as string) ?? 'default')
@@ -394,6 +400,12 @@ const searchAcrossFolders = ref(false)
 const updateActiveFolderId = (folderId: string) => {
   activeFolderId.value = folderId
 }
+
+const activeFolderName = computed(() => {
+  const folders: any[] = (store.state as any).organizationData?.foldersByType?.synthetics ?? []
+  const folder = folders.find((f: any) => f.folderId === activeFolderId.value)
+  return folder?.name ?? 'Default'
+})
 
 watch(activeFolderId, async (newFolderId) => {
   selectedMonitorIds.value = []
@@ -638,12 +650,22 @@ async function bulkTriggerMonitors() {
 }
 
 const onEmptyAction = (actionId: string) => {
-  if (actionId === 'create') openCreate()
-  else if (actionId === 'clear-filters') clearFilters()
+  if (actionId === 'clear-filters') clearFilters()
+  else {
+    // preset action IDs are "create-{type}" (e.g. "create-browser", "create-http")
+    const type = actionId.startsWith('create-') ? actionId.replace('create-', '') as SyntheticCheckType : 'browser'
+    openCreate(type)
+  }
 }
 
 const openCreate = (type: SyntheticCheckType = 'browser') =>
   router.push({ name: 'synthetic-new', query: { folder: activeFolderId.value, type } })
+
+const onTypeSelected = (type: SyntheticCheckType) => {
+  showTypePicker.value = false
+  openCreate(type)
+}
+
 const openEdit = (m: any) => {
   router.push({
     name: 'synthetic-new',

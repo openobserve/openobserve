@@ -432,9 +432,9 @@ describe("MonitorTable", () => {
     it("should emit empty-action when OEmptyState action is triggered", async () => {
       wrapper = mountMonitorTable({ data: [] });
       const emptyState = wrapper.findComponent({ name: "OEmptyStateStub" });
-      await emptyState.vm.$emit("action", "create-monitor");
+      await emptyState.vm.$emit("action", "create-browser");
       expect(wrapper.emitted("empty-action")).toHaveLength(1);
-      expect(wrapper.emitted("empty-action")![0]).toEqual(["create-monitor"]);
+      expect(wrapper.emitted("empty-action")![0]).toEqual(["create-browser"]);
     });
 
     // ── hasFilters prop ───────────────────────────────────────────

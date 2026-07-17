@@ -247,9 +247,10 @@
     <!-- Empty state -->
     <template #empty>
       <OEmptyState
-        size="hero"
+        size="block"
         preset="no-synthetic-monitors"
-        :filtered="hasFilters"
+        :filtered="props.hasFilters"
+        columns
         :description="t('synthetics.table.noResults')"
         :data-test="`${dataTest}-empty-state`"
         @action="(id: string) => emit('empty-action', id)"
