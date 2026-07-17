@@ -32,9 +32,12 @@ vi.mock("@/aws-exports", () => {
   };
 });
 
-// Mock routeGuard
+// Mock routeGuard and local storage helpers
 vi.mock("@/utils/zincutils", () => ({
   routeGuard: vi.fn((to, from, next) => next()),
+  useLocalOrganization: vi.fn(() => null),
+  useLocalCurrentUser: vi.fn(() => null),
+  useLocalTimezone: vi.fn(() => "UTC"),
 }));
 
 // Mock all component imports
@@ -383,10 +386,10 @@ describe("useEnterpriseRoutes.ts", () => {
       expect(iamRoute.children.length).toBe(10);
     });
 
-    // Test 34: Should have 5 routes in cloud configuration (iam + 2 incident routes + actions + workflows)
-    it("should have 5 routes in cloud configuration", () => {
+    // Test 34: Should have 9 routes in cloud configuration (iam + synthetic + 3 synthetic sub-routes + 2 incident routes + actions + workflows)
+    it("should have 8 routes in cloud configuration", () => {
       const routes = useEnterpriseRoutes();
-      expect(routes.length).toBe(5);
+      expect(routes.length).toBe(9);
     });
   });
 
@@ -413,10 +416,10 @@ describe("useEnterpriseRoutes.ts", () => {
       expect(iamRoute.children.length).toBe(9);
     });
 
-    // Test 37: Should have enterprise routes structure (iam + 2 incident routes + actions + workflows)
+    // Test 37: Should have 9 routes in enterprise configuration
     it("should have enterprise routes structure", () => {
       const routes = useEnterpriseRoutes();
-      expect(routes.length).toBe(5);
+      expect(routes.length).toBe(9);
     });
   });
 
@@ -427,10 +430,10 @@ describe("useEnterpriseRoutes.ts", () => {
       config.default.isEnterprise = "true";
     });
 
-    // Test 38: Should add all routes when both flags are true (iam + 2 incident routes + actions + workflows)
+    // Test 38: Should add all routes when both flags are true
     it("should add all routes when both flags are true", () => {
       const routes = useEnterpriseRoutes();
-      expect(routes.length).toBe(5);
+      expect(routes.length).toBe(9);
     });
 
     // Test 39: Should have all IAM children when both flags are true

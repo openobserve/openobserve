@@ -187,9 +187,9 @@ describe("PipelineView.vue", () => {
       expect(wrapper.classes()).toContain("pipeline-view-tooltip");
     });
 
-    it("has container as root class", () => {
+    it("has o2-scroll-container as root class", () => {
       wrapper = createWrapper();
-      expect(wrapper.classes()).toContain("container");
+      expect(wrapper.classes()).toContain("o2-scroll-container");
     });
 
     it("renders the VueFlow component stub", () => {
@@ -495,10 +495,10 @@ describe("PipelineView.vue", () => {
   // -----------------------------------------------------------------------
 
   describe("CSS and styling", () => {
-    it("root element has pipeline-view-tooltip and container classes", () => {
+    it("root element has pipeline-view-tooltip and o2-scroll-container classes", () => {
       wrapper = createWrapper();
       expect(wrapper.classes()).toContain("pipeline-view-tooltip");
-      expect(wrapper.classes()).toContain("container");
+      expect(wrapper.classes()).toContain("o2-scroll-container");
     });
   });
 

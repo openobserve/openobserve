@@ -993,6 +993,43 @@ pub fn service_routes() -> Router {
             .route("/{org_id}/workflows/{id}/errors/{run_id}",get(workflows::get_workflow_errors))
             .route("/{org_id}/workflows/{id}/retry",post(workflows::retry_workflow))
             .route("/{org_id}/workflows/{id}/enable",put(workflows::enable_workflow));
+
+        // Synthetics — all routes gated behind O2_SYNTHETICS_ENABLED. When off,
+        // nothing is registered and every synthetics path 404s.
+        if get_o2_config().synthetics.enabled {
+            router = router
+                // Synthetics — CRUD + locations
+                .route("/{org_id}/synthetics", get(synthetics::list_synthetics).post(synthetics::create_synthetic).delete(synthetics::delete_synthetics_bulk))
+                .route("/{org_id}/synthetics/locations", get(synthetics::list_locations).post(synthetics::create_location))
+                .route("/{org_id}/synthetics/locations/{id}", put(synthetics::update_location).delete(synthetics::delete_location))
+                .route("/{org_id}/synthetics/{id}", get(synthetics::get_synthetic).put(synthetics::update_synthetic).delete(synthetics::delete_synthetic))
+                .route("/{org_id}/synthetics/{id}/run", post(synthetics::run_synthetic_now))
+                .route("/{org_id}/synthetics/{id}/enable", put(synthetics::set_synthetic_enabled))
+                .route("/{org_id}/synthetics/{id}/artifact", get(synthetics::get_artifact))
+                .route("/{org_id}/synthetics/{id}/artifacts/presign", post(synthetics::presign_artifacts))
+                .route("/{org_id}/synthetics/{id}/runs", get(synthetics::list_runs))
+                .route("/{org_id}/synthetics/{id}/runs/{run_id}", get(synthetics::get_run_detail))
+                // Synthetics — folder move (v2 prefix to match the shared MoveAcrossFolders utility)
+                .route("/v2/{org_id}/synthetics/move", patch(synthetics::move_synthetics))
+                // Synthetics — job API (no org prefix; authenticated via o2syn_ token)
+                .route("/synthetics/jobs/resolve", post(synthetics::job_resolve))
+                .route("/synthetics/jobs/lease", post(synthetics::job_lease))
+                .route("/synthetics/jobs/ack", post(synthetics::job_ack))
+                .route(
+                    "/synthetics/jobs/artifact-urls",
+                    post(synthetics::job_artifact_urls),
+                )
+                .route("/synthetics/jobs/upload", post(synthetics::job_upload))
+                // Synthetics — agent liveness API (no org prefix; o2syn_ token)
+                .route(
+                    "/synthetics/agent/register",
+                    post(synthetics::agent_register),
+                )
+                .route(
+                    "/synthetics/agent/heartbeat",
+                    post(synthetics::agent_heartbeat),
+                );
+        }
     }
 
     #[cfg(feature = "cloud")]

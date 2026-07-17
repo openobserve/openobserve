@@ -18,6 +18,7 @@ const props = defineProps<{
   isAllSelected?: boolean;
   isIndeterminate?: boolean;
   expansionEnabled?: boolean;
+  enableRowReorder?: boolean;
   enableColumnReorder?: boolean;
   enableColumnResize?: boolean;
   isResizing?: boolean;
@@ -286,6 +287,14 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
         />
       </th>
 
+      <!-- Drag handle placeholder column -->
+      <th
+        v-if="enableRowReorder"
+        class="w-4 min-w-4 px-0 border-b border-[var(--color-table-header-border)]"
+        data-test="o2-table-th-drag"
+        aria-hidden="true"
+      />
+
       <!-- Column headers -->
       <th
         v-for="header in headerGroup.headers"
@@ -418,11 +427,6 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
       class="bg-[var(--color-table-header-bg)]"
     >
       <th
-        v-if="expansionEnabled"
-        class="w-4 min-w-4 px-0 border-b border-[var(--color-table-header-border)]"
-        data-test="o2-table-th-expand"
-      />
-      <th
         v-if="selectionMultiple"
         class="text-left border-b border-[var(--color-table-header-border)]"
         :style="{ width: TABLE_CHECKBOX_COL_WIDTH + 'px', minWidth: TABLE_CHECKBOX_COL_WIDTH + 'px', maxWidth: TABLE_CHECKBOX_COL_WIDTH + 'px', paddingLeft: TABLE_CHECKBOX_COL_PAD_LEFT + 'px' }"
@@ -435,6 +439,19 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
           @update:model-value="emit('toggle-all-rows')"
         />
       </th>
+
+      <th
+        v-if="enableRowReorder"
+        class="w-4 min-w-4 px-0 border-b border-[var(--color-table-header-border)]"
+        data-test="o2-table-th-drag"
+        aria-hidden="true"
+      />
+
+      <th
+        v-if="expansionEnabled"
+        class="w-4 min-w-4 px-0 border-b border-[var(--color-table-header-border)]"
+        data-test="o2-table-th-expand"
+      />
       <th
         v-for="header in headerGroup.headers"
         :key="header.id"

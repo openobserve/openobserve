@@ -835,7 +835,11 @@
     "pipeline": "Rohrleitungen",
     "language": "Sprache",
     "actions": "Aktionen",
-    "keyboardShortcuts": "Tastenkürzel"
+    "keyboardShortcuts": "Tastenkürzel",
+    "incidents": "Vorfälle",
+    "evals": "Evalen",
+    "aiObservability": "KI-Beobachtbarkeit",
+    "synthetic": "Synthetisch"
   },
   "rum": {
     "title": "Echte Benutzerüberwachung",
@@ -6532,6 +6536,70 @@
       "rumErrorsRefresh": "Liste aktualisieren",
       "rumSessionsRefresh": "Liste aktualisieren",
       "sourceMapsRefresh": "Liste aktualisieren"
+    }
+  },
+  "synthetics": {
+    "scheduleAlert": {
+      "title": "Zeitplan und Warnmeldungen",
+      "frequency": "Frequenz",
+      "frequencyOptions": {
+        "1min": "1 Minute",
+        "5min": "5 Minuten",
+        "15min": "15 Minuten",
+        "30min": "30 Minuten",
+        "1hour": "1 Stunde",
+        "cron": "Cron"
+      },
+      "scheduleNow": "Jetzt terminieren",
+      "scheduleLater": "Später planen",
+      "scheduleNowTooltip": "Check wird sofort mit dem aktuellen Datum und der aktuellen Zeitzone aktiv.",
+      "scheduleLaterTooltip": "Wählen Sie ein Datum und eine Uhrzeit in der Zukunft, um den Scheck zu aktivieren.",
+      "startDate": "Startdatum",
+      "startTime": "Startzeit",
+      "timezone": "Zeitzone",
+      "cronExpression": "Cron-Ausdruck",
+      "cronPlaceholder": "*/5 * * *",
+      "retries": "Wiederholungen",
+      "retriesOnFailure": "Wiederholte Versuche bei Fehlschlag",
+      "retriesOnFailureSuffix": "mal.",
+      "retryDelay": "Warte auf",
+      "retryDelaySuffix": "2 ms zwischen den Wiederholungsversuchen.",
+      "alert": "Warnung",
+      "alertedIfFails": "Wird alarmiert, wenn der Test fehlschlägt",
+      "alertedIfFailsSuffix": "mal.",
+      "destinations": "Destinationen",
+      "noDestinations": "Keine Ziele verfügbar",
+      "refreshDestinations": "Ziele aktualisieren",
+      "addNewDestination": "Neues Ziel hinzufügen",
+      "destinationRequired": "Mindestens ein Ziel ist erforderlich",
+      "cooldownPeriod": "Abklingzeit",
+      "minutes": "Minuten"
+    },
+    "locations": {
+      "title": "Standorte",
+      "locationAwsEast": "AWS · US-East-1",
+      "comingSoon": "Mehr Regionen und private Standorte — Demnächst verfügbar"
+    },
+    "results": {
+      "title": "Ergebnisse überwachen",
+      "monitors": "Monitore",
+      "editMonitor": "Monitor bearbeiten",
+      "uptime": "Betriebszeit",
+      "p95Duration": "P95 Dauer",
+      "failedRuns": "Fehlgeschlagene Ausführungen",
+      "lastRun": "Letzter Lauf",
+      "responseTime": "Reaktionszeit",
+      "responseTimeSubtitle": "Gesamtdauer der Reise",
+      "recentRuns": "Letzte Läufe",
+      "runs": "Läuft",
+      "noRuns": "Für den ausgewählten Zeitraum wurden keine Läufe gefunden.",
+      "status": "Status",
+      "started": "Gestartet",
+      "duration": "Dauer",
+      "location": "Standort",
+      "trigger": "Auslösen",
+      "passed": "Bestanden",
+      "failed": "Fehlgeschlagen"
     }
   }
 }

@@ -67,6 +67,7 @@ pub mod session;
 pub mod short_url;
 pub mod sourcemaps;
 pub mod stream;
+pub mod synthetics;
 pub mod tantivy;
 pub mod tls;
 pub mod traces;

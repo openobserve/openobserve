@@ -79,6 +79,8 @@ pub enum TriggerDataType {
     AnomalyDetectionTraining,
     #[serde(rename = "workflow")]
     Workflow,
+    #[serde(rename = "synthetics")]
+    Synthetics,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
