@@ -151,25 +151,27 @@ function sparkPoints(series: number[]): string {
 }
 </script>
 
-<style>
-/* .qcs-item selected state — pseudo-element and hover cannot be expressed inline */
+<style scoped>
+/* keep(complex-state): the selected list item's hover-override, ::before accent
+   bar, and selected→descendant name color are one cohesive state chain keyed off
+   the conditionally-applied .qcs-item--selected — utilities can't reliably
+   express the selected+hover cascade or the pseudo-element. */
 .qcs-item--selected:hover {
-  background: color-mix(in srgb, var(--color-primary-600, #3F7994) 18%, transparent);
+  background: color-mix(in srgb, var(--color-primary-600) 18%, transparent);
 }
 
 .qcs-item--selected::before {
   content: "";
   position: absolute;
   left: 0;
-  top: 8px;
-  bottom: 8px;
-  width: 3px;
-  border-radius: 0 3px 3px 0;
-  background: var(--color-primary-600, #3F7994);
+  top: 0.5rem;
+  bottom: 0.5rem;
+  width: 0.1875rem;
+  border-radius: 0 0.1875rem 0.1875rem 0;
+  background: var(--color-primary-600);
 }
 
-/* descendant selector: selected item overrides name color */
 .qcs-item--selected .qcs-item__name {
-  color: var(--color-primary-600, #3F7994);
+  color: var(--color-primary-600);
 }
 </style>

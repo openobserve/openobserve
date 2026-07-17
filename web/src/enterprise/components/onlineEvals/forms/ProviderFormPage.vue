@@ -40,7 +40,7 @@
           <div class="m-0 text-sm font-semibold text-text-primary">{{ t("onlineEvals.provider.sectionTitle") }}</div>
         </div>
 
-        <div class="provider-field-row grid grid-cols-2 gap-3.5">
+        <div class="grid grid-cols-2 max-[56.25rem]:grid-cols-1 gap-3.5">
           <div class="mb-3">
             <div class="flex items-center text-xs font-semibold text-text-primary mb-1">
               {{ t("onlineEvals.provider.nameLabel") }}
@@ -85,7 +85,7 @@
           />
         </div>
 
-        <div class="provider-field-row grid grid-cols-2 gap-3.5">
+        <div class="grid grid-cols-2 max-[56.25rem]:grid-cols-1 gap-3.5">
           <div class="mb-3">
             <div class="flex items-center text-xs font-semibold text-text-primary mb-1">
               {{ t("onlineEvals.provider.defaultModelLabel") }}
@@ -310,11 +310,3 @@ async function save(value: ProviderForm) {
   }
 }
 </script>
-
-<style>
-@media (max-width: 900px) {
-  .provider-field-row {
-    grid-template-columns: 1fr;
-  }
-}
-</style>

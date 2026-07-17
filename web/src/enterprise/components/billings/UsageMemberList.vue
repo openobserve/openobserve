@@ -195,12 +195,15 @@ export default defineComponent({
 });
 </script>
 
-<style>
-.card-container .o-tabs--vertical {
-  margin: 5px;
+<style scoped>
+/* keep(lib-override:o2-tabs): OTabs/OTab internals (.o-tabs--vertical, .o-tab,
+   .o-tabs) are child-component DOM this component can only reach through :deep();
+   the active-tab → .member-id opacity is a descendant state chain. */
+.card-container :deep(.o-tabs--vertical) {
+  margin: 0.3125rem;
 }
 
-.card-container .o-tabs--vertical .o-tab {
+.card-container :deep(.o-tabs--vertical .o-tab) {
   justify-content: flex-start;
   padding: 0.375rem 1rem 0.375rem 1.25rem;
   border-radius: 0.5rem;
@@ -208,11 +211,11 @@ export default defineComponent({
   text-transform: none;
 }
 
-.card-container .o-tabs--vertical .o-tab[data-state="active"] .member-id {
+.card-container :deep(.o-tabs--vertical .o-tab[data-state="active"] .member-id) {
   opacity: 0.85;
 }
 
-.members-tabs .o-tabs {
+.members-tabs :deep(.o-tabs) {
   height: auto !important;
   max-height: none !important;
 }

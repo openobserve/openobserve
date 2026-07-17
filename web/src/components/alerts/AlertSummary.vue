@@ -134,16 +134,15 @@ onMounted(async () => {
 });
 </script>
 
-<style>
-/* Styles for bold section labels (v-html content with markdown **text**) */
-.summary-text strong {
+<style scoped>
+/* keep(generated-content): styles v-html output from alertSummaryGenerator (no scope id) */
+.summary-text :deep(strong) {
   display: inline;
   font-weight: 700;
   font-size: 0.875rem;
 }
 
-/* Styles for clickable spans (v-html content) */
-.summary-text .summary-clickable {
+.summary-text :deep(.summary-clickable) {
   cursor: pointer;
   color: var(--color-theme-accent);
   font-weight: 600;
@@ -164,7 +163,7 @@ onMounted(async () => {
   white-space: nowrap;
 }
 
-.summary-text .summary-clickable:hover {
+.summary-text :deep(.summary-clickable:hover) {
   background: linear-gradient(
     135deg,
     color-mix(in srgb, var(--color-theme-accent) 15%, transparent),
@@ -176,16 +175,15 @@ onMounted(async () => {
     0 0.125rem 0.5rem color-mix(in srgb, var(--color-theme-accent) 15%, transparent);
 }
 
-.summary-text .summary-clickable:active {
+.summary-text :deep(.summary-clickable:active) {
   transform: translateY(0) scale(0.98);
   background: color-mix(in srgb, var(--color-theme-accent) 18%, transparent);
   box-shadow:
     0 0 0 0.0625rem color-mix(in srgb, var(--color-theme-accent) 30%, transparent),
-    inset 0 0.0625rem 0.125rem rgba(0, 0, 0, 0.1);
+    inset 0 0.0625rem 0.125rem color-mix(in srgb, var(--color-black) 10%, transparent);
 }
 
-/* Styles for plain English section */
-.summary-text .plain-english-section {
+.summary-text :deep(.plain-english-section) {
   padding: 0.75rem 1rem;
   border-radius: 0.375rem;
   background: linear-gradient(
@@ -200,5 +198,4 @@ onMounted(async () => {
   opacity: 0.95;
   font-weight: 500;
 }
-
 </style>

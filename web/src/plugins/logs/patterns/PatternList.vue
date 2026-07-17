@@ -283,7 +283,9 @@ const jumpTargetSublabel = computed(() => {
 });
 </script>
 
-<style>
+<style scoped>
+/* keep(keyframes): skeleton-loader shimmer + row-in @keyframes and the
+   prefers-reduced-motion opt-out cannot be expressed as Tailwind utilities. */
 /* ── Pattern list loading skeleton ────────────────────────────────────────
    Matches the shimmer style used by the logs table (TenstackTable.vue)
    but at the slightly lighter grey-100 / grey-600 palette for visual parity. */
@@ -296,7 +298,7 @@ const jumpTargetSublabel = computed(() => {
   background: linear-gradient(
     90deg,
     var(--color-grey-100) 0%,
-    rgba(255, 255, 255, 0.65) 50%,
+    color-mix(in srgb, var(--color-white) 65%, transparent) 50%,
     var(--color-grey-100) 100%
   );
   background-size: 200% 100%;
@@ -307,7 +309,7 @@ const jumpTargetSublabel = computed(() => {
   background: linear-gradient(
     90deg,
     var(--color-grey-600) 0%,
-    rgba(255, 255, 255, 0.03) 50%,
+    color-mix(in srgb, var(--color-white) 3%, transparent) 50%,
     var(--color-grey-600) 100%
   );
 }

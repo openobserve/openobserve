@@ -66,8 +66,11 @@ function handleInputUpdate() {
 }
 </script>
 
-<style>
-.job-filter__group  .el-border {
+<style scoped>
+/* keep(lib-override:alerts-filter-group): .el-border / .group-container are
+   FilterGroup's internal DOM, reachable only through :deep(); the width/margin
+   overrides fit the shared builder into this narrow column. */
+.job-filter__group :deep(.el-border) {
   width: 100%;
   max-width: 100%;
   margin-left: 0 !important;
@@ -77,11 +80,11 @@ function handleInputUpdate() {
 /* Only the root group sits flush under the label. Nested groups keep their
    top margin so the upward-shifted AND/OR toggle isn't clipped by the
    parent .group-container (overflow-x-auto also clips vertically). */
-.job-filter__group > .el-border {
+.job-filter__group > :deep(.el-border) {
   margin-top: 0 !important;
 }
 
-.job-filter__group .group-container {
+.job-filter__group :deep(.group-container) {
   width: 100%;
 }
 </style>

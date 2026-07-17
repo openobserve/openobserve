@@ -62,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         v-for="(item, i) in displayValues.slice(0, 10)"
         :key="i"
-        class="wcp__row px-3 pt-[0.375rem] pb-1"
+        class="wcp__row px-3 pt-[0.375rem] pb-1 not-first:pt-2"
         :data-test="`wildcard-value-row-${i}`"
       >
         <!-- Value name + count -->
@@ -212,12 +212,10 @@ watch(
 </script>
 
 <style>
-/* ── Animation ── */
+/* keep(keyframes): wcpIn / wcpInUp are referenced by name from template
+   arbitrary utilities ([animation:wcpIn_...] / [animation-name:wcpInUp]), so
+   this block must stay unscoped — scoping would hash the @keyframes names and
+   break those template references. */
 @keyframes wcpIn    { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
 @keyframes wcpInUp  { from { opacity: 0; transform: translateY(4px);  } to { opacity: 1; transform: none; } }
-
-/* ── Sibling spacing ── */
-.wcp__row + .wcp__row {
-  padding-top: 0.5rem;
-}
 </style>

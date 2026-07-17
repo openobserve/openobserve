@@ -1296,15 +1296,3 @@ async function performBulkJobsDelete() {
   }
 }
 </script>
-
-<!-- Non-scoped @media-only rule: responsive override for the form side rail
-     (.eval-form-page__side is used by ScorerTestPanel). Kept as a plain style
-     block per the "don't convert @media to " rule. -->
-<style>
-@media (max-width: 960px) {
-  .eval-form-page__side {
-    border-left: 0;
-    border-top: 1px solid var(--color-border-default);
-  }
-}
-</style>

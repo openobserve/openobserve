@@ -412,8 +412,8 @@ onMounted(async () => {
 });
 </script>
 
-<style>
-/* Applied via JS to the target group item */
+<style scoped>
+/* keep(keyframes): @keyframes can't be expressed as a utility; applied via JS classList */
 .group-highlight {
   animation: group-border-blink 0.4s ease-in-out 3;
 }
@@ -421,11 +421,11 @@ onMounted(async () => {
 @keyframes group-border-blink {
   0%,
   100% {
-    outline: 2px solid transparent;
+    outline: 0.125rem solid transparent;
   }
   50% {
-    outline: 2px solid var(--color-theme-accent);
-    border-radius: 4px;
+    outline: 0.125rem solid var(--color-theme-accent);
+    border-radius: 0.25rem;
   }
 }
 </style>

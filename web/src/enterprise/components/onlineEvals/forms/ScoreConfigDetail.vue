@@ -47,27 +47,27 @@
 
           <section class="flex flex-col gap-2">
             <h4 class="scd-section__title m-0 font-semibold text-compact leading-normal text-text-primary pb-1.5 border-b border-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] inline-flex items-center gap-1.5">{{ t("onlineEvals.scoreConfig.detail.configurationSection") }}</h4>
-            <dl class="scd-kv grid gap-x-3.5 gap-y-1.5 m-0" style="grid-template-columns: 120px 1fr;">
-              <dt>{{ t("onlineEvals.scoreConfig.detail.dataTypeLabel") }}</dt>
-              <dd>
+            <dl class="grid grid-cols-[7.5rem_1fr] gap-x-3.5 gap-y-1.5 m-0">
+              <dt class="text-xs font-semibold text-text-secondary">{{ t("onlineEvals.scoreConfig.detail.dataTypeLabel") }}</dt>
+              <dd class="m-0 text-compact text-text-primary">
                 <OTag type="evalDataType" :value="dataType" />
               </dd>
 
               <template v-if="dataType === 'numeric' && numericRange">
-                <dt>{{ t("onlineEvals.scoreConfig.detail.rangeLabel") }}</dt>
-                <dd class="font-[ui-monospace,SFMono-Regular,Menlo,monospace] [font-variant-numeric:tabular-nums]">{{ numericRange.min }} – {{ numericRange.max }}</dd>
+                <dt class="text-xs font-semibold text-text-secondary">{{ t("onlineEvals.scoreConfig.detail.rangeLabel") }}</dt>
+                <dd class="m-0 text-compact text-text-primary font-[ui-monospace,SFMono-Regular,Menlo,monospace] [font-variant-numeric:tabular-nums]">{{ numericRange.min }} – {{ numericRange.max }}</dd>
               </template>
 
               <template v-if="dataType === 'categorical' && categories.length">
-                <dt>{{ t("onlineEvals.scoreConfig.detail.categoriesLabel") }}</dt>
-                <dd>
+                <dt class="text-xs font-semibold text-text-secondary">{{ t("onlineEvals.scoreConfig.detail.categoriesLabel") }}</dt>
+                <dd class="m-0 text-compact text-text-primary">
                   <OTag v-for="cat in categories" :key="cat" type="fieldTag" value="soft">{{ cat }}</OTag>
                 </dd>
               </template>
 
               <template v-if="dataType === 'boolean'">
-                <dt>{{ t("onlineEvals.scoreConfig.detail.valuesLabel") }}</dt>
-                <dd class="font-[ui-monospace,SFMono-Regular,Menlo,monospace] [font-variant-numeric:tabular-nums]">true / false</dd>
+                <dt class="text-xs font-semibold text-text-secondary">{{ t("onlineEvals.scoreConfig.detail.valuesLabel") }}</dt>
+                <dd class="m-0 text-compact text-text-primary font-[ui-monospace,SFMono-Regular,Menlo,monospace] [font-variant-numeric:tabular-nums]">true / false</dd>
               </template>
             </dl>
           </section>
@@ -92,21 +92,21 @@
 
           <section class="flex flex-col gap-2">
             <h4 class="scd-section__title m-0 font-semibold text-compact leading-normal text-text-primary pb-1.5 border-b border-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] inline-flex items-center gap-1.5">{{ t("onlineEvals.scoreConfig.detail.metadataSection") }}</h4>
-            <dl class="scd-kv grid gap-x-3.5 gap-y-1.5 m-0" style="grid-template-columns: 120px 1fr;">
-              <dt>{{ t("onlineEvals.scoreConfig.detail.statusLabel") }}</dt>
-              <dd>
+            <dl class="grid grid-cols-[7.5rem_1fr] gap-x-3.5 gap-y-1.5 m-0">
+              <dt class="text-xs font-semibold text-text-secondary">{{ t("onlineEvals.scoreConfig.detail.statusLabel") }}</dt>
+              <dd class="m-0 text-compact text-text-primary">
                 <OTag type="booleanState" :value="isActive ? 'enabled' : 'disabled'">
                   {{ isActive
                     ? t("onlineEvals.scoreConfig.detail.statusActive")
                     : t("onlineEvals.scoreConfig.detail.statusInactive") }}
                 </OTag>
               </dd>
-              <dt>{{ t("onlineEvals.scoreConfig.detail.versionLabel") }}</dt>
-              <dd class="font-[ui-monospace,SFMono-Regular,Menlo,monospace] [font-variant-numeric:tabular-nums]">v{{ row.version }}</dd>
-              <dt v-if="createdAt">{{ t("onlineEvals.scoreConfig.detail.createdLabel") }}</dt>
-              <dd v-if="createdAt" class="font-[ui-monospace,SFMono-Regular,Menlo,monospace] [font-variant-numeric:tabular-nums]">{{ formatTimestamp(createdAt) }}</dd>
-              <dt v-if="updatedAt">{{ t("onlineEvals.scoreConfig.detail.updatedLabel") }}</dt>
-              <dd v-if="updatedAt" class="font-[ui-monospace,SFMono-Regular,Menlo,monospace] [font-variant-numeric:tabular-nums]">{{ formatTimestamp(updatedAt) }}</dd>
+              <dt class="text-xs font-semibold text-text-secondary">{{ t("onlineEvals.scoreConfig.detail.versionLabel") }}</dt>
+              <dd class="m-0 text-compact text-text-primary font-[ui-monospace,SFMono-Regular,Menlo,monospace] [font-variant-numeric:tabular-nums]">v{{ row.version }}</dd>
+              <dt v-if="createdAt" class="text-xs font-semibold text-text-secondary">{{ t("onlineEvals.scoreConfig.detail.createdLabel") }}</dt>
+              <dd v-if="createdAt" class="m-0 text-compact text-text-primary font-[ui-monospace,SFMono-Regular,Menlo,monospace] [font-variant-numeric:tabular-nums]">{{ formatTimestamp(createdAt) }}</dd>
+              <dt v-if="updatedAt" class="text-xs font-semibold text-text-secondary">{{ t("onlineEvals.scoreConfig.detail.updatedLabel") }}</dt>
+              <dd v-if="updatedAt" class="m-0 text-compact text-text-primary font-[ui-monospace,SFMono-Regular,Menlo,monospace] [font-variant-numeric:tabular-nums]">{{ formatTimestamp(updatedAt) }}</dd>
             </dl>
           </section>
         </template>
@@ -312,22 +312,11 @@ function formatTimestamp(microsOrMs: number): string {
 }
 </script>
 
-<style>
-/* scd-kv dt/dd — descendant selectors, cannot inline */
-.scd-kv dt {
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: var(--color-text-secondary, var(--color-text-secondary));
-}
-
-.scd-kv dd {
-  margin: 0;
-  font-size: 0.8125rem;
-  color: var(--color-text-primary, currentColor);
-}
-
-/* OButton internals — child selector targeting component internals */
-.scd-used-card button {
+<style scoped>
+/* keep(complex-state): the "used by" card hover overrides OButton's border/bg and
+   reveals its chevron; the height/padding reset targets the native <button>
+   rendered inside OButton, reachable only via :deep(). */
+.scd-used-card :deep(button) {
   height: auto !important;
   padding: 0.75rem 0.875rem !important;
   gap: 0.625rem;
@@ -336,17 +325,12 @@ function formatTimestamp(microsOrMs: number): string {
 }
 
 .scd-used-card:hover {
-  border-color: color-mix(in srgb, var(--color-primary-600, #3F7994) 35%, transparent) !important;
-  background: color-mix(in srgb, var(--color-primary-600, #3F7994) 4%, var(--color-card-bg)) !important;
-}
-
-.scd-used-card__type--remote {
-  background: color-mix(in srgb, #b25400 14%, transparent);
-  color: #b25400;
+  border-color: color-mix(in srgb, var(--color-primary-600) 35%, transparent) !important;
+  background: color-mix(in srgb, var(--color-primary-600) 4%, var(--color-card-bg)) !important;
 }
 
 .scd-used-card:hover .scd-used-card__chevron {
-  color: var(--color-primary-600, #3F7994);
+  color: var(--color-primary-600);
   opacity: 1;
 }
 </style>

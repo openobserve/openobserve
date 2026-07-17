@@ -620,51 +620,52 @@ export default defineComponent({
 });
 </script>
 
-<style>
-
-.index-menu .index-table table {
+<style scoped>
+/* keep(lib-override:GroupedFieldList): fixed table-layout + block rows on the child
+   OTable's <table>, and field-row label/overlay/container overrides on the child
+   FieldRow DOM — reached through child components, so not expressible as utilities. */
+.index-menu .index-table :deep(table) {
   display: table;
   table-layout: fixed !important;
 }
 
-.index-menu .index-table thead {
+.index-menu .index-table :deep(thead) {
   display: none;
 }
 
-.index-menu .index-table tr {
+.index-menu .index-table :deep(tr) {
   margin-bottom: 1px;
 }
 
-.index-menu .index-table tbody,
-.index-menu .index-table tr,
-.index-menu .index-table td {
+.index-menu .index-table :deep(tbody),
+.index-menu .index-table :deep(tr),
+.index-menu .index-table :deep(td) {
   width: 100%;
   display: block;
   height: fit-content;
   overflow: hidden;
 }
 
-
-.index-menu .index-table thead tr,
-.index-menu .index-table tbody td {
+.index-menu .index-table :deep(thead tr),
+.index-menu .index-table :deep(tbody td) {
   height: auto;
 }
 
-.index-menu .field_list {
-  padding: 0px;
+.index-menu :deep(.field_list) {
+  padding: 0;
   margin-bottom: 0.125rem;
   position: relative;
   overflow: visible;
   cursor: default;
 }
 
-.index-menu .field_list.field-group-header {
+.index-menu :deep(.field_list.field-group-header) {
   font-weight: 600;
   font-size: 0.75rem;
   padding: 0.25rem 0.325rem;
 }
 
-.index-menu .field_list .field_label {
+.index-menu :deep(.field_list .field_label) {
   pointer-events: none;
   font-size: 0.825rem;
   position: relative;
@@ -673,42 +674,36 @@ export default defineComponent({
   left: 0;
 }
 
-.index-menu .field_list .field-container {
-  height: 25px;
+.index-menu :deep(.field_list .field-container) {
+  height: 1.5625rem;
 }
 
-.index-menu .field_list .field_overlay {
+.index-menu :deep(.field_list .field_overlay) {
   position: absolute;
   height: 100%;
   right: 0;
   top: 0;
   z-index: 5;
-  padding: 0 6px;
+  padding: 0 0.375rem;
   visibility: hidden;
   display: flex;
   align-items: center;
 }
 
-.index-menu .field_list.selected .field_overlay {
+.index-menu :deep(.field_list.selected .field_overlay) {
   background-color: var(--color-interactive-hover-bg);
 }
 
-.index-menu .field_list.selected .field_overlay .field_icons {
-  opacity: 0;
-}
-
-
-.index-table table {
+.index-table :deep(table) {
   width: 100%;
   table-layout: fixed;
 }
 
-
-.index-table table .field-container:hover .field_overlay {
+.index-table :deep(table .field-container:hover .field_overlay) {
   visibility: visible;
 }
 
-.index-table table .field_list.selected {
+.index-table :deep(table .field_list.selected) {
   background-color: var(--color-interactive-hover-bg);
 }
 </style>

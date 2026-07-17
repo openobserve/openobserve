@@ -141,7 +141,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="relative-position h-full">
               <div
                 v-if="showDimensionSelector"
-                class="dimension-sidebar card-container h-full flex flex-col bg-white"
+                class="dimension-sidebar card-container h-full flex flex-col bg-surface-overlay"
                 data-test="dimension-selector-sidebar"
               >
                 <!-- Sidebar Header with collapse button -->
@@ -180,7 +180,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <li
                       v-for="dimension in filteredDimensions"
                       :key="dimension.value"
-                      class="dimension-list-item flex items-center gap-2 px-3 py-1 border-none!"
+                      class="dimension-list-item flex items-center gap-2 px-3 py-1 border-none! hover:bg-interactive-hover-bg"
                     >
                       <div class="flex items-center shrink-0">
                         <OCheckbox
@@ -1114,22 +1114,20 @@ watch(
 );
 </script>
 
-<style>
-/* Non-scoped: ODrawer body for this drawer does not have flex:1 by default
- * (intentional for form drawers, but the Insights drawer needs a full-height
- * splitter layout). Override the body div — 4th child of the drawer panel after
- * the two sr-only elements (h2, p) and the header div.
- * Also adds the top gap (matching --spacing-dialog-content-py = 0.75rem)
- * that ODialog provides by default but ODrawer omits.
- */
-[data-test="traces-analysis-dashboard-drawer"] > div:nth-child(4) {
+<style scoped>
+/* keep(lib-override:o-drawer): ODrawer renders its own panel; the Insights drawer
+ * needs the body cell (4th child — after the two sr-only nodes h2/p and the header
+ * div) to flex to full height for the splitter layout, reachable only via :deep. */
+[data-test="traces-analysis-dashboard-drawer"] > :deep(div:nth-child(4)) {
   flex: 1 1 0 !important;
   overflow: hidden !important;
   display: flex;
   flex-direction: column;
 }
 
-/* Time range chips styling - matching chart colors */
+/* keep(brand): comparison chips are tinted from the runtime --chip-color
+ * (COMPARISON_COLORS baseline/selected palette) via color-mix — a dynamic brand
+ * color Tailwind can't express; the text mix flips through --color-text-primary. */
 .time-range-chip {
   font-size: 0.7rem;
   line-height: 1.2;
@@ -1140,34 +1138,7 @@ watch(
 .time-range-chip.selected-chip {
   background: color-mix(in srgb, var(--chip-color) 20%, transparent);
   border: 1px solid color-mix(in srgb, var(--chip-color) 50%, transparent);
-  color: color-mix(in srgb, var(--chip-color) 80%, #000) !important;
+  color: color-mix(in srgb, var(--chip-color) 80%, var(--color-text-primary)) !important;
   font-weight: 500;
-}
-
-.dimension-list-item:hover {
-  background-color: var(--color-interactive-hover-bg));
-}
-
-/* Dark mode support */
-.dark .analysis-content {
-  background: #2a2a2a !important;
-}
-
-.dark .dimension-sidebar {
-  background: #202223 !important;
-}
-
-.dark .dimension-list-item {
-  border-bottom-color: rgba(255, 255, 255, 0.1);
-}
-
-.dark .dimension-list-item:hover {
-  background-color: rgba(255, 255, 255, 0.05);
-}
-
-/* Time range chips: dark mode text adjustment */
-.dark .time-range-chip.baseline-chip,
-.dark .time-range-chip.selected-chip {
-  color: color-mix(in srgb, var(--chip-color) 80%, #fff) !important;
 }
 </style>

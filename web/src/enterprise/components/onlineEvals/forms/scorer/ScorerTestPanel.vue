@@ -1,5 +1,5 @@
 <template>
-  <aside class="eval-form-page__side eval-form-page__side--test p-0">
+  <aside class="eval-form-page__side eval-form-page__side--test p-0 max-[60rem]:border-l-0 max-[60rem]:border-t max-[60rem]:border-border-default">
     <section class="eval-test-panel min-h-full p-5 bg-surface-base rounded-md shadow-[0_0_0.313rem_0.063rem_var(--color-hover-shadow)]">
       <!-- Header -->
       <div class="flex flex-col gap-1">
@@ -20,7 +20,7 @@
               })
             "
             :data-test="`scorer-test-input-${variable}`"
-            class="w-full box-border border border-border-default rounded-sm bg-surface-base text-text-primary font-normal text-xs [font-family:var(--font-sans)] leading-normal py-2 px-[9px] [resize:vertical] max-h-40 overflow-y-auto"
+            class="w-full box-border border border-border-default rounded-sm bg-surface-base text-text-primary font-normal text-xs [font-family:var(--font-sans)] leading-normal py-2 px-[9px] [resize:vertical] max-h-40 overflow-y-auto placeholder:text-text-muted focus:outline-none focus:border-primary-600"
             @input="
               updateInput(variable, ($event.target as HTMLTextAreaElement).value)
             "
@@ -205,15 +205,3 @@ const errorText = computed(
     t("onlineEvals.scorer.testPanel.errorFallback"),
 );
 </script>
-
-<style>
-/* :focus and ::placeholder cannot be expressed inline. */
-.eval-test-panel textarea::placeholder {
-  color: var(--color-text-muted);
-}
-
-.eval-test-panel textarea:focus {
-  outline: none;
-  border-color: var(--color-primary-600, #3f7994);
-}
-</style>

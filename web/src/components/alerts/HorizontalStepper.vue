@@ -16,11 +16,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="w-full py-6">
-    <div class="flex justify-between items-start relative max-w-300 mx-auto px-4 stepper-container">
+    <div class="flex justify-between items-start relative max-w-300 mx-auto px-4 stepper-container max-md:flex-col max-md:gap-4">
       <div
         v-for="(step, index) in steps"
         :key="step.id"
-        class="step-item flex flex-col items-center flex-1 relative cursor-pointer transition-all duration-300 ease-in-out"
+        class="step-item flex flex-col items-center flex-1 relative cursor-pointer transition-all duration-300 ease-in-out max-md:flex-row max-md:w-full max-md:justify-start"
         :class="{
           'step-active': currentStep === step.id,
           'step-completed': completedSteps.includes(step.id),
@@ -31,9 +31,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click="handleStepClick(step.id)"
       >
         <!-- Step indicator -->
-        <div class="step-indicator-wrapper flex items-center w-full relative">
+        <div class="step-indicator-wrapper flex items-center w-full relative max-md:flex-col max-md:w-auto">
           <div
-            class="step-indicator w-10 h-10 rounded-full flex items-center justify-center font-semibold text-base transition-all duration-300 ease-in-out relative z-[2] shrink-0 border-2"
+            class="step-indicator w-10 h-10 rounded-full flex items-center justify-center font-semibold text-base transition-all duration-300 ease-in-out relative z-2 shrink-0 border-2 max-lg:w-9 max-lg:h-9 max-lg:text-sm"
             :class="
               step.hasError
                 ? 'bg-stepper-indicator-error text-stepper-indicator-fg border-stepper-indicator-error'
@@ -61,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Connector line -->
           <div
             v-if="index < steps.length - 1"
-            class="step-connector flex-1 h-0.5 mx-2 transition-all duration-300 ease-in-out"
+            class="step-connector flex-1 h-0.5 mx-2 transition-all duration-300 ease-in-out max-md:w-0.5 max-md:h-7.5 max-md:mx-0 max-md:my-2"
             :class="
               completedSteps.includes(step.id)
                 ? 'bg-stepper-connector-done'
@@ -71,7 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Step label -->
-        <div class="step-label mt-3 text-center max-w-37.5">
+        <div class="step-label mt-3 text-center max-w-37.5 max-lg:max-w-25 max-md:mt-0 max-md:ml-4 max-md:text-left max-md:max-w-none">
           <div
             class="text-sm font-semibold mb-1"
             :class="
@@ -150,53 +150,9 @@ export default defineComponent({
 });
 </script>
 
-<style>
+<style scoped>
+/* keep(complex-state): parent :hover (excluding disabled) scales a child indicator */
 .step-item:hover:not(.step-disabled) .step-indicator {
   transform: scale(1.1);
-}
-
-/* Responsive design */
-@media (max-width: 1024px) {
-  .step-label {
-    max-width: 100px;
-  }
-
-  .step-indicator {
-    width: 36px;
-    height: 36px;
-    font-size: 14px;
-  }
-}
-
-@media (max-width: 768px) {
-  .stepper-container {
-    flex-direction: column;
-    gap: 1rem;
-  }
-
-  .step-item {
-    flex-direction: row;
-    width: 100%;
-    align-items: center;
-    justify-content: flex-start;
-  }
-
-  .step-indicator-wrapper {
-    flex-direction: column;
-    width: auto;
-  }
-
-  .step-connector {
-    width: 2px;
-    height: 30px;
-    margin: 0.5rem 0;
-  }
-
-  .step-label {
-    margin-top: 0;
-    margin-left: 1rem;
-    text-align: left;
-    max-width: none;
-  }
 }
 </style>

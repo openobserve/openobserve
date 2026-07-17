@@ -55,8 +55,13 @@
               :data-test="`sg-legend-${level.key}`"
             >
               <span
-                class="sg-health-ring"
-                :class="`sg-health-ring--${level.key}`"
+                class="w-3 h-3 rounded-full border-2 bg-transparent flex-none"
+                :class="{
+                  'border-service-health-healthy': level.key === 'healthy',
+                  'border-service-health-degraded': level.key === 'degraded',
+                  'border-service-health-warning': level.key === 'warning',
+                  'border-service-health-critical': level.key === 'critical',
+                }"
               />
               <div class="flex flex-row items-baseline gap-1">
                 <div class="text-left text-text-secondary! text-xs font-semibold">
@@ -205,12 +210,12 @@
           </div>
           <div class="flex items-center gap-1 py-0!">
             <div class="flex flex-row items-center gap-1.5">
-              <span class="sg-size-ring sg-size-ring--sm" />
+              <span class="w-4 h-4 rounded-full border-2 border-service-health-healthy bg-transparent shrink-0" />
               <span class="text-xs text-text-secondary!">{{ t("traces.serviceGraph.sizeLow") }}</span>
             </div>
             <div class="opacity-35 text-base tracking-[0.125rem] mb-0">···</div>
             <div class="flex flex-row items-center gap-1.5">
-              <span class="sg-size-ring sg-size-ring--lg" />
+              <span class="w-7 h-7 rounded-full border-2 border-service-health-healthy bg-transparent shrink-0" />
               <span class="text-xs text-text-secondary!">{{ t("traces.serviceGraph.sizeHigh") }}</span>
             </div>
           </div>
@@ -218,7 +223,7 @@
       </div>
     </div>
     <OCardSection
-      class="flex-1 min-h-0 relative overflow-hidden service-graph-container"
+      class="flex-1 min-h-0 relative overflow-hidden service-graph-container bg-surface-base!"
     >
       <!-- Graph Visualization -->
       <OCard class="rounded-lg shadow-sm h-full">
@@ -1827,51 +1832,11 @@ export default defineComponent({
 </script>
 
 <!-- Flowing edge animation — non-scoped so it reaches inside ECharts SVG output -->
-<style>
-/* Legend swatches — driven by the shared health-color design tokens so the
-   legend rings match the graph's node border colors without inline styles. */
-.sg-health-ring {
-  width: 0.75rem;
-  height: 0.75rem;
-  border-radius: 9999px;
-  border: 2px solid;
-  background: transparent;
-  flex: none;
-}
-.sg-health-ring--healthy {
-  border-color: var(--color-service-health-healthy);
-}
-.sg-health-ring--degraded {
-  border-color: var(--color-service-health-degraded);
-}
-.sg-health-ring--warning {
-  border-color: var(--color-service-health-warning);
-}
-.sg-health-ring--critical {
-  border-color: var(--color-service-health-critical);
-}
-
-/* Node-size legend rings: two sizes, both the "healthy" hue (size, not health,
-   is what this legend communicates). */
-.sg-size-ring {
-  border-radius: 9999px;
-  border: 2px solid var(--color-service-health-healthy);
-  background: transparent;
-  flex-shrink: 0;
-}
-.sg-size-ring--sm {
-  width: 1rem;
-  height: 1rem;
-}
-.sg-size-ring--lg {
-  width: 1.75rem;
-  height: 1.75rem;
-}
-
-.service-graph-container {
-  background: var(--color-surface-base) !important;
-}
-
+<style scoped>
+/* keep(lib-override:echarts): dashed edge paths are rendered inside ECharts'
+   SVG DOM (no scope id, reached via :deep), animated by a keyframe that must
+   travel with the rule. ECharts may expose stroke-dasharray as an attribute or
+   an inline style depending on version — both are covered. */
 @keyframes sg-edge-flow {
   from {
     stroke-dashoffset: 14;
@@ -1881,13 +1846,8 @@ export default defineComponent({
   }
 }
 
-/*
- * Target dashed edge paths rendered by ECharts graph series.
- * ECharts SVG mode may set stroke-dasharray as an HTML attribute OR inside
- * an inline style depending on the version — we cover both.
- */
-.graph-container svg path[stroke-dasharray],
-.graph-container svg path[style*="stroke-dasharray"] {
+.graph-container :deep(svg path[stroke-dasharray]),
+.graph-container :deep(svg path[style*="stroke-dasharray"]) {
   animation: sg-edge-flow 0.5s linear infinite;
   animation-fill-mode: both;
 }

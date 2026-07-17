@@ -16,13 +16,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="correlated-logs-table flex flex-col h-full w-full"
+    class="correlated-logs-table flex flex-col h-full w-full relative overflow-hidden"
     data-test="correlated-logs-table"
   >
     <!-- Header with Inline Filters -->
     <div
       v-if="!props.hideDimensionFilters"
-      class="correlation-controls p-0 border-b border-solid border-card-glass-border bg-card-glass-bg"
+      class="correlation-controls p-0 max-md:p-2 border-b border-solid border-card-glass-border bg-card-glass-bg"
     >
       <!-- Dimension Filters Bar with Pending/Apply Pattern -->
       <template v-if="!isLoading || hasResults">
@@ -106,7 +106,7 @@ class="mr-1" />
                   @dragstart="handleDragStart($event, index)"
                   @dragover.prevent
                   @drop="handleDrop($event, index)"
-                  :class="['column-item', { 'dragging': draggedIndex === index }]"
+                  :class="['group cursor-grab transition-colors duration-200 hover:bg-interactive-hover-bg', { 'opacity-50 cursor-grabbing!': draggedIndex === index }]"
                   :data-test="`column-item-${field}`"
                   @select="(e) => { e.preventDefault(); toggleColumnVisibility(field); }"
                 >
@@ -124,7 +124,7 @@ class="mr-1" />
                     <OIcon
                       name="drag-indicator"
                       size="xs"
-                      class="drag-handle cursor-move"
+                      class="cursor-move opacity-40 transition-opacity duration-200 group-hover:opacity-80"
                     />
                   </template>
                 </ODropdownItem>
@@ -135,7 +135,7 @@ class="mr-1" />
       </template>
 
       <!-- Show skeleton while loading -->
-      <div v-else class="flex items-center gap-3 flex-wrap p-3">
+      <div v-else class="flex items-center gap-3 flex-wrap p-3 max-md:flex-col max-md:items-start">
         <OSkeleton class="w-50 h-8" />
         <OSkeleton class="w-50 h-8" />
         <OSkeleton class="w-50 h-8" />
@@ -229,7 +229,7 @@ class="mr-1" />
           >
             <!-- Loading indicator -->
             <div
-              class="flex items-center justify-center gap-3"
+              class="flex items-center justify-center gap-3 max-md:flex-col"
             >
               <OSpinner size="sm" />
               <span class="text-sm opacity-70">
@@ -1284,30 +1284,8 @@ const unifiedChips = computed<DimensionChip[]>(() =>
 
 </script>
 
-<style lang="scss" scoped>
-.correlated-logs-table {
-  position: relative;
-  width: 100%;
-  height: 100%;
-  overflow: hidden;
-}
-
-.correlation-controls {
-  background-color: var(--color-card-glass-bg);
-  border-bottom: 1px solid var(--color-card-glass-border);
-}
-
-:root:not(.dark) {
-  background-color: var(--color-surface-base);
-  color: var(--color-text-primary);
-}
-
-.dark {
-  background-color: var(--color-surface-base);
-  color: var(--color-text-primary);
-}
-
-// Table skeleton container
+<style scoped>
+/* keep(keyframes): scoped rewrites the animation name, so @keyframes and its consumer must stay together */
 [data-test="table-skeleton"] {
   animation: fadeIn 0.3s ease-in;
 }
@@ -1321,51 +1299,8 @@ const unifiedChips = computed<DimensionChip[]>(() =>
   }
 }
 
-.column-visibility-list .column-item {
-  cursor: grab;
-  transition: background-color 0.2s ease;
-}
-
-.column-visibility-list .column-item:hover {
-  background-color: var(--color-interactive-hover-bg);
-}
-
-.column-visibility-list .column-item.dragging {
-  opacity: 0.5;
-  cursor: grabbing;
-}
-
-.column-visibility-list .column-item .drag-handle {
-  opacity: 0.4;
-  transition: opacity 0.2s ease;
-}
-
-.column-visibility-list .column-item:hover .drag-handle {
-  opacity: 0.8;
-}
-
-@media (max-width: 768px) {
-  .correlation-controls {
-    padding: 0.5rem;
-  }
-
-  .flex-wrap {
-    flex-direction: column;
-    align-items: flex-start !important;
-  }
-
-  // Adjust skeleton for mobile
-  [data-test="table-skeleton"] {
-    .flex {
-      flex-direction: column;
-    }
-  }
-}
-
-</style>
-
-<style lang="scss">
-.logs-table-container .o2-scroll-container {
+/* keep(lib-override:tenstack-table): stretch TenstackTable's internal scroll container to full height */
+.logs-table-container :deep(.o2-scroll-container) {
   height: 100% !important;
 }
 </style>

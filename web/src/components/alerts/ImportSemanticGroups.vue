@@ -576,9 +576,10 @@ const handleJsonUpdate = async (jsonArray: any[]) => {
 };
 </script>
 
-<style>
+<style scoped>
+/* keep(scrollbar): ::-webkit-scrollbar pseudo-elements aren't expressible as utilities */
 .groups-scroll-container::-webkit-scrollbar {
-  width: 8px;
+  width: 0.5rem;
 }
 
 .groups-scroll-container::-webkit-scrollbar-track {
@@ -587,15 +588,15 @@ const handleJsonUpdate = async (jsonArray: any[]) => {
 
 .groups-scroll-container::-webkit-scrollbar-thumb {
   background: var(--color-accent);
-  border-radius: 4px;
+  border-radius: 0.25rem;
 }
 
 .groups-scroll-container::-webkit-scrollbar-thumb:hover {
-  background: var(--color-accent, var(--color-accent));
+  background: var(--color-accent);
 }
 
 .field-chips-container::-webkit-scrollbar {
-  width: 6px;
+  width: 0.375rem;
 }
 
 .field-chips-container::-webkit-scrollbar-track {
@@ -604,7 +605,6 @@ const handleJsonUpdate = async (jsonArray: any[]) => {
 
 .field-chips-container::-webkit-scrollbar-thumb {
   background: var(--color-accent);
-  border-radius: 3px;
+  border-radius: 0.1875rem;
 }
-
 </style>

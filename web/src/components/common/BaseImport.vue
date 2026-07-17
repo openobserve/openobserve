@@ -102,7 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :data-test="`${testPrefix}-import-sql-editor`"
                     ref="queryEditorRef"
                     :editor-id="`${testPrefix}-import-query-editor`"
-                    class="import-editor-shell import-url-editor mx-2 flex-1 min-h-0"
+                    class="import-url-editor mx-2 flex-1 min-h-0 box-border w-[calc(100%-1rem)] border border-card-glass-border rounded-md overflow-hidden"
                     :debounceTime="300"
                     v-model:query="jsonStr"
                     language="json"
@@ -147,7 +147,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :data-test="`${testPrefix}-import-sql-editor`"
                     ref="queryEditorRef"
                     :editor-id="`${testPrefix}-import-query-editor`"
-                    class="import-editor-shell import-file-editor mx-2 flex-1 min-h-0"
+                    class="import-file-editor mx-2 flex-1 min-h-0 box-border w-[calc(100%-1rem)] border border-card-glass-border rounded-md overflow-hidden"
                     :debounceTime="300"
                     v-model:query="jsonStr"
                     language="json"
@@ -541,29 +541,12 @@ export default defineComponent({
 </script>
 
 <style>
-/*
- * Box styling (border, radius, padding, height) lives on the editor SHELL
- * wrapper — never on Monaco's internal .monaco-editor element. Monaco sizes
- * its inner .overflow-guard to the full box it measures; adding border/padding
- * directly to that element shrinks the content box and forces phantom
- * horizontal + vertical scrollbars. Styling the wrapper lets Monaco fill a
- * clean box and removes the scrollbars without any !important overrides.
- */
-.import-editor-shell {
-  box-sizing: border-box;
-  /* w-full (100%) + mx-2 (1rem total) would overflow by 1rem and add a
-     horizontal scrollbar; subtract the margins so the box stays inside and
-     keeps a right-side gap. The height comes from flex (flex-1 min-h-0) so the
-     editor grows to fill the pane instead of a brittle calc(100vh - Npx). */
-  width: calc(100% - 1rem);
-  border: 1px solid var(--color-card-glass-border);
-  border-radius: 0.375rem;
-  overflow: hidden;
-}
-
+/* keep(scrollbar): cross-file shared scroll container. .error-report-container
+   supplies overflow scrolling to BaseImport, ImportAlert.vue and
+   ImportPipeline.vue (those two carry no local overflow utility), so the rule
+   must stay an unscoped global rather than be inlined here. */
 .error-report-container {
   overflow: auto;
   resize: none;
 }
-
 </style>

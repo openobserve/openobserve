@@ -93,16 +93,15 @@ onMounted(async () => {
 });
 </script>
 
-<style>
-/* Styles for bold section labels (v-html content with markdown **text**) */
-.summary-text strong {
+<style scoped>
+/* keep(generated-content): styles v-html output from anomalySummaryGenerator (no scope id) */
+.summary-text :deep(strong) {
   display: inline;
   font-weight: 700;
   font-size: 0.875rem;
 }
 
-/* Styles for clickable spans (v-html content) */
-.summary-text .summary-clickable {
+.summary-text :deep(.summary-clickable) {
   cursor: default;
   color: var(--color-theme-accent);
   font-weight: 600;
@@ -122,8 +121,7 @@ onMounted(async () => {
   white-space: nowrap;
 }
 
-/* Styles for plain English section */
-.summary-text .plain-english-section {
+.summary-text :deep(.plain-english-section) {
   padding: 0.75rem 1rem;
   border-radius: 0.375rem;
   background: linear-gradient(

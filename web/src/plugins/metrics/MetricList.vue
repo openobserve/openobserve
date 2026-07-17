@@ -488,37 +488,34 @@ export default defineComponent({
 });
 </script>
 
-<style>
-.index-menu .metrics-label-table table {
+<style scoped>
+/* keep(lib-override:OTable): force fixed table-layout and block-level rows on
+   OTable's internal <table>, which isn't reachable via utilities. */
+.metrics-label-table :deep(table) {
+  width: 100%;
   display: table;
   table-layout: fixed !important;
 }
 
-.index-menu .metrics-label-table thead {
+.metrics-label-table :deep(thead) {
   display: none;
 }
 
-.index-menu .metrics-label-table tr {
+.metrics-label-table :deep(tr) {
   margin-bottom: 1px;
 }
 
-.index-menu .metrics-label-table tbody,
-.index-menu .metrics-label-table tr,
-.index-menu .metrics-label-table td {
+.metrics-label-table :deep(tbody),
+.metrics-label-table :deep(tr),
+.metrics-label-table :deep(td) {
   width: 100%;
   display: block;
   height: fit-content;
   overflow: hidden;
 }
 
-.index-menu .metrics-label-table thead tr,
-.index-menu .metrics-label-table tbody td {
+.metrics-label-table :deep(thead tr),
+.metrics-label-table :deep(tbody td) {
   height: auto;
 }
-
-.metrics-label-table table {
-  width: 100%;
-  table-layout: fixed;
-}
-
 </style>

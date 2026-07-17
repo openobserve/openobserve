@@ -2762,14 +2762,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style>
-@media (max-width: 1440px) {
-  .app-tabs-container .o2-tab {
-    padding-left: 0.75rem !important;
-    padding-right: 0.75rem !important;
-    min-width: auto !important;
-  }
-}
-
-</style>

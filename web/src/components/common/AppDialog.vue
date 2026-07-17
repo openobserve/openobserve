@@ -169,6 +169,10 @@ export default defineComponent({
 </script>
 
 <style>
+/* keep(complex-state): Vue <Transition name="fade"> global — the enter/leave
+   classes are applied by Vue to the teleported backdrop and share the app-wide
+   "fade" convention (also defined in CodeQueryEditor.vue / RetryJobDialog.vue).
+   Scoping would break the transition, so this stays unscoped. */
 /* Transition effects */
 .fade-enter-active,
 .fade-leave-active {

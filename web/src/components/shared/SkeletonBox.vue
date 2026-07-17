@@ -94,6 +94,9 @@ const computedHeight = computed(() => {
 </script>
 
 <style>
+/* keep(keyframes): shimmer ::after overlay + @keyframes are shared globally —
+   HomeViewSkeleton's raw .skeleton-box divs rely on this unscoped rule, so it
+   must not be scoped. */
 /* Flat base colour + sliding ::after overlay.
    The base is always solid (no moving gradient), the shimmer is a separate
    translucent gloss that physically slides left→right via translateX.

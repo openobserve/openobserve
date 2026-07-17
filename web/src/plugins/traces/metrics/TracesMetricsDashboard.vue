@@ -724,16 +724,25 @@ defineExpose({
 });
 </script>
 
-<style>
-.traces-metrics-dashboard .card-container {
+<style scoped>
+/* keep(lib-override:render-dashboard-charts): RenderDashboardCharts renders its
+   own .card-container / .render-dashboard-charts-container DOM that we can only
+   reach through :deep to flatten the card shadow and tighten the chart padding. */
+.traces-metrics-dashboard :deep(.card-container) {
   box-shadow: none;
 }
 
-.traces-metrics-dashboard .card-container :first-child {
+.traces-metrics-dashboard :deep(.card-container :first-child) {
   padding: 0 0.0625rem !important;
 }
 
-/* Slide fade transition */
+.charts-wrapper :deep(.render-dashboard-charts-container) {
+  padding-left: 0.2rem;
+  padding-right: 0.2rem;
+}
+
+/* keep(complex-state): slide-fade-* drive the <transition name="slide-fade">
+   reveal (enter/leave phases) — Tailwind can't express transition-group state. */
 .slide-fade-enter-active,
 .slide-fade-leave-active {
   transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
@@ -741,31 +750,25 @@ defineExpose({
 
 .slide-fade-enter-from {
   opacity: 0;
-  transform: translateY(-10px);
+  transform: translateY(-0.625rem);
   max-height: 0;
 }
 
 .slide-fade-enter-to {
   opacity: 1;
   transform: translateY(0);
-  max-height: 500px;
+  max-height: 31.25rem;
 }
 
 .slide-fade-leave-from {
   opacity: 1;
   transform: translateY(0);
-  max-height: 500px;
+  max-height: 31.25rem;
 }
 
 .slide-fade-leave-to {
   opacity: 0;
-  transform: translateY(-10px);
+  transform: translateY(-0.625rem);
   max-height: 0;
 }
-
-.charts-wrapper .render-dashboard-charts-container {
-  padding-left: 0.2rem;
-  padding-right: 0.2rem;
-}
-
 </style>

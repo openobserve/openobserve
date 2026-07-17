@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         )
       "
     >
-      <div v-if="showHeader" class="trace-combined-header-wrapper card-container border-b border-border-default">
+      <div v-if="showHeader" class="trace-combined-header-wrapper card-container border-b border-border-default py-[0.2rem] shrink-0">
         <!-- Standalone (routed) header: shared AppPageHeader -->
         <AppPageHeader
           v-if="mode === 'standalone'"
@@ -594,7 +594,7 @@ size="sm">
                 />
                 <div
                   ref="traceScrollContainer"
-                  class="relative-position trace-content-scroll overflow-y-auto! overflow-x-hidden! min-h-0! [scrollbar-gutter:stable]!"
+                  class="relative-position trace-content-scroll overflow-y-auto! overflow-x-hidden! min-h-0! [scrollbar-gutter:stable]! flex-1! max-w-full!"
                   :style="{
                     width: isSidebarOpen ? leftWidth + 'px' : '100%',
                   }"
@@ -611,7 +611,7 @@ size="sm">
                           backgroundColor: 'var(--color-border-default)',
                           zIndex: 999,
                         }"
-                        class="absolute resize h-full cursor-col-resize top-0 w-[1px]"
+                        class="absolute resize h-full cursor-col-resize top-0 w-[1px] after:content-[''] after:absolute after:h-full after:-left-2.5 after:-right-2.5 after:top-0 after:bottom-0 after:z-999"
                         @mousedown="startResize"
                       />
                       <trace-tree
@@ -708,10 +708,10 @@ size="sm">
               <!-- Resizable divider -->
               <div
                 v-if="isSidebarOpen && (selectedSpanId || showTraceDetails)"
-                class="dag-resizer w-2 cursor-col-resize flex items-center justify-center shrink-0 relative z-10"
+                class="dag-resizer group w-2 cursor-col-resize flex items-center justify-center shrink-0 relative z-10"
                 @mousedown="startDagResize"
               >
-                <div class="dag-resizer-line w-0.75 h-full bg-border-default rounded-sm transition-colors duration-200"></div>
+                <div class="dag-resizer-line w-0.75 h-full bg-border-default group-hover:bg-accent rounded-sm transition-colors duration-200"></div>
               </div>
               <div
                 v-if="isSidebarOpen && (selectedSpanId || showTraceDetails)"
@@ -883,7 +883,7 @@ size="sm">
                     ref="chartRendererRef"
                     data-test="trace-details-service-map-chart"
                     :data="traceServiceMapChartOptions"
-                    class="trace-chart-height h-full! w-full!"
+                    class="trace-chart-height h-50! min-h-50! w-full!"
                   />
                 </div>
               </div>
@@ -2919,56 +2919,15 @@ export default defineComponent({
 });
 </script>
 
-<style>
-.dag-resizer:hover .dag-resizer-line {
-  background-color: var(--color-accent);
-}
-</style>
-
-<style>
-/* Prevent parent containers from adding scrollbars */
-body:has(.trace-details),
-html:has(.trace-details) {
+<style scoped>
+/* keep(complex-state): body/html :has() overflow lock reaches ancestor DOM the
+   component doesn't own, and the dark-only unified-search-group color states
+   can't be tokenized as utilities (rule 6 bars dark: color variants). */
+:global(body:has(.trace-details)),
+:global(html:has(.trace-details)) {
   overflow: hidden !important;
 }
 
-.histogram-container .trace-content-scroll {
-  flex: 1 !important;
-  max-width: 100% !important;
-}
-
-.histogram-container-full .trace-content-scroll {
-  flex: 1 !important;
-  max-width: 100% !important;
-}
-
-.trace-content-scroll {
-  overflow-y: auto !important;
-  overflow-x: hidden !important;
-  min-height: 0 !important;
-  scrollbar-gutter: stable !important;
-}
-
-.trace-details .trace-combined-header-wrapper {
-  padding: 0.2rem 0rem;
-  flex-shrink: 0;
-}
-
-.trace-details .trace-chart-height {
-  height: 12.5rem !important;
-  min-height: 12.5rem !important;
-}
-
-/* Unified Search Group - input and navigation as one element */
-.unified-search-group {
-  display: flex;
-  align-items: stretch;
-  width: fit-content;
-  border-radius: var(--radius-md);
-  transition: border-color 0.2s ease;
-}
-
-/* Dark mode support */
 .dark .unified-search-group {
   background-color: var(--color-surface-base);
 }
@@ -2976,16 +2935,5 @@ html:has(.trace-details) {
 .dark .unified-search-group:hover,
 .dark .unified-search-group:focus-within {
   border-color: var(--color-theme-accent);
-}
-
-.resize::after {
-  content: " ";
-  position: absolute;
-  height: 100%;
-  left: -10px;
-  right: -10px;
-  top: 0;
-  bottom: 0;
-  z-index: 999;
 }
 </style>

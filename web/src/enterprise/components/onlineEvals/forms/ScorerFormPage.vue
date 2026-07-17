@@ -1345,29 +1345,33 @@ async function save(value: ScorerForm) {
 }
 </script>
 
-<style>
-/* The global `label:not(.o-input-label)` rule (unlayered) overrides these
-   field labels' `text-(--color-text-primary)`/`font-semibold`/`text-xs`
-   utilities, graying them out. This higher-specificity selector restores the
-   dark primary color + weight/size, matching main's scoped `.scorer-field__label`. */
+<style scoped>
+/* keep(complex-state): the global `label:not(.o-input-label)` element rule
+   (unlayered) out-specifies the color/weight/size utilities on these field
+   labels, graying them out — this higher-specificity :not() selector restores
+   the primary color + weight/size. */
 .scorer-form__main label:not(.o-input-label) {
   color: var(--color-text-primary, currentColor);
   font-weight: 600;
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 
-.scorer-form__main textarea {
-  max-height: 280px;
+/* keep(lib-override:o2-forms): native <textarea>/<select>/<input> rendered inside
+   OFormTextarea / OFormSelect / OFormInput are child-component DOM reachable only
+   through :deep(); the url-bar rules butt-join the method select and endpoint
+   input into one control. */
+.scorer-form__main :deep(textarea) {
+  max-height: 17.5rem;
   overflow-y: auto;
 }
 
-.scorer-url-bar .o-select__trigger,
-.scorer-url-bar select {
+.scorer-url-bar :deep(.o-select__trigger),
+.scorer-url-bar :deep(select) {
   border-top-right-radius: 0;
   border-bottom-right-radius: 0;
 }
 
-.scorer-url-bar input {
+.scorer-url-bar :deep(input) {
   border-top-left-radius: 0;
   border-bottom-left-radius: 0;
 }

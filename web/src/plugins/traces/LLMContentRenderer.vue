@@ -688,116 +688,118 @@ const renderMarkdown = (content: string): string => {
 };
 </script>
 
-<style>
+<style scoped>
+/* keep(generated-content): styles the markdown DOM injected via v-html into
+   .message-content, which never receives the scope attribute — reached with
+   :deep(). Tailwind cannot target these runtime-generated nodes. */
 .messages-view .message-item .message-content {
-  font-size: 13px;
+  font-size: 0.8125rem;
   line-height: 1.6;
 }
 
-.messages-view .message-item .message-content p {
-  margin: 0 0 8px 0;
+.messages-view .message-item .message-content :deep(p) {
+  margin: 0 0 0.5rem 0;
 }
 
-.messages-view .message-item .message-content p:last-child {
+.messages-view .message-item .message-content :deep(p:last-child) {
   margin-bottom: 0;
 }
 
-.messages-view .message-item .message-content img {
+.messages-view .message-item .message-content :deep(img) {
   max-width: 50%;
-  max-height: 400px;
+  max-height: 25rem;
   object-fit: contain;
   display: block;
-  margin: 8px 0;
-  border-radius: 4px;
+  margin: 0.5rem 0;
+  border-radius: 0.25rem;
 }
 
-.messages-view .message-item .message-content pre {
-  background-color: rgba(0, 0, 0, 0.05);
-  padding: 8px;
-  border-radius: 4px;
+.messages-view .message-item .message-content :deep(pre) {
+  background-color: color-mix(in srgb, var(--color-black) 5%, transparent);
+  padding: 0.5rem;
+  border-radius: 0.25rem;
   overflow-x: auto;
-  margin: 8px 0;
+  margin: 0.5rem 0;
 }
 
-.messages-view .message-item .message-content code {
+.messages-view .message-item .message-content :deep(code) {
   font-family: monospace;
-  font-size: 12px;
-  background-color: rgba(0, 0, 0, 0.05);
-  padding: 2px 4px;
-  border-radius: 3px;
+  font-size: 0.75rem;
+  background-color: color-mix(in srgb, var(--color-black) 5%, transparent);
+  padding: 0.125rem 0.25rem;
+  border-radius: 0.1875rem;
 }
 
-.messages-view .message-item .message-content pre code {
+.messages-view .message-item .message-content :deep(pre code) {
   background-color: transparent;
   padding: 0;
 }
 
-.messages-view .message-item .message-content ul,
-.messages-view .message-item .message-content ol {
-  margin: 8px 0;
-  padding-left: 24px;
+.messages-view .message-item .message-content :deep(ul),
+.messages-view .message-item .message-content :deep(ol) {
+  margin: 0.5rem 0;
+  padding-left: 1.5rem;
 }
 
-.messages-view .message-item .message-content li {
-  margin: 4px 0;
+.messages-view .message-item .message-content :deep(li) {
+  margin: 0.25rem 0;
 }
 
-.messages-view .message-item .message-content a {
+.messages-view .message-item .message-content :deep(a) {
   color: var(--color-theme-accent);
   text-decoration: none;
 }
 
-.messages-view .message-item .message-content a:hover {
+.messages-view .message-item .message-content :deep(a:hover) {
   text-decoration: underline;
 }
 
-.messages-view .message-item .message-content blockquote {
-  border-left: 3px solid var(--color-border-default);
-  margin: 8px 0;
-  padding-left: 12px;
+.messages-view .message-item .message-content :deep(blockquote) {
+  border-left: 0.1875rem solid var(--color-border-default);
+  margin: 0.5rem 0;
+  padding-left: 0.75rem;
   color: var(--color-text-secondary);
 }
 
-.messages-view .message-item .message-content table {
+.messages-view .message-item .message-content :deep(table) {
   border-collapse: collapse;
   width: 100%;
-  margin: 8px 0;
+  margin: 0.5rem 0;
 }
 
-.messages-view .message-item .message-content table th,
-.messages-view .message-item .message-content table td {
+.messages-view .message-item .message-content :deep(table th),
+.messages-view .message-item .message-content :deep(table td) {
   border: 1px solid var(--color-border-default);
-  padding: 6px 8px;
+  padding: 0.375rem 0.5rem;
   text-align: left;
 }
 
-.messages-view .message-item .message-content table th {
-  background-color: rgba(0, 0, 0, 0.05);
+.messages-view .message-item .message-content :deep(table th) {
+  background-color: color-mix(in srgb, var(--color-black) 5%, transparent);
 }
 
-/* Unscoped — needed because innerHTML-injected nodes don't get the scoped attribute */
-.llm-content-renderer .messages-view .message-item .message-content h1,
-.llm-content-renderer .messages-view .message-item .message-content h2,
-.llm-content-renderer .messages-view .message-item .message-content h3,
-.llm-content-renderer .messages-view .message-item .message-content h4 {
+.messages-view .message-item .message-content :deep(h1),
+.messages-view .message-item .message-content :deep(h2),
+.messages-view .message-item .message-content :deep(h3),
+.messages-view .message-item .message-content :deep(h4) {
   font-weight: 600;
-  margin: 10px 0 6px 0;
+  margin: 0.625rem 0 0.375rem 0;
   line-height: 1.4;
 }
 
-.llm-content-renderer .messages-view .message-item .message-content h1 {
+.messages-view .message-item .message-content :deep(h1) {
   font-size: 1.15rem;
 }
 
-.llm-content-renderer .messages-view .message-item .message-content h2 {
+.messages-view .message-item .message-content :deep(h2) {
   font-size: 1.05rem;
 }
 
-.llm-content-renderer .messages-view .message-item .message-content h3 {
+.messages-view .message-item .message-content :deep(h3) {
   font-size: 0.95rem;
 }
 
-.llm-content-renderer .messages-view .message-item .message-content h4 {
+.messages-view .message-item .message-content :deep(h4) {
   font-size: 0.875rem;
 }
 </style>

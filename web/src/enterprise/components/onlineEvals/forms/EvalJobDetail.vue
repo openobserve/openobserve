@@ -131,12 +131,12 @@
             >
               {{ t("onlineEvals.job.detail.targetSection") }}
             </h4>
-            <dl class="jd-kv">
-              <dt>{{ t("onlineEvals.job.detail.streamLabel") }}</dt>
-              <dd>{{ row.stream }}</dd>
+            <dl class="grid grid-cols-[8.125rem_1fr] gap-x-3.5 gap-y-1.5 m-0">
+              <dt class="text-xs font-semibold text-text-secondary">{{ t("onlineEvals.job.detail.streamLabel") }}</dt>
+              <dd class="m-0 text-compact text-text-primary wrap-break-word">{{ row.stream }}</dd>
 
-              <dt>{{ t("onlineEvals.job.detail.streamTypeLabel") }}</dt>
-              <dd>{{ streamType }}</dd>
+              <dt class="text-xs font-semibold text-text-secondary">{{ t("onlineEvals.job.detail.streamTypeLabel") }}</dt>
+              <dd class="m-0 text-compact text-text-primary wrap-break-word">{{ streamType }}</dd>
             </dl>
 
             <!-- Filter rendered as a code block with a header bar + copy action,
@@ -268,14 +268,14 @@
             >
               {{ t("onlineEvals.job.detail.samplingSection") }}
             </h4>
-            <dl class="jd-kv">
-              <dt>{{ t("onlineEvals.job.detail.samplingModeLabel") }}</dt>
-              <dd>{{ samplingModeLabel }}</dd>
+            <dl class="grid grid-cols-[8.125rem_1fr] gap-x-3.5 gap-y-1.5 m-0">
+              <dt class="text-xs font-semibold text-text-secondary">{{ t("onlineEvals.job.detail.samplingModeLabel") }}</dt>
+              <dd class="m-0 text-compact text-text-primary wrap-break-word">{{ samplingModeLabel }}</dd>
 
-              <dt v-if="samplingValue != null">
+              <dt v-if="samplingValue != null" class="text-xs font-semibold text-text-secondary">
                 {{ t("onlineEvals.job.detail.samplingValueLabel") }}
               </dt>
-              <dd v-if="samplingValue != null">
+              <dd v-if="samplingValue != null" class="m-0 text-compact text-text-primary wrap-break-word">
                 {{ samplingValue }}
               </dd>
             </dl>
@@ -288,23 +288,23 @@
             >
               {{ t("onlineEvals.job.detail.metadataSection") }}
             </h4>
-            <dl class="jd-kv">
-              <dt>{{ t("onlineEvals.job.detail.versionLabel") }}</dt>
-              <dd>v{{ row.version }}</dd>
-              <dt v-if="pipelineId">
+            <dl class="grid grid-cols-[8.125rem_1fr] gap-x-3.5 gap-y-1.5 m-0">
+              <dt class="text-xs font-semibold text-text-secondary">{{ t("onlineEvals.job.detail.versionLabel") }}</dt>
+              <dd class="m-0 text-compact text-text-primary wrap-break-word">v{{ row.version }}</dd>
+              <dt v-if="pipelineId" class="text-xs font-semibold text-text-secondary">
                 {{ t("onlineEvals.job.detail.pipelineLabel") }}
               </dt>
-              <dd v-if="pipelineId">{{ pipelineId }}</dd>
-              <dt v-if="createdAt">
+              <dd v-if="pipelineId" class="m-0 text-compact text-text-primary wrap-break-word">{{ pipelineId }}</dd>
+              <dt v-if="createdAt" class="text-xs font-semibold text-text-secondary">
                 {{ t("onlineEvals.job.detail.createdLabel") }}
               </dt>
-              <dd v-if="createdAt">
+              <dd v-if="createdAt" class="m-0 text-compact text-text-primary wrap-break-word">
                 {{ formatTimestamp(createdAt) }}
               </dd>
-              <dt v-if="updatedAt">
+              <dt v-if="updatedAt" class="text-xs font-semibold text-text-secondary">
                 {{ t("onlineEvals.job.detail.updatedLabel") }}
               </dt>
-              <dd v-if="updatedAt">
+              <dd v-if="updatedAt" class="m-0 text-compact text-text-primary wrap-break-word">
                 {{ formatTimestamp(updatedAt) }}
               </dd>
             </dl>

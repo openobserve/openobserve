@@ -323,7 +323,8 @@ const copyTemplate = () => {
 };
 </script>
 
-<style>
+<style scoped>
+/* keep(brand): pixel-accurate Slack/Teams/Email replicas, colors are external brands (D12) */
 /* The global `a { color: var(--color-text-link) }` rule (unlayered) outranks the
    inline `text-[var(--color-brand-slack-green)]` utility, turning this link the theme link color.
    This selector's specificity wins it back to PagerDuty green, like main. */
@@ -344,7 +345,7 @@ const copyTemplate = () => {
   color: white;
   border: none;
   padding: 0.5rem 1rem;
-  border-radius: 4px;
+  border-radius: 0.25rem;
   cursor: pointer;
 }
 

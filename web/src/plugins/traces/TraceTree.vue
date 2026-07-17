@@ -146,7 +146,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <div
                   v-if="(spans as any[])[virtualRow.index].hasChildSpans"
-                  class="span-count-box min-w-5 h-5 py-0 px-1 rounded-full border flex items-center justify-center text-2xs font-semibold mr-1 transition-colors duration-200 cursor-pointer border-card-glass-border! relative"
+                  class="span-count-box min-w-5 h-5 py-0 px-1 rounded-full border flex items-center justify-center text-2xs font-semibold mr-1 transition-colors duration-200 cursor-pointer border-card-glass-border! relative hover:bg-interactive-hover-bg"
                   :style="{
                     color: (spans as any[])[virtualRow.index].style.color,
                   }"
@@ -868,12 +868,10 @@ export default defineComponent({
 });
 </script>
 
-<style>
-.span-count-box:hover {
-  background-color: var(--color-interactive-hover-bg);
-}
-
-/* Hover highlight via CSS — no JS required */
+<style scoped>
+/* keep(complex-state): span-row hover/selected ::before overlay tints plus
+   parent-state child reveal chains target descendants and pseudo-overlays that
+   Tailwind utilities can't express. */
 .span-row:hover::before {
   content: "";
   position: absolute;
@@ -881,7 +879,7 @@ export default defineComponent({
   right: 0;
   top: 0;
   bottom: 0;
-  background-color: rgba(0, 123, 255, 0.2);
+  background-color: color-mix(in srgb, var(--color-accent) 20%, transparent);
   pointer-events: none;
   z-index: 999;
 }
@@ -901,7 +899,7 @@ export default defineComponent({
   right: 0;
   top: 0;
   bottom: 0;
-  background-color: rgba(0, 123, 255, 0.35);
+  background-color: color-mix(in srgb, var(--color-accent) 35%, transparent);
   pointer-events: none;
   z-index: 999;
 }

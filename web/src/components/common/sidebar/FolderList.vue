@@ -326,18 +326,21 @@ export default defineComponent({
   });
   </script>
 
-<style>
-.folders-tabs .o-tabs {
+<style scoped>
+/* keep(lib-override:OTabs): targets OTabs' internal rendered DOM (.o-tabs,
+   .o-tab, .o-tab__label) which is a child component and never receives this
+   component's scope id — reached via :deep(). Not expressible as template
+   utilities. */
+.folders-tabs :deep(.o-tabs) {
   height: auto !important;
   max-height: none !important;
 }
 
-
-.folders-tabs .o-tabs--vertical {
+.folders-tabs :deep(.o-tabs--vertical) {
   margin: 0;
 }
 
-.folders-tabs .o-tabs--vertical .o-tab {
+.folders-tabs :deep(.o-tabs--vertical .o-tab) {
   justify-content: flex-start;
   padding: 0 0.625rem;
   border-radius: 0.5rem;
@@ -348,9 +351,8 @@ export default defineComponent({
   font-weight: 500;
 }
 
-.folders-tabs .o-tabs--vertical .o-tab__content.tab_content .o-tab__icon + .o-tab__label {
+.folders-tabs :deep(.o-tabs--vertical .o-tab__content.tab_content .o-tab__icon + .o-tab__label) {
   padding-left: 0.875rem;
   font-weight: 500;
 }
-
 </style>

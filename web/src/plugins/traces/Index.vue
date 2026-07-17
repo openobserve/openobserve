@@ -2418,32 +2418,31 @@ useShortcuts([
 ]);
 </script>
 
-<style>
-
-.tracePage .index-table :hover::-webkit-scrollbar,
-.tracePage #tracesSearchGridComponent:hover::-webkit-scrollbar {
-  height: 13px;
-  width: 13px;
+<style scoped>
+/* keep(scrollbar): native ::-webkit-scrollbar sizing/shadows on the child field-list
+   & result-grid scrollers, plus a field-label font-size override on child FieldRow
+   DOM — all reached through child components, so not expressible as utilities here. */
+.tracePage :deep(.index-table :hover::-webkit-scrollbar),
+.tracePage :deep(#tracesSearchGridComponent:hover::-webkit-scrollbar) {
+  height: 0.8125rem;
+  width: 0.8125rem;
 }
 
-.tracePage .index-table ::-webkit-scrollbar-track,
-.tracePage #tracesSearchGridComponent::-webkit-scrollbar-track {
-  -webkit-box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.3);
-  border-radius: 10px;
+.tracePage :deep(.index-table ::-webkit-scrollbar-track),
+.tracePage :deep(#tracesSearchGridComponent::-webkit-scrollbar-track) {
+  -webkit-box-shadow: inset 0 0 0.375rem
+    color-mix(in srgb, var(--color-black) 30%, transparent);
+  border-radius: 0.625rem;
 }
 
-.tracePage .index-table ::-webkit-scrollbar-thumb,
-.tracePage #tracesSearchGridComponent::-webkit-scrollbar-thumb {
-  border-radius: 10px;
-  -webkit-box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.5);
+.tracePage :deep(.index-table ::-webkit-scrollbar-thumb),
+.tracePage :deep(#tracesSearchGridComponent::-webkit-scrollbar-thumb) {
+  border-radius: 0.625rem;
+  -webkit-box-shadow: inset 0 0 0.375rem
+    color-mix(in srgb, var(--color-black) 50%, transparent);
 }
 
-
-.tracePage .index-menu .field_list .field_overlay .field_label {
-  font-size: 12px !important;
-}
-.tracePage .traces-horizontal-splitter.hide-splitter-separator > .o-splitter__separator {
-  background: transparent !important;
-  border: none !important;
+.tracePage :deep(.index-menu .field_list .field_overlay .field_label) {
+  font-size: 0.75rem !important;
 }
 </style>

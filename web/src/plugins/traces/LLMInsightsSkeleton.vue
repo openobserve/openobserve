@@ -68,11 +68,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             preserveAspectRatio="none"
           >
             <path
-              class="panel-tile__area-fill [animation:llm-line-pulse_1.6s_ease-in-out_infinite] fill-[rgba(0,0,0,0.08)] dark:fill-[rgba(255,255,255,0.08)]"
+              class="panel-tile__area-fill [animation:llm-line-pulse_1.6s_ease-in-out_infinite] fill-[color-mix(in_srgb,var(--color-text-primary)_8%,transparent)]"
               d="M0,55 C20,42 35,52 55,46 C72,41 85,30 105,28 C125,26 140,42 160,38 C175,35 190,22 200,18 L200,80 L0,80 Z"
             />
             <path
-              class="panel-tile__line-stroke [animation:llm-line-pulse_1.6s_ease-in-out_infinite] [stroke:rgba(0,0,0,0.18)] dark:[stroke:rgba(255,255,255,0.22)]"
+              class="panel-tile__line-stroke [animation:llm-line-pulse_1.6s_ease-in-out_infinite] stroke-[color-mix(in_srgb,var(--color-text-primary)_18%,transparent)]"
               d="M0,55 C20,42 35,52 55,46 C72,41 85,30 105,28 C125,26 140,42 160,38 C175,35 190,22 200,18"
               fill="none"
               stroke-width="2"
@@ -93,7 +93,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           v-for="row in 5"
           :key="row"
-          class="panel-tile__row flex items-center gap-3 py-1 border-t border-(--tile-border)"
+          class="panel-tile__row flex items-center gap-3 py-1 border-t first:border-t-0 border-(--tile-border)"
         >
           <SkeletonBox width="70px" height="14px" rounded-sm />
           <SkeletonBox width="90px" height="20px" rounded-sm />
@@ -120,28 +120,24 @@ const store = useStore();
 </script>
 
 <style>
-/* Tile tokens map to the centralized --color-* system, which is theme-paired
-   automatically — so the dark/light split no longer needs hardcoded hex.
-   Both classes are kept (the template toggles them) but resolve to the same
-   token-driven values in each theme. */
+/* keep(keyframes): shimmer/pulse keyframes below, plus the shared --tile-*
+   token contract this rule publishes for sibling skeletons (HomeViewSkeleton
+   reads --tile-bg from the global .tile-content class) and the SkeletonBox
+   child-component gradient overrides — none of which can be scoped. Tile tokens
+   map to the centralized --color-* system, which is theme-paired automatically. */
 .tile-content {
   --tile-bg: var(--color-surface-base);
   --tile-border: var(--color-border-default);
   --text-primary: var(--color-text-heading);
 }
 
-.panel-tile__row:first-child {
-  border-top: none;
-}
-
-/* Skeleton overrides — same pattern as HomeViewSkeleton.
-   The SkeletonBox component's default gradient is theme-agnostic; redefining
-   here under .dark-tile-content / .light-tile-content gives proper contrast. */
+/* Skeleton overrides — same pattern as HomeViewSkeleton. Redefines the
+   SkeletonBox child component's gradient for proper per-theme contrast. */
 .skeleton-box {
   background: linear-gradient(
     90deg,
     transparent,
-    rgba(255, 255, 255, 0.15),
+    color-mix(in srgb, var(--color-white) 15%, transparent),
     transparent
   );
   background-size: 200% 100%;
@@ -153,9 +149,9 @@ const store = useStore();
 .dark .tile-content .skeleton-box {
   background: linear-gradient(
     90deg,
-    rgba(255, 255, 255, 0.04),
-    rgba(255, 255, 255, 0.12),
-    rgba(255, 255, 255, 0.04)
+    color-mix(in srgb, var(--color-white) 4%, transparent),
+    color-mix(in srgb, var(--color-white) 12%, transparent),
+    color-mix(in srgb, var(--color-white) 4%, transparent)
   );
   background-size: 200% 100%;
 }
@@ -163,9 +159,9 @@ const store = useStore();
 :root:not(.dark) .tile-content .skeleton-box {
   background: linear-gradient(
     90deg,
-    rgba(0, 0, 0, 0.04),
-    rgba(0, 0, 0, 0.1),
-    rgba(0, 0, 0, 0.04)
+    color-mix(in srgb, var(--color-black) 4%, transparent),
+    color-mix(in srgb, var(--color-black) 10%, transparent),
+    color-mix(in srgb, var(--color-black) 4%, transparent)
   );
   background-size: 200% 100%;
 }

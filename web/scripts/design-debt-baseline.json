@@ -3,14 +3,14 @@
     "rawPalette": 53,
     "arbPx": 173,
     "arbRadius": 25,
-    "unscopedStyle": 144,
-    "arbZ": 48,
-    "styleBlockHex": 469,
-    "stylePxUnit": 974,
+    "unscopedStyle": 110,
+    "arbZ": 47,
+    "styleBlockHex": 435,
+    "stylePxUnit": 884,
     "inlineHexStyle": 21,
     "tsHex": 471,
     "inlineHexBind": 6,
-    "bareRounded": 10,
+    "bareRounded": 9,
     "hexClass": 32,
     "themeTernary": 10,
     "darkMechanism": 33,
@@ -50,33 +50,14 @@
       "styleBlockHex": 2,
       "stylePxUnit": 12
     },
-    "components/alerts/AlertList.vue": {
-      "unscopedStyle": 1,
-      "stylePxUnit": 1
-    },
     "components/alerts/AlertSettingsHelpDrawer.vue": {
       "stylePxUnit": 2
     },
     "components/alerts/AlertSummary.vue": {
-      "unscopedStyle": 1,
-      "arbZ": 1,
-      "styleBlockHex": 1
-    },
-    "components/alerts/DestinationPreview.vue": {
-      "unscopedStyle": 1,
-      "stylePxUnit": 1
+      "arbZ": 1
     },
     "components/alerts/FilterGroup.vue": {
       "stylePxUnit": 3
-    },
-    "components/alerts/HorizontalStepper.vue": {
-      "unscopedStyle": 1,
-      "arbZ": 1,
-      "stylePxUnit": 8
-    },
-    "components/alerts/ImportSemanticGroups.vue": {
-      "unscopedStyle": 1,
-      "stylePxUnit": 4
     },
     "components/alerts/IncidentDetailDrawer.vue": {
       "rawPalette": 10,
@@ -101,25 +82,13 @@
       "arbPx": 12,
       "arbZ": 2
     },
-    "components/alerts/SemanticFieldGroupsConfig.vue": {
-      "unscopedStyle": 1,
-      "stylePxUnit": 3
-    },
     "components/alerts/steps/Advanced.vue": {
       "arbPx": 1
-    },
-    "components/alerts/steps/QueryConfig.vue": {
-      "unscopedStyle": 1,
-      "styleBlockHex": 1,
-      "stylePxUnit": 8
     },
     "components/alerts/TagInput.vue": {
       "unscopedStyle": 1,
       "arbPx": 2,
       "stylePxUnit": 1
-    },
-    "components/anomaly_detection/AnomalySummary.vue": {
-      "unscopedStyle": 1
     },
     "components/anomaly_detection/steps/AnomalyDetectionConfig.vue": {
       "arbPx": 1
@@ -159,9 +128,6 @@
       "unscopedStyle": 1,
       "arbPx": 1,
       "arbZ": 1
-    },
-    "components/common/sidebar/FolderList.vue": {
-      "unscopedStyle": 1
     },
     "components/common/sidebar/InlineSelectFolderDropdown.vue": {
       "stylePxUnit": 7
@@ -533,9 +499,7 @@
       "stylePxUnit": 1
     },
     "components/shared/HomeViewSkeleton.vue": {
-      "arbRadius": 1,
-      "unscopedStyle": 1,
-      "stylePxUnit": 3
+      "arbRadius": 1
     },
     "components/shared/SkeletonBox.vue": {
       "bareRounded": 3,
@@ -605,30 +569,15 @@
       "tsHex": 4
     },
     "enterprise/components/billings/UsageMemberList.vue": {
-      "unscopedStyle": 1,
-      "arbPx": 2,
-      "stylePxUnit": 1
+      "arbPx": 2
     },
     "enterprise/components/onlineEvals/forms/EvalJobDetail.vue": {
       "unscopedStyle": 1,
       "styleBlockHex": 12,
       "stylePxUnit": 3
     },
-    "enterprise/components/onlineEvals/forms/job/JobFilterBuilder.vue": {
-      "unscopedStyle": 1
-    },
     "enterprise/components/onlineEvals/forms/JobFormPage.vue": {
-      "unscopedStyle": 1,
-      "arbPx": 3,
-      "stylePxUnit": 3
-    },
-    "enterprise/components/onlineEvals/forms/ProviderFormPage.vue": {
-      "unscopedStyle": 1,
-      "stylePxUnit": 1
-    },
-    "enterprise/components/onlineEvals/forms/ScoreConfigDetail.vue": {
-      "unscopedStyle": 1,
-      "styleBlockHex": 5
+      "arbPx": 3
     },
     "enterprise/components/onlineEvals/forms/ScoreConfigDialog.vue": {
       "unscopedStyle": 1,
@@ -637,40 +586,24 @@
       "stylePxUnit": 75
     },
     "enterprise/components/onlineEvals/forms/scorer/ScorerTestPanel.vue": {
-      "unscopedStyle": 1,
-      "arbPx": 1,
-      "styleBlockHex": 1
+      "arbPx": 1
     },
     "enterprise/components/onlineEvals/forms/ScorerDetail.vue": {
       "styleBlockHex": 11
     },
     "enterprise/components/onlineEvals/forms/ScorerFormPage.vue": {
-      "unscopedStyle": 1,
-      "arbPx": 2,
-      "stylePxUnit": 2
+      "arbPx": 2
     },
     "enterprise/components/onlineEvals/forms/ScorerTypeDialog.vue": {
       "unscopedStyle": 1
     },
     "enterprise/components/onlineEvals/quality/QualityConfigSidebar.vue": {
       "hexClass": 3,
-      "arbTextSize": 1,
-      "unscopedStyle": 1,
-      "styleBlockHex": 3,
-      "stylePxUnit": 5
-    },
-    "enterprise/components/onlineEvals/quality/QualityDetailPanel.vue": {
-      "unscopedStyle": 1,
-      "styleBlockHex": 1,
-      "stylePxUnit": 6
+      "arbTextSize": 1
     },
     "enterprise/components/onlineEvals/quality/QualityKpiSkeleton.vue": {
       "unscopedStyle": 1,
       "arbPx": 1
-    },
-    "enterprise/components/OnlineEvals.vue": {
-      "unscopedStyle": 1,
-      "stylePxUnit": 1
     },
     "layouts/MainLayout.vue": {
       "bareRounded": 1
@@ -834,16 +767,11 @@
     "lib/overlay/Tooltip/OTooltip.vue": {
       "arbZ": 1
     },
-    "plugins/correlation/CorrelatedLogsTable.vue": {
-      "unscopedStyle": 1,
-      "stylePxUnit": 1
-    },
     "plugins/correlation/DimensionFilterEditor.vue": {
       "rawPalette": 5
     },
     "plugins/correlation/TelemetryCorrelationDashboard.vue": {
-      "rawPalette": 4,
-      "unscopedStyle": 1
+      "rawPalette": 4
     },
     "plugins/correlation/TimeRangeEditor.vue": {
       "rawPalette": 1
@@ -853,8 +781,6 @@
       "stylePxUnit": 2
     },
     "plugins/logs/patterns/PatternList.vue": {
-      "unscopedStyle": 1,
-      "styleBlockHex": 2,
       "stylePxUnit": 1
     },
     "plugins/logs/patterns/WildcardValuePopover.vue": {
@@ -873,7 +799,6 @@
       "stylePxUnit": 2
     },
     "plugins/metrics/MetricList.vue": {
-      "unscopedStyle": 1,
       "arbZ": 1
     },
     "plugins/metrics/SyntaxGuideMetrics.vue": {
@@ -905,23 +830,8 @@
     "plugins/traces/config/llmInsightsPanels.ts": {
       "tsHex": 7
     },
-    "plugins/traces/Index.vue": {
-      "unscopedStyle": 1,
-      "styleBlockHex": 2,
-      "stylePxUnit": 7
-    },
-    "plugins/traces/IndexList.vue": {
-      "unscopedStyle": 1,
-      "stylePxUnit": 2
-    },
-    "plugins/traces/LLMContentRenderer.vue": {
-      "unscopedStyle": 1,
-      "styleBlockHex": 3,
-      "stylePxUnit": 23
-    },
     "plugins/traces/LLMInsightsSkeleton.vue": {
-      "unscopedStyle": 1,
-      "styleBlockHex": 7
+      "unscopedStyle": 1
     },
     "plugins/traces/LLMSchemaPanel.vue": {
       "stylePxUnit": 2
@@ -929,34 +839,18 @@
     "plugins/traces/llmTrendPanel.utils.ts": {
       "tsHex": 8
     },
-    "plugins/traces/metrics/TracesAnalysisDashboard.vue": {
-      "unscopedStyle": 1,
-      "styleBlockHex": 6
-    },
     "plugins/traces/metrics/TracesMetricsContextMenu.vue": {
       "arbZ": 1
-    },
-    "plugins/traces/metrics/TracesMetricsDashboard.vue": {
-      "unscopedStyle": 1,
-      "stylePxUnit": 4
     },
     "plugins/traces/SearchBar.vue": {
       "arbPx": 1,
       "arbZ": 1
-    },
-    "plugins/traces/ServiceGraph.vue": {
-      "unscopedStyle": 1,
-      "stylePxUnit": 4
     },
     "plugins/traces/ServiceGraphNodeSidePanel.vue": {
       "hexClass": 1,
       "unscopedStyle": 1,
       "styleBlockHex": 22,
       "stylePxUnit": 3
-    },
-    "plugins/traces/ServicesCatalog.vue": {
-      "bareRounded": 1,
-      "unscopedStyle": 1
     },
     "plugins/traces/SessionDetails.vue": {
       "arbPx": 2,
@@ -991,19 +885,13 @@
     },
     "plugins/traces/TraceDetails.vue": {
       "arbRadius": 1,
-      "unscopedStyle": 2,
-      "arbPx": 6,
-      "stylePxUnit": 2
+      "arbPx": 6
     },
     "plugins/traces/TraceDetailsSidebar.vue": {
       "inlineHexStyle": 1,
       "unscopedStyle": 3,
       "styleBlockHex": 61,
       "stylePxUnit": 60
-    },
-    "plugins/traces/TraceTree.vue": {
-      "unscopedStyle": 1,
-      "styleBlockHex": 2
     },
     "plugins/traces/TurnPreviewCard.vue": {
       "arbPx": 3

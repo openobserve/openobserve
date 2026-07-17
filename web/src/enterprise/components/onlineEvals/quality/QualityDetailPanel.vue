@@ -4,7 +4,7 @@
          ODrawer header (QualityPage) so the panel content starts straight
          from the KPI tiles without a duplicated identification block. -->
 
-    <div v-if="isLoading && !hasScores" class="qdp__loading">
+    <div v-if="isLoading && !hasScores" class="flex flex-col items-center gap-2 py-7 px-3 border border-dashed border-dialog-header-border rounded-md text-center text-text-secondary text-xs">
       <OSpinner size="sm" />
       <span>{{ t("onlineEvals.quality.detail.loading") }}</span>
     </div>
@@ -12,7 +12,7 @@
     <!-- No scores landed for this config in the window: show one focused
          empty state (same OEmptyState used across list pages) instead of a
          grid of dashed KPI cards + a chart placeholder. -->
-    <div v-else-if="!hasScores" class="qdp__empty">
+    <div v-else-if="!hasScores" class="flex-1 min-h-0 flex items-center justify-center">
       <OEmptyState
         size="block"
         illustration="hourglass"
@@ -30,7 +30,7 @@
         <div
           v-for="kpi in kpis"
           :key="kpi.id"
-          class="kpi-card rounded-lg flex flex-col px-[0.875rem] pt-[0.625rem] pb-[0.625rem] gap-[0.25rem] bg-surface-base border border-border-default transition-shadow duration-200"
+          class="rounded-lg flex flex-col px-[0.875rem] pt-[0.625rem] pb-[0.625rem] gap-[0.25rem] bg-surface-base border border-border-default transition-shadow duration-200 hover:shadow-[0_0.0625rem_0.375rem_rgba(0,0,0,0.08)]"
           :data-test="`quality-detail-kpi-${kpi.id}`"
         >
           <div class="text-2xs font-semibold text-text-secondary">
@@ -214,35 +214,3 @@ function formatKpi(kpi: DetailKpi): string {
   return String(kpi.value);
 }
 </script>
-
-<style>
-/* ::before pseudo-element for KPI accent bar — cannot inline */
-
-.qdp__loading {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  padding: 28px 12px;
-  border: 1px dashed var(--color-dialog-header-border);
-  border-radius: 6px;
-  text-align: center;
-  color: var(--color-text-secondary);
-  font-size: 12px;
-}
-
-.qdp__empty {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-/* Hover shadow on KPI tiles — pseudo-class cannot be inlined. Mirrors the
- * LLM Sessions detail page card chrome so the AI module's KPI tiles look
- * identical across pages. */
-.kpi-card:hover {
-  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.08);
-}
-</style>

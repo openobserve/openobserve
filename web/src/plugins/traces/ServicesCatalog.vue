@@ -1160,20 +1160,21 @@ onUnmounted(() => {
 });
 </script>
 
-<style>
-/* Vertical entity-type rail — same treatment as the Dashboards folder list so
-   the active row shows the app's standard left-rail tint + primary text, and
-   rows read calm (left-aligned, rounded, weight 500). */
-.catalog-type-filter .o-tabs {
+<style scoped>
+/* keep(lib-override:o-tabs): the vertical entity-type rail restyles OTabs' own
+   .o-tabs / .o-tabs--vertical / .o-tab DOM (rendered by the OTabs/OTab library
+   components) so the active row matches the Dashboards folder-list rail —
+   reachable only via :deep. */
+.catalog-type-filter :deep(.o-tabs) {
   height: auto !important;
   max-height: none !important;
 }
 
-.catalog-type-filter .o-tabs--vertical {
+.catalog-type-filter :deep(.o-tabs--vertical) {
   margin: 0;
 }
 
-.catalog-type-filter .o-tabs--vertical .o-tab {
+.catalog-type-filter :deep(.o-tabs--vertical .o-tab) {
   justify-content: flex-start;
   padding: 0 0.5rem;
   border-radius: 0.5rem;

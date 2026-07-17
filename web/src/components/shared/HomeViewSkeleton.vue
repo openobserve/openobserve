@@ -45,9 +45,9 @@
     </div>
 
     <!-- 2nd section - functions and dashboards tiles + 2 charts -->
-    <div class="charts-main-container grid gap-4 mt-4 items-stretch" style="grid-template-columns: minmax(min-content, max-content) 1fr 2fr">
+    <div class="charts-main-container grid grid-cols-1 grid-rows-[auto_auto_auto] xl:grid-cols-[minmax(min-content,max-content)_1fr_2fr] xl:grid-rows-none gap-4 mt-4 items-stretch">
       <!-- Functions and Dashboards column -->
-      <div class="functions-dashboards-column flex flex-col gap-4 w-full">
+      <div class="functions-dashboards-column flex flex-col md:flex-row xl:flex-col gap-4 w-full">
         <!-- Functions tile -->
         <div class="tile-wrapper flex-1 flex min-w-0 w-full">
           <div
@@ -190,35 +190,3 @@
 import SkeletonBox from "./SkeletonBox.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 </script>
-
-<style>
-/* Responsive overrides for charts-main-container */
-@media (max-width: 1280px) {
-  .charts-main-container {
-    grid-template-columns: 1fr;
-    grid-template-rows: auto auto auto;
-  }
-}
-
-/* Responsive overrides for functions-dashboards-column */
-@media (max-width: 1280px) {
-  .functions-dashboards-column {
-    flex-direction: row;
-  }
-}
-
-@media (max-width: 768px) {
-  .functions-dashboards-column {
-    flex-direction: column;
-  }
-}
-
-/* Skeleton base/shimmer theming for the child SkeletonBox component.
-   The base ::after overlay + keyframes live in SkeletonBox.vue; these only
-   override the surface colour + dim the shimmer per theme, scoped to this
-   component so they don't leak to other SkeletonBox usages. The explicit
-   colours guard against this legacy view loading before the token root. */
-.home-view-skeleton .skeleton-box {
-  background-color: var(--color-skeleton-base);
-}
-</style>

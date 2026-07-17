@@ -33,20 +33,22 @@ withDefaults(defineProps<{ count?: number }>(), { count: 5 });
 </script>
 
 <style>
+/* keep(keyframes): the shimmer @keyframes cannot be a utility. `.skeleton-box`
+   is SkeletonBox.vue's shared class (cross-file) — this global override drives
+   the wave gradient + animation on that child element, so the block must stay
+   unscoped (a scope id would never reach the child, and scoping renames the
+   keyframe). */
 .skeleton-box {
   position: relative;
   overflow: hidden;
   background-size: 200% 100%;
-  animation: qkpi-skel-wave 1.5s ease-in-out infinite;
-}
-
-.skeleton-box {
   background: linear-gradient(
     90deg,
     var(--color-skeleton-base),
     var(--color-skeleton-highlight),
     var(--color-skeleton-base)
   );
+  animation: qkpi-skel-wave 1.5s ease-in-out infinite;
 }
 
 @keyframes qkpi-skel-wave {

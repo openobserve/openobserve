@@ -3446,20 +3446,20 @@ watch(
 );
 </script>
 
-<style>
-.telemetry-correlation-traces .trace-details-content {
+<style scoped>
+/* keep(lib-override:o2-traces-tabs): reach child TraceDetails and O2 tab internals via :deep */
+.telemetry-correlation-traces :deep(.trace-details-content) {
   padding: 0 !important;
 }
-.telemetry-correlation-traces .trace-combined-header-wrapper {
+.telemetry-correlation-traces :deep(.trace-combined-header-wrapper) {
   margin-bottom: 0 !important;
 }
-.metric-group-tabs .o-tab {
+.metric-group-tabs :deep(.o-tab) {
   min-height: 2rem;
   padding: 0 0.75rem;
   font-size: 0.8125rem;
 }
-.metric-group-tabs .o-tab__indicator {
+.metric-group-tabs :deep(.o-tab__indicator) {
   height: 0.125rem;
 }
-
 </style>

@@ -32,8 +32,8 @@
       </template>
     </AppPageHeader>
 
-    <div class="job-form__body flex-1 min-h-0 overflow-hidden flex gap-2">
-      <div class="job-form__main flex-[6.5] min-w-0 min-h-0 overflow-auto flex flex-col gap-2 p-2">
+    <div class="job-form__body flex-1 min-h-0 overflow-hidden flex gap-2 max-[68.75rem]:flex-col">
+      <div class="job-form__main flex-[6.5] min-w-0 min-h-0 overflow-auto flex flex-col gap-2 p-2 max-[68.75rem]:flex-auto">
         <!-- Target -->
         <section class="card-container border border-(--color-dialog-header-border,var(--color-border-default)) rounded-md overflow-hidden shrink-0">
           <div class="flex items-center py-2.5 px-3 border-b border-(--color-border-default,var(--color-border-default))">
@@ -118,7 +118,7 @@
             <span class="text-compact font-semibold tracking-[0.01em] text-(--color-text-primary,currentColor)">{{ t("onlineEvals.job.stepper.sampling") }}</span>
           </div>
           <div class="flex flex-col gap-3 py-3.5 px-4">
-          <div class="job-field-row grid grid-cols-2 max-[1100px]:grid-cols-1 gap-3.5">
+          <div class="job-field-row grid grid-cols-2 max-[68.75rem]:grid-cols-1 gap-3.5">
             <div class="job-field">
               <label class="job-field__label">{{ t("onlineEvals.job.samplingModeLabel") }}</label>
               <OFormSelect
@@ -485,28 +485,16 @@ async function onSubmit(value: JobForm) {
 }
 </script>
 
-<style lang="scss">
-// Layout, spacing, colors, and text styling are Tailwind utilities in the
-// template. Only descendant/`:deep` selectors (targeting child-component
-// internals) and the responsive @media block remain here.
+<style scoped lang="scss">
+/* keep(lib-override:o2-forms): caps the height of the native <textarea> rendered
+   inside OFormTextarea — a child-component element this component can only reach
+   through :deep(). */
 .job-form__main :deep(textarea) {
-  max-height: 200px;
+  max-height: 12.5rem;
   overflow-y: auto;
 }
 
 .job-form__main .job-field--desc :deep(textarea) {
-  max-height: 120px;
-}
-
-@media (max-width: 1100px) {
-  .job-form__body {
-    flex-direction: column;
-  }
-  .job-form__main {
-    flex: 1 1 auto;
-  }
-  .job-field-row {
-    grid-template-columns: 1fr;
-  }
+  max-height: 7.5rem;
 }
 </style>
