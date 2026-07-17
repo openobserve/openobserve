@@ -99,12 +99,12 @@ const getNodeErrorInfo = computed(() => {
 //
 // TODO(design-tokens): these are the same three node-TYPE roles the handle CSS
 // below now takes from --color-status-{info,positive,warning} — but they CANNOT
-// become `var(--color-…)` strings here. vue-flow builds its arrowhead marker id
-// from this value (getMarkerId → `color=<value>&type=…`) and then references it
-// as `url(#<id>)`; a `var(--x)` value puts parentheses inside that url(), which
-// terminates it early and breaks the arrowhead. Resolving the token to a literal
-// (getComputedStyle on :root) at call time is the fix, and would also give these
-// edges the dark-mode step they currently lack.
+// be CSS custom-property references here. vue-flow builds its arrowhead marker
+// id from this value (getMarkerId → `color=<value>&type=…`) and then references
+// it as `url(#<id>)`; a custom-property reference puts parentheses inside that
+// url(), which terminates it early and breaks the arrowhead. Resolving the token
+// to a literal (getComputedStyle on :root) at call time is the fix, and would
+// also give these edges the dark-mode step they currently lack.
 const getNodeColor = (ioType) => {
   const colorMap = {
     input: "#3b82f6", // Blue    — pairs with --color-status-info-text
