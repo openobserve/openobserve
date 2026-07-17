@@ -1,6 +1,6 @@
-<template>
+﻿<template>
   <OCard class="h-full flex flex-col">
-    <!-- Top toolbar: [stream-selector] [search-input]  ···spacer···  [legends] -->
+    <!-- Top toolbar: [stream-selector] [search-input]  Â·Â·Â·spacerÂ·Â·Â·  [legends] -->
     <div class="flex items-center gap-2 p-[0.375rem] pb-0">
       <!-- Stream selector -->
       <div
@@ -75,7 +75,7 @@
         <OSeparator vertical class="self-stretch mx-1" />
         <!-- Inventory chip: the at-a-glance "how big is my system" number. Fixed
              width regardless of how many kinds exist. Click to expand the
-             per-kind distribution (read-only here — the show/hide toggles live
+             per-kind distribution (read-only here â€” the show/hide toggles live
              in the "Show types" control next to it). -->
         <ODropdown side="bottom" align="start">
           <template #trigger>
@@ -127,7 +127,7 @@
             >
               {{ t("traces.serviceGraph.showTypes") }}
               <!-- Filter-active dot: signals the graph is filtered (some types
-                   hidden → entities withheld) rather than simply empty. A plain
+                   hidden â†’ entities withheld) rather than simply empty. A plain
                    dot avoids the "is that N shown or N hidden?" ambiguity of a
                    count; the per-type detail lives in the dropdown below. The
                    button is `active` (primary fill) when filtered, so a white
@@ -201,7 +201,7 @@
           data-test="sg-node-size-info"
           class="flex flex-row items-center gap-2 min-w-0"
         >
-          <!-- Node Size — Graph View only (Tree View uses fixed sizes) -->
+          <!-- Node Size â€” Graph View only (Tree View uses fixed sizes) -->
           <div
             class="mb-0! whitespace-nowrap text-text-primary! font-bold text-xs"
           >
@@ -213,7 +213,7 @@
               <span class="w-4 h-4 rounded-full border-2 border-service-health-healthy bg-transparent shrink-0" />
               <span class="text-xs text-text-secondary!">{{ t("traces.serviceGraph.sizeLow") }}</span>
             </div>
-            <div class="opacity-35 text-base tracking-[0.125rem] mb-0">···</div>
+            <div class="opacity-35 text-base tracking-[0.125rem] mb-0">Â·Â·Â·</div>
             <div class="flex flex-row items-center gap-1.5">
               <span class="w-7 h-7 rounded-full border-2 border-service-health-healthy bg-transparent shrink-0" />
               <span class="text-xs text-text-secondary!">{{ t("traces.serviceGraph.sizeHigh") }}</span>
@@ -243,7 +243,7 @@
             </div>
             <div
               v-else-if="error"
-              class="flex flex-center h-full items-center justify-center p-[0.675rem]"
+              class="flex h-full items-center justify-center p-[0.675rem]"
             >
               <div>
                 <OIcon name="error-outline" style="width: 4em; height: 4em;" />
@@ -469,7 +469,7 @@ export default defineComponent({
 
     const searchFilter = ref("");
 
-    // Stream filter — synced from traces page selected stream
+    // Stream filter â€” synced from traces page selected stream
     const tracesStream = searchObj.data.stream?.selectedStream?.value || "";
     const storedStreamFilter = localStorage.getItem(
       "serviceGraph_streamFilter",
@@ -515,7 +515,7 @@ export default defineComponent({
       applyFilters();
     };
 
-    // ── Zoom controls ─────────────────────────────────────────────────────────
+    // â”€â”€ Zoom controls â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     // The mouse still zooms (roam:true) so you can focus an area with the wheel;
     // scaleLimit on the series bounds it so it can't run away (the old "erratic"
     // feel). The +/- buttons drive the SAME series `zoom` option via setOption,
@@ -546,7 +546,7 @@ export default defineComponent({
     const zoomOut = () => zoomBy(1 / 1.25);
 
     // Fit-to-screen: recreate the chart (keyed on chartKey) so ECharts re-fits
-    // the full graph bounding box into the panel at zoom 1, re-centered — the
+    // the full graph bounding box into the panel at zoom 1, re-centered â€” the
     // reliable reset for both tree (layout:none) and graph series (also clears
     // any wheel pan/zoom the user applied).
     const fitToScreen = () => {
@@ -567,7 +567,7 @@ export default defineComponent({
     // no inferred type are instrumented services; the rest are inferred deps.
     const kindCounts = computed(() => {
       const counts = { service: 0, database: 0, queue: 0, external: 0, rpc: 0 };
-      // Count the RAW backend topology, not the collapsed view — the legend must
+      // Count the RAW backend topology, not the collapsed view â€” the legend must
       // report the true entity counts regardless of collapse/expand state, and
       // must never count a boundary node (which represents N members) as one.
       for (const n of graphData.value.nodes || []) {
@@ -582,7 +582,7 @@ export default defineComponent({
       return counts;
     });
 
-    // Total entity count for the header inventory chip. Sums every kind — the
+    // Total entity count for the header inventory chip. Sums every kind â€” the
     // single "how big is my system" number a user reads at a glance.
     const totalEntities = computed(() => {
       const c = kindCounts.value;
@@ -613,7 +613,7 @@ export default defineComponent({
     ]);
 
     // How many entity types the user has hidden. Non-zero means the graph is
-    // filtered — the "Show types" button reflects this (active state + count)
+    // filtered â€” the "Show types" button reflects this (active state + count)
     // so the user knows entities are being withheld, not that the graph is
     // simply empty.
     const activeFilterCount = computed(() => hiddenKinds.value.size);
@@ -694,10 +694,10 @@ export default defineComponent({
         ...newOptions,
         // Always full-replace. ECharts cannot swap a series TYPE via a merge, so
         // a merge (the old graph path) left the previous `tree` series in place
-        // and Graph View rendered blank after a tree→graph switch. Both views now
+        // and Graph View rendered blank after a treeâ†’graph switch. Both views now
         // use fixed node positions (tree: computeTreeLayout; graph: layered
         // layout with explicit x/y), so a replace re-renders at the same
-        // coordinates — no zoom/pan jump — while guaranteeing the series swaps.
+        // coordinates â€” no zoom/pan jump â€” while guaranteeing the series swaps.
         notMerge: true,
         lazyUpdate: true, // Prevent viewport reset when only styles change
         silent: true, // Disable animations during update to prevent position jumps
@@ -790,7 +790,7 @@ export default defineComponent({
     //
     // ECharts' emphasis.lineStyle only fires on direct edge hover, NOT when a
     // connected node is hovered. We handle it explicitly: on node mouseover we
-    // call setOption to switch adjacent edges to dashed (→ CSS animation fires),
+    // call setOption to switch adjacent edges to dashed (â†’ CSS animation fires),
     // on mouseout we restore them to solid.
     //
     // We replicate the same edge deduplication used in convertServiceGraphToNetwork
@@ -800,7 +800,7 @@ export default defineComponent({
       if (!chart) return;
 
       // Tree view: emphasis.focus:'relative' in the series config handles dimming natively.
-      // No manual dispatch needed — ECharts triggers it on mouseover automatically.
+      // No manual dispatch needed â€” ECharts triggers it on mouseover automatically.
       if (searchObj.meta.serviceGraphVisualizationType !== "graph") return;
 
       const rawEdges: any[] = filteredGraphData.value.edges || [];
@@ -848,7 +848,7 @@ export default defineComponent({
       const zr = chart.getZr();
       let hideTimer: ReturnType<typeof setTimeout> | null = null;
 
-      // Custom tooltip element — node tooltips use innerHTML, edge tooltips use an ECharts mini chart
+      // Custom tooltip element â€” node tooltips use innerHTML, edge tooltips use an ECharts mini chart
       const tooltipEl = document.createElement("div");
       const isDarkInit = isDark.value;
       tooltipEl.style.cssText = `
@@ -899,7 +899,7 @@ export default defineComponent({
         name: string;
       }> = [];
 
-      // Robust child access — handles children(), _children, or childAt/childCount
+      // Robust child access â€” handles children(), _children, or childAt/childCount
       const getChildren = (group: any): any[] => {
         if (typeof group.children === "function") return group.children();
         if (Array.isArray(group._children)) return group._children;
@@ -1021,7 +1021,7 @@ export default defineComponent({
           return; // Keep previous good data on error
         }
 
-        // Only swap if we got valid data — never clear good data with empty
+        // Only swap if we got valid data â€” never clear good data with empty
         if (newEdgesGroupEl && newBezierEdges.length > 0) {
           edgesGroupEl = newEdgesGroupEl;
           bezierEdges = newBezierEdges;
@@ -1081,7 +1081,7 @@ export default defineComponent({
       ) => {
         resetToTextTooltip();
 
-        // Always use node-level data for the tooltip — same source as border color
+        // Always use node-level data for the tooltip â€” same source as border color
         const nodes = graphData.value?.nodes || [];
         const node = nodes.find((n: any) => (n.label || n.id) === nodeName);
         if (!node) {
@@ -1158,7 +1158,7 @@ export default defineComponent({
         if (!edgesGroupEl || bezierEdges.length === 0) return;
         if (!edgesGroupEl.transformCoordToLocal) return;
 
-        // Convert mouse pixel coords → edges group local coords
+        // Convert mouse pixel coords â†’ edges group local coords
         const [mx, my] = edgesGroupEl.transformCoordToLocal(
           e.offsetX,
           e.offsetY,
@@ -1271,7 +1271,7 @@ export default defineComponent({
         }
       };
 
-      // Node hover → animate adjacent edges
+      // Node hover â†’ animate adjacent edges
       const onNodeMouseover = (params: any) => {
         if (params.dataType !== "node") return;
         updateEdgeStylesForHover(params.data?.id ?? params.name ?? null);
@@ -1357,7 +1357,7 @@ export default defineComponent({
       },
     );
 
-    // When visualization type changes (tree↔graph), the chart component is reused
+    // When visualization type changes (treeâ†”graph), the chart component is reused
     // but the series type swaps via setOption. Re-register tooltip handlers so both
     // ZRender (tree) and ECharts edge events (graph) work correctly after the swap.
     watch(
@@ -1396,7 +1396,7 @@ export default defineComponent({
     });
 
     const loadServiceGraph = async () => {
-      // Prevent concurrent loads — if already loading, skip
+      // Prevent concurrent loads â€” if already loading, skip
       if (loading.value) return;
 
       loading.value = true;
@@ -1419,8 +1419,8 @@ export default defineComponent({
         // Topology, node kinds, edges and latency all come from the
         // pre-aggregated _o2_service_graph stream via /topology/current. The
         // backend (processor + build_topology) now computes the complete,
-        // classified topology — including async queue consumers and collision
-        // handling — so the UI is a thin renderer with no client-side derivation.
+        // classified topology â€” including async queue consumers and collision
+        // handling â€” so the UI is a thin renderer with no client-side derivation.
         const response = await serviceGraphService.getCurrentTopology(orgId, {
           streamName:
             streamFilter.value && streamFilter.value !== "all"
@@ -1458,7 +1458,7 @@ export default defineComponent({
 
         // Deterministic order. The backend does not guarantee node/edge order,
         // and the layouts (computeTreeLayout Y-slots, computeForceLayout seed)
-        // are order-sensitive — so without this, the SAME topology renders a
+        // are order-sensitive â€” so without this, the SAME topology renders a
         // DIFFERENT graph each fetch. Sort nodes by id and edges by (from,to) so
         // an identical topology always produces an identical graph.
         nodes.sort((a: any, b: any) => String(a.id).localeCompare(String(b.id)));
@@ -1655,11 +1655,11 @@ export default defineComponent({
     watch(
       () => searchObj.meta.serviceGraphVisualizationType,
       () => {
-        // Only clear the cache — do NOT bump chartKey (that would recreate the
+        // Only clear the cache â€” do NOT bump chartKey (that would recreate the
         // ChartRenderer and replay the tree expand animation). The clean series
         // swap comes from chartData rendering with notMerge:true (full replace),
         // which lets a `type:"tree"` series be replaced by a `type:"graph"` one
-        // (and vice-versa) — a merge cannot swap series types.
+        // (and vice-versa) â€” a merge cannot swap series types.
         lastChartOptions.value = null;
       },
     );
@@ -1671,7 +1671,7 @@ export default defineComponent({
       },
     );
 
-    // Watch shared datetime — reload when SearchBar changes time range
+    // Watch shared datetime â€” reload when SearchBar changes time range
     watch(
       () => searchObj.data.datetime,
       () => {
@@ -1724,7 +1724,7 @@ export default defineComponent({
       const clickedId: string | undefined = d?.id ?? d?.name;
       if (d?.is_group || clickedId?.startsWith?.(GROUP_PREFIX)) {
         // Boundary id is `__group_<kind>__<caller>`. Toggle THIS specific group
-        // (one caller's dependencies) — not the whole kind — so expanding
+        // (one caller's dependencies) â€” not the whole kind â€” so expanding
         // payment's externals leaves product's externals collapsed.
         if (clickedId) toggleGroupExpansion(clickedId);
         return;
@@ -1831,12 +1831,12 @@ export default defineComponent({
 });
 </script>
 
-<!-- Flowing edge animation — non-scoped so it reaches inside ECharts SVG output -->
+<!-- Flowing edge animation â€” non-scoped so it reaches inside ECharts SVG output -->
 <style scoped>
 /* keep(lib-override:echarts): dashed edge paths are rendered inside ECharts'
    SVG DOM (no scope id, reached via :deep), animated by a keyframe that must
    travel with the rule. ECharts may expose stroke-dasharray as an attribute or
-   an inline style depending on version — both are covered. */
+   an inline style depending on version â€” both are covered. */
 @keyframes sg-edge-flow {
   from {
     stroke-dashoffset: 14;

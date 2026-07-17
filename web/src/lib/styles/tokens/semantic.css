@@ -102,6 +102,28 @@
   --color-white: var(--color-white);
   --color-black: var(--color-black);
 
+  /* Brand neutral scale (re-exports from base.css).
+     Registered to close a documented trap: these were defined but never
+     registered, so `text-grey-500` compiled to NOTHING. A developer would then
+     reach for `text-gray-500` and silently get Tailwind's *different*, un-themed
+     gray (#6b7280 vs our #737373). The brand scale was effectively unreachable
+     from templates. Note the British spelling — `grey-*` is ours, `gray-*` is
+     Tailwind's and is banned by the rawPalette guard. */
+  --color-grey-0:   var(--color-grey-0);
+  --color-grey-50:  var(--color-grey-50);
+  --color-grey-100: var(--color-grey-100);
+  --color-grey-150: var(--color-grey-150);
+  --color-grey-200: var(--color-grey-200);
+  --color-grey-300: var(--color-grey-300);
+  --color-grey-400: var(--color-grey-400);
+  --color-grey-500: var(--color-grey-500);
+  --color-grey-600: var(--color-grey-600);
+  --color-grey-700: var(--color-grey-700);
+  --color-grey-800: var(--color-grey-800);
+  --color-grey-850: var(--color-grey-850);
+  --color-grey-900: var(--color-grey-900);
+  --color-grey-950: var(--color-grey-950);
+
   /* Brand / Primary (re-exports from base.css) */
   --color-primary-50:  var(--color-primary-50);
   --color-primary-100: var(--color-primary-100);

@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -78,8 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="font-semibold">{{ value }}</div>
           <div
             v-if="row.description"
-            class="text-xs"
-            style="max-width: 260px; white-space: normal; line-height: 1.3; color: var(--color-text-muted)"
+            class="text-xs max-w-65 whitespace-normal leading-tight text-text-muted"
           >
             {{ row.description }}
           </div>
@@ -91,13 +90,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="text-xs"
             style="word-break: break-all; white-space: normal"
           >
-            {{ value || "—" }}
+            {{ value || "â€”" }}
           </code>
         </template>
 
-        <!-- Tiered pricing — each tier on its own row -->
+        <!-- Tiered pricing â€” each tier on its own row -->
         <template #cell-pricing="{ row }">
-          <div v-if="!row.tiers?.length">—</div>
+          <div v-if="!row.tiers?.length">â€”</div>
           <div v-else>
             <div
               v-for="(tier, idx) in [...row.tiers].sort(
@@ -111,7 +110,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="tier-name text-2xs font-semibold text-text-secondary mb-px" :class="tier.condition ? 'text-text-muted' : ''">
                 <span v-if="tier.condition">
                   {{ tier.name }}
-                  <span style="font-weight: 400; color: var(--color-text-muted)">
+                  <span class="font-normal text-text-muted">
                     ({{ tier.condition.usage_key }}
                     {{ tier.condition.operator }}
                     {{ tier.condition.value.toLocaleString() }})
@@ -133,9 +132,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <template #empty>
-          <div class="w-full flex flex-col flex-center p-6">
+          <div class="w-full flex flex-col items-center justify-center p-6">
             <OIcon name="search-off" style="width: 50px; height: 50px;" />
-            <div class="mt-3" style="color: var(--color-text-muted)">
+            <div class="mt-3 text-text-muted">
               {{ t("modelPricing.noModelsFound") }}
             </div>
           </div>
@@ -152,7 +151,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
             <span
               v-if="selectedIds.length > 0"
-              style="color: var(--color-accent)"
+              class="text-accent"
               class="font-semibold"
             >
               {{ selectedIds.length }} selected
