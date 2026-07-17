@@ -368,14 +368,28 @@ export class PipelinesPage {
     // Methods from PipelinePage
     async openPipelineMenu() {
         await openNavFlyoutChild(this.page, 'pipeline');
-        // pipelineTab.click() auto-waits for actionability, so the pre-click sleep
-        // was redundant. After the click, wait for the pipeline list page to render
-        // instead of a blind 2s — resolves in ~0.5-1s on the common path. Best-effort
-        // (.catch) so callers that immediately page.goto elsewhere aren't blocked.
-        await this.pipelineTab.click();
-        await this.page.locator('[data-test="pipeline-list-page"]')
+        // openNavFlyoutChild navigates via a hover-flyout force-click that can
+        // intermittently miss (the flyout self-closes on settle), leaving us on the
+        // previous page. That was the dominant Pipelines-shard flake: the follow-up
+        // pipelineTab.click() then timed out at the 45s action timeout because the
+        // streamPipelines tab only exists on the pipeline list page. Confirm we
+        // actually landed; if not, navigate directly — a goto is deterministic and
+        // needs no flyout.
+        const onPipelinePage = await this.page.locator('[data-test="pipeline-list-page"]')
             .waitFor({ state: 'visible', timeout: 15000 })
-            .catch(() => {});
+            .then(() => true)
+            .catch(() => false);
+        if (!onPipelinePage) {
+            await this.page.goto(
+                `${process.env.ZO_BASE_URL}/web/pipeline/pipelines?org_identifier=${process.env["ORGNAME"]}`
+            );
+            await this.page.locator('[data-test="pipeline-list-page"]')
+                .waitFor({ state: 'visible', timeout: 30000 });
+        }
+        // Ensure the Stream Pipelines section tab is selected. Wait for it to render
+        // before clicking so the click never races the page mount.
+        await this.pipelineTab.waitFor({ state: 'visible', timeout: 15000 });
+        await this.pipelineTab.click();
     }
 
     async addPipeline() {
@@ -1122,11 +1136,34 @@ export class PipelinesPage {
     }
 
     async navigateToStreams() {
+        // `menu-link-/streams-item` is the "Data" nav group tile: it both opens a
+        // hover flyout and navigates. A plain click can register as the hover-open
+        // (flyout appears, page stays blank) without navigating — the same flyout
+        // race that hit openPipelineMenu. Confirm the streams page rendered; if not,
+        // navigate directly. A blind 1s wait previously let refreshStreamStats() fire
+        // against a page that had not loaded.
         await this.streamsMenuItem.click();
-        await this.page.waitForTimeout(1000);
+        const onStreamsPage = await this.page.locator('[data-test="log-stream-table"]')
+            .waitFor({ state: 'visible', timeout: 15000 })
+            .then(() => true)
+            .catch(() => false);
+        if (!onStreamsPage) {
+            await this.page.goto(
+                `${process.env.ZO_BASE_URL}/web/streams?org_identifier=${process.env["ORGNAME"]}`
+            );
+            await this.page.locator('[data-test="log-stream-table"]')
+                .waitFor({ state: 'visible', timeout: 30000 });
+        }
     }
 
     async refreshStreamStats() {
+        // The refresh button is an OButton with :loading bound to the stream-stats
+        // fetch; while loading it is rendered disabled. Clicking during that window
+        // makes Playwright wait on actionability and time out at 45s under CI load
+        // (the pipeline-dynamic flake). Wait for it to settle (visible + enabled)
+        // before clicking.
+        await this.refreshStatsButton.waitFor({ state: 'visible', timeout: 30000 });
+        await expect(this.refreshStatsButton).toBeEnabled({ timeout: 30000 });
         await this.refreshStatsButton.click();
         await this.page.waitForTimeout(1000);
     }
@@ -1144,6 +1181,22 @@ export class PipelinesPage {
     }
 
     async openTimestampMenu() {
+        // The destination-stream data ingested by exploreStreamAndNavigateToPipeline
+        // may not be indexed yet when the logs explorer first renders (indexing
+        // latency is high on loaded envs), so the first row can be absent and a bare
+        // click dead-waits the full 45s action timeout (the pipeline-core:56 flake
+        // once navigation stopped failing earlier). Re-run the query until a row
+        // appears instead of clicking into an empty table.
+        const runQueryBtn = this.page.locator('[data-test="logs-search-bar-refresh-btn"]');
+        for (let attempt = 1; attempt <= 6; attempt++) {
+            if (await this.timestampColumnMenu.isVisible({ timeout: 10000 }).catch(() => false)) {
+                break;
+            }
+            // Re-trigger the search so newly-indexed rows are picked up.
+            await runQueryBtn.first().click({ timeout: 5000 }).catch(() => {});
+            await this.page.waitForTimeout(3000);
+        }
+        await this.timestampColumnMenu.waitFor({ state: 'visible', timeout: 15000 });
         await this.timestampColumnMenu.click();
     }
 
