@@ -64,7 +64,7 @@
         @mouseenter="isHovered = true"
         @mouseleave="isHovered = false"
       >
-        <img :src="getBtnLogo" class="opacity-70 transition-transform duration-600 [.ai-btn-active_&]:!opacity-100 [.ai-hover-btn:hover_&]:rotate-180 [.ai-hover-btn:hover_&]:[filter:brightness(0)_invert(1)]" />
+        <img :src="getBtnLogo" class="opacity-70 transition-transform duration-600 [.ai-btn-active_&]:!opacity-100" />
       </OButton>
       <OButton
         data-test="add-function-fullscreen-btn"

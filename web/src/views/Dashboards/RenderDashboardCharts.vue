@@ -1790,3 +1790,13 @@ export default defineComponent({
   margin: 10mm;
 }
 </style>
+
+<style scoped>
+/* keep(lib-override:vue-grid-layout): the drag placeholder is DOM that
+   vue-grid-layout renders inside its own subtree, so it can only be reached
+   through `:deep()` from the `.displayDiv` grid host this component owns.
+   `!important` beats the library's own `.vue-grid-placeholder` background. */
+.displayDiv :deep(.vue-grid-item.vue-grid-placeholder) {
+  background: var(--color-dashboard-placeholder-bg) !important;
+}
+</style>

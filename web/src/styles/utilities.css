@@ -63,205 +63,31 @@
   background-color: var(--color-card-glass-bg);
 }
 
-/* ── W1.c — F6 AI buttons · F13 syntax guide · F17 misc (verbatim from
-   component.css; same unlayered-legacy contract as the section header).
-   Dead rules (.ai-floating-button*, .ai-icon-button*, .spitter-container,
-   .syntax-guide-sub-title — zero consumers) were deleted, not moved.
-   F6 component extraction (AiActionButton) stays on the W2 ladder. ── */
-.ai-hover-btn {
-  background: linear-gradient(
-    135deg,
-    rgba(139, 92, 246, 0.15) 0%,
-    rgba(236, 72, 153, 0.15) 100%
-  ) !important;
-  color: #6d28d9 !important;
-  transition:
-    background 0.3s ease,
-    box-shadow 0.3s ease,
-    color 0.3s ease;
-}
+/* ── W1.c — F6 AI buttons · F13 syntax guide · F17 misc: FULLY EVACUATED.
+     F6 .ai-hover-btn (+ dark/hover twins, `:hover img`) → `<style scoped>` in
+        lib/core/EmptyState/EmptyStateIngestionChip.vue — it is that chip's
+        modifier API; the 4 empty states keep passing the class.
+     F6 .ai-btn-active (+ twins) → deleted: all 5 call sites already carry the
+        equivalent `[background:var(--color-gradient-ai-subtle)]!` /
+        `hover:[background:var(--color-gradient-ai)]!` utilities unconditionally,
+        so the rule was a no-op. The class name survives as the state hook read
+        by FunctionsToolbar's `[.ai-btn-active_&]:!opacity-100`.
+     F6 .o2-ai-context-btn (+ twins) → template utilities on its owning
+        component, common/O2AIContextAddBtn.vue; class name dropped.
+     F6 .ai-hover-btn:hover .ai-icon → deleted, the compound never matched DOM.
+     F13 .guide-list(+li) / .syntax-guide-button(-dark) / .syntax-guide-title /
+        .syntax-guide-text / .bg-highlight → all deleted, zero live DOM
+        (`syntax-guide-button` survives only as a data-cy attr; `.bg-highlight`
+        call sites moved to `bg-highlight-bg px-1.25`).
+     F17 .splitter-icon-collapse/-expand → deleted, sole call site is commented
+        out in enterprise billings/Billing.vue.
+     F17 .alert-field-highlight → already colocated as `:deep()` in
+        alerts/AddAlert.vue; the global was a redundant duplicate.
+     F17 .displayDiv .vue-grid-item.vue-grid-placeholder → scoped `:deep()` in
+        Dashboards/RenderDashboardCharts.vue.
+     F17 .warning-msg / .dashboard-chart-border / .no-data-image → deleted, zero
+        consumers. ── */
 
-html.dark .ai-hover-btn,
-.dark .ai-hover-btn {
-  background: linear-gradient(
-    135deg,
-    rgba(139, 92, 246, 0.5) 0%,
-    rgba(236, 72, 153, 0.5) 100%
-  ) !important;
-  box-shadow: 0 0.25rem 0.75rem 0 rgba(139, 92, 246, 0.2);
-  color: #ede9fe !important;
-}
-
-.ai-hover-btn:hover {
-  background: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%) !important;
-  box-shadow: 0 0.25rem 0.75rem 0 rgba(139, 92, 246, 0.35);
-  color: white !important;
-}
-
-html.dark .ai-hover-btn:hover,
-.dark .ai-hover-btn:hover {
-  background: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%) !important;
-  box-shadow: 0 0.25rem 0.75rem 0 rgba(139, 92, 246, 0.35);
-  color: white !important;
-}
-
-.ai-btn-active {
-  background: linear-gradient(
-    135deg,
-    rgba(139, 92, 246, 0.15) 0%,
-    rgba(236, 72, 153, 0.15) 100%
-  ) !important;
-}
-
-html.dark .ai-btn-active,
-.dark .ai-btn-active {
-  background: linear-gradient(
-    135deg,
-    rgba(139, 92, 246, 0.5) 0%,
-    rgba(236, 72, 153, 0.5) 100%
-  ) !important;
-  box-shadow: 0 0.25rem 0.75rem 0 rgba(139, 92, 246, 0.2);
-}
-
-.ai-btn-active:hover {
-  background: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%) !important;
-}
-
-.o2-ai-context-btn {
-  background: linear-gradient(
-    135deg,
-    rgba(139, 92, 246, 0.15) 0%,
-    rgba(236, 72, 153, 0.15) 100%
-  ) !important;
-  transition:
-    background 0.3s ease,
-    box-shadow 0.3s ease;
-}
-
-html.dark .o2-ai-context-btn,
-.dark .o2-ai-context-btn {
-  background: linear-gradient(
-    135deg,
-    rgba(139, 92, 246, 0.5) 0%,
-    rgba(236, 72, 153, 0.5) 100%
-  ) !important;
-  box-shadow: 0 0.25rem 0.75rem 0 rgba(139, 92, 246, 0.2);
-}
-
-.o2-ai-context-btn:hover {
-  background: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%) !important;
-  box-shadow: 0 0.25rem 0.75rem 0 rgba(139, 92, 246, 0.35);
-}
-
-html.dark .o2-ai-context-btn:hover,
-.dark .o2-ai-context-btn:hover {
-  background: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%) !important;
-  box-shadow: 0 0.25rem 0.75rem 0 rgba(139, 92, 246, 0.35) !important;
-}
-
-.ai-hover-btn:hover .ai-icon {
-  transform: rotate(180deg);
-}
-
-.ai-hover-btn:hover img {
-  filter: brightness(0) invert(1);
-  transition: filter 0.3s ease;
-}
-
-.guide-list {
-  padding: 0 10px;
-  margin: 10px 0 0 0;
-}
-
-.guide-list li {
-  font-size: 14px;
-  line-height: 23px;
-}
-
-.syntax-guide-button {
-  cursor: pointer;
-  text-transform: capitalize;
-  min-width: 1.875rem;
-  min-height: 1.875rem;
-  padding: 0.25rem 0.375rem;
-  font-weight: normal;
-  border: 0.0625rem solid rgba(0, 0, 0, 0.12) !important;
-  border-radius: 0.375rem;
-  transition: all 0.2s ease;
-
-  &:hover {
-    background-color: var(--color-interactive-hover-bg);
-  }
-}
-
-.syntax-guide-button-dark {
-  border: 0.0625rem solid var(--color-card-glass-border) !important;
-}
-
-.syntax-guide-title {
-  width: 420px;
-
-  .label {
-    font-size: 15px;
-    font-weight: bold;
-  }
-}
-
-.syntax-guide-text {
-  font-size: 12px;
-  margin-left: 5px;
-}
-
-.bg-highlight {
-  padding-left: 5px;
-  padding-right: 5px;
-  background-color: var(--color-highlight-bg);
-}
-
-.splitter-icon-collapse {
-  min-height: 3em !important;
-  min-width: 0.3rem !important;
-  position: absolute !important;
-  top: 1.625rem !important;
-  left: 0rem !important;
-  z-index: 100 !important;
-  border-radius: 0.325rem;
-}
-
-.splitter-icon-expand {
-  min-height: 3em !important;
-  min-width: 0.3rem !important;
-  position: absolute !important;
-  top: 1.625rem !important;
-  left: 0.25rem !important;
-  z-index: 100 !important;
-  border-radius: 0.325rem;
-}
-
-.alert-field-highlight {
-  border: 0.125rem solid var(--color-accent) !important;
-  border-radius: 0.25rem;
-  transition: border 0.3s ease;
-}
-
-.warning-msg {
-  background-color: var(--color-status-warning-bg);
-  padding: 0.313rem;
-  border-radius: 0.313rem;
-}
-
-.displayDiv .vue-grid-item.vue-grid-placeholder {
-  background: var(--color-dashboard-placeholder-bg) !important;
-}
-
-.dashboard-chart-border {
-  border-right: 0.03rem solid var(--color-card-glass-border);
-  border-bottom: 0.03rem solid var(--color-card-glass-border);
-}
-
-.no-data-image {
-  color: var(--color-button-primary);
-}
 /* ── W1.d — F8 schema explorer · F14 resizer/splitter/layout · F10 logs
    mega-block · stragglers (verbatim from component.css, file order preserved
    so the DIFFERENT-body duplicate pairs — §11.3.2 — keep their cascade

@@ -6,7 +6,8 @@
         size="icon-toolbar"
         @click.stop="sendToAiChat"
         data-test="o2-ai-context-add-btn"
-        :class="['group o2-ai-context-btn', props.class]"
+        class="group [background:var(--color-gradient-ai-subtle)]! [transition:background_0.3s_ease,box-shadow_0.3s_ease] dark:shadow-[0_0.25rem_0.75rem_0_color-mix(in_srgb,var(--color-ai-accent)_20%,transparent)] hover:[background:var(--color-gradient-ai)]! hover:shadow-[0_0.25rem_0.75rem_0_color-mix(in_srgb,var(--color-ai-accent)_35%,transparent)] dark:hover:shadow-[0_0.25rem_0.75rem_0_color-mix(in_srgb,var(--color-ai-accent)_35%,transparent)]!"
+        :class="props.class"
         :style="props.style"
         >
         <div class="flex items-center flex-nowrap">
