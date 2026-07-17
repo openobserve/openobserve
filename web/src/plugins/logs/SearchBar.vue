@@ -231,14 +231,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <ODropdownItem
                   v-for="view in sortedSavedViews"
                   :key="view.view_id"
-                  :icon-left="
-                    favoriteViews.includes(view.view_id)
-                      ? 'favorite'
-                      : 'saved-search'
-                  "
                   :data-test="`logs-search-bar-saved-views-menu-apply-${view.view_name}`"
                   @select="applySavedView(view)"
                 >
+                  <template #icon-left>
+                    <OIcon
+                      :name="
+                        favoriteViews.includes(view.view_id)
+                          ? 'favorite'
+                          : 'saved-search'
+                      "
+                      size="sm"
+                      :class="
+                        favoriteViews.includes(view.view_id)
+                          ? 'text-favorite'
+                          : ''
+                      "
+                    />
+                  </template>
                   <span class="truncate max-w-56">{{ view.view_name }}</span>
                   <template #icon-right>
                     <OButton
@@ -1780,6 +1790,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             : 'favorite-border'
                         "
                         size="xs"
+                        :class="
+                          favoriteViews.includes(row.view_id)
+                            ? 'text-favorite'
+                            : ''
+                        "
                       />
                     </OButton>
                     <OButton
@@ -1862,7 +1877,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :data-test="`logs-search-bar-favorite-${row.view_id}-saved-view-btn`"
                       @click.stop="handleFavoriteSavedView(row, true)"
                     >
-                      <OIcon name="favorite" size="xs" />
+                      <OIcon name="favorite" size="xs" class="text-favorite" />
                     </OButton>
                     <OButton
                       :title="t('common.edit')"

@@ -198,7 +198,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
             <template #cell-name="{ row, value }">
               <span class="inline-flex items-center gap-1">
-                <!-- One-click favorite toggle — filled star when favorited. -->
+                <!-- One-click favorite toggle — filled rose heart when
+                     favorited, neutral outline otherwise. -->
                 <OButton
                   variant="ghost"
                   size="icon-xs-sq"
@@ -207,7 +208,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   "
                   :class="
                     isFavorite(row.id)
-                      ? 'text-primary shrink-0'
+                      ? 'text-favorite shrink-0'
                       : 'text-text-secondary shrink-0'
                   "
                   :title="
