@@ -73,6 +73,7 @@ pub mod traces;
 #[cfg(feature = "cloud")]
 pub mod trial_quota;
 pub mod users;
+#[cfg(feature = "enterprise")]
 pub mod workflows;
 
 // format stream name

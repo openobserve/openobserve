@@ -422,6 +422,7 @@ impl Search for Searcher {
         Err(Status::unimplemented("Not Supported"))
     }
 
+    #[cfg(feature = "enterprise")]
     async fn get_workflow_inputs(
         &self,
         req: Request<GetWorkflowInputsRequest>,
@@ -477,5 +478,13 @@ impl Search for Searcher {
         };
 
         Ok(Response::new(GetWorkflowInputsResponse { data }))
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    async fn get_workflow_inputs(
+        &self,
+        _req: Request<GetWorkflowInputsRequest>,
+    ) -> Result<Response<GetWorkflowInputsResponse>, Status> {
+        Err(Status::unimplemented("Not Supported"))
     }
 }

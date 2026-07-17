@@ -66,6 +66,8 @@ use tracing::{Level, span};
 use crate::common::utils::auth::check_permissions;
 #[cfg(feature = "enterprise")]
 use crate::common::utils::http::get_or_create_trace_id;
+#[cfg(feature = "enterprise")]
+use crate::service::workflows::WorkflowTriggerType;
 use crate::{
     common::{
         infra::config::ORGANIZATIONS,
@@ -80,7 +82,6 @@ use crate::{
         db, folders,
         search::sql::RE_ONLY_SELECT,
         short_url,
-        workflows::WorkflowTriggerType,
     },
 };
 
@@ -365,6 +366,7 @@ async fn prepare_alert(
         }
     }
 
+    #[cfg(feature = "enterprise")]
     for workflow in alert.workflows.iter() {
         match crate::service::workflows::get_workflow_by_id(org_id, workflow).await {
             Ok(None) => {
@@ -1066,7 +1068,7 @@ impl AlertExt for Alert {
 
     async fn send_notification(
         &self,
-        trace_id: &str,
+        _trace_id: &str,
         rows: &[Map<String, Value>],
         rows_end_time: i64,
         start_time: Option<i64>,
@@ -1075,8 +1077,16 @@ impl AlertExt for Alert {
         let mut err_message = "".to_string();
         let mut success_message = "".to_string();
         let mut no_of_error = 0;
+
+        #[cfg(feature = "enterprise")]
         let mut workflow_error = 0;
+        #[cfg(feature = "enterprise")]
         let mut workflow_err_msg = "".to_string();
+
+        #[cfg(not(feature = "enterprise"))]
+        let workflow_error = 0;
+        #[cfg(not(feature = "enterprise"))]
+        let workflow_err_msg = "".to_string();
 
         // Get alert-level template if specified (takes precedence over destination templates)
         let alert_template = if let Some(ref template_name) = self.template {
@@ -1160,6 +1170,7 @@ impl AlertExt for Alert {
         }
 
         // we check specifically for non empty to avoid the clone of data into Value
+        #[cfg(feature = "enterprise")]
         if !self.workflows.is_empty() {
             let data: Vec<_> = rows.iter().map(|v| Value::Object(v.clone())).collect();
 
@@ -1212,7 +1223,7 @@ impl AlertExt for Alert {
 
             for workflow in self.workflows.iter() {
                 if let Err(e) = crate::service::workflows::send_workflow_trigger(
-                    trace_id,
+                    _trace_id,
                     &self.org_id,
                     source_id.clone(),
                     WorkflowTriggerType::AlertFired,

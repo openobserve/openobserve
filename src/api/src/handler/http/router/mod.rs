@@ -866,15 +866,7 @@ pub fn service_routes() -> Router {
         // sourcemaps
         .route("/{org_id}/sourcemaps",get(sourcemaps::list).post(sourcemaps::upload_maps).delete(sourcemaps::delete))
         .route("/{org_id}/sourcemaps/values",get(sourcemaps::list_values))
-        .route("/{org_id}/sourcemaps/stacktrace",post(sourcemaps::translate_stacktrace))
-
-        .route("/{org_id}/workflows",get(workflows::list_workflows).post(workflows::save_workflow))
-        .route("/{org_id}/workflows/{id}",delete(workflows::delete_workflows).put(workflows::update_workflows))
-        .route("/{org_id}/workflows/{id}/test",post(workflows::test_workflow))
-        .route("/{org_id}/workflows/{id}/history",get(workflows::get_workflow_history))
-        .route("/{org_id}/workflows/{id}/errors/{run_id}",get(workflows::get_workflow_errors))
-        .route("/{org_id}/workflows/{id}/retry",post(workflows::retry_workflow))
-        .route("/{org_id}/workflows/{id}/enable",put(workflows::enable_workflow));
+        .route("/{org_id}/sourcemaps/stacktrace",post(sourcemaps::translate_stacktrace));
 
     #[cfg(feature = "enterprise")]
     {
@@ -991,7 +983,16 @@ pub fn service_routes() -> Router {
             .route("/{org_id}/service_streams/_correlate", post(service_streams::correlate_streams))
             .route("/{org_id}/service_streams/config/identity", get(service_streams::get_identity_config).put(service_streams::save_identity_config))
             .route("/{org_id}/service_streams/_reset", delete(service_streams::reset_services))
-            .route("/{org_id}/storage",get(organization::storage::get).post(organization::storage::save).put(organization::storage::update));
+            .route("/{org_id}/storage",get(organization::storage::get).post(organization::storage::save).put(organization::storage::update))
+
+            // workflows
+            .route("/{org_id}/workflows",get(workflows::list_workflows).post(workflows::save_workflow))
+            .route("/{org_id}/workflows/{id}",delete(workflows::delete_workflows).put(workflows::update_workflows))
+            .route("/{org_id}/workflows/{id}/test",post(workflows::test_workflow))
+            .route("/{org_id}/workflows/{id}/history",get(workflows::get_workflow_history))
+            .route("/{org_id}/workflows/{id}/errors/{run_id}",get(workflows::get_workflow_errors))
+            .route("/{org_id}/workflows/{id}/retry",post(workflows::retry_workflow))
+            .route("/{org_id}/workflows/{id}/enable",put(workflows::enable_workflow));
     }
 
     #[cfg(feature = "cloud")]

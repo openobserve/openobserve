@@ -24,14 +24,12 @@ use std::{
 use anyhow::{Result, anyhow};
 use async_trait::async_trait;
 use chrono::Utc;
+#[cfg(feature = "enterprise")]
+use config::meta::{destinations::Module, pipeline::components::WorkflowDestination};
 use config::{
     meta::{
-        destinations::Module,
         function::{Transform, VRLResultResolver},
-        pipeline::{
-            Pipeline, PipelineKind,
-            components::{NodeData, WorkflowDestination},
-        },
+        pipeline::{Pipeline, PipelineKind, components::NodeData},
         self_reporting::error::{ErrorData, ErrorSource, NodeErrors, PipelineError},
         stream::{StreamParams, StreamType},
     },
@@ -1227,7 +1225,7 @@ async fn process_node(
             );
             if let Err(send_err) = channels
                 .error_sender
-                .send((node.id.to_string(), node.node_type(), err_msg, None))
+                .send((node.id.to_string(), node.node_type(), err_msg, None, None))
                 .await
             {
                 log::error!(
@@ -1264,7 +1262,7 @@ async fn process_node(
             process_destination_node(metadata, channels, &node, dest).await?
         }
         #[cfg(not(feature = "enterprise"))]
-        NodeData::Destination(dest) => {
+        NodeData::Destination(_) => {
             log::warn!(
                 "[Workflow] {} [inv={inv_id}]: Destination node {node_idx} skipped because workflows are enterprise-only",
                 metadata.pipeline_name
@@ -2283,6 +2281,7 @@ async fn process_stream_node(
     count
 }
 
+#[cfg(feature = "enterprise")]
 async fn process_destination_node(
     metadata: ProcessMetadata,
     mut channels: ProcessChannels,
