@@ -312,6 +312,11 @@ impl Engine {
                         "VectorSelector: or_matchers is not supported".into(),
                     ));
                 }
+                if vs.at.is_some() {
+                    return Err(DataFusionError::NotImplemented(
+                        "VectorSelector: @ modifier is not supported".into(),
+                    ));
+                }
                 let data = self.eval_vector_selector(&vs).await?;
                 if data.is_empty() {
                     Value::None
@@ -325,6 +330,11 @@ impl Engine {
                 if !vs.matchers.or_matchers.is_empty() {
                     return Err(DataFusionError::Plan(
                         "MatrixSelector: or_matchers is not supported".into(),
+                    ));
+                }
+                if vs.at.is_some() {
+                    return Err(DataFusionError::NotImplemented(
+                        "MatrixSelector: @ modifier is not supported".into(),
                     ));
                 }
                 let data = self.eval_matrix_selector(&vs, *range).await?;
@@ -1915,6 +1925,83 @@ mod tests {
         engine.extract_columns_from_modifier(&modifier, &create_test_token());
         // Should not change label_selector for exclude
         assert!(engine.label_selector.is_empty());
+    }
+
+    /// The `@` modifier PARSES (the fork supports the syntax) but nothing in the
+    /// engine ever reads `vs.at` — every selector is evaluated at the step's own
+    /// timestamp. So before this guard, `foo @ 1600000000` did not pin anything:
+    /// it silently returned UNPINNED results, and the user got a plausible wrong
+    /// number with no error. An unsupported feature must fail loudly; returning
+    /// the wrong data quietly is the worst outcome in a metrics engine.
+    ///
+    /// Rejected at both selector arms — a range selector carries its own `at`
+    /// (`foo[5m] @ end()`), and a subquery recurses through `exec_expr`, so a
+    /// nested `@` lands on one of these two.
+    #[tokio::test]
+    async fn test_exec_expr_rejects_at_modifier() {
+        let trace_id = "test_trace";
+        let org_id = "test_org";
+
+        // (query, what it exercises)
+        let cases = [
+            ("foo @ 1600000000", "instant selector, absolute @"),
+            ("foo @ start()", "instant selector, @ start()"),
+            ("foo @ end()", "instant selector, @ end()"),
+            ("rate(foo[5m] @ 1600000000)", "range selector inside a call"),
+            ("sum_over_time(foo[5m] @ end())", "range selector, @ end()"),
+        ];
+
+        for (query, what) in cases {
+            let mut engine = Engine::new(
+                trace_id,
+                Arc::new(PromqlContext::new(
+                    create_test_query_ctx(trace_id, org_id, 30),
+                    SimpleMockProvider,
+                    vec![],
+                )),
+                create_test_eval_ctx(),
+            );
+
+            let expr = promql_parser::parser::parse(query)
+                .unwrap_or_else(|e| panic!("{what}: `{query}` should parse: {e}"));
+            let err = engine.exec_expr(&expr).await.err().unwrap_or_else(|| {
+                panic!("{what}: `{query}` must be rejected, not silently ignored")
+            });
+
+            assert!(
+                err.to_string().contains("@ modifier is not supported"),
+                "{what}: `{query}` should fail with the @-modifier error, got: {err}",
+            );
+        }
+    }
+
+    /// The guard must not fire on a query that merely LOOKS adjacent — `offset`
+    /// is genuinely implemented and must keep working.
+    #[tokio::test]
+    async fn test_exec_expr_allows_offset_without_at_modifier() {
+        let trace_id = "test_trace";
+        let org_id = "test_org";
+        let mut engine = Engine::new(
+            trace_id,
+            Arc::new(PromqlContext::new(
+                create_test_query_ctx(trace_id, org_id, 30),
+                SimpleMockProvider,
+                vec![],
+            )),
+            create_test_eval_ctx(),
+        );
+
+        let expr = promql_parser::parser::parse("foo offset 5m").expect("should parse");
+        let err = engine.exec_expr(&expr).await.err();
+
+        // The mock provider returns no data, so this may or may not error — what
+        // matters is that it is never the @-modifier rejection.
+        if let Some(err) = err {
+            assert!(
+                !err.to_string().contains("@ modifier"),
+                "offset must not be caught by the @-modifier guard, got: {err}",
+            );
+        }
     }
 
     #[tokio::test]

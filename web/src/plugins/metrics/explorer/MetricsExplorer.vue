@@ -37,8 +37,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          wraps its OWN chips internally (flex-wrap), so the row does not need
          items-start to let chips grow — that only left the controls top-aligned
          and visibly out of line with each other. -->
+    <!-- `p-[0.375rem]`, the SAME padding the Logs and Traces toolbars use
+         (SearchBar.vue:23 / traces SearchBar.vue:19). It was `px-4 py-2`, which
+         put the mode toggle 10px further right than the Logs one — switching
+         Logs -> Metrics visibly jumped the control that is in the same place on
+         both pages. The toolbars are the same object; they must share geometry. -->
     <div
-      class="flex items-center gap-2 shrink-0 px-4 py-2 border-b border-border-default"
+      class="flex items-center gap-2 shrink-0 p-[0.375rem] border-b border-border-default"
       data-test="metrics-explorer-filter-bar"
     >
       <!-- Page mode toggle at the start of the toolbar — Explore (browse grid)
@@ -67,39 +72,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="sm"
           data-test="metrics-explorer-mode-visualize"
         >
+          <!-- The wrench (`build`), matching the Logs toolbar's Visualize —
+               Visualize is where you BUILD a chart, and the two pages must not
+               name the same job with different glyphs. -->
           <template #icon-left>
-            <OIcon name="timeline" size="sm" class="shrink-0" />
+            <OIcon name="build" size="sm" class="shrink-0" />
           </template>
           {{ t("metrics.explorer.modeVisualize") }}
         </OToggleGroupItem>
+        <OToggleGroupItem
+          value="workspace"
+          size="sm"
+          data-test="metrics-explorer-mode-workspace"
+        >
+          <!-- The SAME ♥ the card's button carries: the icon the user clicks to
+               fill this tab is the icon that names it. `workspaces` was left over
+               from when this was called Scratchpad.
+
+               `favorite-border` (outline), not the filled `favorite`: a filled
+               heart is the card's ON state — on a tab it reads as "already
+               favourited" rather than "your favourites live here". The tab names
+               a place; it is not itself a toggle. -->
+          <template #icon-left>
+            <OIcon name="favorite-border" size="sm" class="shrink-0" />
+          </template>
+          {{ t("metrics.explorer.modeWorkspace") }}
+        </OToggleGroupItem>
       </OToggleGroup>
 
-      <!-- Label filters belong to EXPLORE only. In Visualize the PromQL query
-           carries its own matchers, so a separate filter bar is redundant — the
-           same split Logs' visualize uses. A spacer keeps the time controls
-           pinned right when the filters are hidden. -->
-      <div
-        v-if="isExplore"
-        class="flex flex-1 min-w-0 items-center gap-2"
-      >
-        <span
-          class="text-xs font-medium text-text-secondary shrink-0"
-        >
-          {{ t("metrics.explorer.filterLabel") }}
-        </span>
-        <LabelFilterBar
-          :filters="grid.labelFilters.value"
-          :label-names="grid.labelNames.value"
-          :label-names-loading="grid.labelNamesLoading.value"
-          :schema-loading="grid.schemaLoading.value"
-          :load-values="grid.loadLabelValues"
-          @focus-picker="grid.loadLabelNames"
-          @add="onAddLabelFilter"
-          @remove="onRemoveLabelFilter"
-          @clear-all="onClearLabelFilters"
-        />
-      </div>
-      <div v-else class="flex-1" />
+      <!-- The filter control has its own row below (see `metrics-explorer-
+           filter-row`). This spacer is what pins the time cluster right. -->
+      <div class="flex-1" />
 
       <div class="flex items-center gap-2 shrink-0">
         <DateTimePickerDashboard
@@ -112,13 +115,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           trigger
           @trigger="onRefreshTick"
         />
-        <!-- Same refresh control as the dashboard toolbar. -->
+        <!-- Same refresh control as the dashboard toolbar. In Visualize it
+             re-runs the chart's query; in Explore/Workspace it refreshes the
+             grid — so its disabled/loading state follows the grid only there. -->
         <OButton
           variant="outline"
           size="icon-toolbar"
           icon-left="refresh"
-          :disabled="refreshing || grid.loading.value"
-          :loading="refreshing"
+          :disabled="isGridMode && (refreshing || grid.loading.value)"
+          :loading="isGridMode && refreshing"
           data-test="metrics-explorer-refresh"
           @click="onRefresh"
         >
@@ -127,16 +132,55 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
-    <!-- EXPLORE mode — the browse grid. Body is two columns that START ON THE
-         SAME LINE: the left facet panel and the right column (search row + grid)
-         both begin here, so the panel gets the full height and the search bar
-         starts exactly where the grid cards start. -->
-    <div v-if="isExplore" class="flex flex-1 min-h-0">
-      <!-- Left column: the facet selector (Prefix/Suffix/Type) as its OWN header,
-           with the always-open facet panel beneath — one self-contained column,
-           the same shape as the Dashboards page's Folders panel (header on top,
-           list below). The selector is part of this panel, not the search row. -->
+    <!--
+      The filter row.
+
+      Its own line, not a slot in the toolbar: filters are the one control here
+      whose width is UNBOUNDED (a matcher is `label=value`, the value can be a
+      regex, and there can be any number of them), and sharing a line with the
+      fixed-width mode toggle and time cluster meant they were permanently
+      squeezed. Given the full width, the chips simply fit.
+
+      ALWAYS present in grid mode, never `v-if="labelFilters.length"`. A row that
+      appears with the first filter would push the whole grid down at the exact
+      moment the user is reading it — the same shift we removed from the facet
+      panel's Clear control. The picker is the row's resting state, so the height
+      is identical at zero filters and at ten.
+
+      Explore + Workspace only: in Visualize the PromQL query carries its own
+      matchers, so a filter bar would be a second, conflicting way to say the
+      same thing — the same split Logs' visualize uses.
+    -->
+    <div
+      v-if="isGridMode"
+      class="flex items-center gap-2 shrink-0 p-[0.375rem] border-b border-border-default"
+      data-test="metrics-explorer-filter-row"
+    >
+      <!-- No "Filters" caption: the chips already read `action = accept_challenge`
+           and the button already says "+ Filter", so a label in front of them
+           only spends the row's leading space to name what is self-evident. -->
+      <LabelFilterBar
+        :filters="grid.labelFilters.value"
+        :label-names="grid.labelNames.value"
+        :label-names-loading="grid.labelNamesLoading.value"
+        :schema-loading="grid.schemaLoading.value"
+        :load-values="grid.loadLabelValues"
+        @focus-picker="grid.loadLabelNames"
+        @add="onAddLabelFilter"
+        @remove="onRemoveLabelFilter"
+        @clear-all="onClearLabelFilters"
+      />
+    </div>
+
+    <!-- EXPLORE + FAVOURITES — the same browse grid. Favourites is that grid
+         narrowed to the metrics you ♥'d, so the body is identical bar the facet
+         panel (Explore only): the right column is the search row + grid. -->
+    <div v-if="isGridMode" class="flex flex-1 min-h-0">
+      <!-- Facet panel — EXPLORE only. It is an editing control (filter by
+           prefix/suffix/type); Workspace is a read-only lens viewer, so it shows
+           just the grid (with the Views rail), no facets. -->
       <aside
+        v-if="isExplore"
         class="w-60 flex-none flex flex-col min-h-0 border-r border-border-default"
         :aria-label="t('metrics.explorer.railsAriaLabel')"
       >
@@ -335,18 +379,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </OToggleGroup>
 
-          <!-- Saved Views — named snapshots of the explorer's filters + pinned
-               metrics, persisted through the /savedviews API (mirrors the Logs
-               saved views). Applying one restores the filters and pins. -->
-          <MetricsSavedViews
-            :build-snapshot="buildSavedViewSnapshot"
-            @apply="applySavedViewSnapshot"
-          />
-
-          <!-- Convert to dashboard — turns the pinned metrics into real dashboard
-               panels (one per pin). Only offered when something is pinned. -->
+          <!-- Convert to dashboard — the bridge from ephemeral Favourites to a
+               durable Dashboard: each favourite becomes a panel. FAVOURITES only,
+               where they are what's on screen, so "convert what I'm looking at"
+               is unambiguous. This is why Favourites needs no save of its own —
+               you promote it to a real Dashboard instead. -->
           <OButton
-            v-if="grid.favorites.value.length"
+            v-if="isWorkspace && grid.favorites.value.length"
             variant="outline"
             size="sm-action"
             icon-left="dashboard-customize"
@@ -397,6 +436,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >{{ t("metrics.explorer.learnIngest") }}</a
           >
         </div>
+
+        <!-- FAVOURITES with none added yet — the reason is not "filters hid
+             everything", so show the right guidance (add one in Explore) and NO
+             filter-clearing action. -->
+        <OEmptyState
+          v-else-if="isWorkspace && !grid.favorites.value.length"
+          size="block"
+          preset="no-data"
+          :title="t('metrics.explorer.workspace.emptyScratchpadTitle')"
+          :description="t('metrics.explorer.workspace.emptyScratchpadDesc')"
+          data-test="metrics-workspace-empty-grid"
+        />
 
         <!-- Every remedy the hint names, as an action card — but only the ones
              that would actually change anything right now: each card is gated
@@ -453,6 +504,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @select="onSelect"
               @configure="onConfigure"
               @toggle-favorite="grid.toggleFavorite($event.name)"
+              @zoom="onCardZoom"
             />
           </div>
         </div>
@@ -484,10 +536,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          where the user writes PromQL and builds a chart. Keyed on mode so it
          re-initialises its panel state cleanly each time Visualize is entered. -->
     <MetricsVisualize
-      v-else
+      v-else-if="mode === 'visualize'"
+      ref="visualizeRef"
       key="metrics-visualize"
       class="flex-1 min-h-0"
-      :selected-date-time="selectedDate"
+      :selected-date-time="visualizeDateTime"
+      :seed="visualizeSeed"
+      @seed-consumed="visualizeSeed = null"
     />
 
     <FunctionConfigDialog
@@ -544,7 +599,6 @@ import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 
 import MetricCard from "./MetricCard.vue";
 import MetricsVisualize from "./MetricsVisualize.vue";
-import MetricsSavedViews from "./MetricsSavedViews.vue";
 import AddToDashboard from "../AddToDashboard.vue";
 import PrefixFilterPanel from "./PrefixFilterPanel.vue";
 import LabelFilterBar from "./LabelFilterBar.vue";
@@ -557,10 +611,6 @@ import useMetricsExplorerGrid, {
 import { buildPanelDataForCard } from "@/utils/metrics/metricsHandoff";
 import { PANEL_RATE_WINDOW } from "@/utils/metrics/metricDefaults";
 import { BADGE_LABELS, cardColorForIndex } from "@/utils/metrics/metricPalette";
-import {
-  encodeMetricsConfig,
-  METRICS_BLOB_VERSION,
-} from "@/composables/metrics/metricsUrlState";
 import {
   EXPLORER_FILTER_PARAM_KEYS,
   explorerFiltersToQuery,
@@ -616,7 +666,6 @@ export default defineComponent({
     OToggleGroupItem,
     MetricCard,
     MetricsVisualize,
-    MetricsSavedViews,
     AddToDashboard,
     PrefixFilterPanel,
     LabelFilterBar,
@@ -722,11 +771,46 @@ export default defineComponent({
     // workspace. Local to the component (it is not grid data), synced to the URL
     // as `?mode=` like Logs' `logs_visualize_toggle`. The setter ignores the
     // OToggleGroup deselect (undefined) so a re-click can't leave a blank mode.
-    const mode = ref<"explore" | "visualize">("explore");
+    const mode = ref<"explore" | "visualize" | "workspace">("explore");
     const isExplore = computed(() => mode.value === "explore");
+    const isWorkspace = computed(() => mode.value === "workspace");
+    // Explore and Workspace share the grid + facet body (Workspace adds a views
+    // rail); only Visualize swaps to the query workspace.
+    const isGridMode = computed(
+      () => mode.value === "explore" || mode.value === "workspace",
+    );
     const setMode = (v: string | number | undefined) => {
-      if (v === "explore" || v === "visualize") mode.value = v;
+      if (v !== "explore" && v !== "visualize" && v !== "workspace") return;
+      // Pause BEFORE the mode flips, synchronously. The watcher below also keeps
+      // `paused` in sync, but it runs after the DOM has begun tearing the grid
+      // down — and the teardown's own "card visible" events would already have
+      // fired a query each. Setting it here closes that window.
+      grid.paused.value = v === "visualize";
+      mode.value = v;
     };
+
+    // The Favourites tab = only the metrics you ♥'d. So it forces the
+    // favourites-only narrowing; Explore browses everything. `showFavoritesOnly`
+    // is the existing narrowing mechanism — the mode drives it.
+    watch(
+      isWorkspace,
+      (on) => {
+        grid.showFavoritesOnly.value = on;
+      },
+      { immediate: true },
+    );
+
+    // Pause the grid whenever it is not on screen (Visualize). The grid sweeps
+    // its slice whenever the slice changes — and switching modes changes it (the
+    // pinned-only narrowing flips). Unpaused, that sweep re-queries every card
+    // for a grid the user just navigated away from.
+    watch(
+      isGridMode,
+      (on) => {
+        grid.paused.value = !on;
+      },
+      { immediate: true },
+    );
 
     /* ---------------------------------------------------------- layout */
 
@@ -1053,6 +1137,25 @@ export default defineComponent({
 
     /* ---------------------------------------------------- Select handoff */
 
+    // The panel-schema data a card hands to Visualize on "Open" — carries the
+    // metric's TYPE-BASED operation so Visualize opens on the card's own query.
+    // Consumed once by MetricsVisualize, then cleared.
+    const visualizeSeed = ref<Record<string, any> | null>(null);
+
+    // The mounted Visualize pane — the toolbar's refresh drives its runQuery in
+    // visualize mode.
+    const visualizeRef = ref<any>(null);
+
+    // The toolbar window as a CONSUMABLE absolute range (ms) for the Visualize
+    // chart. The picker's v-model is a RELATIVE descriptor ({relativeTimePeriod:
+    // "15m"}) which the panel cannot use — it needs concrete start/end. Depending
+    // on `selectedDate` keeps this reactive as the user changes the range.
+    const visualizeDateTime = computed(() => {
+      void selectedDate.value; // reactive dep on the toolbar range
+      const c = dateTimePickerRef.value?.getConsumableDateTime?.();
+      return c ? { startTime: c.startTime, endTime: c.endTime } : {};
+    });
+
     const onSelect = (card: MetricCardModel) => {
       // Resolved for a PANEL, not for the card: the rate window goes over as
       // `$__rate_interval` rather than the concrete window the card charted, so
@@ -1070,19 +1173,18 @@ export default defineComponent({
         had_override: !!grid.overrides.value[card.name],
       });
 
-      const data = buildPanelDataForCard(card, resolved, defaults.bucketUnit);
-
-      router.push({
-        name: "metricsEditor",
-        query: {
-          org_identifier: store.state.selectedOrganization?.identifier,
-          metrics_data: encodeMetricsConfig({ v: METRICS_BLOB_VERSION, data }),
-          ...selectedDateToQueryParams(selectedDate.value),
-          ...(refreshInterval.value
-            ? { refresh: refreshIntervalToLabel(refreshInterval.value) }
-            : {}),
-        },
-      });
+      // Open IN-PAGE Visualize (not the separate editor route), seeded with the
+      // card's type-aware panel data — so Visualize opens on the same query the
+      // card charted (sum(rate(...)) for a counter, a quantile for a histogram),
+      // not a blank editor.
+      visualizeSeed.value = buildPanelDataForCard(
+        card,
+        resolved,
+        defaults.bucketUnit,
+      );
+      // Through setMode so the grid is paused synchronously before it unmounts —
+      // otherwise its teardown fires a first-time query per card on the way out.
+      setMode("visualize");
     };
 
     /* --------------------------------------------------------------- URL */
@@ -1098,8 +1200,7 @@ export default defineComponent({
       if (f.selectedPrefixes) grid.selectedPrefixes.value = f.selectedPrefixes;
       if (f.selectedSuffixes) grid.selectedSuffixes.value = f.selectedSuffixes;
       if (f.selectedTypes) grid.selectedTypes.value = f.selectedTypes;
-      if (f.showFavoritesOnly !== undefined)
-        grid.showFavoritesOnly.value = f.showFavoritesOnly;
+      // showFavoritesOnly is not restored from the URL — the mode drives it.
       if (f.hideEmptyPanels !== undefined)
         grid.hideEmptyPanels.value = f.hideEmptyPanels;
       if (f.sortBy) grid.sortBy.value = f.sortBy;
@@ -1154,36 +1255,14 @@ export default defineComponent({
       return query;
     };
 
-    /* ------------------------------------------------------ saved views */
-
-    // The snapshot a Saved View stores: the SAME serialized filter state the URL
-    // uses (via explorerFiltersToQuery) plus the pinned metrics. Deliberately no
-    // time range — a view opens against live "now" — and no showFavoritesOnly (a
-    // transient quick filter, not part of the named view).
-    const buildSavedViewSnapshot = () => ({
-      kind: "metrics" as const,
-      filters: explorerFiltersToQuery({
-        searchTerm: grid.searchTerm.value,
-        selectedPrefixes: grid.selectedPrefixes.value,
-        selectedSuffixes: grid.selectedSuffixes.value,
-        selectedTypes: grid.selectedTypes.value,
-        labelFilters: grid.labelFilters.value,
-        showFavoritesOnly: false,
-        hideEmptyPanels: grid.hideEmptyPanels.value,
-        sortBy: grid.sortBy.value,
-        viewMode: grid.viewMode.value,
-        mode: mode.value,
-      }),
-      pinned: [...grid.favorites.value],
-    });
-
     /* -------------------------------------------- convert to dashboard */
 
-    // Build one panel-schema `data` object per PINNED metric, using the same
-    // type-based variant the card charts (effectiveVariant + buildPanelDataForCard,
-    // as the drill-in does). These become N separate panels on the target
-    // dashboard. Rate windows go over as `$__rate_interval` (PANEL_RATE_WINDOW) so
-    // each panel re-derives against the dashboard's own range.
+    // The bridge from ephemeral Favourites to a durable Dashboard: build one
+    // panel-schema `data` object per FAVOURITE metric, using the same type-based
+    // variant the card charts (effectiveVariant + buildPanelDataForCard, as the
+    // drill-in does). These become N separate panels on the target dashboard.
+    // Rate windows go over as `$__rate_interval` (PANEL_RATE_WINDOW) so each panel
+    // re-derives against the dashboard's own range.
     const convertPanels = ref<any[]>([]);
     const convertDialogOpen = ref(false);
 
@@ -1204,28 +1283,6 @@ export default defineComponent({
       if (!panels.length) return;
       convertPanels.value = panels;
       convertDialogOpen.value = true;
-    };
-
-    // Restore a snapshot onto the grid: the filters via the URL deserializer
-    // (which the sync watcher then reflects into the URL), and the pinned set
-    // directly. Missing keys fall back to defaults, so an older/partial snapshot
-    // degrades cleanly rather than throwing.
-    const applySavedViewSnapshot = (snapshot: {
-      filters?: Record<string, any>;
-      pinned?: string[];
-    }) => {
-      const f = queryToExplorerFilters(snapshot.filters ?? {});
-      grid.searchTerm.value = f.searchTerm ?? "";
-      grid.selectedPrefixes.value = f.selectedPrefixes ?? new Set();
-      grid.selectedSuffixes.value = f.selectedSuffixes ?? new Set();
-      grid.selectedTypes.value = f.selectedTypes ?? new Set();
-      grid.labelFilters.value = f.labelFilters ?? [];
-      grid.hideEmptyPanels.value = f.hideEmptyPanels ?? true;
-      grid.sortBy.value = f.sortBy ?? "a-z";
-      grid.viewMode.value = f.viewMode ?? "grid";
-      mode.value = f.mode ?? "explore";
-      grid.favorites.value = [...(snapshot.pinned ?? [])];
-      if (f.labelFilters?.length) grid.ensureSchemas();
     };
 
     // State -> URL via replace, so filter changes never stack history entries.
@@ -1289,6 +1346,22 @@ export default defineComponent({
         }
         if (isEqual(incoming, current)) return;
 
+        // A MODE-only change (Explore <-> Visualize <-> Workspace) is not grid
+        // state: switching tabs must not re-apply the filters. Re-assigning them
+        // hands the grid brand-new Set/array identities, and its watchers answer
+        // an identical-but-new value by re-querying EVERY card — ~40 requests just
+        // for clicking a card's Open. Sync the mode and leave the grid alone.
+        const withoutMode = (o: Record<string, string>) => {
+          const { mode: _m, ...rest } = o;
+          return rest;
+        };
+        if (isEqual(withoutMode(incoming), withoutMode(current))) {
+          mode.value =
+            (incoming.mode as "explore" | "visualize" | "workspace") ??
+            "explore";
+          return;
+        }
+
         const q = route.query as Record<string, any>;
         const f = queryToExplorerFilters(q);
         grid.searchTerm.value = f.searchTerm ?? "";
@@ -1296,10 +1369,10 @@ export default defineComponent({
         grid.selectedSuffixes.value = f.selectedSuffixes ?? new Set();
         grid.selectedTypes.value = f.selectedTypes ?? new Set();
         grid.labelFilters.value = f.labelFilters ?? [];
-        grid.showFavoritesOnly.value = f.showFavoritesOnly ?? false;
         grid.hideEmptyPanels.value = f.hideEmptyPanels ?? true;
         grid.sortBy.value = f.sortBy ?? "a-z";
         grid.viewMode.value = f.viewMode ?? "grid";
+        // Setting mode last lets the isWorkspace watcher set showFavoritesOnly.
         mode.value = f.mode ?? "explore";
         if (f.labelFilters?.length) grid.ensureSchemas();
 
@@ -1331,6 +1404,11 @@ export default defineComponent({
 
     const onCardVisible = (card: MetricCardModel) => {
       onScreen.set(card.name, card);
+      // Not while the grid is off screen. Leaving Explore unmounts the grid, and
+      // the virtualizer's teardown briefly reports rows as "visible" on the way
+      // out — each one would fire a FIRST-time query for a card the user will
+      // never see (~40 requests just for clicking a card's Open).
+      if (grid.paused.value) return;
       grid.requestPreview(card);
     };
 
@@ -1389,6 +1467,53 @@ export default defineComponent({
     };
 
     /**
+     * Drag-select on a card's chart -> the grid's window.
+     *
+     * A zoom re-ranges EVERY card, not just the one dragged: the grid is a
+     * comparison surface (same window on every card, so a spike at the same x is
+     * the same moment), and zooming one card alone would quietly break that.
+     * Following a spike therefore reads as "narrow the whole view to here",
+     * which is also what the same gesture does on a dashboard.
+     *
+     * Deliberately does NOT call the grid directly — it drives the picker, and
+     * the picker's `@on:date-change` runs `onDateChange`. So a zoom takes the
+     * exact path a hand-picked range takes (skipCache + sweep), and the toolbar
+     * shows the window the user is actually looking at instead of still
+     * claiming "Past 15 Minutes". That also makes it undoable: the picker's
+     * range is right there to change back.
+     *
+     * Mirrors ViewDashboard.onDataZoom, including the equal-endpoints guard —
+     * a click-without-drag yields start === end, which is an empty window.
+     */
+    const onCardZoom = (event: { start: number; end: number }) => {
+      if (!event?.start || !event?.end) return;
+
+      const range = { start: new Date(event.start), end: new Date(event.end) };
+      range.start.setMilliseconds(0);
+      range.end.setMilliseconds(0);
+      if (range.start.getTime() === range.end.getTime()) {
+        range.end.setMinutes(range.end.getMinutes() + 1);
+      }
+
+      dateTimePickerRef.value?.setCustomDate?.("absolute", range);
+      // `setCustomDate` alone does NOT reach the grid. It mutates the picker's
+      // internal date/time refs and leaves the emit to DateTime's auto-apply
+      // watcher — which is gated on `autoApply`, and `DateTimePickerDashboard`
+      // defaults `autoApplyDashboard` to false. So the toolbar would show the
+      // zoomed range while every card kept its old data.
+      //
+      // `refresh()` calls `saveDate()` directly, which is what emits
+      // `on:date-change` -> `onDateChange` -> skipCache + sweep. This is exactly
+      // why ViewDashboard.onDataZoom calls it too; the pair is the contract.
+      dateTimePickerRef.value?.refresh?.();
+      track("metrics_explorer_card_zoomed", {
+        window_seconds: Math.round(
+          (range.end.getTime() - range.start.getTime()) / 1000,
+        ),
+      });
+    };
+
+    /**
      * Manual refresh.
      *
      * Advances a relative window to "now", drops cached responses (an absolute
@@ -1398,6 +1523,20 @@ export default defineComponent({
      */
     const onRefresh = async (opts?: { manual?: boolean }) => {
       if (refreshing.value) return;
+
+      // VISUALIZE: refresh means "re-run the query in the chart" — exactly ONE
+      // query — and nothing else.
+      //
+      // Deliberately does NOT touch the DateTimePicker: its `refresh()` RE-EMITS
+      // a date-change, which `onDateChange` answers by re-querying every
+      // on-screen card — ~50 requests for a single chart. The Visualize pane
+      // re-derives its own window from `selectedDate` inside runQuery, so there
+      // is nothing to refresh here but the chart itself.
+      if (mode.value === "visualize") {
+        visualizeRef.value?.runQuery?.();
+        return;
+      }
+
       refreshing.value = true;
       const manual = opts?.manual !== false;
       try {
@@ -1552,6 +1691,8 @@ export default defineComponent({
       viewModel,
       mode,
       isExplore,
+      isWorkspace,
+      isGridMode,
       setMode,
       noDataHiddenLabel,
       noMatchDescription,
@@ -1568,16 +1709,18 @@ export default defineComponent({
       runDialogPreview,
       onApplyOverride,
       onRestoreOverride,
-      buildSavedViewSnapshot,
-      applySavedViewSnapshot,
       openConvertToDashboard,
       convertPanels,
       convertDialogOpen,
       onSelect,
+      visualizeSeed,
+      visualizeRef,
+      visualizeDateTime,
       onDateChange,
       onRefreshTick,
       onCardVisible,
       onCardHidden,
+      onCardZoom,
       onRefresh,
       refreshing,
     };

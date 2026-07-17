@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :edit-mode="true"
       :dashboard-data="{}"
       :variables-data="{}"
-      :selected-date-time="selectedDateTime"
+      :selected-date-time="dashboardPanelData.meta.dateTime"
       :allowed-chart-types="allowedChartTypes"
       @add-to-dashboard="onAddToDashboard"
       @chart-api-error="onChartApiError"
@@ -50,7 +50,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, provide, onMounted, type PropType } from "vue";
+import {
+  defineComponent,
+  ref,
+  provide,
+  onBeforeMount,
+  onMounted,
+  nextTick,
+  watch,
+  type PropType,
+} from "vue";
 import { useStore } from "vuex";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 import useNotifications from "@/composables/useNotifications";
@@ -76,8 +85,16 @@ export default defineComponent({
         endTime: null,
       }),
     },
+    /** A panel-schema `data` object handed in from a card's "Open" — carries the
+     *  metric's TYPE-BASED operation (sum(rate()), quantile, …). When present,
+     *  Visualize opens on this query instead of the blank metrics defaults. */
+    seed: {
+      type: Object as PropType<Record<string, any> | null>,
+      default: null,
+    },
   },
-  setup() {
+  emits: ["seed-consumed"],
+  setup(props, { emit }) {
     // The PanelEditor family keys its shared state off this provide — "metrics"
     // gives us the metrics defaults and the promql query bar, matching Index.vue.
     provide("dashboardPanelDataPageKey", "metrics");
@@ -120,8 +137,32 @@ export default defineComponent({
       dashboardPanelData.layout.showQueryBar = true;
     };
 
-    onMounted(() => {
-      applyMetricsDefaults();
+    // Open on a card's type-based query: reset to a clean metrics panel, then lay
+    // the seed's panel-schema `data` on top (the same shape the metrics editor
+    // receives from the card drill-in). Every query is forced to the metrics
+    // stream type. Mirrors `applyMetricsBlob`, but from a raw data object.
+    const applySeed = (seed: Record<string, any>) => {
+      resetDashboardPanelData();
+      dashboardPanelData.layout.showQueryBar = true;
+      if (Array.isArray(seed.queries)) {
+        for (const q of seed.queries) {
+          if (q && q.fields) q.fields.stream_type = "metrics";
+        }
+      }
+      Object.assign(dashboardPanelData.data, seed);
+      dashboardPanelData.layout.currentQueryIndex = 0;
+    };
+
+    // BEFORE the PanelEditor child mounts (matches the metrics editor route): if
+    // it mounts first, it initialises an empty query area and a later assign does
+    // not reflect into the already-built query bar.
+    onBeforeMount(() => {
+      if (props.seed) {
+        applySeed(props.seed);
+        emit("seed-consumed");
+      } else {
+        applyMetricsDefaults();
+      }
     });
 
     // Validate before opening the add-to-dashboard dialog — the same handshake
@@ -140,6 +181,64 @@ export default defineComponent({
       // PanelEditor surfaces its own error UI; nothing extra to do here.
     };
 
+    /**
+     * Push the toolbar's window into the panel's `meta.dateTime` — the shape the
+     * PanelEditor/chart reads (absolute start/end Dates).
+     *
+     * PanelEditor's own runQuery only refreshes ITS dateTimePickerRef, which does
+     * not exist in this embedded usage (our picker lives in the parent toolbar).
+     * So without this the panel has no window at all and the chart never queries.
+     */
+    const applyDateTime = () => {
+      const dt = props.selectedDateTime;
+      if (dt?.startTime != null && dt?.endTime != null) {
+        dashboardPanelData.meta.dateTime = {
+          start_time: new Date(dt.startTime),
+          end_time: new Date(dt.endTime),
+        };
+      }
+    };
+
+    /**
+     * Re-run the CURRENT query and repaint the chart — exactly one query. Exposed
+     * so the toolbar's refresh can drive Visualize (in this mode refresh must
+     * re-run this query, NOT sweep the Explore grid).
+     */
+    const runQuery = () => {
+      applyDateTime();
+      panelEditorRef.value?.runQuery?.();
+    };
+
+    // Declared AFTER applyDateTime/runQuery: the hooks call them, and a const
+    // arrow function is in its temporal dead zone until defined.
+    //
+    // A card's "Open" arrives with a real query — paint it straight away rather
+    // than making the user hit refresh. A blank Visualize (no seed) just sets the
+    // window and waits for the user to build a query. `nextTick` lets PanelEditor
+    // mount so its exposed runQuery is available.
+    onMounted(async () => {
+      applyDateTime();
+      if (!props.seed) return;
+      // Two ticks: the first lets PanelEditor mount, the second lets ITS own
+      // watchers settle so `panelEditorRef.runQuery` is exposed and the panel
+      // state it reads is committed. One tick fires before the ref is populated
+      // and the auto-run silently does nothing.
+      await nextTick();
+      await nextTick();
+      runQuery();
+    });
+
+    // Follow the toolbar's window: re-run when the range changes (only once there
+    // is a query to run).
+    watch(
+      () => props.selectedDateTime,
+      () => {
+        if (dashboardPanelData.data?.queries?.[0]?.query) runQuery();
+        else applyDateTime();
+      },
+      { deep: true },
+    );
+
     return {
       panelEditorRef,
       dashboardPanelData,
@@ -147,6 +246,7 @@ export default defineComponent({
       allowedChartTypes,
       onAddToDashboard,
       onChartApiError,
+      runQuery,
     };
   },
 });

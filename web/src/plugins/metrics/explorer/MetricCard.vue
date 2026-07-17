@@ -118,11 +118,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- The drill-in. Deliberately the ONLY thing that navigates; the chart
              and card are not click targets, so the metric name stays selectable.
              Kept as a discrete tinted icon (not buried in ⋮) — it is the primary
-             action on the card. -->
+             action on the card.
+
+             `edit`, not `open-in-new`: this opens the metric in the in-page
+             Visualize workspace to CHANGE it (query, chart type, functions), and
+             open-in-new is the web's idiom for "leaves this page / new tab",
+             which this does not do. -->
         <OButton
           variant="ghost-primary"
           size="icon"
-          icon-left="open-in-new"
+          icon-left="edit"
           :aria-label="t('metrics.explorer.card.openAria', { name: card.name })"
           :data-test="`metrics-explorer-card-select-${card.name}`"
           @click="$emit('select', card)"
@@ -391,8 +396,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :bucket-unit="bucketO2Unit.unit"
         :bucket-unit-custom="bucketO2Unit.unitCustom"
         :color="color"
-        :time-range="timeRange"
+        :time-range="dataTimeRange"
         @error="renderError = String($event ?? '')"
+        @zoom="$emit('zoom', $event)"
+        @contextmenu="onChartContextMenu"
       />
 
       <div v-else class="h-full">
@@ -480,22 +487,44 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
     </div>
+
+    <!-- Create Alert — the SAME menu the dashboard panel raises on right-click
+         (PanelSchemaRenderer mounts this exact component), so the gesture and the
+         wording are identical wherever a chart is. Position is viewport-fixed
+         from the click, so the card's `overflow-hidden` cannot clip it. -->
+    <AlertContextMenu
+      :visible="alertMenu.visible"
+      :x="alertMenu.x"
+      :y="alertMenu.y"
+      :value="alertMenu.value"
+      @select="onCreateAlert"
+      @close="alertMenu.visible = false"
+    />
   </div>
 </template>
 
 <script lang="ts">
 import {
   computed,
+  defineAsyncComponent,
   defineComponent,
   onBeforeUnmount,
   onMounted,
+  reactive,
   ref,
   watch,
   type PropType,
 } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
+import { useRouter } from "vue-router";
 import MetricCardChart from "./MetricCardChart.vue";
+
+// Async, exactly as PanelSchemaRenderer imports it: the menu is only ever
+// needed once a user right-clicks a chart, so it stays out of the grid's chunk.
+const AlertContextMenu = defineAsyncComponent(
+  () => import("@/components/dashboards/AlertContextMenu.vue"),
+);
 import RelativeTime from "@/components/common/RelativeTime.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -550,6 +579,7 @@ export default defineComponent({
     LoadingProgress,
     OTag,
     OTooltip,
+    AlertContextMenu,
   },
   props: {
     card: { type: Object as PropType<MetricCardModel>, required: true },
@@ -582,12 +612,88 @@ export default defineComponent({
     // never fires the day someone renames the event to something a DOM element
     // also emits.
     "refresh",
+    // A drag-select on the card's chart, as `{start, end}` epoch ms. Forwarded
+    // straight from MetricCardChart — the card takes no action of its own,
+    // because a zoom re-ranges the WHOLE grid (every card shares one window),
+    // which only the explorer can do.
+    "zoom",
   ],
   setup(props, { emit }) {
     const { t } = useI18n();
     const store = useStore();
+    const router = useRouter();
     const root = ref<HTMLElement | null>(null);
     const isDark = computed(() => store.state.theme === "dark");
+
+    /* ------------------------------------------------ create alert */
+
+    /**
+     * Right-click a data point -> Create Alert, the same gesture a dashboard
+     * panel offers. Handled HERE rather than emitted to the explorer: the menu is
+     * positioned from the click and the payload is this card's own query, so
+     * there is nothing for the parent to decide. (`contextmenu` is also a real
+     * DOM event name — emitting it would bind to the root element and fire on
+     * every right-click anywhere on the card, which is the trap the `refresh`
+     * note above describes.)
+     */
+    const alertMenu = reactive({ visible: false, x: 0, y: 0, value: 0 });
+
+    const onChartContextMenu = (event: {
+      x: number;
+      y: number;
+      value: number;
+    }) => {
+      // The clicked point's value seeds the threshold, so the alert opens
+      // pre-filled with the number the user actually pointed at.
+      if (!Number.isFinite(event?.value)) return;
+      alertMenu.visible = true;
+      alertMenu.x = event.x;
+      alertMenu.y = event.y;
+      alertMenu.value = event.value;
+    };
+
+    /**
+     * The same `panelData` contract the dashboard path builds
+     * (usePanelActions.handleCreateAlert) and the alert page reads: queries +
+     * queryType + timeRange + the chosen condition/threshold.
+     *
+     * `yAxisColumn` is deliberately absent — it is SQL-only there too; a PromQL
+     * alert thresholds the expression's own value.
+     */
+    const onCreateAlert = (selection: {
+      condition: string;
+      threshold: number;
+    }) => {
+      alertMenu.visible = false;
+
+      const queries = props.queries ?? [];
+      if (!queries.length) return;
+
+      const panelData = {
+        panelTitle: props.card.name,
+        panelId: `metrics-explorer-card-${props.card.name}`,
+        queries: queries.map((q: any) => ({
+          query: q.expr,
+          customQuery: true,
+          fields: { stream_type: "metrics" },
+          config: { promql_legend: q.legendTemplate ?? "" },
+        })),
+        queryType: "promql",
+        timeRange: props.timeRange,
+        threshold: selection.threshold,
+        condition: selection.condition,
+        executedQuery: queries[0]?.expr,
+      };
+
+      router.push({
+        name: "addAlert",
+        query: {
+          org_identifier: store.state.selectedOrganization?.identifier,
+          fromPanel: "true",
+          panelData: encodeURIComponent(JSON.stringify(panelData)),
+        },
+      });
+    };
 
     const color = computed(() => cardColorForIndex(props.index, isDark.value));
     // Kept for the card's aria label; the VISIBLE badge renders through the
@@ -703,6 +809,27 @@ export default defineComponent({
      */
     const isSparse = computed(() => !!props.preview?.sparse && isEmpty.value);
 
+    /**
+     * The window the chart's x-axis is drawn against: the one this data was
+     * FETCHED for, falling back to the selected one.
+     *
+     * They are the same thing on the live path. They diverge only for a card
+     * painted from the persisted cache, and there the selected window is a lie:
+     * a relative range ("Past 15 Minutes") re-resolves against `now` on every
+     * mount, so `timeRange` marches forward with the wall clock while the cached
+     * points stay where they were. Pinning to it drew an axis of 10:15-10:30 over
+     * data from 09:40 — the chart appeared to drift on its own.
+     *
+     * Dashboards never hit this because their pin is streaming-only (it is gated
+     * on `loading`, which a cache paint leaves false), so a cached panel just
+     * auto-ranges onto its own data. A card pins deliberately — it has to, since
+     * one sparse series would otherwise invent a two-day axis — so it must pin to
+     * the window that is actually true of the data.
+     */
+    const dataTimeRange = computed(
+      () => props.preview?.cachedTimeRange ?? props.timeRange,
+    );
+
     // Lazy queries: only cards in (or within one viewport of) the scroll window
     // fetch anything.
     let observer: IntersectionObserver | null = null;
@@ -745,8 +872,12 @@ export default defineComponent({
       copyErrorReport,
       isEmpty,
       isSparse,
+      dataTimeRange,
       renderError,
       onRetryRender,
+      alertMenu,
+      onChartContextMenu,
+      onCreateAlert,
     };
   },
 });

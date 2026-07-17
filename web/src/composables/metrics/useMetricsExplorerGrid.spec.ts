@@ -205,6 +205,24 @@ describe("useMetricsExplorerGrid", () => {
   const cardNamed = (grid: any, name: string) =>
     grid.cards.value.find((c: any) => c.name === name)!;
 
+  describe("the Scratchpad (favorites) narrows the grid when showFavoritesOnly is on", () => {
+    it("narrows sortedCards to the pinned scratchpad set (Workspace tab)", async () => {
+      const grid = await setup();
+      const names = grid.cards.value.map((c: any) => c.name);
+      expect(names.length).toBeGreaterThan(1);
+
+      grid.showFavoritesOnly.value = true;
+      grid.favorites.value = [names[0]]; // scratchpad pins the first
+      expect(grid.sortedCards.value.map((c: any) => c.name)).toEqual([names[0]]);
+
+      // Pinning another metric adds it to the scratchpad view.
+      grid.favorites.value = [names[0], names[1]];
+      expect(grid.sortedCards.value.map((c: any) => c.name).sort()).toEqual(
+        [names[0], names[1]].sort(),
+      );
+    });
+  });
+
   describe("a metric hidden as no-data must not stay hidden across a range change", () => {
     it("forgets what was empty when the window changes", async () => {
       // The set is self-sealing: a card in it is filtered OUT of the grid, so it

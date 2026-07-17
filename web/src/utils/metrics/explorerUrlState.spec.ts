@@ -78,7 +78,9 @@ describe("explorerUrlState", () => {
       { label: "code", operator: "=~", value: "5.." },
       { label: "pod", operator: "=", value: "api-1,canary" },
     ]);
-    expect(restored.showFavoritesOnly).toBe(true);
+    // showFavoritesOnly is no longer URL-serialized — the mode drives it — so it
+    // does not round-trip (stays undefined on restore).
+    expect(restored.showFavoritesOnly).toBeUndefined();
     expect(restored.hideEmptyPanels).toBe(false);
     expect(restored.sortBy).toBe("z-a");
     expect(restored.viewMode).toBe("rows");

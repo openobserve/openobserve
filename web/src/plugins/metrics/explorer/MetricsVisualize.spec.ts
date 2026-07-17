@@ -24,7 +24,10 @@ const makePanelData = () => ({
     queryType: "",
     queries: [{ customQuery: true, fields: { stream_type: "", stream: "" } }],
   },
-  layout: { showQueryBar: false },
+  layout: { showQueryBar: false, currentQueryIndex: 0 },
+  // The panel's time window — the component writes the toolbar's range here and
+  // the template binds PanelEditor's selected-date-time to it.
+  meta: { dateTime: {} },
 });
 
 const panelData = vi.hoisted(() => ({ current: null as any }));
