@@ -231,8 +231,12 @@ Origin tags map back to the source docs: `[A#]` = audit task, `[P#]` = PRD phase
 ### Phase E — Complete AI guidance `[A9]`
 
 #### E1. `CLAUDE.md` / `AGENTS.md` + wire skills into AI review
-- **Status:** ◐ partial — skills exist; no `CLAUDE.md`/`AGENTS.md`, not referenced by
-  `ai-code-review.yml`.
+- **Status:** ✅ **DONE** — `web/CLAUDE.md` (links skills + ESLint-encoded conventions) and
+  `web/AGENTS.md` (thin pointer) exist; the AI reviewer now consults them: `shared-rules.md`
+  Project Context tells all reviewers to read `web/CLAUDE.md` for `web/` changes (and corrects
+  the stale "Pinia" → Vuex), and `agents/code-quality.md` enumerates the frontend conventions to
+  flag (no `any`/`!`/use-site `as`, `no-mutating-props`, O2-over-Quasar, tokens+i18n, type/lint
+  clean). No stale `ui-guidelines.md` exists to deprecate.
 - **How:** create a concise `web/CLAUDE.md` (stack; "use O-components not Quasar" derived from the
   `vue/no-restricted-html-elements` block; commands; the ratchet rules from this roadmap), add
   `web/AGENTS.md` as a thin pointer, reference it from `ai-code-review.yml` (+ bug/feat checkers),
