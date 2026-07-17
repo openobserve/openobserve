@@ -40,7 +40,10 @@ jobs:
   ent-e2e-gate:
     name: ent-e2e-gate
     runs-on: ubuntu-latest
-    timeout-minutes: 55   # ~5 min to find the ENT run + up to ~45 min to poll it to completion
+    # ~5 min to find the ENT run + up to ~75 min to poll. Generous on purpose: normal is ~20 min,
+    # but a cold Rust cache can push the ENT build+run toward its own timeouts — don't false-fail
+    # the gate ("timed out") while ENT is still legitimately running.
+    timeout-minutes: 90
     steps:
       - name: Triage — relevant paths? which label?
         id: triage
@@ -138,9 +141,9 @@ jobs:
           RUN_URL="https://github.com/$REPO/actions/runs/$RUN_ID"
           echo "::notice::Tracking ENT run: $RUN_URL"
 
-          # Poll to completion (~45 min budget).
+          # Poll to completion (~75 min budget — covers a cold-cache ENT build+run worst case).
           STATUS=""; CONCL=""
-          for i in $(seq 1 180); do           # 180 * 15s = 45 min
+          for i in $(seq 1 300); do           # 300 * 15s = 75 min
             read -r STATUS CONCL < <(gh run view "$RUN_ID" --repo "$REPO" \
               --json status,conclusion -q '.status + " " + (.conclusion // "")' 2>/dev/null || echo "unknown ")
             if [ "$STATUS" = "completed" ]; then break; fi
