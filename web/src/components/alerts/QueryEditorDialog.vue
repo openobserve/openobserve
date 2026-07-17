@@ -376,7 +376,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                   <!-- Running indicator -->
                   <div v-if="runFnQueryLoading" class="flex items-center gap-1">
-                    <span class="w-1.5 h-1.5 rounded-full bg-status-positive [animation:query-editor-dot-pulse_1.5s_ease-in-out_infinite]" />
+                    <span class="query-editor-run-dot w-1.5 h-1.5 rounded-full bg-status-positive" />
                     <span class="text-3xs font-semibold text-status-positive">Running</span>
                   </div>
                 </div>
@@ -1173,4 +1173,23 @@ const getBtnLogo = computed(() => {
     : getImageURL('images/common/ai_icon_gradient.svg')
 })
 </script>
+
+<style scoped>
+/* keep(keyframes): the "Running" status dot is used only by this dialog. The
+   `animation` is declared here, not as a template `[animation:…]` utility, so
+   Vue's scoped compiler renames the keyframe and this reference together. */
+.query-editor-run-dot {
+  animation: dot-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes dot-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.3;
+  }
+}
+</style>
 

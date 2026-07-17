@@ -106,7 +106,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :name="job.status === 'completed' ? 'check-circle' : job.status === 'failed' ? 'warning' : job.status === 'processing' ? 'sync' : 'schedule'"
                       size="sm"
                       :class="[
-                        job.status === 'processing' ? '[animation:o2-spin-rotate_2s_linear_infinite]' : '',
+                        job.status === 'processing' ? 'animate-[spin_2s_linear_infinite]' : '',
                         job.status === 'completed' ? 'text-status-positive' :
                         job.status === 'failed' ? 'text-status-negative' :
                         job.status === 'processing' ? 'text-accent' :

@@ -68,11 +68,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             preserveAspectRatio="none"
           >
             <path
-              class="panel-tile__area-fill [animation:o2-llm-line-pulse_1.6s_ease-in-out_infinite] fill-[color-mix(in_srgb,var(--color-text-primary)_8%,transparent)]"
+              class="panel-tile__area-fill fill-[color-mix(in_srgb,var(--color-text-primary)_8%,transparent)]"
               d="M0,55 C20,42 35,52 55,46 C72,41 85,30 105,28 C125,26 140,42 160,38 C175,35 190,22 200,18 L200,80 L0,80 Z"
             />
             <path
-              class="panel-tile__line-stroke [animation:o2-llm-line-pulse_1.6s_ease-in-out_infinite] stroke-[color-mix(in_srgb,var(--color-text-primary)_18%,transparent)]"
+              class="panel-tile__line-stroke stroke-[color-mix(in_srgb,var(--color-text-primary)_18%,transparent)]"
               d="M0,55 C20,42 35,52 55,46 C72,41 85,30 105,28 C125,26 140,42 160,38 C175,35 190,22 200,18"
               fill="none"
               stroke-width="2"
@@ -127,9 +127,14 @@ const store = useStore();
    (class order does not guarantee that) and because `.dark` / `:root:not(.dark)`
    ancestor pairs have no utility form here.
    Scoping IS safe: Vue puts this component's scope id on a child component's
-   root element, and the `o2-skel-wave` / `o2-llm-line-pulse` keyframes now live
-   in styles/keyframes.css — the scoped compiler only renames names declared in
-   this block, so the references below and in the template both still resolve.
+   root element, and `o2-skel-wave` still lives in styles/keyframes.css — the
+   scoped compiler only renames names *declared* in this block, so a reference to
+   a global keyframe passes through untouched and still resolves.
+   keep(keyframes): `line-pulse` below is this component's alone, so it is
+   declared here. Its `animation` moved out of the template `[animation:…]`
+   utilities on the two <path>s and into the rules below — the scoped compiler
+   renames a keyframe and its `animation:` together only within this block, and
+   never rewrites class strings in the template.
    `.tile-content` publishes the --tile-* contract for this component's own
    tiles; it is scoped now because the other `.tile-content` users
    (HomeViewSkeleton, logstream/schema) set their own bg/border/text utilities
@@ -173,5 +178,23 @@ const store = useStore();
     color-mix(in srgb, var(--color-black) 4%, transparent)
   );
   background-size: 200% 100%;
+}
+
+/* Breathing sparkline placeholder — the area fill and the line stroke pulse in
+   step. Only the `animation` moved here; the fill/stroke colours stay as
+   utilities on the <path>s. */
+.panel-tile__area-fill,
+.panel-tile__line-stroke {
+  animation: line-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes line-pulse {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
 }
 </style>

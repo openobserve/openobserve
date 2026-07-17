@@ -24,12 +24,7 @@
         }"
       >
         <div
-          class="absolute inset-0 bg-gradient-to-r from-transparent to-transparent via-white/40 dark:via-gray-300/40"
-          :style="{
-            animation: 'loading-progress-shimmer 1.5s infinite linear',
-            width: '200%',
-            left: '-200%',
-          }"
+          class="loading-progress__shimmer absolute inset-0 bg-gradient-to-r from-transparent to-transparent via-white/40 dark:via-gray-300/40"
         ></div>
       </div>
       <!-- Moving circle indicator -->
@@ -46,7 +41,7 @@
         }"
       >
         <div
-          class="absolute inset-0 rounded-full bg-white/20 dark:bg-gray-300/20 [animation:loading-progress-pulse_1.5s_cubic-bezier(0.4,0,0.6,1)_infinite]"
+          class="loading-progress__head-glow absolute inset-0 rounded-full bg-white/20 dark:bg-gray-300/20"
         ></div>
       </div>
     </div>
@@ -126,4 +121,42 @@ export default defineComponent({
   },
 });
 </script>
+
+<style scoped>
+/* keep(keyframes): the gloss sweep and the head glow belong to this progress bar
+   alone. Both `animation`s are declared here rather than on the elements (one was
+   a template `[animation:…]` utility, one an inline `:style` binding) — Vue's
+   scoped compiler rewrites `animation` only inside this block, so keeping the
+   keyframe and its reference together here is what makes the rename resolve.
+   The scoped `[data-v-*]` attribute also lifts these rules above the `inset-0`
+   utility, so the shimmer's own `left` wins regardless of stylesheet order. */
+.loading-progress__shimmer {
+  width: 200%;
+  left: -200%;
+  animation: shimmer 1.5s infinite linear;
+}
+
+.loading-progress__head-glow {
+  animation: head-glow-pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes shimmer {
+  0% {
+    transform: translateX(-200%);
+  }
+  100% {
+    transform: translateX(200%);
+  }
+}
+
+@keyframes head-glow-pulse {
+  0%,
+  100% {
+    opacity: 0.2;
+  }
+  50% {
+    opacity: 0.4;
+  }
+}
+</style>
 

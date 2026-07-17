@@ -1,6 +1,6 @@
 <template>
   <div
-    class="skeleton-box bg-skeleton-base relative overflow-hidden rounded-sm after:content-[''] after:absolute after:inset-0 after:[background:linear-gradient(90deg,transparent_0%,transparent_30%,var(--color-skeleton-shimmer)_50%,transparent_70%,transparent_100%)] after:[animation:o2-skeleton-shimmer_1.8s_ease-in-out_infinite]"
+    class="skeleton-box bg-skeleton-base relative overflow-hidden rounded-sm after:content-[''] after:absolute after:inset-0 after:[background:linear-gradient(90deg,transparent_0%,transparent_30%,var(--color-skeleton-shimmer)_50%,transparent_70%,transparent_100%)]"
     :class="[
       variantClass,
       rounded && 'rounded-lg',
@@ -92,3 +92,26 @@ const computedHeight = computed(() => {
   }
 })
 </script>
+
+<style scoped>
+/* keep(keyframes): SkeletonBox is now the only consumer of the gloss beam
+   (HomeViewSkeleton's chart placeholders, which hand-rolled this markup, are
+   <SkeletonBox> instances again). The `animation` is declared here rather than as
+   a template `after:[animation:…]` utility because Vue's scoped compiler renames
+   a keyframe and its `animation:` together only within one style block, and never
+   rewrites class strings in the template — the rest of the ::after (content,
+   inset, gradient) stays as utilities.
+   ease-in-out on the translate is intentional: it mimics light reflection. */
+.skeleton-box::after {
+  animation: shimmer 1.8s ease-in-out infinite;
+}
+
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+</style>

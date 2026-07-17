@@ -1189,7 +1189,7 @@
           <OButton
             variant="ghost"
             size="icon-sm"
-            class="scroll-to-bottom-btn transition-all duration-300 animate-[o2ai-fade-in-up_0.3s_ease] pointer-events-auto [backdrop-filter:blur(0.5rem)] shadow-[0_2px_8px_color-mix(in_srgb,var(--color-black)_20%,transparent)] border-2! border-text-link! text-text-link! bg-surface-base! dark:border-ai-accent! dark:text-ai-accent! dark:bg-surface-base! hover:scale-110 hover:shadow-[0_4px_12px_color-mix(in_srgb,var(--color-black)_30%,transparent)] hover:border-text-link! hover:text-text-link! hover:bg-surface-base! dark:hover:border-ai-accent! dark:hover:text-ai-accent! dark:hover:bg-surface-base! active:scale-100"
+            class="scroll-to-bottom-btn transition-all duration-300 pointer-events-auto [backdrop-filter:blur(0.5rem)] shadow-[0_2px_8px_color-mix(in_srgb,var(--color-black)_20%,transparent)] border-2! border-text-link! text-text-link! bg-surface-base! dark:border-ai-accent! dark:text-ai-accent! dark:bg-surface-base! hover:scale-110 hover:shadow-[0_4px_12px_color-mix(in_srgb,var(--color-black)_30%,transparent)] hover:border-text-link! hover:text-text-link! hover:bg-surface-base! dark:hover:border-ai-accent! dark:hover:text-ai-accent! dark:hover:bg-surface-base! active:scale-100"
             @click="scrollToBottomSmooth"
           >
             <OIcon name="arrow-downward" size="sm" />
@@ -5853,6 +5853,23 @@ export default defineComponent({
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+/* Scroll-to-bottom button entrance. Rises from below with a slight scale-up, so
+   it is not the same curve as fadeIn/fadeInSlide above (those drop from above). */
+.scroll-to-bottom-btn {
+  animation: fadeInUp 0.3s ease;
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(0.625rem) scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
   }
 }
 

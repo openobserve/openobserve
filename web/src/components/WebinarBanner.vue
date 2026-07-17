@@ -69,7 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="webinar-home-left flex flex-col gap-[0.3rem]">
         <!-- Live badge -->
         <div class="webinar-home-badge inline-flex items-center gap-[0.375rem] text-2xs font-bold uppercase tracking-[0.06em] text-promo-webinar-accent-text">
-          <span class="webinar-home-badge-dot w-[0.5rem] h-[0.5rem] rounded-full bg-(--color-promo-webinar-accent) shrink-0 [animation:o2-webinar-badge-pulse_1.8s_ease-in-out_infinite]" />
+          <span class="webinar-home-badge-dot w-[0.5rem] h-[0.5rem] rounded-full bg-(--color-promo-webinar-accent) shrink-0" />
           {{ webinarData.tag }}
         </div>
 
@@ -178,4 +178,25 @@ onMounted(async () => {
   }
 });
 </script>
+
+<style scoped>
+/* keep(keyframes): the "live" badge dot pulse is used only by this banner. The
+   `animation` is declared here, not as a template `[animation:…]` utility, so
+   Vue's scoped compiler renames the keyframe and this reference together. */
+.webinar-home-badge-dot {
+  animation: badge-pulse 1.8s ease-in-out infinite;
+}
+
+@keyframes badge-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.5);
+    opacity: 0.5;
+  }
+}
+</style>
 

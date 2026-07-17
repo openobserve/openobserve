@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <OIcon
             name="update"
-            :class="isAnimating ? '![animation:auto-refresh-rotate_2s_linear_infinite] ![transform-origin:center_center] !inline-block' : ''"
+            :class="isAnimating ? 'auto-refresh-icon--spinning' : ''"
             size="sm"
           />
           <OTooltip :content="`${t('search.autoRefresh')}: ${selectedLabel}`" />
@@ -100,7 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               name="update"
               size="sm"
               :class="[
-                isAnimating ? '![animation:auto-refresh-rotate_2s_linear_infinite] ![transform-origin:center_center] !inline-block' : '',
+                isAnimating ? 'auto-refresh-icon--spinning' : '',
                 isAnimating ? 'text-primary' : '',
                 'mr-0.5',
               ]"
@@ -381,4 +381,27 @@ export default defineComponent({
   },
 });
 </script>
+
+<style scoped>
+/* keep(keyframes): the spinning refresh icon is used only by this component (both
+   the icon-only and the labelled dropdown trigger share this one class). The
+   `animation` is declared here rather than as a template `[animation:…]` utility
+   so Vue's scoped compiler renames the keyframe and this reference together.
+   The class lands on an OIcon root, which carries this component's scope id too.
+   `!important` is retained from the original `!`-prefixed utilities. */
+.auto-refresh-icon--spinning {
+  display: inline-block !important;
+  transform-origin: center center !important;
+  animation: rotate 2s linear infinite !important;
+}
+
+@keyframes rotate {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+</style>
 

@@ -329,7 +329,7 @@ onUnmounted(() => {
         aria-hidden="true"
       >
         <div
-          :class="['h-full w-full origin-left [animation:o2-toast-shrink_linear_forwards]', progressBarColorClasses[variant ?? 'default']]"
+          :class="['toast-progress-bar h-full w-full origin-left', progressBarColorClasses[variant ?? 'default']]"
           :style="{
             animationDuration: `${timeout}ms`,
             animationPlayState: isPaused ? 'paused' : 'running',
@@ -339,4 +339,25 @@ onUnmounted(() => {
     </div>
   </ToastRoot>
 </template>
+
+<style scoped>
+/* keep(keyframes): the auto-dismiss progress bar is used only by this toast. The
+   `animation` shorthand is declared here, not as a template `[animation:…]`
+   utility, so Vue's scoped compiler renames the keyframe and this reference
+   together. Duration and play-state stay as inline `:style` longhands because
+   they are runtime values (per-toast timeout, pause-on-hover) — inline longhands
+   override this shorthand's initial values, so the pairing is intentional. */
+.toast-progress-bar {
+  animation: shrink linear forwards;
+}
+
+@keyframes shrink {
+  from {
+    transform: scaleX(1);
+  }
+  to {
+    transform: scaleX(0);
+  }
+}
+</style>
 

@@ -18,8 +18,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div
     v-show="visible && !!anchorEl"
     ref="popoverRef"
-    class="wcp w-72 bg-card-glass-solid border border-border-default rounded-lg overflow-hidden shadow-[0_0.5rem_1.5rem_rgba(0,0,0,0.14),0_0.125rem_0.375rem_rgba(0,0,0,0.06)] [animation:o2-wcp-in_0.15s_ease-out]"
-    :class="{ '[animation-name:o2-wcp-in-up]': flipUpward }"
+    class="wcp w-72 bg-card-glass-solid border border-border-default rounded-lg overflow-hidden shadow-[0_0.5rem_1.5rem_rgba(0,0,0,0.14),0_0.125rem_0.375rem_rgba(0,0,0,0.06)]"
+    :class="{ 'wcp--flip-up': flipUpward }"
     :style="popoverStyle"
     data-test="wildcard-value-popover"
     @mouseenter="$emit('popoverEnter')"
@@ -210,4 +210,41 @@ watch(
   },
 );
 </script>
+
+<style scoped>
+/* keep(keyframes): the popover entrance is used only here. Both the `animation`
+   and the flipped variant's `animation-name` are declared in this block rather
+   than as template `[animation:…]` / `[animation-name:…]` utilities, so Vue's
+   scoped compiler renames the keyframes and both references together.
+   `.wcp--flip-up` follows `.wcp`, so the flipped name wins on source order. */
+.wcp {
+  animation: pop-in 0.15s ease-out;
+}
+
+.wcp--flip-up {
+  animation-name: pop-in-up;
+}
+
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(-0.25rem);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes pop-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(0.25rem);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+</style>
 

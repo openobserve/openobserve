@@ -1,5 +1,5 @@
 <template>
-  <div v-if="visible" class="confirmation-overlay w-full mb-2 [animation:o2-ai-confirm-slide-up_0.25s_ease-out]">
+  <div v-if="visible" class="confirmation-overlay w-full mb-2">
     <div
       class="confirmation-dialog w-full pt-4 px-4 pb-3.5 rounded-xl flex flex-col gap-3.5 bg-surface-base border-2 border-border-default shadow-[0_2px_8px_rgba(0,0,0,0.1)] dark:shadow-[0_2px_8px_rgba(0,0,0,0.3)]"
       @keydown="handleDialogKeydown"
@@ -396,4 +396,24 @@ onUnmounted(() => {
   }
 });
 </script>
+
+<style scoped>
+/* keep(keyframes): the inline confirmation entrance is used only by this dialog.
+   The `animation` is declared here, not as a template `[animation:…]` utility, so
+   Vue's scoped compiler renames the keyframe and this reference together. */
+.confirmation-overlay {
+  animation: slide-up 0.25s ease-out;
+}
+
+@keyframes slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(0.625rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+</style>
 
