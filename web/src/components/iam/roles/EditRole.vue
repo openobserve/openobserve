@@ -319,6 +319,7 @@ import cipherKeysService from "@/services/cipher_keys";
 import RePatternsService from "@/services/regex_pattern";
 import config from "@/aws-exports";
 import commonService from "@/services/common";
+import syntheticsService from "@/services/synthetics";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
@@ -862,6 +863,24 @@ const updateRolePermissions = async (permissions: Permission[]) => {
         }
       }
 
+      if (!resourceMapper[resource] && resource === "synthetics") {
+        if (!resourceMapper["synthetic_folder"]) {
+          resourceMapper["synthetic_folder"] = getResourceByName(
+            permissionsState.permissions,
+            "synthetic_folder",
+          ) as Resource;
+        }
+
+        await getResourceEntities(resourceMapper["synthetic_folder"]);
+
+        if (!resourceMapper[resource]) {
+          resourceMapper[resource] = getResourceByName(
+            permissionsState.permissions,
+            resource,
+          ) as Resource;
+        }
+      }
+
       if (!resourceMapper[resource]) continue;
 
       if (
@@ -908,6 +927,14 @@ const updateRolePermissions = async (permissions: Permission[]) => {
           (e: Entity) => e.name === folderId,
         );
         await getResourceEntities(reportResource as Entity);
+      } else if (resource === "synthetics") {
+        // Synthetics entities are plain monitor ids (no folder prefix), so the
+        // owning folder can't be derived from the entity — load every folder's
+        // monitors so the permission can be matched to its row.
+        for (const folderEntity of resourceMapper["synthetic_folder"]?.entities ??
+          []) {
+          await getResourceEntities(folderEntity as Entity);
+        }
       } else if (
         resource === "logs" ||
         resource === "metrics" ||
@@ -1125,6 +1152,12 @@ const updateJsonInTable = () => {
         resourceDetails = resourceMapper.value["rfolder"].entities.find(
           (e: Entity) => e.name === folderId,
         ) as Entity;
+      } else if (resource === "synthetics") {
+        // Plain-id entity — locate the folder whose loaded monitors contain it.
+        resourceDetails = resourceMapper.value["synthetic_folder"].entities.find(
+          (f: Entity) =>
+            (f.entities ?? []).some((e: Entity) => e.name === entity),
+        ) as Entity;
       } else if (entity === "_all_" + getOrgId()) {
         resourceDetails.permission[permission.permission as "AllowAll"].value =
           selectedPermissionsHash.value.has(
@@ -1176,6 +1209,12 @@ const updateJsonInTable = () => {
 
         resourceDetails = resourceMapper.value["afolder"].entities.find(
           (e: Entity) => e.name === folderId,
+        ) as Entity;
+      } else if (resource === "synthetics") {
+        // Plain-id entity — locate the folder whose loaded monitors contain it.
+        resourceDetails = resourceMapper.value["synthetic_folder"].entities.find(
+          (f: Entity) =>
+            (f.entities ?? []).some((e: Entity) => e.name === entity),
         ) as Entity;
       } else if (resource === "report") {
         const [folderId] = entity.split("/");
@@ -1526,6 +1565,8 @@ const getResourceEntities = (resource: Resource | Entity) => {
     cipher_keys: getCipherKeys,
     afolder: getAlertFolders,
     rfolder: getReportFolders,
+    synthetic_folder: getSyntheticsFolders,
+    synthetics: getSynthetics,
     re_patterns: getRePatterns,
     provider: getProviders,
     score_config: getScoreConfigs,
@@ -1677,6 +1718,53 @@ const getAlertFolders = async () => {
     "name",
     "alert",
   );
+  return new Promise((resolve) => {
+    resolve(true);
+  });
+};
+const getSyntheticsFolders = async () => {
+  // Same shape as getAlertFolders — synthetics folders live under folder type "synthetics".
+  const folders: any = await commonService.list_Folders(
+    store.state.selectedOrganization.identifier,
+    "synthetics",
+  );
+
+  let isDefaultPresent = folders.data.list.find(
+    (folder: any) => folder.folderId === "default",
+  );
+
+  if (!isDefaultPresent) {
+    folders.data.list.unshift({ folderId: "default", name: "default" });
+  }
+
+  updateResourceEntities(
+    "synthetic_folder",
+    ["folderId"],
+    [...folders.data.list],
+    true,
+    "name",
+    "synthetics",
+  );
+  return new Promise((resolve) => {
+    resolve(true);
+  });
+};
+const getSynthetics = async (resource: Entity | Resource) => {
+  // Monitors of one folder. Unlike alerts, synthetics FGA entities are plain
+  // monitor ids (no folder prefix) — matches backend set_ownership objects.
+  const res: any = await syntheticsService.listByFolderId(
+    store.state.selectedOrganization.identifier,
+    resource.name,
+  );
+
+  updateEntityEntities(
+    resource,
+    ["id"],
+    [...(res.data?.monitors ?? [])],
+    false,
+    "name",
+  );
+
   return new Promise((resolve) => {
     resolve(true);
   });

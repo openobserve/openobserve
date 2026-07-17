@@ -119,6 +119,7 @@ pub async fn save_folder(
         FolderType::Dashboards => "folders",
         FolderType::Alerts => "alert_folders",
         FolderType::Reports => "report_folders",
+        FolderType::Synthetics => "synthetic_folder",
     };
     set_ownership(org_id, folder_type_ofga, Authz::new(&folder.folder_id)).await;
 
@@ -191,6 +192,7 @@ pub async fn list_folders(
         FolderType::Dashboards => OFGA_MODELS.get("folders").unwrap().key,
         FolderType::Alerts => OFGA_MODELS.get("alert_folders").unwrap().key,
         FolderType::Reports => OFGA_MODELS.get("report_folders").unwrap().key,
+        FolderType::Synthetics => OFGA_MODELS.get("synthetic_folder").unwrap().key,
     };
     #[cfg(not(feature = "enterprise"))]
     let folder_ofga_model = "";
@@ -265,6 +267,8 @@ pub async fn delete_folder(
                 return Err(FolderError::DeleteWithReports);
             }
         }
+        // Synthetics monitor cleanup is handled by the enterprise synthetics handler.
+        FolderType::Synthetics => {}
     };
 
     if !table::folders::exists(org_id, folder_id, folder_type).await? {
@@ -276,6 +280,7 @@ pub async fn delete_folder(
         FolderType::Dashboards => "folders",
         FolderType::Alerts => "alert_folders",
         FolderType::Reports => "report_folders",
+        FolderType::Synthetics => "synthetic_folder",
     };
     remove_ownership(org_id, folder_type_ofga, Authz::new(folder_id)).await;
 
@@ -322,6 +327,10 @@ async fn permitted_folders(
         FolderType::Reports => (
             OFGA_MODELS.get("report_folders").unwrap().key,
             OFGA_MODELS.get("reports").unwrap().key,
+        ),
+        FolderType::Synthetics => (
+            OFGA_MODELS.get("synthetic_folder").unwrap().key,
+            OFGA_MODELS.get("synthetics").unwrap().key,
         ),
     };
 

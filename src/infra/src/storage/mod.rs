@@ -419,6 +419,29 @@ pub fn format_key(key: &str, with_prefix: bool) -> String {
     }
 }
 
+pub async fn presign_url(
+    key: &str,
+    method: reqwest::Method,
+    expires: std::time::Duration,
+) -> anyhow::Result<url::Url> {
+    if is_local_disk_storage() {
+        return Err(anyhow::anyhow!(
+            "presigned URLs not supported in local disk mode"
+        ));
+    }
+    let (_, mut account_map) = accounts::parse_storage_config(&get_config().s3);
+    let storage_config = account_map
+        .remove("default")
+        .ok_or_else(|| anyhow::anyhow!("no default storage account configured"))?;
+    let signer =
+        remote::build_signer(storage_config).map_err(|e| anyhow::anyhow!("build signer: {e}"))?;
+    let path = format_key(key, true);
+    signer
+        .signed_url(method, &path.as_str().into(), expires)
+        .await
+        .map_err(|e| anyhow::anyhow!("presign: {e}"))
+}
+
 pub fn get_stream_from_file(file: &Path) -> Option<String> {
     // eg: files/default/logs/olympics/2023/08/21/08/a.parquet
     // eg: files/default/traces/default/2023/09/04/05/default/service_name=ingester/
