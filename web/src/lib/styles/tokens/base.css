@@ -797,6 +797,10 @@
      sm is intentionally none: cards use a 1px border, not a drop shadow.
      md/lg retained for overlays (dialogs, menus) that need real elevation. */
   --shadow-sm: none;
+  /* Hairline card lift — the step between `sm` (none) and `md` (0 4px 12px).
+     Registered because several cards/chips wanted a 0 1px 3px elevation that had
+     no honest home and were falling back to a heavier shadow. */
+  --shadow-xs: 0 1px 3px -1px rgb(0 0 0 / 0.10), 0 1px 2px -1px rgb(0 0 0 / 0.06);
   --shadow-md: 0 4px 12px -2px rgb(0 0 0 / 0.08), 0 2px 6px -2px rgb(0 0 0 / 0.06);
   --shadow-lg: 0 12px 24px -4px rgb(0 0 0 / 0.10), 0 4px 8px -4px rgb(0 0 0 / 0.06);
 }

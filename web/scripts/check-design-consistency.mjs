@@ -16,13 +16,53 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const SRC_DIR = join(__dirname, "..", "src");
 const BASELINE = join(__dirname, "design-debt-baseline.json");
 
-// Palette-source files: the declared home for literal hex in .ts (§12.3). Excluded
-// from the `tsHex` category so series palettes / theme defs don't count as debt.
+// Declared homes for literal hex in .ts (§12.3). Excluded from the `tsHex`
+// category because their CONSUMER cannot resolve a CSS custom property, so a
+// `var(--color-*)` is impossible there — the hex is the only option:
+//   • ECharts option objects / canvas 2D contexts (dashboard chart converters)
+//   • user-editable chart-template source strings (customChartTemplates/*)
+//   • Monaco editor theme + language token colours (vrlLanguage*)
+//   • SVG/canvas trace-tree rendering
+//   • the theme source-of-truth itself (theme.ts defines the runtime palette)
+//   • JS that builds styled log/status HTML from a fixed status→colour map
+// Entries ending in "/" match by directory prefix; others by exact suffix.
 const TS_HEX_ALLOWLIST = [
+  // categorical / series palettes + theme source
   "utils/dashboard/colorPalette.ts",
   "constants/themes.ts",
   "utils/traces/traceColors.ts",
+  "utils/theme.ts",
+  "utils/themeManager.ts",
   "utils/chartTheme.ts", // sanctioned seam: light-theme fallback constants for jsdom/pre-CSS
+  // ECharts / canvas / geo chart builders — options are serialised, no var() resolves
+  "utils/dashboard/",
+  "composables/dashboard/",
+  "components/dashboards/addPanel/customChartExamples/",
+  "utils/traces/convertTraceData.ts",
+  "utils/traces/treeVisualizationEngine.ts",
+  "composables/useServiceGraphTree.ts",
+  "composables/useMetricsExplorer.ts",
+  // Monaco editor language/theme definitions (colour strings the editor lib reads)
+  "utils/query/vrlLanguage.ts",
+  "utils/query/vrlLanguageDefinition.ts",
+  // JS that builds styled HTML/canvas from a fixed status→colour map
+  "utils/logs/convertLogData.ts",
+  "utils/logs/statusParser.ts",
+  "utils/logs/keyValueParser.ts",
+  // LLM / metric / latency chart-panel series palettes (ECharts, no var())
+  "plugins/traces/llmTrendPanel.utils.ts",
+  "plugins/traces/config/",
+  "enterprise/components/billings/usageDailyPanelSchema.ts",
+  "composables/useLatencyInsightsDashboard.ts",
+  "composables/useMetricsCorrelationDashboard.ts",
+  "utils/metrics/metricPalette.ts",
+  "utils/traces/treeTooltipHelpers.ts",
+  "utils/alerts/alertChartData.ts",
+  "composables/useAlertForm.ts", // ECharts markLine colour
+  // Ingestion vendor brand accents (D12-style fixed brand colour; `tone` is a
+  // reserved-future field that is never read — see setup-card content types)
+  "components/ingestion/setupCard/content/",
+  "components/ingestion/ai/content/",
 ];
 
 // The two sanctioned dark-mode seams (§3.R.1) — the only files allowed to read
@@ -39,7 +79,10 @@ const WHOLE = {
   inlineHexStyle: /style="[^"]*#[0-9a-fA-F]{3,8}/g,
   inlineHexBind: /:style="[^"]*#[0-9a-fA-F]{3,8}/g,
   themeTernary: /theme\s*===?\s*['"]dark['"]/g,
-  bareRounded: /(?:^|[\s"'`])rounded(?![-\w])/g,
+  // A bare `rounded` utility is bounded by class-list separators on BOTH sides.
+  // Requiring a trailing separator (space/quote/backtick/EOL) skips prose in
+  // comments ("short, rounded, inset") and JS object keys (`rounded: "..."`).
+  bareRounded: /(?:^|[\s"'`])rounded(?=[\s"'`]|$)/gm,
   arbRadius: /rounded(?:-[a-z]+)*-\[[^\]]+\]/g,
   arbTextSize: /text-\[[0-9.]+(?:px|rem)\]/g,
   unscopedStyle: /<style(?![^>]*\bscoped\b)[^>]*>/g,
@@ -118,8 +161,17 @@ function countFile(file, rel) {
     if (unjustified) counts.styleKeepComment = unjustified;
   } else {
     // .ts — only tsHex (non-spec, non-allowlisted) and darkMechanism apply.
-    if (!isSpec && !TS_HEX_ALLOWLIST.some((p) => rel.endsWith(p))) {
-      const n = (text.match(/['"]#[0-9a-fA-F]{3,8}['"]/g) || []).length;
+    // Allowlist entry ending in "/" matches by directory prefix, else by suffix.
+    const allowed = TS_HEX_ALLOWLIST.some((p) =>
+      p.endsWith("/") ? rel.includes(p) : rel.endsWith(p),
+    );
+    if (!isSpec && !allowed) {
+      // Strip comments first so a hex mentioned in prose ("e.g. #FF0000")
+      // doesn't count as a real colour literal.
+      const code = text
+        .replace(/\/\*[\s\S]*?\*\//g, "")
+        .replace(/(^|[^:])\/\/[^\n]*/g, "$1");
+      const n = (code.match(/['"]#[0-9a-fA-F]{3,8}['"]/g) || []).length;
       if (n) counts.tsHex = n;
     }
     if (!isSpec && !DARK_SEAM_ALLOWLIST.some((p) => rel.endsWith(p))) {

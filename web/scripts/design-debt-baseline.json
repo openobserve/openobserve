@@ -1,30 +1,21 @@
 {
   "totals": {
-    "rawPalette": 28,
-    "arbPx": 25,
+    "rawPalette": 20,
     "arbRadius": 6,
-    "arbZ": 42,
+    "arbZ": 40,
     "styleBlockHex": 5,
+    "arbPx": 21,
     "styleKeepComment": 2,
     "unscopedStyle": 8,
-    "tsHex": 463,
     "stylePxUnit": 90,
     "themeTernary": 2,
     "darkMechanism": 24,
     "inlineHexStyle": 5,
-    "hexClass": 5,
-    "bareRounded": 4
+    "hexClass": 5
   },
   "files": {
     "components/actionScripts/EditScript.vue": {
       "rawPalette": 5
-    },
-    "components/actionScripts/FileItem.vue": {
-      "rawPalette": 5,
-      "arbPx": 2
-    },
-    "components/actionScripts/ScriptEditor.vue": {
-      "rawPalette": 3
     },
     "components/ai-assistant/welcome/CapabilityCards.vue": {
       "arbRadius": 1,
@@ -69,96 +60,12 @@
       "arbPx": 2,
       "arbZ": 1
     },
-    "components/dashboards/addPanel/customChartExamples/customChartTemplates/bar3dDataset.ts": {
-      "tsHex": 13
-    },
-    "components/dashboards/addPanel/customChartExamples/customChartTemplates/bar3dPunchCard.ts": {
-      "tsHex": 5
-    },
-    "components/dashboards/addPanel/customChartExamples/customChartTemplates/confidenceBand.ts": {
-      "tsHex": 5
-    },
-    "components/dashboards/addPanel/customChartExamples/customChartTemplates/dataTransformAggregate.ts": {
-      "tsHex": 5
-    },
-    "components/dashboards/addPanel/customChartExamples/customChartTemplates/funnelCustomize.ts": {
-      "tsHex": 1
-    },
-    "components/dashboards/addPanel/customChartExamples/customChartTemplates/intradayBreaks1.ts": {
-      "tsHex": 2
-    },
-    "components/dashboards/addPanel/customChartExamples/customChartTemplates/multipleXAxis.ts": {
-      "tsHex": 2
-    },
-    "components/dashboards/addPanel/customChartExamples/customChartTemplates/pieBorderRadius.ts": {
-      "tsHex": 1
-    },
-    "components/dashboards/addPanel/customChartExamples/customChartTemplates/radarCustom.ts": {
-      "tsHex": 7
-    },
-    "components/dashboards/addPanel/customChartExamples/customChartTemplates/scatter3dDataset.ts": {
-      "tsHex": 11
-    },
-    "components/dashboards/addPanel/customChartExamples/customChartTemplates/scatter3dScatterMatrix.ts": {
-      "tsHex": 12
-    },
-    "components/dashboards/addPanel/customChartExamples/customChartTemplates/scatterPolynomialRegression.ts": {
-      "tsHex": 1
-    },
     "components/dashboards/panels/HTMLRenderer.vue": {
       "unscopedStyle": 2
-    },
-    "components/DateTimePicker.vue": {
-      "arbPx": 2
     },
     "components/EnterpriseUpgradeDialog.vue": {
       "arbRadius": 2,
       "arbZ": 1
-    },
-    "components/functions/RetryJobDialog.vue": {
-      "arbZ": 1
-    },
-    "components/ingestion/ai/content/richCard/buildFromMarkdown.ts": {
-      "tsHex": 1
-    },
-    "components/ingestion/setupCard/content/aerospike.ts": {
-      "tsHex": 1
-    },
-    "components/ingestion/setupCard/content/cassandra.ts": {
-      "tsHex": 1
-    },
-    "components/ingestion/setupCard/content/databricks.ts": {
-      "tsHex": 1
-    },
-    "components/ingestion/setupCard/content/dynamodb.ts": {
-      "tsHex": 1
-    },
-    "components/ingestion/setupCard/content/mongodb.ts": {
-      "tsHex": 1
-    },
-    "components/ingestion/setupCard/content/mysql.ts": {
-      "tsHex": 1
-    },
-    "components/ingestion/setupCard/content/oracle.ts": {
-      "tsHex": 1
-    },
-    "components/ingestion/setupCard/content/postgres.ts": {
-      "tsHex": 1
-    },
-    "components/ingestion/setupCard/content/redis.ts": {
-      "tsHex": 1
-    },
-    "components/ingestion/setupCard/content/rum.ts": {
-      "tsHex": 1
-    },
-    "components/ingestion/setupCard/content/snowflake.ts": {
-      "tsHex": 1
-    },
-    "components/ingestion/setupCard/content/sqlServer.ts": {
-      "tsHex": 1
-    },
-    "components/ingestion/setupCard/content/zookeeper.ts": {
-      "tsHex": 1
     },
     "components/pipeline/NodeForm/Condition.vue": {
       "arbPx": 2
@@ -207,39 +114,6 @@
       "rawPalette": 1,
       "hexClass": 5,
       "arbZ": 1
-    },
-    "composables/dashboard/useColumnFormatting.ts": {
-      "tsHex": 14
-    },
-    "composables/dashboard/useDashboardPanelDefaults.ts": {
-      "tsHex": 1
-    },
-    "composables/dashboard/usePanelFields.ts": {
-      "tsHex": 12
-    },
-    "composables/useAlertForm.ts": {
-      "tsHex": 1
-    },
-    "composables/useLatencyInsightsDashboard.ts": {
-      "tsHex": 4
-    },
-    "composables/useMetricsCorrelationDashboard.ts": {
-      "tsHex": 2
-    },
-    "composables/useMetricsExplorer.ts": {
-      "tsHex": 12
-    },
-    "composables/useServiceGraphTree.ts": {
-      "tsHex": 8
-    },
-    "enterprise/components/billings/usageDailyPanelSchema.ts": {
-      "tsHex": 4
-    },
-    "lib/core/Badge/OBadge.vue": {
-      "bareRounded": 1
-    },
-    "lib/core/Badge/OTag.vue": {
-      "bareRounded": 1
     },
     "lib/core/EmptyState/illustrations/EmptyAlert.vue": {
       "stylePxUnit": 2
@@ -292,9 +166,6 @@
     "lib/core/EmptyState/illustrations/EmptyWaiting.vue": {
       "stylePxUnit": 2
     },
-    "lib/core/Table/sub-components/OTableHeader.vue": {
-      "bareRounded": 2
-    },
     "lib/forms/Color/OColor.vue": {
       "arbZ": 1
     },
@@ -316,20 +187,11 @@
     "plugins/logs/SearchBar.vue": {
       "arbZ": 4
     },
-    "plugins/metrics/MetricList.vue": {
-      "arbZ": 1
-    },
     "plugins/pipelines/CustomNode.vue": {
       "arbZ": 7
     },
     "plugins/pipelines/PipelineFlow.vue": {
       "arbZ": 1
-    },
-    "plugins/traces/config/llmInsightsPanels.ts": {
-      "tsHex": 7
-    },
-    "plugins/traces/llmTrendPanel.utils.ts": {
-      "tsHex": 8
     },
     "plugins/traces/metrics/TracesMetricsContextMenu.vue": {
       "arbZ": 1
@@ -346,112 +208,41 @@
     "plugins/traces/ThreadToolCalls.vue": {
       "styleBlockHex": 3
     },
-    "stores/index.ts": {
-      "tsHex": 3
-    },
-    "utils/alerts/alertChartData.ts": {
-      "tsHex": 1
-    },
-    "utils/dashboard/chartColorUtils.ts": {
-      "tsHex": 6
-    },
     "utils/dashboard/colorPalette.ts": {
       "darkMechanism": 5
     },
-    "utils/dashboard/convertGeoMapData.ts": {
-      "tsHex": 12
-    },
-    "utils/dashboard/convertMapsData.ts": {
-      "tsHex": 12
-    },
     "utils/dashboard/convertPromQLData.ts": {
-      "tsHex": 3,
       "darkMechanism": 2
     },
-    "utils/dashboard/defaultFields.ts": {
-      "tsHex": 2
-    },
-    "utils/dashboard/promql/convertPromQLChartData.ts": {
-      "tsHex": 1
-    },
-    "utils/dashboard/promql/convertPromQLGeoChart.ts": {
-      "tsHex": 12
-    },
-    "utils/dashboard/promql/convertPromQLMapsChart.ts": {
-      "tsHex": 11
-    },
-    "utils/dashboard/promql/convertPromQLTimeSeriesChart.ts": {
-      "tsHex": 1
-    },
-    "utils/dashboard/promql/shared/spectral.ts": {
-      "tsHex": 11
-    },
     "utils/dashboard/sql/charts/convertSQLHeatmapChart.ts": {
-      "tsHex": 1,
       "darkMechanism": 1
     },
     "utils/dashboard/sql/charts/convertSQLLineAreaChart.ts": {
-      "tsHex": 1,
       "darkMechanism": 1
     },
     "utils/dashboard/sql/charts/convertSQLMetricChart.ts": {
       "darkMechanism": 2
     },
     "utils/dashboard/sql/charts/convertSQLStackedChart.ts": {
-      "tsHex": 1,
       "darkMechanism": 1
     },
     "utils/dashboard/sql/shared/contextBuilder.ts": {
-      "tsHex": 1,
       "darkMechanism": 1
-    },
-    "utils/dashboard/sql/shared/seriesBuilder.ts": {
-      "tsHex": 1
     },
     "utils/dashboard/sqlTimeSeriesConverter.ts": {
-      "tsHex": 2,
       "darkMechanism": 2
     },
-    "utils/dashboard/streaming/overlayNewDataOnOldOptions.ts": {
-      "tsHex": 2
-    },
     "utils/logs/convertLogData.ts": {
-      "tsHex": 40,
       "darkMechanism": 1
     },
-    "utils/logs/keyValueParser.ts": {
-      "tsHex": 26
-    },
-    "utils/logs/statusParser.ts": {
-      "tsHex": 34
-    },
-    "utils/metrics/metricPalette.ts": {
-      "tsHex": 2
-    },
-    "utils/query/vrlLanguage.ts": {
-      "tsHex": 28
-    },
-    "utils/query/vrlLanguageDefinition.ts": {
-      "tsHex": 10
-    },
     "utils/theme.ts": {
-      "tsHex": 23,
       "darkMechanism": 2
     },
     "utils/themeManager.ts": {
       "darkMechanism": 1
     },
-    "utils/traces/convertTraceData.ts": {
-      "tsHex": 40
-    },
     "utils/traces/traceColors.ts": {
       "darkMechanism": 2
-    },
-    "utils/traces/treeTooltipHelpers.ts": {
-      "tsHex": 2
-    },
-    "utils/traces/treeVisualizationEngine.ts": {
-      "tsHex": 22
     },
     "views/Dashboards/ImportDashboard.vue": {
       "unscopedStyle": 1
