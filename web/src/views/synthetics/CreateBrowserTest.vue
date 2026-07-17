@@ -170,7 +170,8 @@ async function loadForEdit(id: string) {
   }
 }
 
-function onLoadRetry(actionId: string) {
+function onLoadRetry(actionId?: string) {
+  if (!actionId) return;
   if (actionId === 'retry' && editId.value) {
     loadForEdit(editId.value)
   }

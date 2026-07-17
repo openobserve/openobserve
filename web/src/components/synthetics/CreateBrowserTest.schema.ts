@@ -95,9 +95,7 @@ export const makeBrowserCheckSaveSchema = (t: (_key: string) => string) =>
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["journey", i, "selector"],
-          message: t("synthetics.validation.selectorRequired", {
-            step: step.name || `Step ${i + 1}`,
-          }),
+          message: t("synthetics.validation.selectorRequired"),
         });
       }
     }

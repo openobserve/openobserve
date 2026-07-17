@@ -45,7 +45,7 @@ watch(
       const windowUs = 5 * 60 * 1_000_000
       const start = props.scheduledTs - windowUs
       const end = props.scheduledTs + windowUs
-      const rows = await executeQuery(buildRunDetailSql(props.runId), start, end, 'logs')
+      const rows = await executeQuery(buildRunDetailSql(props.monitorId, props.runId, ''), start, end, 'logs')
       locations.value = rows.map(mapRunLocationResult)
       // Auto-expand steps for locations that have failures
       for (const loc of locations.value) {

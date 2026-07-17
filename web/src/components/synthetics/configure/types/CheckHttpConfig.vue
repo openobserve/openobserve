@@ -116,7 +116,7 @@ function removeAssertion(index: number) {
               :model-value="h.name"
               :placeholder="t('synthetics.protocolConfig.http.headerName')"
               :data-test="`synthetics-check-http-header-name-${i}`"
-              @update:model-value="(v: string) => patchHeader(i, { name: v })"
+              @update:model-value="(v: string | number) => patchHeader(i, { name: typeof v === 'string' ? v : String(v) })"
             />
           </div>
           <div class="flex-1 min-w-0">
@@ -124,7 +124,7 @@ function removeAssertion(index: number) {
               :model-value="h.value"
               :placeholder="t('synthetics.protocolConfig.http.headerValue')"
               :data-test="`synthetics-check-http-header-value-${i}`"
-              @update:model-value="(v: string) => patchHeader(i, { value: v })"
+              @update:model-value="(v: string | number) => patchHeader(i, { value: typeof v === 'string' ? v : String(v) })"
             />
           </div>
           <OButton
@@ -177,7 +177,7 @@ function removeAssertion(index: number) {
               :model-value="a.value"
               :placeholder="t('synthetics.protocolConfig.http.assertionValue')"
               :data-test="`synthetics-check-http-assertion-value-${i}`"
-              @update:model-value="(v: string) => patchAssertion(i, { value: v })"
+              @update:model-value="(v: string | number) => patchAssertion(i, { value: typeof v === 'string' ? v : String(v) })"
             />
           </div>
           <OButton
