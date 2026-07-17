@@ -265,6 +265,7 @@ mod tests {
         let payload = CreateViewRequest {
             data: "base64-encoded-data".into(),
             view_name: format!("query-for-blah-{}", config::ider::uuid()),
+            view_type: None,
         };
         let app = Router::new().route("/{org_id}/savedviews", post(create_view));
         let req = Request::builder()

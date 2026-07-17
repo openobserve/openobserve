@@ -35,7 +35,9 @@ import useMetricsSavedViews from "./useMetricsSavedViews";
 const metricsView = (id: string, name: string) => ({
   view_id: id,
   view_name: name,
-  data: { kind: "metrics", filters: {}, pinned: [] },
+  // The list now carries `view_type` (the backend returns it); that is what the
+  // filter keys on, not the data blob.
+  view_type: "metrics",
 });
 
 describe("useMetricsSavedViews", () => {
@@ -77,6 +79,7 @@ describe("useMetricsSavedViews", () => {
     expect(service.post).toHaveBeenCalledWith("org1", {
       view_name: "My view",
       data: snapshot,
+      view_type: "metrics",
     });
     expect(sv.views.value).toContainEqual({ view_id: "new-1", view_name: "My view" });
     expect(sv.activeViewId.value).toBe("new-1");
@@ -93,6 +96,7 @@ describe("useMetricsSavedViews", () => {
     expect(service.put).toHaveBeenCalledWith("org1", "v1", {
       view_name: "renamed",
       data: snapshot,
+      view_type: "metrics",
     });
     expect(sv.views.value[0].view_name).toBe("renamed");
   });

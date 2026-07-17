@@ -34,10 +34,15 @@ export interface MetricsSavedView {
   view_name: string;
 }
 
+/** The `view_type` value that marks a saved view as belonging to the Metrics
+ *  page. Sent to the API on create/update and returned in the list, so the two
+ *  pages can separate their views without shipping the whole data blob. */
+export const METRICS_VIEW_TYPE = "metrics";
+
 /** The opaque snapshot stored in a view's `data` field. */
 export interface MetricsSavedViewSnapshot {
-  /** `metrics` marks the record as ours so a shared `/savedviews` list can tell
-   *  a Metrics view from a Logs one. */
+  /** Redundant with the record's `view_type`, kept in the blob too so an
+   *  applied snapshot is self-describing. */
   kind: "metrics";
   /** Serialized ExplorerFilterState — Sets already flattened to arrays. */
   filters: Record<string, any>;
@@ -57,15 +62,16 @@ export default function useMetricsSavedViews() {
 
   const org = () => store.state.selectedOrganization?.identifier;
 
-  /** Fetch the org's views, keeping only the Metrics ones (a shared list may hold
-   *  Logs views too). Best-effort: a failure leaves the list empty, not broken. */
+  /** Fetch the org's views, keeping only the Metrics ones (the shared list also
+   *  holds Logs views). Filters by the `view_type` the list now returns — no need
+   *  to fetch each view's data blob. Best-effort: a failure leaves an empty list. */
   const listViews = async (): Promise<MetricsSavedView[]> => {
     loading.value = true;
     try {
       const res = await savedViewsService.get(org());
       const raw = res?.data?.views ?? res?.data ?? [];
       views.value = (Array.isArray(raw) ? raw : [])
-        .filter((v: any) => isMetricsSnapshot(v?.payload) || isMetricsSnapshot(v?.data))
+        .filter((v: any) => v?.view_type === METRICS_VIEW_TYPE)
         .map((v: any) => ({ view_id: v.view_id, view_name: v.view_name }));
       return views.value;
     } catch {
@@ -84,6 +90,7 @@ export default function useMetricsSavedViews() {
     const res = await savedViewsService.post(org(), {
       view_name: name,
       data: snapshot,
+      view_type: METRICS_VIEW_TYPE,
     });
     const id = res?.data?.view_id ?? "";
     if (id) {
@@ -102,6 +109,7 @@ export default function useMetricsSavedViews() {
     await savedViewsService.put(org(), viewId, {
       view_name: name,
       data: snapshot,
+      view_type: METRICS_VIEW_TYPE,
     });
     const existing = views.value.find((v) => v.view_id === viewId);
     if (existing) existing.view_name = name;

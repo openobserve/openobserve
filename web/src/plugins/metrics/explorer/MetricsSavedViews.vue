@@ -25,88 +25,107 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   one (`@apply`).
 -->
 <template>
-  <div class="flex items-center gap-1" data-test="metrics-saved-views">
-    <!-- Open the list of saved views -->
-    <OButton
-      variant="outline"
-      size="sm-action"
-      icon-left="bookmark-border"
-      data-test="metrics-saved-views-list-btn"
-      @click="openList"
+  <div data-test="metrics-saved-views">
+    <!-- Two joined icon buttons — list (saved-search + dropdown arrow) and
+         create (save) — exactly like the Logs saved-views control. -->
+    <OButtonGroup
+      class="p-0 element-box-shadow border border-button-outline-border"
     >
-      {{ t("metrics.explorer.savedViews.button") }}
-      <OTag
-        v-if="savedViews.views.value.length"
-        type="countChip"
-        value="primary"
-        size="xs"
-        class="ml-1"
-        data-test="metrics-saved-views-count"
-        >{{ savedViews.views.value.length }}</OTag
+      <OButton
+        variant="ghost"
+        size="icon-toolbar"
+        data-test="metrics-saved-views-list-btn"
+        @click="openList"
       >
-      <OTooltip :content="t('metrics.explorer.savedViews.listTooltip')" />
-    </OButton>
+        <OIcon name="saved-search" size="sm" />
+        <OIcon name="arrow-drop-down" size="sm" class="-ml-0.5" />
+        <OTooltip :content="t('metrics.explorer.savedViews.listTooltip')" />
+      </OButton>
+      <OButton
+        variant="ghost"
+        size="icon-toolbar"
+        data-test="metrics-saved-views-create-btn"
+        @click="openCreate"
+      >
+        <OIcon name="save" size="sm" />
+        <OTooltip :content="t('metrics.explorer.savedViews.createTooltip')" />
+      </OButton>
+    </OButtonGroup>
 
-    <!-- Save the current explorer state as a new view -->
-    <OButton
-      variant="ghost"
-      size="icon"
-      icon-left="add"
-      data-test="metrics-saved-views-create-btn"
-      @click="openCreate"
-    >
-      <OTooltip :content="t('metrics.explorer.savedViews.createTooltip')" />
-    </OButton>
-
-    <!-- List dialog: apply or delete a saved view. -->
+    <!-- List dialog: click a view's NAME to apply it; edit/delete icons on the
+         row; a search box filters the list. Header hidden. Mirrors Logs. -->
     <ODialog
       v-model:open="listOpen"
-      size="md"
+      size="lg"
       :title="t('metrics.explorer.savedViews.listTitle')"
       :secondary-button-label="t('confirmDialog.cancel')"
       data-test="metrics-saved-views-list-dialog"
       @click:secondary="listOpen = false"
     >
-      <OTable
-        :data="savedViews.views.value"
-        :columns="listColumns"
-        :loading="savedViews.loading.value"
-        :frame="false"
-        data-test="metrics-saved-views-table"
-      >
-        <template #cell-actions="{ row }">
-          <div class="flex items-center gap-1 justify-end">
-            <OButton
-              variant="ghost-primary"
-              size="xs"
-              :data-test="`metrics-saved-views-apply-${row.view_name}`"
-              @click="onApply(row)"
+      <div class="min-h-[17.5rem]">
+        <OTable
+          v-model:global-filter="listFilter"
+          :data="savedViews.views.value"
+          :columns="listColumns"
+          :loading="savedViews.loading.value"
+          :frame="false"
+          class="o2-table-hide-header"
+          data-test="metrics-saved-views-table"
+        >
+          <template #toolbar>
+            <div class="px-2 py-2 w-full min-w-0 box-border">
+              <OSearchInput
+                v-model="listFilter"
+                clearable
+                :debounce="300"
+                class="w-full"
+                :placeholder="t('metrics.explorer.savedViews.searchPlaceholder')"
+                data-test="metrics-saved-views-search"
+              />
+            </div>
+          </template>
+
+          <template #cell-view_name="{ row, value }">
+            <div
+              class="truncate cursor-pointer text-sm min-w-0 w-full"
+              :title="value"
+              :data-test="`metrics-saved-views-apply-${value}`"
+              @click.stop="onApply(row)"
             >
-              {{ t("metrics.explorer.savedViews.apply") }}
-            </OButton>
-            <OButton
-              variant="ghost"
-              size="icon-xs"
-              icon-left="delete"
-              :aria-label="
-                t('metrics.explorer.savedViews.deleteAria', {
-                  name: row.view_name,
-                })
-              "
-              :data-test="`metrics-saved-views-delete-${row.view_name}`"
-              @click="askDelete(row)"
-            />
-          </div>
-        </template>
-      </OTable>
-      <OEmptyState
-        v-if="!savedViews.loading.value && !savedViews.views.value.length"
-        size="block"
-        preset="no-data"
-        :title="t('metrics.explorer.savedViews.empty')"
-        :description="t('metrics.explorer.savedViews.emptyHint')"
-        data-test="metrics-saved-views-empty"
-      />
+              {{ value }}
+            </div>
+          </template>
+
+          <template #cell-actions="{ row }">
+            <div class="flex items-center gap-0.5 justify-end">
+              <OButton
+                variant="ghost-neutral"
+                size="icon-sm"
+                :title="t('common.edit')"
+                :data-test="`metrics-saved-views-update-${row.view_name}`"
+                @click.stop="onUpdate(row)"
+              >
+                <OIcon name="edit" size="xs" />
+              </OButton>
+              <OButton
+                variant="ghost-neutral"
+                size="icon-sm"
+                :title="t('common.delete')"
+                :data-test="`metrics-saved-views-delete-${row.view_name}`"
+                @click.stop="askDelete(row)"
+              >
+                <OIcon name="delete" size="xs" />
+              </OButton>
+            </div>
+          </template>
+
+          <template #empty>
+            <div class="text-center p-2 w-full text-text-secondary">
+              {{ t("metrics.explorer.savedViews.empty") }}
+            </div>
+          </template>
+        </OTable>
+      </div>
     </ODialog>
 
     <!-- Create / update dialog: name the view (OForm + Zod). -->
@@ -159,13 +178,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, ref, computed, onMounted, type PropType } from "vue";
 import { useI18n } from "vue-i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OTag from "@/lib/core/Badge/OTag.vue";
+import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
-import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import useMetricsSavedViews, {
   type MetricsSavedView,
@@ -177,13 +197,14 @@ export default defineComponent({
   name: "MetricsSavedViews",
   components: {
     OButton,
-    OTag,
+    OButtonGroup,
+    OIcon,
     OTooltip,
     ODialog,
     OTable,
+    OSearchInput,
     OForm,
     OFormInput,
-    OEmptyState,
     ConfirmDialog,
   },
   props: {
@@ -203,13 +224,18 @@ export default defineComponent({
     const formOpen = ref(false);
     const confirmDeleteOpen = ref(false);
     const pendingDelete = ref<MetricsSavedView | null>(null);
+    // Text filter for the list dialog (client-side, via OTable's globalFilter).
+    const listFilter = ref("");
+    // When set, the form dialog is editing THIS view (save overwrites it);
+    // otherwise the form creates a new one.
+    const pendingUpdate = ref<MetricsSavedView | null>(null);
 
     const schema = computed(() => makeMetricsSavedViewSchema(t));
-    const formDefaults = {
-      isSavedViewAction: "create",
-      savedViewName: "",
+    const formDefaults = computed(() => ({
+      isSavedViewAction: pendingUpdate.value ? "update" : "create",
+      savedViewName: pendingUpdate.value?.view_name ?? "",
       savedViewSelectedName: "",
-    };
+    }));
 
     const listColumns = computed(() => [
       {
@@ -237,12 +263,25 @@ export default defineComponent({
     };
 
     const openCreate = () => {
+      pendingUpdate.value = null;
+      formOpen.value = true;
+    };
+
+    // Edit: reopen the name dialog seeded with this view; save overwrites it.
+    const onUpdate = (row: MetricsSavedView) => {
+      pendingUpdate.value = row;
       formOpen.value = true;
     };
 
     const onSubmit = async (values: Record<string, any>) => {
       const snapshot = props.buildSnapshot();
-      await savedViews.createView(values.savedViewName.trim(), snapshot);
+      const name = values.savedViewName.trim();
+      if (pendingUpdate.value) {
+        await savedViews.updateView(pendingUpdate.value.view_id, name, snapshot);
+      } else {
+        await savedViews.createView(name, snapshot);
+      }
+      pendingUpdate.value = null;
       formOpen.value = false;
     };
 
@@ -275,11 +314,13 @@ export default defineComponent({
       formOpen,
       confirmDeleteOpen,
       pendingDelete,
+      listFilter,
       schema,
       formDefaults,
       listColumns,
       openList,
       openCreate,
+      onUpdate,
       onSubmit,
       onApply,
       askDelete,

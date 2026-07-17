@@ -32,10 +32,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          So the first row IS the toolbar, and it carries both clusters the way
          the Logs toolbar does: scope on the left (what you are looking at),
          time on the right (which window, and how often it reloads). -->
-    <!-- items-START, not center: expanding the chips grows the row downward
-         while the label and the time controls stay pinned to the first line. -->
+    <!-- items-center: every control on this row (mode toggle, filter label +
+         button, time picker, refresh) sits on one centred line. LabelFilterBar
+         wraps its OWN chips internally (flex-wrap), so the row does not need
+         items-start to let chips grow — that only left the controls top-aligned
+         and visibly out of line with each other. -->
     <div
-      class="flex items-start gap-2 shrink-0 px-4 py-2 border-b border-border-default"
+      class="flex items-center gap-2 shrink-0 px-4 py-2 border-b border-border-default"
       data-test="metrics-explorer-filter-bar"
     >
       <!-- Page mode toggle at the start of the toolbar — Explore (browse grid)
@@ -77,10 +80,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            pinned right when the filters are hidden. -->
       <div
         v-if="isExplore"
-        class="flex flex-1 min-w-0 items-start gap-2"
+        class="flex flex-1 min-w-0 items-center gap-2"
       >
         <span
-          class="text-xs font-medium text-text-secondary shrink-0 leading-7"
+          class="text-xs font-medium text-text-secondary shrink-0"
         >
           {{ t("metrics.explorer.filterLabel") }}
         </span>

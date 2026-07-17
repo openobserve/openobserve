@@ -270,6 +270,7 @@ describe("useSearchBar Composable", () => {
       wrapper.vm.getSavedViews();
       // Loading state is set before the async call
     });
+
   });
 
   describe("getFunctions", () => {

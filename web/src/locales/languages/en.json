@@ -3954,6 +3954,7 @@
         "listTooltip": "Open your saved views",
         "createTooltip": "Save the current filters and pinned metrics as a view",
         "listTitle": "Saved Views",
+        "searchPlaceholder": "Search saved views",
         "saveTitle": "Save this view",
         "saveDesc": "A view remembers your current filters and pinned metrics, so you can return to this exact setup. It opens against live data, not a fixed time range.",
         "nameLabel": "View name",

@@ -55,14 +55,17 @@ const mountSV = () =>
         // Render-through the shells so triggers/table/form slots exist; the O2
         // internals are not what these wiring tests assert.
         OButton: { template: '<button v-bind="$attrs"><slot /></button>' },
-        OTag: true,
+        OButtonGroup: { template: "<div><slot /></div>" },
+        OSearchInput: true,
         OTooltip: true,
         OIcon: true,
         ODialog: { template: "<div><slot /></div>" },
         OTable: {
           props: ["data"],
+          // Render both custom cells (name = apply target, actions = edit/delete)
+          // plus the toolbar, the way the real table lays the rows out.
           template:
-            '<table><tr v-for="row in data" :key="row.view_id"><slot name="cell-actions" :row="row" /></tr></table>',
+            '<table><slot name="toolbar" /><tr v-for="row in data" :key="row.view_id"><td><slot name="cell-view_name" :row="row" :value="row.view_name" /></td><td><slot name="cell-actions" :row="row" /></td></tr></table>',
         },
         OForm: {
           // Expose a submit that calls @submit with a name, so onSubmit runs.
@@ -70,7 +73,6 @@ const mountSV = () =>
             '<form data-test="form" @submit.prevent="$emit(\'submit\', { savedViewName: \'My view\' })"><slot /><button type="submit" data-test="do-submit" /></form>',
         },
         OFormInput: true,
-        OEmptyState: true,
         ConfirmDialog: {
           props: ["modelValue"],
           emits: ["update:ok", "update:cancel"],
@@ -133,6 +135,29 @@ describe("MetricsSavedViews", () => {
       filters: { type: "counter" },
       pinned: ["m1"],
     });
+  });
+
+  it("editing a view saves over it (update, not create)", async () => {
+    composable.views.value = [{ view_id: "v1", view_name: "Morning" }];
+    const wrapper = mountSV();
+    await wrapper
+      .find('[data-test="metrics-saved-views-list-btn"]')
+      .trigger("click");
+    await flushPromises();
+
+    // Click edit on the row, then submit the form.
+    await wrapper
+      .find('[data-test="metrics-saved-views-update-Morning"]')
+      .trigger("click");
+    await wrapper.find('[data-test="do-submit"]').trigger("submit");
+    await flushPromises();
+
+    expect(composable.updateView).toHaveBeenCalledWith(
+      "v1",
+      "My view",
+      expect.objectContaining({ kind: "metrics" }),
+    );
+    expect(composable.createView).not.toHaveBeenCalled();
   });
 
   it("deletes a view only after the confirm dialog is accepted", async () => {
