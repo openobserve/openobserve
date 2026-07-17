@@ -97,10 +97,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="relative pl-3 py-1"
         style="height: 3.75rem"
       >
+        <!-- scrim off: this box is empty while loading, so there is nothing to
+             dim — and the scrim is 70% of surface-base (white), which on this
+             panel's grey surface just reads as a white block. -->
         <OInnerLoading
           :showing="fieldValues?.isLoading && !displayValues.length"
           label="Fetching values..."
           size="xs"
+          :scrim="false"
           data-test="field-values-panel-loading-indicator"
         />
       </div>
