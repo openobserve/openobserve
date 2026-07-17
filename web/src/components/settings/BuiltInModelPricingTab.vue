@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="built-in-model-pricing-container bg-card-glass-bg h-full flex flex-col">
     <!-- Search and Filter Bar -->
-    <div class="filters-bar p-3 shrink-0 border-b border-(--color-border-default)">
+    <div class="filters-bar p-3 shrink-0 border-b border-border-default">
       <div class="flex items-center justify-between flex-wrap">
         <!-- Text search -->
         <div class="flex gap-3">

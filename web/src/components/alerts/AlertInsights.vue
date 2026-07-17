@@ -77,7 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Filters Section -->
     <div
       v-if="show"
-      class="flex items-center gap-2 flex-wrap px-4 py-3 border-b border-(--color-border-default) shrink-0"
+      class="flex items-center gap-2 flex-wrap px-4 py-3 border-b border-border-default shrink-0"
     >
           <span class="text-sm font-semibold relative top-1">{{ t("common.filters") }}:</span>
 
@@ -149,7 +149,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Action Buttons Row -->
     <div
       v-if="selectedAlertForAction"
-      class="bg-primary bg-opacity-10 flex items-center px-4 py-3 gap-3 border-b border-(--color-border-default) shrink-0"
+      class="bg-primary bg-opacity-10 flex items-center px-4 py-3 gap-3 border-b border-border-default shrink-0"
       data-test="action-buttons-row"
     >
       <OIcon name="campaign" size="sm" />

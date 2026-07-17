@@ -352,7 +352,7 @@ function onRowBlur() {
   <tr
     v-if="showTreeWarning"
     :data-test="`o2-table-tree-warning-${row.index}`"
-    class="bg-(--color-warning-surface)"
+    class="bg-warning-surface"
   >
     <td
       :colspan="

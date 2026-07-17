@@ -210,7 +210,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="flex flex-col justify-between">
                 <div class="flex justify-between">
                   <div class="text-(length:--text-base) font-medium [line-height:1.4] [letter-spacing:0%]">{{ t("home.indexSizeLbl") }}</div>
-                  <div class="inline-flex items-center justify-center shrink-0 w-10 h-10 rounded-lg bg-(--color-warning-50) text-(--color-warning-700) dark:bg-(--color-warning-900) dark:text-(--color-warning-300)" aria-hidden="true">
+                  <div class="inline-flex items-center justify-center shrink-0 w-10 h-10 rounded-lg bg-warning-50 text-warning-700 dark:bg-(--color-warning-900) dark:text-(--color-warning-300)" aria-hidden="true">
                     <OIcon name="save" size="md" />
                   </div>
                 </div>
@@ -360,7 +360,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="gap-2 mb-3">
             <div class="flex justify-between items-center">
               <span class="text-(length:--text-base) font-medium [line-height:1.4] [letter-spacing:0%] flex items-center gap-2">
-                <div class="inline-flex items-center justify-center shrink-0 w-10 h-10 rounded-lg bg-(--color-warning-50) text-(--color-warning-700) dark:bg-(--color-warning-900) dark:text-(--color-warning-300)" aria-hidden="true">
+                <div class="inline-flex items-center justify-center shrink-0 w-10 h-10 rounded-lg bg-warning-50 text-warning-700 dark:bg-(--color-warning-900) dark:text-(--color-warning-300)" aria-hidden="true">
                   <OIcon name="shield-alert-outline" size="md" />
                 </div>
                 {{ t("home.alertTitle") }}

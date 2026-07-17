@@ -48,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="hero-page__left flex-1 max-w-120">
 
           <div class="hero-page__headline font-bold leading-tight mb-4.5 text-text-heading" style="font-size: 2.6rem; letter-spacing: -0.6px; line-height: 1.2;">
-            {{ t("storage_settings.heroHeadline") }} <span class="hero-page__brand-text text-(--color-theme-accent)">OpenObserve.</span>
+            {{ t("storage_settings.heroHeadline") }} <span class="hero-page__brand-text text-theme-accent">OpenObserve.</span>
           </div>
 
           <div class="hero-page__sub leading-[1.7] text-text-secondary mb-9 max-w-100" style="font-size: 0.97rem;">
@@ -90,7 +90,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="feature-card flex items-start rounded-[16px] border border-[rgba(0,0,0,0.07)] bg-white dark:bg-[rgba(255,255,255,0.05)] dark:border-[rgba(255,255,255,0.08)] dark:[box-shadow:0_2px_12px_rgba(0,0,0,0.3)] transition-all duration-200" style="gap: 16px; padding: 20px 22px; box-shadow: 0 2px 12px rgba(0,0,0,0.05), 0 1px 3px rgba(0,0,0,0.04);"
           >
             <div class="feature-card__icon-box w-10 h-10 rounded-lg bg-[rgba(66,133,244,0.08)] dark:bg-[rgba(66,133,244,0.15)] flex items-center justify-center shrink-0">
-              <OIcon :name="feature.icon" size="md" class="feature-card__icon text-(--color-theme-accent) opacity-85" />
+              <OIcon :name="feature.icon" size="md" class="feature-card__icon text-theme-accent opacity-85" />
             </div>
             <div class="feature-card__content pt-0.5 flex-1">
               <div class="feature-card__title font-bold text-text-heading mb-[5px]" style="font-size: 0.92rem;">{{ feature.title }}</div>

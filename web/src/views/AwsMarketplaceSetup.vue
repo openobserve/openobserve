@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="aws-marketplace-setup min-h-screen bg-(--color-surface-base)">
+  <div class="aws-marketplace-setup min-h-screen bg-surface-base">
     <div class="flex relative-position tw-px-3 tw-pt-2">
       <img
         data-test="aws-marketplace-setup-logo"

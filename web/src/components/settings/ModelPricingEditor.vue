@@ -118,7 +118,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OButton
                 variant="ghost"
                 size="icon-xs-sq"
-                class="opacity-50 text-(--color-theme-accent) hover:opacity-100"
+                class="opacity-50 text-theme-accent hover:opacity-100"
                 data-test="model-pricing-pattern-examples-btn"
                 @click="showExamples = true"
               >

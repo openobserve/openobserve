@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="w-full h-full flex flex-col min-h-0 px-2.5 bg-(--color-surface-base)">
+  <div class="w-full h-full flex flex-col min-h-0 px-2.5 bg-surface-base">
     <!-- Top Header Bar -->
     <AppPageHeader
       title="Upload Source Maps"

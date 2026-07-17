@@ -122,7 +122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ truncate(head.systemPrompt, 160) }}
           </span>
           <span v-else class="flex-1" />
-          <span class="thread-system__toggle inline-flex items-center gap-[0.15rem] text-(--color-theme-accent) text-xs font-medium shrink-0">
+          <span class="thread-system__toggle inline-flex items-center gap-[0.15rem] text-theme-accent text-xs font-medium shrink-0">
             <OIcon
               :name="showSystemFull ? 'expand-less' : 'expand-more'"
               size="sm"
@@ -242,7 +242,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               Error
             </span>
             <button
-              class="thread-turn__view-span ml-auto inline-flex items-center gap-[0.2rem] py-[0.2rem] px-[0.55rem] rounded-md text-(--color-theme-accent) text-xs font-medium bg-transparent border border-transparent cursor-pointer transition-all duration-[120ms] shrink-0 hover:bg-[color-mix(in_srgb,var(--color-blue-500)_8%,transparent)] hover:border-[color-mix(in_srgb,var(--color-blue-500)_25%,transparent)] dark:hover:bg-[color-mix(in_srgb,var(--color-blue-400)_12%,transparent)] dark:hover:border-[color-mix(in_srgb,var(--color-blue-400)_30%,transparent)]"
+              class="thread-turn__view-span ml-auto inline-flex items-center gap-[0.2rem] py-[0.2rem] px-[0.55rem] rounded-md text-theme-accent text-xs font-medium bg-transparent border border-transparent cursor-pointer transition-all duration-[120ms] shrink-0 hover:bg-[color-mix(in_srgb,var(--color-blue-500)_8%,transparent)] hover:border-[color-mix(in_srgb,var(--color-blue-500)_25%,transparent)] dark:hover:bg-[color-mix(in_srgb,var(--color-blue-400)_12%,transparent)] dark:hover:border-[color-mix(in_srgb,var(--color-blue-400)_30%,transparent)]"
               @click="emit('span-selected', turn.span.span_id)"
             >
               View span

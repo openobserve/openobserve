@@ -104,7 +104,7 @@
           class="p-3 bg-[image:var(--color-gradient-ai-faint)] border-b border-card-glass-border"
         >
           <!-- Show streaming status with spinner -->
-          <div v-if="isGenerating" class="ai-bar-streaming flex items-center gap-2 bg-surface-base rounded-lg py-2 px-3 text-(--color-theme-accent)">
+          <div v-if="isGenerating" class="ai-bar-streaming flex items-center gap-2 bg-surface-base rounded-lg py-2 px-3 text-theme-accent">
             <img :src="nlpIcon" alt="AI" class="w-5 h-5" />
             <OSpinner variant="dots" size="xs" />
             <span class="text-sm text-text-secondary">{{ aiStatusText || t('search.analyzingQuery') }}</span>

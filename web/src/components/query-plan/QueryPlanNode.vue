@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Expand/collapse icon for nodes with children -->
       <span
         v-if="node.children.length > 0"
-        class="expand-icon cursor-pointer select-none text-(--color-theme-accent) text-3xs w-4 inline-block text-center hover:opacity-70"
+        class="expand-icon cursor-pointer select-none text-theme-accent text-3xs w-4 inline-block text-center hover:opacity-70"
         data-test="query-plan-node-expand-icon"
         @click="toggleChildrenExpanded"
       >
@@ -85,7 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span
           v-if="node.metrics.output_rows !== undefined"
           data-test="query-plan-node-metric-badge"
-          class="inline-flex items-center gap-1 py-0.5 px-2 bg-[color-mix(in_srgb,var(--color-theme-accent)_10%,transparent)] rounded-sm text-2xs font-medium text-(--color-theme-accent) whitespace-nowrap dark:bg-[color-mix(in_srgb,var(--color-theme-accent)_20%,transparent)]"
+          class="inline-flex items-center gap-1 py-0.5 px-2 bg-[color-mix(in_srgb,var(--color-theme-accent)_10%,transparent)] rounded-sm text-2xs font-medium text-theme-accent whitespace-nowrap dark:bg-[color-mix(in_srgb,var(--color-theme-accent)_20%,transparent)]"
         >
           <OIcon name="format-list-numbered" size="xs" />
           {{ formatNumber(node.metrics.output_rows) }} rows
@@ -93,7 +93,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span
           v-if="node.metrics.elapsed_compute"
           data-test="query-plan-node-metric-badge"
-          class="inline-flex items-center gap-1 py-0.5 px-2 bg-[color-mix(in_srgb,var(--color-theme-accent)_10%,transparent)] rounded-sm text-2xs font-medium text-(--color-theme-accent) whitespace-nowrap dark:bg-[color-mix(in_srgb,var(--color-theme-accent)_20%,transparent)]"
+          class="inline-flex items-center gap-1 py-0.5 px-2 bg-[color-mix(in_srgb,var(--color-theme-accent)_10%,transparent)] rounded-sm text-2xs font-medium text-theme-accent whitespace-nowrap dark:bg-[color-mix(in_srgb,var(--color-theme-accent)_20%,transparent)]"
         >
           <OIcon name="schedule" size="xs" />
           {{ node.metrics.elapsed_compute }}

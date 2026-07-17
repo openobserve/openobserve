@@ -13,7 +13,7 @@
           <OCardSection role="body">
             <div class="log-viewer flex flex-col gap-3">
               <!-- Sample Log 1 -->
-              <div class="log-line group p-4 bg-(--color-surface-base,#f5f5f5) rounded-lg border-2 border-transparent cursor-pointer transition-all duration-200 relative hover:border-(--color-theme-accent) hover:bg-(--color-surface-base,#eeeeee)" @click="selectLog(sampleLog1)">
+              <div class="log-line group p-4 bg-(--color-surface-base,#f5f5f5) rounded-lg border-2 border-transparent cursor-pointer transition-all duration-200 relative hover:border-theme-accent hover:bg-(--color-surface-base,#eeeeee)" @click="selectLog(sampleLog1)">
                 <div class="log-timestamp font-mono text-xs text-[var(--color-theme-accent)] mb-2">2025-12-02 10:23:45</div>
                 <div class="log-content flex flex-col gap-1 text-compact [&>div]:flex [&>div]:gap-2 [&_strong]:min-w-37.5 [&_strong]:text-text-secondary">
                   <div><strong>service.name:</strong> checkout-api</div>
@@ -28,7 +28,7 @@
               </div>
 
               <!-- Sample Log 2 -->
-              <div class="log-line group p-4 bg-(--color-surface-base,#f5f5f5) rounded-lg border-2 border-transparent cursor-pointer transition-all duration-200 relative hover:border-(--color-theme-accent) hover:bg-(--color-surface-base,#eeeeee)" @click="selectLog(sampleLog2)">
+              <div class="log-line group p-4 bg-(--color-surface-base,#f5f5f5) rounded-lg border-2 border-transparent cursor-pointer transition-all duration-200 relative hover:border-theme-accent hover:bg-(--color-surface-base,#eeeeee)" @click="selectLog(sampleLog2)">
                 <div class="log-timestamp font-mono text-xs text-[var(--color-theme-accent)] mb-2">2025-12-02 10:24:12</div>
                 <div class="log-content flex flex-col gap-1 text-compact [&>div]:flex [&>div]:gap-2 [&_strong]:min-w-37.5 [&_strong]:text-text-secondary">
                   <div><strong>service.name:</strong> inventory-service</div>
@@ -42,7 +42,7 @@
               </div>
 
               <!-- Sample Log 3 -->
-              <div class="log-line group p-4 bg-(--color-surface-base,#f5f5f5) rounded-lg border-2 border-transparent cursor-pointer transition-all duration-200 relative hover:border-(--color-theme-accent) hover:bg-(--color-surface-base,#eeeeee)" @click="selectLog(sampleLog3)">
+              <div class="log-line group p-4 bg-(--color-surface-base,#f5f5f5) rounded-lg border-2 border-transparent cursor-pointer transition-all duration-200 relative hover:border-theme-accent hover:bg-(--color-surface-base,#eeeeee)" @click="selectLog(sampleLog3)">
                 <div class="log-timestamp font-mono text-xs text-[var(--color-theme-accent)] mb-2">2025-12-02 10:25:30</div>
                 <div class="log-content flex flex-col gap-1 text-compact [&>div]:flex [&>div]:gap-2 [&_strong]:min-w-37.5 [&_strong]:text-text-secondary">
                   <div><strong>service.name:</strong> user-auth</div>

@@ -930,6 +930,11 @@
 
   /* Input (OInput, OTextarea) */
   --color-input-bg: var(--color-input-bg);
+  /* Registered so text-input-label-text compiles: the F7 .o-input-label rule
+     became template utilities, and without this the utility silently emitted
+     nothing (label colour fell through to inherit). */
+  --color-input-label-text: var(--color-input-label-text);
+  --color-input-label-text-disabled: var(--color-input-label-text-disabled);
   --color-input-border: var(--color-input-border);
   --color-input-border-hover: var(--color-input-border-hover);
   --color-input-border-focus: var(--color-input-border-focus);
@@ -1600,6 +1605,9 @@
   --color-banner-success-bg: var(--color-banner-success-bg);
   --color-banner-success-border: var(--color-banner-success-border);
   --color-banner-success-text: var(--color-banner-success-text);
+  /* Registered so bg-warning-surface compiles — it had consumers (DrilldownPopUp,
+     ColumnFormatControls) but no @theme entry, so the utility emitted nothing. */
+  --color-warning-surface: var(--color-warning-surface);
   --color-banner-warning-bg: var(--color-banner-warning-bg);
   --color-banner-warning-border: var(--color-banner-warning-border);
   --color-banner-warning-text: var(--color-banner-warning-text);

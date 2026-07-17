@@ -61,15 +61,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="webinar-home-banner"
   >
     <!-- Decorative blobs -->
-    <div class="absolute rounded-full pointer-events-none opacity-[0.18] bg-(--color-promo-webinar-accent) blur-[2.5rem] w-[10rem] h-[10rem] top-[-3rem] left-[-2rem]" aria-hidden="true" />
-    <div class="absolute rounded-full pointer-events-none opacity-[0.18] bg-(--color-promo-webinar-accent) blur-[2.5rem] w-[8rem] h-[8rem] bottom-[-2.5rem] right-[6rem]" aria-hidden="true" />
+    <div class="absolute rounded-full pointer-events-none opacity-[0.18] bg-promo-webinar-accent blur-[2.5rem] w-[10rem] h-[10rem] top-[-3rem] left-[-2rem]" aria-hidden="true" />
+    <div class="absolute rounded-full pointer-events-none opacity-[0.18] bg-promo-webinar-accent blur-[2.5rem] w-[8rem] h-[8rem] bottom-[-2.5rem] right-[6rem]" aria-hidden="true" />
 
     <!-- Content row -->
     <div class="webinar-home-content relative z-[1] flex items-center justify-between flex-wrap gap-3 p-4 pr-[1.375rem]">
       <div class="webinar-home-left flex flex-col gap-[0.3rem]">
         <!-- Live badge -->
         <div class="webinar-home-badge inline-flex items-center gap-[0.375rem] text-2xs font-bold uppercase tracking-[0.06em] text-promo-webinar-accent-text">
-          <span class="webinar-home-badge-dot w-[0.5rem] h-[0.5rem] rounded-full bg-(--color-promo-webinar-accent) shrink-0" />
+          <span class="webinar-home-badge-dot w-[0.5rem] h-[0.5rem] rounded-full bg-promo-webinar-accent shrink-0" />
           {{ webinarData.tag }}
         </div>
 

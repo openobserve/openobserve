@@ -42,19 +42,19 @@
     </AppPageHeader>
 
     <div class="flex-1 min-h-0 overflow-hidden grid grid-cols-[minmax(0,1.6fr)_minmax(320px,0.9fr)] max-[1100px]:grid-cols-1 gap-2.5">
-      <div class="scorer-form__main min-w-0 overflow-auto p-[18px_24px_24px] bg-(--color-surface-base) rounded-md shadow-[0_0_0.313rem_0.063rem_var(--color-hover-shadow)]">
+      <div class="scorer-form__main min-w-0 overflow-auto p-[18px_24px_24px] bg-surface-base rounded-md shadow-[0_0_0.313rem_0.063rem_var(--color-hover-shadow)]">
         <!-- Section 01: Identity -->
         <section class="mb-6">
-          <div class="flex items-center gap-2.5 pb-2.5 border-b border-(--color-dialog-header-border) mb-3">
-            <span class="inline-flex items-center justify-center w-5.5 h-5.5 rounded-full bg-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] text-(--color-text-secondary) font-bold text-2xs font-mono">01</span>
-            <h3 class="m-0 text-sm font-semibold text-(--color-text-primary)">{{ t("onlineEvals.scorer.identitySection") }}</h3>
+          <div class="flex items-center gap-2.5 pb-2.5 border-b border-dialog-header-border mb-3">
+            <span class="inline-flex items-center justify-center w-5.5 h-5.5 rounded-full bg-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] text-text-secondary font-bold text-2xs font-mono">01</span>
+            <h3 class="m-0 text-sm font-semibold text-text-primary">{{ t("onlineEvals.scorer.identitySection") }}</h3>
           </div>
 
           <div class="mb-3">
-            <label class="flex items-center text-xs font-semibold text-(--color-text-primary) mb-1">
+            <label class="flex items-center text-xs font-semibold text-text-primary mb-1">
               {{ t("onlineEvals.scorer.nameLabel") }}
-              <span class="text-(--color-status-error-text) ml-0.5">*</span>
-              <OIcon v-if="mode === 'edit'" name="lock" size="xs" class="ml-1.5 text-(--color-text-secondary)" />
+              <span class="text-status-error-text ml-0.5">*</span>
+              <OIcon v-if="mode === 'edit'" name="lock" size="xs" class="ml-1.5 text-text-secondary" />
             </label>
             <OFormInput
               name="name"
@@ -66,7 +66,7 @@
           </div>
 
           <div class="mb-3">
-            <label class="flex items-center text-xs font-semibold text-(--color-text-primary) mb-1">
+            <label class="flex items-center text-xs font-semibold text-text-primary mb-1">
               {{ t("onlineEvals.scorer.descriptionLabel") }}
             </label>
             <OFormTextarea
@@ -79,9 +79,9 @@
           </div>
 
           <div class="mb-3">
-            <label class="flex items-center text-xs font-semibold text-(--color-text-primary) mb-1">
+            <label class="flex items-center text-xs font-semibold text-text-primary mb-1">
               {{ t("onlineEvals.scorer.producesScoreConfigLabel") }}
-              <OIcon v-if="mode === 'edit'" name="lock" size="xs" class="ml-1.5 text-(--color-text-secondary)" />
+              <OIcon v-if="mode === 'edit'" name="lock" size="xs" class="ml-1.5 text-text-secondary" />
             </label>
             <OFormSelect
               name="producesScoreConfigId"
@@ -92,28 +92,28 @@
               data-test="scorer-form-score-config-select"
               @update:modelValue="handleScoreConfigSelection"
             />
-            <div class="text-2xs text-(--color-text-secondary) mt-1">{{ t("onlineEvals.scorer.producesScoreHelp") }}</div>
+            <div class="text-2xs text-text-secondary mt-1">{{ t("onlineEvals.scorer.producesScoreHelp") }}</div>
 
-            <div v-if="selectedScoreConfig" class="flex items-center flex-wrap gap-[6px_10px] p-[8px_12px] mt-2 border border-[color-mix(in_srgb,var(--color-status-info-text)_25%,transparent)] rounded-md bg-[color-mix(in_srgb,var(--color-status-info-text)_8%,transparent)] text-xs text-(--color-text-primary)">
-              <span class="w-2 h-2 rounded-full bg-(--color-status-info-text) shrink-0" />
+            <div v-if="selectedScoreConfig" class="flex items-center flex-wrap gap-[6px_10px] p-[8px_12px] mt-2 border border-[color-mix(in_srgb,var(--color-status-info-text)_25%,transparent)] rounded-md bg-[color-mix(in_srgb,var(--color-status-info-text)_8%,transparent)] text-xs text-text-primary">
+              <span class="w-2 h-2 rounded-full bg-status-info-text shrink-0" />
               <span class="font-medium">
                 {{ t("onlineEvals.scorer.selectedPrefix") }}
                 <strong class="font-mono">{{ selectedScoreConfig.name }}</strong>
               </span>
-              <span class="text-(--color-text-secondary)">·</span>
-              <span class="text-(--color-text-secondary)">
+              <span class="text-text-secondary">·</span>
+              <span class="text-text-secondary">
                 {{ t("onlineEvals.scorer.typeLabel") }}
                 <span class="font-mono">{{ dataTypeOf(selectedScoreConfig) }}</span>
               </span>
               <template v-if="selectedRange">
-                <span class="text-(--color-text-secondary)">·</span>
-                <span class="text-(--color-text-secondary)">
+                <span class="text-text-secondary">·</span>
+                <span class="text-text-secondary">
                   {{ t("onlineEvals.scorer.rangeLabel") }}
                   <span class="font-mono">{{ selectedRange }}</span>
                 </span>
               </template>
-              <span class="text-(--color-text-secondary)">·</span>
-              <span class="text-(--color-text-secondary)">
+              <span class="text-text-secondary">·</span>
+              <span class="text-text-secondary">
                 {{ t("onlineEvals.scorer.healthyLabel") }}
                 <span class="font-mono">{{ selectedHealthy }}</span>
               </span>
@@ -123,15 +123,15 @@
 
         <!-- Section 02: LLM Judge configuration -->
         <section v-if="formValues.scorerType === 'llm_judge'" class="mb-6">
-          <div class="flex items-center gap-2.5 pb-2.5 border-b border-(--color-dialog-header-border) mb-3">
-            <span class="inline-flex items-center justify-center w-5.5 h-5.5 rounded-full bg-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] text-(--color-text-secondary) font-bold text-2xs font-mono">02</span>
-            <h3 class="m-0 text-sm font-semibold text-(--color-text-primary)">{{ t("onlineEvals.scorer.judgeSection") }}</h3>
+          <div class="flex items-center gap-2.5 pb-2.5 border-b border-dialog-header-border mb-3">
+            <span class="inline-flex items-center justify-center w-5.5 h-5.5 rounded-full bg-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] text-text-secondary font-bold text-2xs font-mono">02</span>
+            <h3 class="m-0 text-sm font-semibold text-text-primary">{{ t("onlineEvals.scorer.judgeSection") }}</h3>
           </div>
 
           <div class="mb-3">
-            <label class="flex items-center text-xs font-semibold text-(--color-text-primary) mb-1">
+            <label class="flex items-center text-xs font-semibold text-text-primary mb-1">
               {{ t("onlineEvals.scorer.providerLabel") }}
-              <span class="text-(--color-status-error-text) ml-0.5">*</span>
+              <span class="text-status-error-text ml-0.5">*</span>
             </label>
             <div class="flex items-center gap-2">
               <OFormSelect
@@ -153,30 +153,30 @@
               />
             </div>
 
-            <div v-if="selectedProvider" class="flex items-center flex-wrap gap-[6px_10px] p-[8px_12px] mt-2 border border-[color-mix(in_srgb,var(--color-status-info-text)_25%,transparent)] rounded-md bg-[color-mix(in_srgb,var(--color-status-info-text)_8%,transparent)] text-xs text-(--color-text-primary)">
-              <span class="w-2 h-2 rounded-full bg-(--color-status-info-text) shrink-0" />
-              <span class="text-(--color-text-secondary)">
+            <div v-if="selectedProvider" class="flex items-center flex-wrap gap-[6px_10px] p-[8px_12px] mt-2 border border-[color-mix(in_srgb,var(--color-status-info-text)_25%,transparent)] rounded-md bg-[color-mix(in_srgb,var(--color-status-info-text)_8%,transparent)] text-xs text-text-primary">
+              <span class="w-2 h-2 rounded-full bg-status-info-text shrink-0" />
+              <span class="text-text-secondary">
                 {{ t("onlineEvals.scorer.endpointLabel") }}
                 <span class="font-mono">{{ providerEndpoint(selectedProvider) }}</span>
               </span>
-              <span class="text-(--color-text-secondary)">·</span>
-              <span class="text-(--color-text-secondary)">
+              <span class="text-text-secondary">·</span>
+              <span class="text-text-secondary">
                 {{ t("onlineEvals.scorer.defaultModelPreviewLabel") }}
                 <span class="font-mono">{{ defaultModelOf(selectedProvider) || "—" }}</span>
               </span>
-              <span class="text-(--color-text-secondary)">·</span>
-              <span class="text-(--color-text-secondary)">
+              <span class="text-text-secondary">·</span>
+              <span class="text-text-secondary">
                 {{ t("onlineEvals.scorer.authLabel") }}
                 <span class="font-mono">{{ t("onlineEvals.scorer.authConfigured") }}</span>
               </span>
             </div>
 
-            <div class="text-2xs text-(--color-text-secondary) mt-1">
+            <div class="text-2xs text-text-secondary mt-1">
               <i18n-t keypath="onlineEvals.scorer.providerHelp" tag="span">
                 <template #settingsLink>
                   <router-link
                     :to="{ name: 'llmProviders' }"
-                    class="scorer-field__help-link text-(--color-primary-600) font-semibold no-underline hover:underline"
+                    class="scorer-field__help-link text-primary-600 font-semibold no-underline hover:underline"
                     target="_blank"
                   >
                     {{ t("onlineEvals.scorer.providerHelpSettingsLink") }}
@@ -187,7 +187,7 @@
           </div>
 
           <div class="mb-3">
-            <label class="flex items-center text-xs font-semibold text-(--color-text-primary) mb-1">{{ t("onlineEvals.scorer.modelLabel") }}</label>
+            <label class="flex items-center text-xs font-semibold text-text-primary mb-1">{{ t("onlineEvals.scorer.modelLabel") }}</label>
             <OFormInput
               name="model"
               :placeholder="t('onlineEvals.scorer.modelPlaceholder')"
@@ -197,9 +197,9 @@
           </div>
 
           <div class="mb-3 flex flex-col gap-3.5">
-            <label class="flex items-center text-xs font-semibold text-(--color-text-primary) mb-1">
+            <label class="flex items-center text-xs font-semibold text-text-primary mb-1">
               {{ t("onlineEvals.scorer.promptLabel") }}
-              <span class="text-(--color-status-error-text) ml-0.5">*</span>
+              <span class="text-status-error-text ml-0.5">*</span>
             </label>
             <OFormTextarea
               name="template"
@@ -208,16 +208,16 @@
               data-test="scorer-form-prompt-input"
             />
             <div class="flex items-center flex-wrap gap-1.5 mt-1.5 text-2xs">
-              <span class="text-(--color-text-secondary)">
+              <span class="text-text-secondary">
                 {{ t("onlineEvals.scorer.promptVariablesLabel") }}
               </span>
               <span
                 v-for="v in promptVariables"
                 :key="v"
-                class="py-[1px] px-1.5 rounded-sm text-2xs font-mono bg-[color-mix(in_srgb,var(--color-text-secondary)_10%,transparent)] text-(--color-text-primary)"
+                class="py-[1px] px-1.5 rounded-sm text-2xs font-mono bg-[color-mix(in_srgb,var(--color-text-secondary)_10%,transparent)] text-text-primary"
               >{{ formatTemplateVariable(v) }}</span>
             </div>
-            <div class="text-2xs text-(--color-text-secondary) mt-1">
+            <div class="text-2xs text-text-secondary mt-1">
               {{
                 t("onlineEvals.scorer.promptHelp", {
                   inputVar: formatTemplateVariable("input"),
@@ -235,8 +235,8 @@
             >
               <template #label>
                 <span>
-                  <strong class="block text-xs text-(--color-text-primary)">{{ t("onlineEvals.scorer.includeReasoningLabel") }}</strong>
-                  <small class="block text-2xs text-(--color-text-secondary)">{{ t("onlineEvals.scorer.includeReasoningHint") }}</small>
+                  <strong class="block text-xs text-text-primary">{{ t("onlineEvals.scorer.includeReasoningLabel") }}</strong>
+                  <small class="block text-2xs text-text-secondary">{{ t("onlineEvals.scorer.includeReasoningHint") }}</small>
                 </span>
               </template>
             </OFormCheckbox>
@@ -244,10 +244,10 @@
             <div class="flex justify-between items-baseline gap-3">
               <div class="flex flex-col gap-0.5">
                 <strong class="text-xs font-semibold">{{ t("onlineEvals.scorer.extraFieldsLabel") }}</strong>
-                <span class="text-3xs font-semibold text-(--color-text-muted) uppercase tracking-[0.04em]">
+                <span class="text-3xs font-semibold text-text-muted uppercase tracking-[0.04em]">
                   {{ t("onlineEvals.scorer.extraFieldsOptional") }}
                 </span>
-                <small class="block text-2xs text-(--color-text-secondary)">{{ t("onlineEvals.scorer.extraFieldsHint") }}</small>
+                <small class="block text-2xs text-text-secondary">{{ t("onlineEvals.scorer.extraFieldsHint") }}</small>
               </div>
             </div>
 
@@ -288,7 +288,7 @@
                 />
                 <button
                   type="button"
-                  class="w-6 h-6 border-0 bg-transparent text-(--color-text-secondary) text-base cursor-pointer rounded-sm hover:bg-[color-mix(in_srgb,var(--color-status-error-text)_12%,transparent)] hover:text-(--color-status-error-text)"
+                  class="w-6 h-6 border-0 bg-transparent text-text-secondary text-base cursor-pointer rounded-sm hover:bg-[color-mix(in_srgb,var(--color-status-error-text)_12%,transparent)] hover:text-status-error-text"
                   :aria-label="t('onlineEvals.buttons.remove')"
                   :data-test="`scorer-form-extra-field-remove-${idx}`"
                   @click="removeExtraField(idx)"
@@ -301,20 +301,20 @@
             <div class="flex justify-between gap-3">
               <button
                 type="button"
-                class="border-0 bg-transparent py-1 px-0 text-xs font-semibold text-(--color-primary-600) cursor-pointer disabled:text-(--color-text-muted) disabled:cursor-not-allowed"
+                class="border-0 bg-transparent py-1 px-0 text-xs font-semibold text-primary-600 cursor-pointer disabled:text-text-muted disabled:cursor-not-allowed"
                 :disabled="formValues.extraMetadataFields.length >= MAX_EXTRA_FIELDS"
                 data-test="scorer-form-extra-field-add"
                 @click="addExtraField"
               >
                 {{ t("onlineEvals.scorer.extraFields.addButton") }}
-                <span class="font-normal text-(--color-text-secondary) ml-1">
+                <span class="font-normal text-text-secondary ml-1">
                   ({{ formValues.extraMetadataFields.length }} / {{ MAX_EXTRA_FIELDS }})
                 </span>
               </button>
 
               <button
                 type="button"
-                class="scorer-extras__preview border-0 bg-transparent py-1 px-0 text-xs font-semibold text-(--color-primary-600) cursor-pointer"
+                class="scorer-extras__preview border-0 bg-transparent py-1 px-0 text-xs font-semibold text-primary-600 cursor-pointer"
                 data-test="scorer-form-preview-schema"
                 @click="previewOutputSchema"
               >
@@ -327,15 +327,15 @@
 
         <!-- Section 02: Endpoint -->
         <section v-else class="mb-6">
-          <div class="flex items-center gap-2.5 pb-2.5 border-b border-(--color-dialog-header-border) mb-3">
-            <span class="inline-flex items-center justify-center w-5.5 h-5.5 rounded-full bg-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] text-(--color-text-secondary) font-bold text-2xs font-mono">02</span>
-            <h3 class="m-0 text-sm font-semibold text-(--color-text-primary)">{{ t("onlineEvals.scorer.endpointSection") }}</h3>
+          <div class="flex items-center gap-2.5 pb-2.5 border-b border-dialog-header-border mb-3">
+            <span class="inline-flex items-center justify-center w-5.5 h-5.5 rounded-full bg-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] text-text-secondary font-bold text-2xs font-mono">02</span>
+            <h3 class="m-0 text-sm font-semibold text-text-primary">{{ t("onlineEvals.scorer.endpointSection") }}</h3>
           </div>
 
           <div class="mb-3">
-            <label class="flex items-center text-xs font-semibold text-(--color-text-primary) mb-1">
+            <label class="flex items-center text-xs font-semibold text-text-primary mb-1">
               {{ t("onlineEvals.scorer.remoteUrlLabel") }}
-              <span class="text-(--color-status-error-text) ml-0.5">*</span>
+              <span class="text-status-error-text ml-0.5">*</span>
             </label>
             <div class="scorer-url-bar grid grid-cols-[104px_minmax(0,1fr)] gap-0">
               <OFormSelect
@@ -356,7 +356,7 @@
 
           <div class="mb-3 grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)] gap-3">
             <div class="flex flex-col gap-1.5">
-              <label class="flex items-center text-xs font-semibold text-(--color-text-primary) mb-1">
+              <label class="flex items-center text-xs font-semibold text-text-primary mb-1">
                 {{ t("onlineEvals.scorer.remoteTimeoutLabel") }}
               </label>
               <OFormInput
@@ -368,7 +368,7 @@
               />
             </div>
             <div class="flex flex-col gap-1.5">
-              <label class="flex items-center text-xs font-semibold text-(--color-text-primary) mb-1">
+              <label class="flex items-center text-xs font-semibold text-text-primary mb-1">
                 {{ t("onlineEvals.scorer.remoteRetriesLabel") }}
               </label>
               <OFormInput
@@ -380,7 +380,7 @@
               />
             </div>
             <div class="flex flex-col gap-1.5">
-              <label class="flex items-center text-xs font-semibold text-(--color-text-primary) mb-1">
+              <label class="flex items-center text-xs font-semibold text-text-primary mb-1">
                 {{ t("onlineEvals.scorer.remoteBackoffLabel") }}
               </label>
               <OFormSelect
@@ -396,13 +396,13 @@
 
         <!-- Section 03: Authentication -->
         <section v-if="formValues.scorerType === 'remote'" class="mb-6">
-          <div class="flex items-center gap-2.5 pb-2.5 border-b border-(--color-dialog-header-border) mb-3">
-            <span class="inline-flex items-center justify-center w-5.5 h-5.5 rounded-full bg-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] text-(--color-text-secondary) font-bold text-2xs font-mono">03</span>
-            <h3 class="m-0 text-sm font-semibold text-(--color-text-primary)">{{ t("onlineEvals.scorer.authSection") }}</h3>
+          <div class="flex items-center gap-2.5 pb-2.5 border-b border-dialog-header-border mb-3">
+            <span class="inline-flex items-center justify-center w-5.5 h-5.5 rounded-full bg-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] text-text-secondary font-bold text-2xs font-mono">03</span>
+            <h3 class="m-0 text-sm font-semibold text-text-primary">{{ t("onlineEvals.scorer.authSection") }}</h3>
           </div>
 
           <div class="mb-3">
-            <label class="flex items-center text-xs font-semibold text-(--color-text-primary) mb-1">
+            <label class="flex items-center text-xs font-semibold text-text-primary mb-1">
               {{ t("onlineEvals.scorer.remoteAuthLabel") }}
             </label>
             <!-- Clearable so a user can return to "no auth": the auth-type
@@ -423,9 +423,9 @@
           </div>
 
           <div v-if="formValues.authType === 'bearer'" class="mb-3">
-            <label class="flex items-center text-xs font-semibold text-(--color-text-primary) mb-1">
+            <label class="flex items-center text-xs font-semibold text-text-primary mb-1">
               {{ t("onlineEvals.scorer.remoteAuth.tokenLabel") }}
-              <span class="text-(--color-status-error-text) ml-0.5">*</span>
+              <span class="text-status-error-text ml-0.5">*</span>
             </label>
             <OFormInput
               name="authBearerToken"
@@ -434,16 +434,16 @@
               type="password"
               data-test="scorer-form-remote-auth-bearer-token"
             />
-            <div class="text-2xs text-(--color-text-secondary) mt-1">
+            <div class="text-2xs text-text-secondary mt-1">
               {{ t("onlineEvals.scorer.remoteAuth.encryptedHint") }}
             </div>
           </div>
 
           <div v-if="formValues.authType === 'basic'" class="mb-3 grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-3">
             <div class="flex flex-col gap-1.5">
-              <label class="flex items-center text-xs font-semibold text-(--color-text-primary) mb-1">
+              <label class="flex items-center text-xs font-semibold text-text-primary mb-1">
                 {{ t("onlineEvals.scorer.remoteAuth.usernameLabel") }}
-                <span class="text-(--color-status-error-text) ml-0.5">*</span>
+                <span class="text-status-error-text ml-0.5">*</span>
               </label>
               <OFormInput
                 name="authBasicUsername"
@@ -453,9 +453,9 @@
               />
             </div>
             <div class="flex flex-col gap-1.5">
-              <label class="flex items-center text-xs font-semibold text-(--color-text-primary) mb-1">
+              <label class="flex items-center text-xs font-semibold text-text-primary mb-1">
                 {{ t("onlineEvals.scorer.remoteAuth.passwordLabel") }}
-                <span class="text-(--color-status-error-text) ml-0.5">*</span>
+                <span class="text-status-error-text ml-0.5">*</span>
               </label>
               <OFormInput
                 name="authBasicPassword"
@@ -464,7 +464,7 @@
                 type="password"
                 data-test="scorer-form-remote-auth-basic-password"
               />
-              <div class="text-2xs text-(--color-text-secondary) mt-1">
+              <div class="text-2xs text-text-secondary mt-1">
                 {{ t("onlineEvals.scorer.remoteAuth.encryptedHint") }}
               </div>
             </div>
@@ -472,9 +472,9 @@
 
           <div v-if="formValues.authType === 'api_key'" class="mb-3 grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-3">
             <div class="flex flex-col gap-1.5">
-              <label class="flex items-center text-xs font-semibold text-(--color-text-primary) mb-1">
+              <label class="flex items-center text-xs font-semibold text-text-primary mb-1">
                 {{ t("onlineEvals.scorer.remoteAuth.headerNameLabel") }}
-                <span class="text-(--color-status-error-text) ml-0.5">*</span>
+                <span class="text-status-error-text ml-0.5">*</span>
               </label>
               <OFormInput
                 name="authApiKeyHeaderName"
@@ -484,9 +484,9 @@
               />
             </div>
             <div class="flex flex-col gap-1.5">
-              <label class="flex items-center text-xs font-semibold text-(--color-text-primary) mb-1">
+              <label class="flex items-center text-xs font-semibold text-text-primary mb-1">
                 {{ t("onlineEvals.scorer.remoteAuth.tokenLabel") }}
-                <span class="text-(--color-status-error-text) ml-0.5">*</span>
+                <span class="text-status-error-text ml-0.5">*</span>
               </label>
               <OFormInput
                 name="authApiKeyToken"
@@ -495,7 +495,7 @@
                 type="password"
                 data-test="scorer-form-remote-auth-apikey-token"
               />
-              <div class="text-2xs text-(--color-text-secondary) mt-1">
+              <div class="text-2xs text-text-secondary mt-1">
                 {{ t("onlineEvals.scorer.remoteAuth.encryptedHint") }}
               </div>
             </div>
@@ -504,10 +504,10 @@
 
         <!-- Section 04: Custom headers -->
         <section v-if="formValues.scorerType === 'remote'" class="mb-6">
-          <div class="flex items-center gap-2.5 pb-2.5 border-b border-(--color-dialog-header-border) mb-3">
-            <span class="inline-flex items-center justify-center w-5.5 h-5.5 rounded-full bg-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] text-(--color-text-secondary) font-bold text-2xs font-mono">04</span>
-            <h3 class="m-0 text-sm font-semibold text-(--color-text-primary)">{{ t("onlineEvals.scorer.headersSection") }}</h3>
-            <span class="ml-auto text-2xs text-(--color-text-secondary) italic">
+          <div class="flex items-center gap-2.5 pb-2.5 border-b border-dialog-header-border mb-3">
+            <span class="inline-flex items-center justify-center w-5.5 h-5.5 rounded-full bg-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] text-text-secondary font-bold text-2xs font-mono">04</span>
+            <h3 class="m-0 text-sm font-semibold text-text-primary">{{ t("onlineEvals.scorer.headersSection") }}</h3>
+            <span class="ml-auto text-2xs text-text-secondary italic">
               {{ t("onlineEvals.scorer.remoteHeaders.subtitle") }}
             </span>
           </div>
@@ -542,7 +542,7 @@
                 />
                 <button
                   type="button"
-                  class="w-6 h-6 border-0 bg-transparent text-(--color-text-secondary) text-base cursor-pointer rounded-sm hover:bg-[color-mix(in_srgb,var(--color-status-error-text)_12%,transparent)] hover:text-(--color-status-error-text)"
+                  class="w-6 h-6 border-0 bg-transparent text-text-secondary text-base cursor-pointer rounded-sm hover:bg-[color-mix(in_srgb,var(--color-status-error-text)_12%,transparent)] hover:text-status-error-text"
                   :aria-label="t('onlineEvals.buttons.remove')"
                   :data-test="`scorer-form-remote-header-remove-${idx}`"
                   @click="removeCustomHeader(idx)"
@@ -555,7 +555,7 @@
             <div class="flex justify-between gap-3">
               <button
                 type="button"
-                class="border-0 bg-transparent py-1 px-0 text-xs font-semibold text-(--color-primary-600) cursor-pointer"
+                class="border-0 bg-transparent py-1 px-0 text-xs font-semibold text-primary-600 cursor-pointer"
                 data-test="scorer-form-remote-header-add"
                 @click="addCustomHeader"
               >
@@ -567,15 +567,15 @@
 
         <!-- Section 05: Request body template -->
         <section v-if="formValues.scorerType === 'remote'" class="mb-6">
-          <div class="flex items-center gap-2.5 pb-2.5 border-b border-(--color-dialog-header-border) mb-3">
-            <span class="inline-flex items-center justify-center w-5.5 h-5.5 rounded-full bg-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] text-(--color-text-secondary) font-bold text-2xs font-mono">05</span>
-            <h3 class="m-0 text-sm font-semibold text-(--color-text-primary)">{{ t("onlineEvals.scorer.requestBodySection") }}</h3>
+          <div class="flex items-center gap-2.5 pb-2.5 border-b border-dialog-header-border mb-3">
+            <span class="inline-flex items-center justify-center w-5.5 h-5.5 rounded-full bg-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] text-text-secondary font-bold text-2xs font-mono">05</span>
+            <h3 class="m-0 text-sm font-semibold text-text-primary">{{ t("onlineEvals.scorer.requestBodySection") }}</h3>
           </div>
 
           <div class="mb-3">
-            <label class="flex items-center text-xs font-semibold text-(--color-text-primary) mb-1">
+            <label class="flex items-center text-xs font-semibold text-text-primary mb-1">
               {{ t("onlineEvals.scorer.requestBodyLabel") }}
-              <span class="text-(--color-status-error-text) ml-0.5">*</span>
+              <span class="text-status-error-text ml-0.5">*</span>
             </label>
             <OFormTextarea
               name="template"
@@ -584,13 +584,13 @@
               data-test="scorer-form-request-body-input"
             />
             <div class="flex items-center flex-wrap gap-1.5 mt-1.5 text-2xs">
-              <span class="text-(--color-text-secondary)">
+              <span class="text-text-secondary">
                 {{ t("onlineEvals.scorer.promptVariablesLabel") }}
               </span>
               <span
                 v-for="v in promptVariables"
                 :key="v"
-                class="py-[1px] px-1.5 rounded-sm text-2xs font-mono bg-[color-mix(in_srgb,var(--color-text-secondary)_10%,transparent)] text-(--color-text-primary)"
+                class="py-[1px] px-1.5 rounded-sm text-2xs font-mono bg-[color-mix(in_srgb,var(--color-text-secondary)_10%,transparent)] text-text-primary"
               >{{ formatTemplateVariable(v) }}</span>
             </div>
           </div>
@@ -609,7 +609,7 @@
       />
     </div>
 
-    <footer class="sticky bottom-0 flex items-center justify-end gap-2 px-5.5 py-3 bg-(--color-surface-base) rounded-md shadow-[0_0_0.313rem_0.063rem_var(--color-hover-shadow)] shrink-0 z-1">
+    <footer class="sticky bottom-0 flex items-center justify-end gap-2 px-5.5 py-3 bg-surface-base rounded-md shadow-[0_0_0.313rem_0.063rem_var(--color-hover-shadow)] shrink-0 z-1">
       <OButton
         data-test="scorer-form-cancel-btn"
         type="button"
@@ -637,16 +637,16 @@
       size="md"
       :title="t('onlineEvals.scorer.extraFields.schemaTitle')"
     >
-      <p v-if="isLoadingSchemaPreview" class="m-0 p-3 text-xs text-(--color-text-secondary)">
+      <p v-if="isLoadingSchemaPreview" class="m-0 p-3 text-xs text-text-secondary">
         {{ t("onlineEvals.scorer.extraFields.schemaLoading") }}
       </p>
       <p
         v-else-if="schemaPreviewError"
-        class="m-0 p-3 text-xs text-(--color-status-error-text)"
+        class="m-0 p-3 text-xs text-status-error-text"
       >
         {{ schemaPreviewError }}
       </p>
-      <pre class="m-0 max-h-[60vh] overflow-auto p-3 rounded-md bg-card-bg border border-border-default font-normal text-xs font-(family-name:--font-mono) text-(--color-text-primary) whitespace-pre [tab-size:2]" v-else>{{ schemaPreview }}</pre>
+      <pre class="m-0 max-h-[60vh] overflow-auto p-3 rounded-md bg-card-bg border border-border-default font-normal text-xs font-(family-name:--font-mono) text-text-primary whitespace-pre [tab-size:2]" v-else>{{ schemaPreview }}</pre>
 
       <template #footer>
         <div class="flex items-center justify-between gap-2 w-full">

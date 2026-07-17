@@ -113,7 +113,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="flex items-center justify-between py-2 px-3 min-h-12 shrink-0 bg-surface-subtle border-b border-border-default"
                     >
                       <div class="flex items-center gap-2">
-                        <div class="w-[3px] h-3.5 rounded-sm shrink-0 bg-(--color-theme-accent)" />
+                        <div class="w-[3px] h-3.5 rounded-sm shrink-0 bg-theme-accent" />
                         <span class="text-xs font-semibold">{{ localTab === 'sql' ? 'SQL Editor' : 'PromQL Editor' }}</span>
                       </div>
                       <div class="flex items-center gap-2">
@@ -226,7 +226,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="flex items-center justify-between py-2 px-3 min-h-12 shrink-0 bg-surface-subtle border-b border-border-default"
                   >
                     <div class="flex items-center gap-2">
-                      <div class="w-[3px] h-3.5 rounded-sm shrink-0 bg-(--color-section-accent-secondary)" />
+                      <div class="w-[3px] h-3.5 rounded-sm shrink-0 bg-section-accent-secondary" />
                       <span class="text-xs font-semibold">VRL Editor</span>
                     </div>
                     <div v-if="!sqlEditorMaximized" class="flex gap-2 items-center">
@@ -314,7 +314,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="flex items-center justify-between py-2 px-3 min-h-12 shrink-0 bg-surface-subtle border-b border-border-default"
                 >
                   <div class="flex items-center gap-2">
-                    <div class="w-[3px] h-3.5 rounded-sm shrink-0 bg-(--color-theme-accent)" />
+                    <div class="w-[3px] h-3.5 rounded-sm shrink-0 bg-theme-accent" />
                     <span class="text-xs font-semibold">Query Result</span>
                     <span
                       v-if="multiTimeRange && multiTimeRange.length > 0"
@@ -368,7 +368,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="flex items-center justify-between py-2 px-3 min-h-12 shrink-0 bg-surface-subtle border-b border-border-default"
                 >
                   <div class="flex items-center gap-2">
-                    <div class="w-[3px] h-3.5 rounded-sm shrink-0 bg-(--color-section-accent-secondary)" />
+                    <div class="w-[3px] h-3.5 rounded-sm shrink-0 bg-section-accent-secondary" />
                     <span class="text-xs font-semibold">Combined Output</span>
                     <span
                       class="text-3xs font-bold py-px px-[7px] rounded-sm tracking-[0.04em] bg-badge-purple-soft-bg border border-badge-purple-ol-border text-badge-purple-ol-text"

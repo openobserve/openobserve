@@ -380,14 +380,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       id="dangerZone"
       v-if="canDeleteOrg"
       data-test="general-settings-danger-zone"
-      class="mt-8 overflow-hidden rounded-lg border border-(--color-banner-error-soft-border)"
+      class="mt-8 overflow-hidden rounded-lg border border-banner-error-soft-border"
     >
       <!-- Red-accented header signals this section is destructive. -->
       <div
-        class="flex items-center gap-2 border-b border-(--color-banner-error-soft-border) bg-(--color-banner-error-soft-bg) px-5 py-3"
+        class="flex items-center gap-2 border-b border-banner-error-soft-border bg-banner-error-soft-bg px-5 py-3"
       >
-        <OIcon name="warning" size="sm" class="text-(--color-banner-error-soft-text)" />
-        <span class="text-base font-bold text-(--color-banner-error-soft-text)">
+        <OIcon name="warning" size="sm" class="text-banner-error-soft-text" />
+        <span class="text-base font-bold text-banner-error-soft-text">
           {{ t("settings.dangerZone") }}
         </span>
       </div>
@@ -519,13 +519,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OIcon
           name="warning"
           size="sm"
-          class="mt-0.5 shrink-0 text-(--color-banner-error-soft-text)"
+          class="mt-0.5 shrink-0 text-banner-error-soft-text"
         />
         <div class="flex flex-col gap-1">
-          <p class="text-xs text-(--color-banner-error-soft-text)">
+          <p class="text-xs text-banner-error-soft-text">
             {{ t("settings.deleteOrganizationWarning") }}
           </p>
-          <p class="text-xs text-(--color-banner-error-soft-text)">
+          <p class="text-xs text-banner-error-soft-text">
             {{ t("settings.deleteOrganizationRecoverable") }}
           </p>
         </div>
