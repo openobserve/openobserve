@@ -188,7 +188,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="selectedTemplates.length > 0"
           #bottom
         >
-          <span class="text-xs text-text-primary">
+          <span class="text-xs text-text-heading">
             {{ selectedTemplates.length }} selected
           </span>
           <OButton

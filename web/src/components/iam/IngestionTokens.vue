@@ -172,11 +172,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @click:secondary="showRevealedDialog = false"
     >
       <!-- Primary: the ready-to-paste Authorization credential. -->
-      <div class="mb-1 text-xs font-medium text-text-primary">
+      <div class="mb-1 text-xs font-medium text-text-heading">
         {{ t('ingestion.authHeaderLabel') }}
       </div>
       <div
-        class="p-2.5 border border-dashed rounded-sm border-border-strong mb-1 bg-surface-subtle"
+        class="p-2.5 border border-dashed rounded-sm border-border-default mb-1 bg-surface-subtle"
       >
         <code
           class="break-all font-mono text-sm"

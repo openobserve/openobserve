@@ -95,7 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             type="fieldTag"
             value="soft"
           >{{ row.destination_type_name }}</OTag>
-          <span v-else class="text-text-primary">—</span>
+          <span v-else class="text-text-heading">—</span>
         </template>
 
         <template #cell-output_format="{ row }">
@@ -104,7 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             type="fieldTag"
             value="soft"
           >{{ formatOutputFormat(row.output_format) }}</OTag>
-          <span v-else class="text-text-primary">—</span>
+          <span v-else class="text-text-heading">—</span>
         </template>
 
         <template #cell-actions="{ row }">
@@ -134,7 +134,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="selectedDestinations.length > 0"
           #bottom
         >
-          <span class="text-xs text-text-primary font-medium">
+          <span class="text-xs text-text-heading font-medium">
             {{ selectedDestinations.length }} selected
           </span>
           <OButton

@@ -15,7 +15,7 @@
           <span class="breadcrumb-text text-lg font-normal leading-6 cursor-pointer text-brand-indigo" @click="closeDialog"
             >{{ t('regex_patterns.associated_breadcrumb') }} &gt; &nbsp;
           </span>
-          <span class="associated-field-name text-lg font-normal leading-6 text-text-primary">
+          <span class="associated-field-name text-lg font-normal leading-6 text-text-heading">
             {{ fieldName }}
           </span>
         </div>
@@ -141,7 +141,7 @@
                     {{ t('regex_patterns.pattern_name') }}
                   </span>
                   <span
-                    class="individual-section-value text-sm font-[700] text-text-primary"
+                    class="individual-section-value text-sm font-[700] text-text-heading"
                     data-test="associated-regex-patterns-pattern-name"
                   >
                     {{ userClickedPattern.pattern_name }}
@@ -155,7 +155,7 @@
                     {{ t('regex_patterns.description') }}
                   </span>
                   <span
-                    class="individual-section-value text-sm font-[700] text-text-primary"
+                    class="individual-section-value text-sm font-[700] text-text-heading"
                     data-test="associated-regex-patterns-pattern-description"
                   >
                     {{

@@ -76,7 +76,7 @@
 
 
     <!-- Footer -->
-    <div class="absolute bottom-5 text-sm mb-4 text-text-caption">
+    <div class="absolute bottom-5 text-sm mb-4 text-text-secondary">
       &copy; OpenObserve <span id="year">{{ new Date().getFullYear() }}</span>
     </div>
   </div>

@@ -211,7 +211,7 @@ const rowStateClass = (row: { org: OrgOption; index: number }) => {
           variant="outline-primary"
           size="xs"
           data-test="navbar-organizations-select-trigger"
-          class="w-56 text-text-primary!"
+          class="w-56 text-text-heading!"
           :class="open ? 'ring-1 ring-inset ring-primary-300' : ''"
         >
           <template #icon-left>
@@ -243,7 +243,7 @@ const rowStateClass = (row: { org: OrgOption; index: number }) => {
         <div
           class="flex items-center justify-between gap-2 px-3 pt-2 pb-1.5"
         >
-          <span class="text-compact font-semibold text-text-primary">
+          <span class="text-compact font-semibold text-text-heading">
             {{ t("organization.header") }}
           </span>
           <span

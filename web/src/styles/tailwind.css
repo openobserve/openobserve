@@ -22,34 +22,14 @@
 @source "../**/*.{vue,js,ts}";
 
 /*
- * text-sm / text-base line-height pin.
+ * text-sm / text-base line-height pin — REMOVED.
  *
- * The `--text-sm` (14px) and `--text-base` (16px) tokens now match Tailwind's
- * conventional scale, so the font-SIZE here is redundant-but-explicit. This block
- * is retained to lock the paired line-heights (`var(--tw-leading, …)`) for the
- * ~780 utility usages so `leading-*` overrides still win. (Element rules use the
- * same tokens via var(--text-*), so element and utility text now agree pixel-for-pixel.)
+ * The whole `--text-*` ladder is now registered in the `@theme inline` block in
+ * tokens/component.css, with paired `--text-*--line-height` keys reproducing the
+ * exact line-heights this hand-pin used to lock. So `text-sm`/`text-base` (and the
+ * `!` variants) derive both size and leading from the tokens, `leading-*` overrides
+ * still win via `--tw-leading`, and the font-size is no longer hand-duplicated.
  */
-@layer utilities {
-  .text-sm {
-    font-size: 0.875rem;
-    line-height: var(--tw-leading, calc(1.25 / 0.875));
-  }
-  .text-base {
-    font-size: 1rem;
-    line-height: var(--tw-leading, calc(1.5 / 1));
-  }
-  /* `!important` variants (`text-sm!` / `text-base!`) are separate classes and
-     must be re-pinned too, or they fall back to the smaller O2 token. */
-  .text-sm\! {
-    font-size: 0.875rem !important;
-    line-height: var(--tw-leading, calc(1.25 / 0.875)) !important;
-  }
-  .text-base\! {
-    font-size: 1rem !important;
-    line-height: var(--tw-leading, calc(1.5 / 1)) !important;
-  }
-}
 
 /*
  * Light↔dark mode switch — soft curtain sweep (View Transitions API, started

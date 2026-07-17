@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       }"
     >
       <div
-        class="flex flex-nowrap items-center w-full min-h-7 py-1 px-2 border-b border-border-subtle rounded-t-lg"
+        class="flex flex-nowrap items-center w-full min-h-7 py-1 px-2 border-b border-border-default rounded-t-lg"
         :class="{ 'border-b-transparent': isPanelLoading }"
         data-test="dashboard-panel-bar"
       >
@@ -41,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <div
           :title="props.data.title"
-          class="whitespace-nowrap overflow-hidden text-ellipsis text-compact font-medium text-text-primary tracking-[0.02em]"
+          class="whitespace-nowrap overflow-hidden text-ellipsis text-compact font-medium text-text-heading tracking-[0.02em]"
           data-test="dashboard-panel-header"
         >
           {{ props.data.title }}

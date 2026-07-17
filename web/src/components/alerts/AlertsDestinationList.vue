@@ -155,7 +155,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="flex-shrink-0"
               />
             </div>
-            <span v-else class="text-text-primary">—</span>
+            <span v-else class="text-text-heading">—</span>
           </template>
 
           <template #cell-type="{ row }">

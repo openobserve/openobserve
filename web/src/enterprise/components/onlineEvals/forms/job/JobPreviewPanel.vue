@@ -3,7 +3,7 @@
     <section class="py-3.5 px-4 mb-3 border border-(--color-dialog-header-border,var(--color-border-default)) rounded-md">
       <header class="flex items-center gap-1.5 mb-1.5 text-(--color-text-secondary,var(--color-text-secondary))">
         <OIcon name="visibility" size="xs" />
-        <span class="m-0 text-compact font-semibold text-(--color-text-primary,currentColor)">{{ t("onlineEvals.job.preview.title") }}</span>
+        <span class="m-0 text-compact font-semibold text-(--color-text-heading,currentColor)">{{ t("onlineEvals.job.preview.title") }}</span>
       </header>
       <div v-if="!stream" class="m-0 text-text-secondary text-xs leading-normal">
         {{ t("onlineEvals.job.preview.hint") }}
@@ -28,9 +28,9 @@
     <section class="py-3.5 px-4 mb-0 border border-(--color-dialog-header-border,var(--color-border-default)) rounded-md">
       <header class="flex items-center gap-1.5 mb-1.5 text-(--color-text-secondary,var(--color-text-secondary))">
         <OIcon name="info" size="xs" />
-        <span class="m-0 text-compact font-semibold text-(--color-text-primary,currentColor)">{{ t("onlineEvals.job.preview.summaryTitle") }}</span>
+        <span class="m-0 text-compact font-semibold text-(--color-text-heading,currentColor)">{{ t("onlineEvals.job.preview.summaryTitle") }}</span>
       </header>
-      <dl class="grid grid-cols-[96px_1fr] gap-x-3 gap-y-2 m-0 text-xs [&_dt]:text-text-secondary [&_dd]:m-0 [&_dd]:text-text-primary">
+      <dl class="grid grid-cols-[96px_1fr] gap-x-3 gap-y-2 m-0 text-xs [&_dt]:text-text-secondary [&_dd]:m-0 [&_dd]:text-text-heading">
         <dt>{{ t("onlineEvals.job.preview.summaryName") }}</dt>
         <dd>{{ name || t("onlineEvals.job.preview.emptyValue") }}</dd>
         <dt>{{ t("onlineEvals.job.preview.summaryType") }}</dt>

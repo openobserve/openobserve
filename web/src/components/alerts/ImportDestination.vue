@@ -30,11 +30,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="w-full h-full flex flex-col border-l border-border-default min-w-100">
         <div
           v-if="destinationErrorsToDisplay.length > 0 || destinationCreators.length > 0"
-          class="text-center text-sm font-semibold text-text-primary py-3 shrink-0"
+          class="text-center text-sm font-semibold text-text-heading py-3 shrink-0"
         >
           {{ destinationErrorsToDisplay.length > 0 ? t('alert_destinations.import.errorValidations') : t('alert_destinations.import.outputMessages') }}
         </div>
-        <div v-else class="text-center text-sm font-semibold text-text-primary py-3 shrink-0">{{ t('alert_destinations.import.outputMessages') }}</div>
+        <div v-else class="text-center text-sm font-semibold text-text-heading py-3 shrink-0">{{ t('alert_destinations.import.outputMessages') }}</div>
         <OSeparator class="mt-1 shrink-0" />
         <div class="flex-1 min-h-0 overflow-auto [resize:none] w-full min-w-100">
           <!-- Destination Errors Section -->

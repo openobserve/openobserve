@@ -1527,7 +1527,7 @@ function generateHistogramData() {
       text: "",
       font: {
         size: 12,
-        color: chartColor("--color-text-primary"),
+        color: chartColor("--color-text-heading"),
       },
     },
     margin: {
@@ -1538,7 +1538,7 @@ function generateHistogramData() {
     },
     font: {
       size: 12,
-      color: chartColor("--color-text-primary"),
+      color: chartColor("--color-text-heading"),
     },
     xaxis: { type: "date" },
     yaxis: { ticksuffix: "ms" },

@@ -47,7 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <div class="flex flex-col gap-2.5 max-w-xl">
         <h2
-          class="text-2xl! font-semibold! text-text-primary tracking-[-0.01em]"
+          class="text-2xl! font-semibold! text-text-heading tracking-[-0.01em]"
         >
           <slot name="title">{{ title }}</slot>
         </h2>

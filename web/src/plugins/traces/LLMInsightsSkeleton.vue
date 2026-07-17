@@ -62,11 +62,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             preserveAspectRatio="none"
           >
             <path
-              class="panel-tile__area-fill fill-[color-mix(in_srgb,var(--color-text-primary)_8%,transparent)]"
+              class="panel-tile__area-fill fill-[color-mix(in_srgb,var(--color-text-heading)_8%,transparent)]"
               d="M0,55 C20,42 35,52 55,46 C72,41 85,30 105,28 C125,26 140,42 160,38 C175,35 190,22 200,18 L200,80 L0,80 Z"
             />
             <path
-              class="panel-tile__line-stroke stroke-[color-mix(in_srgb,var(--color-text-primary)_18%,transparent)]"
+              class="panel-tile__line-stroke stroke-[color-mix(in_srgb,var(--color-text-heading)_18%,transparent)]"
               d="M0,55 C20,42 35,52 55,46 C72,41 85,30 105,28 C125,26 140,42 160,38 C175,35 190,22 200,18"
               fill="none"
               stroke-width="2"

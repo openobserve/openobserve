@@ -59,7 +59,7 @@
       <template #before>
         <div
           v-if="sidebarVisible"
-          class="w-full h-full flex flex-col overflow-hidden border-r border-border-subtle"
+          class="w-full h-full flex flex-col overflow-hidden border-r border-border-default"
         >
           <slot name="sidebar" />
         </div>
@@ -85,7 +85,7 @@
       class="flex-1 flex min-h-0"
     >
       <aside
-        class="shrink-0 h-full flex flex-col overflow-hidden border-r border-border-subtle"
+        class="shrink-0 h-full flex flex-col overflow-hidden border-r border-border-default"
         :style="{ width: (sidebarWidth ?? 200) + 'px' }"
       >
         <slot name="sidebar" />

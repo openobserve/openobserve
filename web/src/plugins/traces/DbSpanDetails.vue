@@ -103,7 +103,7 @@ const metadataRows = computed(() =>
             style="
               background: var(--color-surface-base);
               border: 1px solid var(--color-border-default);
-              color: var(--color-text-primary);
+              color: var(--color-text-heading);
             "
           >
             <span style="color: var(--color-text-secondary)"

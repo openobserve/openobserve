@@ -378,11 +378,11 @@ export default defineComponent({
 
 /* Sticky total column visual separator */
 .table-wrapper :deep(.pivot-total-col) {
-  box-shadow: inset 0.25rem 0 0.375rem -0.125rem var(--color-actions-column-shawdow) !important;
+  box-shadow: inset 0.25rem 0 0.375rem -0.125rem var(--color-actions-column-shadow) !important;
 }
 
 .table-wrapper :deep(.sticky-column.pivot-total-col) {
-  box-shadow: 0.25rem 0 0.5rem var(--color-actions-column-shawdow), inset 0.25rem 0 0.375rem -0.125rem var(--color-actions-column-shawdow) !important;
+  box-shadow: 0.25rem 0 0.5rem var(--color-actions-column-shadow), inset 0.25rem 0 0.375rem -0.125rem var(--color-actions-column-shadow) !important;
 }
 
 @media print {

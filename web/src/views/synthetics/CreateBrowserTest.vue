@@ -555,7 +555,7 @@ function onClearResults() {
     <main v-else-if="phase === 'extension-setup'" class="flex-1 flex flex-col items-center justify-center">
       <div class="max-w-[48rem] w-full mx-auto py-4 px-4">
         <div class="flex justify-center mb-6">
-          <div class="rounded-2xl border border-border-default bg-surface-base p-6 flex items-center justify-center">
+          <div class="rounded-lg border border-border-default bg-surface-base p-6 flex items-center justify-center">
             <OIcon name="open-in-browser" size="xl" class="text-primary-500" aria-hidden="true" />
           </div>
         </div>

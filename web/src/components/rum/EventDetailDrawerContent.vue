@@ -274,7 +274,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template v-if="isLoadingRelatedResources">
               <div class="mt-2 p-2 text-center">
                 <OSpinner size="xs" />
-                <div class="mt-1 text-text-caption text-xs">
+                <div class="mt-1 text-text-secondary text-xs">
                   Loading related events...
                 </div>
               </div>
@@ -352,7 +352,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
 
                   <!-- Event Details Row -->
-                  <div class="flex items-center text-text-caption text-3xs">
+                  <div class="flex items-center text-text-secondary text-3xs">
                     <OIcon name="schedule" size="xs" class="mr-1" />
                     <span class="mr-2">{{
                       formatTimestamp(item.date)
@@ -421,7 +421,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </span>
               </div>
               <div
-                class="flex items-center gap-x-3 text-3xs text-text-caption"
+                class="flex items-center gap-x-3 text-3xs text-text-secondary"
               >
                 <div class="flex items-center">
                   <OIcon name="access-time" size="xs" class="mr-1" />

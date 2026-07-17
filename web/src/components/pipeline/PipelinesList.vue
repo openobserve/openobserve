@@ -217,7 +217,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
                 <div class="flex flex-col">
                   <div>View Error</div>
-                  <div class="text-xs text-text-caption">
+                  <div class="text-xs text-text-secondary">
                     {{
                       new Date(
                         row.last_error.last_error_timestamp / 1000,
@@ -405,7 +405,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-for="(nodeError, nodeId) in errorDialog.data.last_error
               .node_errors"
             :key="nodeId"
-            class="node-error-item p-4 rounded-lg bg-surface-subtle border border-border-subtle transition-all hover:bg-interactive-hover-bg"
+            class="node-error-item p-4 rounded-lg bg-surface-subtle border border-border-default transition-all hover:bg-interactive-hover-bg"
           >
             <div class="node-error-header flex items-center justify-between mb-2.5">
               <span class="node-name font-semibold text-sm">{{ nodeError.node_name || nodeId }}</span>

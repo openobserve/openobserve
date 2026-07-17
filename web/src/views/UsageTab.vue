@@ -785,7 +785,7 @@ const alertsPanelData = computed(() => {
       textStyle: {
         fontSize: 16,
         fontWeight: "normal",
-        color: chartColor("--color-text-primary"),
+        color: chartColor("--color-text-heading"),
       },
     },
     tooltip: {
@@ -796,7 +796,7 @@ const alertsPanelData = computed(() => {
       orient: "vertical",
       left: "65%",
       textStyle: {
-        color: chartColor("--color-text-primary"),
+        color: chartColor("--color-text-heading"),
       },
     },
     series: [
@@ -811,7 +811,7 @@ const alertsPanelData = computed(() => {
           formatter: "{d}%",
           show: true,
           fontSize: 14,
-          color: chartColor("--color-text-primary"),
+          color: chartColor("--color-text-heading"),
         },
         labelLine: {
           show: true,

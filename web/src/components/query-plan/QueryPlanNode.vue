@@ -51,7 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Operator name -->
       <span
         data-test="query-plan-node-operator-name"
-        class="font-semibold text-text-primary pl-1"
+        class="font-semibold text-text-heading pl-1"
       >{{ node.name }}</span>
 
       <!-- Inline details (clickable to expand if truncated) -->
@@ -59,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="inlineDetails"
         class="inline-details text-text-secondary font-normal text-xs italic"
         :class="{
-          'cursor-pointer hover:text-text-primary': hasLongDetails,
+          'cursor-pointer hover:text-text-heading': hasLongDetails,
           'whitespace-nowrap overflow-hidden [text-overflow:ellipsis] max-w-150 truncated': !detailsExpanded && hasLongDetails,
         }"
         data-test="query-plan-node-inline-details"

@@ -73,7 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ webinarData.tag }}
         </div>
 
-        <div class="webinar-home-title text-base font-bold text-text-primary leading-[1.35] max-w-[36rem]">{{ webinarData.title }}</div>
+        <div class="webinar-home-title text-base font-bold text-text-heading leading-[1.35] max-w-[36rem]">{{ webinarData.title }}</div>
 
         <div v-if="webinarData.date" class="webinar-home-meta flex items-center gap-[0.3rem] text-compact leading-none text-text-secondary">
           <OIcon name="schedule" size="xs" />

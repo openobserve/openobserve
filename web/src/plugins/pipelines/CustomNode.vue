@@ -883,7 +883,7 @@ function getIcon(data, ioType) {
                   <strong>{{ t("pipeline.samplingLabel") }}:</strong>
                   {{ t("pipeline.samplingAllTraces") }}
                 </div>
-                <div class="mt-2 text-xs text-text-caption">
+                <div class="mt-2 text-xs text-text-secondary">
                   {{ t("pipeline.llmEvaluationDescription") }}
                 </div>
               </div>

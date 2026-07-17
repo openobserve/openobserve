@@ -101,7 +101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="showTabs"
         v-model="activeAnalysisType"
         dense
-        class="border-b border-solid border-card-glass-border text-text-caption! insights-dashboard-tabs"
+        class="border-b border-solid border-card-glass-border text-text-secondary! insights-dashboard-tabs"
         align="left"
       >
         <OTab
@@ -1128,7 +1128,7 @@ watch(
 
 /* keep(brand): comparison chips are tinted from the runtime --chip-color
  * (COMPARISON_COLORS baseline/selected palette) via color-mix — a dynamic brand
- * color Tailwind can't express; the text mix flips through --color-text-primary. */
+ * color Tailwind can't express; the text mix flips through --color-text-heading. */
 .time-range-chip {
   font-size: 0.7rem;
   line-height: 1.2;
@@ -1139,7 +1139,7 @@ watch(
 .time-range-chip.selected-chip {
   background: color-mix(in srgb, var(--chip-color) 20%, transparent);
   border: 1px solid color-mix(in srgb, var(--chip-color) 50%, transparent);
-  color: color-mix(in srgb, var(--chip-color) 80%, var(--color-text-primary)) !important;
+  color: color-mix(in srgb, var(--chip-color) 80%, var(--color-text-heading)) !important;
   font-weight: 500;
 }
 </style>

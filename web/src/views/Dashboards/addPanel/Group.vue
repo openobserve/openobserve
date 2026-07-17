@@ -61,7 +61,7 @@
         </ODropdownItem>
       </ODropdown>
     </div>
-    <div v-if="groupNestedIndex !== 0" class="border-l border-border-subtle flex justify-between items-center">
+    <div v-if="groupNestedIndex !== 0" class="border-l border-border-default flex justify-between items-center">
       <OButton
         variant="ghost"
         size="icon"

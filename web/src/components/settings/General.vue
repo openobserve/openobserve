@@ -122,7 +122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <!-- Reset Button -->
               <div
-                class="group/resetChip inline-flex items-center justify-center w-8 h-8 rounded-full cursor-pointer transition-all duration-200 bg-transparent border border-dashed border-border-strong opacity-60 hover:bg-[color-mix(in_srgb,var(--color-error-500)_10%,transparent)] hover:border-error-400 hover:border-solid hover:opacity-100 hover:-translate-y-px hover:rotate-180"
+                class="group/resetChip inline-flex items-center justify-center w-8 h-8 rounded-full cursor-pointer transition-all duration-200 bg-transparent border border-dashed border-border-default opacity-60 hover:bg-[color-mix(in_srgb,var(--color-error-500)_10%,transparent)] hover:border-error-400 hover:border-solid hover:opacity-100 hover:-translate-y-px hover:rotate-180"
                 @click="resetThemeColors"
                 data-test="reset-theme-colors-btn"
               >
@@ -391,7 +391,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            name is interpolated so the sentence names the thing being destroyed. -->
       <div class="flex items-start justify-between gap-6 bg-surface-base px-5 py-4">
         <div class="flex flex-col gap-1">
-          <span class="text-sm font-semibold text-text-primary">
+          <span class="text-sm font-semibold text-text-heading">
             {{ t("settings.deleteOrganizationTitle") }}
           </span>
           <i18n-t
@@ -400,7 +400,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="max-w-3xl text-sm text-text-secondary"
           >
             <template #name>
-              <span class="font-semibold text-text-primary">{{ deleteOrgName }}</span>
+              <span class="font-semibold text-text-heading">{{ deleteOrgName }}</span>
             </template>
           </i18n-t>
         </div>
@@ -431,7 +431,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <div class="flex items-center gap-2">
             <OIcon :name="fact.icon" size="sm" class="shrink-0 text-text-muted" />
-            <span class="text-sm font-semibold text-text-primary">{{ fact.title }}</span>
+            <span class="text-sm font-semibold text-text-heading">{{ fact.title }}</span>
           </div>
           <span class="text-xs text-text-secondary">{{ fact.detail }}</span>
         </div>
@@ -482,7 +482,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div class="flex flex-col gap-3">
       <!-- What will happen -->
-      <p class="text-sm text-text-primary">
+      <p class="text-sm text-text-heading">
         {{
           t("settings.deleteOrganizationConfirm", {
             name: deleteOrgName,
@@ -502,7 +502,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <p
         v-else-if="orgScope"
         data-test="general-delete-org-scope"
-        class="text-xs font-semibold text-text-primary"
+        class="text-xs font-semibold text-text-heading"
       >
         {{ orgScope }}
       </p>
@@ -531,7 +531,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <label class="block text-xs text-text-secondary">
           <i18n-t keypath="settings.deleteOrganizationTypeToConfirm" tag="span">
             <template #name>
-              <span class="font-semibold text-text-primary">{{ deleteOrgName }}</span>
+              <span class="font-semibold text-text-heading">{{ deleteOrgName }}</span>
             </template>
           </i18n-t>
         </label>

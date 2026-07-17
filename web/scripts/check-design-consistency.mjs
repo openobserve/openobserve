@@ -82,6 +82,10 @@ const WHOLE = {
   // A bare `rounded` utility is bounded by class-list separators on BOTH sides.
   // Requiring a trailing separator (space/quote/backtick/EOL) skips prose in
   // comments ("short, rounded, inset") and JS object keys (`rounded: "..."`).
+  // Retired text-colour aliases (Tier 1): text-text-primary → text-text-heading,
+  // text-text-caption → text-text-secondary. Baseline 0 after the codemod, so any
+  // reintroduction of the class utility is a regression.
+  retiredTextAlias: /\btext-text-(?:primary|caption)\b/g,
   bareRounded: /(?:^|[\s"'`])rounded(?=[\s"'`]|$)/gm,
   // Arbitrary radius VALUE — but not a CSS keyword (`rounded-[inherit]` etc.),
   // which is not a hardcoded dimension and has no scale-token equivalent.
@@ -96,10 +100,16 @@ const WHOLE = {
   darkMechanism: /theme\s*[=!]==?\s*['"]dark['"]|const\s+(?:isDark|isDarkMode|darkMode)\s*=|\.body--(?:dark|light)|classList\.contains\(['"]body--|\.(?:light|dark)-mode\b/g,
 };
 
-// Categories evaluated ONLY inside <style>…</style> blocks.
+// Categories evaluated ONLY inside <style>…</style> blocks (scoped AND unscoped —
+// styleBlocks() collects every block regardless of the `scoped` attribute).
 const STYLE_ONLY = {
   styleBlockHex: /#[0-9a-fA-F]{3,8}\b|rgba?\(|hsla?\(/g,
   stylePxUnit: /\b(?:[2-9]|[0-9]{2,})(?:\.[0-9]+)?px\b/g, // 1px hairlines exempt
+  // Raw `var(--color-*)` inside a component style block (F.6). The consumption
+  // ladder wants colours reached via a registered utility, not a raw var() in a
+  // <style> block; ~84% of these already have a utility (AUDIT §7). Ratcheted so
+  // the count can only shrink — the biggest previously-unmeasured debt surface.
+  rawVarInComponent: /var\(\s*--color-[a-z0-9-]+/g,
 };
 
 function walk(dir, files = []) {

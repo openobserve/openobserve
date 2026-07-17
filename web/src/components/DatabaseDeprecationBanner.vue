@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="flex items-center">
       <div class="flex flex-col">
         <span
-          class="text-base font-semibold leading-6 text-text-primary"
+          class="text-base font-semibold leading-6 text-text-heading"
           data-test="database-deprecation-banner-title"
         >
           ⚠️ MySQL support is DEPRECATED and will be removed in future.

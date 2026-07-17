@@ -298,7 +298,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OIcon name="notifications" size="md" />
           </span>
           <span class="flex-1 min-w-0 flex flex-col gap-[0.125rem]">
-            <span class="text-(length:--text-sm) font-semibold text-text-primary truncate">{{ t('overview.emptyActionAlerts') }}</span>
+            <span class="text-(length:--text-sm) font-semibold text-text-heading truncate">{{ t('overview.emptyActionAlerts') }}</span>
             <span class="text-(length:--text-xs) text-text-secondary leading-[1.4]">{{ t('overview.emptyActionAlertsDesc') }}</span>
           </span>
           <OIcon name="chevron-right" size="sm" class="shrink-0 text-text-disabled transition-[transform,color] duration-150 group-hover:translate-x-[0.125rem] group-hover:text-primary-600" />
@@ -309,7 +309,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OIcon name="search" size="md" />
           </span>
           <span class="flex-1 min-w-0 flex flex-col gap-[0.125rem]">
-            <span class="text-(length:--text-sm) font-semibold text-text-primary truncate">{{ t('overview.emptyActionLogs') }}</span>
+            <span class="text-(length:--text-sm) font-semibold text-text-heading truncate">{{ t('overview.emptyActionLogs') }}</span>
             <span class="text-(length:--text-xs) text-text-secondary leading-[1.4]">{{ t('overview.emptyActionLogsDesc') }}</span>
           </span>
           <OIcon name="chevron-right" size="sm" class="shrink-0 text-text-disabled transition-[transform,color] duration-150 group-hover:translate-x-[0.125rem] group-hover:text-primary-600" />
@@ -320,7 +320,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OIcon name="account-tree" size="md" />
           </span>
           <span class="flex-1 min-w-0 flex flex-col gap-[0.125rem]">
-            <span class="text-(length:--text-sm) font-semibold text-text-primary truncate">{{ t('overview.emptyActionTraces') }}</span>
+            <span class="text-(length:--text-sm) font-semibold text-text-heading truncate">{{ t('overview.emptyActionTraces') }}</span>
             <span class="text-(length:--text-xs) text-text-secondary leading-[1.4]">{{ t('overview.emptyActionTracesDesc') }}</span>
           </span>
           <OIcon name="chevron-right" size="sm" class="shrink-0 text-text-disabled transition-[transform,color] duration-150 group-hover:translate-x-[0.125rem] group-hover:text-primary-600" />

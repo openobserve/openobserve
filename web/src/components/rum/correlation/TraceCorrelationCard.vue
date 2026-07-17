@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="mt-3 border border-solid border-card-glass-border rounded-sm">
-    <div class="text-base text-text-primary font-bold ml-1 mb-2">Distributed Trace</div>
+    <div class="text-base text-text-heading font-bold ml-1 mb-2">Distributed Trace</div>
 
     <template v-if="isLoading">
       <div class="p-3 text-center">
@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="w-3/4 flex items-center flex-nowrap">
             <code
               data-test="trace-correlation-card-trace-id-text"
-              class="font-mono text-sm py-1 px-2 bg-surface-accent rounded-sm text-text-primary"
+              class="font-mono text-sm py-1 px-2 bg-surface-accent rounded-sm text-text-heading"
             >{{ formatTraceId(traceId) }}</code>
             <OButton
               icon-left="content-copy"
@@ -59,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="w-3/4">
             <code
               data-test="trace-correlation-card-span-id-text"
-              class="font-mono text-sm py-1 px-2 bg-surface-accent rounded-sm text-text-primary"
+              class="font-mono text-sm py-1 px-2 bg-surface-accent rounded-sm text-text-heading"
             >{{ formatSpanId(spanId) }}</code>
           </div>
         </div>

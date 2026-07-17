@@ -17,10 +17,10 @@
           <div
             class="text-xs font-bold text-text-secondary"
           >
-            <span class="text-text-primary">{{ totalSpans }}</span>
+            <span class="text-text-heading">{{ totalSpans }}</span>
             spans
             <span class="mx-2">•</span>
-            <span class="text-text-primary">{{ maxDepth }}</span>
+            <span class="text-text-heading">{{ maxDepth }}</span>
             depth
           </div>
         </div>

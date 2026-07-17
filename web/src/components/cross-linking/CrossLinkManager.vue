@@ -34,7 +34,7 @@
             <div
               class="text-sm font-medium font-bold truncate"
               :title="link.name"
-              style="color: var(--color-text-primary)"
+              style="color: var(--color-text-heading)"
               :data-test="`cross-link-item-name-${idx}`"
             >
               {{ link.name }}

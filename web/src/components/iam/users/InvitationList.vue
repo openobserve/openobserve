@@ -74,7 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
           <template #cell-role="{ row }">
             <OTag v-if="row.role" type="userRole" :value="row.role" />
-            <span v-else class="text-text-primary">—</span>
+            <span v-else class="text-text-heading">—</span>
           </template>
           <template #cell-inviter_id="{ row }">
             <OUserCell :value="row.inviter_id" />

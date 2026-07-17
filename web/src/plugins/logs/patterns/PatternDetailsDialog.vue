@@ -49,7 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Row 2: full-width module path, truncates at edge -->
         <code
           v-if="selectedPattern && patternPathToken"
-          class="block w-full truncate text-text-code font-mono text-2xs text-text-caption"
+          class="block w-full truncate text-text-code font-mono text-2xs text-text-secondary"
         >{{ patternPathToken }}</code>
       </div>
     </template>
@@ -257,7 +257,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
           </div>
           <div class="col-auto text-center">
-            <span class="text-xs text-text-caption">
+            <span class="text-xs text-text-secondary">
               {{ t("search.patternXofYShort", { index: selectedPattern.index + 1, total: totalPatterns }) }}
             </span>
           </div>

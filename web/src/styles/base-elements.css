@@ -196,7 +196,7 @@ a:hover {
 
 small {
   font-size: var(--text-xs);
-  color: var(--color-text-caption);
+  color: var(--color-text-secondary);
 }
 
 label:not(.o-input-label) {

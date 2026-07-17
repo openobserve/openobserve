@@ -83,7 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :class="
           variant.id === selectedId
             ? 'border-primary-600 ring-1 ring-primary-600'
-            : 'border-border-default hover:border-border-strong'
+            : 'border-border-default hover:border-border-default'
         "
         :data-test="`metrics-fn-variant-${variant.id}`"
         @click="select(variant.id)"

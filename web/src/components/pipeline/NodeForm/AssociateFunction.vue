@@ -461,7 +461,7 @@ const filterFunctions = (val: any, update: any) => {
 }
 
 .function-code-container::-webkit-scrollbar-thumb:hover {
-  background: var(--color-text-caption);
+  background: var(--color-text-secondary);
 }
 
 .dark .function-code-container::-webkit-scrollbar {
@@ -480,6 +480,6 @@ const filterFunctions = (val: any, update: any) => {
 }
 
 .dark .function-code-container::-webkit-scrollbar-thumb:hover {
-  background: var(--color-text-caption);
+  background: var(--color-text-secondary);
 }
 </style>

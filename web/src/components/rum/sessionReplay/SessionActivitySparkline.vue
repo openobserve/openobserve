@@ -51,7 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data-test="`rum-session-activity-dot-${bucket.index}`"
         />
         <span
-          class="rounded-xs w-full"
+          class="rounded-sm w-full"
           :class="
             bucket.events > 0
               ? 'bg-accent opacity-40'
@@ -62,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
     <small
-      class="text-text-caption"
+      class="text-text-secondary"
       data-test="rum-session-activity-events-text"
     >{{ t("rum.eventsCount", { count: activity.totalEvents }) }}</small>
   </div>
@@ -78,7 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <span
       v-for="index in 24"
       :key="index"
-      class="rounded-xs bg-card-glass-border opacity-60 w-1.5"
+      class="rounded-sm bg-card-glass-border opacity-60 w-1.5"
       :style="{ height: `${20 + ((index * 7) % 60)}%` }"
     />
   </div>

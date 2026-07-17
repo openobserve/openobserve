@@ -91,7 +91,7 @@
     <div class="flex items-center gap-4">
       <div class="border-t border-border-default flex-1"></div>
       <div
-        class="py-2 text-center text-xs text-text-primary"
+        class="py-2 text-center text-xs text-text-heading"
         v-if="showJoinSummary"
       >
         Performing

@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ store.state.timezone || 'UTC' }}
             </span>
             <div
-              class="text-xs font-semibold text-text-primary"
+              class="text-xs font-semibold text-text-heading"
             >
               {{ formatTimeRange(profileData.start_time, profileData.end_time) }}
             </div>
@@ -72,12 +72,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div class="flex flex-col gap-1">
                 <div
-                  class="text-2xl font-bold text-text-primary"
+                  class="text-2xl font-bold text-text-heading"
                 >
                   {{ hasNoData ? 'NA' : (profileData?.data_records || 0).toLocaleString() }}
                 </div>
                 <div
-                  class="text-3xs text-text-caption"
+                  class="text-3xs text-text-secondary"
                 >
                   Returned from query
                 </div>
@@ -105,12 +105,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div class="flex flex-col gap-1">
                 <div
-                  class="text-2xl font-bold text-text-primary"
+                  class="text-2xl font-bold text-text-heading"
                 >
                   {{ hasNoData ? 'NA' : (profileData?.scan_records || 0).toLocaleString() }}
                 </div>
                 <div
-                  class="text-3xs text-text-caption"
+                  class="text-3xs text-text-secondary"
                 >
                   Scanned events for this query
                 </div>
@@ -141,13 +141,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div class="flex flex-col gap-1">
                 <div
-                  class="text-2xl font-bold text-text-primary"
+                  class="text-2xl font-bold text-text-heading"
                 >
                   {{ hasNoData ? 'NA' : formatDuration(profileData?.time_taken || profileData?.total_duration) }}
                 </div>
                 <div
                   class="text-3xs"
-                  :class="hasNoData ? 'text-text-caption' : getResponseTimeLabel(profileData?.time_taken || profileData?.total_duration).colorClass"
+                  :class="hasNoData ? 'text-text-secondary' : getResponseTimeLabel(profileData?.time_taken || profileData?.total_duration).colorClass"
                 >
                   {{ hasNoData ? 'No data' : getResponseTimeLabel(profileData?.time_taken || profileData?.total_duration).text }}
                 </div>
@@ -285,7 +285,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="icon-sm"
           :class="[
                 'border',
-                copiedSql ? 'text-status-positive border-status-positive' : 'border-border-strong'
+                copiedSql ? 'text-status-positive border-status-positive' : 'border-border-default'
               ]"
           @click="copySql"
           data-test="inspector-copy-sql-btn"
@@ -596,7 +596,7 @@ export default defineComponent({
     };
 
     const getResponseTimeLabel = (ms: number | undefined) => {
-      if (!ms) return { text: "No data", colorClass: "text-text-caption" };
+      if (!ms) return { text: "No data", colorClass: "text-text-secondary" };
 
       if (ms < 50) {
         return {

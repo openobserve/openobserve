@@ -69,7 +69,7 @@ const isOIcon = computed<boolean>(() =>
     <div class="flex-1 min-w-0 pt-0.5 pb-1">
       <p
         v-if="title"
-        class="m-0 text-sm font-medium leading-snug text-text-primary"
+        class="m-0 text-sm font-medium leading-snug text-text-heading"
       >
         {{ title }}
       </p>

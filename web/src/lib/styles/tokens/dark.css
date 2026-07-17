@@ -75,11 +75,9 @@
 
     /* --- Text (mapped to the foundation) --- */
     --color-text-heading:     var(--d-text);   /* h1-h6, modal titles */
-    --color-text-primary:     var(--d-text);   /* alias for heading */
     --color-text-soft:        var(--d-text);   /* feeds --color-select-text (OSelect trigger value). Soft variant: var(--d-text-2) */
     --color-text-body:        var(--d-text-2); /* paragraphs, default body */
     --color-text-secondary:   var(--d-text-2); /* supporting text, descriptions */
-    --color-text-caption:     var(--d-text-3); /* captions, footnotes, timestamps */
     --color-text-label:       var(--d-text-3); /* form labels, metadata */
     --color-text-muted:       var(--d-text-3); /* disabled, de-emphasized */
     --color-text-disabled:    var(--d-text-3);
@@ -146,21 +144,21 @@
 
     /* secondary (darkened surface) */
     --color-button-secondary: var(--color-surface-overlay);
-    --color-button-secondary-foreground: var(--color-text-primary);
+    --color-button-secondary-foreground: var(--color-text-heading);
     --color-button-secondary-border: var(--color-border-subtle, rgba(255,255,255,0.12));
     --color-button-secondary-hover: var(--color-primary-900);
     --color-button-secondary-active: var(--color-primary-800);
     --color-button-secondary-disabled: var(--color-surface-overlay);
 
     /* outline */
-    --color-button-outline-text: var(--color-text-primary);
+    --color-button-outline-text: var(--color-text-heading);
     --color-button-outline-border: var(--color-border-default);
     --color-button-outline-hover-bg: var(--color-primary-900);
     --color-button-outline-hover-border: var(--color-border-strong);
     --color-button-outline-active-bg: var(--color-primary-800);
 
     /* ghost */
-    --color-button-ghost-text: var(--color-text-primary);
+    --color-button-ghost-text: var(--color-text-heading);
     --color-button-ghost-hover-bg: var(--color-primary-900);
     --color-button-ghost-active-bg: var(--color-primary-800);
 
@@ -261,8 +259,8 @@
     --color-badge-error-soft-text: var(--color-error-400);
 
     /* info (blue): brighten for dark bg */
-    --color-badge-info-ol-border: var(--color-info-200);
-    --color-badge-info-ol-text:   var(--color-info-200);
+    --color-badge-info-ol-border: var(--color-blue-200);
+    --color-badge-info-ol-text:   var(--color-blue-200);
 
     /* purple: brighten for dark bg */
     --color-badge-purple-ol-border: var(--color-purple-400);
@@ -487,9 +485,9 @@
     /* Banner (OBanner) */
     --color-banner-default-bg:     var(--color-grey-800);
     --color-banner-default-text:   var(--color-grey-200);
-    --color-banner-info-bg:        color-mix(in srgb, var(--color-info-800) 20%, transparent);
-    --color-banner-info-border:    var(--color-info-700);
-    --color-banner-info-text:      var(--color-info-100);
+    --color-banner-info-bg:        color-mix(in srgb, var(--color-blue-800) 20%, transparent);
+    --color-banner-info-border:    var(--color-blue-700);
+    --color-banner-info-text:      var(--color-blue-100);
     --color-banner-success-bg:     color-mix(in srgb, var(--color-success-900) 20%, transparent);
     --color-banner-success-border: var(--color-success-700);
     --color-banner-success-text:   var(--color-success-100);
@@ -510,12 +508,6 @@
     --color-usage-banner-warning-bg:     linear-gradient(to right, transparent 60%, #2d2a1f 70%, #3d3520 100%);
 
     /* Note Container */
-    --color-note-bg:               color-mix(in srgb, var(--color-warning-900) 15%, transparent);
-    --color-note-border:           var(--color-note-dark-border);
-    --color-note-text:             var(--color-note-dark-text);
-    --color-note-highlight:        var(--color-note-highlight-dark);
-    --color-note-emphasis:         var(--color-grey-300);
-    --color-note-code:             var(--color-note-code-dark);
 }
 
 /* â”€â”€ Theme-driven runtime tokens, dark mode (utils/theme.ts) â”€â”€
@@ -552,10 +544,6 @@
 .dark {
   --color-label-chip-ip-bg:      #253627;
   --color-label-chip-ip-text:    #89CC8E;
-  --color-label-chip-ipv4-bg:    #253627;
-  --color-label-chip-ipv4-text:  #89CC8E;
-  --color-label-chip-ipv6-bg:    #253627;
-  --color-label-chip-ipv6-text:  #89CC8E;
   --color-label-chip-method-bg:  #5E3838;
   --color-label-chip-method-text: #F2B1AA;
   --color-label-chip-url-bg:     #22264A;
@@ -568,10 +556,6 @@
   --color-label-chip-hex-text:   #F7DE8B;
   --color-label-chip-ts-bg:      #2F2936;
   --color-label-chip-ts-text:    #A571E6;
-  --color-label-chip-date-bg:    #2F2936;
-  --color-label-chip-date-text:  #A571E6;
-  --color-label-chip-time-bg:    #2F2936;
-  --color-label-chip-time-text:  #A571E6;
   --color-label-chip-id-bg:      #1D3838;
   --color-label-chip-id-text:    #9BDDD6;
   --color-label-chip-email-bg:   #402929;
@@ -631,7 +615,7 @@
 :root.dark,
 .dark :root,
 .dark {
-  --color-actions-column-shawdow: rgba(125, 125, 125, 0.694);
+  --color-actions-column-shadow: rgba(125, 125, 125, 0.694);
   --color-bg-gray: color-mix(in srgb, var(--color-theme-accent) 5%, rgb(42, 42, 42));
   /* Form field label â€” dark steps (exact hex the .o-input-label rules used:
      grey-200, and #c4c4c4 which has no palette equivalent). */

@@ -138,7 +138,7 @@ function formatTime(ts: string): string {
         </svg>
         <input
           v-model="searchTerm"
-          class="hch-search-input flex-1 min-w-0 border-0 bg-transparent outline-none text-[0.8125em] text-text-primary py-[0.375em] placeholder:text-text-muted placeholder:opacity-70"
+          class="hch-search-input flex-1 min-w-0 border-0 bg-transparent outline-none text-[0.8125em] text-text-heading py-[0.375em] placeholder:text-text-muted placeholder:opacity-70"
           :placeholder="t('chatHistory.search')"
           type="text"
         />
@@ -177,7 +177,7 @@ function formatTime(ts: string): string {
       >
         <div class="flex-1 min-w-0">
           <div class="text-[0.8125em] leading-[1.35] truncate text-text-body" :class="{ 'font-medium': activeChatId === chat.id }">{{ chat.title }}</div>
-          <div class="text-[0.6875em] text-text-caption mt-[0.0625em]">{{ formatTime(chat.timestamp) }}</div>
+          <div class="text-[0.6875em] text-text-secondary mt-[0.0625em]">{{ formatTime(chat.timestamp) }}</div>
         </div>
         <span class="inline-flex items-center shrink-0 opacity-0 transition-opacity duration-[120ms] group-hover:opacity-100">
           <OButton

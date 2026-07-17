@@ -82,7 +82,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
             <span class="text-3xs font-medium mr-0.75 text-text-secondary">Service</span>
             <span
-              class="text-3xs font-semibold text-text-primary"
+              class="text-3xs font-semibold text-text-heading"
               data-test="trace-details-sidebar-header-toolbar-service-name"
             >
               {{ span.service_name }}
@@ -98,7 +98,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <template #icon><OIcon name="schedule" size="xs" /></template>
             <span class="text-3xs font-medium mr-0.75 text-text-secondary">Duration</span>
-            <span class="text-3xs font-semibold text-text-primary">{{ getDuration }}</span>
+            <span class="text-3xs font-semibold text-text-heading">{{ getDuration }}</span>
           </OTag>
 
           <!-- TTFT Badge -->
@@ -111,7 +111,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <template #icon><OIcon name="speed" size="xs" /></template>
             <span class="text-3xs font-medium mr-0.75 text-text-secondary">TTFT</span>
-            <span class="text-3xs font-semibold text-text-primary">{{ getTTFT }}</span>
+            <span class="text-3xs font-semibold text-text-heading">{{ getTTFT }}</span>
           </OTag>
 
           <!-- Start Time Badge -->
@@ -123,7 +123,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <template #icon><OIcon name="access-time" size="xs" /></template>
             <span class="text-3xs font-medium mr-0.75 text-text-secondary">Start</span>
-            <span class="text-3xs font-semibold text-text-primary">{{ getStartTime }}</span>
+            <span class="text-3xs font-semibold text-text-heading">{{ getStartTime }}</span>
           </OTag>
 
           <!-- Resend Count Badge -->
@@ -136,7 +136,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <template #icon><OIcon name="replay" size="xs" /></template>
             <span class="text-3xs font-medium mr-0.75 text-text-secondary">Resends</span>
-            <span class="text-3xs font-semibold text-text-primary">{{ spanHttpResendCount }}</span>
+            <span class="text-3xs font-semibold text-text-heading">{{ spanHttpResendCount }}</span>
           </OTag>
         </div>
 
@@ -151,7 +151,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="trace-details-sidebar-header-toolbar-span-id"
           >
             <template #icon><OIcon name="tag" size="xs" /></template>
-            <span class="text-3xs font-semibold text-text-primary">{{ span.span_id }}</span>
+            <span class="text-3xs font-semibold text-text-heading">{{ span.span_id }}</span>
             <OIcon
               name="content-copy"
               size="xs"
@@ -345,7 +345,7 @@ class="h-full overflow-y-auto">
               <!-- Input Section -->
               <div class="w-1/2 io-section basis-[calc(50%-0.4rem)] grow-0 shrink-0 flex flex-col h-full pr-[0.5rem]">
                 <div
-                  class="section-label font-bold mb-2 flex items-center justify-between text-text-primary text-sm"
+                  class="section-label font-bold mb-2 flex items-center justify-between text-text-heading text-sm"
                 >
                   <div>Input</div>
                   <div class="flex items-center gap-1">
@@ -412,7 +412,7 @@ class="h-full overflow-y-auto">
               <!-- Output Section -->
               <div class="w-1/2 io-section basis-[calc(50%-0.4rem)] grow-0 shrink-0 flex flex-col h-full">
                 <div
-                  class="section-label font-bold mb-2 flex items-center justify-between text-text-primary text-sm"
+                  class="section-label font-bold mb-2 flex items-center justify-between text-text-heading text-sm"
                 >
                   <div>Output</div>
                   <div class="flex items-center gap-1">

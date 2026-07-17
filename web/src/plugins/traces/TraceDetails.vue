@@ -56,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ t("traces.traceId") }}:
                 <span
                   data-test="trace-details-trace-id"
-                  class="text-text-primary font-mono"
+                  class="text-text-heading font-mono"
                   :title="effectiveTraceId"
                 >
                   {{ effectiveTraceId }}
@@ -68,7 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="trace-details-copy-trace-id-btn"
                 name="content-copy"
                 size="xs"
-                class="cursor-pointer hover:text-text-primary"
+                class="cursor-pointer hover:text-text-heading"
                 :title="t('traces.copyTraceId')"
                 @click="copyTraceId"
               />
@@ -80,7 +80,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   Session ID:
                   <span
                     data-test="trace-details-session-id"
-                    class="text-text-primary font-mono"
+                    class="text-text-heading font-mono"
                     :title="sessionId"
                   >
                     {{ sessionId }}
@@ -90,7 +90,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="trace-details-copy-session-id-btn"
                   name="content-copy"
                   size="xs"
-                  class="cursor-pointer hover:text-text-primary"
+                  class="cursor-pointer hover:text-text-heading"
                   title="Copy Session ID"
                   @click="copySessionId"
                 />
@@ -201,7 +201,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Operation Name -->
               <div
                 data-test="trace-details-operation-name"
-                class="text-base font-semibold leading-tight text-text-primary truncate min-w-0 max-w-[24rem]!"
+                class="text-base font-semibold leading-tight text-text-heading truncate min-w-0 max-w-[24rem]!"
                 :title="traceTree[0]?.operationName"
               >
                 {{ traceTree[0]?.operationName || t("traces.loadingTrace") }}
@@ -221,7 +221,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <span
                     v-if="mode === 'embedded'"
                     data-test="trace-details-trace-id"
-                    class="text-text-primary font-mono cursor-pointer hover:text-theme-accent transition-colors"
+                    class="text-text-heading font-mono cursor-pointer hover:text-theme-accent transition-colors"
                     :title="t('traces.openInTraces')"
                     @click="handleExpandToFullView"
                   >
@@ -230,7 +230,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <span
                     v-else
                     data-test="trace-details-trace-id"
-                    class="text-text-primary font-mono"
+                    class="text-text-heading font-mono"
                     :title="effectiveTraceId"
                   >
                     {{ effectiveTraceId }}
@@ -242,7 +242,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="trace-details-copy-trace-id-btn"
                   name="content-copy"
                   size="xs"
-                  class="cursor-pointer hover:text-text-primary"
+                  class="cursor-pointer hover:text-text-heading"
                   :title="t('traces.copyTraceId')"
                   @click="copyTraceId"
                 />
@@ -256,7 +256,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     Session ID:
                     <span
                       data-test="trace-details-session-id"
-                      class="text-text-primary font-mono"
+                      class="text-text-heading font-mono"
                       :title="sessionId"
                     >
                       {{ sessionId }}
@@ -266,7 +266,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="trace-details-copy-session-id-btn"
                     name="content-copy"
                     size="xs"
-                    class="cursor-pointer hover:text-text-primary"
+                    class="cursor-pointer hover:text-text-heading"
                     title="Copy Session ID"
                     @click="copySessionId"
                   />

@@ -223,7 +223,7 @@ function handleUpdateExpanded(ids: string[]) {
         class="w-18 h-12 shrink-0 rounded-sm border border-border-default bg-surface-subtle flex items-center justify-center overflow-hidden"
       >
         <slot name="screenshot-thumb" :row="row">
-          <OIcon name="image" size="xs" class="text-text-caption" />
+          <OIcon name="image" size="xs" class="text-text-secondary" />
         </slot>
       </div>
     </template>

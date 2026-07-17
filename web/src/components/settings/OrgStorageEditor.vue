@@ -64,7 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="flex items-start gap-2.5 px-3 py-2.5 mb-3 rounded-lg border bg-banner-warning-bg border-banner-warning-border"
             >
               <OIcon name="warning" size="sm" class="flex-shrink-0 mt-px" />
-              <div class="text-compact leading-[1.55] text-text-primary">
+              <div class="text-compact leading-[1.55] text-text-heading">
                 This action is <strong>irreversible</strong>. Once set, you cannot switch to a different storage provider or delete this configuration. To use a different provider, you must create a new organization.
               </div>
             </div>
@@ -73,7 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="flex items-start gap-2.5 px-3 py-2.5 mb-3 rounded-lg border bg-banner-info-bg border-banner-info-border"
             >
               <OIcon name="info" size="sm" class="flex-shrink-0 mt-px" />
-              <div class="text-compact leading-[1.55] text-text-primary">
+              <div class="text-compact leading-[1.55] text-text-heading">
                 Once configured, only credential fields can be updated. All other fields will be locked.
               </div>
             </div>
@@ -105,7 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   size="lg"
                   class="mb-2 text-text-secondary [transition:color_0.3s_ease] group-[.selected]/card:text-card-glass-border"
                 />
-                <div class="text-compact font-medium text-center [line-height:1.3] mt-1 text-text-primary">{{ provider.label }}</div>
+                <div class="text-compact font-medium text-center [line-height:1.3] mt-1 text-text-heading">{{ provider.label }}</div>
                 <div
                   v-if="selectedProvider === provider.value"
                   class="check-icon absolute top-[0.375rem] right-[0.375rem] w-[1.25rem] h-[1.25rem] rounded-full overflow-hidden bg-status-positive text-white flex items-center justify-center z-[1]"
@@ -254,7 +254,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="flex items-start gap-2.5 px-3 py-2.5 mb-3 rounded-lg border bg-banner-info-bg border-banner-info-border"
                 >
                   <OIcon name="info" size="sm" class="flex-shrink-0 mt-px" />
-                  <div class="text-compact leading-[1.55] text-text-primary">
+                  <div class="text-compact leading-[1.55] text-text-heading">
                     <template v-if="isCloud">
                       {{ t("storage_settings.awsStsCloudInfo") }}
                     </template>

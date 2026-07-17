@@ -157,7 +157,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Right: membership facts -->
           <div class="w-85 shrink-0 flex flex-col gap-3.5" data-test="org-group-child-details">
-            <div class="og-feature flex items-start gap-4 py-4.5 px-5 rounded-2xl bg-surface-base border border-card-glass-border transition-all duration-200 hover:shadow-lg hover:-translate-y-px">
+            <div class="og-feature flex items-start gap-4 py-4.5 px-5 rounded-lg bg-surface-base border border-card-glass-border transition-all duration-200 hover:shadow-lg hover:-translate-y-px">
               <div class="w-10 h-10 rounded-lg shrink-0 flex items-center justify-center bg-[color-mix(in_srgb,var(--color-primary-600)_10%,transparent)] text-primary-600">
                 <OIcon name="person-add" />
               </div>
@@ -170,7 +170,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
             </div>
-            <div class="og-feature flex items-start gap-4 py-4.5 px-5 rounded-2xl bg-surface-base border border-card-glass-border transition-all duration-200 hover:shadow-lg hover:-translate-y-px">
+            <div class="og-feature flex items-start gap-4 py-4.5 px-5 rounded-lg bg-surface-base border border-card-glass-border transition-all duration-200 hover:shadow-lg hover:-translate-y-px">
               <div class="w-10 h-10 rounded-lg shrink-0 flex items-center justify-center bg-[color-mix(in_srgb,var(--color-primary-600)_10%,transparent)] text-primary-600">
                 <OIcon name="how-to-reg" />
               </div>
@@ -186,7 +186,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
             </div>
-            <div class="og-feature flex items-start gap-4 py-4.5 px-5 rounded-2xl bg-surface-base border border-card-glass-border transition-all duration-200 hover:shadow-lg hover:-translate-y-px">
+            <div class="og-feature flex items-start gap-4 py-4.5 px-5 rounded-lg bg-surface-base border border-card-glass-border transition-all duration-200 hover:shadow-lg hover:-translate-y-px">
               <div class="w-10 h-10 rounded-lg shrink-0 flex items-center justify-center bg-[color-mix(in_srgb,var(--color-primary-600)_10%,transparent)] text-primary-600">
                 <OIcon name="schedule" />
               </div>

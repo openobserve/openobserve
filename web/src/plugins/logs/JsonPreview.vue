@@ -188,7 +188,7 @@
       }
       <div
         v-if="showMenu"
-        class="context-menu shadow-lg rounded-sm min-w-50 py-1 [font-size:0.8125rem] bg-surface-overlay border border-border-default text-text-primary"
+        class="context-menu shadow-lg rounded-sm min-w-50 py-1 [font-size:0.8125rem] bg-surface-overlay border border-border-default text-text-heading"
         :style="{
           position: 'fixed',
           top: `${menuY}px`,

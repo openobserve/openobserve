@@ -20,7 +20,7 @@
         <div class="w-85 shrink-0 overflow-y-auto py-5 pr-5 pl-6 flex flex-col gap-5">
           <!-- Model Name -->
           <div class="flex flex-col gap-1.5">
-            <label class="text-compact font-semibold text-text-primary"
+            <label class="text-compact font-semibold text-text-heading"
               >{{ t("modelPricing.modelNameInput") }}
               <span class="text-status-error-text">*</span></label
             >
@@ -222,7 +222,7 @@
                   <div
                     v-for="row in pricingRows"
                     :key="row.key"
-                    class="tmm-cost-table-row grid gap-2 py-2 px-3.5 text-xs border-b border-border-subtle last:border-b-0 hover:bg-hover-gray grid-cols-[1.5fr_1fr]"
+                    class="tmm-cost-table-row grid gap-2 py-2 px-3.5 text-xs border-b border-border-default last:border-b-0 hover:bg-hover-gray grid-cols-[1.5fr_1fr]"
                   >
                     <span class="font-semibold font-mono text-2xs">{{ row.key }}</span>
                     <span class="font-semibold tabular-nums text-right"

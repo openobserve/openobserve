@@ -138,7 +138,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @click="showUrlJobsDialog(row)"
                     >
                       <OTag type="enrichmentType" value="url" />
-                      <span v-if="row.urlJobs.length > 1" class="text-text-primary"> ({{ row.urlJobs.length }})</span>
+                      <span v-if="row.urlJobs.length > 1" class="text-text-heading"> ({{ row.urlJobs.length }})</span>
                     </span>
                     <span v-if="row.aggregateStatus === 'completed'">
                       <OIcon name="check-circle" size="sm" class="text-status-positive">

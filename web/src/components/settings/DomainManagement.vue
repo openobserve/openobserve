@@ -193,11 +193,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >{{ t('settings.addDomain') }}
           </OButton>
       </OForm>
-      <div class="text-xs text-text-caption mt-1">
+      <div class="text-xs text-text-secondary mt-1">
         {{ t('settings.domainHint', { at_sign: '@' }) }}
       </div>
 
-      <div class="text-xs text-text-caption mt-1 mb-3" v-if="domains.length > 0">
+      <div class="text-xs text-text-secondary mt-1 mb-3" v-if="domains.length > 0">
         {{ t("settings.domainConfiguredCount", { count: domains.length }) }}
       </div>
     </div>
@@ -371,7 +371,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Hint for any block policy -->
           <div
             v-if="domain.policy === 'block_specific' || domain.policy === 'block_all'"
-            class="text-xs text-text-caption mt-3"
+            class="text-xs text-text-secondary mt-3"
           >
             {{ t("settings.blockedUsersHint") }}
           </div>

@@ -33,7 +33,7 @@ const cache = new Map<string, string>();
 // (jsdom unit tests / SSR). Keeps charts from rendering with empty color strings.
 // These are the light-theme resolutions of the corresponding tokens.
 const FALLBACKS: Record<string, string> = {
-  "--color-text-primary": "#171717",
+  "--color-text-heading": "#171717",
   "--color-text-secondary": "#737373",
   "--color-border-default": "#e5e5e5",
   "--color-border-subtle": "#ededed",

@@ -373,7 +373,7 @@ export const convertMultiSQLData = async (
         ((parseFloat(cell.left) + parseFloat(cell.width) / 2) / 100) * panelW;
       const cy =
         ((parseFloat(cell.top) + parseFloat(cell.height) / 2) / 100) * panelH;
-      const fill = s?._metricFillColor ?? chartColor("--color-text-primary");
+      const fill = s?._metricFillColor ?? chartColor("--color-text-heading");
       // Grid-cell rect (px) is the hover zone; cx/cy/fontSize place + size the
       // copy icon beside the number, clamped inside the cell.
       s._metricLayout = {

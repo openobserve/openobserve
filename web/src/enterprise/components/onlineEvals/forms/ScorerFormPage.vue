@@ -47,11 +47,11 @@
         <section class="mb-6">
           <div class="flex items-center gap-2.5 pb-2.5 border-b border-dialog-header-border mb-3">
             <span class="inline-flex items-center justify-center w-5.5 h-5.5 rounded-full bg-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] text-text-secondary font-bold text-2xs font-mono">01</span>
-            <h3 class="m-0 text-sm font-semibold text-text-primary">{{ t("onlineEvals.scorer.identitySection") }}</h3>
+            <h3 class="m-0 text-sm font-semibold text-text-heading">{{ t("onlineEvals.scorer.identitySection") }}</h3>
           </div>
 
           <div class="mb-3">
-            <label class="flex items-center text-xs font-semibold text-text-primary mb-1">
+            <label class="flex items-center text-xs font-semibold text-text-heading mb-1">
               {{ t("onlineEvals.scorer.nameLabel") }}
               <span class="text-status-error-text ml-0.5">*</span>
               <OIcon v-if="mode === 'edit'" name="lock" size="xs" class="ml-1.5 text-text-secondary" />
@@ -66,7 +66,7 @@
           </div>
 
           <div class="mb-3">
-            <label class="flex items-center text-xs font-semibold text-text-primary mb-1">
+            <label class="flex items-center text-xs font-semibold text-text-heading mb-1">
               {{ t("onlineEvals.scorer.descriptionLabel") }}
             </label>
             <OFormTextarea
@@ -79,7 +79,7 @@
           </div>
 
           <div class="mb-3">
-            <label class="flex items-center text-xs font-semibold text-text-primary mb-1">
+            <label class="flex items-center text-xs font-semibold text-text-heading mb-1">
               {{ t("onlineEvals.scorer.producesScoreConfigLabel") }}
               <OIcon v-if="mode === 'edit'" name="lock" size="xs" class="ml-1.5 text-text-secondary" />
             </label>
@@ -94,7 +94,7 @@
             />
             <div class="text-2xs text-text-secondary mt-1">{{ t("onlineEvals.scorer.producesScoreHelp") }}</div>
 
-            <div v-if="selectedScoreConfig" class="flex items-center flex-wrap gap-[6px_10px] p-[8px_12px] mt-2 border border-[color-mix(in_srgb,var(--color-status-info-text)_25%,transparent)] rounded-md bg-[color-mix(in_srgb,var(--color-status-info-text)_8%,transparent)] text-xs text-text-primary">
+            <div v-if="selectedScoreConfig" class="flex items-center flex-wrap gap-[6px_10px] p-[8px_12px] mt-2 border border-[color-mix(in_srgb,var(--color-status-info-text)_25%,transparent)] rounded-md bg-[color-mix(in_srgb,var(--color-status-info-text)_8%,transparent)] text-xs text-text-heading">
               <span class="w-2 h-2 rounded-full bg-status-info-text shrink-0" />
               <span class="font-medium">
                 {{ t("onlineEvals.scorer.selectedPrefix") }}
@@ -125,11 +125,11 @@
         <section v-if="formValues.scorerType === 'llm_judge'" class="mb-6">
           <div class="flex items-center gap-2.5 pb-2.5 border-b border-dialog-header-border mb-3">
             <span class="inline-flex items-center justify-center w-5.5 h-5.5 rounded-full bg-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] text-text-secondary font-bold text-2xs font-mono">02</span>
-            <h3 class="m-0 text-sm font-semibold text-text-primary">{{ t("onlineEvals.scorer.judgeSection") }}</h3>
+            <h3 class="m-0 text-sm font-semibold text-text-heading">{{ t("onlineEvals.scorer.judgeSection") }}</h3>
           </div>
 
           <div class="mb-3">
-            <label class="flex items-center text-xs font-semibold text-text-primary mb-1">
+            <label class="flex items-center text-xs font-semibold text-text-heading mb-1">
               {{ t("onlineEvals.scorer.providerLabel") }}
               <span class="text-status-error-text ml-0.5">*</span>
             </label>
@@ -153,7 +153,7 @@
               />
             </div>
 
-            <div v-if="selectedProvider" class="flex items-center flex-wrap gap-[6px_10px] p-[8px_12px] mt-2 border border-[color-mix(in_srgb,var(--color-status-info-text)_25%,transparent)] rounded-md bg-[color-mix(in_srgb,var(--color-status-info-text)_8%,transparent)] text-xs text-text-primary">
+            <div v-if="selectedProvider" class="flex items-center flex-wrap gap-[6px_10px] p-[8px_12px] mt-2 border border-[color-mix(in_srgb,var(--color-status-info-text)_25%,transparent)] rounded-md bg-[color-mix(in_srgb,var(--color-status-info-text)_8%,transparent)] text-xs text-text-heading">
               <span class="w-2 h-2 rounded-full bg-status-info-text shrink-0" />
               <span class="text-text-secondary">
                 {{ t("onlineEvals.scorer.endpointLabel") }}
@@ -187,7 +187,7 @@
           </div>
 
           <div class="mb-3">
-            <label class="flex items-center text-xs font-semibold text-text-primary mb-1">{{ t("onlineEvals.scorer.modelLabel") }}</label>
+            <label class="flex items-center text-xs font-semibold text-text-heading mb-1">{{ t("onlineEvals.scorer.modelLabel") }}</label>
             <OFormInput
               name="model"
               :placeholder="t('onlineEvals.scorer.modelPlaceholder')"
@@ -197,7 +197,7 @@
           </div>
 
           <div class="mb-3 flex flex-col gap-3.5">
-            <label class="flex items-center text-xs font-semibold text-text-primary mb-1">
+            <label class="flex items-center text-xs font-semibold text-text-heading mb-1">
               {{ t("onlineEvals.scorer.promptLabel") }}
               <span class="text-status-error-text ml-0.5">*</span>
             </label>
@@ -214,7 +214,7 @@
               <span
                 v-for="v in promptVariables"
                 :key="v"
-                class="py-px px-1.5 rounded-sm text-2xs font-mono bg-[color-mix(in_srgb,var(--color-text-secondary)_10%,transparent)] text-text-primary"
+                class="py-px px-1.5 rounded-sm text-2xs font-mono bg-[color-mix(in_srgb,var(--color-text-secondary)_10%,transparent)] text-text-heading"
               >{{ formatTemplateVariable(v) }}</span>
             </div>
             <div class="text-2xs text-text-secondary mt-1">
@@ -235,7 +235,7 @@
             >
               <template #label>
                 <span>
-                  <strong class="block text-xs text-text-primary">{{ t("onlineEvals.scorer.includeReasoningLabel") }}</strong>
+                  <strong class="block text-xs text-text-heading">{{ t("onlineEvals.scorer.includeReasoningLabel") }}</strong>
                   <small class="block text-2xs text-text-secondary">{{ t("onlineEvals.scorer.includeReasoningHint") }}</small>
                 </span>
               </template>
@@ -329,11 +329,11 @@
         <section v-else class="mb-6">
           <div class="flex items-center gap-2.5 pb-2.5 border-b border-dialog-header-border mb-3">
             <span class="inline-flex items-center justify-center w-5.5 h-5.5 rounded-full bg-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] text-text-secondary font-bold text-2xs font-mono">02</span>
-            <h3 class="m-0 text-sm font-semibold text-text-primary">{{ t("onlineEvals.scorer.endpointSection") }}</h3>
+            <h3 class="m-0 text-sm font-semibold text-text-heading">{{ t("onlineEvals.scorer.endpointSection") }}</h3>
           </div>
 
           <div class="mb-3">
-            <label class="flex items-center text-xs font-semibold text-text-primary mb-1">
+            <label class="flex items-center text-xs font-semibold text-text-heading mb-1">
               {{ t("onlineEvals.scorer.remoteUrlLabel") }}
               <span class="text-status-error-text ml-0.5">*</span>
             </label>
@@ -356,7 +356,7 @@
 
           <div class="mb-3 grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)] gap-3">
             <div class="flex flex-col gap-1.5">
-              <label class="flex items-center text-xs font-semibold text-text-primary mb-1">
+              <label class="flex items-center text-xs font-semibold text-text-heading mb-1">
                 {{ t("onlineEvals.scorer.remoteTimeoutLabel") }}
               </label>
               <OFormInput
@@ -368,7 +368,7 @@
               />
             </div>
             <div class="flex flex-col gap-1.5">
-              <label class="flex items-center text-xs font-semibold text-text-primary mb-1">
+              <label class="flex items-center text-xs font-semibold text-text-heading mb-1">
                 {{ t("onlineEvals.scorer.remoteRetriesLabel") }}
               </label>
               <OFormInput
@@ -380,7 +380,7 @@
               />
             </div>
             <div class="flex flex-col gap-1.5">
-              <label class="flex items-center text-xs font-semibold text-text-primary mb-1">
+              <label class="flex items-center text-xs font-semibold text-text-heading mb-1">
                 {{ t("onlineEvals.scorer.remoteBackoffLabel") }}
               </label>
               <OFormSelect
@@ -398,11 +398,11 @@
         <section v-if="formValues.scorerType === 'remote'" class="mb-6">
           <div class="flex items-center gap-2.5 pb-2.5 border-b border-dialog-header-border mb-3">
             <span class="inline-flex items-center justify-center w-5.5 h-5.5 rounded-full bg-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] text-text-secondary font-bold text-2xs font-mono">03</span>
-            <h3 class="m-0 text-sm font-semibold text-text-primary">{{ t("onlineEvals.scorer.authSection") }}</h3>
+            <h3 class="m-0 text-sm font-semibold text-text-heading">{{ t("onlineEvals.scorer.authSection") }}</h3>
           </div>
 
           <div class="mb-3">
-            <label class="flex items-center text-xs font-semibold text-text-primary mb-1">
+            <label class="flex items-center text-xs font-semibold text-text-heading mb-1">
               {{ t("onlineEvals.scorer.remoteAuthLabel") }}
             </label>
             <!-- Clearable so a user can return to "no auth": the auth-type
@@ -423,7 +423,7 @@
           </div>
 
           <div v-if="formValues.authType === 'bearer'" class="mb-3">
-            <label class="flex items-center text-xs font-semibold text-text-primary mb-1">
+            <label class="flex items-center text-xs font-semibold text-text-heading mb-1">
               {{ t("onlineEvals.scorer.remoteAuth.tokenLabel") }}
               <span class="text-status-error-text ml-0.5">*</span>
             </label>
@@ -441,7 +441,7 @@
 
           <div v-if="formValues.authType === 'basic'" class="mb-3 grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-3">
             <div class="flex flex-col gap-1.5">
-              <label class="flex items-center text-xs font-semibold text-text-primary mb-1">
+              <label class="flex items-center text-xs font-semibold text-text-heading mb-1">
                 {{ t("onlineEvals.scorer.remoteAuth.usernameLabel") }}
                 <span class="text-status-error-text ml-0.5">*</span>
               </label>
@@ -453,7 +453,7 @@
               />
             </div>
             <div class="flex flex-col gap-1.5">
-              <label class="flex items-center text-xs font-semibold text-text-primary mb-1">
+              <label class="flex items-center text-xs font-semibold text-text-heading mb-1">
                 {{ t("onlineEvals.scorer.remoteAuth.passwordLabel") }}
                 <span class="text-status-error-text ml-0.5">*</span>
               </label>
@@ -472,7 +472,7 @@
 
           <div v-if="formValues.authType === 'api_key'" class="mb-3 grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-3">
             <div class="flex flex-col gap-1.5">
-              <label class="flex items-center text-xs font-semibold text-text-primary mb-1">
+              <label class="flex items-center text-xs font-semibold text-text-heading mb-1">
                 {{ t("onlineEvals.scorer.remoteAuth.headerNameLabel") }}
                 <span class="text-status-error-text ml-0.5">*</span>
               </label>
@@ -484,7 +484,7 @@
               />
             </div>
             <div class="flex flex-col gap-1.5">
-              <label class="flex items-center text-xs font-semibold text-text-primary mb-1">
+              <label class="flex items-center text-xs font-semibold text-text-heading mb-1">
                 {{ t("onlineEvals.scorer.remoteAuth.tokenLabel") }}
                 <span class="text-status-error-text ml-0.5">*</span>
               </label>
@@ -506,7 +506,7 @@
         <section v-if="formValues.scorerType === 'remote'" class="mb-6">
           <div class="flex items-center gap-2.5 pb-2.5 border-b border-dialog-header-border mb-3">
             <span class="inline-flex items-center justify-center w-5.5 h-5.5 rounded-full bg-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] text-text-secondary font-bold text-2xs font-mono">04</span>
-            <h3 class="m-0 text-sm font-semibold text-text-primary">{{ t("onlineEvals.scorer.headersSection") }}</h3>
+            <h3 class="m-0 text-sm font-semibold text-text-heading">{{ t("onlineEvals.scorer.headersSection") }}</h3>
             <span class="ml-auto text-2xs text-text-secondary italic">
               {{ t("onlineEvals.scorer.remoteHeaders.subtitle") }}
             </span>
@@ -569,11 +569,11 @@
         <section v-if="formValues.scorerType === 'remote'" class="mb-6">
           <div class="flex items-center gap-2.5 pb-2.5 border-b border-dialog-header-border mb-3">
             <span class="inline-flex items-center justify-center w-5.5 h-5.5 rounded-full bg-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] text-text-secondary font-bold text-2xs font-mono">05</span>
-            <h3 class="m-0 text-sm font-semibold text-text-primary">{{ t("onlineEvals.scorer.requestBodySection") }}</h3>
+            <h3 class="m-0 text-sm font-semibold text-text-heading">{{ t("onlineEvals.scorer.requestBodySection") }}</h3>
           </div>
 
           <div class="mb-3">
-            <label class="flex items-center text-xs font-semibold text-text-primary mb-1">
+            <label class="flex items-center text-xs font-semibold text-text-heading mb-1">
               {{ t("onlineEvals.scorer.requestBodyLabel") }}
               <span class="text-status-error-text ml-0.5">*</span>
             </label>
@@ -590,7 +590,7 @@
               <span
                 v-for="v in promptVariables"
                 :key="v"
-                class="py-px px-1.5 rounded-sm text-2xs font-mono bg-[color-mix(in_srgb,var(--color-text-secondary)_10%,transparent)] text-text-primary"
+                class="py-px px-1.5 rounded-sm text-2xs font-mono bg-[color-mix(in_srgb,var(--color-text-secondary)_10%,transparent)] text-text-heading"
               >{{ formatTemplateVariable(v) }}</span>
             </div>
           </div>
@@ -646,7 +646,7 @@
       >
         {{ schemaPreviewError }}
       </p>
-      <pre class="m-0 max-h-[60vh] overflow-auto p-3 rounded-md bg-card-bg border border-border-default font-normal text-xs font-(family-name:--font-mono) text-text-primary whitespace-pre [tab-size:2]" v-else>{{ schemaPreview }}</pre>
+      <pre class="m-0 max-h-[60vh] overflow-auto p-3 rounded-md bg-card-bg border border-border-default font-normal text-xs font-(family-name:--font-mono) text-text-heading whitespace-pre [tab-size:2]" v-else>{{ schemaPreview }}</pre>
 
       <template #footer>
         <div class="flex items-center justify-between gap-2 w-full">
@@ -1351,7 +1351,7 @@ async function save(value: ScorerForm) {
    labels, graying them out — this higher-specificity :not() selector restores
    the primary color + weight/size. */
 .scorer-form__main label:not(.o-input-label) {
-  color: var(--color-text-primary, currentColor);
+  color: var(--color-text-heading, currentColor);
   font-weight: 600;
   font-size: 0.75rem;
 }

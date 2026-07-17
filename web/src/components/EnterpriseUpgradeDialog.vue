@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <ODialog v-model:open="showDialog" data-test="enterprise-upgrade-dialog" :show-close="false" :width="75" @update:open="(v) => !v && onDialogHide()">
     <div class="enterprise-dialog-v3 overflow-hidden relative -my-(--spacing-dialog-content-py) -mx-(--spacing-dialog-content-px)">
       <!-- Close Button -->
-      <div class="absolute top-4 right-4 z-[100] text-text-secondary hover:text-text-primary">
+      <div class="absolute top-4 right-4 z-[100] text-text-secondary hover:text-text-heading">
         <OButton
           variant="ghost"
           size="icon"
@@ -52,7 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="enterprise-upgrade-usage-indicator-skeleton"
                 />
                 <OSkeleton
-                  class="shrink-0 rounded-3xl"
+                  class="shrink-0 rounded-lg"
                   style="width: 200px; height: 44px;"
                   data-test="enterprise-upgrade-offer-badge-skeleton"
                 />
@@ -161,7 +161,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OIcon :name="feature.icon" size="sm" />
               </div>
               <div class="flex-1 min-w-0">
-                <div class="text-compact font-semibold mb-0.5 leading-[1.25] flex items-center gap-1.5" :class="'text-text-primary'">
+                <div class="text-compact font-semibold mb-0.5 leading-[1.25] flex items-center gap-1.5" :class="'text-text-heading'">
                   {{ feature.name }}
                   <OIcon v-if="feature.link" name="open-in-new" size="xs" class="opacity-60 ml-1 align-middle" />
                 </div>
@@ -192,7 +192,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OIcon :name="feature.icon" size="sm" />
               </div>
               <div class="flex-1 min-w-0">
-                <div class="text-compact font-semibold mb-0.5 leading-[1.25] flex items-center gap-1.5" :class="'text-text-primary'">
+                <div class="text-compact font-semibold mb-0.5 leading-[1.25] flex items-center gap-1.5" :class="'text-text-heading'">
                   {{ feature.name }}
                   <OIcon v-if="feature.link" name="open-in-new" size="xs" class="opacity-60 ml-1 align-middle" />
                   <OTag v-if="feature.beta" type="featureFlag" value="beta" data-test="enterprise-upgrade-feature-beta-badge" />
@@ -226,7 +226,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OIcon :name="feature.icon" size="sm" />
               </div>
               <div class="flex-1 min-w-0">
-                <div data-test="enterprise-upgrade-feature-name" class="text-compact font-semibold mb-0.5 leading-[1.25] flex items-center gap-1.5" :class="'text-text-primary'">
+                <div data-test="enterprise-upgrade-feature-name" class="text-compact font-semibold mb-0.5 leading-[1.25] flex items-center gap-1.5" :class="'text-text-heading'">
                   {{ feature.name }}
                   <OIcon v-if="feature.link" name="open-in-new" size="xs" data-test="enterprise-upgrade-feature-external-link" class="opacity-60 ml-1 align-middle" />
                   <OTag v-if="feature.beta" type="featureFlag" value="beta" data-test="enterprise-upgrade-feature-beta-badge" />

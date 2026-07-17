@@ -1,10 +1,21 @@
 /**
  * Trace Span Color Utilities
- * Provides helper functions to access the 50 span colors defined in tokens/base.css (--color-span-*)
+ *
+ * `getSpanColor(i)` returns the theme-aware CSS var for span colour i — the
+ * `--color-span-*` set (50 colours) in tokens/base.css — prefer it wherever a CSS
+ * colour is accepted.
+ *
+ * `getSpanColorHex(i, theme)` returns a raw hex from the two arrays below, for the
+ * canvas/ECharts call sites that cannot consume a CSS var. NOTE: these arrays hold
+ * 35 entries and do NOT currently match the 50 --color-span-* token values — a
+ * known divergence. The single-source-of-truth fix (resolve the tokens via the
+ * chartColor() seam and delete these arrays) is deferred because it changes rendered
+ * trace colours and needs a visual pass; see O2_TOKEN_SYSTEM_AUDIT.md §10.
  */
 
 /**
- * Light mode span colors (50 colors)
+ * Light-mode span colours — 35-entry raw-hex fallback for getSpanColorHex (NOT the
+ * --color-span-* token set; see the file header). Used only where a CSS var can't go.
  */
 export const LIGHT_SPAN_COLORS = [
   "#10B981",

@@ -329,7 +329,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         v-else
                         name="image"
                         size="xs"
-                        class="text-text-caption"
+                        class="text-text-secondary"
                       />
                     </template>
 
@@ -367,8 +367,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 </div>
                               </div>
                               <template v-else>
-                                <OIcon name="image" :class="row.status === 'fail' ? 'text-status-error-text' : 'text-text-caption'" size="lg" />
-                                <span class="text-xs font-semibold" :class="row.status === 'fail' ? 'text-status-error-text' : 'text-text-caption'">
+                                <OIcon name="image" :class="row.status === 'fail' ? 'text-status-error-text' : 'text-text-secondary'" size="lg" />
+                                <span class="text-xs font-semibold" :class="row.status === 'fail' ? 'text-status-error-text' : 'text-text-secondary'">
                                   {{ row.status === 'fail' ? t('synthetics.runDetail.failureScreenshot') : t('synthetics.runDetail.screenshotPlaceholder') }}
                                 </span>
                               </template>

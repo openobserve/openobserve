@@ -52,7 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >· {{ card.rate }}</span
         >
       </span>
-      <small :class="card.captionClass || 'text-text-caption'">{{
+      <small :class="card.captionClass || 'text-text-secondary'">{{
         card.caption
       }}</small>
     </button>
@@ -128,7 +128,7 @@ const deltaCaption = (
     // More sessions is neutral; more errors/frustration is bad, fewer is good.
     captionClass:
       suffix === "%"
-        ? "text-text-caption"
+        ? "text-text-secondary"
         : delta > 0
           ? "text-status-error-text"
           : "text-status-success-text",

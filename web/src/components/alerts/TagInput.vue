@@ -52,7 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model="inputValue"
           type="text"
           :placeholder="modelValue.length > 0 ? '' : placeholder"
-          class="[flex:1_1_100px] min-w-25 border-0 outline-none bg-transparent p-1 text-sm text-text-primary placeholder:text-text-secondary"
+          class="[flex:1_1_100px] min-w-25 border-0 outline-none bg-transparent p-1 text-sm text-text-heading placeholder:text-text-secondary"
           @keydown.enter.prevent="addTag"
           @input="handleInput"
           @keydown.delete="handleBackspace"

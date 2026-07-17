@@ -147,7 +147,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </OProgressBar>
                 </div>
                 <div
-                  class="text-xs text-text-primary whitespace-nowrap pr-2 w-24 shrink-0"
+                  class="text-xs text-text-heading whitespace-nowrap pr-2 w-24 shrink-0"
                 >
                   <template v-if="row.chunks_total">
                     {{ row.chunks_completed || 0 }}/{{

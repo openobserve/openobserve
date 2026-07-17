@@ -106,5 +106,5 @@ const activeCommand = computed(() => {
 const selectedCardClass = "border-[var(--color-theme-accent)] bg-status-info-bg";
 
 const unselectedCardClass =
-  "border-border-default bg-surface-base hover:border-border-strong";
+  "border-border-default bg-surface-base hover:border-border-default";
 </script>

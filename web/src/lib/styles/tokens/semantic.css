@@ -12,13 +12,15 @@
 /* â”€â”€ Light-mode defaults â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 :root {
   /* Text â€” grey-based semantic hierarchy */
-  --color-text-heading:     var(--color-grey-900);  /* h1-h6, modal titles */
-  --color-text-primary:     var(--color-grey-900);  /* alias for heading â€” backward compat */
+  --color-text-heading:     var(--color-grey-900);  /* h1-h6, modal titles, page/panel titles */
   --color-text-body:        var(--color-grey-800);  /* paragraphs, default body */
-  --color-text-secondary:   var(--color-grey-500);  /* supporting text, descriptions */
-  --color-text-caption:     var(--color-grey-500);  /* captions, footnotes, timestamps */
+  --color-text-secondary:   var(--color-grey-500);  /* supporting text, descriptions, captions */
   --color-text-label:       var(--color-grey-400);  /* form labels, metadata, badges */
   --color-text-muted:       var(--color-grey-300);  /* disabled, placeholder, de-emphasized */
+  /* label / disabled / placeholder (+ border-strong, scrollbar-thumb-hover) are
+     intentionally-equal-for-now: all route through the grey-400 primitive rather
+     than a copied literal, so any one can diverge later without hunting hex (C.3).
+     Different intents kept as distinct tokens on purpose — NOT aliases. */
   --color-text-disabled:    var(--color-grey-400);
   --color-text-placeholder: var(--color-grey-400);
   --color-text-soft:        rgba(0, 0, 0, 0.75);   /* black at 75% â€” readable but not harsh */
@@ -36,10 +38,7 @@
   /* App chrome (top bar + side rail + the gutter behind the content card) â€” a
      BARELY-tinted near-white (prototype --g-100 â‰ˆ #F5F6F9), just a whisper of
      brand hue so the white content card floats on a calm backdrop. A strong
-     tint reads as "too bright". (Must live here in the .scss set the app loads â€”
-     the parallel .css set is NOT imported by the app, so a value defined only
-     there leaves the token undefined and the chrome falls through to the body
-     tint.) */
+     tint reads as "too bright". */
   --color-surface-chrome:  color-mix(in srgb, var(--color-primary-50) 55%, var(--color-grey-50));
   --color-surface-chrome-deeper: var(--color-primary-100);
 
@@ -61,12 +60,12 @@
 
 /* â”€â”€ Register ALL semantic tokens for Tailwind utilities â”€â”€ */
 @theme inline {
-  /* Text */
+  /* Text — `-primary` (alias of heading) and `-caption` (alias of secondary)
+     retired in Tier 1; feature code + component tokens repointed to the canonical
+     heading/secondary tokens so those two knobs now reach every consumer. */
   --color-text-heading:     var(--color-text-heading);
-  --color-text-primary:     var(--color-text-primary);
   --color-text-body:        var(--color-text-body);
   --color-text-secondary:   var(--color-text-secondary);
-  --color-text-caption:     var(--color-text-caption);
   --color-text-label:       var(--color-text-label);
   --color-text-muted:       var(--color-text-muted);
   --color-text-disabled:    var(--color-text-disabled);
@@ -170,7 +169,6 @@
   --radius-full: var(--radius-full);
 
   --shadow-sm: var(--shadow-sm);
-  --shadow-xs: var(--shadow-xs);
   --shadow-md: var(--shadow-md);
   --shadow-lg: var(--shadow-lg);
 
@@ -237,10 +235,6 @@
 :root {
   --color-label-chip-ip-bg:      #F2FCF3;
   --color-label-chip-ip-text:    #208A3C;
-  --color-label-chip-ipv4-bg:    #F2FCF3;
-  --color-label-chip-ipv4-text:  #208A3C;
-  --color-label-chip-ipv6-bg:    #F2FCF3;
-  --color-label-chip-ipv6-text:  #208A3C;
   --color-label-chip-method-bg:  #FFF2F3;
   --color-label-chip-method-text: #CC3645;
   --color-label-chip-url-bg:     #E4E9FE;
@@ -253,10 +247,6 @@
   --color-label-chip-hex-text:   #C27D04;
   --color-label-chip-ts-bg:      #FAF5FF;
   --color-label-chip-ts-text:    #643CB8;
-  --color-label-chip-date-bg:    #FAF5FF;
-  --color-label-chip-date-text:  #643CB8;
-  --color-label-chip-time-bg:    #FAF5FF;
-  --color-label-chip-time-text:  #643CB8;
   --color-label-chip-id-bg:      #F2FCFC;
   --color-label-chip-id-text:    #077A7F;
   --color-label-chip-email-bg:   #FFF7F7;
@@ -269,14 +259,14 @@
   --color-label-chip-pattern-text: #2E55A3;
 }
 
-/* â”€â”€ Legacy aliases (_legacy-variables.scss) â”€â”€ */
+/* â”€â”€ Layout aliases â”€â”€ */
 :root {
   --navbar-height: 36px;
 }
 
 /* â”€â”€ Domain data-viz & migrated color tokens â”€â”€ */
 :root {
-  --color-actions-column-shawdow: rgba(0, 0, 0, 0.1);
+  --color-actions-column-shadow: rgba(0, 0, 0, 0.1);
   --color-bg-gray: color-mix(in srgb, var(--color-theme-accent) 10%, rgb(237, 237, 237));
   --color-card-glass-border: rgba(0, 0, 0, 0.12);
   --color-cancel-query-bg: #f67a7a;

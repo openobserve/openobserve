@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </p>
       <small
         v-if="traceId"
-        class="text-text-caption"
+        class="text-text-secondary"
         data-test="error-detail-trace-id"
       >
         <span class="font-medium">{{ t("queryError.traceId") }}</span>

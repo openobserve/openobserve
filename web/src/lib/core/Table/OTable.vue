@@ -1059,7 +1059,7 @@ defineExpose({
               :colspan="header.colSpan"
               :data-test="`o2-table-footer-cell-${header.id}`"
               :class="[
-                'px-2 py-1 text-left text-text-primary text-xs',
+                'px-2 py-1 text-left text-text-heading text-xs',
                 'border-t border-table-header-border',
                 (header.column.columnDef.meta as any)?.align === 'center' ? 'text-center' : '',
                 (header.column.columnDef.meta as any)?.align === 'right' ? 'text-right' : '',

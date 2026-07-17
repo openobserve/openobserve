@@ -73,7 +73,7 @@
                         <div class="text-compact truncate">
                           {{ chat.title }}
                         </div>
-                        <div class="text-2xs text-text-caption">
+                        <div class="text-2xs text-text-secondary">
                           {{ formatTime(chat.timestamp) }}
                         </div>
                       </div>
@@ -277,7 +277,7 @@
           <div
             v-for="(message, index) in processedMessages"
             :key="index"
-            class="message p-3 rounded-xl border border-border-default [box-shadow:0_1px_2px_color-mix(in_srgb,var(--color-text-primary)_10%,transparent)]"
+            class="message p-3 rounded-xl border border-border-default [box-shadow:0_1px_2px_color-mix(in_srgb,var(--color-text-heading)_10%,transparent)]"
             :class="[
               message.role,
               message.role === 'user'
@@ -495,7 +495,7 @@
                             <OTooltip content="Copy query" />
                           </OButton>
                         </div>
-                        <code class="detail-value query-value text-xs select-text font-mono p-2 rounded-sm whitespace-pre-wrap break-all cursor-text [background:color-mix(in_srgb,var(--color-text-primary)_5%,transparent)]">{{
+                        <code class="detail-value query-value text-xs select-text font-mono p-2 rounded-sm whitespace-pre-wrap break-all cursor-text [background:color-mix(in_srgb,var(--color-text-heading)_5%,transparent)]">{{
                           getToolCallDisplayData(block.context)?.query
                         }}</code>
                       </div>
@@ -592,7 +592,7 @@
                             <OTooltip content="Copy VRL" />
                           </OButton>
                         </div>
-                        <code class="detail-value query-value text-xs select-text font-mono p-2 rounded-sm whitespace-pre-wrap break-all cursor-text [background:color-mix(in_srgb,var(--color-text-primary)_5%,transparent)]">{{
+                        <code class="detail-value query-value text-xs select-text font-mono p-2 rounded-sm whitespace-pre-wrap break-all cursor-text [background:color-mix(in_srgb,var(--color-text-heading)_5%,transparent)]">{{
                           getToolCallDisplayData(block.context)?.vrl
                         }}</code>
                       </div>
@@ -616,7 +616,7 @@
                             <OTooltip content="Copy command" />
                           </OButton>
                         </div>
-                        <code class="detail-value query-value text-xs select-text font-mono p-2 rounded-sm whitespace-pre-wrap break-all cursor-text [background:color-mix(in_srgb,var(--color-text-primary)_5%,transparent)]">{{
+                        <code class="detail-value query-value text-xs select-text font-mono p-2 rounded-sm whitespace-pre-wrap break-all cursor-text [background:color-mix(in_srgb,var(--color-text-heading)_5%,transparent)]">{{
                           getToolCallDisplayData(block.context)?.command
                         }}</code>
                       </div>
@@ -639,7 +639,7 @@
                               <OTooltip content="Copy results" />
                             </OButton>
                           </div>
-                          <div class="tool-response-hits flex flex-col gap-1 text-xs font-mono px-2 py-1.5 rounded-sm max-h-50 overflow-y-auto [background:color-mix(in_srgb,var(--color-text-primary)_5%,transparent)]">
+                          <div class="tool-response-hits flex flex-col gap-1 text-xs font-mono px-2 py-1.5 rounded-sm max-h-50 overflow-y-auto [background:color-mix(in_srgb,var(--color-text-heading)_5%,transparent)]">
                             <div
                               v-for="(hit, hIdx) in block.response.hits"
                               :key="hIdx"
@@ -684,7 +684,7 @@
                       >
                         <div v-if="block.response.input" class="detail-item flex flex-col gap-1">
                           <span class="detail-label text-2xs font-semibold uppercase opacity-60">Input Events</span>
-                          <div class="tool-response-hits flex flex-col gap-1 text-xs font-mono px-2 py-1.5 rounded-sm max-h-50 overflow-y-auto [background:color-mix(in_srgb,var(--color-text-primary)_5%,transparent)]">
+                          <div class="tool-response-hits flex flex-col gap-1 text-xs font-mono px-2 py-1.5 rounded-sm max-h-50 overflow-y-auto [background:color-mix(in_srgb,var(--color-text-heading)_5%,transparent)]">
                             <div
                               v-for="(evt, eIdx) in block.response.input"
                               :key="eIdx"
@@ -707,7 +707,7 @@
                         </div>
                         <div v-if="block.response.output" class="detail-item flex flex-col gap-1">
                           <span class="detail-label text-2xs font-semibold uppercase opacity-60">Output</span>
-                          <div class="tool-response-hits flex flex-col gap-1 text-xs font-mono px-2 py-1.5 rounded-sm max-h-50 overflow-y-auto [background:color-mix(in_srgb,var(--color-text-primary)_5%,transparent)]">
+                          <div class="tool-response-hits flex flex-col gap-1 text-xs font-mono px-2 py-1.5 rounded-sm max-h-50 overflow-y-auto [background:color-mix(in_srgb,var(--color-text-heading)_5%,transparent)]">
                             <div
                               v-for="(res, rIdx) in block.response.output"
                               :key="rIdx"
@@ -766,7 +766,7 @@
                               <OTooltip content="Copy items" />
                             </OButton>
                           </div>
-                          <div class="tool-response-hits flex flex-col gap-1 text-xs font-mono px-2 py-1.5 rounded-sm max-h-50 overflow-y-auto [background:color-mix(in_srgb,var(--color-text-primary)_5%,transparent)]">
+                          <div class="tool-response-hits flex flex-col gap-1 text-xs font-mono px-2 py-1.5 rounded-sm max-h-50 overflow-y-auto [background:color-mix(in_srgb,var(--color-text-heading)_5%,transparent)]">
                             <div
                               v-for="(item, iIdx) in block.response.items"
                               :key="iIdx"
@@ -808,7 +808,7 @@
                             <OTooltip content="Copy response" />
                           </OButton>
                         </div>
-                        <code class="detail-value query-value text-xs select-text font-mono p-2 rounded-sm whitespace-pre-wrap break-all cursor-text [background:color-mix(in_srgb,var(--color-text-primary)_5%,transparent)]">{{
+                        <code class="detail-value query-value text-xs select-text font-mono p-2 rounded-sm whitespace-pre-wrap break-all cursor-text [background:color-mix(in_srgb,var(--color-text-heading)_5%,transparent)]">{{
                           typeof block.response === "string"
                             ? block.response
                             : JSON.stringify(block.response, null, 2)
@@ -851,7 +851,7 @@
                         <OButton
                           variant="ghost"
                           size="icon-xs-circle"
-                          class="copy-btn opacity-60 hover:opacity-100 absolute top-2 right-2 z-1 rounded-sm px-2 py-1 [background:color-mix(in_srgb,var(--color-text-primary)_10%,transparent)] hover:[background:color-mix(in_srgb,var(--color-text-primary)_8%,transparent)] dark:hover:[background:color-mix(in_srgb,var(--color-text-primary)_15%,transparent)]"
+                          class="copy-btn opacity-60 hover:opacity-100 absolute top-2 right-2 z-1 rounded-sm px-2 py-1 [background:color-mix(in_srgb,var(--color-text-heading)_10%,transparent)] hover:[background:color-mix(in_srgb,var(--color-text-heading)_8%,transparent)] dark:hover:[background:color-mix(in_srgb,var(--color-text-heading)_15%,transparent)]"
                           @click.stop="copyToClipboard(block.content)"
                         >
                           <OIcon name="content-copy" size="sm" />
@@ -989,7 +989,7 @@
                       <img
                         :src="'data:' + img.mimeType + ';base64,' + img.data"
                         :alt="img.filename"
-                        class="max-w-50 max-h-37.5 object-contain rounded-lg border border-border-strong cursor-pointer [transition:transform_0.2s_ease,box-shadow_0.2s_ease] hover:scale-102 hover:shadow-[0_4px_12px_color-mix(in_srgb,var(--color-black)_15%,transparent)]"
+                        class="max-w-50 max-h-37.5 object-contain rounded-lg border border-border-default cursor-pointer [transition:transform_0.2s_ease,box-shadow_0.2s_ease] hover:scale-102 hover:shadow-[0_4px_12px_color-mix(in_srgb,var(--color-black)_15%,transparent)]"
                         @click="openImagePreview(img)"
                       />
                       <OTooltip :content="img.filename" />

@@ -23,7 +23,7 @@
             </div>
             <div>
               <div
-                class="text-sm font-semibold leading-tight text-text-primary"
+                class="text-sm font-semibold leading-tight text-text-heading"
               >
                 {{ t("shortcuts.title") }}
               </div>
@@ -130,7 +130,7 @@
                   :data-test="`shortcut-cheatsheet-row-${entry.id}`"
                 >
                   <span
-                    class="text-compact text-text-primary truncate leading-snug"
+                    class="text-compact text-text-heading truncate leading-snug"
                     >{{ entry.label }}</span
                   >
                   <div
@@ -203,7 +203,7 @@
                   :data-test="`shortcut-cheatsheet-row-${entry.id}`"
                 >
                   <span
-                    class="text-compact text-text-primary truncate leading-snug"
+                    class="text-compact text-text-heading truncate leading-snug"
                     >{{ entry.label }}</span
                   >
                   <div

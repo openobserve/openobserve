@@ -31,7 +31,7 @@
 
   /* Button â€” secondary */
   --color-button-secondary: var(--color-surface-panel);
-  --color-button-secondary-foreground: var(--color-text-primary);
+  --color-button-secondary-foreground: var(--color-text-heading);
   --color-button-secondary-border: var(--color-border-subtle, #e5e7eb);
   --color-button-secondary-hover: var(--color-primary-50);
   --color-button-secondary-active: var(--color-primary-100);
@@ -39,7 +39,7 @@
   --color-button-secondary-focus-ring: var(--color-primary-400);
 
   /* Button â€” outline */
-  --color-button-outline-text: var(--color-text-primary);
+  --color-button-outline-text: var(--color-text-heading);
   --color-button-outline-border: var(--color-border-default);
   --color-button-outline-hover-bg: var(--color-interactive-hover-bg);
   --color-button-outline-hover-border: var(--color-primary-300);
@@ -47,7 +47,7 @@
   --color-button-outline-focus-ring: var(--color-primary-200);
 
   /* Button â€” ghost */
-  --color-button-ghost-text: var(--color-text-primary);
+  --color-button-ghost-text: var(--color-text-heading);
   --color-button-ghost-hover-bg: var(--color-primary-50);
   --color-button-ghost-active-bg: var(--color-primary-100);
   --color-button-ghost-hover-ring: var(--color-primary-300);
@@ -118,7 +118,7 @@
   /* ToggleGroup */
   --color-toggle-track-bg: var(--color-surface-subtle);
   --color-toggle-item-bg: transparent;
-  --color-toggle-item-text: var(--color-text-primary);
+  --color-toggle-item-text: var(--color-text-heading);
   --color-toggle-item-hover-bg: var(--color-primary-50);
   --color-toggle-item-active-bg: var(--color-primary-100);
   --color-toggle-item-active-text: var(--color-primary-700);
@@ -129,7 +129,7 @@
   /* Dropdown */
   --color-dropdown-bg: var(--color-surface-overlay);
   --color-dropdown-border: var(--color-border-default);
-  --color-dropdown-item-text: var(--color-text-primary);
+  --color-dropdown-item-text: var(--color-text-heading);
   --color-dropdown-item-hover-bg: var(--color-primary-50);
   --color-dropdown-item-active-bg: var(--color-primary-100);
   --color-dropdown-item-disabled: var(--color-text-disabled);
@@ -142,7 +142,7 @@
   /* Tooltip â€” the overlay surface, matching OTooltip's own `bg-surface-overlay`.
      Chart tooltips (ECharts) read these via chartTheme's chartColor(). */
   --color-tooltip-bg: var(--color-surface-overlay);
-  --color-tooltip-text: var(--color-text-primary);
+  --color-tooltip-text: var(--color-text-heading);
   --color-tooltip-border: var(--color-border-subtle);
   --color-tooltip-arrow: var(--color-surface-overlay);
 
@@ -169,7 +169,7 @@
   --color-tabs-active-text: var(--color-primary-600);
   --color-tabs-active-bg: var(--color-primary-100);
   --color-tabs-inactive-text: var(--color-text-heading);
-  --color-tabs-hover-text: var(--color-text-primary);
+  --color-tabs-hover-text: var(--color-text-heading);
   --color-tabs-hover-bg: color-mix(in srgb, var(--color-primary-100) 50%, var(--color-primary-50));
   --color-tabs-disabled-text: var(--color-text-disabled);
   --color-tabs-bar-border: var(--color-border-default);
@@ -179,10 +179,10 @@
 
   /* Card */
   --color-card-bg: var(--color-surface-panel);
-  --color-card-text: var(--color-text-primary);
+  --color-card-text: var(--color-text-heading);
 
   /* Collapsible */
-  --color-collapsible-label: var(--color-text-primary);
+  --color-collapsible-label: var(--color-text-heading);
   --color-collapsible-caption: var(--color-text-secondary);
   --color-collapsible-icon: var(--color-text-secondary);
   --color-collapsible-trigger-hover-bg: var(--color-primary-100);
@@ -192,7 +192,7 @@
   /* OFieldList / OFieldRow / OFieldLabel */
   --color-field-list-row-hover-bg:     var(--color-primary-100);
   --color-field-list-group-text:       var(--color-text-secondary);
-  --color-field-list-label-text:       var(--color-text-primary);
+  --color-field-list-label-text:       var(--color-text-heading);
   --color-field-list-label-icon:       var(--color-text-secondary);
   --color-field-list-drag-icon:        var(--color-text-secondary);
   --color-field-list-expand-icon:      var(--color-text-secondary);
@@ -212,8 +212,8 @@
   --color-stepper-connector: var(--color-border-default);
   --color-stepper-connector-done: var(--color-primary-300);
   --color-stepper-title-default: var(--color-text-secondary);
-  --color-stepper-title-active: var(--color-text-primary);
-  --color-stepper-title-done: var(--color-text-primary);
+  --color-stepper-title-active: var(--color-text-heading);
+  --color-stepper-title-done: var(--color-text-heading);
   --color-stepper-trigger-hover: var(--color-surface-subtle);
   --color-stepper-trigger-focus-ring: var(--color-primary-400);
 
@@ -229,11 +229,11 @@
 
   /* Header */
   --color-dialog-header-bg:     var(--color-surface-panel);
-  --color-dialog-header-text:   var(--color-text-primary);
+  --color-dialog-header-text:   var(--color-text-heading);
   --color-dialog-header-border: var(--color-border-default);
 
   /* Content */
-  --color-dialog-content-text:  var(--color-text-primary);
+  --color-dialog-content-text:  var(--color-text-heading);
 
   /* Footer */
   --color-dialog-footer-bg:     var(--color-surface-panel);
@@ -302,8 +302,8 @@
   --color-badge-error-soft-text: var(--color-error-700);
 
   /* Badge â€” info (blue, for logs stream type) */
-  --color-badge-info-ol-border: var(--color-info-700);
-  --color-badge-info-ol-text:   var(--color-info-700);
+  --color-badge-info-ol-border: var(--color-blue-700);
+  --color-badge-info-ol-text:   var(--color-blue-700);
 
   /* Badge â€” purple (for metrics stream type) */
   --color-badge-purple-ol-border: var(--color-purple-600);
@@ -403,7 +403,7 @@
   --color-toast-default-border: var(--color-border-default);
 
   /* shared foreground */
-  --color-toast-fg:             var(--color-text-primary);
+  --color-toast-fg:             var(--color-text-heading);
   --color-toast-fg-secondary:   var(--color-text-secondary);
   --color-toast-action-text:    var(--color-primary-600);
   --color-toast-action-hover:   var(--color-primary-700);
@@ -471,19 +471,19 @@
   --color-input-disabled-border: var(--color-border-default);
   --color-input-disabled-text: var(--color-text-secondary);
   --color-input-focus-ring: var(--color-primary-200);
-  --color-input-text: var(--color-text-primary);
+  --color-input-text: var(--color-text-heading);
   --color-input-placeholder: var(--color-text-disabled);
   /* Labels were resolving to text-secondary which is the same muted grey
      used for disabled / hint text â€” making every form label look disabled.
      Bumped to text-primary so labels read as active form metadata. */
-  --color-input-label: var(--color-text-primary);
+  --color-input-label: var(--color-text-heading);
   --color-input-hint: var(--color-text-secondary);
   --color-input-help-text: var(--color-text-secondary);
   --color-input-error-text: var(--color-error-600);
   --color-input-addon-bg: var(--color-surface-panel);
   --color-input-addon-text: var(--color-text-secondary);
   --color-input-clear-btn: var(--color-text-secondary);
-  --color-input-clear-btn-hover: var(--color-text-primary);
+  --color-input-clear-btn-hover: var(--color-text-heading);
 
   /* Select (OSelect) */
   --color-select-bg: var(--color-surface-base);
@@ -498,12 +498,12 @@
   --color-select-text: var(--color-text-soft);
   --color-select-placeholder: var(--color-text-disabled);
   /* Select labels were grey (text-secondary) â€” same fix as input-label. */
-  --color-select-label: var(--color-text-primary);
+  --color-select-label: var(--color-text-heading);
   --color-select-icon: var(--color-text-secondary);
   --color-select-error-text: var(--color-error-600);
   --color-select-content-bg: var(--color-surface-overlay);
   --color-select-content-border: var(--color-border-default);
-  --color-select-item-text: var(--color-text-primary);
+  --color-select-item-text: var(--color-text-heading);
   --color-select-item-hover-bg: var(--color-primary-50);
   --color-select-item-selected-bg: var(--color-primary-100);
   --color-select-item-selected-text: var(--color-primary-700);
@@ -511,7 +511,7 @@
 
   /* Switch (OSwitch) */
   --color-switch-focus-ring: var(--color-primary-400);
-  --color-switch-label: var(--color-text-primary);
+  --color-switch-label: var(--color-text-heading);
   --color-switch-label-disabled: var(--color-text-secondary);
   /* Switch palette â€” single solid color (primary-500) for both border AND
      fill on ON state so the track reads as one color, not two-tone.
@@ -535,7 +535,7 @@
   --color-checkbox-disabled-bg: var(--color-surface-subtle);
   --color-checkbox-disabled-border: var(--color-border-default);
   --color-checkbox-focus-ring: var(--color-primary-400);
-  --color-checkbox-label: var(--color-text-primary);
+  --color-checkbox-label: var(--color-text-heading);
   --color-checkbox-label-disabled: var(--color-text-disabled);
 
   /* Radio (ORadio) â€” primary outline by default (interactive signal),
@@ -548,7 +548,7 @@
   --color-radio-disabled-bg: var(--color-surface-subtle);
   --color-radio-disabled-border: var(--color-grey-300);
   --color-radio-focus-ring: var(--color-primary-400);
-  --color-radio-label: var(--color-text-primary);
+  --color-radio-label: var(--color-text-heading);
   --color-radio-label-disabled: var(--color-text-disabled);
 
   /* Slider (OSlider) */
@@ -560,7 +560,7 @@
   --color-slider-disabled-track-fill: var(--color-grey-300);
   --color-slider-disabled-thumb: var(--color-grey-400);
   --color-slider-focus-ring: var(--color-primary-400);
-  --color-slider-label: var(--color-text-primary);
+  --color-slider-label: var(--color-text-heading);
   --color-slider-value: var(--color-text-secondary);
   --color-slider-error-text: var(--color-error-600);
 
@@ -572,7 +572,7 @@
   --color-file-focus-ring: var(--color-primary-400);
   --color-file-disabled-bg: var(--color-surface-subtle);
   --color-file-disabled-border: var(--color-border-default);
-  --color-file-text: var(--color-text-primary);
+  --color-file-text: var(--color-text-heading);
   --color-file-placeholder: var(--color-text-disabled);
   --color-file-label: var(--color-text-secondary);
   --color-file-icon: var(--color-text-secondary);
@@ -592,7 +592,7 @@
   --color-datepicker-focus-ring: var(--color-primary-400);
   --color-datepicker-disabled-bg: var(--color-surface-subtle);
   --color-datepicker-disabled-border: var(--color-border-default);
-  --color-datepicker-text: var(--color-text-primary);
+  --color-datepicker-text: var(--color-text-heading);
   --color-datepicker-placeholder: var(--color-text-disabled);
   --color-datepicker-label: var(--color-text-secondary);
   --color-datepicker-icon: var(--color-text-secondary);
@@ -603,7 +603,7 @@
   /* DatePicker calendar popup */
   --color-datepicker-popup-bg: var(--color-surface-overlay);
   --color-datepicker-popup-border: var(--color-border-default);
-  --color-datepicker-day-text: var(--color-text-primary);
+  --color-datepicker-day-text: var(--color-text-heading);
   --color-datepicker-day-hover-bg: var(--color-primary-50);
   --color-datepicker-day-selected-bg: var(--color-primary-600);
   --color-datepicker-day-selected-text: var(--color-white);
@@ -611,7 +611,7 @@
   --color-datepicker-day-outside-text: var(--color-text-disabled);
   --color-datepicker-day-disabled-text: var(--color-text-disabled);
   --color-datepicker-nav-hover-bg: var(--color-primary-50);
-  --color-datepicker-heading-text: var(--color-text-primary);
+  --color-datepicker-heading-text: var(--color-text-heading);
   --color-datepicker-weekday-text: var(--color-text-secondary);
   --color-datepicker-day-range-bg: var(--color-primary-100);
   --color-datepicker-day-range-text: var(--color-primary-700);
@@ -625,7 +625,7 @@
   --color-datepicker-clock-hover-bg: var(--color-primary-50);
   /* DateTimeRange relative quick-select buttons */
   --color-datepicker-relative-btn-bg: var(--color-surface-subtle);
-  --color-datepicker-relative-btn-text: var(--color-text-primary);
+  --color-datepicker-relative-btn-text: var(--color-text-heading);
   --color-datepicker-relative-btn-selected-bg: var(--color-primary-600);
   --color-datepicker-relative-btn-selected-text: var(--color-white);
   --color-datepicker-relative-btn-hover-bg: var(--color-primary-50);
@@ -637,7 +637,7 @@
   --color-colorpicker-thumb: var(--color-white);
 
   /* Option Group (OOptionGroup) */
-  --color-option-group-label: var(--color-text-primary);
+  --color-option-group-label: var(--color-text-heading);
   --color-option-group-label-disabled: var(--color-text-disabled);
   --color-option-group-error-text: var(--color-error-600);
 
@@ -656,9 +656,9 @@
   --color-table-row-divider: var(--color-border-subtle);
   --color-table-border: var(--color-border-default);
   --color-table-cell-bg: var(--color-surface-base);
-  --color-table-cell-text: var(--color-text-primary);
+  --color-table-cell-text: var(--color-text-heading);
   --color-table-highlight-bg: color-mix(in srgb, var(--color-warning-400) 35%, transparent);
-  --color-table-highlight-text: var(--color-text-primary);
+  --color-table-highlight-text: var(--color-text-heading);
   --color-table-pagination-text: var(--color-text-secondary);
   --color-table-resize-handle: var(--color-primary-400);
   --color-table-sort-icon-active: var(--color-primary-600);
@@ -679,9 +679,9 @@
   --color-banner-default-text:    var(--color-grey-800);
 
   /* info */
-  --color-banner-info-bg:         var(--color-info-100);
-  --color-banner-info-border:     var(--color-info-200);
-  --color-banner-info-text:       var(--color-info-900);
+  --color-banner-info-bg:         var(--color-blue-100);
+  --color-banner-info-border:     var(--color-blue-200);
+  --color-banner-info-text:       var(--color-blue-900);
 
   /* success */
   --color-banner-success-bg:      var(--color-success-50);
@@ -713,33 +713,29 @@
   --color-usage-banner-warning-bg:     linear-gradient(to right, transparent 60%, #fffbf0 70%, #fff3cd 100%);
 
   /* â”€â”€ Note Container (pipeline guideline cards) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
-  --color-note-bg:               var(--color-note-light-bg);
-  --color-note-border:           var(--color-note-light-border);
-  --color-note-text:             var(--color-note-light-text);
-  --color-note-highlight:        var(--color-note-highlight-light);
-  --color-note-emphasis:         var(--color-grey-600);
-  --color-note-code:             var(--color-note-code-light);
 
   /* â”€â”€ OText typography colours (one per variant) â€” these were previously only
      in the parallel .css token set, which the app does NOT load, so OText's
      per-variant colours (esp. meta/section grey) silently fell back to inherited
      text. Define them here in the .scss set the app actually loads. â”€â”€ */
-  --color-typography-page-title:  var(--color-text-primary);
+  --color-typography-page-title:  var(--color-text-heading);
   --color-typography-section:     var(--color-text-secondary);
-  --color-typography-panel-title: var(--color-text-primary);
-  --color-typography-body:        var(--color-text-primary);
-  --color-typography-label:       var(--color-text-primary);
+  --color-typography-panel-title: var(--color-text-heading);
+  /* Body typography routes through the BODY token (C.4) — previously mis-pointed
+     at the heading alias, so OText's body variant ignored --color-text-body. */
+  --color-typography-body:        var(--color-text-body);
+  --color-typography-label:       var(--color-text-heading);
   --color-typography-meta:        var(--color-text-secondary);
-  --color-typography-mono:        var(--color-text-primary);
+  --color-typography-mono:        var(--color-text-heading);
 
   /* â”€â”€ OCode (inline chip + block) â€” same .css-only gap as above â”€â”€ */
-  --color-code-text:              var(--color-text-primary);
+  --color-code-text:              var(--color-text-heading);
   --color-code-bg:                var(--color-surface-subtle);
   --color-code-border:            var(--color-border-default);
-  --color-code-block-text:        var(--color-text-primary);
+  --color-code-block-text:        var(--color-text-heading);
   --color-code-block-bg:          var(--color-surface-panel);
   --color-code-copy-icon:         var(--color-text-secondary);
-  --color-code-copy-hover-icon:   var(--color-text-primary);
+  --color-code-copy-hover-icon:   var(--color-text-heading);
   --color-code-copy-hover-bg:     var(--color-surface-subtle-hover);
 
   /* Skeleton shimmer + datepicker inner border (were .css-only too) */
@@ -1115,7 +1111,7 @@
   /* OFieldList / OFieldRow / OFieldLabel */
   --color-field-list-row-hover-bg:     var(--color-field-list-row-hover-bg);
   --color-field-list-group-text:       var(--color-field-list-group-text);
-  --color-field-list-label-text:       var(--color-text-primary);
+  --color-field-list-label-text:       var(--color-text-heading);
   --color-field-list-label-icon:       var(--color-field-list-label-icon);
   --color-field-list-drag-icon:        var(--color-field-list-drag-icon);
   --color-field-list-expand-icon:      var(--color-field-list-expand-icon);
@@ -1403,10 +1399,6 @@
 @theme inline {
   --color-label-chip-ip-bg:        var(--color-label-chip-ip-bg);
   --color-label-chip-ip-text:      var(--color-label-chip-ip-text);
-  --color-label-chip-ipv4-bg:      var(--color-label-chip-ipv4-bg);
-  --color-label-chip-ipv4-text:    var(--color-label-chip-ipv4-text);
-  --color-label-chip-ipv6-bg:      var(--color-label-chip-ipv6-bg);
-  --color-label-chip-ipv6-text:    var(--color-label-chip-ipv6-text);
   --color-label-chip-method-bg:    var(--color-label-chip-method-bg);
   --color-label-chip-method-text:  var(--color-label-chip-method-text);
   --color-label-chip-url-bg:       var(--color-label-chip-url-bg);
@@ -1419,10 +1411,6 @@
   --color-label-chip-hex-text:     var(--color-label-chip-hex-text);
   --color-label-chip-ts-bg:        var(--color-label-chip-ts-bg);
   --color-label-chip-ts-text:      var(--color-label-chip-ts-text);
-  --color-label-chip-date-bg:      var(--color-label-chip-date-bg);
-  --color-label-chip-date-text:    var(--color-label-chip-date-text);
-  --color-label-chip-time-bg:      var(--color-label-chip-time-bg);
-  --color-label-chip-time-text:    var(--color-label-chip-time-text);
   --color-label-chip-id-bg:        var(--color-label-chip-id-bg);
   --color-label-chip-id-text:      var(--color-label-chip-id-text);
   --color-label-chip-email-bg:     var(--color-label-chip-email-bg);
@@ -1475,7 +1463,7 @@
   .pagination__content {
     input {
       border: 1px solid rgba(255, 255, 255, 0.28) !important;
-      color: var(--color-text-primary);
+      color: var(--color-text-heading);
       background-color: transparent;
     }
   }
@@ -1715,11 +1703,86 @@
   --color-text-soft: var(--color-text-soft);
   --color-log-table-header-bg: var(--color-log-table-header-bg);
   --color-log-table-row-hover: var(--color-log-table-row-hover);
-  /* Type-scale utilities (Â§3.J) â€” text-2xs (11px) / text-compact (13px) */
+  /* Type-scale utilities â€” the WHOLE ladder is registered so `text-sm`/`text-lg`/
+     etc. derive their font-size from our tokens (base.css), not Tailwind's built-in
+     scale (AUDIT Â§8.3). Our token px values already equal Tailwind's defaults, so
+     this is visually neutral; it makes the token the single source of truth.
+     Paired `--text-*--line-height` keys reproduce today's exact line-heights so the
+     hand-pin previously in tailwind.css can be deleted with zero regression across
+     ~780 `text-sm`/`text-base` usages. `leading-*` overrides still win via
+     `--tw-leading`. (3xl/4xl are intentionally NOT registered â€” 0 uses, retired.) */
   --text-3xs: var(--text-3xs);
   --text-2xs: var(--text-2xs);
+  --text-xs: var(--text-xs);
+  --text-xs--line-height: calc(1 / 0.75);
   --text-compact: var(--text-compact);
+  --text-sm: var(--text-sm);
+  --text-sm--line-height: calc(1.25 / 0.875);
+  --text-base: var(--text-base);
+  --text-base--line-height: calc(1.5 / 1);
+  --text-lg: var(--text-lg);
+  --text-lg--line-height: calc(1.75 / 1.125);
+  --text-xl: var(--text-xl);
+  --text-xl--line-height: calc(1.75 / 1.25);
+  --text-2xl: var(--text-2xl);
+  --text-2xl--line-height: calc(2 / 1.5);
   /* Domain tokens (Â§3.K.4) */
   --color-highlight-bg: var(--color-highlight-bg);
   --color-brand-indigo: var(--color-brand-indigo);
+}
+
+/* â”€â”€ Tier 0.3 (DESIGN_TOKEN_STANDARD Part D) â”€â”€
+   Register defined-but-unregistered SOLID domain tokens so they generate real
+   Tailwind bg / text / border utilities instead of forcing arbitrary var()
+   usage in style blocks. Excludes raw palette ramps (Phase G territory), gradient
+   values (would emit invalid background-color), the dead note chain, runtime span
+   colours, and info-* (merged into blue-* in Tier 1). */
+@theme inline {
+  --color-brand-email-accent: var(--color-brand-email-accent);
+  --color-brand-email-ink: var(--color-brand-email-ink);
+  --color-brand-email-ink-deep: var(--color-brand-email-ink-deep);
+  --color-brand-email-warning: var(--color-brand-email-warning);
+  --color-brand-msg-bg: var(--color-brand-msg-bg);
+  --color-brand-msg-border: var(--color-brand-msg-border);
+  --color-brand-msg-border-2: var(--color-brand-msg-border-2);
+  --color-brand-msg-divider: var(--color-brand-msg-divider);
+  --color-brand-msg-error: var(--color-brand-msg-error);
+  --color-brand-msg-meta: var(--color-brand-msg-meta);
+  --color-brand-msg-text: var(--color-brand-msg-text);
+  --color-brand-msg-text-dark: var(--color-brand-msg-text-dark);
+  --color-brand-msg-text-strong: var(--color-brand-msg-text-strong);
+  --color-brand-slack-aubergine: var(--color-brand-slack-aubergine);
+  --color-brand-slack-avatar: var(--color-brand-slack-avatar);
+  --color-brand-slack-green: var(--color-brand-slack-green);
+  --color-brand-slack-link: var(--color-brand-slack-link);
+  --color-brand-slack-meta: var(--color-brand-slack-meta);
+  --color-brand-slack-text: var(--color-brand-slack-text);
+  --color-brand-teams-bg: var(--color-brand-teams-bg);
+  --color-brand-teams-ink: var(--color-brand-teams-ink);
+  --color-brand-teams-text: var(--color-brand-teams-text);
+  --color-dag-node-agent: var(--color-dag-node-agent);
+  --color-dag-node-chain: var(--color-dag-node-chain);
+  --color-dag-node-default: var(--color-dag-node-default);
+  --color-dag-node-embedding: var(--color-dag-node-embedding);
+  --color-dag-node-evaluator: var(--color-dag-node-evaluator);
+  --color-dag-node-event: var(--color-dag-node-event);
+  --color-dag-node-generation: var(--color-dag-node-generation);
+  --color-dag-node-guardrail: var(--color-dag-node-guardrail);
+  --color-dag-node-rerank: var(--color-dag-node-rerank);
+  --color-dag-node-retriever: var(--color-dag-node-retriever);
+  --color-dag-node-task: var(--color-dag-node-task);
+  --color-dag-node-tool: var(--color-dag-node-tool);
+  --color-dag-node-workflow: var(--color-dag-node-workflow);
+  --color-dashboard-placeholder-bg: var(--color-dashboard-placeholder-bg);
+  --color-hover-shadow: var(--color-hover-shadow);
+  --color-pivot-header-border: var(--color-pivot-header-border);
+  --color-scrollbar-thumb: var(--color-scrollbar-thumb);
+  --color-scrollbar-thumb-hover: var(--color-scrollbar-thumb-hover);
+  --color-theme-body-bg-secondary: var(--color-theme-body-bg-secondary);
+  --color-theme-header-menu-bg: var(--color-theme-header-menu-bg);
+  --color-theme-menu-color: var(--color-theme-menu-color);
+  --color-theme-menu-gradient-end: var(--color-theme-menu-gradient-end);
+  --color-theme-menu-gradient-start: var(--color-theme-menu-gradient-start);
+  --color-theme-tab-bg-inactive: var(--color-theme-tab-bg-inactive);
+  --color-theme-table-header-bg: var(--color-theme-table-header-bg);
 }

@@ -415,7 +415,7 @@
                   </div>
                   <div
                     v-if="isIngestionUnlimited"
-                    class="text-xs text-text-caption mt-1 text-center"
+                    class="text-xs text-text-secondary mt-1 text-center"
                     style="font-size: 10px"
                   >
                     {{ t("about.usage_shows_zero_unlimited") }}

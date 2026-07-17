@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div
       v-if="title"
-      class="shrink-0 px-3.5 pt-3 pb-1 text-sm font-semibold text-text-primary truncate"
+      class="shrink-0 px-3.5 pt-3 pb-1 text-sm font-semibold text-text-heading truncate"
     >
       {{ title }}
     </div>

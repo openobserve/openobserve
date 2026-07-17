@@ -23,7 +23,7 @@
       <div class="tiles-grid grid gap-4 grid-cols-[repeat(auto-fit,minmax(15rem,1fr))]">
         <div v-for="n in 5" :key="n" data-test="home-view-skeleton-tile" class="rounded-md border border-card-glass-border">
           <div
-            class="tile-content h-full p-4 gap-2 rounded-sm text-center flex flex-col justify-between bg-surface-base border border-border-default text-text-primary"
+            class="tile-content h-full p-4 gap-2 rounded-sm text-center flex flex-col justify-between bg-surface-base border border-border-default text-text-heading"
           >
             <!-- Top Section (60%) -->
             <div class="flex flex-col justify-between">
@@ -50,7 +50,7 @@
         <!-- Functions tile -->
         <div class="tile-wrapper flex-1 flex min-w-0 w-full">
           <div
-            class="feature-card bg-surface-base border border-border-default p-4 w-full rounded-sm text-center flex flex-col justify-between text-text-primary"
+            class="feature-card bg-surface-base border border-border-default p-4 w-full rounded-sm text-center flex flex-col justify-between text-text-heading"
           >
             <div class="flex flex-col justify-between">
               <div
@@ -70,7 +70,7 @@
         <!-- Dashboards tile -->
         <div class="tile-wrapper flex-1 flex min-w-0 w-full">
           <div
-            class="feature-card bg-surface-base border border-border-default p-4 w-full rounded-sm text-center flex flex-col justify-between text-text-primary"
+            class="feature-card bg-surface-base border border-border-default p-4 w-full rounded-sm text-center flex flex-col justify-between text-text-heading"
           >
             <div class="flex flex-col justify-between">
               <div

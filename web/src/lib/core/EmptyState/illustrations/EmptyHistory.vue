@@ -47,7 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <line x1="120" y1="58" x2="120" y2="63" /><line x1="150" y1="88" x2="145" y2="88" /><line x1="120" y1="118" x2="120" y2="113" /><line x1="90" y1="88" x2="95" y2="88" />
     </g>
     <!-- hands -->
-    <line x1="120" y1="88" x2="120" y2="70" stroke="var(--color-text-primary)" stroke-width="3" stroke-linecap="round" opacity="0.75" />
+    <line x1="120" y1="88" x2="120" y2="70" stroke="var(--color-text-heading)" stroke-width="3" stroke-linecap="round" opacity="0.75" />
     <line class="es-hand" x1="120" y1="88" x2="138" y2="88" stroke="var(--color-primary-600)" stroke-width="2.5" stroke-linecap="round" />
     <circle cx="120" cy="88" r="3.5" fill="var(--color-primary-600)" />
   </svg>

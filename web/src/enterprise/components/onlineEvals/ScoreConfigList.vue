@@ -388,7 +388,7 @@ function formatDateShort(value: number) {
 }
 
 function dtypeChipClass(dataType: string): string {
-  if (dataType === 'numeric') return 'bg-[color-mix(in_srgb,var(--color-info-700)_14%,transparent)] text-status-info-text';
+  if (dataType === 'numeric') return 'bg-[color-mix(in_srgb,var(--color-blue-700)_14%,transparent)] text-status-info-text';
   if (dataType === 'categorical') return 'bg-[color-mix(in_srgb,var(--color-warning-700)_14%,transparent)] text-warning-700';
   if (dataType === 'boolean') return 'bg-[color-mix(in_srgb,var(--color-success-600)_14%,transparent)] text-status-success-text';
   return '';

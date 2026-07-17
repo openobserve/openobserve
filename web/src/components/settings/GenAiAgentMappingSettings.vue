@@ -122,7 +122,7 @@
       @click:secondary="clearRegistryDialogOpen = false"
       @click:primary="clearAgentRegistry"
     >
-      <p class="text-sm text-text-primary">
+      <p class="text-sm text-text-heading">
         {{ t("settings.genAiAgentMapping.clearRegistryDescription") }}
       </p>
     </ODialog>

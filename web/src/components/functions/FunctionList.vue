@@ -94,7 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
 
               <template #cell-name="{ row, value }">
-                <span class="text-text-primary" :data-test="`function-list-name-cell-${row?.name ?? value}`">{{ value }}</span>
+                <span class="text-text-heading" :data-test="`function-list-name-cell-${row?.name ?? value}`">{{ value }}</span>
               </template>
 
               <template #cell-actions="{ row }">

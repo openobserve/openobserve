@@ -167,7 +167,7 @@ const tooltip = computed(() => {
 <template>
   <span
     v-if="display === null"
-    class="text-text-primary text-xs"
+    class="text-text-heading text-xs"
   >{{ emptyLabel }}</span>
   <template v-else>
     <span class="tabular-nums whitespace-nowrap">{{ display }}</span>

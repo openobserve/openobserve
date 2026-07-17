@@ -54,7 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OIcon name="backup" size="xl" class="mb-3" />
             <div class="text-xl font-semibold text-text-secondary mb-2">Drop your file here</div>
             <div class="text-sm text-text-secondary mb-3">or click to browse</div>
-            <div class="text-xs text-text-caption">.zip files only</div>
+            <div class="text-xs text-text-secondary">.zip files only</div>
           </div>
 
           <div v-else class="file-info">
@@ -63,7 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OIcon name="draft" size="lg" />
                 <div>
                   <div class="text-sm font-medium font-medium">{{ field.state.value.name }}</div>
-                  <div class="text-xs text-text-caption">{{ formatFileSize(field.state.value.size) }}</div>
+                  <div class="text-xs text-text-secondary">{{ formatFileSize(field.state.value.size) }}</div>
                 </div>
               </div>
               <OButton

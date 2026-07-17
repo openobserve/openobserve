@@ -132,13 +132,13 @@ export default defineComponent({
    Judgment mappings (near-identical values, flagged for the §7.4 eyeball pass):
    slate text → neutral text tokens; inline-code pink (rose-700) → status-error-text. */
 :deep(.rca-report-content) {
-  --rca-bg-primary: var(--color-info-50);
-  --rca-bg-secondary: var(--color-info-50);
+  --rca-bg-primary: var(--color-blue-50);
+  --rca-bg-secondary: var(--color-blue-50);
   --rca-bg-code: var(--color-surface-subtle);
-  --rca-bg-table-even: var(--color-info-50);
-  --rca-bg-table-hover: var(--color-info-100);
+  --rca-bg-table-even: var(--color-blue-50);
+  --rca-bg-table-hover: var(--color-blue-100);
   --rca-bg-section: color-mix(in srgb, var(--color-blue-600) 5%, transparent);
-  --rca-bg-blockquote: var(--color-info-50);
+  --rca-bg-blockquote: var(--color-blue-50);
 
   --rca-text-primary: var(--color-text-heading);
   --rca-text-secondary: var(--color-text-body);
@@ -151,9 +151,9 @@ export default defineComponent({
   --rca-text-list: var(--color-text-body);
 
   --rca-border-primary: var(--color-border-strong);
-  --rca-border-secondary: var(--color-info-200);
+  --rca-border-secondary: var(--color-blue-200);
   --rca-border-tertiary: var(--color-border-default);
-  --rca-border-table: var(--color-info-200);
+  --rca-border-table: var(--color-blue-200);
   --rca-border-accent: var(--color-blue-500);
 
   --rca-icon-color: var(--color-text-body);
@@ -169,10 +169,10 @@ export default defineComponent({
      to on its own: the info-blue washes go neutral/deep-blue, accents brighten. */
   --rca-bg-primary: var(--color-surface-panel);
   --rca-bg-secondary: var(--color-surface-subtle);
-  --rca-bg-table-even: color-mix(in srgb, var(--color-info-900) 35%, var(--color-surface-base));
-  --rca-bg-table-hover: color-mix(in srgb, var(--color-info-800) 30%, var(--color-surface-panel));
+  --rca-bg-table-even: color-mix(in srgb, var(--color-blue-900) 35%, var(--color-surface-base));
+  --rca-bg-table-hover: color-mix(in srgb, var(--color-blue-800) 30%, var(--color-surface-panel));
   --rca-bg-section: color-mix(in srgb, var(--color-blue-400) 8%, transparent);
-  --rca-bg-blockquote: var(--color-info-900);
+  --rca-bg-blockquote: var(--color-blue-900);
 
   --rca-text-heading: var(--color-blue-400);
   --rca-text-blockquote: var(--color-blue-400);

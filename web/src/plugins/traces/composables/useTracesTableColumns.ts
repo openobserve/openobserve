@@ -65,12 +65,12 @@ const KNOWN_COLUMN_META: Record<
   service_name: {
     header: "Service",
     size: 160,
-    meta: { cellClass: "text-[var(--color-text-caption)]", slot: true },
+    meta: { cellClass: "text-[var(--color-text-secondary)]", slot: true },
   },
   operation_name: {
     header: "Operation Name",
     size: 200,
-    meta: { cellClass: "text-[var(--color-text-caption)]", slot: true },
+    meta: { cellClass: "text-[var(--color-text-secondary)]", slot: true },
   },
   duration: {
     header: "Duration",
@@ -78,7 +78,7 @@ const KNOWN_COLUMN_META: Record<
     meta: {
       sortable: true,
       slot: true,
-      cellClass: "text-[var(--color-text-primary)]!",
+      cellClass: "text-[var(--color-text-heading)]!",
     },
   },
   spans: {
@@ -87,7 +87,7 @@ const KNOWN_COLUMN_META: Record<
     meta: {
       align: "right",
       slot: false,
-      cellClass: "text-[var(--color-text-caption)]!",
+      cellClass: "text-[var(--color-text-secondary)]!",
     },
     accessorFn: (row: any) => row.spans,
   },

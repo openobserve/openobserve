@@ -166,7 +166,7 @@
 
           <section class="flex flex-col gap-2 px-5">
             <h4
-              class="m-0 pb-1.5 inline-flex items-center gap-1.5 text-compact font-semibold leading-normal text-text-primary border-b border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)]"
+              class="m-0 pb-1.5 inline-flex items-center gap-1.5 text-compact font-semibold leading-normal text-text-heading border-b border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)]"
             >
               {{ t("onlineEvals.scorer.detail.producesSection") }}
             </h4>
@@ -197,7 +197,7 @@
 
           <section v-if="row.template" class="flex flex-col gap-2 px-5">
             <h4
-              class="m-0 pb-1.5 inline-flex items-center gap-1.5 text-compact font-semibold leading-normal text-text-primary border-b border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)]"
+              class="m-0 pb-1.5 inline-flex items-center gap-1.5 text-compact font-semibold leading-normal text-text-heading border-b border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)]"
             >
               {{
                 scorerType === "llm_judge"
@@ -216,7 +216,7 @@
 
           <section v-if="outputSchemaPretty" class="flex flex-col gap-2 px-5">
             <h4
-              class="m-0 pb-1.5 inline-flex items-center gap-1.5 text-compact font-semibold leading-normal text-text-primary border-b border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)]"
+              class="m-0 pb-1.5 inline-flex items-center gap-1.5 text-compact font-semibold leading-normal text-text-heading border-b border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)]"
             >
               {{ t("onlineEvals.scorer.detail.outputSchemaSection") }}
             </h4>
@@ -225,7 +225,7 @@
 
           <section class="flex flex-col gap-2 px-5">
             <h4
-              class="m-0 pb-1.5 inline-flex items-center gap-1.5 text-compact font-semibold leading-normal text-text-primary border-b border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)]"
+              class="m-0 pb-1.5 inline-flex items-center gap-1.5 text-compact font-semibold leading-normal text-text-heading border-b border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)]"
             >
               {{ t("onlineEvals.scorer.detail.metadataSection") }}
             </h4>
@@ -834,7 +834,7 @@ function relativeTime(timestampMs: number): string {
 .sd-kv dd {
   margin: 0;
   font-size: 0.8125rem;
-  color: var(--color-text-primary, currentColor);
+  color: var(--color-text-heading, currentColor);
 }
 
 .sd-type-chip {
@@ -877,7 +877,7 @@ function relativeTime(timestampMs: number): string {
     color-mix(in srgb, var(--color-primary-600) 30%, transparent);
   border-radius: 0.3125rem;
   font-size: 0.75rem;
-  color: var(--color-text-primary, currentColor);
+  color: var(--color-text-heading, currentColor);
 }
 
 .sd-produces__name {
@@ -895,14 +895,14 @@ function relativeTime(timestampMs: number): string {
 .sd-code {
   margin: 0;
   padding: 0.75rem;
-  background: color-mix(in srgb, var(--color-text-primary) 5%, transparent);
+  background: color-mix(in srgb, var(--color-text-heading) 5%, transparent);
   border: 0.0625rem solid
     color-mix(in srgb, var(--color-text-secondary) 14%, transparent);
   border-radius: 0.375rem;
   font-family: var(--font-mono);
   font-size: 0.75rem;
   line-height: 1.55;
-  color: var(--color-text-primary, currentColor);
+  color: var(--color-text-heading, currentColor);
   white-space: pre-wrap;
   word-break: break-word;
   max-height: 12.5rem;
@@ -953,7 +953,7 @@ function relativeTime(timestampMs: number): string {
 .sd-versions__label {
   font-weight: 700;
   font-size: 0.8125rem;
-  color: var(--color-text-primary, currentColor);
+  color: var(--color-text-heading, currentColor);
 }
 
 .sd-versions__chip {

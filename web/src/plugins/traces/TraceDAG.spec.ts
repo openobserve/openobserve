@@ -32,13 +32,13 @@ const nodeStyleFor = (suffix: string): string =>
 
 /** text = base token mixed 70/30 toward the primary text color. */
 const textStyleFor = (suffix: string): string =>
-  `text-[color-mix(in_srgb,var(--color-dag-node-${suffix})_70%,var(--color-text-primary))]`;
+  `text-[color-mix(in_srgb,var(--color-dag-node-${suffix})_70%,var(--color-text-heading))]`;
 
 const NODE_STYLE_LITERAL_DEFAULT =
   "border-[var(--color-dag-node-default)] bg-[color-mix(in_srgb,var(--color-dag-node-default)_12%,var(--color-surface-base))]";
 
 const TEXT_STYLE_LITERAL_DEFAULT =
-  "text-[color-mix(in_srgb,var(--color-dag-node-default)_70%,var(--color-text-primary))]";
+  "text-[color-mix(in_srgb,var(--color-dag-node-default)_70%,var(--color-text-heading))]";
 
 /** Every OTEL gen_ai operation name the component recognises. */
 const ALL_OBSERVATION_TYPES = [
@@ -912,7 +912,7 @@ describe("TraceDAG", () => {
     it("should build text styles as a 70/30 mix of the base token toward the primary text color", () => {
       // Anchors the exact literal format that textStyleFor() reproduces.
       expect(wrapper.vm.getObservationTypeTextClass("chat")).toBe(
-        "text-[color-mix(in_srgb,var(--color-dag-node-generation)_70%,var(--color-text-primary))]",
+        "text-[color-mix(in_srgb,var(--color-dag-node-generation)_70%,var(--color-text-heading))]",
       );
       const all = ALL_OBSERVATION_TYPES.map((t) =>
         wrapper.vm.getObservationTypeTextClass(t),

@@ -1,7 +1,9 @@
 # OpenObserve Design-Token Standard & Canonical Allow-List
 
-> **Date:** 2026-07-17 · **Branch:** `fix/token` · **Scope:** `web/`
-> **Status:** Proposal for review. **Nothing in this document has been executed.**
+> **Date:** 2026-07-17 (execution log 2026-07-18) · **Branch:** `fix/token` · **Scope:** `web/`
+> **Status:** Tiers 0–1 + safe hygiene of Tier 3 **EXECUTED** (see the Execution Status
+> section below). Tier 2 and the Phase-G lock remain — they are design-gated or need a
+> full visual-regression pass.
 >
 > **What you asked for:** *"Check all token usage. Goal: tokens we can change and see the change
 > across the whole app — text size, text colour, colours, border, corner radius (and anything else
@@ -13,6 +15,58 @@
 > This document is the answer: **Part A** is the canonical allow-list (the only tokens feature code
 > may use), **Parts C–E** are the change/add/remove lists, **Part F** is the standard, **Part G** is
 > the ordered, reviewable execution plan.
+
+---
+
+## Execution Status (2026-07-18)
+
+Verified green after every step: `lint:tokens`, `lint:styles`, `lint:token-purity`,
+`lint:design` all pass; `type-check` and `lint:ci` clean; the 3 codemod-touched specs
+(221 tests) pass; the app compiles and renders correctly in **both light and dark** in the
+dev server, and every retired token resolves to empty / every kept token to its value at
+runtime (`--color-text-primary`/`-caption`, `--color-info-*`, `--color-label-chip-ipv4/6/date/time-*`
+gone; `--color-primary-950` now JS-generated under a custom theme).
+
+**✅ Shipped (Tier 0 + Tier 1 + safe Tier 3):**
+- **Tier 0.1** — `lint:token-purity` + `lint:design` wired into `playwright.yml` (per-PR gate);
+  `rawVarInComponent` category added to the design ratchet (counts raw `var(--color-*)` in
+  scoped + unscoped `<style>` blocks) and baseline regenerated. (stylelint `color-no-hex` was
+  already `error`.)
+- **Tier 0.2** — `generatePrimaryPalette` now emits shade **950** (`theme.ts`).
+- **Tier 0.3** — registered **47** defined-but-unregistered SOLID domain tokens (brand-\*,
+  dag-node-\*, theme-\*, scrollbar, dashboard-placeholder, hover-shadow, pivot-header-border).
+  Deliberately did NOT register raw palette ramps, gradient values, the dead `note` chain, or
+  runtime `span` colours.
+- **Tier 0.4** — registered the full `--text-{xs,sm,base,lg,xl,2xl}` ladder with paired
+  line-heights reproducing today's values (deleted the hand-pin in `tailwind.css`); retired
+  `--radius-xs/2xl/3xl` (codemod → `sm`/`lg`), `--shadow-xs` (→ `md`); codemodded feature-code
+  `border-strong`/`border-subtle` → `border-default` (kept both for O2-library internals).
+- **Tier 0.5** — removed the two false `.scss` comments; fixed the `--color-actions-column-shawdow`
+  typo. (Stale PLAN/PENDING docs left in place — separate concern.)
+- **Tier 1** — killed the `text-primary`→`heading` alias (365 class + 74 var refs) and the
+  `text-caption`→`secondary` alias (53 class + 9 var refs); fixed `AppPageHeader`; repointed the
+  7 `--color-typography-*` lines (body→`text-body`); merged `info-*`≡`blue-*` and the
+  ip/ipv4/ipv6 + ts/date/time chip triplets (all byte-identical in both themes); documented the
+  intentional `#a3a3a3` group; added stylelint + design-ratchet bans so the aliases can't return.
+- **Tier 3 (safe subset)** — deleted the dead `note` chain (16 tokens, 0 refs) and unused
+  `--leading-xs` / `--tracking-tighter` / `--font-black`; corrected the `traceColors.ts` docstring.
+  Token count **1052 → 1020**.
+
+**⏳ NOT shipped — design-gated or needs a full visual-regression pass (Tier 2 + rest of Tier 3):**
+- **Tier 2.11-2.16** — growing the interaction-state semantic vocabulary and rewiring
+  `component.css`'s ~301 base-palette refs through it; the **brand-colour architecture decision**
+  (runtime engine vs. token files); dark overrides for the 45 semantic-annex/brand tokens (the
+  brand-\* replicas are *intentionally* theme-independent — changing them is a design call);
+  minting overlay/soft + chart-palette token sets; and un-registering the raw base palette.
+- **Tier 3.18-3.20** — deriving `traceColors.ts` hex from the tokens (changes rendered trace
+  colours); the 70-file chart-hex → `chartColor()` burn-down (those files are *sanctioned* by the
+  `tsHex` allowlist); dismantling `utilities.css`; and the **Phase-G `@theme { --color-*: initial }`
+  lock**, which the audit itself gates behind handling all residual raw-palette compile
+  dependencies and which needs a whole-app visual pass to land safely. The now-per-PR design
+  ratchet already prevents new raw-palette debt in the meantime.
+
+Correction found during execution: `--text-3xl` (7 uses) and `--text-4xl` (3 uses) are **not**
+dead (the audit's §8.1 "0 uses" was stale) — kept.
 
 ---
 

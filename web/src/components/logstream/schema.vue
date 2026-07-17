@@ -99,7 +99,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                   </div>
                   <div
-                    class="tile-value text-lg flex items-end justify-start text-text-primary"
+                    class="tile-value text-lg flex items-end justify-start text-text-heading"
                   >
                     {{
                       parseInt(indexData.stats.doc_num).toLocaleString("en-US")
@@ -129,7 +129,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                   </div>
                   <div
-                    class="tile-value text-lg flex items-end justify-start text-text-primary"
+                    class="tile-value text-lg flex items-end justify-start text-text-heading"
                   >
                     {{ formatSizeFromMB(indexData.stats.storage_size) }}
                   </div>
@@ -161,7 +161,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                   </div>
                   <div
-                    class="tile-value text-lg flex items-end justify-start text-text-primary"
+                    class="tile-value text-lg flex items-end justify-start text-text-heading"
                   >
                     {{ formatSizeFromMB(indexData.stats.compressed_size) }}
                   </div>
@@ -193,7 +193,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                   </div>
                   <div
-                    class="tile-value text-lg flex items-end justify-start text-text-primary"
+                    class="tile-value text-lg flex items-end justify-start text-text-heading"
                   >
                     {{ formatSizeFromMB(indexData.stats.index_size) }}
                   </div>

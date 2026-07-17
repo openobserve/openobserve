@@ -42,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          Identical in both views: rows view is grid view with a single, wider
          column, not a different card. -->
     <div
-      class="relative flex items-center gap-2 min-w-0 min-h-7 py-1 px-2 border-b border-border-subtle"
+      class="relative flex items-center gap-2 min-w-0 min-h-7 py-1 px-2 border-b border-border-default"
     >
       <!-- The name gets the full header width; the type badge sits in the
            footer, where it cannot truncate the name it describes. -->
@@ -53,7 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              semibold looked like a different COLOR at this size — denser
              glyphs, same grey-900. -->
         <span
-          class="whitespace-nowrap overflow-hidden text-ellipsis text-compact font-medium text-text-primary tracking-[0.02em]"
+          class="whitespace-nowrap overflow-hidden text-ellipsis text-compact font-medium text-text-heading tracking-[0.02em]"
           :title="card.name"
           >{{ card.name }}</span
         >

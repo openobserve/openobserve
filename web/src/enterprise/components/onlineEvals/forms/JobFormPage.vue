@@ -38,11 +38,11 @@
         <section class="bg-card-glass-bg border border-(--color-dialog-header-border,var(--color-border-default)) rounded-md overflow-hidden shrink-0">
           <div class="flex items-center py-2.5 px-3 border-b border-(--color-border-default,var(--color-border-default))">
             <div class="w-0.75 h-4 rounded-sm mr-2 shrink-0 bg-theme-accent" />
-            <span class="text-compact font-semibold tracking-[0.01em] text-(--color-text-primary,currentColor)">{{ t("onlineEvals.job.targetSection") }}</span>
+            <span class="text-compact font-semibold tracking-[0.01em] text-(--color-text-heading,currentColor)">{{ t("onlineEvals.job.targetSection") }}</span>
           </div>
           <div class="flex flex-col gap-3 py-3.5 px-4">
           <div class="job-field">
-            <label class="flex items-center text-xs font-semibold text-(--color-text-primary,currentColor) mb-1">
+            <label class="flex items-center text-xs font-semibold text-(--color-text-heading,currentColor) mb-1">
               {{ t("onlineEvals.job.nameLabel") }}
               <span class="text-status-error-text ml-0.5">*</span>
               <OIcon v-if="mode === 'edit'" name="lock" size="xs" class="ml-1.5 text-(--color-text-secondary,var(--color-text-secondary))" />
@@ -57,7 +57,7 @@
           </div>
 
           <div class="job-field">
-            <label class="flex items-center text-xs font-semibold text-(--color-text-primary,currentColor) mb-1">
+            <label class="flex items-center text-xs font-semibold text-(--color-text-heading,currentColor) mb-1">
               {{ t("onlineEvals.job.streamLabel") }}
               <span class="text-status-error-text ml-0.5">*</span>
               <OIcon v-if="mode === 'edit'" name="lock" size="xs" class="ml-1.5 text-(--color-text-secondary,var(--color-text-secondary))" />
@@ -89,7 +89,7 @@
         <section class="bg-card-glass-bg border border-(--color-dialog-header-border,var(--color-border-default)) rounded-md overflow-hidden shrink-0">
           <div class="flex items-center py-2.5 px-3 border-b border-(--color-border-default,var(--color-border-default))">
             <div class="w-0.75 h-4 rounded-sm mr-2 shrink-0 bg-theme-accent" />
-            <span class="text-compact font-semibold tracking-[0.01em] text-(--color-text-primary,currentColor)">{{ t("onlineEvals.job.scorersSection") }}</span>
+            <span class="text-compact font-semibold tracking-[0.01em] text-(--color-text-heading,currentColor)">{{ t("onlineEvals.job.scorersSection") }}</span>
           </div>
           <div class="flex flex-col gap-3 py-3.5 px-4">
           <JobScorerPicker
@@ -115,7 +115,7 @@
         <section class="bg-card-glass-bg border border-(--color-dialog-header-border,var(--color-border-default)) rounded-md overflow-hidden shrink-0">
           <div class="flex items-center py-2.5 px-3 border-b border-(--color-border-default,var(--color-border-default))">
             <div class="w-0.75 h-4 rounded-sm mr-2 shrink-0 bg-theme-accent" />
-            <span class="text-compact font-semibold tracking-[0.01em] text-(--color-text-primary,currentColor)">{{ t("onlineEvals.job.stepper.sampling") }}</span>
+            <span class="text-compact font-semibold tracking-[0.01em] text-(--color-text-heading,currentColor)">{{ t("onlineEvals.job.stepper.sampling") }}</span>
           </div>
           <div class="flex flex-col gap-3 py-3.5 px-4">
           <div class="job-field-row grid grid-cols-2 max-[68.75rem]:grid-cols-1 gap-3.5">
@@ -131,7 +131,7 @@
             </div>
 
             <div class="job-field">
-              <label class="flex items-center text-xs font-semibold text-(--color-text-primary,currentColor) mb-1">
+              <label class="flex items-center text-xs font-semibold text-(--color-text-heading,currentColor) mb-1">
                 {{ t("onlineEvals.job.samplingValueLabel") }}
                 <span v-if="formValues.samplingMode !== 'all'" class="text-status-error-text ml-0.5">*</span>
               </label>

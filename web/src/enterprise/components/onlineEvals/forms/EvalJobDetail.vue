@@ -127,16 +127,16 @@
           <!-- Target -->
           <section class="flex flex-col gap-2 px-5">
             <h4
-              class="m-0 pb-[0.375rem] inline-flex items-center gap-[0.375rem] text-compact font-semibold leading-[1.5] text-text-primary border-b border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)]"
+              class="m-0 pb-[0.375rem] inline-flex items-center gap-[0.375rem] text-compact font-semibold leading-[1.5] text-text-heading border-b border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)]"
             >
               {{ t("onlineEvals.job.detail.targetSection") }}
             </h4>
             <dl class="grid grid-cols-[8.125rem_1fr] gap-x-3.5 gap-y-1.5 m-0">
               <dt class="text-xs font-semibold text-text-secondary">{{ t("onlineEvals.job.detail.streamLabel") }}</dt>
-              <dd class="m-0 text-compact text-text-primary wrap-break-word">{{ row.stream }}</dd>
+              <dd class="m-0 text-compact text-text-heading wrap-break-word">{{ row.stream }}</dd>
 
               <dt class="text-xs font-semibold text-text-secondary">{{ t("onlineEvals.job.detail.streamTypeLabel") }}</dt>
-              <dd class="m-0 text-compact text-text-primary wrap-break-word">{{ streamType }}</dd>
+              <dd class="m-0 text-compact text-text-heading wrap-break-word">{{ streamType }}</dd>
             </dl>
 
             <!-- Filter rendered as a code block with a header bar + copy action,
@@ -168,7 +168,7 @@
               </div>
               <!-- Hard cap the filter condition height; longer conditions scroll. -->
               <pre
-                class="m-0 px-3.5 py-2.5 font-mono text-compact leading-[1.6] text-text-primary whitespace-pre-wrap overflow-x-auto max-h-50 overflow-y-auto"
+                class="m-0 px-3.5 py-2.5 font-mono text-compact leading-[1.6] text-text-heading whitespace-pre-wrap overflow-x-auto max-h-50 overflow-y-auto"
               >{{
                 filterText || t("onlineEvals.job.detail.filterEmpty")
               }}</pre>
@@ -178,7 +178,7 @@
           <!-- Scorers -->
           <section class="flex flex-col gap-2 px-5">
             <h4
-              class="m-0 pb-[0.375rem] inline-flex items-center gap-[0.375rem] text-compact font-semibold leading-[1.5] text-text-primary border-b border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)]"
+              class="m-0 pb-[0.375rem] inline-flex items-center gap-[0.375rem] text-compact font-semibold leading-[1.5] text-text-heading border-b border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)]"
             >
               {{ t("onlineEvals.job.detail.scorersSection") }}
               <OTag type="fieldTag" value="soft">{{ resolvedScorers.length }}</OTag>
@@ -225,7 +225,7 @@
                   </span>
                   <div class="flex-1 min-w-0 flex flex-col gap-1.25">
                     <div class="flex items-center gap-2 flex-wrap">
-                      <span class="font-bold text-sm text-text-primary">{{
+                      <span class="font-bold text-sm text-text-heading">{{
                         item.name
                       }}</span>
                       <OTag
@@ -249,7 +249,7 @@
                       <span class="font-medium">
                         {{ t("onlineEvals.job.detail.producesPrefix") }}
                       </span>
-                      <span class="text-text-primary font-bold">{{
+                      <span class="text-text-heading font-bold">{{
                         item.scoreConfigName
                       }}</span>
                       <template v-if="item.scoreConfigDataType">
@@ -286,18 +286,18 @@
           <!-- Sampling -->
           <section class="flex flex-col gap-2 px-5">
             <h4
-              class="m-0 pb-[0.375rem] inline-flex items-center gap-[0.375rem] text-compact font-semibold leading-[1.5] text-text-primary border-b border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)]"
+              class="m-0 pb-[0.375rem] inline-flex items-center gap-[0.375rem] text-compact font-semibold leading-[1.5] text-text-heading border-b border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)]"
             >
               {{ t("onlineEvals.job.detail.samplingSection") }}
             </h4>
             <dl class="grid grid-cols-[8.125rem_1fr] gap-x-3.5 gap-y-1.5 m-0">
               <dt class="text-xs font-semibold text-text-secondary">{{ t("onlineEvals.job.detail.samplingModeLabel") }}</dt>
-              <dd class="m-0 text-compact text-text-primary wrap-break-word">{{ samplingModeLabel }}</dd>
+              <dd class="m-0 text-compact text-text-heading wrap-break-word">{{ samplingModeLabel }}</dd>
 
               <dt v-if="samplingValue != null" class="text-xs font-semibold text-text-secondary">
                 {{ t("onlineEvals.job.detail.samplingValueLabel") }}
               </dt>
-              <dd v-if="samplingValue != null" class="m-0 text-compact text-text-primary wrap-break-word">
+              <dd v-if="samplingValue != null" class="m-0 text-compact text-text-heading wrap-break-word">
                 {{ samplingValue }}
               </dd>
             </dl>
@@ -306,27 +306,27 @@
           <!-- Metadata -->
           <section class="flex flex-col gap-2 px-5">
             <h4
-              class="m-0 pb-[0.375rem] inline-flex items-center gap-[0.375rem] text-compact font-semibold leading-[1.5] text-text-primary border-b border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)]"
+              class="m-0 pb-[0.375rem] inline-flex items-center gap-[0.375rem] text-compact font-semibold leading-[1.5] text-text-heading border-b border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)]"
             >
               {{ t("onlineEvals.job.detail.metadataSection") }}
             </h4>
             <dl class="grid grid-cols-[8.125rem_1fr] gap-x-3.5 gap-y-1.5 m-0">
               <dt class="text-xs font-semibold text-text-secondary">{{ t("onlineEvals.job.detail.versionLabel") }}</dt>
-              <dd class="m-0 text-compact text-text-primary wrap-break-word">v{{ row.version }}</dd>
+              <dd class="m-0 text-compact text-text-heading wrap-break-word">v{{ row.version }}</dd>
               <dt v-if="pipelineId" class="text-xs font-semibold text-text-secondary">
                 {{ t("onlineEvals.job.detail.pipelineLabel") }}
               </dt>
-              <dd v-if="pipelineId" class="m-0 text-compact text-text-primary wrap-break-word">{{ pipelineId }}</dd>
+              <dd v-if="pipelineId" class="m-0 text-compact text-text-heading wrap-break-word">{{ pipelineId }}</dd>
               <dt v-if="createdAt" class="text-xs font-semibold text-text-secondary">
                 {{ t("onlineEvals.job.detail.createdLabel") }}
               </dt>
-              <dd v-if="createdAt" class="m-0 text-compact text-text-primary wrap-break-word">
+              <dd v-if="createdAt" class="m-0 text-compact text-text-heading wrap-break-word">
                 {{ formatTimestamp(createdAt) }}
               </dd>
               <dt v-if="updatedAt" class="text-xs font-semibold text-text-secondary">
                 {{ t("onlineEvals.job.detail.updatedLabel") }}
               </dt>
-              <dd v-if="updatedAt" class="m-0 text-compact text-text-primary wrap-break-word">
+              <dd v-if="updatedAt" class="m-0 text-compact text-text-heading wrap-break-word">
                 {{ formatTimestamp(updatedAt) }}
               </dd>
             </dl>

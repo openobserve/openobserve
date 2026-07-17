@@ -46,7 +46,7 @@
 
       <section v-if="dataType === 'numeric'" class="bg-card-glass-bg py-3 px-3.5 pb-3.5 border border-border-default rounded-md">
         <header class="mb-1.5">
-          <h4 class="m-0 text-compact font-semibold text-text-primary">
+          <h4 class="m-0 text-compact font-semibold text-text-heading">
             {{ t("onlineEvals.quality.detail.trendTitle") }}
             <span class="font-normal text-text-secondary text-2xs">— {{ config.name }}</span>
           </h4>
@@ -68,7 +68,7 @@
 
       <section v-if="dataType === 'numeric'" class="bg-card-glass-bg py-3 px-3.5 pb-3.5 border border-border-default rounded-md">
         <header class="mb-1.5">
-          <h4 class="m-0 text-compact font-semibold text-text-primary">{{ t("onlineEvals.quality.detail.distributionTitle") }}</h4>
+          <h4 class="m-0 text-compact font-semibold text-text-heading">{{ t("onlineEvals.quality.detail.distributionTitle") }}</h4>
         </header>
         <div class="h-55">
           <QualityDistributionChart
@@ -84,7 +84,7 @@
 
       <section v-if="dataType === 'boolean'" class="bg-card-glass-bg py-3 px-3.5 pb-3.5 border border-border-default rounded-md">
         <header class="mb-1.5">
-          <h4 class="m-0 text-compact font-semibold text-text-primary">
+          <h4 class="m-0 text-compact font-semibold text-text-heading">
             {{ t("onlineEvals.quality.detail.passRateTitle") }}
             <span class="font-normal text-text-secondary text-2xs">— {{ config.name }}</span>
           </h4>
@@ -102,7 +102,7 @@
 
       <section v-if="dataType === 'boolean'" class="bg-card-glass-bg py-3 px-3.5 pb-3.5 border border-border-default rounded-md">
         <header class="mb-1.5">
-          <h4 class="m-0 text-compact font-semibold text-text-primary">{{ t("onlineEvals.quality.detail.trueFalseTitle") }}</h4>
+          <h4 class="m-0 text-compact font-semibold text-text-heading">{{ t("onlineEvals.quality.detail.trueFalseTitle") }}</h4>
         </header>
         <div class="h-30">
           <QualityBooleanBarsChart
@@ -118,7 +118,7 @@
 
       <section v-if="dataType === 'categorical'" class="bg-card-glass-bg py-3 px-3.5 pb-3.5 border border-border-default rounded-md">
         <header class="mb-1.5">
-          <h4 class="m-0 text-compact font-semibold text-text-primary">{{ t("onlineEvals.quality.detail.categoryDistributionTitle") }}</h4>
+          <h4 class="m-0 text-compact font-semibold text-text-heading">{{ t("onlineEvals.quality.detail.categoryDistributionTitle") }}</h4>
         </header>
         <div class="h-65">
           <QualityCategoryBarsChart

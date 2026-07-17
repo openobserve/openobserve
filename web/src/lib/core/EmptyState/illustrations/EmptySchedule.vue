@@ -57,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- clock badge (overlapping bottom-right corner) -->
     <circle cx="182" cy="128" r="22" fill="var(--color-surface-base)" stroke="var(--color-border-strong)" stroke-width="2.5" />
     <circle cx="182" cy="128" r="17.5" fill="var(--color-primary-500)" opacity="0.08" />
-    <line x1="182" y1="128" x2="182" y2="116" stroke="var(--color-text-primary)" stroke-width="2.5" stroke-linecap="round" opacity="0.75" />
+    <line x1="182" y1="128" x2="182" y2="116" stroke="var(--color-text-heading)" stroke-width="2.5" stroke-linecap="round" opacity="0.75" />
     <line class="es-hand" x1="182" y1="128" x2="192" y2="128" stroke="var(--color-primary-600)" stroke-width="2.25" stroke-linecap="round" />
     <circle cx="182" cy="128" r="2.75" fill="var(--color-primary-600)" />
   </svg>

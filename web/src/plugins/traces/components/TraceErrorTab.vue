@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div class="flex-col items-center gap-1">
       <div
-        class="text-text-primary! text-sm tracking-[0.03rem] pl-[0.5rem] w-full pb-[0.125rem]"
+        class="text-text-heading! text-sm tracking-[0.03rem] pl-[0.5rem] w-full pb-[0.125rem]"
       >
         {{ spanStatusCode ? "HTTP Status Code" : "gRPC Status Code" }}
       </div>
@@ -59,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div class="flex-col items-center gap-1">
       <div
-        class="text-text-primary! text-3xs tracking-[0.03rem] pl-[0.5rem] w-full pb-[0.125rem]"
+        class="text-text-heading! text-3xs tracking-[0.03rem] pl-[0.5rem] w-full pb-[0.125rem]"
       >
         DB Response Status Code
       </div>
@@ -82,7 +82,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div class="flex-col items-center gap-1">
       <div
-        class="text-text-primary! text-3xs tracking-[0.03rem] pl-[0.5rem] w-full pb-[0.125rem]"
+        class="text-text-heading! text-3xs tracking-[0.03rem] pl-[0.5rem] w-full pb-[0.125rem]"
       >
         Process Exit Code
       </div>

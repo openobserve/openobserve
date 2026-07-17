@@ -49,7 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="wcp__unique-count text-sm font-bold text-text-heading [font-variant-numeric:tabular-nums]"
         >{{ displayValues.length }}</span>
         <span
-          class="wcp__unique-label text-2xs text-text-caption"
+          class="wcp__unique-label text-2xs text-text-secondary"
         >unique</span>
       </div>
     </div>
@@ -88,7 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <!-- Percentage -->
         <div
-          class="wcp__row-pct text-3xs text-text-caption [font-variant-numeric:tabular-nums]"
+          class="wcp__row-pct text-3xs text-text-secondary [font-variant-numeric:tabular-nums]"
         >
           {{ totalOccurrences > 0 ? ((item.count / totalOccurrences) * 100).toFixed(1) + '%' : '' }}
         </div>
@@ -108,7 +108,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="wcp__footer flex items-center justify-end py-[0.4375rem] px-3 border-t border-card-glass-border"
     >
       <span
-        class="wcp__occurrences text-2xs font-semibold text-text-caption [font-variant-numeric:tabular-nums]"
+        class="wcp__occurrences text-2xs font-semibold text-text-secondary [font-variant-numeric:tabular-nums]"
       >{{ totalOccurrences.toLocaleString() }} occurrences</span>
     </div>
   </div>

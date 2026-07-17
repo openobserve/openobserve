@@ -153,6 +153,11 @@ const generatePrimaryPalette = (baseHex: string): Record<string, string> => {
     '700': mixColors(baseHex, '#000000', 80),
     '800': mixColors(baseHex, '#000000', 60),
     '900': mixColors(baseHex, '#000000', 40),
+    // 950 continues the linear −20 step (700:80 → 800:60 → 900:40 → 950:20).
+    // dark.css consumes --color-primary-950 for two surfaces; without this a
+    // custom theme in dark mode kept the stock O2 teal (#0d181e). For the default
+    // #3F7994 base, 20% reproduces that exact stock value (13/63 ≈ 0.20).
+    '950': mixColors(baseHex, '#000000', 20),
   };
 };
 

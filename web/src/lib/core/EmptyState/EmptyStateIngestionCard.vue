@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OIcon :name="icon" size="md" />
     </span>
     <span class="es-ing-card__body flex-1 min-w-0 flex flex-col gap-0.5">
-      <span class="text-compact font-semibold text-text-primary truncate">{{ label }}</span>
+      <span class="text-compact font-semibold text-text-heading truncate">{{ label }}</span>
       <span v-if="sublabel" class="text-xs text-text-secondary leading-[1.4]">{{ sublabel }}</span>
     </span>
     <OIcon name="chevron-right" size="sm" class="es-ing-card__chevron shrink-0 text-text-disabled transition-[transform,color] duration-150 group-hover:translate-x-0.5 group-hover:text-primary-600" />

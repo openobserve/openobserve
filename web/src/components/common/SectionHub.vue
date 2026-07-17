@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <header v-if="title || description" class="mb-6">
         <h1
           v-if="title"
-          class="text-xl! font-semibold! text-text-primary"
+          class="text-xl! font-semibold! text-text-heading"
         >
           {{ title }}
         </h1>
@@ -54,7 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <h2
           v-if="group.label"
-          class="text-sm! font-semibold! text-text-primary mb-3"
+          class="text-sm! font-semibold! text-text-heading mb-3"
         >
           {{ group.label }}
         </h2>
@@ -83,7 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </span>
             <span class="flex flex-col min-w-0">
               <span
-                class="text-sm font-semibold text-text-primary transition-colors group-hover:text-primary-600"
+                class="text-sm font-semibold text-text-heading transition-colors group-hover:text-primary-600"
                 >{{ item.label }}</span
               >
               <span

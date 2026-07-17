@@ -195,7 +195,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #cell-name="{ row, value }">
               <span class="inline-flex items-center gap-1">
                 <span
-                  class="text-text-primary"
+                  class="text-text-heading"
                   :data-test="`dashboard-name-cell-${value}`"
                   :title="value"
                 >{{ value }}</span
@@ -218,14 +218,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
             <template #cell-identifier="{ value }">
               <span
-                class="font-mono text-xs text-text-primary"
+                class="font-mono text-xs text-text-heading"
                 :title="value"
               >{{ value }}</span
               >
             </template>
             <template #cell-description="{ value }">
               <span
-                class="text-text-primary"
+                class="text-text-heading"
                 :title="value"
               >{{ value || "—" }}</span
               >
@@ -243,7 +243,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #cell-folder="{ row }">
               <button
                 type="button"
-                class="inline-flex items-center gap-1 max-w-full px-2 py-0.5 rounded-full bg-surface-subtle text-text-primary text-xs leading-5 transition-colors outline-none hover:bg-surface-subtle-hover hover:text-text-primary focus-visible:ring-4 focus-visible:ring-primary-500/25 focus-visible:ring-inset"
+                class="inline-flex items-center gap-1 max-w-full px-2 py-0.5 rounded-full bg-surface-subtle text-text-heading text-xs leading-5 transition-colors outline-none hover:bg-surface-subtle-hover hover:text-text-heading focus-visible:ring-4 focus-visible:ring-primary-500/25 focus-visible:ring-inset"
                 @click.stop="updateActiveFolderId(row.folder_id)"
               >
                 <OIcon name="folder-outline" size="xs" />
@@ -346,7 +346,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="bulk-action-bar flex items-center gap-2"
                 >
                   <span
-                    class="text-sm text-text-primary mr-1"
+                    class="text-sm text-text-heading mr-1"
                   >{{ selectedIds.length }} selected</span
                   >
                   <OButton

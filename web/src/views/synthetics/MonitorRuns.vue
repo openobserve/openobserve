@@ -167,7 +167,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </template>
                       <template v-else>
                         <span
-                          class="text-xl font-bold leading-none text-[var(--color-text-primary)]"
+                          class="text-xl font-bold leading-none text-[var(--color-text-heading)]"
                           :class="card.valueClass"
                         >
                           {{ card.value }}
@@ -655,7 +655,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
                 <template #cell-location="{ row }">
                   <span
-                    class="inline-flex items-center gap-1 text-sm text-text-primary"
+                    class="inline-flex items-center gap-1 text-sm text-text-heading"
                   >
                     <OIcon
                       :name="locationIcon((row as VisibleRun).location)"
@@ -666,7 +666,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
                 <template #cell-browser="{ row }">
                   <span
-                    class="inline-flex items-center gap-1 text-sm text-text-primary"
+                    class="inline-flex items-center gap-1 text-sm text-text-heading"
                   >
                     <OIcon
                       :name="browserIcon((row as VisibleRun).browser)"
@@ -677,7 +677,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
                 <template #cell-device="{ row }">
                   <span
-                    class="inline-flex items-center gap-1 text-sm text-text-primary"
+                    class="inline-flex items-center gap-1 text-sm text-text-heading"
                   >
                     <OIcon
                       :name="deviceIconName((row as VisibleRun).device)"
@@ -704,7 +704,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </span>
                 </template>
                 <template #cell-trigger_type="{ row }">
-                  <span class="text-sm text-text-primary">
+                  <span class="text-sm text-text-heading">
                     {{ (row as VisibleRun).triggerType }}
                   </span>
                 </template>
@@ -1911,7 +1911,7 @@ function cssVar(name: string, fallback: string): string {
 
 const responseChartOption = computed(() => {
   const lineColor = cssVar("--color-primary-600", "#3b82f6");
-  const axisColor = cssVar("--color-text-caption", "#6c707e");
+  const axisColor = cssVar("--color-text-secondary", "#6c707e");
   const splitColor = cssVar("--color-border-default", "#e2e8f0");
   const p95Color = cssVar("--color-status-warning-text", "#f59e0b");
 
@@ -1981,7 +1981,7 @@ const responseChartOption = computed(() => {
 });
 
 const errorChartOption = computed(() => {
-  const axisColor = cssVar("--color-text-caption", "#6c707e");
+  const axisColor = cssVar("--color-text-secondary", "#6c707e");
   const splitColor = cssVar("--color-border-default", "#e2e8f0");
   const errorColor = cssVar("--color-status-error-text", "#dc2626");
 

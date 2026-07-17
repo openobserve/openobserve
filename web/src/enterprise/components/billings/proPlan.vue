@@ -89,7 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OIcon name="check-circle" size="xs" />
           </template>
         </OTag>
-        <div class="text-xs text-text-caption mt-2">
+        <div class="text-xs text-text-secondary mt-2">
           Billing is handled through your AWS account
         </div>
       </div>
@@ -106,7 +106,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OIcon name="check-circle" size="xs" />
           </template>
         </OTag>
-        <div class="text-xs text-text-caption mt-2">
+        <div class="text-xs text-text-secondary mt-2">
           Billing is handled through your Azure account
         </div>
       </div>
@@ -124,7 +124,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OIcon name="description" size="xs" />
           </template>
         </OTag>
-        <div class="text-xs text-text-caption mt-2">
+        <div class="text-xs text-text-secondary mt-2">
           Billing is handled through your contract — contact your account
           manager for changes
         </div>

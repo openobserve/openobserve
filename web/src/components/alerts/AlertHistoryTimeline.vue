@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="flex flex-col gap-1.5 w-full shrink-0 px-1 py-2">
     <!-- Header row: oldest … legend … newest -->
     <div class="flex items-center justify-between px-1">
-      <span class="text-2xs tabular-nums text-text-caption">
+      <span class="text-2xs tabular-nums text-text-secondary">
         {{ oldestLabel }}
       </span>
 
@@ -41,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </span>
       </div>
 
-      <span class="text-2xs tabular-nums text-text-caption">
+      <span class="text-2xs tabular-nums text-text-secondary">
         {{ newestLabel }}
       </span>
     </div>
@@ -108,7 +108,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <span
         v-for="(tick, i) in tickLabels"
         :key="i"
-        class="absolute top-0 text-3xs tabular-nums whitespace-nowrap -translate-x-1/2 text-text-caption"
+        class="absolute top-0 text-3xs tabular-nums whitespace-nowrap -translate-x-1/2 text-text-secondary"
         :style="{ left: tick.leftPct + '%' }"
       >
         {{ tick.label }}

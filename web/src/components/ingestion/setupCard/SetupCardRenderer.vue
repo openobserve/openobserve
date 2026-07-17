@@ -833,7 +833,7 @@ function fireConfetti() {
 
   --panel: var(--color-surface-base);
   --border: var(--color-border-default);
-  --text-1: var(--color-text-primary);
+  --text-1: var(--color-text-heading);
   --text-2: var(--color-text-secondary);
   --text-3: var(--color-text-label);
   --primary-ink: var(--color-text-link);

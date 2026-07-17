@@ -65,7 +65,7 @@ const barClass = computed(
   <div class="flex flex-col items-end justify-center gap-0.75 w-full min-w-0">
     <span
       class="tabular-nums whitespace-nowrap leading-none"
-      :class="num === null ? 'text-text-primary text-xs' : ''"
+      :class="num === null ? 'text-text-heading text-xs' : ''"
     >{{ text }}</span>
     <div
       v-if="widthPct > 0"

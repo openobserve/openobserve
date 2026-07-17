@@ -2108,7 +2108,7 @@ export default defineComponent({
   box-shadow: var(--shadow-lg);
   padding: 0.5rem 0;
   font-size: var(--text-xs);
-  color: var(--color-text-primary);
+  color: var(--color-text-heading);
   outline: none;
 
   &__time {

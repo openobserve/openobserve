@@ -73,7 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div :class="['flex flex-col max-w-xl', sizeClass.copy]">
         <component
           :is="size === 'inline' ? 'p' : 'h2'"
-          :class="['font-medium text-text-primary tracking-[-0.01em]', sizeClass.title]"
+          :class="['font-medium text-text-heading tracking-[-0.01em]', sizeClass.title]"
         >
           <slot name="title">{{ resolvedTitle }}</slot>
         </component>

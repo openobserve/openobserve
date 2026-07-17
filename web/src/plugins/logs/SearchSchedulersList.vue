@@ -156,7 +156,7 @@
                   </div>
                   <div class="flex items-start justify-center">
                     <div
-                      class="w-full overflow-y-auto p-2.5 h-full max-h-50 border border-border-default border-l-3 border-l-sql-accent bg-surface-subtle text-text-primary o2-colorized-query"
+                      class="w-full overflow-y-auto p-2.5 h-full max-h-50 border border-border-default border-l-3 border-l-sql-accent bg-surface-subtle text-text-heading o2-colorized-query"
                     >
                       <!-- Monaco-colorized SQL (sanitized in colorizeRow). Falls
                            back to plain text before colorize resolves / if it throws. -->
@@ -192,7 +192,7 @@
 
                   <div class="flex items-start justify-center">
                     <div
-                      class="w-full overflow-y-auto p-2.5 h-full max-h-50 border border-border-default border-l-3 border-l-function-accent bg-surface-subtle text-text-primary o2-colorized-query"
+                      class="w-full overflow-y-auto p-2.5 h-full max-h-50 border border-border-default border-l-3 border-l-function-accent bg-surface-subtle text-text-heading o2-colorized-query"
                     >
                       <pre
                         v-if="colorizedFunction[row.trace_id]"

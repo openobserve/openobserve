@@ -33,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </span>
 
     <span class="relative flex-1 min-w-0">
-      <span class="block text-sm font-semibold truncate text-text-primary">{{
+      <span class="block text-sm font-semibold truncate text-text-heading">{{
         label
       }}</span>
       <span

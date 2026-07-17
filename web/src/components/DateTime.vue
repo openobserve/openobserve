@@ -99,7 +99,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       relativePeriod == period.value &&
                       relativeValue == item
                         ? 'bg-button-primary! text-button-primary-foreground!'
-                        : `bg-[color-mix(in_srgb,var(--color-text-primary)_7%,transparent)]! ${relativePeriod}`
+                        : `bg-[color-mix(in_srgb,var(--color-text-heading)_7%,transparent)]! ${relativePeriod}`
                     "
                     variant="ghost"
                     size="xs"

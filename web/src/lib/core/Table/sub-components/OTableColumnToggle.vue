@@ -106,7 +106,7 @@ function resetToDefault(): void {
             @update:model-value="toggleColumn(col.id)"
             @click.stop
           />
-          <span class="text-sm text-text-primary select-none flex-1">
+          <span class="text-sm text-text-heading select-none flex-1">
             {{ typeof col.header === "string" ? col.header : col.id }}
           </span>
         </li>
@@ -119,7 +119,7 @@ function resetToDefault(): void {
       >
         <button
           v-if="hiddenCount > 0"
-          class="flex items-center gap-2 px-3 py-1.5 w-full text-sm cursor-pointer rounded-sm hover:bg-surface-panel transition-colors text-text-primary"
+          class="flex items-center gap-2 px-3 py-1.5 w-full text-sm cursor-pointer rounded-sm hover:bg-surface-panel transition-colors text-text-heading"
           data-test="o2-table-column-toggle-reset-btn"
           @click="resetToDefault"
         >
@@ -128,7 +128,7 @@ function resetToDefault(): void {
         </button>
         <button
           v-if="props.hasResizedColumns"
-          class="flex items-center gap-2 px-3 py-1.5 w-full text-sm cursor-pointer rounded-sm hover:bg-surface-panel transition-colors text-text-primary"
+          class="flex items-center gap-2 px-3 py-1.5 w-full text-sm cursor-pointer rounded-sm hover:bg-surface-panel transition-colors text-text-heading"
           data-test="o2-table-column-resize-reset-btn"
           @click="emit('reset:columnSizes')"
         >

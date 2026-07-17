@@ -23,9 +23,9 @@
   ],
   "rules": {
     "declaration-property-value-disallowed-list": [
-      { "/.*/": ["/var\\(\\s*--o2-/"] },
+      { "/.*/": ["/var\\(\\s*--o2-/", "/var\\(\\s*--color-text-(primary|caption)\\b/"] },
       {
-        "message": "Legacy --o2-* tokens are banned. Use the modern --color-* token or a Tailwind utility.",
+        "message": "Banned token. --o2-* is legacy; --color-text-primary/-caption were retired (Tier 1) — use --color-text-heading / --color-text-secondary.",
         "severity": "error"
       }
     ]

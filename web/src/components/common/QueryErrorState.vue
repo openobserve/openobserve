@@ -245,7 +245,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
 
     <!-- Trace ID (block) -->
-    <small v-if="traceId" class="text-text-caption" data-test="query-error-trace-id">
+    <small v-if="traceId" class="text-text-secondary" data-test="query-error-trace-id">
       <span class="font-medium">{{ t("queryError.traceId") }}</span>
       {{ traceId }}
     </small>

@@ -172,7 +172,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <template #illustration>
             <div
-              class="w-18 h-18 rounded-2xl bg-[color-mix(in_srgb,var(--color-grey-500)_8%,transparent)] flex items-center justify-center text-text-secondary"
+              class="w-18 h-18 rounded-lg bg-[color-mix(in_srgb,var(--color-grey-500)_8%,transparent)] flex items-center justify-center text-text-secondary"
             >
               <OIcon name="tune" size="xl" />
             </div>

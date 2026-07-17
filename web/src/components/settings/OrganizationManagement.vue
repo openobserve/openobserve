@@ -167,10 +167,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :key="page"
               @click="extendedTrial = page"
               :class="[
-                'cursor-pointer px-2 py-1 border border-border-strong',
+                'cursor-pointer px-2 py-1 border border-border-default',
                 extendedTrial === page
                   ? 'bg-button-primary text-button-primary-foreground border-button-primary'
-                  : 'bg-surface-base text-text-body border-border-strong',
+                  : 'bg-surface-base text-text-body border-border-default',
               ]"
             >
               {{ page }}

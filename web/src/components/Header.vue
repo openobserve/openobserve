@@ -348,7 +348,7 @@ size="xs" class="text-warning" />{{
                 v-if="selectedLanguage.icon && selectedLanguage.icon.startsWith('img:')"
                 :src="selectedLanguage.icon.slice(4)"
                 :alt="selectedLanguage.label"
-                class="w-4 h-3 object-cover rounded-xs inline-block shrink-0"
+                class="w-4 h-3 object-cover rounded-sm inline-block shrink-0"
               />
               <OIcon
                 v-else-if="selectedLanguage.icon"
@@ -383,7 +383,7 @@ size="xs" class="text-warning" />{{
                   v-if="lang.icon && lang.icon.startsWith('img:')"
                   :src="lang.icon.slice(4)"
                   :alt="lang.label"
-                  class="w-4 h-3 object-cover rounded-xs inline-block shrink-0"
+                  class="w-4 h-3 object-cover rounded-sm inline-block shrink-0"
                 />
                 <OIcon v-else-if="lang.icon" size="xs" :name="lang.icon" />
                 <span class="flex-1">{{ lang.label }}</span>

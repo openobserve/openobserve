@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <span class="relative flex-1 min-w-0">
       <span
         :title="label"
-        class="block text-sm font-medium text-text-primary wrap-break-word"
+        class="block text-sm font-medium text-text-heading wrap-break-word"
         >{{ label }}</span
       >
       <span

@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span
           v-for="(value, index) in displayBuckets"
           :key="index"
-          class="trend-bar rounded-xs w-1.5"
+          class="trend-bar rounded-sm w-1.5"
           :class="
             value > 0
               ? isUnhandled
@@ -62,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <span
         v-for="index in 12"
         :key="index"
-        class="trend-bar rounded-xs bg-card-glass-border opacity-60 w-1.5"
+        class="trend-bar rounded-sm bg-card-glass-border opacity-60 w-1.5"
         :style="{ height: `${20 + ((index * 11) % 60)}%` }"
       />
     </div>
@@ -171,8 +171,8 @@ const annotation = computed(() =>
 const ANNOTATION_CLASS: Record<string, string> = {
   spike: "text-severity-error-color not-italic font-semibold",
   drop: "text-status-success-text",
-  new: "text-text-caption",
-  flat: "text-text-caption",
+  new: "text-text-secondary",
+  flat: "text-text-secondary",
 };
 
 const annotationClass = computed(

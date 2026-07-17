@@ -523,7 +523,6 @@
   --text-4xl:  2.25rem;   /* 36px — display */
 
   /* --- Line-height scale --- */
-  --leading-xs:    1rem;      /* 16px */
   --leading-sm:    1.125rem;  /* 18px */
   --leading-base:  1.25rem;   /* 20px */
   --leading-md:    1.375rem;  /* 22px */
@@ -534,7 +533,6 @@
   --leading-4xl:   2.5rem;    /* 40px */
 
   /* --- Letter-spacing scale --- */
-  --tracking-tighter: -0.05em;
   --tracking-tight:   -0.025em;
   --tracking-normal:   0;
   --tracking-wide:     0.025em;
@@ -544,7 +542,6 @@
   --font-medium: 500;
   --font-semibold: 600;
   --font-bold: 700;
-  --font-black: 900;
   /* --- Primary palette — blue-teal #3F7994 --- */
   --color-primary-50:  #f5f8fa;
   --color-primary-100: #e2ebef;
@@ -617,23 +614,8 @@
   --color-purple-900: #581c87;
 
   /* --- Info palette (blue, used by OBanner info variant) --- */
-  --color-info-50:  #eff6ff;
-  --color-info-100: #dbeafe;
-  --color-info-200: #bfdbfe;
-  --color-info-700: #1d4ed8;
-  --color-info-800: #1e3a8a;
-  --color-info-900: #1e3a5f;
 
   /* --- Note container palette (pipeline guideline cards) --- */
-  --color-note-light-bg:        #f9f290;
-  --color-note-light-border:    #f5a623;
-  --color-note-light-text:      #865300;
-  --color-note-dark-border:     #b45309;
-  --color-note-dark-text:       #fef3c7;
-  --color-note-highlight-light: #007bff;
-  --color-note-highlight-dark:  #93c5fd;
-  --color-note-code-light:      #d63384;
-  --color-note-code-dark:       #f9a8d4;
 
   /* --- Teal palette --- */
   --color-teal-50:  #f0fdfa;
@@ -797,10 +779,8 @@
      sm is intentionally none: cards use a 1px border, not a drop shadow.
      md/lg retained for overlays (dialogs, menus) that need real elevation. */
   --shadow-sm: none;
-  /* Hairline card lift — the step between `sm` (none) and `md` (0 4px 12px).
-     Registered because several cards/chips wanted a 0 1px 3px elevation that had
-     no honest home and were falling back to a heavier shadow. */
-  --shadow-xs: 0 1px 3px -1px rgb(0 0 0 / 0.10), 0 1px 2px -1px rgb(0 0 0 / 0.06);
+  /* --shadow-xs retired (A6): only md/lg render real elevation. Its single use
+     was codemodded to shadow-md. */
   --shadow-md: 0 4px 12px -2px rgb(0 0 0 / 0.08), 0 2px 6px -2px rgb(0 0 0 / 0.06);
   --shadow-lg: 0 12px 24px -4px rgb(0 0 0 / 0.10), 0 4px 8px -4px rgb(0 0 0 / 0.06);
 }

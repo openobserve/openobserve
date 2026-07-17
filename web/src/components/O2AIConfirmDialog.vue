@@ -7,7 +7,7 @@
     >
       <div class="confirmation-header flex items-start gap-3">
         <OIcon name="help-outline" size="md" class="confirmation-icon shrink-0 mt-0.5 text-icon-color" />
-        <span class="confirmation-title flex-1 text-sm font-medium leading-normal text-text-primary">{{ formattedMessage }}</span>
+        <span class="confirmation-title flex-1 text-sm font-medium leading-normal text-text-heading">{{ formattedMessage }}</span>
       </div>
 
       <div class="confirmation-buttons flex flex-col gap-2.5 w-full pt-3.5 mt-1 border-t border-border-default">
@@ -39,7 +39,7 @@
             ref="noButtonRef"
             variant="outline"
             :block="true"
-            class="confirmation-btn w-full text-sm font-semibold rounded-md normal-case tracking-normal transition-all duration-200 text-text-primary border-2 border-border-default bg-surface-base hover:bg-button-ghost-destructive-hover-bg hover:border-status-negative"
+            class="confirmation-btn w-full text-sm font-semibold rounded-md normal-case tracking-normal transition-all duration-200 text-text-heading border-2 border-border-default bg-surface-base hover:bg-button-ghost-destructive-hover-bg hover:border-status-negative"
             :class="isFocusedNo ? 'text-white! bg-status-negative! border-status-negative! ring-3 ring-status-negative/40' : ''"
             tabindex="2"
             @click="handleCancel"
@@ -65,7 +65,7 @@
             ref="noButtonRef"
             variant="outline"
             :block="true"
-            class="confirmation-btn w-full text-sm font-semibold rounded-md normal-case tracking-normal transition-all duration-200 text-text-primary border-2 border-border-default bg-surface-base hover:bg-button-ghost-destructive-hover-bg hover:border-status-negative"
+            class="confirmation-btn w-full text-sm font-semibold rounded-md normal-case tracking-normal transition-all duration-200 text-text-heading border-2 border-border-default bg-surface-base hover:bg-button-ghost-destructive-hover-bg hover:border-status-negative"
             :class="isFocusedNo ? 'text-white! bg-status-negative! border-status-negative! ring-3 ring-status-negative/40' : ''"
             tabindex="1"
             @click="handleCancel"

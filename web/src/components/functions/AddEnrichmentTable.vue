@@ -101,7 +101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="rounded-md border border-card-glass-border bg-surface-panel p-2 flex flex-col gap-1">
                 <div v-for="(job, index) in formData.urlJobs" :key="job.id">
                   <div class="flex items-center gap-2">
-                    <span class="font-medium text-text-caption text-xs">{{ Number(index) + 1 }}.</span>
+                    <span class="font-medium text-text-secondary text-xs">{{ Number(index) + 1 }}.</span>
                     <OIcon
                       :name="job.status === 'completed' ? 'check-circle' : job.status === 'failed' ? 'warning' : job.status === 'processing' ? 'sync' : 'schedule'"
                       size="sm"
