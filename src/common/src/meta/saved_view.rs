@@ -25,13 +25,6 @@ pub struct CreateViewRequest {
 
     /// User-readable name of the view, must be unique within the organization.
     pub view_name: String,
-
-    /// Which page the view belongs to (e.g. "logs", "metrics"). Optional so
-    /// existing callers keep working; absence is treated as the "logs" default
-    /// by the frontend. Lets the list separate views per page without shipping
-    /// the whole data blob.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub view_type: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, ToSchema)]
@@ -43,10 +36,6 @@ pub struct UpdateViewRequest {
 
     /// User-readable name of the view, must be unique within the organization.
     pub view_name: String,
-
-    /// See `CreateViewRequest::view_type`.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub view_type: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, ToSchema)]
@@ -55,12 +44,6 @@ pub struct View {
     pub data: serde_json::Value,
     pub view_id: String,
     pub view_name: String,
-
-    /// See `CreateViewRequest::view_type`. Stored in the view's blob, so the
-    /// list (which deserializes the same blob into `ViewWithoutData`) gets it
-    /// for free. Old records without the field deserialize to `None`.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub view_type: Option<String>,
 }
 
 /// Save the bandwidth for a given view, without sending the actual data
@@ -70,11 +53,6 @@ pub struct ViewWithoutData {
     pub org_id: String,
     pub view_id: String,
     pub view_name: String,
-
-    /// See `CreateViewRequest::view_type`. Carried through so the list can be
-    /// filtered per page without fetching each view's full data.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub view_type: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, ToSchema)]
@@ -108,7 +86,6 @@ mod tests {
         let request = CreateViewRequest {
             data: serde_json::json!({"key": "value", "number": 42}),
             view_name: "test-view".to_string(),
-            view_type: None,
         };
 
         let serialized = serde_json::to_string(&request);
@@ -132,7 +109,6 @@ mod tests {
         let request = UpdateViewRequest {
             data: serde_json::json!({"updated": true, "version": 2}),
             view_name: "updated-view".to_string(),
-            view_type: None,
         };
 
         let serialized = serde_json::to_string(&request);
@@ -158,7 +134,6 @@ mod tests {
             data: serde_json::json!({"dashboard": "main"}),
             view_id: "view456".to_string(),
             view_name: "main-dashboard".to_string(),
-            view_type: None,
         };
 
         let serialized = serde_json::to_string(&view);
@@ -184,7 +159,6 @@ mod tests {
             org_id: "org123".to_string(),
             view_id: "view456".to_string(),
             view_name: "main-dashboard".to_string(),
-            view_type: None,
         };
 
         let serialized = serde_json::to_string(&view);
@@ -211,13 +185,11 @@ mod tests {
                     org_id: "org123".to_string(),
                     view_id: "view1".to_string(),
                     view_name: "dashboard1".to_string(),
-                    view_type: None,
                 },
                 ViewWithoutData {
                     org_id: "org123".to_string(),
                     view_id: "view2".to_string(),
                     view_name: "dashboard2".to_string(),
-                    view_type: None,
                 },
             ],
         };

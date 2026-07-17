@@ -119,12 +119,7 @@ export const useSearchBar = () => {
         .get(store.state.selectedOrganization.identifier)
         .then((res) => {
           searchObj.loadingSavedView = false;
-          // The /savedviews list is shared across pages; keep only Logs views
-          // (anything not explicitly tagged for another page). A metrics view is
-          // tagged `view_type: "metrics"` and must not appear on the Logs list.
-          searchObj.data.savedViews = (res.data.views ?? []).filter(
-            (v: any) => !v?.view_type || v.view_type === "logs",
-          );
+          searchObj.data.savedViews = res.data.views;
         })
         .catch((err) => {
           searchObj.loadingSavedView = false;

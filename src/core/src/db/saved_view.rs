@@ -41,7 +41,6 @@ pub async fn set_view(org_id: &str, view: &CreateViewRequest) -> Result<View, Er
         view_id: view_id.clone(),
         data: view.data.clone(),
         view_name: view.view_name.clone(),
-        view_type: view.view_type.clone(),
     };
     let key = format!("{SAVED_VIEWS_KEY_PREFIX}/{org_id}/{view_id}");
     let val = json::to_vec(&view)
@@ -72,8 +71,6 @@ pub async fn update_view(
         Ok(original_view) => View {
             data: view.data.clone(),
             view_name: view.view_name.clone(),
-            // Keep the original type if the update request doesn't set one.
-            view_type: view.view_type.clone().or(original_view.view_type.clone()),
             ..original_view
         },
         Err(e) => return Err(e),
