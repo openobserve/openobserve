@@ -3134,6 +3134,25 @@
     "SearchSQLCancelled": "エラー:検索 SQL はキャンセルされました。"
   },
   "alerts": {
+    "validation": {
+      "streamTypeRequired": "Streamタイプは必須です。",
+      "streamNameRequired": "Stream名は必須です。",
+      "fieldRequired": "フィールドは必須です！",
+      "fieldRequiredPlain": "フィールドは必須です",
+      "nameInvalidChars": ":, ?, /, # やスペースなどの文字は使用できません。",
+      "templateRequired": "テンプレートは必須です！",
+      "validEmails": "有効なメールアドレスを追加してください！",
+      "silenceNonNegative": "通知のサイレンスは0以上である必要があります",
+      "periodPositive": "期間は0より大きい必要があります",
+      "destinationRequired": "少なくとも1つの宛先が必要です。",
+      "thresholdPositive": "しきい値は0より大きい必要があります",
+      "frequencyPositive": "頻度は0より大きい必要があります",
+      "groupByRequired": "少なくとも1つのグループ化フィールドが必要です",
+      "minimumOneDay": "最低1日",
+      "detectionFunctionRequired": "検出関数は必須です",
+      "timestampAliasBanned": "{column} は列のエイリアスとして使用できません。代わりに time_bucket を使用してください。",
+      "credentialFieldRequired": "{field} は必須です"
+    },
     "header": "アラート",
     "subtitle": "アラートルールと通知チャネル",
     "searchThisFolder": "このフォルダー",

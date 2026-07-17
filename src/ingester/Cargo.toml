@@ -10,13 +10,11 @@ infra.workspace = true
 wal.workspace = true
 arrow.workspace = true
 arrow-schema.workspace = true
-bytes.workspace = true
 byteorder.workspace = true
 chrono.workspace = true
 futures.workspace = true
 hashbrown.workspace = true
 indexmap.workspace = true
-itertools.workspace = true
 log.workspace = true
 datafusion.workspace = true
 parquet.workspace = true
@@ -24,7 +22,6 @@ serde.workspace = true
 serde_json.workspace = true
 snafu.workspace = true
 tokio.workspace = true
-core_affinity = "0.8"
 
 [[bin]]
 name = "wal-reader"

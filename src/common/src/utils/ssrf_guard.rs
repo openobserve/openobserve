@@ -14,7 +14,8 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 //! Re-export of the SSRF guard from the `config` crate so OSS call sites that
-//! already import from `crate::common::utils::ssrf_guard` keep compiling. The
+//! already import from `crate::common::utils::ssrf_guard` through the core compatibility namespace
+//! keep compiling. The
 //! canonical implementation lives in `config::utils::ssrf_guard` so that
 //! `o2-enterprise` (which depends on `config`, not on the top-level
 //! `openobserve` crate) can use the same primitives.

@@ -36,10 +36,7 @@ use config::{
 use infra::runtime::{create_grpc_runtime, create_job_runtime};
 use openobserve::{
     cli::basic::cli,
-    common::{
-        infra::{self as common_infra, cluster},
-        meta,
-    },
+    common::{infra::cluster, meta},
     handler::{
         grpc::{
             auth::check_auth,
@@ -58,6 +55,7 @@ use openobserve::{
     },
     job, migration, router,
     service::{
+        bootstrap,
         cluster_info::ClusterInfoService,
         db::{self, scheduler::TriggerModule::QueryRecommendations},
         metadata,
@@ -239,7 +237,7 @@ async fn main() -> Result<(), anyhow::Error> {
                 panic!("infra init failed: {e}");
             }
 
-            if let Err(e) = common_infra::init().await {
+            if let Err(e) = bootstrap::init().await {
                 job_init_tx.send(false).ok();
                 panic!("common infra init failed: {e}");
             }

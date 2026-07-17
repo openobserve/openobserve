@@ -18,12 +18,11 @@ use std::{
     io::{BufReader, Cursor, Lines},
 };
 
+use ::common::meta::stream::SchemaRecords;
 use axum::body::Bytes;
 use config::utils::json;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
-
-use super::stream::SchemaRecords;
 
 /// System job types for backend ingestion processes
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

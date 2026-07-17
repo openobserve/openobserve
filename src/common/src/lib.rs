@@ -5,7 +5,7 @@
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// This program is distributed in the hope that it will be useful
+// This program is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU Affero General Public License for more details.
@@ -13,11 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-pub mod auth;
-pub mod functions;
-pub mod http;
-pub mod js;
-pub mod jwt;
-pub mod redirect_response;
-pub mod ssrf_guard;
-pub mod stream;
+//! Shared application types, infrastructure helpers, and utilities.
+
+#![recursion_limit = "256"]
+
+pub mod infra;
+pub mod meta;
+pub mod utils;
+
+pub(crate) static USER_AGENT_REGEX_FILE: &[u8] = include_bytes!("../ua_regex/regexes.yaml");
