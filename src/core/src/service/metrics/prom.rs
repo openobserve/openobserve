@@ -26,7 +26,13 @@ use config::{
     get_config,
     meta::{
         alerts::alert,
-        promql::*,
+        promql::{
+            histogram::{
+                CounterResetHint, HistogramError, HistogramSpan, NativeHistogram,
+                NativeHistogramCounts,
+            },
+            *,
+        },
         search::default_use_cache,
         self_reporting::usage::UsageType,
         stream::{StreamParams, StreamPartition, StreamStats, StreamType},
@@ -45,7 +51,10 @@ use infra::{
     errors::{Error, Result},
     schema::{SchemaCache, get_partition_time_level},
 };
-use promql_parser::{label::MatchOp, parser};
+use promql_parser::{
+    label::{MatchOp, Matcher},
+    parser,
+};
 use prost::Message;
 use proto::prometheus_rpc;
 
@@ -79,6 +88,7 @@ pub async fn remote_write(
     let started_at = Utc::now().timestamp_micros();
 
     let cfg = get_config();
+    let accept_native_histograms = super::accept_prom_native_histograms();
     let dedup_enabled = cfg.common.metrics_dedup_enabled;
     let election_interval = cfg.limit.metrics_leader_election_interval * 1000000;
     let mut last_received: i64 = 0;
@@ -112,6 +122,11 @@ pub async fn remote_write(
 
     // records buffer
     let mut json_data_by_stream: HashMap<String, Vec<_>> = HashMap::new();
+    // Native histograms bypass executable pipelines and are merged only after
+    // the scalar pipeline fallback has run. Merging earlier can make the
+    // fallback's `contains_key` guard drop scalar samples for the same stream.
+    let mut native_json_data_by_stream: HashMap<String, Vec<_>> = HashMap::new();
+    let mut native_metadata_streams = HashSet::new();
 
     // parse metadata
     for item in request.metadata {
@@ -286,7 +301,17 @@ pub async fn remote_write(
                     true
                 }
             })
-            .map(|label| (format_label_name(&label.name), label.value))
+            .filter_map(|label| {
+                let name = format_label_name(&label.name);
+                if name == NATIVE_HISTOGRAM_LABEL {
+                    log::warn!(
+                        "[remote_write] stripped reserved metric label {NATIVE_HISTOGRAM_LABEL}"
+                    );
+                    None
+                } else {
+                    Some((name, label.value))
+                }
+            })
             .collect();
 
         let metric_name = match labels.get(NAME_LABEL) {
@@ -296,6 +321,68 @@ pub async fn remote_write(
 
         // Note: All configurations (pipeline, UDS, schema, partition, alerts) are now pre-loaded
         // before the loop to avoid repeated async queries
+
+        let has_records =
+            !event.samples.is_empty() || (accept_native_histograms && !event.histograms.is_empty());
+        if !has_records {
+            continue;
+        }
+
+        // Run HA election for the first scalar or histogram record. Keeping it
+        // outside the scalar loop is required for histogram-only requests.
+        if first_line && dedup_enabled && !cluster_name.is_empty() {
+            let lock = METRIC_CLUSTER_LEADER.read().await;
+            match lock.get(&cluster_name) {
+                Some(leader) => {
+                    last_received = leader.last_received;
+                    has_entry = true;
+                }
+                None => {
+                    has_entry = false;
+                }
+            }
+            drop(lock);
+            accept_record = if !replica_label.is_empty() {
+                prom_ha_handler(
+                    has_entry,
+                    &cluster_name,
+                    &replica_label,
+                    last_received,
+                    election_interval,
+                )
+                .await
+            } else {
+                true
+            };
+            has_entry = true;
+            first_line = false;
+        } else {
+            accept_record = true;
+        }
+        if !accept_record {
+            let time = start.elapsed().as_secs_f64();
+            metrics::HTTP_RESPONSE_TIME
+                .with_label_values(&[
+                    "/prometheus/api/v1/write",
+                    "200",
+                    org_id,
+                    StreamType::Metrics.as_str(),
+                    "",
+                    "",
+                ])
+                .observe(time);
+            metrics::HTTP_INCOMING_REQUESTS
+                .with_label_values(&[
+                    "/prometheus/api/v1/write",
+                    "200",
+                    org_id,
+                    StreamType::Metrics.as_str(),
+                    "",
+                    "",
+                ])
+                .inc();
+            return Ok(());
+        }
 
         // parse samples
         let sample_start = std::time::Instant::now();
@@ -310,61 +397,6 @@ pub async fn remote_write(
                 labels: &labels,
                 value: sample_val,
             };
-
-            if first_line && dedup_enabled && !cluster_name.is_empty() {
-                let lock = METRIC_CLUSTER_LEADER.read().await;
-                match lock.get(&cluster_name) {
-                    Some(leader) => {
-                        last_received = leader.last_received;
-                        has_entry = true;
-                    }
-                    None => {
-                        has_entry = false;
-                    }
-                }
-                drop(lock);
-                accept_record = if !replica_label.is_empty() {
-                    prom_ha_handler(
-                        has_entry,
-                        &cluster_name,
-                        &replica_label,
-                        last_received,
-                        election_interval,
-                    )
-                    .await
-                } else {
-                    true
-                };
-                has_entry = true;
-                first_line = false;
-            } else {
-                accept_record = true
-            }
-            if !accept_record {
-                // do not accept any entries for request
-                let time = start.elapsed().as_secs_f64();
-                metrics::HTTP_RESPONSE_TIME
-                    .with_label_values(&[
-                        "/prometheus/api/v1/write",
-                        "200",
-                        org_id,
-                        StreamType::Metrics.as_str(),
-                        "",
-                        "",
-                    ])
-                    .observe(time);
-                metrics::HTTP_INCOMING_REQUESTS
-                    .with_label_values(&[
-                        "/prometheus/api/v1/write",
-                        "200",
-                        org_id,
-                        StreamType::Metrics.as_str(),
-                        "",
-                        "",
-                    ])
-                    .inc();
-                return Ok(());
-            }
 
             let mut value: json::Value = json::to_value(&metric).unwrap();
             let timestamp = parse_i64_to_timestamp_micros(sample.timestamp);
@@ -399,6 +431,84 @@ pub async fn remote_write(
                     .entry(metric_name.clone())
                     .or_default()
                     .push((local_val, timestamp));
+            }
+        }
+
+        if accept_native_histograms {
+            for histogram in event.histograms {
+                let native = match native_histogram_from_prometheus(&histogram) {
+                    Ok(native) => native,
+                    Err(err) => {
+                        log::warn!(
+                            "[remote_write] rejected native histogram for {metric_name}: {err}"
+                        );
+                        continue;
+                    }
+                };
+                let payload = match native.to_payload() {
+                    Ok(payload) => payload,
+                    Err(err) => {
+                        log::warn!(
+                            "[remote_write] failed to encode native histogram for {metric_name}: {err}"
+                        );
+                        continue;
+                    }
+                };
+                let limit = &cfg.limit;
+                if let Err(err) = native.validate_limits(
+                    payload.len(),
+                    limit.metrics_nh_max_payload_bytes,
+                    limit.metrics_nh_max_buckets,
+                    limit.metrics_nh_max_spans,
+                ) {
+                    log::warn!("[remote_write] rejected native histogram for {metric_name}: {err}");
+                    continue;
+                }
+
+                if native_metadata_streams.insert(metric_name.clone()) {
+                    let schema = infra::schema::get(org_id, &metric_name, StreamType::Metrics)
+                        .await
+                        .unwrap_or_else(|_| Schema::empty());
+                    if !schema.metadata().contains_key(METADATA_LABEL) {
+                        let metadata = Metadata {
+                            metric_family_name: metric_name.clone(),
+                            metric_type: MetricType::ExponentialHistogram,
+                            help: String::new(),
+                            unit: String::new(),
+                        };
+                        let mut extra_metadata = HashMap::new();
+                        extra_metadata.insert(
+                            METADATA_LABEL.to_string(),
+                            json::to_string(&metadata).unwrap(),
+                        );
+                        if let Err(err) = db::schema::update_setting(
+                            org_id,
+                            &metric_name,
+                            StreamType::Metrics,
+                            extra_metadata,
+                        )
+                        .await
+                        {
+                            log::warn!(
+                                "failed to store native histogram metadata for {metric_name}: {err}"
+                            );
+                        }
+                    }
+                }
+
+                let mut value = json::Map::new();
+                for (name, value_str) in &labels {
+                    value.insert(name.clone(), json::Value::String(value_str.clone()));
+                }
+                value.insert(
+                    NATIVE_HISTOGRAM_LABEL.to_string(),
+                    json::Value::String(payload),
+                );
+                let timestamp = parse_i64_to_timestamp_micros(histogram.timestamp);
+                native_json_data_by_stream
+                    .entry(metric_name.clone())
+                    .or_default()
+                    .push((value, timestamp));
             }
         }
         sample_processing_time += sample_start.elapsed().as_micros();
@@ -479,6 +589,10 @@ pub async fn remote_write(
                                 json::Value::Object(v) => v,
                                 _ => unreachable!(),
                             };
+                            super::strip_reserved_pipeline_field(
+                                &mut local_val,
+                                "METRICS:REMOTE_WRITE",
+                            );
 
                             if let Some(Some(fields)) =
                                 user_defined_schema_map.get(&destination_stream)
@@ -517,6 +631,13 @@ pub async fn remote_write(
         }
     }
 
+    for (stream_name, records) in native_json_data_by_stream {
+        json_data_by_stream
+            .entry(stream_name)
+            .or_default()
+            .extend(records);
+    }
+
     let step_start = std::time::Instant::now();
     for (stream_name, json_data) in json_data_by_stream {
         // get partition keys
@@ -527,7 +648,11 @@ pub async fn remote_write(
         let partition_time_level = get_partition_time_level(StreamType::Metrics);
 
         for (mut val_map, timestamp) in json_data {
-            let hash = super::signature_without_labels(&val_map, &[VALUE_LABEL]);
+            let hash = if val_map.contains_key(NATIVE_HISTOGRAM_LABEL) {
+                super::signature_without_labels(&val_map, &[VALUE_LABEL, NATIVE_HISTOGRAM_LABEL])
+            } else {
+                super::signature_without_labels(&val_map, &[VALUE_LABEL])
+            };
             val_map.insert(HASH_LABEL.to_string(), json::Value::Number(hash.into()));
             val_map.insert(
                 TIMESTAMP_COL_NAME.to_string(),
@@ -836,6 +961,20 @@ fn get_metadata_object(schema: &Schema) -> Option<MetadataObject> {
     super::get_prom_metadata_from_schema(schema).map(Into::into)
 }
 
+/// Internal storage columns are absent from the Prometheus label set. Return how a matcher on
+/// the native histogram column evaluates against that absent label.
+fn internal_label_matcher_result(matcher: &Matcher) -> Option<bool> {
+    if matcher.name != NATIVE_HISTOGRAM_LABEL {
+        return None;
+    }
+    Some(match &matcher.op {
+        MatchOp::Equal => matcher.value.is_empty(),
+        MatchOp::NotEqual => !matcher.value.is_empty(),
+        MatchOp::Re(regex) => regex.is_match(""),
+        MatchOp::NotRe(regex) => !regex.is_match(""),
+    })
+}
+
 pub async fn get_series(
     org_id: &str,
     selector: Option<parser::VectorSelector>,
@@ -860,7 +999,12 @@ pub async fn get_series(
         .fields()
         .iter()
         .map(|f| f.name().as_str())
-        .filter(|&s| s != TIMESTAMP_COL_NAME && s != VALUE_LABEL && s != HASH_LABEL)
+        .filter(|&s| {
+            s != TIMESTAMP_COL_NAME
+                && s != VALUE_LABEL
+                && s != HASH_LABEL
+                && s != NATIVE_HISTOGRAM_LABEL
+        })
         .collect::<Vec<_>>()
         .join("\", \"");
     if label_names.is_empty() {
@@ -871,6 +1015,12 @@ pub async fn get_series(
     let mut sql_where = Vec::new();
     if let Some(selector) = selector {
         for mat in selector.matchers.matchers.iter() {
+            if let Some(matches_absent) = internal_label_matcher_result(mat) {
+                if !matches_absent {
+                    sql_where.push("1 = 0".to_string());
+                }
+                continue;
+            }
             if mat.name == TIMESTAMP_COL_NAME
                 || mat.name == VALUE_LABEL
                 || schema.field_with_name(&mat.name).is_err()
@@ -947,6 +1097,7 @@ pub async fn get_labels(
         Err(_) => return Ok(vec![]),
         Ok(schemas) => schemas,
     };
+    let exclude_labels = super::get_exclude_labels();
     let mut label_names = hashbrown::HashSet::new();
     for schema in stream_schemas {
         if let Some(ref metric_name) = opt_metric_name
@@ -963,7 +1114,7 @@ pub async fn get_labels(
                 .fields()
                 .iter()
                 .map(|f| f.name())
-                .filter(|&s| s != TIMESTAMP_COL_NAME && s != VALUE_LABEL && s != HASH_LABEL)
+                .filter(|&name| !exclude_labels.contains(&name.as_str()))
                 .cloned();
             label_names.extend(field_names);
         }
@@ -1003,14 +1154,13 @@ fn family_stats(
         return stats::get_stream_stats(org_id, stream_name, stream_type);
     }
 
+    // Merge base + family-member liveness. During a dual-write cutover the historical `_count`
+    // stream can be idle while the base native stream is current; preferring the first non-empty
+    // sibling would hide the metric from discovery after cutover.
     let base = stats::get_stream_stats(org_id, stream_name, stream_type);
-    for member in [format!("{stream_name}_count"), format!("{stream_name}_sum")] {
-        let stats = stats::get_stream_stats(org_id, &member, stream_type);
-        if stats.doc_num > 0 {
-            return stats;
-        }
-    }
-    base
+    let count = stats::get_stream_stats(org_id, &format!("{stream_name}_count"), stream_type);
+    let sum = stats::get_stream_stats(org_id, &format!("{stream_name}_sum"), stream_type);
+    &(&base + &count) + &sum
 }
 
 pub async fn get_label_values(
@@ -1020,6 +1170,9 @@ pub async fn get_label_values(
     start: i64,
     end: i64,
 ) -> Result<Vec<String>> {
+    if label_name != NAME_LABEL && super::get_exclude_labels().contains(&label_name.as_str()) {
+        return Ok(Vec::new());
+    }
     let opt_metric_name = selector.as_ref().and_then(try_into_metric_name);
     let stream_type = StreamType::Metrics;
 
@@ -1079,6 +1232,12 @@ pub async fn get_label_values(
 
     if let Some(selector) = selector {
         for mat in selector.matchers.matchers.iter() {
+            if let Some(matches_absent) = internal_label_matcher_result(mat) {
+                if !matches_absent {
+                    sql_where.push("1 = 0".to_string());
+                }
+                continue;
+            }
             // Skip special fields and fields that don't exist in the schema
             if mat.name == TIMESTAMP_COL_NAME
                 || mat.name == VALUE_LABEL
@@ -1164,6 +1323,60 @@ pub fn try_into_metric_name(selector: &parser::VectorSelector) -> Option<String>
     }
 }
 
+fn native_histogram_from_prometheus(
+    histogram: &prometheus_rpc::Histogram,
+) -> std::result::Result<NativeHistogram, HistogramError> {
+    use prometheus_rpc::histogram::{Count, ResetHint, ZeroCount};
+
+    let counts = match (&histogram.count, &histogram.zero_count) {
+        (Some(Count::CountInt(count)), Some(ZeroCount::ZeroCountInt(zero_count))) => {
+            NativeHistogramCounts::Integer {
+                zero_count: *zero_count,
+                count: *count,
+                positive_buckets: histogram.positive_deltas.clone(),
+                negative_buckets: histogram.negative_deltas.clone(),
+            }
+        }
+        (Some(Count::CountFloat(count)), Some(ZeroCount::ZeroCountFloat(zero_count))) => {
+            NativeHistogramCounts::Float {
+                zero_count: *zero_count,
+                count: *count,
+                positive_buckets: histogram.positive_counts.clone(),
+                negative_buckets: histogram.negative_counts.clone(),
+            }
+        }
+        _ => return Err(HistogramError::CountVariantMismatch),
+    };
+
+    let spans = |spans: &[prometheus_rpc::BucketSpan]| {
+        spans
+            .iter()
+            .map(|span| HistogramSpan {
+                offset: span.offset,
+                length: span.length,
+            })
+            .collect::<Vec<_>>()
+    };
+    let reset_hint = match ResetHint::try_from(histogram.reset_hint).unwrap_or(ResetHint::Unknown) {
+        ResetHint::Unknown => CounterResetHint::Unknown,
+        ResetHint::Yes => CounterResetHint::CounterReset,
+        ResetHint::No => CounterResetHint::NotCounterReset,
+        ResetHint::Gauge => CounterResetHint::Gauge,
+    };
+    let native = NativeHistogram {
+        schema: histogram.schema,
+        zero_threshold: histogram.zero_threshold,
+        sum: histogram.sum,
+        start_time: 0,
+        positive_spans: spans(&histogram.positive_spans),
+        negative_spans: spans(&histogram.negative_spans),
+        counter_reset_hint: reset_hint,
+        counts,
+    };
+    native.validate()?;
+    Ok(native)
+}
+
 async fn prom_ha_handler(
     has_entry: bool,
     cluster_name: &str,
@@ -1241,8 +1454,37 @@ mod tests {
         label::{MatchOp, Matcher, Matchers},
         parser::VectorSelector,
     };
+    use proto::prometheus_rpc::{BucketSpan, Histogram, histogram};
 
     use super::*;
+
+    #[test]
+    fn test_remote_write_native_histogram_conversion() {
+        let histogram = Histogram {
+            count: Some(histogram::Count::CountInt(7)),
+            zero_count: Some(histogram::ZeroCount::ZeroCountInt(1)),
+            sum: 8.0,
+            schema: 0,
+            zero_threshold: 0.001,
+            positive_spans: vec![BucketSpan {
+                offset: 0,
+                length: 2,
+            }],
+            positive_deltas: vec![2, 2],
+            reset_hint: histogram::ResetHint::No as i32,
+            timestamp: 1_000,
+            ..Default::default()
+        };
+        let native = native_histogram_from_prometheus(&histogram).unwrap();
+        let decoded = native.to_float().unwrap();
+        assert_eq!(decoded.count, 7.0);
+        assert_eq!(decoded.positive_buckets, vec![2.0, 4.0]);
+        assert_eq!(
+            decoded.counter_reset_hint,
+            CounterResetHint::NotCounterReset
+        );
+        assert!(native.to_payload().unwrap().starts_with('{'));
+    }
 
     fn schema_with_metadata(blob: &str) -> Schema {
         Schema::empty().with_metadata(
@@ -1326,6 +1568,23 @@ mod tests {
         );
 
         assert_eq!(stats.doc_num, 100);
+    }
+
+    #[test]
+    fn test_family_stats_merges_legacy_and_native_cutover_ranges() {
+        let org = "test_family_stats_native_cutover";
+        seed_stats(org, "http_request_duration_seconds_count", 100, 5_000);
+        seed_stats(org, "http_request_duration_seconds", 50, 50_000);
+
+        let stats = family_stats(
+            org,
+            "http_request_duration_seconds",
+            Some(&family_metadata(MetricType::ExponentialHistogram)),
+            StreamType::Metrics,
+        );
+
+        assert_eq!(stats.doc_num, 150);
+        assert!(stats.time_range_intersects(40_000, 60_000));
     }
 
     /// A summary's quantile rows keep the base metric name -- they are not renamed the way

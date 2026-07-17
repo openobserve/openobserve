@@ -217,6 +217,7 @@ pub fn count_values(
         .map(|(labels, samples)| RangeValue {
             labels,
             samples,
+            histogram_samples: None,
             exemplars: None,
             time_window: None,
         })
@@ -274,18 +275,21 @@ mod tests {
             RangeValue {
                 labels: labels1.clone(),
                 samples: vec![Sample::new(timestamp, 10.0)],
+                histogram_samples: None,
                 exemplars: None,
                 time_window: None,
             },
             RangeValue {
                 labels: labels2.clone(),
                 samples: vec![Sample::new(timestamp, 10.0)], // Same value
+                histogram_samples: None,
                 exemplars: None,
                 time_window: None,
             },
             RangeValue {
                 labels: labels1.clone(),
                 samples: vec![Sample::new(timestamp, 20.0)],
+                histogram_samples: None,
                 exemplars: None,
                 time_window: None,
             },
@@ -330,6 +334,7 @@ mod tests {
         let data = Value::Matrix(vec![RangeValue {
             labels: labels.clone(),
             samples: vec![Sample::new(timestamp, 10.5)],
+            histogram_samples: None,
             exemplars: None,
             time_window: None,
         }]);
@@ -387,6 +392,7 @@ mod tests {
                     Sample::new(timestamp2, 20.0),
                     Sample::new(timestamp3, 10.0),
                 ],
+                histogram_samples: None,
                 exemplars: None,
                 time_window: None,
             },
@@ -397,6 +403,7 @@ mod tests {
                     Sample::new(timestamp2, 10.0),
                     Sample::new(timestamp3, 30.0),
                 ],
+                histogram_samples: None,
                 exemplars: None,
                 time_window: None,
             },

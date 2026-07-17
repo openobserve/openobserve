@@ -45,6 +45,7 @@ pub fn quantile(qtile: f64, data: Value, eval_ctx: &EvalContext) -> Result<Value
         let range_value = RangeValue {
             labels: Default::default(),
             samples,
+            histogram_samples: None,
             exemplars: None,
             time_window: None,
         };

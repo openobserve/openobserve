@@ -34,7 +34,10 @@ use futures::{Stream, TryStreamExt};
 use parquet::{
     arrow::{AsyncArrowWriter, ParquetRecordBatchStreamBuilder, arrow_reader::ArrowReaderMetadata},
     basic::{Compression, Encoding},
-    file::{metadata::KeyValue, properties::WriterProperties},
+    file::{
+        metadata::KeyValue,
+        properties::{EnabledStatistics, WriterProperties},
+    },
 };
 #[cfg(feature = "vortex")]
 use vortex::{
@@ -69,6 +72,18 @@ pub fn new_parquet_writer<'a>(
         .set_column_encoding(
             TIMESTAMP_COL_NAME.into(),
             Encoding::DELTA_BINARY_PACKED,
+        )
+        .set_column_dictionary_enabled(
+            crate::meta::promql::NATIVE_HISTOGRAM_LABEL.into(),
+            false,
+        )
+        .set_column_statistics_enabled(
+            crate::meta::promql::NATIVE_HISTOGRAM_LABEL.into(),
+            EnabledStatistics::None,
+        )
+        .set_column_encoding(
+            crate::meta::promql::NATIVE_HISTOGRAM_LABEL.into(),
+            Encoding::DELTA_LENGTH_BYTE_ARRAY,
         );
     if cfg.common.timestamp_compression_disabled {
         writer_props = writer_props
@@ -95,6 +110,7 @@ pub fn new_parquet_writer<'a>(
     }
     if cfg.common.bloom_filter_parquet_enabled {
         let mut fields = bloom_filter_fields.to_vec();
+        fields.retain(|field| field != crate::meta::promql::NATIVE_HISTOGRAM_LABEL);
         fields.sort();
         fields.dedup();
         for field in fields {

@@ -30,6 +30,7 @@ fn generate_absent_matrix(eval_ctx: &EvalContext) -> Value {
     let range_value = RangeValue {
         labels: Labels::default(),
         samples,
+        histogram_samples: None,
         exemplars: None,
         time_window: None,
     };
@@ -53,6 +54,11 @@ pub(crate) fn absent(data: Value, eval_ctx: &EvalContext) -> Result<Value> {
                 for sample in &range_value.samples {
                     timestamps_with_data.insert(sample.timestamp);
                 }
+                if let Some(histograms) = &range_value.histogram_samples {
+                    for sample in histograms {
+                        timestamps_with_data.insert(sample.timestamp);
+                    }
+                }
             }
 
             // Generate samples for timestamps that DON'T have data
@@ -74,6 +80,7 @@ pub(crate) fn absent(data: Value, eval_ctx: &EvalContext) -> Result<Value> {
             let range_value = RangeValue {
                 labels: Labels::default(),
                 samples: absent_samples,
+                histogram_samples: None,
                 exemplars: None,
                 time_window: None,
             };
@@ -156,6 +163,7 @@ mod tests {
                 Sample::new(1001, 43.0),
                 Sample::new(1002, 44.0),
             ],
+            histogram_samples: None,
             exemplars: None,
             time_window: None,
         }]);
@@ -174,6 +182,7 @@ mod tests {
                 // 1001 is missing
                 Sample::new(1002, 44.0),
             ],
+            histogram_samples: None,
             exemplars: None,
             time_window: None,
         }]);

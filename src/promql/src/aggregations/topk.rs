@@ -164,6 +164,7 @@ pub(super) fn select_topk_series(
             result.push(RangeValue {
                 labels: series.labels.clone(),
                 samples: filtered_samples,
+                histogram_samples: None,
                 exemplars: series.exemplars.clone(),
                 time_window: series.time_window.clone(),
             });
@@ -205,18 +206,21 @@ mod tests {
             RangeValue {
                 labels: labels1.clone(),
                 samples: vec![Sample::new(timestamp, 10.5)],
+                histogram_samples: None,
                 exemplars: None,
                 time_window: None,
             },
             RangeValue {
                 labels: labels2.clone(),
                 samples: vec![Sample::new(timestamp, 15.3)], // Highest value
+                histogram_samples: None,
                 exemplars: None,
                 time_window: None,
             },
             RangeValue {
                 labels: labels3.clone(),
                 samples: vec![Sample::new(timestamp, 8.2)], // Lowest value
+                histogram_samples: None,
                 exemplars: None,
                 time_window: None,
             },
@@ -274,6 +278,7 @@ mod tests {
         let data = Value::Matrix(vec![RangeValue {
             labels: labels.clone(),
             samples: vec![Sample::new(timestamp, 10.5)],
+            histogram_samples: None,
             exemplars: None,
             time_window: None,
         }]);
@@ -313,6 +318,7 @@ mod tests {
         let matrix = vec![RangeValue {
             labels: vec![Arc::new(Label::new("k", "v"))],
             samples: vec![Sample::new(timestamp, 1.0)],
+            histogram_samples: None,
             exemplars: None,
             time_window: None,
         }];
@@ -329,12 +335,14 @@ mod tests {
             RangeValue {
                 labels: vec![Arc::new(Label::new("i", "1"))],
                 samples: vec![Sample::new(timestamp, 5.0)],
+                histogram_samples: None,
                 exemplars: None,
                 time_window: None,
             },
             RangeValue {
                 labels: vec![Arc::new(Label::new("i", "2"))],
                 samples: vec![Sample::new(timestamp, 3.0)],
+                histogram_samples: None,
                 exemplars: None,
                 time_window: None,
             },

@@ -63,6 +63,7 @@ mod tests {
             .collect();
         RangeValue {
             samples,
+            histogram_samples: None,
             exemplars: None,
             time_window: None,
             labels: Default::default(),

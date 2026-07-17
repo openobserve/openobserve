@@ -157,18 +157,21 @@ mod tests {
             RangeValue {
                 labels: labels1.clone(),
                 samples: vec![Sample::new(timestamp, 10.0)],
+                histogram_samples: None,
                 exemplars: None,
                 time_window: None,
             },
             RangeValue {
                 labels: labels1.clone(),
                 samples: vec![Sample::new(timestamp, 20.0)],
+                histogram_samples: None,
                 exemplars: None,
                 time_window: None,
             },
             RangeValue {
                 labels: labels2.clone(),
                 samples: vec![Sample::new(timestamp, 30.0)],
+                histogram_samples: None,
                 exemplars: None,
                 time_window: None,
             },

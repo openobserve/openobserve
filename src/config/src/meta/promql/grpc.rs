@@ -17,7 +17,10 @@ use std::sync::Arc;
 
 use proto::cluster_rpc;
 
-use super::value::*;
+use super::{
+    histogram::{HistogramError, HistogramSample},
+    value::*,
+};
 
 impl From<&cluster_rpc::Label> for Label {
     fn from(req: &cluster_rpc::Label) -> Self {
@@ -52,6 +55,23 @@ impl From<&Sample> for cluster_rpc::Sample {
     }
 }
 
+impl From<&cluster_rpc::NativeHistogramSample> for HistogramSample {
+    fn from(req: &cluster_rpc::NativeHistogramSample) -> Self {
+        HistogramSample::from_payload(req.time, req.histogram.clone())
+    }
+}
+
+impl TryFrom<&HistogramSample> for cluster_rpc::NativeHistogramSample {
+    type Error = Arc<HistogramError>;
+
+    fn try_from(req: &HistogramSample) -> Result<Self, Self::Error> {
+        Ok(Self {
+            time: req.timestamp,
+            histogram: req.histogram.payload()?.clone(),
+        })
+    }
+}
+
 impl From<&Exemplar> for cluster_rpc::Exemplar {
     fn from(req: &Exemplar) -> Self {
         cluster_rpc::Exemplar {
@@ -74,7 +94,9 @@ impl From<&cluster_rpc::Exemplar> for Exemplar {
 
 #[cfg(test)]
 mod tests {
+    use bytes::Bytes;
     use proto::cluster_rpc;
+    use tonic_prost::prost::Message;
 
     use super::*;
 
@@ -192,5 +214,20 @@ mod tests {
         assert_eq!(rpc.value, 5.0);
         assert_eq!(rpc.labels.len(), 1);
         assert_eq!(rpc.labels[0].name, "job");
+    }
+
+    #[test]
+    fn test_native_histogram_bytes_roundtrip_without_utf8_conversion() {
+        let payload = Bytes::from_static(b"{\"schema\":0}");
+        let rpc = cluster_rpc::NativeHistogramSample {
+            time: 123,
+            histogram: payload.clone(),
+        };
+        let wire = rpc.encode_to_vec();
+        let decoded = cluster_rpc::NativeHistogramSample::decode(wire.as_slice()).unwrap();
+        let sample = HistogramSample::from(&decoded);
+        let back = cluster_rpc::NativeHistogramSample::try_from(&sample).unwrap();
+        assert_eq!(back.time, 123);
+        assert_eq!(back.histogram, payload);
     }
 }

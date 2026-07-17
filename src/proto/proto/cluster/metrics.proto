@@ -53,6 +53,9 @@ message Series {
     optional double  scalar = 4;
     optional string stringliteral = 5;
     optional Exemplars  exemplars = 6;
+    repeated NativeHistogramSample histogram_samples = 7;
+    optional NativeHistogramSample histogram_sample = 8;
+    bool native_histogram_provenance = 9;
 }
 
 message Label {
@@ -63,6 +66,11 @@ message Label {
 message Sample {
     int64   time = 1;
     double value = 2;
+}
+
+message NativeHistogramSample {
+    int64 time = 1;
+    bytes histogram = 2;
 }
 
 message Exemplars {

@@ -6,6 +6,7 @@ license.workspace = true
 
 [dependencies]
 async-trait.workspace = true
+bytes.workspace = true
 datafusion.workspace = true
 datafusion-proto.workspace = true
 prost.workspace = true

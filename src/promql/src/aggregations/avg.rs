@@ -30,7 +30,19 @@ pub fn avg(param: &Option<LabelModifier>, data: Value, eval_ctx: &EvalContext) -
         eval_ctx.trace_id,
     );
 
-    let result = super::eval_aggregate(param, data, Avg, eval_ctx);
+    let has_histograms = data.get_ref_matrix_values().is_some_and(|matrix| {
+        matrix.iter().any(|series| {
+            series
+                .histogram_samples
+                .as_ref()
+                .is_some_and(|samples| !samples.is_empty())
+        })
+    });
+    let result = if has_histograms {
+        super::eval_aggregate_with_histograms(param, data, Avg, true, eval_ctx)
+    } else {
+        super::eval_aggregate(param, data, Avg, eval_ctx)
+    };
     log::info!(
         "[trace_id: {}] [PromQL Timing] avg() execution took: {:?}",
         eval_ctx.trace_id,
@@ -155,18 +167,21 @@ mod tests {
             RangeValue {
                 labels: labels1.clone(),
                 samples: vec![Sample::new(timestamp, 10.0)],
+                histogram_samples: None,
                 exemplars: None,
                 time_window: None,
             },
             RangeValue {
                 labels: labels1.clone(),
                 samples: vec![Sample::new(timestamp, 20.0)],
+                histogram_samples: None,
                 exemplars: None,
                 time_window: None,
             },
             RangeValue {
                 labels: labels2.clone(),
                 samples: vec![Sample::new(timestamp, 30.0)],
+                histogram_samples: None,
                 exemplars: None,
                 time_window: None,
             },

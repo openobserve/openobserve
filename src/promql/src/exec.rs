@@ -95,13 +95,34 @@ impl PromqlContext {
             // For instant queries, convert Matrix to Vector format
             match value {
                 Value::Matrix(matrix) => {
-                    // Convert each RangeValue to InstantValue (take first sample)
+                    // Convert each RangeValue to the newest float or histogram sample.
                     let vector: Vec<InstantValue> = matrix
                         .into_iter()
                         .filter_map(|range_val| {
-                            range_val.samples.first().map(|sample| InstantValue {
-                                labels: range_val.labels.clone(),
-                                sample: *sample,
+                            let native_provenance = range_val.histogram_samples.is_some();
+                            let float = range_val.samples.iter().max_by_key(|s| s.timestamp);
+                            let histogram = range_val
+                                .histogram_samples
+                                .as_deref()
+                                .and_then(|samples| samples.iter().max_by_key(|s| s.timestamp));
+                            let sample = match (float, histogram) {
+                                (Some(float), Some(histogram))
+                                    if histogram.timestamp >= float.timestamp =>
+                                {
+                                    InstantPoint::Histogram(histogram.clone())
+                                }
+                                (Some(float), _) if native_provenance => {
+                                    InstantPoint::PromFloat(*float)
+                                }
+                                (Some(float), _) => InstantPoint::Float(*float),
+                                (None, Some(histogram)) => {
+                                    InstantPoint::Histogram(histogram.clone())
+                                }
+                                (None, None) => return None,
+                            };
+                            Some(InstantValue {
+                                labels: range_val.labels,
+                                sample,
                             })
                         })
                         .collect();
@@ -132,6 +153,7 @@ impl PromqlContext {
                     let range_value = RangeValue {
                         labels: Labels::default(),
                         samples,
+                        histogram_samples: None,
                         exemplars: None,
                         time_window: None,
                     };

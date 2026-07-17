@@ -30,6 +30,7 @@ pub(crate) fn scalar(data: Value, eval_ctx: &EvalContext) -> Result<Value> {
             Ok(Value::Matrix(vec![RangeValue {
                 labels: Labels::default(),
                 samples,
+                histogram_samples: None,
                 exemplars: None,
                 time_window: None,
             }]))

@@ -52,6 +52,11 @@ fn main() -> Result<()> {
         .type_attribute("Series", "#[derive(serde::Serialize)]")
         .type_attribute("Label", "#[derive(serde::Deserialize,serde::Serialize)]")
         .type_attribute("Sample", "#[derive(serde::Deserialize,serde::Serialize)]")
+        .type_attribute(
+            "NativeHistogramSample",
+            "#[derive(serde::Deserialize,serde::Serialize)]",
+        )
+        .bytes(".cluster.NativeHistogramSample.histogram")
         .type_attribute("Exemplar", "#[derive(serde::Deserialize,serde::Serialize)]")
         .type_attribute(
             "Exemplars",

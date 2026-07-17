@@ -111,18 +111,21 @@ mod tests {
             RangeValue {
                 labels: labels1.clone(),
                 samples: vec![Sample::new(timestamp, 15.3)], // Highest value
+                histogram_samples: None,
                 exemplars: None,
                 time_window: None,
             },
             RangeValue {
                 labels: labels2.clone(),
                 samples: vec![Sample::new(timestamp, 8.2)], // Lowest value
+                histogram_samples: None,
                 exemplars: None,
                 time_window: None,
             },
             RangeValue {
                 labels: labels3.clone(),
                 samples: vec![Sample::new(timestamp, 12.1)], // Middle value
+                histogram_samples: None,
                 exemplars: None,
                 time_window: None,
             },
@@ -180,6 +183,7 @@ mod tests {
         let data = Value::Matrix(vec![RangeValue {
             labels: labels.clone(),
             samples: vec![Sample::new(timestamp, 10.5)],
+            histogram_samples: None,
             exemplars: None,
             time_window: None,
         }]);

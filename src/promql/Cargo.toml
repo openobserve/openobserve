@@ -13,6 +13,7 @@ enterprise = ["dep:o2_enterprise"]
 ahash.workspace = true
 async-recursion.workspace = true
 async-trait.workspace = true
+bytes.workspace = true
 chrono.workspace = true
 config.workspace = true
 datafusion.workspace = true

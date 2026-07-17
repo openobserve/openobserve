@@ -18,10 +18,12 @@
 
 use std::sync::Arc;
 
+use bytes::Bytes;
 use config::{
     TIMESTAMP_COL_NAME,
     meta::promql::{
-        EXEMPLARS_LABEL, HASH_LABEL, VALUE_LABEL,
+        EXEMPLARS_LABEL, HASH_LABEL, NATIVE_HISTOGRAM_LABEL, VALUE_LABEL,
+        histogram::{HistogramLoadMode, HistogramSample},
         value::{Exemplar, QueryContext, RangeValue, Sample},
     },
     utils::{
@@ -31,10 +33,11 @@ use config::{
 };
 use datafusion::{
     arrow::{
-        array::{Float64Array, Int64Array, StringArray, UInt64Array},
+        array::{Array, Float64Array, Int64Array, LargeStringArray, StringArray, UInt64Array},
         datatypes::{DataType, Schema},
     },
     error::{DataFusionError, Result},
+    execution::memory_pool::MemoryConsumer,
     logical_expr::utils::disjunction,
     physical_plan::{
         Partitioning, execute_stream_partitioned, expressions::Column, repartition::RepartitionExec,
@@ -81,6 +84,7 @@ pub(super) async fn selector_load_data_from_datafusion(
     step: i64,
     lookback: i64,
     skip_labels: bool,
+    histogram_load_mode: HistogramLoadMode,
 ) -> Result<LoadedMetrics> {
     let start_time = std::time::Instant::now();
     let table_name = selector.name.as_ref().unwrap();
@@ -150,7 +154,11 @@ pub(super) async fn selector_load_data_from_datafusion(
         .iter()
         .filter_map(|field| {
             let name = field.name();
-            if name == TIMESTAMP_COL_NAME || name == VALUE_LABEL || name == EXEMPLARS_LABEL {
+            if name == TIMESTAMP_COL_NAME
+                || name == VALUE_LABEL
+                || name == NATIVE_HISTOGRAM_LABEL
+                || name == EXEMPLARS_LABEL
+            {
                 None
             } else {
                 Some(name.to_string())
@@ -177,6 +185,7 @@ pub(super) async fn selector_load_data_from_datafusion(
             hash_field_type,
             df_group.clone(),
             !skip_labels,
+            histogram_load_mode,
         )
         .await?
     };
@@ -228,11 +237,22 @@ pub(super) async fn load_samples_from_datafusion(
     hash_field_type: &DataType,
     df: DataFrame,
     collect_timestamps: bool,
+    histogram_load_mode: HistogramLoadMode,
 ) -> Result<(PartitionedMetrics, HashSet<i64>)> {
     let ctx = Arc::new(df.task_ctx());
     let target_partitions = ctx.session_config().target_partitions();
+    let input_schema = df.schema().as_arrow();
+    let has_float_samples = input_schema.field_with_name(VALUE_LABEL).is_ok();
+    let has_histogram_samples = input_schema.field_with_name(NATIVE_HISTOGRAM_LABEL).is_ok();
+    let mut projection = vec![TIMESTAMP_COL_NAME, HASH_LABEL];
+    if has_float_samples {
+        projection.push(VALUE_LABEL);
+    }
+    if has_histogram_samples {
+        projection.push(NATIVE_HISTOGRAM_LABEL);
+    }
     let plan = df
-        .select_columns(&[TIMESTAMP_COL_NAME, HASH_LABEL, VALUE_LABEL])?
+        .select_columns(&projection)?
         .create_physical_plan()
         .await?;
     let schema = plan.schema();
@@ -251,10 +271,12 @@ pub(super) async fn load_samples_from_datafusion(
         );
     }
 
-    let streams = execute_stream_partitioned(plan, ctx)?;
+    let streams = execute_stream_partitioned(plan, Arc::clone(&ctx))?;
     let mut tasks = Vec::with_capacity(streams.len());
     for mut stream in streams {
         let hash_field_type = hash_field_type.clone();
+        let memory_reservation =
+            MemoryConsumer::new("promql-native-histogram").register(ctx.memory_pool());
         let task: TokioResult = tokio::task::spawn(async move {
             let mut metrics: HashMap<u64, RangeValue> = HashMap::new();
             loop {
@@ -268,10 +290,8 @@ pub(super) async fn load_samples_from_datafusion(
                             .unwrap();
                         let value_values = batch
                             .column_by_name(VALUE_LABEL)
-                            .unwrap()
-                            .as_any()
-                            .downcast_ref::<Float64Array>()
-                            .unwrap();
+                            .and_then(|array| array.as_any().downcast_ref::<Float64Array>());
+                        let histogram_values = batch.column_by_name(NATIVE_HISTOGRAM_LABEL);
 
                         if hash_field_type == DataType::UInt64 {
                             let hash_values = batch
@@ -286,12 +306,31 @@ pub(super) async fn load_samples_from_datafusion(
                                 let entry = metrics.entry(hash).or_insert_with(|| RangeValue {
                                     labels: vec![],
                                     samples: vec![],
+                                    histogram_samples: None,
                                     exemplars: None,
                                     time_window: None,
                                 });
-                                entry
-                                    .samples
-                                    .push(Sample::new(timestamp, value_values.value(i)));
+                                if let Some(values) = value_values
+                                    && !values.is_null(i)
+                                {
+                                    entry.samples.push(Sample::new(timestamp, values.value(i)));
+                                }
+                                if let Some(payload) = histogram_payload(histogram_values, i) {
+                                    match HistogramSample::from_payload_mode_reserved(
+                                        timestamp,
+                                        Bytes::copy_from_slice(payload.as_bytes()),
+                                        histogram_load_mode,
+                                        Some(memory_reservation.new_empty()),
+                                    ) {
+                                        Ok(sample) => entry
+                                            .histogram_samples
+                                            .get_or_insert_default()
+                                            .push(sample),
+                                        Err(err) => log::warn!(
+                                            "dropping invalid native histogram while loading: {err}"
+                                        ),
+                                    }
+                                }
                             }
                         } else {
                             let hash_values = batch
@@ -306,12 +345,31 @@ pub(super) async fn load_samples_from_datafusion(
                                 let entry = metrics.entry(hash).or_insert_with(|| RangeValue {
                                     labels: vec![],
                                     samples: vec![],
+                                    histogram_samples: None,
                                     exemplars: None,
                                     time_window: None,
                                 });
-                                entry
-                                    .samples
-                                    .push(Sample::new(timestamp, value_values.value(i)));
+                                if let Some(values) = value_values
+                                    && !values.is_null(i)
+                                {
+                                    entry.samples.push(Sample::new(timestamp, values.value(i)));
+                                }
+                                if let Some(payload) = histogram_payload(histogram_values, i) {
+                                    match HistogramSample::from_payload_mode_reserved(
+                                        timestamp,
+                                        Bytes::copy_from_slice(payload.as_bytes()),
+                                        histogram_load_mode,
+                                        Some(memory_reservation.new_empty()),
+                                    ) {
+                                        Ok(sample) => entry
+                                            .histogram_samples
+                                            .get_or_insert_default()
+                                            .push(sample),
+                                        Err(err) => log::warn!(
+                                            "dropping invalid native histogram while loading: {err}"
+                                        ),
+                                    }
+                                }
                             }
                         }
                     }
@@ -324,11 +382,26 @@ pub(super) async fn load_samples_from_datafusion(
             }
             let mut unique_timestamps = HashSet::new();
             if collect_timestamps {
-                for metric in metrics.values() {
-                    if let Some(max_timestamp) =
-                        metric.samples.iter().map(|sample| sample.timestamp).max()
-                    {
+                for metric in metrics.values_mut() {
+                    metric.samples.sort_by_key(|sample| sample.timestamp);
+                    if let Some(histograms) = &mut metric.histogram_samples {
+                        histograms.sort_by_key(|sample| sample.timestamp);
+                    }
+                    let max_float = metric.samples.last().map(|sample| sample.timestamp);
+                    let max_histogram = metric
+                        .histogram_samples
+                        .as_ref()
+                        .and_then(|samples| samples.last())
+                        .map(|sample| sample.timestamp);
+                    if let Some(max_timestamp) = max_float.max(max_histogram) {
                         unique_timestamps.insert(max_timestamp);
+                    }
+                }
+            } else {
+                for metric in metrics.values_mut() {
+                    metric.samples.sort_by_key(|sample| sample.timestamp);
+                    if let Some(histograms) = &mut metric.histogram_samples {
+                        histograms.sort_by_key(|sample| sample.timestamp);
                     }
                 }
             }
@@ -348,6 +421,24 @@ pub(super) async fn load_samples_from_datafusion(
     }
 
     Ok((metrics, all_unique_timestamps))
+}
+
+fn histogram_payload(array: Option<&Arc<dyn Array>>, index: usize) -> Option<&str> {
+    let array = array?;
+    if array.is_null(index) {
+        return None;
+    }
+    match array.data_type() {
+        DataType::Utf8 => array
+            .as_any()
+            .downcast_ref::<StringArray>()
+            .map(|values| values.value(index)),
+        DataType::LargeUtf8 => array
+            .as_any()
+            .downcast_ref::<LargeStringArray>()
+            .map(|values| values.value(index)),
+        _ => None,
+    }
 }
 
 async fn load_exemplars_from_datafusion(
@@ -409,6 +500,7 @@ async fn load_exemplars_from_datafusion(
                                     let entry = metrics.entry(hash).or_insert_with(|| RangeValue {
                                         labels: vec![],
                                         samples: vec![],
+                                        histogram_samples: None,
                                         exemplars: Some(vec![]),
                                         time_window: None,
                                     });
@@ -435,6 +527,7 @@ async fn load_exemplars_from_datafusion(
                                     let entry = metrics.entry(hash).or_insert_with(|| RangeValue {
                                         labels: vec![],
                                         samples: vec![],
+                                        histogram_samples: None,
                                         exemplars: Some(vec![]),
                                         time_window: None,
                                     });
@@ -550,19 +643,29 @@ mod tests {
         let ctx = SessionContext::new_with_config(SessionConfig::new().with_target_partitions(4));
         let df = ctx.read_batch(batch).unwrap();
 
-        let (metrics_without_timestamps, skipped_timestamps) =
-            load_samples_from_datafusion("test", &DataType::UInt64, df.clone(), false)
-                .await
-                .unwrap();
+        let (metrics_without_timestamps, skipped_timestamps) = load_samples_from_datafusion(
+            "test",
+            &DataType::UInt64,
+            df.clone(),
+            false,
+            HistogramLoadMode::RawLazy,
+        )
+        .await
+        .unwrap();
         assert!(skipped_timestamps.is_empty());
         assert_eq!(metrics_without_timestamps.len(), 4);
         let metrics_without_timestamps = merge_partitioned_metrics(metrics_without_timestamps);
         assert_eq!(metrics_without_timestamps[&11].samples.len(), 2);
 
-        let (metrics, timestamps) =
-            load_samples_from_datafusion("test", &DataType::UInt64, df, true)
-                .await
-                .unwrap();
+        let (metrics, timestamps) = load_samples_from_datafusion(
+            "test",
+            &DataType::UInt64,
+            df,
+            true,
+            HistogramLoadMode::RawLazy,
+        )
+        .await
+        .unwrap();
         let metrics = merge_partitioned_metrics(metrics);
 
         assert_eq!(timestamps, HashSet::from([150, 200]));

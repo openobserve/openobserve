@@ -23,7 +23,12 @@ use datafusion::error::Result;
 use crate::functions::RangeFunc;
 
 pub(crate) fn increase(data: Value, eval_ctx: &EvalContext) -> Result<Value> {
-    super::eval_range(data, IncreaseFunc::new(), eval_ctx)
+    super::eval_rate_like(
+        data,
+        IncreaseFunc::new(),
+        ExtrapolationKind::Increase,
+        eval_ctx,
+    )
 }
 
 pub struct IncreaseFunc;
@@ -83,6 +88,7 @@ mod tests {
         let range_value = RangeValue {
             labels: Labels::default(),
             samples,
+            histogram_samples: None,
             exemplars: None,
             time_window: Some(TimeWindow {
                 range: Duration::from_secs(2),

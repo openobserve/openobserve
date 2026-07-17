@@ -614,7 +614,8 @@ pub fn refactor_map(
     let mut has_elements = false;
     non_schema_map.write_all(b"{").unwrap();
     for (key, value) in original_map {
-        if defined_schema_keys.contains(&key) {
+        if defined_schema_keys.contains(&key) || key == config::meta::promql::NATIVE_HISTOGRAM_LABEL
+        {
             new_map.insert(key, value);
         } else {
             if has_elements {

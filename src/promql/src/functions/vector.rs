@@ -37,6 +37,7 @@ pub(crate) fn vector(data: Value, eval_ctx: &EvalContext) -> Result<Value> {
     let range_value = RangeValue {
         labels: Labels::default(),
         samples,
+        histogram_samples: None,
         exemplars: None,
         time_window: None,
     };

@@ -109,6 +109,7 @@ fn exec(data: Value, op: &MathOperationsType) -> Result<Value> {
                     RangeValue {
                         labels: std::mem::take(&mut range_value.labels).without_metric_name(),
                         samples,
+                        histogram_samples: None,
                         exemplars: range_value.exemplars,
                         time_window: range_value.time_window,
                     }
@@ -139,6 +140,7 @@ mod tests {
             .map(|val| RangeValue {
                 labels: Labels::default(),
                 samples: vec![Sample::new(eval_ts, val)],
+                histogram_samples: None,
                 exemplars: None,
                 time_window: Some(TimeWindow {
                     range: Duration::from_secs(5),

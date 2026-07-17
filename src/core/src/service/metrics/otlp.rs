@@ -30,7 +30,13 @@ use config::{
     meta::{
         alerts::alert,
         otlp::OtlpRequestType,
-        promql::*,
+        promql::{
+            histogram::{
+                CounterResetHint, HistogramError, HistogramSpan, NativeHistogram,
+                NativeHistogramCounts, STALE_NAN, STALE_NAN_BITS,
+            },
+            *,
+        },
         self_reporting::usage::UsageType,
         stream::{StreamParams, StreamPartition, StreamType},
     },
@@ -48,6 +54,7 @@ use opentelemetry_proto::tonic::{
     collector::metrics::v1::{
         ExportMetricsPartialSuccess, ExportMetricsServiceRequest, ExportMetricsServiceResponse,
     },
+    common::v1::KeyValue,
     metrics::v1::{metric::Data, *},
 };
 use prost::Message;
@@ -180,6 +187,7 @@ pub async fn handle_otlp_request(
 
     // records buffer
     let mut json_data_by_stream: HashMap<String, Vec<_>> = HashMap::new();
+    let mut native_json_data_by_stream: HashMap<String, Vec<_>> = HashMap::new();
 
     for resource_metric in &request.resource_metrics {
         if resource_metric.scope_metrics.is_empty() {
@@ -192,7 +200,7 @@ pub async fn handle_otlp_request(
                 let mut rec = json::json!({});
                 if let Some(res) = &resource_metric.resource {
                     for item in &res.attributes {
-                        rec[format_label_name(item.key.as_str())] = get_val(&item.value.as_ref());
+                        insert_otlp_attribute(&mut rec, item);
                     }
                 }
                 if let Some(lib) = &scope_metric.scope {
@@ -360,6 +368,18 @@ pub async fn handle_otlp_request(
                         .await;
                     }
 
+                    if rec.get(NATIVE_HISTOGRAM_LABEL).is_some() {
+                        let local_val = match rec.take() {
+                            json::Value::Object(value) => value,
+                            _ => unreachable!(),
+                        };
+                        native_json_data_by_stream
+                            .entry(local_metric_name)
+                            .or_default()
+                            .push(local_val);
+                        continue;
+                    }
+
                     // get stream pipeline -- for the stream this record actually lands in, which
                     // is not always the metric's own name: a histogram's rows all carry a
                     // `_count` / `_sum` / `_bucket` name and none carry the base. Registering the
@@ -468,6 +488,7 @@ pub async fn handle_otlp_request(
                                 json::Value::Object(v) => v,
                                 _ => unreachable!(),
                             };
+                            super::strip_reserved_pipeline_field(&mut local_val, "METRICS:OTLP");
 
                             if let Some(Some(fields)) =
                                 user_defined_schema_map.get(&destination_stream)
@@ -504,6 +525,13 @@ pub async fn handle_otlp_request(
                     .push(local_val);
             }
         }
+    }
+
+    for (stream_name, records) in native_json_data_by_stream {
+        json_data_by_stream
+            .entry(stream_name)
+            .or_default()
+            .extend(records);
     }
 
     for (local_metric_name, json_data) in json_data_by_stream {
@@ -801,15 +829,32 @@ fn process_exponential_histogram(
         METADATA_LABEL.to_string(),
         json::to_string(&metadata).unwrap(),
     );
+    let mode = super::otlp_exp_histogram_mode();
     let mut records = vec![];
     process_aggregation_temporality(rec, hist.aggregation_temporality);
     for data_point in &hist.data_points {
-        let mut dp_rec = rec.clone();
-        for mut bucket_rec in process_exp_hist_data_point(&mut dp_rec, data_point) {
-            let val_map = bucket_rec.as_object_mut().unwrap();
-            let hash = super::signature_without_labels(val_map, &get_exclude_labels());
-            val_map.insert(HASH_LABEL.to_string(), json::Value::Number(hash.into()));
-            records.push(bucket_rec);
+        if mode != super::OtlpExpHistogramMode::Native {
+            let mut dp_rec = rec.clone();
+            for mut bucket_rec in process_exp_hist_data_point(&mut dp_rec, data_point) {
+                let val_map = bucket_rec.as_object_mut().unwrap();
+                let hash = super::signature_without_labels(val_map, &get_exclude_labels());
+                val_map.insert(HASH_LABEL.to_string(), json::Value::Number(hash.into()));
+                records.push(bucket_rec);
+            }
+        }
+        if mode != super::OtlpExpHistogramMode::Legacy {
+            match process_native_exp_hist_data_point(rec, data_point, hist.aggregation_temporality)
+            {
+                Ok(mut native_rec) => {
+                    let val_map = native_rec.as_object_mut().unwrap();
+                    let hash = super::signature_without_labels(val_map, &get_exclude_labels());
+                    val_map.insert(HASH_LABEL.to_string(), json::Value::Number(hash.into()));
+                    records.push(native_rec);
+                }
+                Err(err) => {
+                    log::warn!("[METRICS:OTLP] rejected native histogram data point: {err}");
+                }
+            }
         }
     }
     records
@@ -841,6 +886,15 @@ fn process_summary(
     records
 }
 
+fn insert_otlp_attribute(rec: &mut json::Value, attribute: &KeyValue) {
+    let name = format_label_name(attribute.key.as_str());
+    if name == NATIVE_HISTOGRAM_LABEL {
+        log::warn!("[METRICS:OTLP] stripped reserved metric attribute {NATIVE_HISTOGRAM_LABEL}");
+        return;
+    }
+    rec[name] = get_val(&attribute.value.as_ref());
+}
+
 /// Returns false if this data point has no usable value and must not be recorded.
 ///
 /// The caller owns the drop, not this function: it mutates a record in place and cannot
@@ -850,7 +904,7 @@ fn process_summary(
 #[must_use]
 fn process_data_point(rec: &mut json::Value, data_point: &NumberDataPoint) -> bool {
     for attr in &data_point.attributes {
-        rec[format_label_name(attr.key.as_str())] = get_val(&attr.value.as_ref());
+        insert_otlp_attribute(rec, attr);
     }
     let Some(value) = get_metric_val(&data_point.value).and_then(super::metric_value) else {
         return false;
@@ -875,7 +929,7 @@ fn process_hist_data_point(
     let mut bucket_recs = vec![];
 
     for attr in &data_point.attributes {
-        rec[format_label_name(attr.key.as_str())] = get_val(&attr.value.as_ref());
+        insert_otlp_attribute(rec, attr);
     }
     rec[TIMESTAMP_COL_NAME] = (data_point.time_unix_nano / 1000).into();
     rec["start_time"] = data_point.start_time_unix_nano.to_string().into();
@@ -940,7 +994,7 @@ fn process_exp_hist_data_point(
     let mut bucket_recs = vec![];
 
     for attr in &data_point.attributes {
-        rec[format_label_name(attr.key.as_str())] = get_val(&attr.value.as_ref());
+        insert_otlp_attribute(rec, attr);
     }
     rec[TIMESTAMP_COL_NAME] = (data_point.time_unix_nano / 1000).into();
     rec["start_time"] = data_point.start_time_unix_nano.to_string().into();
@@ -996,6 +1050,170 @@ fn process_exp_hist_data_point(
     bucket_recs
 }
 
+fn process_native_exp_hist_data_point(
+    rec: &json::Value,
+    data_point: &ExponentialHistogramDataPoint,
+    aggregation_temporality: i32,
+) -> Result<json::Value, HistogramError> {
+    let mut native_rec = rec.clone();
+    if let Some(object) = native_rec.as_object_mut() {
+        object.remove("aggregation_temporality");
+    }
+    for attr in &data_point.attributes {
+        insert_otlp_attribute(&mut native_rec, attr);
+    }
+    native_rec[TIMESTAMP_COL_NAME] = (data_point.time_unix_nano / 1000).into();
+    process_exemplars(&mut native_rec, &data_point.exemplars);
+
+    let native = native_histogram_from_otlp(data_point, aggregation_temporality)?;
+    let payload = native.to_payload()?;
+    let limits = &config::get_config().limit;
+    native.validate_limits(
+        payload.len(),
+        limits.metrics_nh_max_payload_bytes,
+        limits.metrics_nh_max_buckets,
+        limits.metrics_nh_max_spans,
+    )?;
+    native_rec[NATIVE_HISTOGRAM_LABEL] = payload.into();
+    Ok(native_rec)
+}
+
+fn native_histogram_from_otlp(
+    data_point: &ExponentialHistogramDataPoint,
+    aggregation_temporality: i32,
+) -> Result<NativeHistogram, HistogramError> {
+    let mut schema = data_point.scale;
+    if schema < config::meta::promql::histogram::EXPONENTIAL_SCHEMA_MIN {
+        return Err(HistogramError::UnsupportedSchema(schema));
+    }
+    let scale_down = if schema > config::meta::promql::histogram::EXPONENTIAL_SCHEMA_MAX {
+        let scale_down = schema - config::meta::promql::histogram::EXPONENTIAL_SCHEMA_MAX;
+        schema = config::meta::promql::histogram::EXPONENTIAL_SCHEMA_MAX;
+        scale_down
+    } else {
+        0
+    };
+
+    let (positive_spans, positive_buckets) = data_point
+        .positive
+        .as_ref()
+        .map(|buckets| {
+            convert_otlp_buckets_layout(&buckets.bucket_counts, buckets.offset, scale_down)
+        })
+        .unwrap_or_default();
+    let (negative_spans, negative_buckets) = data_point
+        .negative
+        .as_ref()
+        .map(|buckets| {
+            convert_otlp_buckets_layout(&buckets.bucket_counts, buckets.offset, scale_down)
+        })
+        .unwrap_or_default();
+
+    let is_stale = data_point.flags & 1 != 0;
+    let temporality = AggregationTemporality::try_from(aggregation_temporality)
+        .unwrap_or(AggregationTemporality::Unspecified);
+    let native = NativeHistogram {
+        schema,
+        zero_threshold: data_point.zero_threshold,
+        sum: if is_stale {
+            STALE_NAN
+        } else {
+            data_point.sum.unwrap_or(0.0)
+        },
+        start_time: (data_point.start_time_unix_nano / 1000) as i64,
+        positive_spans,
+        negative_spans,
+        counter_reset_hint: if temporality == AggregationTemporality::Delta {
+            CounterResetHint::Gauge
+        } else {
+            CounterResetHint::Unknown
+        },
+        counts: NativeHistogramCounts::Integer {
+            zero_count: data_point.zero_count,
+            count: if is_stale {
+                STALE_NAN_BITS
+            } else {
+                data_point.count
+            },
+            positive_buckets,
+            negative_buckets,
+        },
+    };
+    native.validate()?;
+    Ok(native)
+}
+
+/// Convert OTLP dense exponential buckets into Prometheus sparse spans and
+/// delta counts. OTLP index `i` maps to Prometheus index `i + 1`.
+fn convert_otlp_buckets_layout(
+    bucket_counts: &[u64],
+    offset: i32,
+    scale_down: i32,
+) -> (Vec<HistogramSpan>, Vec<i64>) {
+    if bucket_counts.is_empty() {
+        return (Vec::new(), Vec::new());
+    }
+
+    let mut spans = vec![HistogramSpan {
+        offset: (offset >> scale_down) + 1,
+        length: 0,
+    }];
+    let mut deltas = Vec::new();
+    let mut count = 0_i64;
+    let mut previous_count = 0_i64;
+    let mut bucket_index = (offset >> scale_down) + 1;
+
+    let append_delta = |count: i64,
+                        spans: &mut Vec<HistogramSpan>,
+                        deltas: &mut Vec<i64>,
+                        previous_count: &mut i64| {
+        spans.last_mut().expect("initial span exists").length += 1;
+        deltas.push(count - *previous_count);
+        *previous_count = count;
+    };
+
+    for (position, bucket_count) in bucket_counts.iter().enumerate() {
+        let next_bucket_index = ((position as i32 + offset) >> scale_down) + 1;
+        if bucket_index == next_bucket_index {
+            count += *bucket_count as i64;
+            continue;
+        }
+        if count == 0 {
+            count = *bucket_count as i64;
+            continue;
+        }
+        let gap = next_bucket_index - bucket_index - 1;
+        if gap > 2 {
+            spans.push(HistogramSpan {
+                offset: gap,
+                length: 0,
+            });
+        } else {
+            for _ in 0..gap {
+                append_delta(0, &mut spans, &mut deltas, &mut previous_count);
+            }
+        }
+        append_delta(count, &mut spans, &mut deltas, &mut previous_count);
+        count = *bucket_count as i64;
+        bucket_index = next_bucket_index;
+    }
+
+    let final_index = (((bucket_counts.len() as i32) + offset - 1) >> scale_down) + 1;
+    let gap = final_index - bucket_index;
+    if gap > 2 {
+        spans.push(HistogramSpan {
+            offset: gap,
+            length: 0,
+        });
+    } else {
+        for _ in 0..gap {
+            append_delta(0, &mut spans, &mut deltas, &mut previous_count);
+        }
+    }
+    append_delta(count, &mut spans, &mut deltas, &mut previous_count);
+    (spans, deltas)
+}
+
 fn process_summary_data_point(
     rec: &mut json::Value,
     data_point: &SummaryDataPoint,
@@ -1003,7 +1221,7 @@ fn process_summary_data_point(
     let mut bucket_recs = vec![];
 
     for attr in &data_point.attributes {
-        rec[format_label_name(attr.key.as_str())] = get_val(&attr.value.as_ref());
+        insert_otlp_attribute(rec, attr);
     }
     rec[TIMESTAMP_COL_NAME] = (data_point.time_unix_nano / 1000).into();
     rec["start_time"] = data_point.start_time_unix_nano.to_string().into();
@@ -1234,7 +1452,7 @@ mod tests {
                     zero_threshold: 0.0,
                     positive: Some(opentelemetry_proto::tonic::metrics::v1::exponential_histogram_data_point::Buckets {
                         offset: 0,
-                        bucket_counts: vec![50, 30, 20],
+                        bucket_counts: vec![40, 30, 20],
                     }),
                     negative: Some(opentelemetry_proto::tonic::metrics::v1::exponential_histogram_data_point::Buckets {
                         offset: 0,
@@ -1244,6 +1462,46 @@ mod tests {
                 aggregation_temporality: AggregationTemporality::Cumulative as i32,
             })),
         }
+    }
+
+    #[test]
+    fn test_otlp_native_histogram_conversion() {
+        let metric = create_test_exponential_histogram_metric("test_exp_histogram");
+        let Data::ExponentialHistogram(histogram) = metric.data.unwrap() else {
+            panic!("exponential histogram expected")
+        };
+        let native = native_histogram_from_otlp(
+            &histogram.data_points[0],
+            histogram.aggregation_temporality,
+        )
+        .unwrap();
+        let decoded = native.to_float().unwrap();
+        assert_eq!(decoded.schema, 0);
+        assert_eq!(decoded.count, 100.0);
+        assert_eq!(decoded.zero_count, 10.0);
+        assert_eq!(decoded.positive_buckets, vec![40.0, 30.0, 20.0]);
+        assert_eq!(decoded.start_time, 0);
+    }
+
+    #[test]
+    fn test_otlp_bucket_downscale_coalesces_counts() {
+        let (spans, deltas) = convert_otlp_buckets_layout(&[1, 2, 3, 4], 0, 1);
+        let native = NativeHistogram {
+            schema: 7,
+            zero_threshold: 0.0,
+            sum: 10.0,
+            start_time: 0,
+            positive_spans: spans,
+            negative_spans: vec![],
+            counter_reset_hint: CounterResetHint::Unknown,
+            counts: NativeHistogramCounts::Integer {
+                zero_count: 0,
+                count: 10,
+                positive_buckets: deltas,
+                negative_buckets: vec![],
+            },
+        };
+        assert_eq!(native.to_float().unwrap().positive_buckets, vec![3.0, 7.0]);
     }
 
     fn create_test_summary_metric(name: &str) -> Metric {

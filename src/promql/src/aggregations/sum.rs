@@ -31,7 +31,19 @@ pub fn sum(param: &Option<LabelModifier>, data: Value, eval_ctx: &EvalContext) -
         eval_ctx.trace_id
     );
 
-    let result = super::eval_aggregate(param, data, Sum, eval_ctx);
+    let has_histograms = data.get_ref_matrix_values().is_some_and(|matrix| {
+        matrix.iter().any(|series| {
+            series
+                .histogram_samples
+                .as_ref()
+                .is_some_and(|samples| !samples.is_empty())
+        })
+    });
+    let result = if has_histograms {
+        super::eval_aggregate_with_histograms(param, data, Sum, false, eval_ctx)
+    } else {
+        super::eval_aggregate(param, data, Sum, eval_ctx)
+    };
     log::info!(
         "[trace_id: {}] [PromQL Timing] sum() execution took: {:?}",
         eval_ctx.trace_id,
@@ -158,6 +170,7 @@ mod tests {
                     Sample::new(ts2, 20.0),
                     Sample::new(ts3, 30.0),
                 ],
+                histogram_samples: None,
                 exemplars: None,
                 time_window: None,
             },
@@ -168,6 +181,7 @@ mod tests {
                     Sample::new(ts2, 15.0),
                     Sample::new(ts3, 25.0),
                 ],
+                histogram_samples: None,
                 exemplars: None,
                 time_window: None,
             },
@@ -178,6 +192,7 @@ mod tests {
                     Sample::new(ts2, 4.0),
                     Sample::new(ts3, 6.0),
                 ],
+                histogram_samples: None,
                 exemplars: None,
                 time_window: None,
             },

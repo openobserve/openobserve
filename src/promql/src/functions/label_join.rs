@@ -54,6 +54,7 @@ pub(crate) fn label_join(
                     RangeValue {
                         labels,
                         samples: range_value.samples,
+                        histogram_samples: range_value.histogram_samples,
                         exemplars: range_value.exemplars,
                         time_window: range_value.time_window,
                     }
@@ -99,6 +100,7 @@ mod tests {
         let range_value1 = RangeValue {
             labels: labels1,
             samples: vec![Sample::new(eval_ts, 42.0)],
+            histogram_samples: None,
             exemplars: None,
             time_window: None,
         };
@@ -111,6 +113,7 @@ mod tests {
         let range_value2 = RangeValue {
             labels: labels2,
             samples: vec![Sample::new(eval_ts, 43.0)],
+            histogram_samples: None,
             exemplars: None,
             time_window: None,
         };

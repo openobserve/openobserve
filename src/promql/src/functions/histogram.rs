@@ -16,6 +16,7 @@
 use config::{
     meta::promql::{
         BUCKET_LABEL, HASH_LABEL, NAME_LABEL,
+        histogram::O2FloatHistogram,
         value::{EvalContext, LabelsExt, RangeValue, Sample, Value, signature_without_labels},
     },
     utils::sort::sort_float,
@@ -57,7 +58,31 @@ pub(crate) fn histogram_quantile(phi: f64, data: Value, eval_ctx: &EvalContext) 
     // Group metrics by their signature (without bucket label)
     let mut metrics_by_sig: HashMap<u64, Vec<RangeValue>> = HashMap::default();
 
-    for rv in in_matrix {
+    let mut range_values = Vec::new();
+    for mut rv in in_matrix {
+        if let Some(histograms) = rv.histogram_samples.take()
+            && !histograms.is_empty()
+        {
+            let mut samples = Vec::with_capacity(histograms.len());
+            for sample in histograms {
+                let histogram = sample
+                    .histogram
+                    .float()
+                    .map_err(|err| DataFusionError::Execution(err.to_string()))?;
+                samples.push(Sample::new(
+                    sample.timestamp,
+                    native_histogram_quantile(phi, histogram)?,
+                ));
+            }
+            range_values.push(RangeValue {
+                labels: rv.labels.without_metric_name(),
+                samples,
+                histogram_samples: Some(Vec::new()),
+                exemplars: None,
+                time_window: None,
+            });
+            continue;
+        }
         // Verify this metric has a bucket label
         if rv.labels.get_value(BUCKET_LABEL).parse::<f64>().is_err() {
             continue;
@@ -66,8 +91,6 @@ pub(crate) fn histogram_quantile(phi: f64, data: Value, eval_ctx: &EvalContext) 
         let sig = signature_without_labels(&rv.labels, &[HASH_LABEL, NAME_LABEL, BUCKET_LABEL]);
         metrics_by_sig.entry(sig).or_default().push(rv);
     }
-
-    let mut range_values = Vec::new();
 
     for (_sig, bucket_series) in metrics_by_sig {
         // Get the labels (without bucket label) from the first series
@@ -109,6 +132,7 @@ pub(crate) fn histogram_quantile(phi: f64, data: Value, eval_ctx: &EvalContext) 
             range_values.push(RangeValue {
                 labels: base_labels,
                 samples,
+                histogram_samples: None,
                 exemplars: None,
                 time_window: None,
             });
@@ -116,6 +140,230 @@ pub(crate) fn histogram_quantile(phi: f64, data: Value, eval_ctx: &EvalContext) 
     }
 
     Ok(Value::Matrix(range_values))
+}
+
+pub(crate) fn histogram_count(data: Value) -> Result<Value> {
+    histogram_scalar(data, |histogram| histogram.count)
+}
+
+pub(crate) fn histogram_sum(data: Value) -> Result<Value> {
+    histogram_scalar(data, |histogram| histogram.sum)
+}
+
+pub(crate) fn histogram_avg(data: Value) -> Result<Value> {
+    histogram_scalar(data, |histogram| histogram.sum / histogram.count)
+}
+
+pub(crate) fn histogram_fraction(lower: f64, upper: f64, data: Value) -> Result<Value> {
+    let Value::Matrix(matrix) = data else {
+        return if matches!(data, Value::None) {
+            Ok(Value::None)
+        } else {
+            Err(DataFusionError::Plan(
+                "histogram_fraction: vector or matrix argument expected".into(),
+            ))
+        };
+    };
+    let mut output = Vec::new();
+    for rv in matrix {
+        let Some(histograms) = rv.histogram_samples else {
+            continue;
+        };
+        let mut samples = Vec::with_capacity(histograms.len());
+        for sample in histograms {
+            let histogram = sample
+                .histogram
+                .float()
+                .map_err(|err| DataFusionError::Execution(err.to_string()))?;
+            samples.push(Sample::new(
+                sample.timestamp,
+                native_histogram_fraction(lower, upper, histogram)?,
+            ));
+        }
+        if !samples.is_empty() {
+            output.push(RangeValue {
+                labels: rv.labels.without_metric_name(),
+                samples,
+                histogram_samples: Some(Vec::new()),
+                exemplars: None,
+                time_window: rv.time_window,
+            });
+        }
+    }
+    Ok(Value::Matrix(output))
+}
+
+fn histogram_scalar(data: Value, value: impl Fn(&O2FloatHistogram) -> f64) -> Result<Value> {
+    let Value::Matrix(matrix) = data else {
+        return if matches!(data, Value::None) {
+            Ok(Value::None)
+        } else {
+            Err(DataFusionError::Plan(
+                "native histogram vector or matrix argument expected".into(),
+            ))
+        };
+    };
+    let mut output = Vec::new();
+    for rv in matrix {
+        let Some(histograms) = rv.histogram_samples else {
+            continue;
+        };
+        let mut samples = Vec::with_capacity(histograms.len());
+        for sample in histograms {
+            let histogram = sample
+                .histogram
+                .float()
+                .map_err(|err| DataFusionError::Execution(err.to_string()))?;
+            samples.push(Sample::new(sample.timestamp, value(histogram)));
+        }
+        if !samples.is_empty() {
+            output.push(RangeValue {
+                labels: rv.labels.without_metric_name(),
+                samples,
+                histogram_samples: Some(Vec::new()),
+                exemplars: None,
+                time_window: rv.time_window,
+            });
+        }
+    }
+    Ok(Value::Matrix(output))
+}
+
+fn native_histogram_quantile(phi: f64, histogram: &O2FloatHistogram) -> Result<f64> {
+    if phi < 0.0 {
+        return Ok(f64::NEG_INFINITY);
+    }
+    if phi > 1.0 {
+        return Ok(f64::INFINITY);
+    }
+    if histogram.count == 0.0 || phi.is_nan() {
+        return Ok(f64::NAN);
+    }
+
+    let buckets = histogram
+        .all_buckets()
+        .map_err(|err| DataFusionError::Execution(err.to_string()))?;
+    let reverse = !histogram.sum.is_nan() && phi >= 0.5;
+    let mut rank = if reverse {
+        (1.0 - phi) * histogram.count
+    } else {
+        phi * histogram.count
+    };
+    let mut count = 0.0;
+    let mut selected = None;
+    let iterator: Box<dyn Iterator<Item = _>> = if reverse {
+        Box::new(buckets.iter().rev().copied())
+    } else {
+        Box::new(buckets.iter().copied())
+    };
+    for bucket in iterator {
+        if bucket.count == 0.0 {
+            continue;
+        }
+        count += bucket.count;
+        selected = Some(bucket);
+        if count >= rank {
+            break;
+        }
+    }
+    let Some(mut bucket) = selected else {
+        return Ok(f64::NAN);
+    };
+    if bucket.lower < 0.0 && bucket.upper > 0.0 {
+        if histogram.negative_buckets.is_empty() && !histogram.positive_buckets.is_empty() {
+            bucket.lower = 0.0;
+        } else if histogram.positive_buckets.is_empty() && !histogram.negative_buckets.is_empty() {
+            bucket.upper = 0.0;
+        }
+    }
+    count = count.min(histogram.count);
+    if count < rank {
+        return if histogram.sum.is_nan() {
+            Ok(f64::NAN)
+        } else {
+            Ok(bucket.upper)
+        };
+    }
+    if reverse {
+        rank = count - rank;
+    } else {
+        rank -= count - bucket.count;
+    }
+    let fraction = rank / bucket.count;
+    if bucket.lower <= 0.0 && bucket.upper >= 0.0 {
+        return Ok(bucket.lower + (bucket.upper - bucket.lower) * fraction);
+    }
+    let log_lower = bucket.lower.abs().log2();
+    let log_upper = bucket.upper.abs().log2();
+    if bucket.lower > 0.0 {
+        Ok(2.0_f64.powf(log_lower + (log_upper - log_lower) * fraction))
+    } else {
+        Ok(-2.0_f64.powf(log_upper + (log_lower - log_upper) * (1.0 - fraction)))
+    }
+}
+
+fn native_histogram_fraction(lower: f64, upper: f64, histogram: &O2FloatHistogram) -> Result<f64> {
+    if histogram.count == 0.0 || lower.is_nan() || upper.is_nan() {
+        return Ok(f64::NAN);
+    }
+    if lower >= upper {
+        return Ok(0.0);
+    }
+    let buckets = histogram
+        .all_buckets()
+        .map_err(|err| DataFusionError::Execution(err.to_string()))?;
+    let mut rank = 0.0;
+    let mut lower_rank = None;
+    let mut upper_rank = None;
+    for mut bucket in buckets {
+        let zero_bucket = bucket.lower <= 0.0 && bucket.upper >= 0.0;
+        if zero_bucket {
+            if histogram.negative_buckets.is_empty() && !histogram.positive_buckets.is_empty() {
+                bucket.lower = 0.0;
+            } else if histogram.positive_buckets.is_empty()
+                && !histogram.negative_buckets.is_empty()
+            {
+                bucket.upper = 0.0;
+            }
+        }
+        let interpolate = |bound: f64| {
+            if zero_bucket {
+                rank + bucket.count * (bound - bucket.lower) / (bucket.upper - bucket.lower)
+            } else {
+                let log_lower = bucket.lower.abs().log2();
+                let log_upper = bucket.upper.abs().log2();
+                let log_bound = bound.abs().log2();
+                let fraction = if bound > 0.0 {
+                    (log_bound - log_lower) / (log_upper - log_lower)
+                } else {
+                    1.0 - (log_bound - log_upper) / (log_lower - log_upper)
+                };
+                rank + bucket.count * fraction
+            }
+        };
+        if lower_rank.is_none() {
+            if bucket.lower >= lower {
+                lower_rank = Some(rank);
+            } else if bucket.lower < lower && bucket.upper > lower {
+                lower_rank = Some(interpolate(lower));
+            }
+        }
+        if upper_rank.is_none() {
+            if bucket.lower >= upper {
+                upper_rank = Some(rank);
+            } else if bucket.lower < upper && bucket.upper > upper {
+                upper_rank = Some(interpolate(upper));
+            }
+        }
+        if lower_rank.is_some() && upper_rank.is_some() {
+            break;
+        }
+        rank += bucket.count;
+    }
+    let count = histogram.count;
+    let lower_rank = lower_rank.unwrap_or(count).min(count);
+    let upper_rank = upper_rank.unwrap_or(count).min(count);
+    Ok((upper_rank - lower_rank) / count)
 }
 
 // cf. https://github.com/prometheus/prometheus/blob/cf1bea344a3c390a90c35ea8764c4a468b345d5e/promql/quantile.go#L76
@@ -217,9 +465,61 @@ fn ensure_monotonic(buckets: &mut [Bucket]) {
 
 #[cfg(test)]
 mod tests {
+    use config::meta::promql::histogram::{
+        CounterResetHint, HistogramSample, HistogramSpan, O2FloatHistogram,
+    };
     use expect_test::expect;
 
     use super::*;
+
+    fn native_value() -> Value {
+        let histogram = O2FloatHistogram {
+            schema: 0,
+            zero_threshold: 0.0,
+            zero_count: 0.0,
+            count: 4.0,
+            sum: 5.0,
+            positive_spans: vec![HistogramSpan {
+                offset: 0,
+                length: 2,
+            }],
+            negative_spans: vec![],
+            positive_buckets: vec![2.0, 2.0],
+            negative_buckets: vec![],
+            counter_reset_hint: CounterResetHint::Gauge,
+            start_time: 0,
+        };
+        Value::Matrix(vec![RangeValue {
+            labels: vec![],
+            samples: vec![],
+            histogram_samples: Some(vec![HistogramSample::from_decoded(1_000_000, histogram)]),
+            exemplars: None,
+            time_window: None,
+        }])
+    }
+
+    fn only_float(value: Value) -> f64 {
+        let Value::Matrix(matrix) = value else {
+            panic!("matrix expected")
+        };
+        matrix[0].samples[0].value
+    }
+
+    #[test]
+    fn test_native_histogram_functions() {
+        let eval_ctx = EvalContext::new(1_000_000, 1_000_000, 1, "test".into());
+        assert_eq!(only_float(histogram_count(native_value()).unwrap()), 4.0);
+        assert_eq!(only_float(histogram_sum(native_value()).unwrap()), 5.0);
+        assert_eq!(only_float(histogram_avg(native_value()).unwrap()), 1.25);
+        assert_eq!(
+            only_float(histogram_quantile(0.5, native_value(), &eval_ctx).unwrap()),
+            1.0
+        );
+        assert_eq!(
+            only_float(histogram_fraction(0.0, 1.0, native_value()).unwrap()),
+            0.5
+        );
+    }
 
     #[test]
     fn test_coalesce_buckets() {

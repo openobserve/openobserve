@@ -15,7 +15,10 @@
 
 use std::{collections::HashSet, sync::LazyLock as Lazy, time::Duration};
 
-use config::meta::promql::value::{EvalContext, LabelsExt, RangeValue, Sample, Value};
+use config::meta::promql::{
+    histogram::{CounterResetHint, HistogramSample, O2FloatHistogram},
+    value::{EvalContext, ExtrapolationKind, LabelsExt, RangeValue, Sample, Value},
+};
 use datafusion::error::{DataFusionError, Result};
 use rayon::prelude::*;
 use strum::EnumString;
@@ -60,7 +63,9 @@ pub(crate) use clamp::clamp;
 pub(crate) use count_over_time::count_over_time;
 pub(crate) use delta::delta;
 pub(crate) use deriv::deriv;
-pub(crate) use histogram::histogram_quantile;
+pub(crate) use histogram::{
+    histogram_avg, histogram_count, histogram_fraction, histogram_quantile, histogram_sum,
+};
 pub(crate) use holt_winters::holt_winters;
 pub(crate) use idelta::idelta;
 pub(crate) use increase::increase;
@@ -104,6 +109,7 @@ pub(crate) enum Func {
     Deriv,
     Exp,
     Floor,
+    HistogramAvg,
     HistogramCount,
     HistogramFraction,
     HistogramQuantile,
@@ -246,6 +252,7 @@ where
     let results: Vec<RangeValue> = data
         .into_par_iter()
         .flat_map(|mut metric| {
+            let native_provenance = metric.histogram_samples.is_some();
             let mut labels = std::mem::take(&mut metric.labels);
             if !KEEP_METRIC_NAME_FUNC.contains(func.name()) {
                 labels = labels.without_metric_name();
@@ -284,6 +291,7 @@ where
                 Some(RangeValue {
                     labels,
                     samples: result_samples,
+                    histogram_samples: native_provenance.then(Vec::new),
                     exemplars: None,
                     time_window: metric.time_window,
                 })
@@ -299,6 +307,208 @@ where
         results.len()
     );
     Ok(Value::Matrix(results))
+}
+
+/// Evaluate rate/increase/delta for either float or native-histogram windows.
+/// Both sample streams use monotonic cursors, keeping evaluation O(samples + steps).
+pub(crate) fn eval_rate_like<F>(
+    data: Value,
+    func: F,
+    kind: ExtrapolationKind,
+    eval_ctx: &EvalContext,
+) -> Result<Value>
+where
+    F: RangeFunc,
+{
+    let data = match data {
+        Value::Matrix(values) => values,
+        Value::None => return Ok(Value::None),
+        value => {
+            return Err(DataFusionError::Plan(format!(
+                "{}: matrix argument expected but got {}",
+                func.name(),
+                value.get_type()
+            )));
+        }
+    };
+    let timestamps = eval_ctx.timestamps();
+    let results: Vec<Result<Option<RangeValue>>> = data
+        .into_par_iter()
+        .map(|mut metric| {
+        let time_window = metric.time_window.clone().ok_or_else(|| {
+            DataFusionError::Plan(format!("{}: range selector required", func.name()))
+        })?;
+        let range = time_window.range;
+        let range_micros = micros(range);
+        let mut float_output = Vec::with_capacity(timestamps.len());
+        let mut histogram_output = Vec::with_capacity(timestamps.len());
+        let mut float_start = 0;
+        let mut float_end = 0;
+        let mut histogram_start = 0;
+        let mut histogram_end = 0;
+        let histograms = metric.histogram_samples.as_deref().unwrap_or_default();
+        for &eval_ts in &timestamps {
+            let window_start = eval_ts - range_micros;
+            let float_window = advance_sample_window(
+                &metric.samples,
+                window_start,
+                eval_ts,
+                &mut float_start,
+                &mut float_end,
+            );
+            let histogram_window = advance_histogram_window(
+                histograms,
+                window_start,
+                eval_ts,
+                &mut histogram_start,
+                &mut histogram_end,
+            );
+            if !float_window.is_empty() && !histogram_window.is_empty() {
+                log::warn!(
+                    "[trace_id: {}] {} omitted a window containing mixed float and histogram samples",
+                    eval_ctx.trace_id,
+                    func.name()
+                );
+                continue;
+            }
+            if !histogram_window.is_empty() {
+                if let Some(histogram) =
+                    extrapolated_histogram(histogram_window, eval_ts, range, kind)?
+                {
+                    histogram_output.push(
+                        HistogramSample::from_computed(
+                            eval_ts,
+                            histogram,
+                            histogram_window[0].histogram.as_ref(),
+                        )
+                        .map_err(|err| DataFusionError::ResourcesExhausted(err.to_string()))?,
+                    );
+                }
+            } else if let Some(value) = func.exec(float_window, eval_ts, &range) {
+                float_output.push(Sample::new(eval_ts, value));
+            }
+        }
+        if float_output.is_empty() && histogram_output.is_empty() {
+            return Ok(None);
+        }
+        Ok(Some(RangeValue {
+            labels: std::mem::take(&mut metric.labels).without_metric_name(),
+            samples: float_output,
+            histogram_samples: (!histogram_output.is_empty()).then_some(histogram_output),
+            exemplars: None,
+            time_window: Some(time_window),
+        }))
+    })
+    .collect();
+    let output = results
+        .into_iter()
+        .collect::<Result<Vec<_>>>()?
+        .into_iter()
+        .flatten()
+        .collect();
+    Ok(Value::Matrix(output))
+}
+
+fn advance_histogram_window<'a>(
+    samples: &'a [HistogramSample],
+    window_start: i64,
+    window_end: i64,
+    start_index: &mut usize,
+    end_index: &mut usize,
+) -> &'a [HistogramSample] {
+    while *start_index < samples.len() && samples[*start_index].timestamp < window_start {
+        *start_index += 1;
+    }
+    if *end_index < *start_index {
+        *end_index = *start_index;
+    }
+    while *end_index < samples.len() && samples[*end_index].timestamp <= window_end {
+        *end_index += 1;
+    }
+    &samples[*start_index..*end_index]
+}
+
+fn extrapolated_histogram(
+    samples: &[HistogramSample],
+    eval_ts: i64,
+    range: Duration,
+    kind: ExtrapolationKind,
+) -> Result<Option<O2FloatHistogram>> {
+    if samples.len() < 2 {
+        return Ok(None);
+    }
+    let decoded = samples
+        .iter()
+        .map(|sample| {
+            sample
+                .histogram
+                .float()
+                .map_err(|err| DataFusionError::Execution(err.to_string()))
+        })
+        .collect::<Result<Vec<_>>>()?;
+    if decoded.iter().any(|histogram| histogram.is_stale()) {
+        return Ok(None);
+    }
+
+    let is_counter = matches!(kind, ExtrapolationKind::Rate | ExtrapolationKind::Increase);
+    if is_counter
+        && decoded
+            .iter()
+            .any(|histogram| histogram.counter_reset_hint == CounterResetHint::Gauge)
+    {
+        log::warn!("rate/increase applied to a gauge-hint native histogram");
+    }
+    let mut result = (*decoded.last().expect("at least two histograms")).clone();
+    result
+        .sub_assign(&decoded[0])
+        .map_err(|err| DataFusionError::Execution(err.to_string()))?;
+    if is_counter {
+        for index in 1..decoded.len() {
+            if decoded[index]
+                .detect_reset(&decoded[index - 1])
+                .map_err(|err| DataFusionError::Execution(err.to_string()))?
+            {
+                result
+                    .add_assign(&decoded[index - 1])
+                    .map_err(|err| DataFusionError::Execution(err.to_string()))?;
+            }
+        }
+    }
+
+    let first_timestamp = samples[0].timestamp;
+    let last_timestamp = samples.last().expect("at least two samples").timestamp;
+    let sampled_interval = (last_timestamp - first_timestamp) as f64 / 1_000.0;
+    if sampled_interval <= 0.0 {
+        return Ok(None);
+    }
+    let window_start = eval_ts - micros(range);
+    let mut duration_to_start = (first_timestamp - window_start) as f64 / 1_000.0;
+    let duration_to_end = (eval_ts - last_timestamp) as f64 / 1_000.0;
+    if is_counter && result.count > 0.0 && decoded[0].count >= 0.0 {
+        duration_to_start =
+            duration_to_start.min(sampled_interval * decoded[0].count / result.count);
+    }
+    let average_interval = sampled_interval / (samples.len() - 1) as f64;
+    let threshold = average_interval * 1.1;
+    let mut extrapolated_interval = sampled_interval;
+    extrapolated_interval += if duration_to_start < threshold {
+        duration_to_start
+    } else {
+        average_interval / 2.0
+    };
+    extrapolated_interval += if duration_to_end < threshold {
+        duration_to_end
+    } else {
+        average_interval / 2.0
+    };
+    let mut factor = extrapolated_interval / sampled_interval;
+    if matches!(kind, ExtrapolationKind::Rate) {
+        factor /= range.as_secs_f64();
+    }
+    result.scale(factor);
+    result.counter_reset_hint = CounterResetHint::Gauge;
+    result.start_time = 0;
+    Ok(Some(result))
 }
 
 /// Advance two indices through sorted samples for monotonically increasing
@@ -445,5 +655,46 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    fn test_extrapolated_histogram_rate_handles_reset() {
+        use config::meta::promql::histogram::HistogramSpan;
+
+        let make = |timestamp, count, hint| {
+            HistogramSample::from_decoded(
+                timestamp,
+                O2FloatHistogram {
+                    schema: 0,
+                    zero_threshold: 0.0,
+                    zero_count: 0.0,
+                    count,
+                    sum: count,
+                    positive_spans: vec![HistogramSpan {
+                        offset: 0,
+                        length: 1,
+                    }],
+                    negative_spans: vec![],
+                    positive_buckets: vec![count],
+                    negative_buckets: vec![],
+                    counter_reset_hint: hint,
+                    start_time: 0,
+                },
+            )
+        };
+        let samples = vec![
+            make(10_000_000, 10.0, CounterResetHint::Unknown),
+            make(70_000_000, 3.0, CounterResetHint::CounterReset),
+        ];
+        let rate = extrapolated_histogram(
+            &samples,
+            70_000_000,
+            Duration::from_secs(60),
+            ExtrapolationKind::Rate,
+        )
+        .unwrap()
+        .unwrap();
+        assert!((rate.count - 0.05).abs() < 1e-12);
+        assert_eq!(rate.counter_reset_hint, CounterResetHint::Gauge);
     }
 }

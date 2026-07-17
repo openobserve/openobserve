@@ -555,6 +555,12 @@ pub struct Series {
     pub stringliteral: ::core::option::Option<::prost::alloc::string::String>,
     #[prost(message, optional, tag = "6")]
     pub exemplars: ::core::option::Option<Exemplars>,
+    #[prost(message, repeated, tag = "7")]
+    pub histogram_samples: ::prost::alloc::vec::Vec<NativeHistogramSample>,
+    #[prost(message, optional, tag = "8")]
+    pub histogram_sample: ::core::option::Option<NativeHistogramSample>,
+    #[prost(bool, tag = "9")]
+    pub native_histogram_provenance: bool,
 }
 #[derive(serde::Deserialize, serde::Serialize)]
 #[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
@@ -571,6 +577,14 @@ pub struct Sample {
     pub time: i64,
     #[prost(double, tag = "2")]
     pub value: f64,
+}
+#[derive(serde::Deserialize, serde::Serialize)]
+#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
+pub struct NativeHistogramSample {
+    #[prost(int64, tag = "1")]
+    pub time: i64,
+    #[prost(bytes = "bytes", tag = "2")]
+    pub histogram: ::prost::bytes::Bytes,
 }
 #[derive(serde::Deserialize, serde::Serialize)]
 #[derive(Clone, PartialEq, ::prost::Message)]

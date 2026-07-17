@@ -137,6 +137,7 @@ mod tests {
         let range_value = RangeValue {
             labels: Labels::default(),
             samples,
+            histogram_samples: None,
             exemplars: None,
             time_window: Some(TimeWindow {
                 range: Duration::from_secs(2),

@@ -30,7 +30,13 @@ use serde::{
 
 use crate::{
     FxIndexMap,
-    meta::{promql::NAME_LABEL, search::SearchEventType},
+    meta::{
+        promql::{
+            NAME_LABEL,
+            histogram::{HistogramSample, O2FloatHistogram},
+        },
+        search::SearchEventType,
+    },
     utils::{json, sort::sort_float},
 };
 
@@ -238,6 +244,20 @@ impl Sample {
     }
 }
 
+struct ApiPromSample<'a>(&'a Sample);
+
+impl Serialize for ApiPromSample<'_> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut seq = serializer.serialize_seq(Some(2))?;
+        seq.serialize_element(&PromTimestamp(self.0.timestamp))?;
+        seq.serialize_element(&PromFloat(self.0.value))?;
+        seq.end()
+    }
+}
+
 #[derive(Debug, Default, Clone)]
 pub struct Exemplar {
     /// Time in microseconds
@@ -351,10 +371,154 @@ impl From<&json::Map<String, json::Value>> for Exemplar {
     }
 }
 
+struct ApiHistogramSample<'a>(&'a HistogramSample);
+
+impl Serialize for ApiHistogramSample<'_> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut seq = serializer.serialize_seq(Some(2))?;
+        seq.serialize_element(&PromTimestamp(self.0.timestamp))?;
+        let histogram = self
+            .0
+            .histogram
+            .float()
+            .map_err(serde::ser::Error::custom)?;
+        seq.serialize_element(&ApiHistogram(histogram))?;
+        seq.end()
+    }
+}
+
+struct ApiHistogram<'a>(&'a O2FloatHistogram);
+
+impl Serialize for ApiHistogram<'_> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let buckets = self.0.all_buckets().map_err(serde::ser::Error::custom)?;
+        let buckets = buckets
+            .into_iter()
+            .filter(|bucket| bucket.count != 0.0)
+            .collect::<Vec<_>>();
+        let mut object = serializer
+            .serialize_struct("native_histogram", if buckets.is_empty() { 2 } else { 3 })?;
+        object.serialize_field("count", &PromFloat(self.0.count))?;
+        object.serialize_field("sum", &PromFloat(self.0.sum))?;
+        if !buckets.is_empty() {
+            object.serialize_field("buckets", &ApiHistogramBuckets(&buckets))?;
+        }
+        object.end()
+    }
+}
+
+struct ApiHistogramBuckets<'a>(&'a [super::histogram::HistogramBucket]);
+
+impl Serialize for ApiHistogramBuckets<'_> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut seq = serializer.serialize_seq(Some(self.0.len()))?;
+        for bucket in self.0 {
+            seq.serialize_element(&ApiHistogramBucket(bucket))?;
+        }
+        seq.end()
+    }
+}
+
+struct ApiHistogramBucket<'a>(&'a super::histogram::HistogramBucket);
+
+impl Serialize for ApiHistogramBucket<'_> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut seq = serializer.serialize_seq(Some(4))?;
+        seq.serialize_element(&self.0.boundaries_code())?;
+        seq.serialize_element(&PromFloat(self.0.lower))?;
+        seq.serialize_element(&PromFloat(self.0.upper))?;
+        seq.serialize_element(&PromFloat(self.0.count))?;
+        seq.end()
+    }
+}
+
+struct PromTimestamp(i64);
+
+impl Serialize for PromTimestamp {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        // Prometheus emits millisecond-precision decimal seconds.
+        serializer.serialize_f64((self.0 / 1_000) as f64 / 1_000.0)
+    }
+}
+
+struct PromFloat(f64);
+
+impl Serialize for PromFloat {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let value = if self.0.is_nan() {
+            "NaN".to_string()
+        } else if self.0 == f64::INFINITY {
+            "+Inf".to_string()
+        } else if self.0 == f64::NEG_INFINITY {
+            "-Inf".to_string()
+        } else if self.0 != 0.0 && (self.0.abs() < 1e-6 || self.0.abs() >= 1e21) {
+            let scientific = format!("{:e}", self.0);
+            let (mantissa, exponent) = scientific
+                .split_once('e')
+                .expect("Rust scientific formatting always contains an exponent");
+            let exponent = exponent.parse::<i32>().expect("valid decimal exponent");
+            format!("{mantissa}e{exponent:+}")
+        } else {
+            self.0.to_string()
+        };
+        serializer.serialize_str(&value)
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct InstantValue {
     pub labels: Labels,
-    pub sample: Sample,
+    pub sample: InstantPoint,
+}
+
+#[derive(Debug, Clone)]
+pub enum InstantPoint {
+    Float(Sample),
+    /// Scalar result derived from a native histogram. It uses Prometheus wire formatting while
+    /// ordinary float-only queries retain OpenObserve's existing serializer.
+    PromFloat(Sample),
+    Histogram(HistogramSample),
+}
+
+impl InstantPoint {
+    pub fn timestamp(&self) -> i64 {
+        match self {
+            Self::Float(sample) | Self::PromFloat(sample) => sample.timestamp,
+            Self::Histogram(sample) => sample.timestamp,
+        }
+    }
+
+    pub fn as_float(&self) -> Option<&Sample> {
+        match self {
+            Self::Float(sample) | Self::PromFloat(sample) => Some(sample),
+            Self::Histogram(_) => None,
+        }
+    }
+
+    pub fn into_float(self) -> Option<Sample> {
+        match self {
+            Self::Float(sample) | Self::PromFloat(sample) => Some(sample),
+            Self::Histogram(_) => None,
+        }
+    }
 }
 
 impl Serialize for InstantValue {
@@ -369,7 +533,15 @@ impl Serialize for InstantValue {
             .map(|l| (l.name.as_str(), l.value.as_str()))
             .collect::<FxIndexMap<_, _>>();
         seq.serialize_field("metric", &labels_map)?;
-        seq.serialize_field("value", &self.sample)?;
+        match &self.sample {
+            InstantPoint::Float(sample) => seq.serialize_field("value", sample)?,
+            InstantPoint::PromFloat(sample) => {
+                seq.serialize_field("value", &ApiPromSample(sample))?
+            }
+            InstantPoint::Histogram(sample) => {
+                seq.serialize_field("histogram", &ApiHistogramSample(sample))?
+            }
+        }
         seq.end()
     }
 }
@@ -452,6 +624,7 @@ pub struct QueryContext {
 pub struct RangeValue {
     pub labels: Labels,
     pub samples: Vec<Sample>,
+    pub histogram_samples: Option<Vec<HistogramSample>>,
     pub exemplars: Option<Vec<Arc<Exemplar>>>,
     pub time_window: Option<TimeWindow>,
 }
@@ -465,6 +638,15 @@ impl RangeValue {
     pub fn extend(&mut self, other: RangeValue) {
         if !other.samples.is_empty() {
             self.samples.extend(other.samples);
+        }
+        if let Some(histograms) = other.histogram_samples
+            && !histograms.is_empty()
+        {
+            if let Some(self_histograms) = &mut self.histogram_samples {
+                self_histograms.extend(histograms);
+            } else {
+                self.histogram_samples = Some(histograms);
+            }
         }
         // check exemplars
         if let Some(exemplars) = other.exemplars
@@ -497,14 +679,37 @@ impl Serialize for RangeValue {
                 seq.end()
             }
             None => {
-                let mut seq = serializer.serialize_struct("range_value", 2)?;
+                let has_histograms = self
+                    .histogram_samples
+                    .as_ref()
+                    .is_some_and(|samples| !samples.is_empty());
+                let mut seq = serializer.serialize_struct(
+                    "range_value",
+                    1 + usize::from(!self.samples.is_empty()) + usize::from(has_histograms),
+                )?;
                 let labels_map = self
                     .labels
                     .iter()
                     .map(|l| (l.name.as_str(), l.value.as_str()))
                     .collect::<FxIndexMap<_, _>>();
                 seq.serialize_field("metric", &labels_map)?;
-                seq.serialize_field("values", &self.samples)?;
+                if !self.samples.is_empty() {
+                    if self.histogram_samples.is_some() {
+                        let samples = self.samples.iter().map(ApiPromSample).collect::<Vec<_>>();
+                        seq.serialize_field("values", &samples)?;
+                    } else {
+                        seq.serialize_field("values", &self.samples)?;
+                    }
+                }
+                if let Some(histograms) = &self.histogram_samples
+                    && !histograms.is_empty()
+                {
+                    let histograms = histograms
+                        .iter()
+                        .map(ApiHistogramSample)
+                        .collect::<Vec<_>>();
+                    seq.serialize_field("histograms", &histograms)?;
+                }
                 seq.end()
             }
         }
@@ -560,6 +765,7 @@ impl<'de> Deserialize<'de> for RangeValue {
                 Ok(RangeValue {
                     labels,
                     samples: samples.unwrap_or_default(),
+                    histogram_samples: None,
                     exemplars,
                     time_window: None,
                 })
@@ -578,6 +784,7 @@ impl RangeValue {
         Self {
             labels,
             samples: Vec::from_iter(samples),
+            histogram_samples: None,
             exemplars: None,
             time_window: None,
         }
@@ -590,13 +797,14 @@ impl RangeValue {
         Self {
             labels,
             samples: vec![],
+            histogram_samples: None,
             exemplars: Some(Vec::from_iter(exemplars)),
             time_window: None,
         }
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub enum ExtrapolationKind {
     /// Calculate the per-second average rate of increase of the time series.
     /// Adjust for breaks in monotonicity (counter resets).
@@ -757,6 +965,64 @@ pub enum Value {
 }
 
 impl Value {
+    pub fn mark_native_histogram_provenance(&mut self) {
+        match self {
+            Value::Instant(value) => {
+                if let InstantPoint::Float(sample) = &value.sample {
+                    value.sample = InstantPoint::PromFloat(*sample);
+                }
+            }
+            Value::Range(value) => {
+                value.histogram_samples.get_or_insert_with(Vec::new);
+            }
+            Value::Vector(values) => {
+                for value in values {
+                    if let InstantPoint::Float(sample) = &value.sample {
+                        value.sample = InstantPoint::PromFloat(*sample);
+                    }
+                }
+            }
+            Value::Matrix(values) => {
+                for value in values {
+                    value.histogram_samples.get_or_insert_with(Vec::new);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    pub fn has_native_histogram_provenance(&self) -> bool {
+        match self {
+            Value::Instant(value) => !matches!(&value.sample, InstantPoint::Float(_)),
+            Value::Range(value) => value.histogram_samples.is_some(),
+            Value::Vector(values) => values
+                .iter()
+                .any(|value| !matches!(&value.sample, InstantPoint::Float(_))),
+            Value::Matrix(values) => values.iter().any(|value| value.histogram_samples.is_some()),
+            _ => false,
+        }
+    }
+
+    pub fn contains_native_histograms(&self) -> bool {
+        match self {
+            Value::Instant(value) => matches!(&value.sample, InstantPoint::Histogram(_)),
+            Value::Range(value) => value
+                .histogram_samples
+                .as_ref()
+                .is_some_and(|samples| !samples.is_empty()),
+            Value::Vector(values) => values
+                .iter()
+                .any(|value| matches!(&value.sample, InstantPoint::Histogram(_))),
+            Value::Matrix(values) => values.iter().any(|value| {
+                value
+                    .histogram_samples
+                    .as_ref()
+                    .is_some_and(|samples| !samples.is_empty())
+            }),
+            _ => false,
+        }
+    }
+
     pub fn get_ref_matrix_values(&self) -> Option<&Vec<RangeValue>> {
         match self {
             Value::Matrix(values) => Some(values),
@@ -808,7 +1074,12 @@ impl Value {
     pub fn sort(&mut self) {
         match self {
             Value::Vector(v) => {
-                v.sort_by(|a, b| sort_float(&b.sample.value, &a.sample.value));
+                v.sort_by(|a, b| match (a.sample.as_float(), b.sample.as_float()) {
+                    (Some(a), Some(b)) => sort_float(&b.value, &a.value),
+                    (Some(_), None) => std::cmp::Ordering::Less,
+                    (None, Some(_)) => std::cmp::Ordering::Greater,
+                    (None, None) => std::cmp::Ordering::Equal,
+                });
             }
             Value::Matrix(v) => {
                 v.sort_by(|a, b| {
@@ -892,6 +1163,9 @@ mod tests {
     use float_cmp::approx_eq;
 
     use super::*;
+    use crate::meta::promql::histogram::{
+        CounterResetHint, HistogramSample, HistogramSpan, O2FloatHistogram,
+    };
 
     fn generate_test_labels() -> Labels {
         let labels: Labels = vec![
@@ -913,6 +1187,66 @@ mod tests {
             }),
         ];
         labels
+    }
+
+    fn api_histogram_sample(timestamp: i64) -> HistogramSample {
+        HistogramSample::from_decoded(
+            timestamp,
+            O2FloatHistogram {
+                schema: 0,
+                zero_threshold: 0.0,
+                zero_count: 0.0,
+                count: 2.0,
+                sum: f64::INFINITY,
+                positive_spans: vec![HistogramSpan {
+                    offset: 0,
+                    length: 2,
+                }],
+                negative_spans: vec![],
+                positive_buckets: vec![2.0, 0.0],
+                negative_buckets: vec![],
+                counter_reset_hint: CounterResetHint::Gauge,
+                start_time: 0,
+            },
+        )
+    }
+
+    #[test]
+    fn native_histogram_api_uses_prometheus_shape_and_omits_zero_buckets() {
+        let value = RangeValue {
+            labels: vec![],
+            samples: vec![],
+            histogram_samples: Some(vec![api_histogram_sample(1_234_567)]),
+            exemplars: None,
+            time_window: None,
+        };
+        assert_eq!(
+            serde_json::to_string(&value).unwrap(),
+            r#"{"metric":{},"histograms":[[1.234,{"count":"2","sum":"+Inf","buckets":[[0,"0.5","1","2"]]}]]}"#
+        );
+    }
+
+    #[test]
+    fn native_scalar_provenance_uses_prometheus_timestamp_and_float_format() {
+        let range = RangeValue {
+            labels: vec![],
+            samples: vec![Sample::new(1_234_567, 1e21)],
+            histogram_samples: Some(Vec::new()),
+            exemplars: None,
+            time_window: None,
+        };
+        assert_eq!(
+            serde_json::to_string(&range).unwrap(),
+            r#"{"metric":{},"values":[[1.234,"1e+21"]]}"#
+        );
+        let instant = InstantValue {
+            labels: vec![],
+            sample: InstantPoint::PromFloat(Sample::new(1_234_567, f64::INFINITY)),
+        };
+        assert_eq!(
+            serde_json::to_string(&instant).unwrap(),
+            r#"{"metric":{},"value":[1.234,"+Inf"]}"#
+        );
     }
     #[test]
     fn test_signature_without_labels() {
@@ -1201,6 +1535,7 @@ mod tests {
         let mut range_value1 = RangeValue {
             labels: vec![],
             samples: vec![],
+            histogram_samples: None,
             exemplars: Some(vec![Arc::new(Exemplar {
                 timestamp: 1000,
                 value: 1.0,
@@ -1212,6 +1547,7 @@ mod tests {
         let range_value2 = RangeValue {
             labels: vec![],
             samples: vec![],
+            histogram_samples: None,
             exemplars: Some(vec![Arc::new(Exemplar {
                 timestamp: 2000,
                 value: 2.0,
@@ -1252,7 +1588,7 @@ mod tests {
     fn test_value_get_methods() {
         let instant_value = InstantValue {
             labels: vec![],
-            sample: Sample::new(1000, 1.0),
+            sample: InstantPoint::Float(Sample::new(1000, 1.0)),
         };
         let vector = vec![instant_value.clone()];
         let range_value = RangeValue::new(vec![], vec![Sample::new(1000, 1.0)]);
@@ -1278,7 +1614,7 @@ mod tests {
         assert_eq!(
             Value::Instant(InstantValue {
                 labels: vec![],
-                sample: Sample::new(1000, 1.0)
+                sample: InstantPoint::Float(Sample::new(1000, 1.0))
             })
             .get_type(),
             "vector"
@@ -1305,11 +1641,11 @@ mod tests {
         let vector_unique = Value::Vector(vec![
             InstantValue {
                 labels: label1.clone(),
-                sample: Sample::new(1000, 1.0),
+                sample: InstantPoint::Float(Sample::new(1000, 1.0)),
             },
             InstantValue {
                 labels: label2.clone(),
-                sample: Sample::new(2000, 2.0),
+                sample: InstantPoint::Float(Sample::new(2000, 2.0)),
             },
         ]);
         assert!(!vector_unique.contains_same_label_set());
@@ -1318,11 +1654,11 @@ mod tests {
         let vector_duplicate = Value::Vector(vec![
             InstantValue {
                 labels: label1.clone(),
-                sample: Sample::new(1000, 1.0),
+                sample: InstantPoint::Float(Sample::new(1000, 1.0)),
             },
             InstantValue {
                 labels: label1_dup.clone(),
-                sample: Sample::new(2000, 2.0),
+                sample: InstantPoint::Float(Sample::new(2000, 2.0)),
             },
         ]);
         assert!(vector_duplicate.contains_same_label_set());
@@ -1344,7 +1680,7 @@ mod tests {
         // Test single element cases
         let single_vector = Value::Vector(vec![InstantValue {
             labels: label1.clone(),
-            sample: Sample::new(1000, 1.0),
+            sample: InstantPoint::Float(Sample::new(1000, 1.0)),
         }]);
         assert!(!single_vector.contains_same_label_set());
 
@@ -1360,24 +1696,24 @@ mod tests {
         let mut vector = Value::Vector(vec![
             InstantValue {
                 labels: vec![],
-                sample: Sample::new(1000, 1.0),
+                sample: InstantPoint::Float(Sample::new(1000, 1.0)),
             },
             InstantValue {
                 labels: vec![],
-                sample: Sample::new(2000, 3.0),
+                sample: InstantPoint::Float(Sample::new(2000, 3.0)),
             },
             InstantValue {
                 labels: vec![],
-                sample: Sample::new(3000, 2.0),
+                sample: InstantPoint::Float(Sample::new(3000, 2.0)),
             },
         ]);
 
         vector.sort();
 
         if let Value::Vector(ref v) = vector {
-            assert_eq!(v[0].sample.value, 3.0); // Highest value first
-            assert_eq!(v[1].sample.value, 2.0);
-            assert_eq!(v[2].sample.value, 1.0); // Lowest value last
+            assert_eq!(v[0].sample.as_float().unwrap().value, 3.0); // Highest value first
+            assert_eq!(v[1].sample.as_float().unwrap().value, 2.0);
+            assert_eq!(v[2].sample.as_float().unwrap().value, 1.0); // Lowest value last
         }
 
         let mut matrix = Value::Matrix(vec![
@@ -1531,7 +1867,7 @@ mod tests {
     fn test_value_get_vector() {
         let iv = InstantValue {
             labels: vec![],
-            sample: Sample::new(1000, 5.0),
+            sample: InstantPoint::Float(Sample::new(1000, 5.0)),
         };
         let val = Value::Vector(vec![iv]);
         assert!(val.get_vector().is_some());
@@ -1605,15 +1941,15 @@ mod tests {
         let v = Value::Vector(vec![
             InstantValue {
                 labels: label_a,
-                sample: Sample::new(1, 1.0),
+                sample: InstantPoint::Float(Sample::new(1, 1.0)),
             },
             InstantValue {
                 labels: label_b,
-                sample: Sample::new(2, 2.0),
+                sample: InstantPoint::Float(Sample::new(2, 2.0)),
             },
             InstantValue {
                 labels: label_c,
-                sample: Sample::new(3, 3.0),
+                sample: InstantPoint::Float(Sample::new(3, 3.0)),
             },
         ]);
         assert!(!v.contains_same_label_set());
@@ -1627,15 +1963,15 @@ mod tests {
         let v = Value::Vector(vec![
             InstantValue {
                 labels: label_a,
-                sample: Sample::new(1, 1.0),
+                sample: InstantPoint::Float(Sample::new(1, 1.0)),
             },
             InstantValue {
                 labels: label_b,
-                sample: Sample::new(2, 2.0),
+                sample: InstantPoint::Float(Sample::new(2, 2.0)),
             },
             InstantValue {
                 labels: label_a2,
-                sample: Sample::new(3, 3.0),
+                sample: InstantPoint::Float(Sample::new(3, 3.0)),
             },
         ]);
         assert!(v.contains_same_label_set());

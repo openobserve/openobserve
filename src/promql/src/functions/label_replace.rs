@@ -60,6 +60,7 @@ pub(crate) fn label_replace(
                     RangeValue {
                         labels,
                         samples: range_value.samples,
+                        histogram_samples: range_value.histogram_samples,
                         exemplars: range_value.exemplars,
                         time_window: range_value.time_window,
                     }
@@ -105,6 +106,7 @@ mod tests {
         let range_value = RangeValue {
             labels,
             samples: vec![Sample::new(eval_ts, 42.0)],
+            histogram_samples: None,
             exemplars: None,
             time_window: None,
         };
@@ -145,6 +147,7 @@ mod tests {
         let range_value = RangeValue {
             labels,
             samples: vec![Sample::new(1000, 1.0)],
+            histogram_samples: None,
             exemplars: None,
             time_window: None,
         };
@@ -169,6 +172,7 @@ mod tests {
         let range_value = RangeValue {
             labels,
             samples: vec![Sample::new(1000, 1.0)],
+            histogram_samples: None,
             exemplars: None,
             time_window: None,
         };

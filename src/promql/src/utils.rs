@@ -17,7 +17,7 @@ use std::ops::Not;
 
 use config::{
     TIMESTAMP_COL_NAME,
-    meta::promql::{BUCKET_LABEL, HASH_LABEL, VALUE_LABEL},
+    meta::promql::{BUCKET_LABEL, HASH_LABEL, NATIVE_HISTOGRAM_LABEL, VALUE_LABEL},
 };
 use datafusion::{
     arrow::datatypes::Schema,
@@ -31,6 +31,18 @@ use promql_parser::label::{MatchOp, Matchers};
 pub fn apply_matchers(df: DataFrame, schema: &Schema, matchers: &Matchers) -> Result<DataFrame> {
     let mut df = df;
     for mat in matchers.matchers.iter() {
+        // The native histogram payload is a physical storage column, not a Prometheus label.
+        // Match it exactly as Prometheus matches any label that is absent from a series.
+        if mat.name == NATIVE_HISTOGRAM_LABEL {
+            let matches_absent = match &mat.op {
+                MatchOp::Equal => mat.value.is_empty(),
+                MatchOp::NotEqual => !mat.value.is_empty(),
+                MatchOp::Re(regex) => regex.is_match(""),
+                MatchOp::NotRe(regex) => !regex.is_match(""),
+            };
+            df = df.filter(lit(matches_absent))?;
+            continue;
+        }
         if mat.name == TIMESTAMP_COL_NAME
             || mat.name == VALUE_LABEL
             || schema.field_with_name(&mat.name).is_err()
@@ -72,6 +84,7 @@ pub fn apply_label_selector(
         let mut def_labels = vec![
             HASH_LABEL.to_string(),
             VALUE_LABEL.to_string(),
+            NATIVE_HISTOGRAM_LABEL.to_string(),
             BUCKET_LABEL.to_string(),
             TIMESTAMP_COL_NAME.to_string(),
         ];
@@ -260,5 +273,33 @@ mod tests {
             batches.iter().map(|batch| batch.num_rows()).sum::<usize>(),
             1
         );
+    }
+
+    #[tokio::test]
+    async fn test_native_histogram_storage_column_matches_as_absent_label() {
+        use promql_parser::label::Matcher;
+
+        for (op, value, expected_rows) in [
+            (MatchOp::Equal, "", 3),
+            (MatchOp::Equal, "payload", 0),
+            (MatchOp::NotEqual, "", 0),
+            (MatchOp::NotEqual, "payload", 3),
+        ] {
+            let (df, schema) = make_df();
+            let matchers = Matchers::new(vec![Matcher {
+                op,
+                name: NATIVE_HISTOGRAM_LABEL.to_string(),
+                value: value.to_string(),
+            }]);
+            let batches = apply_matchers(df, &schema, &matchers)
+                .unwrap()
+                .collect()
+                .await
+                .unwrap();
+            assert_eq!(
+                batches.iter().map(|batch| batch.num_rows()).sum::<usize>(),
+                expected_rows
+            );
+        }
     }
 }

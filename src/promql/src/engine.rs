@@ -16,7 +16,11 @@
 use std::{str::FromStr, sync::Arc, time::Duration};
 
 use async_recursion::async_recursion;
-use config::meta::promql::{NAME_LABEL, value::*};
+use config::meta::promql::{
+    NAME_LABEL,
+    histogram::{HistogramLoadMode, HistogramSample},
+    value::*,
+};
 use datafusion::error::{DataFusionError, Result};
 use futures::future::try_join_all;
 use hashbrown::{HashMap, HashSet};
@@ -38,6 +42,114 @@ use super::{
 };
 use crate::{aggregations, binaries, functions, micros, rewrite::remove_filter_all};
 
+fn histogram_load_mode_for_expr(expr: &PromExpr) -> HistogramLoadMode {
+    let child_requirement = |expressions: &[Box<PromExpr>]| {
+        expressions
+            .iter()
+            .map(|expr| histogram_load_mode_for_expr(expr.as_ref()))
+            .fold(HistogramLoadMode::PresenceOnly, strongest_histogram_mode)
+    };
+    match expr {
+        PromExpr::VectorSelector(_) | PromExpr::MatrixSelector(_) | PromExpr::Extension(_) => {
+            HistogramLoadMode::RawLazy
+        }
+        PromExpr::Paren(ParenExpr { expr }) => histogram_load_mode_for_expr(expr),
+        PromExpr::Subquery(expr) => histogram_load_mode_for_expr(&expr.expr),
+        PromExpr::Call(Call { func, args }) => {
+            let child = child_requirement(&args.args);
+            match func.name {
+                "rate" | "increase" | "delta" => HistogramLoadMode::DecodedOnly,
+                "histogram_avg" | "histogram_count" | "histogram_fraction"
+                | "histogram_quantile" | "histogram_sum" | "timestamp" => {
+                    if child == HistogramLoadMode::DecodedOnly {
+                        child
+                    } else {
+                        HistogramLoadMode::DecodeAfterSelection
+                    }
+                }
+                "label_join" | "label_replace" | "last_over_time" => {
+                    if matches!(
+                        child,
+                        HistogramLoadMode::DecodedOnly | HistogramLoadMode::DecodeAfterSelection
+                    ) {
+                        child
+                    } else {
+                        HistogramLoadMode::RawLazy
+                    }
+                }
+                _ if matches!(
+                    child,
+                    HistogramLoadMode::DecodedOnly | HistogramLoadMode::DecodeAfterSelection
+                ) =>
+                {
+                    child
+                }
+                _ => HistogramLoadMode::PresenceOnly,
+            }
+        }
+        PromExpr::Aggregate(AggregateExpr { op, expr, .. }) => {
+            let child = histogram_load_mode_for_expr(expr);
+            if matches!(op.id(), token::T_SUM | token::T_AVG) {
+                if child == HistogramLoadMode::DecodedOnly {
+                    child
+                } else {
+                    HistogramLoadMode::DecodeAfterSelection
+                }
+            } else if matches!(
+                child,
+                HistogramLoadMode::DecodedOnly | HistogramLoadMode::DecodeAfterSelection
+            ) {
+                child
+            } else {
+                HistogramLoadMode::PresenceOnly
+            }
+        }
+        PromExpr::Binary(BinaryExpr { lhs, rhs, .. }) => {
+            let child = strongest_histogram_mode(
+                histogram_load_mode_for_expr(lhs),
+                histogram_load_mode_for_expr(rhs),
+            );
+            if matches!(
+                child,
+                HistogramLoadMode::DecodedOnly | HistogramLoadMode::DecodeAfterSelection
+            ) {
+                child
+            } else {
+                HistogramLoadMode::PresenceOnly
+            }
+        }
+        PromExpr::Unary(UnaryExpr { expr }) => {
+            let child = histogram_load_mode_for_expr(expr);
+            if matches!(
+                child,
+                HistogramLoadMode::DecodedOnly | HistogramLoadMode::DecodeAfterSelection
+            ) {
+                child
+            } else {
+                HistogramLoadMode::PresenceOnly
+            }
+        }
+        _ => HistogramLoadMode::PresenceOnly,
+    }
+}
+
+fn strongest_histogram_mode(
+    left: HistogramLoadMode,
+    right: HistogramLoadMode,
+) -> HistogramLoadMode {
+    let rank = |mode| match mode {
+        HistogramLoadMode::PresenceOnly => 0,
+        HistogramLoadMode::RawLazy => 1,
+        HistogramLoadMode::DecodeAfterSelection => 2,
+        HistogramLoadMode::DecodedOnly => 3,
+    };
+    if rank(left) >= rank(right) {
+        left
+    } else {
+        right
+    }
+}
+
 pub struct Engine {
     trace_id: String,
     /// PromQL evaluation context
@@ -57,6 +169,7 @@ pub struct Engine {
     skip_labels: bool,
     /// The result type of the query
     result_type: Option<String>,
+    histogram_load_mode: HistogramLoadMode,
 }
 
 impl Engine {
@@ -68,6 +181,7 @@ impl Engine {
             disable_label_selector: false,
             skip_labels: false,
             result_type: None,
+            histogram_load_mode: HistogramLoadMode::RawLazy,
             trace_id: trace_id.to_string(),
         }
     }
@@ -83,6 +197,7 @@ impl Engine {
     }
 
     pub async fn exec(&mut self, prom_expr: &PromExpr) -> Result<(Value, Option<String>)> {
+        self.histogram_load_mode = histogram_load_mode_for_expr(prom_expr);
         self.extract_columns_from_prom_expr(prom_expr)?;
         if self.disable_label_selector {
             self.label_selector.clear();
@@ -205,6 +320,18 @@ impl Engine {
                 let val = self.exec_expr(expr).await?;
                 match val {
                     Value::Matrix(m) => {
+                        let native_provenance =
+                            m.iter().any(|range| range.histogram_samples.is_some());
+                        if m.iter().any(|range| {
+                            range
+                                .histogram_samples
+                                .as_ref()
+                                .is_some_and(|samples| !samples.is_empty())
+                        }) {
+                            return Err(DataFusionError::NotImplemented(
+                                "unary operations on native histograms are not supported".into(),
+                            ));
+                        }
                         let out = m
                             .into_iter()
                             .map(|mut range| RangeValue {
@@ -217,6 +344,7 @@ impl Engine {
                                         value: -s.value,
                                     })
                                     .collect(),
+                                histogram_samples: native_provenance.then(Vec::new),
                                 exemplars: range.exemplars,
                                 time_window: range.time_window,
                             })
@@ -234,6 +362,13 @@ impl Engine {
             PromExpr::Binary(expr) => {
                 let lhs = self.exec_expr(&expr.lhs).await?;
                 let rhs = self.exec_expr(&expr.rhs).await?;
+                let native_provenance =
+                    lhs.has_native_histogram_provenance() || rhs.has_native_histogram_provenance();
+                if lhs.contains_native_histograms() || rhs.contains_native_histograms() {
+                    return Err(DataFusionError::NotImplemented(
+                        "binary operations on native histograms are not supported".into(),
+                    ));
+                }
                 let token = expr.op.id();
                 let return_bool = expr.return_bool();
                 let op = expr.op.is_comparison_operator();
@@ -247,7 +382,7 @@ impl Engine {
                     }
                     _ => rhs,
                 };
-                match (lhs, rhs) {
+                let mut result = match (lhs, rhs) {
                     (Value::Float(left), Value::Float(right)) => {
                         let value = binaries::scalar_binary_operations(
                             token,
@@ -275,7 +410,11 @@ impl Engine {
                         );
                         Value::Matrix(vec![])
                     }
+                };
+                if native_provenance {
+                    result.mark_native_histogram_provenance();
                 }
+                result
             }
             PromExpr::Paren(ParenExpr { expr }) => self.exec_expr(expr).await?,
             PromExpr::Subquery(expr) => {
@@ -392,6 +531,7 @@ impl Engine {
         let mut result = Vec::with_capacity(metrics_cache.len());
         for metric in metrics_cache {
             let mut selected_samples = Vec::with_capacity(eval_timestamps.len());
+            let mut selected_histograms = Vec::with_capacity(eval_timestamps.len());
 
             for &eval_ts in &eval_timestamps {
                 // Calculate lookback window for this evaluation timestamp
@@ -416,8 +556,64 @@ impl Engine {
                     None
                 };
 
-                // Add the matched sample (already validated to be within range)
-                if let Some(sample) = match_sample {
+                let histogram_end_index = metric
+                    .histogram_samples
+                    .as_deref()
+                    .unwrap_or_default()
+                    .partition_point(|v| v.timestamp + offset_modifier <= eval_ts);
+                let match_histogram = if histogram_end_index > 0 {
+                    metric
+                        .histogram_samples
+                        .as_deref()
+                        .and_then(|samples| samples.get(histogram_end_index - 1))
+                        .filter(|sample| {
+                            let adjusted_ts = sample.timestamp + offset_modifier;
+                            adjusted_ts >= start && adjusted_ts <= eval_ts
+                        })
+                } else {
+                    None
+                };
+
+                // A series can switch between float and histogram samples. Only the
+                // most recent sample in the lookback window is visible.
+                let use_histogram = match (match_sample, match_histogram) {
+                    (None, Some(_)) => true,
+                    (Some(float), Some(histogram)) => histogram.timestamp >= float.timestamp,
+                    _ => false,
+                };
+                if use_histogram {
+                    let histogram = match_histogram.expect("histogram sample must exist");
+                    match histogram.histogram.is_stale() {
+                        Ok(false) => {
+                            let histogram = if self.histogram_load_mode
+                                == HistogramLoadMode::DecodeAfterSelection
+                            {
+                                HistogramSample::from_computed(
+                                    eval_ts,
+                                    histogram
+                                        .histogram
+                                        .float()
+                                        .map_err(|err| DataFusionError::Execution(err.to_string()))?
+                                        .clone(),
+                                    histogram.histogram.as_ref(),
+                                )
+                                .map_err(|err| {
+                                    DataFusionError::ResourcesExhausted(err.to_string())
+                                })?
+                            } else {
+                                let mut histogram = histogram.clone();
+                                histogram.timestamp = eval_ts;
+                                histogram
+                            };
+                            selected_histograms.push(histogram);
+                        }
+                        Ok(true) => {}
+                        Err(err) => log::warn!(
+                            "[trace_id: {}] dropping invalid native histogram: {err}",
+                            self.trace_id
+                        ),
+                    }
+                } else if let Some(sample) = match_sample {
                     // Use eval_ts as the timestamp for the selected sample
                     // See https://promlabs.com/blog/2020/06/18/the-anatomy-of-a-promql-query/#instant-queries
                     selected_samples.push(Sample::new(eval_ts, sample.value));
@@ -425,10 +621,12 @@ impl Engine {
             }
 
             // Only include metrics that have at least one sample
-            if !selected_samples.is_empty() {
+            if !selected_samples.is_empty() || !selected_histograms.is_empty() {
                 result.push(RangeValue {
                     labels: metric.labels,
                     samples: selected_samples,
+                    histogram_samples: (!selected_histograms.is_empty())
+                        .then_some(selected_histograms),
                     exemplars: metric.exemplars,
                     time_window: metric.time_window,
                 });
@@ -477,13 +675,29 @@ impl Engine {
         };
 
         let start = std::time::Instant::now();
+        let trace_id = self.trace_id.clone();
         let mut values = values
             .into_par_iter()
-            .map(|rv| RangeValue {
-                labels: rv.labels,
-                samples: rv.samples,
-                exemplars: rv.exemplars,
-                time_window: Some(TimeWindow::new(range)),
+            .map(|mut rv| {
+                if let Some(histograms) = &mut rv.histogram_samples {
+                    histograms.retain(|sample| match sample.histogram.is_stale() {
+                        Ok(is_stale) => !is_stale,
+                        Err(err) => {
+                            log::warn!(
+                                "[trace_id: {}] dropping invalid native histogram: {err}",
+                                trace_id
+                            );
+                            false
+                        }
+                    });
+                }
+                RangeValue {
+                    labels: rv.labels,
+                    samples: rv.samples,
+                    histogram_samples: rv.histogram_samples,
+                    exemplars: rv.exemplars,
+                    time_window: Some(TimeWindow::new(range)),
+                }
             })
             .collect::<Vec<_>>();
 
@@ -500,6 +714,11 @@ impl Engine {
                 rv.samples
                     .iter_mut()
                     .for_each(|s| s.timestamp += offset_modifier);
+                if let Some(histograms) = &mut rv.histogram_samples {
+                    histograms
+                        .iter_mut()
+                        .for_each(|sample| sample.timestamp += offset_modifier);
+                }
             });
         }
 
@@ -589,6 +808,25 @@ impl Engine {
         // check for super cluster
         let trace_id = self.ctx.query_ctx.trace_id.clone();
         #[cfg(feature = "enterprise")]
+        if self.ctx.query_ctx.is_super_cluster {
+            let schema = infra::schema::get(
+                &self.ctx.query_ctx.org_id,
+                table_name,
+                config::meta::stream::StreamType::Metrics,
+            )
+            .await
+            .map_err(|err| DataFusionError::External(Box::new(err)))?;
+            if schema
+                .field_with_name(config::meta::promql::NATIVE_HISTOGRAM_LABEL)
+                .is_ok()
+            {
+                return Err(DataFusionError::Plan(
+                    "native histogram queries are not supported across super clusters in Phase 0-3"
+                        .into(),
+                ));
+            }
+        }
+        #[cfg(feature = "enterprise")]
         let (super_tx, mut super_rx) = tokio::sync::mpsc::channel::<
             Result<(HashMap<u64, RangeValue>, config::meta::search::ScanStats)>,
         >(1);
@@ -658,6 +896,7 @@ impl Engine {
         let lookback = range.map_or(self.ctx.lookback_delta, micros);
 
         let skip_labels = self.skip_labels;
+        let histogram_load_mode = self.histogram_load_mode;
         let mut tasks = Vec::with_capacity(ctxs.len());
         let mut abort_handles = Vec::with_capacity(ctxs.len());
         for (ctx, schema, scan_stats, keep_filters) in ctxs {
@@ -681,6 +920,7 @@ impl Engine {
                         step,
                         lookback,
                         skip_labels,
+                        histogram_load_mode,
                     ),
                 )
                 .await
@@ -815,6 +1055,22 @@ impl Engine {
         modifier: &Option<LabelModifier>,
     ) -> Result<Value> {
         let input = self.exec_expr(expr).await?;
+
+        if input.contains_native_histograms()
+            && !matches!(
+                op.id(),
+                token::T_SUM | token::T_AVG | token::T_TOPK | token::T_BOTTOMK
+            )
+        {
+            return Err(DataFusionError::NotImplemented(format!(
+                "aggregation {} does not support native histogram samples",
+                op
+            )));
+        }
+        if input.contains_native_histograms() && matches!(op.id(), token::T_TOPK | token::T_BOTTOMK)
+        {
+            log::warn!("aggregation {op} omitted native histogram samples");
+        }
 
         let eval_ctx = self.eval_ctx.clone();
 
@@ -978,6 +1234,7 @@ impl Engine {
                     let default_now_matrix = vec![RangeValue {
                         labels: Labels::default(),
                         samples,
+                        histogram_samples: None,
                         exemplars: None,
                         time_window: None,
                     }];
@@ -999,6 +1256,29 @@ impl Engine {
             }
         };
 
+        if input.contains_native_histograms()
+            && !matches!(
+                func_name,
+                Func::HistogramAvg
+                    | Func::HistogramCount
+                    | Func::HistogramFraction
+                    | Func::HistogramQuantile
+                    | Func::HistogramSum
+                    | Func::Rate
+                    | Func::Increase
+                    | Func::Delta
+                    | Func::LastOverTime
+                    | Func::LabelJoin
+                    | Func::LabelReplace
+                    | Func::Timestamp
+            )
+        {
+            return Err(DataFusionError::NotImplemented(format!(
+                "{} does not support native histogram samples",
+                func.name
+            )));
+        }
+
         Ok(match func_name {
             Func::Abs => functions::abs(input)?,
             Func::Absent => functions::absent(input, &self.eval_ctx)?,
@@ -1012,6 +1292,11 @@ impl Engine {
                 self.ensure_three_args(args, err)?;
 
                 let input = self.call_expr_first_arg(args).await?;
+                if input.contains_native_histograms() {
+                    return Err(DataFusionError::NotImplemented(
+                        "clamp does not support native histogram samples".into(),
+                    ));
+                }
                 let min = self.call_expr_second_arg(args).await?;
                 let max = self.call_expr_third_arg(args).await?;
 
@@ -1033,6 +1318,11 @@ impl Engine {
                 self.ensure_two_args(args, err)?;
 
                 let input = self.call_expr_first_arg(args).await?;
+                if input.contains_native_histograms() {
+                    return Err(DataFusionError::NotImplemented(
+                        "clamp_max does not support native histogram samples".into(),
+                    ));
+                }
                 let max = self.call_expr_second_arg(args).await?;
                 let max_f = match max {
                     Value::Float(max) => max,
@@ -1047,6 +1337,11 @@ impl Engine {
                 self.ensure_two_args(args, err)?;
 
                 let input = self.call_expr_first_arg(args).await?;
+                if input.contains_native_histograms() {
+                    return Err(DataFusionError::NotImplemented(
+                        "clamp_min does not support native histogram samples".into(),
+                    ));
+                }
                 let min = self.call_expr_second_arg(args).await?;
                 let min_f = match min {
                     Value::Float(min) => min,
@@ -1065,15 +1360,19 @@ impl Engine {
             Func::Deriv => functions::deriv(input, &self.eval_ctx)?,
             Func::Exp => functions::exp(input)?,
             Func::Floor => functions::floor(input)?,
-            Func::HistogramCount => {
-                return Err(DataFusionError::NotImplemented(format!(
-                    "Unsupported Function: {func_name:?}"
-                )));
-            }
+            Func::HistogramAvg => functions::histogram_avg(input)?,
+            Func::HistogramCount => functions::histogram_count(input)?,
             Func::HistogramFraction => {
-                return Err(DataFusionError::NotImplemented(format!(
-                    "Unsupported Function: {func_name:?}"
-                )));
+                let err =
+                    "Invalid args, expected histogram_fraction(lower scalar, upper scalar, vector)";
+                self.ensure_three_args(args, err)?;
+                let lower = self.call_expr_first_arg(args).await?;
+                let upper = self.call_expr_second_arg(args).await?;
+                functions::histogram_fraction(
+                    self.parse_f64_else_err(&lower, err)?,
+                    self.parse_f64_else_err(&upper, err)?,
+                    input,
+                )?
             }
             Func::HistogramQuantile => {
                 let args = &args.args;
@@ -1099,17 +1398,18 @@ impl Engine {
                 // Use range version if we have an eval context
                 functions::histogram_quantile(phi, input, &self.eval_ctx)?
             }
-            Func::HistogramSum => {
-                return Err(DataFusionError::NotImplemented(format!(
-                    "Unsupported Function: {func_name:?}"
-                )));
-            }
+            Func::HistogramSum => functions::histogram_sum(input)?,
             Func::HoltWinters => {
                 let err =
                     "Invalid args, expected \"holt_winters(v range-vector, sf scalar, tf scalar)\"";
                 self.ensure_three_args(args, err)?;
 
                 let input = self.call_expr_first_arg(args).await?;
+                if input.contains_native_histograms() {
+                    return Err(DataFusionError::NotImplemented(
+                        "holt_winters does not support native histogram samples".into(),
+                    ));
+                }
                 let sf = self.call_expr_second_arg(args).await?;
                 let tf = self.call_expr_third_arg(args).await?;
 
@@ -1183,6 +1483,11 @@ impl Engine {
 
                 self.ensure_two_args(args, err)?;
                 let input = self.call_expr_first_arg(args).await?;
+                if input.contains_native_histograms() {
+                    return Err(DataFusionError::NotImplemented(
+                        "predict_linear does not support native histogram samples".into(),
+                    ));
+                }
 
                 let prediction_steps = self.call_expr_second_arg(args).await?.get_float().ok_or(
                     DataFusionError::NotImplemented(
@@ -1204,6 +1509,11 @@ impl Engine {
                     }
                 };
                 let input = self.call_expr_second_arg(args).await?;
+                if input.contains_native_histograms() {
+                    return Err(DataFusionError::NotImplemented(
+                        "quantile_over_time does not support native histogram samples".into(),
+                    ));
+                }
                 functions::quantile_over_time(phi_quantile, input, &self.eval_ctx)?
             }
             Func::Rate => functions::rate(input, &self.eval_ctx)?,
@@ -1344,6 +1654,7 @@ mod tests {
         RangeValue {
             labels: vec![],
             samples: vec![Sample::new(timestamp, value)],
+            histogram_samples: None,
             exemplars: None,
             time_window: None,
         }
@@ -2044,7 +2355,7 @@ mod tests {
         let sample = Sample::new(1640995200000000i64, 42.0);
         let instant = InstantValue {
             labels: vec![Arc::new(Label::new("env", "prod"))],
-            sample,
+            sample: InstantPoint::Float(sample),
         };
         let _vector = Value::Vector(vec![instant]);
         let vector_expr = PromExpr::Extension(Extension {
@@ -2211,7 +2522,7 @@ mod tests {
         let sample = Sample::new(1640995200000000i64, 42.0);
         let _instant = InstantValue {
             labels: vec![Arc::new(Label::new("env", "prod"))],
-            sample,
+            sample: InstantPoint::Float(sample),
         };
         let vector = PromExpr::Extension(Extension {
             expr: Arc::new(TestExtension),
@@ -3019,5 +3330,21 @@ mod tests {
     fn test_get_offset_modifier_negative() {
         let result = get_offset_modifier(Some(Offset::Neg(Duration::from_secs(30))));
         assert_eq!(result, -30_000_000); // -30s in micros
+    }
+
+    #[test]
+    fn test_histogram_load_mode_classifier() {
+        let mode = |query: &str| {
+            let expr = promql_parser::parser::parse(query).unwrap();
+            histogram_load_mode_for_expr(&expr)
+        };
+        assert_eq!(mode("metric"), HistogramLoadMode::RawLazy);
+        assert_eq!(mode("abs(metric)"), HistogramLoadMode::PresenceOnly);
+        assert_eq!(mode("sum(metric)"), HistogramLoadMode::DecodeAfterSelection);
+        assert_eq!(mode("rate(metric[5m])"), HistogramLoadMode::DecodedOnly);
+        assert_eq!(
+            mode("histogram_count(rate(metric[5m]))"),
+            HistogramLoadMode::DecodedOnly
+        );
     }
 }

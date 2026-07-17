@@ -184,6 +184,23 @@ pub async fn get(
             series.samples.drain(last_i..);
         }
 
+        let value_n = series.histogram_samples.len();
+        let mut first_i = 0;
+        while first_i < value_n && series.histogram_samples[first_i].time < start {
+            first_i += 1;
+        }
+        if first_i > 0 {
+            series.histogram_samples.drain(0..first_i);
+        }
+        let value_n = series.histogram_samples.len();
+        let mut last_i = value_n;
+        while last_i > 0 && series.histogram_samples[last_i - 1].time > end {
+            last_i -= 1;
+        }
+        if last_i < value_n {
+            series.histogram_samples.drain(last_i..);
+        }
+
         // filter the exemplars, remove the exemplars over time range
         if let Some(exemplars) = series.exemplars.as_mut() {
             let value_n = exemplars.exemplars.len();
@@ -205,11 +222,21 @@ pub async fn get(
         }
 
         // update the new start
-        let ns = if let Some(exemplars) = series.exemplars.as_ref() {
-            exemplars.exemplars.last().map(|v| v.time).unwrap_or(0)
-        } else {
-            series.samples.last().map(|v| v.time).unwrap_or(0)
-        };
+        let ns = series
+            .samples
+            .last()
+            .map(|v| v.time)
+            .into_iter()
+            .chain(series.histogram_samples.last().map(|v| v.time))
+            .chain(
+                series
+                    .exemplars
+                    .as_ref()
+                    .and_then(|values| values.exemplars.last())
+                    .map(|v| v.time),
+            )
+            .max()
+            .unwrap_or(0);
         if ns > new_start {
             new_start = ns;
         }
@@ -300,6 +327,13 @@ pub async fn set(
                 series.samples.drain(last_i + 1..);
             }
 
+            if let Some(histograms) = series.histogram_samples.as_mut() {
+                histograms.retain(|sample| sample.timestamp < max_ts);
+                if !histograms.is_empty() {
+                    empty_data = false;
+                }
+            }
+
             // check exemplars
             if let Some(exemplars) = series.exemplars.as_mut() {
                 empty_data = false;
@@ -339,6 +373,16 @@ pub async fn set(
     let mut resp = proto::cluster_rpc::MetricsQueryResponse::default();
     super::grpc::add_value(&mut resp, Value::Matrix(range_values));
     let bytes_data = resp.encode_to_vec();
+    let cluster_admission_limit = cfg.grpc.max_message_size * 1024 * 1024 / 2;
+    let cache_admission_limit = cfg.disk_cache.result_max_size.min(cluster_admission_limit);
+    if bytes_data.len() > cache_admission_limit {
+        log::warn!(
+            "[trace_id {trace_id}] promql->search->cache: skip {} byte entry above result cache admission limit {}",
+            bytes_data.len(),
+            cache_admission_limit
+        );
+        return Ok(());
+    }
 
     // store the series to disk cache
     let cache_key = get_cache_item_key(&key, org, start, new_end);
@@ -548,6 +592,7 @@ mod tests {
         let mut range_values = vec![RangeValue {
             labels: Labels::new(),
             samples: vec![],
+            histogram_samples: None,
             exemplars: None,
             time_window: None,
         }];
@@ -605,6 +650,7 @@ mod tests {
                     timestamp: start,
                     value: i as f64,
                 }],
+                histogram_samples: None,
                 exemplars: None,
                 time_window: None,
             }];
@@ -708,6 +754,7 @@ mod tests {
                 timestamp: start,
                 value: 42.0,
             }],
+            histogram_samples: None,
             exemplars: None,
             time_window: None,
         }];

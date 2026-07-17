@@ -14,6 +14,8 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use chrono::{DateTime, Datelike, Duration, TimeZone, Timelike, Utc};
+#[cfg(feature = "enterprise")]
+use config::meta::promql::NATIVE_HISTOGRAM_LABEL;
 use config::{
     COMPACT_OLD_DATA_STREAM_SET,
     cluster::LOCAL_NODE,
@@ -204,6 +206,15 @@ pub async fn run_generate_downsampling_job() -> Result<(), anyhow::Error> {
         let stream_type = StreamType::Metrics;
         let streams = db::schema::list_streams_from_cache(&org_id, stream_type).await;
         for stream_name in streams {
+            let schema = infra::schema::get(&org_id, &stream_name, stream_type)
+                .await
+                .unwrap_or_else(|_| datafusion::arrow::datatypes::Schema::empty());
+            if schema.field_with_name(NATIVE_HISTOGRAM_LABEL).is_ok() {
+                log::info!(
+                    "[DOWNSAMPLING] skipping native histogram stream [{org_id}/{stream_type}/{stream_name}]"
+                );
+                continue;
+            }
             let Some(node_name) =
                 get_node_from_consistent_hash(&stream_name, &Role::Compactor, None).await
             else {

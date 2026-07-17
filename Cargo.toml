@@ -357,7 +357,7 @@ aws-sdk-sns = { version = "1.97", default-features = false, features = [
     "rt-tokio",
 ] }
 base64 = "0.22"
-bytes = "1.11"
+bytes = { version = "1.11", features = ["serde"] }
 byteorder = "1.5"
 chromiumoxide = { git = "https://github.com/mattsse/chromiumoxide", features = [
     "tokio-runtime",

@@ -23,7 +23,7 @@ use config::{
     get_config,
     meta::{
         cluster::{Node, RoleGroup},
-        promql::value::*,
+        promql::{histogram::HistogramSample, value::*},
         search::ScanStats,
         self_reporting::usage::{RequestStats, UsageType},
         stream::StreamType,
@@ -557,6 +557,8 @@ async fn search_in_cluster(
 
 async fn merge_matrix_query(series: &[cluster_rpc::Series], org_id: &str) -> Result<Value> {
     let mut merged_data = HashMap::new();
+    let mut merged_histograms = HashMap::new();
+    let mut native_provenance = hashbrown::HashSet::new();
     let mut merged_metrics = HashMap::new();
     for ser in series {
         let labels: Labels = ser
@@ -570,7 +572,17 @@ async fn merge_matrix_query(series: &[cluster_rpc::Series], org_id: &str) -> Res
         ser.samples.iter().for_each(|v| {
             entry.insert(v.time, v.value);
         });
-        merged_metrics.insert(signature(&labels), labels);
+        let signature = signature(&labels);
+        if ser.native_histogram_provenance {
+            native_provenance.insert(signature);
+        }
+        let histogram_entry = merged_histograms
+            .entry(signature)
+            .or_insert_with(HashMap::new);
+        ser.histogram_samples.iter().for_each(|sample| {
+            histogram_entry.insert(sample.time, HistogramSample::from(sample));
+        });
+        merged_metrics.insert(signature, labels);
     }
     let mut merged_data = merged_data
         .into_iter()
@@ -583,7 +595,18 @@ async fn merge_matrix_query(series: &[cluster_rpc::Series], org_id: &str) -> Res
                 })
                 .collect::<Vec<_>>();
             samples.sort_by_key(|k| k.timestamp);
-            RangeValue::new(merged_metrics.get(&sig).unwrap().to_owned(), samples)
+            let mut range = RangeValue::new(merged_metrics.get(&sig).unwrap().to_owned(), samples);
+            if let Some(histograms) = merged_histograms.remove(&sig) {
+                let mut histograms = histograms.into_values().collect::<Vec<_>>();
+                histograms.sort_by_key(|sample| sample.timestamp);
+                if !histograms.is_empty() {
+                    range.histogram_samples = Some(histograms);
+                }
+            }
+            if native_provenance.contains(&sig) && range.histogram_samples.is_none() {
+                range.histogram_samples = Some(Vec::new());
+            }
+            range
         })
         .collect::<Vec<_>>();
 
@@ -599,7 +622,7 @@ async fn merge_matrix_query(series: &[cluster_rpc::Series], org_id: &str) -> Res
 }
 
 async fn merge_vector_query(series: &[cluster_rpc::Series], org_id: &str) -> Result<Value> {
-    let mut merged_data = HashMap::new();
+    let mut merged_data: HashMap<u64, InstantPoint> = HashMap::new();
     let mut merged_metrics: HashMap<u64, Vec<Arc<Label>>> = HashMap::new();
     for ser in series {
         let labels: Labels = ser
@@ -609,7 +632,20 @@ async fn merge_vector_query(series: &[cluster_rpc::Series], org_id: &str) -> Res
             .collect();
         if let Some(sample) = ser.sample.as_ref() {
             let sample: Sample = sample.into();
-            merged_data.insert(signature(&labels), sample);
+            merged_data.insert(
+                signature(&labels),
+                if ser.native_histogram_provenance {
+                    InstantPoint::PromFloat(sample)
+                } else {
+                    InstantPoint::Float(sample)
+                },
+            );
+            merged_metrics.insert(signature(&labels), labels);
+        } else if let Some(sample) = ser.histogram_sample.as_ref() {
+            merged_data.insert(
+                signature(&labels),
+                InstantPoint::Histogram(HistogramSample::from(sample)),
+            );
             merged_metrics.insert(signature(&labels), labels);
         }
     }

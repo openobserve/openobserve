@@ -18,6 +18,7 @@ use std::{collections::HashMap, hash::Hasher, sync::Arc};
 use config::{
     meta::promql::{
         NAME_LABEL,
+        histogram::{CounterResetHint, HistogramSample, LazyHistogram, O2FloatHistogram},
         value::{EvalContext, Label, Labels, RangeValue, Sample, Value},
     },
     utils::hash::gxhash,
@@ -290,6 +291,9 @@ where
         .map(|(_, series_indices)| {
             // Get the labels for this group (from the first series in the group)
             let labels = projected_labels(param, &matrix[series_indices[0]].labels);
+            let native_provenance = series_indices
+                .iter()
+                .any(|&index| matrix[index].histogram_samples.is_some());
 
             let accumulate_chunk = |chunk: &[usize]| {
                 let mut acc = func.build();
@@ -331,6 +335,7 @@ where
             RangeValue {
                 labels,
                 samples,
+                histogram_samples: native_provenance.then(Vec::new),
                 exemplars: None,
                 time_window: None,
             }
@@ -352,6 +357,297 @@ where
         start4.elapsed()
     );
 
+    Ok(Value::Matrix(results))
+}
+
+#[derive(Default)]
+struct HistogramAggregationState {
+    histograms: HashMap<i64, O2FloatHistogram>,
+    parents: HashMap<i64, Arc<LazyHistogram>>,
+    compensations: HashMap<i64, O2FloatHistogram>,
+    counts: HashMap<i64, usize>,
+    timestamps: std::collections::HashSet<i64>,
+    incremental_mean_timestamps: std::collections::HashSet<i64>,
+    counter_reset_timestamps: std::collections::HashSet<i64>,
+    not_counter_reset_timestamps: std::collections::HashSet<i64>,
+}
+
+impl HistogramAggregationState {
+    fn accumulate(&mut self, sample: &HistogramSample, average: bool) -> Result<()> {
+        let timestamp = sample.timestamp;
+        self.timestamps.insert(timestamp);
+        let histogram = sample
+            .histogram
+            .float()
+            .map_err(|err| DataFusionError::Execution(err.to_string()))?;
+        match histogram.counter_reset_hint {
+            CounterResetHint::CounterReset => {
+                self.counter_reset_timestamps.insert(timestamp);
+            }
+            CounterResetHint::NotCounterReset => {
+                self.not_counter_reset_timestamps.insert(timestamp);
+            }
+            _ => {}
+        }
+        if let Some(sum) = self.histograms.get_mut(&timestamp) {
+            let current_count = self.counts[&timestamp];
+            let next_count = current_count + 1;
+            let compensation = self
+                .compensations
+                .get_mut(&timestamp)
+                .expect("compensation initialized with histogram sum");
+            if average && self.incremental_mean_timestamps.contains(&timestamp) {
+                let mut delta = histogram.clone();
+                delta
+                    .sub_assign(sum)
+                    .map_err(|err| DataFusionError::Execution(err.to_string()))?;
+                delta.scale(1.0 / next_count as f64);
+                sum.add_assign(&delta)
+                    .map_err(|err| DataFusionError::Execution(err.to_string()))?;
+            } else if average {
+                let mut candidate = sum.clone();
+                let mut candidate_compensation = compensation.clone();
+                candidate
+                    .kahan_add_assign(histogram, &mut candidate_compensation)
+                    .map_err(|err| DataFusionError::Execution(err.to_string()))?;
+                let candidate_hint = candidate.counter_reset_hint;
+                let mut finalized = candidate.clone();
+                finalized
+                    .add_assign(&candidate_compensation)
+                    .map_err(|err| DataFusionError::Execution(err.to_string()))?;
+                finalized.counter_reset_hint = candidate_hint;
+                if finalized.has_overflow() && !sum.has_overflow() && !histogram.has_overflow() {
+                    let hint = sum.counter_reset_hint;
+                    sum.add_assign(compensation)
+                        .map_err(|err| DataFusionError::Execution(err.to_string()))?;
+                    sum.counter_reset_hint = hint;
+                    sum.scale(1.0 / current_count as f64);
+                    let mut delta = histogram.clone();
+                    delta
+                        .sub_assign(sum)
+                        .map_err(|err| DataFusionError::Execution(err.to_string()))?;
+                    delta.scale(1.0 / next_count as f64);
+                    sum.add_assign(&delta)
+                        .map_err(|err| DataFusionError::Execution(err.to_string()))?;
+                    *compensation = O2FloatHistogram::empty(sum.schema);
+                    compensation.zero_threshold = sum.zero_threshold;
+                    self.incremental_mean_timestamps.insert(timestamp);
+                } else {
+                    *sum = candidate;
+                    *compensation = candidate_compensation;
+                }
+            } else {
+                sum.kahan_add_assign(histogram, compensation)
+                    .map_err(|err| DataFusionError::Execution(err.to_string()))?;
+            }
+        } else {
+            self.histograms.insert(timestamp, histogram.clone());
+            self.parents.insert(timestamp, sample.histogram.clone());
+            let mut compensation = O2FloatHistogram::empty(histogram.schema);
+            compensation.zero_threshold = histogram.zero_threshold;
+            self.compensations.insert(timestamp, compensation);
+        }
+        *self.counts.entry(timestamp).or_insert(0) += 1;
+        Ok(())
+    }
+
+    /// Merge a partial histogram sum. Both the partial's main histogram and
+    /// compensation histogram must be folded as separate Kahan increments;
+    /// adding the compensations together first loses residuals during
+    /// cancellation across chunk boundaries.
+    fn merge_sum(&mut self, other: Self) -> Result<()> {
+        let Self {
+            histograms,
+            parents,
+            mut compensations,
+            counts,
+            timestamps,
+            incremental_mean_timestamps: _,
+            counter_reset_timestamps,
+            not_counter_reset_timestamps,
+        } = other;
+        for (timestamp, histogram) in histograms {
+            let other_compensation = compensations
+                .remove(&timestamp)
+                .expect("partial histogram has compensation");
+            if let Some(sum) = self.histograms.get_mut(&timestamp) {
+                let compensation = self
+                    .compensations
+                    .get_mut(&timestamp)
+                    .expect("histogram sum has compensation");
+                sum.kahan_add_assign(&histogram, compensation)
+                    .map_err(|err| DataFusionError::Execution(err.to_string()))?;
+                sum.kahan_add_assign(&other_compensation, compensation)
+                    .map_err(|err| DataFusionError::Execution(err.to_string()))?;
+                *self.counts.entry(timestamp).or_insert(0) += counts[&timestamp];
+            } else {
+                self.histograms.insert(timestamp, histogram);
+                self.compensations.insert(timestamp, other_compensation);
+                self.counts.insert(timestamp, counts[&timestamp]);
+                self.parents.insert(timestamp, parents[&timestamp].clone());
+            }
+        }
+        self.timestamps.extend(timestamps);
+        self.counter_reset_timestamps
+            .extend(counter_reset_timestamps);
+        self.not_counter_reset_timestamps
+            .extend(not_counter_reset_timestamps);
+        Ok(())
+    }
+}
+
+pub(crate) fn eval_aggregate_with_histograms<F>(
+    param: &Option<LabelModifier>,
+    data: Value,
+    func: F,
+    average: bool,
+    eval_ctx: &EvalContext,
+) -> Result<Value>
+where
+    F: AggFunc,
+{
+    let matrix = match data {
+        Value::Matrix(matrix) => matrix,
+        Value::None => return Ok(Value::None),
+        _ => {
+            return Err(DataFusionError::Plan(format!(
+                "[{}] function only accepts vector or matrix values",
+                func.name()
+            )));
+        }
+    };
+    if matrix.is_empty() {
+        return Ok(Value::None);
+    }
+    let eval_timestamps = eval_ctx
+        .timestamps()
+        .into_iter()
+        .collect::<std::collections::HashSet<_>>();
+    let groups = group_series_by_labels(&matrix, param);
+    let results = groups
+        .par_iter()
+        .map(|(_, series_indices)| -> Result<RangeValue> {
+            let labels = projected_labels(param, &matrix[series_indices[0]].labels);
+            let mut float_accumulator = func.build();
+            let mut float_timestamps = std::collections::HashSet::new();
+            for &series_index in series_indices {
+                let series = &matrix[series_index];
+                for sample in &series.samples {
+                    if eval_timestamps.contains(&sample.timestamp) {
+                        float_timestamps.insert(sample.timestamp);
+                        float_accumulator.accumulate(sample);
+                    }
+                }
+            }
+
+            let accumulate_histograms = |indices: &[usize]| -> Result<HistogramAggregationState> {
+                let mut state = HistogramAggregationState::default();
+                for &series_index in indices {
+                    for sample in matrix[series_index]
+                        .histogram_samples
+                        .as_deref()
+                        .unwrap_or_default()
+                    {
+                        if eval_timestamps.contains(&sample.timestamp) {
+                            state.accumulate(sample, average)?;
+                        }
+                    }
+                }
+                Ok(state)
+            };
+            let mut histogram_state =
+                if !average && series_indices.len() >= 2 * AGG_PARALLEL_CHUNK {
+                    let partials = series_indices
+                        .par_chunks(AGG_PARALLEL_CHUNK)
+                        .map(accumulate_histograms)
+                        .collect::<Vec<_>>();
+                    let mut merged = HistogramAggregationState::default();
+                    for partial in partials {
+                        merged.merge_sum(partial?)?;
+                    }
+                    merged
+                } else {
+                    // Histogram averages deliberately remain sequential: once
+                    // overflow forces incremental-mean state, no proven merge
+                    // formula exists for independently computed partials.
+                    accumulate_histograms(series_indices)?
+                };
+            let mixed_timestamps = float_timestamps
+                .intersection(&histogram_state.timestamps)
+                .copied()
+                .collect::<std::collections::HashSet<_>>();
+            if !mixed_timestamps.is_empty() {
+                log::warn!(
+                    "[trace_id: {}] {} omitted {} mixed float/histogram aggregation points",
+                    eval_ctx.trace_id,
+                    func.name(),
+                    mixed_timestamps.len()
+                );
+            }
+            let hint_collisions = histogram_state
+                .counter_reset_timestamps
+                .intersection(&histogram_state.not_counter_reset_timestamps)
+                .count();
+            if hint_collisions != 0 {
+                log::warn!(
+                    "[trace_id: {}] {} observed CounterReset and NotCounterReset hints at {} timestamps",
+                    eval_ctx.trace_id,
+                    func.name(),
+                    hint_collisions
+                );
+            }
+            let mut samples = float_accumulator.evaluate();
+            samples.retain(|sample| !mixed_timestamps.contains(&sample.timestamp));
+            samples.sort_by_key(|sample| sample.timestamp);
+            let mut histogram_samples =
+                Vec::with_capacity(histogram_state.histograms.len());
+            for (timestamp, mut histogram) in histogram_state.histograms {
+                if mixed_timestamps.contains(&timestamp) {
+                    continue;
+                }
+                if !histogram_state
+                    .incremental_mean_timestamps
+                    .contains(&timestamp)
+                    && let Some(compensation) =
+                        histogram_state.compensations.remove(&timestamp)
+                {
+                    let reset_hint = histogram.counter_reset_hint;
+                    if let Err(err) = histogram.add_assign(&compensation) {
+                        log::warn!(
+                            "[trace_id: {}] {} omitted incompatible compensated histogram at {timestamp}: {err}",
+                            eval_ctx.trace_id,
+                            func.name()
+                        );
+                        continue;
+                    }
+                    histogram.counter_reset_hint = reset_hint;
+                }
+                if average
+                    && !histogram_state
+                        .incremental_mean_timestamps
+                        .contains(&timestamp)
+                {
+                    histogram.scale(1.0 / histogram_state.counts[&timestamp] as f64);
+                }
+                histogram_samples.push(
+                    HistogramSample::from_computed(
+                        timestamp,
+                        histogram,
+                        histogram_state.parents[&timestamp].as_ref(),
+                    )
+                    .map_err(|err| DataFusionError::ResourcesExhausted(err.to_string()))?,
+                );
+            }
+            histogram_samples.sort_by_key(|sample| sample.timestamp);
+            Ok(RangeValue {
+                labels,
+                samples,
+                histogram_samples: (!histogram_samples.is_empty()).then_some(histogram_samples),
+                exemplars: None,
+                time_window: None,
+            })
+        })
+        .collect::<Result<Vec<_>>>()?;
     Ok(Value::Matrix(results))
 }
 
@@ -435,6 +731,7 @@ mod tests {
             .map(|&v| RangeValue {
                 labels: Labels::default(),
                 samples: vec![Sample::new(ts, v)],
+                histogram_samples: None,
                 exemplars: None,
                 time_window: None,
             })
@@ -567,6 +864,7 @@ mod tests {
             RangeValue {
                 labels: labels1,
                 samples: vec![Sample::new(1000, 1.0)],
+                histogram_samples: None,
                 exemplars: None,
                 time_window: Some(TimeWindow {
                     range: Duration::from_secs(1),
@@ -576,6 +874,7 @@ mod tests {
             RangeValue {
                 labels: labels2,
                 samples: vec![Sample::new(1000, 2.0)],
+                histogram_samples: None,
                 exemplars: None,
                 time_window: Some(TimeWindow {
                     range: Duration::from_secs(1),
@@ -610,6 +909,7 @@ mod tests {
             RangeValue {
                 labels: labels_a,
                 samples: vec![Sample::new(1000, 1.0)],
+                histogram_samples: None,
                 exemplars: None,
                 time_window: Some(TimeWindow {
                     range: Duration::from_secs(1),
@@ -619,6 +919,7 @@ mod tests {
             RangeValue {
                 labels: labels_b,
                 samples: vec![Sample::new(1000, 2.0)],
+                histogram_samples: None,
                 exemplars: None,
                 time_window: Some(TimeWindow {
                     range: Duration::from_secs(1),
@@ -633,5 +934,142 @@ mod tests {
         }));
         let groups = group_series_by_labels(&matrix, &modifier);
         assert_eq!(groups.len(), 1);
+    }
+
+    #[test]
+    fn test_native_histogram_sum_and_avg() {
+        use config::meta::promql::histogram::{
+            CounterResetHint, HistogramSample, HistogramSpan, O2FloatHistogram,
+        };
+
+        let sample = |count| {
+            HistogramSample::from_decoded(
+                1_000_000,
+                O2FloatHistogram {
+                    schema: 0,
+                    zero_threshold: 0.0,
+                    zero_count: 0.0,
+                    count,
+                    sum: count,
+                    positive_spans: vec![HistogramSpan {
+                        offset: 0,
+                        length: 1,
+                    }],
+                    negative_spans: vec![],
+                    positive_buckets: vec![count],
+                    negative_buckets: vec![],
+                    counter_reset_hint: CounterResetHint::Gauge,
+                    start_time: 0,
+                },
+            )
+        };
+        let input = Value::Matrix(vec![
+            RangeValue {
+                labels: vec![],
+                samples: vec![],
+                histogram_samples: Some(vec![sample(2.0)]),
+                exemplars: None,
+                time_window: None,
+            },
+            RangeValue {
+                labels: vec![],
+                samples: vec![],
+                histogram_samples: Some(vec![sample(4.0)]),
+                exemplars: None,
+                time_window: None,
+            },
+        ]);
+        let eval_ctx = EvalContext::new(1_000_000, 1_000_000, 1, "test".into());
+        let Value::Matrix(sum) = sum::sum(&None, input.clone(), &eval_ctx).unwrap() else {
+            panic!("sum matrix expected")
+        };
+        assert_eq!(
+            sum[0].histogram_samples.as_ref().unwrap()[0]
+                .histogram
+                .float()
+                .unwrap()
+                .count,
+            6.0
+        );
+        let Value::Matrix(avg) = avg::avg(&None, input, &eval_ctx).unwrap() else {
+            panic!("avg matrix expected")
+        };
+        assert_eq!(
+            avg[0].histogram_samples.as_ref().unwrap()[0]
+                .histogram
+                .float()
+                .unwrap()
+                .count,
+            3.0
+        );
+    }
+
+    fn histogram_matrix(values: &[f64]) -> Value {
+        let timestamp = 1_000_000;
+        Value::Matrix(
+            values
+                .iter()
+                .map(|&value| RangeValue {
+                    labels: Vec::new(),
+                    samples: Vec::new(),
+                    histogram_samples: Some(vec![HistogramSample::from_decoded(
+                        timestamp,
+                        O2FloatHistogram {
+                            schema: 0,
+                            zero_threshold: 0.0,
+                            zero_count: 0.0,
+                            count: value,
+                            sum: value,
+                            positive_spans: vec![config::meta::promql::histogram::HistogramSpan {
+                                offset: 0,
+                                length: 1,
+                            }],
+                            negative_spans: Vec::new(),
+                            positive_buckets: vec![value],
+                            negative_buckets: Vec::new(),
+                            counter_reset_hint: CounterResetHint::Gauge,
+                            start_time: 0,
+                        },
+                    )]),
+                    exemplars: None,
+                    time_window: None,
+                })
+                .collect(),
+        )
+    }
+
+    fn only_histogram(value: Value) -> O2FloatHistogram {
+        let Value::Matrix(matrix) = value else {
+            panic!("matrix expected")
+        };
+        matrix[0].histogram_samples.as_ref().unwrap()[0]
+            .histogram
+            .float()
+            .unwrap()
+            .clone()
+    }
+
+    #[test]
+    fn test_native_histogram_sum_crosses_parallel_merge_with_cancellation() {
+        let mut values = vec![0.0; 2 * AGG_PARALLEL_CHUNK + 1];
+        values[0] = 1e16;
+        values[AGG_PARALLEL_CHUNK + 100] = -1e16;
+        values[AGG_PARALLEL_CHUNK + 200] = 1.0;
+        let eval_ctx = EvalContext::new(1_000_000, 1_000_000, 1, "test".into());
+        let result = sum::sum(&None, histogram_matrix(&values), &eval_ctx).unwrap();
+        let histogram = only_histogram(result);
+        assert_eq!(histogram.count, 1.0);
+        assert_eq!(histogram.sum, 1.0);
+        assert_eq!(histogram.positive_buckets, vec![1.0]);
+    }
+
+    #[test]
+    fn test_native_histogram_avg_uses_incremental_mean_on_overflow() {
+        let eval_ctx = EvalContext::new(1_000_000, 1_000_000, 1, "test".into());
+        let result = avg::avg(&None, histogram_matrix(&[f64::MAX, f64::MAX]), &eval_ctx).unwrap();
+        let histogram = only_histogram(result);
+        assert_eq!(histogram.count, f64::MAX);
+        assert_eq!(histogram.sum, f64::MAX);
+        assert_eq!(histogram.positive_buckets, vec![f64::MAX]);
     }
 }

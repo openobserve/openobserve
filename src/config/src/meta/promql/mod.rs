@@ -65,6 +65,7 @@ where
 }
 
 pub mod grpc;
+pub mod histogram;
 pub mod value;
 
 pub const NAME_LABEL: &str = "__name__";
@@ -75,6 +76,8 @@ pub const BUCKET_LABEL: &str = "le";
 pub const QUANTILE_LABEL: &str = "quantile";
 pub const METADATA_LABEL: &str = "prom_metadata"; // for schema metadata key
 pub const EXEMPLARS_LABEL: &str = "exemplars";
+/// Reserved column carrying a versioned Prometheus native-histogram payload.
+pub const NATIVE_HISTOGRAM_LABEL: &str = "__native_histogram__";
 
 #[derive(Debug, Clone, Serialize)]
 pub struct Metric<'a> {
@@ -402,6 +405,14 @@ impl<T: Serialize> ApiFuncResponse<T> {
     pub fn err_internal(error: impl ToString, trace_id: Option<String>) -> Self {
         ApiFuncResponse::Error {
             error_type: ApiErrorType::Internal,
+            error: error.to_string(),
+            trace_id,
+        }
+    }
+
+    pub fn err_exec(error: impl ToString, trace_id: Option<String>) -> Self {
+        ApiFuncResponse::Error {
+            error_type: ApiErrorType::Exec,
             error: error.to_string(),
             trace_id,
         }

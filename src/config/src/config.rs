@@ -1681,6 +1681,14 @@ pub struct Limit {
     pub metrics_max_points_per_series: usize,
     #[env_config(name = "ZO_METRICS_MAX_SERIES_RESPONSE", default = 40000)]
     pub metrics_max_series_response: usize,
+    #[env_config(name = "ZO_METRICS_NH_MAX_PAYLOAD_BYTES", default = 32768)]
+    pub metrics_nh_max_payload_bytes: usize,
+    #[env_config(name = "ZO_METRICS_NH_MAX_BUCKETS", default = 4096)]
+    pub metrics_nh_max_buckets: usize,
+    #[env_config(name = "ZO_METRICS_NH_MAX_SPANS", default = 1024)]
+    pub metrics_nh_max_spans: usize,
+    #[env_config(name = "ZO_METRICS_NH_MAX_RESPONSE_BYTES", default = 67108864)]
+    pub metrics_nh_max_response_bytes: usize,
     #[env_config(name = "ZO_METRICS_CACHE_MAX_ENTRIES", default = 10000)]
     pub metrics_cache_max_entries: usize,
     #[env_config(name = "ZO_METRICS_INLIST_FILTER_ENABLED", default = false)]
@@ -2380,6 +2388,10 @@ pub struct Prometheus {
     pub ha_cluster_label: String,
     #[env_config(name = "ZO_PROMETHEUS_HA_REPLICA", default = "__replica__")]
     pub ha_replica_label: String,
+    #[env_config(name = "ZO_METRICS_OTLP_EXP_HISTOGRAMS", default = "legacy")]
+    pub otlp_exp_histograms: String,
+    #[env_config(name = "ZO_METRICS_PROM_NATIVE_HISTOGRAMS", default = "drop")]
+    pub native_histograms: String,
 }
 
 #[derive(Serialize, Debug, EnvConfig, Default)]

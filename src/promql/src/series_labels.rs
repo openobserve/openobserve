@@ -455,6 +455,7 @@ mod tests {
             &DataType::UInt64,
             sample_df,
             false,
+            config::meta::promql::histogram::HistogramLoadMode::RawLazy,
         )
         .await
         .unwrap();

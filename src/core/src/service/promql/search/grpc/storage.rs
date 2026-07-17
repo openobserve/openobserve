@@ -18,7 +18,7 @@ use std::sync::Arc;
 use config::{
     TIMESTAMP_COL_NAME, get_config,
     meta::{
-        promql::VALUE_LABEL,
+        promql::{NATIVE_HISTOGRAM_LABEL, VALUE_LABEL},
         search::{Session as SearchSession, StorageType},
         stream::{FileKey, PartitionTimeLevel, StreamParams, StreamPartition, StreamType},
     },
@@ -309,6 +309,7 @@ fn convert_matchers_to_index_condition(
     for mat in matchers.matchers.iter() {
         if mat.name == TIMESTAMP_COL_NAME
             || mat.name == VALUE_LABEL
+            || mat.name == NATIVE_HISTOGRAM_LABEL
             || !index_fields.contains(&mat.name)
             || schema.field_with_name(&mat.name).is_err()
         {

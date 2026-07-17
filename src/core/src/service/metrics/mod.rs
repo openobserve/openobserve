@@ -14,7 +14,9 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::{
-    meta::promql::{EXEMPLARS_LABEL, HASH_LABEL, METADATA_LABEL, Metadata, VALUE_LABEL},
+    meta::promql::{
+        EXEMPLARS_LABEL, HASH_LABEL, METADATA_LABEL, Metadata, NATIVE_HISTOGRAM_LABEL, VALUE_LABEL,
+    },
     utils::hash::{Sum64, gxhash},
 };
 use datafusion::arrow::datatypes::Schema;
@@ -24,7 +26,56 @@ pub mod otlp;
 mod otlp_json_compat;
 pub mod prom;
 
-const EXCLUDE_LABELS: [&str; 8] = [
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum OtlpExpHistogramMode {
+    Legacy,
+    Dual,
+    Native,
+}
+
+fn otlp_exp_histogram_mode() -> OtlpExpHistogramMode {
+    match config::get_config()
+        .prom
+        .otlp_exp_histograms
+        .to_ascii_lowercase()
+        .as_str()
+    {
+        "dual" => OtlpExpHistogramMode::Dual,
+        "native" => OtlpExpHistogramMode::Native,
+        value if value != "legacy" => {
+            log::warn!("invalid ZO_METRICS_OTLP_EXP_HISTOGRAMS={value:?}; falling back to legacy");
+            OtlpExpHistogramMode::Legacy
+        }
+        _ => OtlpExpHistogramMode::Legacy,
+    }
+}
+
+fn accept_prom_native_histograms() -> bool {
+    match config::get_config()
+        .prom
+        .native_histograms
+        .to_ascii_lowercase()
+        .as_str()
+    {
+        "accept" => true,
+        value if value != "drop" => {
+            log::warn!("invalid ZO_METRICS_PROM_NATIVE_HISTOGRAMS={value:?}; falling back to drop");
+            false
+        }
+        _ => false,
+    }
+}
+
+fn strip_reserved_pipeline_field(
+    record: &mut config::utils::json::Map<String, config::utils::json::Value>,
+    source: &str,
+) {
+    if record.remove(NATIVE_HISTOGRAM_LABEL).is_some() {
+        log::warn!("[{source}] stripped reserved pipeline output field {NATIVE_HISTOGRAM_LABEL}");
+    }
+}
+
+const EXCLUDE_LABELS: [&str; 9] = [
     VALUE_LABEL,
     HASH_LABEL,
     EXEMPLARS_LABEL,
@@ -33,6 +84,7 @@ const EXCLUDE_LABELS: [&str; 8] = [
     "span_id",
     "_timestamp",
     "_all",
+    NATIVE_HISTOGRAM_LABEL,
 ];
 
 /// The value policy for every metric we ingest, on every path.

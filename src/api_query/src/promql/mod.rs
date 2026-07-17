@@ -1332,17 +1332,7 @@ async fn search(
     )
     .await
     {
-        Ok(data) if !req.query_exemplars => (
-            StatusCode::OK,
-            axum::Json(config::meta::promql::ApiFuncResponse::ok(
-                config::meta::promql::QueryResult {
-                    result_type: data.get_type().to_string(),
-                    result: data,
-                },
-                Some(trace_id.to_string()),
-            )),
-        )
-            .into_response(),
+        Ok(data) if !req.query_exemplars => promql_success_response(data, trace_id),
         Ok(data) => (
             StatusCode::OK,
             axum::Json(config::meta::promql::ApiFuncResponse::ok(
@@ -1365,6 +1355,49 @@ async fn search(
             )
                 .into_response()
         }
+    }
+}
+
+fn promql_success_response(data: config::meta::promql::value::Value, trace_id: &str) -> Response {
+    let contains_native_histograms = data.has_native_histogram_provenance();
+    let response = config::meta::promql::ApiFuncResponse::ok(
+        config::meta::promql::QueryResult {
+            result_type: data.get_type().to_string(),
+            result: data,
+        },
+        Some(trace_id.to_string()),
+    );
+    if !contains_native_histograms {
+        return (StatusCode::OK, axum::Json(response)).into_response();
+    }
+
+    match serde_json::to_vec(&response) {
+        Ok(bytes) if bytes.len() <= config::get_config().limit.metrics_nh_max_response_bytes => (
+            StatusCode::OK,
+            [(axum::http::header::CONTENT_TYPE, "application/json")],
+            bytes,
+        )
+            .into_response(),
+        Ok(bytes) => (
+            StatusCode::UNPROCESSABLE_ENTITY,
+            axum::Json(config::meta::promql::ApiFuncResponse::<()>::err_exec(
+                format!(
+                    "native histogram response size {} exceeds limit {}",
+                    bytes.len(),
+                    config::get_config().limit.metrics_nh_max_response_bytes
+                ),
+                Some(trace_id.to_string()),
+            )),
+        )
+            .into_response(),
+        Err(err) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            axum::Json(config::meta::promql::ApiFuncResponse::<()>::err_internal(
+                err,
+                Some(trace_id.to_string()),
+            )),
+        )
+            .into_response(),
     }
 }
 
@@ -1413,6 +1446,7 @@ async fn search_streaming(
         }
 
         let total_partitions = partitions.len();
+        let mut native_response_bytes = 0_usize;
         for (i, (start, end)) in partitions.into_iter().enumerate() {
             let mut req = req.clone();
             req.start = start;
@@ -1428,6 +1462,7 @@ async fn search_streaming(
             .await
             {
                 Ok(data) => {
+                    let native_provenance = data.has_native_histogram_provenance();
                     let res = StreamResponses::PromqlResponse {
                         data: config::meta::promql::QueryResult {
                             result_type: data.get_type().to_string(),
@@ -1435,6 +1470,34 @@ async fn search_streaming(
                         },
                         trace_id: Some(req_trace_id.clone()),
                     };
+                    if native_provenance {
+                        match serde_json::to_vec(&res) {
+                            Ok(bytes) => native_response_bytes += bytes.len(),
+                            Err(err) => {
+                                let _ = tx
+                                    .send(Ok(StreamResponses::Error {
+                                        code: 500,
+                                        message: err.to_string(),
+                                        error_detail: None,
+                                    }))
+                                    .await;
+                                break;
+                            }
+                        }
+                        let limit = config::get_config().limit.metrics_nh_max_response_bytes;
+                        if native_response_bytes > limit {
+                            let _ = tx
+                                .send(Ok(StreamResponses::Error {
+                                    code: 422,
+                                    message: format!(
+                                        "native histogram response exceeds {limit} bytes; narrow the range or increase the step"
+                                    ),
+                                    error_detail: None,
+                                }))
+                                .await;
+                            break;
+                        }
+                    }
                     if tx.send(Ok(res)).await.is_err() {
                         log::warn!(
                             "[HTTP2_STREAM PromQL trace_id {req_trace_id}] Sender is closed, stop sending data to client",

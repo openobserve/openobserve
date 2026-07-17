@@ -32,6 +32,7 @@ use datafusion::{arrow::datatypes::Schema, error::DataFusionError, prelude::Sess
 use hashbrown::HashSet;
 use infra::errors::Result;
 use promql_parser::{label::Matchers, parser};
+use prost::Message;
 use proto::cluster_rpc;
 use rayon::slice::ParallelSliceMut;
 use tokio::sync::mpsc;
@@ -202,8 +203,22 @@ pub async fn search(
         scan_stats.add(&stats);
     }
     resp.scan_stats = Some(cluster_rpc::ScanStats::from(&scan_stats));
+    ensure_grpc_response_size(&resp)?;
 
     Ok(resp)
+}
+
+fn ensure_grpc_response_size(resp: &cluster_rpc::MetricsQueryResponse) -> Result<()> {
+    let encoded = resp.encoded_len();
+    // Keep half of the transport maximum for protobuf framing, labels, scan stats, and version
+    // skew. This is the same admission budget used by the result cache.
+    let limit = config::get_config().grpc.max_message_size * 1024 * 1024 / 2;
+    if encoded > limit {
+        return Err(infra::errors::Error::Message(format!(
+            "PromQL gRPC response is {encoded} bytes, exceeding ZO_GRPC_MAX_MESSAGE_SIZE ({limit} bytes); reduce the query range or step"
+        )));
+    }
+    Ok(())
 }
 
 #[tracing::instrument(name = "promql:search:grpc:data", skip_all, fields(org_id = req.org_id))]
@@ -240,6 +255,12 @@ pub async fn data(
 
                     add_value(&mut resp, value);
                     resp.scan_stats = Some(cluster_rpc::ScanStats::from(&stats));
+                    if let Err(err) = ensure_grpc_response_size(&resp) {
+                        let _ = tx
+                            .send(Err(tonic::Status::resource_exhausted(err.to_string())))
+                            .await;
+                        continue;
+                    }
                     if let Err(e) = tx.send(Ok(resp)).await {
                         log::error!(
                             "[trace_id {data_trace_id}] promql->data->grpc: group[{start}, {end}] data streaming error: {e}",
@@ -491,39 +512,66 @@ pub(crate) fn add_value(resp: &mut cluster_rpc::MetricsQueryResponse, value: val
     match value {
         value::Value::None => {}
         value::Value::Instant(v) => {
-            resp.series.push(cluster_rpc::Series {
+            let mut series = cluster_rpc::Series {
                 metric: v.labels.iter().map(|x| x.as_ref().into()).collect(),
-                sample: Some((&v.sample).into()),
                 ..Default::default()
-            });
+            };
+            match &v.sample {
+                value::InstantPoint::Float(sample) => series.sample = Some(sample.into()),
+                value::InstantPoint::PromFloat(sample) => {
+                    series.sample = Some(sample.into());
+                    series.native_histogram_provenance = true;
+                }
+                value::InstantPoint::Histogram(sample) => {
+                    series.histogram_sample = encode_histogram_sample(sample);
+                    series.native_histogram_provenance = true;
+                }
+            }
+            resp.series.push(series);
         }
         value::Value::Range(v) => {
             resp.series.push(cluster_rpc::Series {
                 metric: v.labels.iter().map(|x| x.as_ref().into()).collect(),
                 samples: v.samples.iter().map(|x| x.into()).collect(),
+                histogram_samples: encode_histogram_samples(v.histogram_samples.as_deref()),
+                native_histogram_provenance: v.histogram_samples.is_some(),
                 ..Default::default()
             });
         }
         value::Value::Vector(v) => {
             v.iter().for_each(|v| {
-                resp.series.push(cluster_rpc::Series {
+                let mut series = cluster_rpc::Series {
                     metric: v.labels.iter().map(|x| x.as_ref().into()).collect(),
-                    sample: Some((&v.sample).into()),
                     ..Default::default()
-                });
+                };
+                match &v.sample {
+                    value::InstantPoint::Float(sample) => series.sample = Some(sample.into()),
+                    value::InstantPoint::PromFloat(sample) => {
+                        series.sample = Some(sample.into());
+                        series.native_histogram_provenance = true;
+                    }
+                    value::InstantPoint::Histogram(sample) => {
+                        series.histogram_sample = encode_histogram_sample(sample);
+                        series.native_histogram_provenance = true;
+                    }
+                }
+                resp.series.push(series);
             });
         }
         value::Value::Matrix(v) => {
             v.iter().for_each(|v| {
                 let samples = v.samples.iter().map(|x| x.into()).collect::<Vec<_>>();
+                let histogram_samples = encode_histogram_samples(v.histogram_samples.as_deref());
                 let exemplars = v.exemplars.as_ref().map(|v| {
                     let exemplars = v.iter().map(|x| x.as_ref().into()).collect::<Vec<_>>();
                     cluster_rpc::Exemplars { exemplars }
                 });
-                if !samples.is_empty() || exemplars.is_some() {
+                if !samples.is_empty() || !histogram_samples.is_empty() || exemplars.is_some() {
                     resp.series.push(cluster_rpc::Series {
                         metric: v.labels.iter().map(|x| x.as_ref().into()).collect(),
                         samples,
+                        histogram_samples,
+                        native_histogram_provenance: v.histogram_samples.is_some(),
                         exemplars,
                         ..Default::default()
                     });
@@ -549,6 +597,28 @@ pub(crate) fn add_value(resp: &mut cluster_rpc::MetricsQueryResponse, value: val
             });
         }
     }
+}
+
+fn encode_histogram_sample(
+    sample: &config::meta::promql::histogram::HistogramSample,
+) -> Option<cluster_rpc::NativeHistogramSample> {
+    match sample.try_into() {
+        Ok(sample) => Some(sample),
+        Err(err) => {
+            log::warn!("dropping invalid native histogram from cluster response: {err}");
+            None
+        }
+    }
+}
+
+fn encode_histogram_samples(
+    samples: Option<&[config::meta::promql::histogram::HistogramSample]>,
+) -> Vec<cluster_rpc::NativeHistogramSample> {
+    samples
+        .unwrap_or_default()
+        .iter()
+        .filter_map(encode_histogram_sample)
+        .collect()
 }
 
 #[cfg(test)]

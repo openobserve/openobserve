@@ -26,7 +26,10 @@ use config::{
     TIMESTAMP_COL_NAME,
     meta::{
         alerts::alert::Alert,
-        promql::{HASH_LABEL, METADATA_LABEL, Metadata, NAME_LABEL, TYPE_LABEL, VALUE_LABEL},
+        promql::{
+            HASH_LABEL, METADATA_LABEL, Metadata, NAME_LABEL, NATIVE_HISTOGRAM_LABEL, TYPE_LABEL,
+            VALUE_LABEL,
+        },
         self_reporting::usage::UsageType,
         stream::{StreamParams, StreamPartition, StreamType},
     },
@@ -146,6 +149,11 @@ pub async fn ingest(
         let mut record = flatten::flatten(record)?;
         // check data type
         let record = record.as_object_mut().unwrap();
+        if record.contains_key(NATIVE_HISTOGRAM_LABEL) {
+            return Err(anyhow!(
+                "{NATIVE_HISTOGRAM_LABEL} is reserved for native histogram storage"
+            ));
+        }
         let stream_name = match stream_name {
             Some(name) => name.to_string(),
             None => match record.get(NAME_LABEL).ok_or(anyhow!("missing __name__"))? {
@@ -330,6 +338,8 @@ pub async fn ingest(
                                 _ => unreachable!(),
                             };
 
+                            super::strip_reserved_pipeline_field(&mut local_val, "METRICS:JSON");
+
                             if let Some(Some(fields)) =
                                 user_defined_schema_map.get(&destination_stream)
                             {
@@ -354,6 +364,8 @@ pub async fn ingest(
                     json::Value::Object(val) => val,
                     _ => unreachable!(),
                 };
+
+                super::strip_reserved_pipeline_field(&mut local_val, "METRICS:JSON");
 
                 if let Some(Some(fields)) = user_defined_schema_map.get(stream_name) {
                     local_val = crate::service::ingestion::refactor_map(local_val, fields);
@@ -385,6 +397,11 @@ pub async fn ingest(
         let partition_time_level = get_partition_time_level(StreamType::Metrics);
 
         for (mut record, metric_type) in json_data {
+            if record.contains_key(NATIVE_HISTOGRAM_LABEL) {
+                return Err(anyhow!(
+                    "{NATIVE_HISTOGRAM_LABEL} is reserved for native histogram storage"
+                ));
+            }
             // Start get stream alerts
             if !stream_alerts_map.contains_key(&stream_name) {
                 crate::service::ingestion::get_stream_alerts(

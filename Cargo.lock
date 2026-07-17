@@ -7627,6 +7627,7 @@ dependencies = [
  "ahash 0.8.12",
  "async-recursion",
  "async-trait",
+ "bytes",
  "chrono",
  "config",
  "datafusion",
@@ -7821,6 +7822,7 @@ name = "proto"
 version = "0.1.0"
 dependencies = [
  "async-trait",
+ "bytes",
  "cargo_metadata",
  "datafusion",
  "datafusion-proto",

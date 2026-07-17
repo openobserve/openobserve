@@ -102,6 +102,7 @@ pub async fn vector_scalar_bin_op(
                 Some(RangeValue {
                     labels,
                     samples: new_samples,
+                    histogram_samples: None,
                     exemplars: range.exemplars,
                     time_window: range.time_window,
                 })
@@ -337,6 +338,7 @@ fn vector_arithmetic_operators(
                 Some(RangeValue {
                     labels,
                     samples: new_samples,
+                    histogram_samples: None,
                     exemplars: lhs_range.exemplars,
                     time_window: lhs_range.time_window,
                 })
@@ -414,6 +416,7 @@ mod tests {
         RangeValue {
             labels,
             samples,
+            histogram_samples: None,
             exemplars: None,
             time_window: None,
         }

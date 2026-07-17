@@ -23,7 +23,7 @@ use datafusion::error::Result;
 use crate::functions::RangeFunc;
 
 pub(crate) fn rate(data: Value, eval_ctx: &EvalContext) -> Result<Value> {
-    super::eval_range(data, RateFunc::new(), eval_ctx)
+    super::eval_rate_like(data, RateFunc::new(), ExtrapolationKind::Rate, eval_ctx)
 }
 
 pub struct RateFunc;

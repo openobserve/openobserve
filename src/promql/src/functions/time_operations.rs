@@ -103,18 +103,26 @@ pub(crate) fn timestamp(data: Value) -> Result<Value> {
             let out: Vec<RangeValue> = matrix
                 .into_par_iter()
                 .map(|mut range_value| {
+                    let native_provenance = range_value.histogram_samples.is_some();
                     // Convert timestamp from microseconds to seconds for all samples
-                    let samples: Vec<Sample> = range_value
+                    let mut samples: Vec<Sample> = range_value
                         .samples
                         .into_iter()
                         .map(|sample| {
-                            Sample::new(sample.timestamp, (sample.timestamp / 1_000_000) as f64)
+                            Sample::new(sample.timestamp, sample.timestamp as f64 / 1_000_000.0)
                         })
                         .collect();
+                    if let Some(histograms) = range_value.histogram_samples.take() {
+                        samples.extend(histograms.into_iter().map(|sample| {
+                            Sample::new(sample.timestamp, sample.timestamp as f64 / 1_000_000.0)
+                        }));
+                        samples.sort_by_key(|sample| sample.timestamp);
+                    }
 
                     RangeValue {
                         labels: std::mem::take(&mut range_value.labels).without_metric_name(),
                         samples,
+                        histogram_samples: native_provenance.then(Vec::new),
                         exemplars: range_value.exemplars,
                         time_window: range_value.time_window,
                     }
@@ -136,6 +144,7 @@ fn exec(data: Value, op: &TimeOperationType) -> Result<Value> {
             let out: Vec<RangeValue> = matrix
                 .into_par_iter()
                 .map(|mut range_value| {
+                    let native_provenance = range_value.histogram_samples.is_some();
                     // Apply the time operation to all samples in this range
                     let samples: Vec<Sample> = range_value
                         .samples
@@ -149,6 +158,7 @@ fn exec(data: Value, op: &TimeOperationType) -> Result<Value> {
                     RangeValue {
                         labels: std::mem::take(&mut range_value.labels).without_metric_name(),
                         samples,
+                        histogram_samples: native_provenance.then(Vec::new),
                         exemplars: range_value.exemplars,
                         time_window: range_value.time_window,
                     }
