@@ -213,6 +213,8 @@ vi.mock("@/composables/useTraces", () => ({
     setServiceColors: mockSetServiceColors,
     loadLocalLogFilterField: vi.fn(),
     updatedLocalLogFilterField: vi.fn(),
+    loadTracesParser: vi.fn().mockResolvedValue(undefined),
+    tracesParser: { value: { astify: vi.fn() } },
   }),
 }));
 
