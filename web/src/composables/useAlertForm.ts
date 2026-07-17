@@ -60,6 +60,7 @@ import { type SqlErrorRange } from "@/utils/query/sqlDiagnostics";
 import {
   getAlertPayload as getAlertPayloadUtil,
   prepareAndSaveAlert as prepareAndSaveAlertUtil,
+  stripFormExtras,
   type PayloadContext,
   type SaveAlertContext,
 } from "@/utils/alerts/alertPayload";
@@ -610,23 +611,6 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       return wizardStep.value === 3;
     }
     return wizardStep.value === 6;
-  });
-
-  const canSaveAlert = computed(() => {
-    if (formData.value.is_real_time === "anomaly") {
-      if (!anomalyConfig.value.name?.trim()) {
-        return false;
-      }
-      if (
-        anomalyConfig.value.alert_enabled &&
-        anomalyConfig.value.alert_destination_ids.length === 0
-      ) {
-        return false;
-      }
-      return true;
-    }
-    // For V3 layout, always allow save (validation happens on save)
-    return true;
   });
 
   const getFormattedDestinations = computed(() => {
@@ -1513,6 +1497,15 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
 
   // ── JSON Editor Save ────────────────────────────────────────────────────
 
+  /** What the JSON editor DISPLAYS. `formData` is the whole form value set, so
+   *  it carries the form-only keys (_ui/_meta/logGroupBy); pre-migration
+   *  formData had none of them, so strip them to show the alert resource the
+   *  user actually edits (Rule ④). cloneDeep first — formData is a readonly
+   *  read-view and stripFormExtras mutates. */
+  const jsonEditorData = computed(() =>
+    stripFormExtras(cloneDeep(formData.value)),
+  );
+
   const saveAlertJson = async (json: any) => {
     const saveContext: SaveAlertContext = {
       store,
@@ -1540,12 +1533,16 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       prepareAndSaveAlert: prepareAndSaveAlertFunction,
     };
 
+    // Seed the ONE form with the edited JSON (Rule ③ — `formData` is a readonly
+    // read-view, so the old `formData.value = payload` was a silent no-op).
+    // Matters on server-side rejection: the drawer is already closed, so without
+    // this the user's JSON edits are lost and can't be retried.
     await saveAlertJsonUtil(
       json,
       props,
       validationErrors,
       showJsonEditorDialog,
-      formData,
+      resetForm,
       jsonValidationContext,
     );
   };
@@ -3041,7 +3038,6 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     rowTemplatePlaceholder,
     decodedVrlFunction,
     getSelectedTab,
-    canSaveAlert,
     getFormattedDestinations,
     generatedSqlQuery,
 
@@ -3099,6 +3095,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     routeToCreateDestination,
     openEditorDialog,
     openJsonEditor,
+    jsonEditorData,
     saveAlertJson,
     loadPanelDataIfPresent,
     handleSave,

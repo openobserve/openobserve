@@ -580,7 +580,7 @@ export const saveAlertJson = async (
   props: any,
   validationErrors: any,
   showJsonEditorDialog: any,
-  formData: any,
+  applyFormData: (obj: any) => void,
   context: JsonValidationContext,
 ): Promise<void> => {
   const {
@@ -666,7 +666,7 @@ export const saveAlertJson = async (
 
       // If we get here, SQL is valid
       showJsonEditorDialog.value = false;
-      formData.value = jsonPayload;
+      applyFormData(jsonPayload);
       await prepareAndSaveAlert(jsonPayload);
     } catch (err: any) {
       // Handle SQL validation errors
@@ -677,7 +677,7 @@ export const saveAlertJson = async (
   } else {
     // If not SQL or is real-time, just close and update
     showJsonEditorDialog.value = false;
-    formData.value = jsonPayload;
+    applyFormData(jsonPayload);
     await prepareAndSaveAlert(jsonPayload);
   }
 };

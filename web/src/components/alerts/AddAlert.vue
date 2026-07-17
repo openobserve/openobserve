@@ -442,7 +442,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     persistent
   >
     <JsonEditor
-      :data="formData"
+      :data="jsonEditorData"
       :title="t('alerts.editJson')"
       :type="'alerts'"
       :validation-errors="validationErrors"

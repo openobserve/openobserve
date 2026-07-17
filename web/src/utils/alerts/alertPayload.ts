@@ -59,6 +59,28 @@ export interface SaveAlertContext {
   handleAlertError: (err: any) => void;
 }
 
+/**
+ * Drop the FORM-ONLY keys added by the OForm migration. These are seeded into
+ * the form by `withFormExtras` and are not part of the alert resource:
+ *   _ui        → display-only state (the "Check every" hours/minutes value the
+ *                user sees; the real value is trigger_condition.frequency)
+ *   _meta      → schema discriminators (tab / mode / org floor)
+ *   logGroupBy → the logs group-by field array (mirrored into
+ *                query_condition.aggregation.group_by)
+ * Pre-migration formData had none of these, so dropping them restores the
+ * pre-migration shape exactly (Rule ④). Mutates and returns `obj`.
+ *
+ * BOTH save paths must use this: the normal one (getAlertPayload) and the JSON
+ * editor one (prepareAndSaveAlert). It is also applied to the JSON editor's
+ * displayed data, so users never see or edit these internal keys.
+ */
+export const stripFormExtras = <T>(obj: T): T => {
+  delete (obj as any)._ui;
+  delete (obj as any)._meta;
+  delete (obj as any).logGroupBy;
+  return obj;
+};
+
 export const getAlertPayload = (
   formData: PayloadFormData,
   context: PayloadContext,
@@ -69,19 +91,9 @@ export const getAlertPayload = (
   // Deleting uuid from payload as it was added for reference of frontend
   if (payload.uuid) delete payload.uuid;
 
-  // Same reason: these are FORM-ONLY keys added by the OForm migration, not part
-  // of the alert resource. `payload` is a cloneDeep of the whole form value set,
-  // so anything seeded into the form leaks to the backend unless dropped here.
-  //   _ui        → display-only state (the "Check every" hours/minutes value the
-  //                user sees; the real value is trigger_condition.frequency)
-  //   _meta      → schema discriminators (tab / mode / org floor)
-  //   logGroupBy → the logs group-by field array (mirrored into
-  //                query_condition.aggregation.group_by)
-  // Pre-migration formData had none of these, so dropping them restores the
-  // pre-migration payload shape exactly (Rule ④).
-  delete (payload as any)._ui;
-  delete (payload as any)._meta;
-  delete (payload as any).logGroupBy;
+  // Same reason: `payload` is a cloneDeep of the whole form value set, so
+  // anything seeded into the form leaks to the backend unless dropped here.
+  stripFormExtras(payload);
 
   payload.is_real_time = payload.is_real_time === "true";
 
@@ -201,7 +213,11 @@ export const prepareAndSaveAlert = async (
   } = context;
 
   const payload = cloneDeep(data);
-  
+
+  // The JSON editor's data comes from the form value set, so it can carry the
+  // form-only keys. Pre-migration formData had none of them (Rule ④).
+  stripFormExtras(payload);
+
   if (!isAggregationEnabled.value) {
     payload.query_condition.aggregation = null;
   }
