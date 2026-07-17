@@ -512,6 +512,38 @@ describe("Dashboards.vue", () => {
       expect(wrapper.vm.dashboards).toHaveLength(2);
     });
 
+    it("lists favorites from OTHER folders too — favorites are folder-independent", async () => {
+      wrapper = shallowMount(Dashboards, {
+        global: buildGlobalConfig(storeWithTwo(), router, i18n),
+      });
+      await nextTick();
+      await nextTick();
+
+      // Active folder is "default"; this favorite lives in folder1 (whose
+      // dashboard list is not cached), so the row must come from the stored
+      // favorite entry itself.
+      useFavoriteDashboards().favorites.value = [
+        { dashboardId: "remote1", folderId: "folder1", label: "Remote Dash" },
+        { dashboardId: "dash1", folderId: "default", label: "Dashboard 1" },
+      ];
+      wrapper.vm.showFavoritesOnly = true;
+      await nextTick();
+
+      expect(wrapper.vm.dashboards).toHaveLength(2);
+      const remote = wrapper.vm.dashboards.find((r: any) => r.id === "remote1");
+      expect(remote).toBeDefined();
+      expect(remote.folder_id).toBe("folder1");
+      expect(remote.folder).toBe("Folder 1"); // resolved from the folders list
+      expect(remote.name).toBe("Remote Dash"); // stored label, folder not cached
+      // The cached default-folder favorite is enriched from the store list.
+      const local = wrapper.vm.dashboards.find((r: any) => r.id === "dash1");
+      expect(local.name).toBe("Dashboard 1");
+
+      // The favorites view shows the folder column, like cross-folder search.
+      const columnIds = wrapper.vm.columns.map((c: any) => c.id);
+      expect(columnIds).toContain("folder");
+    });
+
     it("toggleFavorite persists the per-user setting resolved to the active folder", async () => {
       const testStore = storeWithTwo();
       (testStore.state.userInfo as any).email = "me@example.com";

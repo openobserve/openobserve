@@ -648,8 +648,10 @@ export default defineComponent({
     const { isHome, setHomeDashboard, clearHomeDashboard, homeDashboard } =
       useHomeDashboard();
 
-    // Per-user favorites — star toggle on each row + a favorites-only filter.
+    // Per-user favorites — heart toggle on each row + a folder-independent
+    // favorites view.
     const {
+      favorites,
       isFavorite,
       toggleFavorite: toggleFavoriteSetting,
       load: loadFavorites,
@@ -658,11 +660,10 @@ export default defineComponent({
     const toggleFavorite = (row: any) => {
       const org = store.state.selectedOrganization?.identifier;
       const userId = store.state.userInfo?.email;
-      // Same folder resolution as toggleHome: row.folder_id only exists in
-      // search-across-folders mode; otherwise the active folder is the one.
-      const folderId = searchAcrossFolders.value
-        ? row.folder_id
-        : activeFolderId.value || "default";
+      // row.folder_id is populated in the cross-folder surfaces (search
+      // results, the favorites view); in the normal folder view it is
+      // undefined, so fall back to the active folder (default).
+      const folderId = row.folder_id || activeFolderId.value || "default";
       toggleFavoriteSetting(org, userId, {
         dashboardId: row.id,
         folderId,
@@ -826,7 +827,10 @@ export default defineComponent({
         },
       ];
 
-      if (searchAcrossFolders.value && searchQuery.value != "") {
+      if (
+        (searchAcrossFolders.value && searchQuery.value != "") ||
+        showFavoritesOnly.value
+      ) {
         baseColumns.splice(2, 0, {
           id: "folder",
           header: t("dashboard.folder"),
@@ -1073,9 +1077,7 @@ export default defineComponent({
         query: {
           org_identifier: store.state.selectedOrganization.identifier,
           dashboard: row.id,
-          folder: searchAcrossFolders.value
-            ? row.folder_id
-            : activeFolderId.value || "default",
+          folder: row.folder_id || activeFolderId.value || "default",
           // tab: selectedTabId,
         },
       });
@@ -1130,26 +1132,50 @@ export default defineComponent({
 
     const dashboards = computed(function () {
       selectedIds.value = [];
+      // The favorites view is folder-independent: rows come from the stored
+      // favorites themselves (each carries its folderId), enriched from any
+      // folder list already cached in the store. A favorite whose folder
+      // hasn't been visited yet still shows via its stored label.
+      if (showFavoritesOnly.value) {
+        const folderNames = new Map(
+          (store.state.organizationData?.folders ?? []).map((f: any) => [
+            f.folderId,
+            f.name,
+          ]),
+        );
+        const allLists = store.state.organizationData?.allDashboardList ?? {};
+        return favorites.value.map((fav: any, index: number) => {
+          const cached = (allLists[fav.folderId] ?? []).find(
+            (board: any) => board.dashboardId === fav.dashboardId,
+          );
+          return {
+            "#": index < 9 ? `0${index + 1}` : index + 1,
+            id: fav.dashboardId,
+            folder: folderNames.get(fav.folderId) ?? fav.folderId,
+            folder_id: fav.folderId,
+            name: cached?.title ?? fav.label,
+            identifier: fav.dashboardId,
+            description: cached?.description ?? "",
+            owner: cached?.owner ?? "",
+            created_raw: cached?.created ?? "",
+            created: cached?.created
+              ? formatDate(cached.created, "YYYY-MM-DDTHH:mm:ss")
+              : "",
+            actions: "true",
+          };
+        });
+      }
       if (!searchAcrossFolders.value || searchQuery.value == "") {
         const dashboardList = toRaw(
           store.state.organizationData?.allDashboardList[
             activeFolderId.value
           ] ?? [],
         );
-        // Filter BEFORE mapping so the "#" column stays sequential.
-        const visible = showFavoritesOnly.value
-          ? dashboardList.filter((board: any) => isFavorite(board.dashboardId))
-          : dashboardList;
-        return visible.map((board: any, index) =>
+        return dashboardList.map((board: any, index) =>
           mapDashboard(board, index),
         );
       } else {
-        const visible = showFavoritesOnly.value
-          ? filteredResults.value.filter((board: any) =>
-              isFavorite(board.dashboard?.dashboardId),
-            )
-          : filteredResults.value;
-        return visible.map((board: any, index) =>
+        return filteredResults.value.map((board: any, index) =>
           mapDashboard(board, index, {
             name: board.folder_name,
             id: board.folder_id,
