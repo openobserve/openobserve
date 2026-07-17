@@ -34,12 +34,9 @@ use hashbrown::HashMap;
 use infra::table::short_urls::ShortUrlRecord;
 pub use openobserve_vrl::{QUERY_FUNCTIONS, enrichment::ENRICHMENT_TABLES};
 
-use crate::{
-    common::meta::{
-        maxmind::MaxmindClient,
-        organization::{OrgStatus, Organization, OrganizationSetting},
-    },
-    service::{db::scheduler as db_scheduler, pipeline::batch_execution::ExecutablePipeline},
+use crate::meta::{
+    maxmind::MaxmindClient,
+    organization::{OrgStatus, Organization, OrganizationSetting},
 };
 
 // global cache variables
@@ -63,15 +60,11 @@ pub static METRIC_CLUSTER_LEADER: Lazy<Arc<RwAHashMap<String, ClusterLeader>>> =
 pub static STREAM_ALERTS: Lazy<RwAHashMap<String, Vec<String>>> = Lazy::new(Default::default);
 pub static ALERTS: Lazy<RwAHashMap<String, (Folder, Alert)>> = Lazy::new(Default::default);
 // Key for realtime alert triggers cache is org/alert_id
-pub static REALTIME_ALERT_TRIGGERS: Lazy<RwAHashMap<String, db_scheduler::Trigger>> =
-    Lazy::new(Default::default);
 pub static ALERTS_TEMPLATES: Lazy<RwHashMap<String, Template>> = Lazy::new(Default::default);
 pub static DESTINATIONS: Lazy<RwHashMap<String, Destination>> = Lazy::new(Default::default);
 pub static MAXMIND_DB_CLIENT: Lazy<Arc<tokio::sync::RwLock<Option<MaxmindClient>>>> =
     Lazy::new(|| Arc::new(tokio::sync::RwLock::new(None)));
 
-pub static STREAM_EXECUTABLE_PIPELINES: Lazy<RwAHashMap<StreamParams, Vec<ExecutablePipeline>>> =
-    Lazy::new(Default::default);
 pub static PIPELINE_STREAM_MAPPING: Lazy<RwAHashMap<String, StreamParams>> =
     Lazy::new(Default::default);
 

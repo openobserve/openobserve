@@ -281,7 +281,7 @@ pub(super) mod tests {
 
     /// Helper function to create test record batches.
     /// Shared with [`super::sequential`] and [`super::parallel`] test modules.
-    pub(in crate::service::tantivy) fn create_test_batch(
+    pub(in crate::tantivy) fn create_test_batch(
         num_rows: usize,
         include_timestamp: bool,
         include_fts_field: bool,
@@ -325,7 +325,7 @@ pub(super) mod tests {
     /// Helper: serializes `batches` to an in-memory parquet file and returns
     /// the raw bytes. Shared by both the stream-based and the new
     /// row_group-direct parallel tests.
-    pub(in crate::service::tantivy) async fn create_test_parquet_bytes(
+    pub(in crate::tantivy) async fn create_test_parquet_bytes(
         batches: Vec<RecordBatch>,
     ) -> bytes::Bytes {
         let schema = batches[0].schema();
@@ -353,7 +353,7 @@ pub(super) mod tests {
     }
 
     /// Test helper: build the per-index schema struct or panic on `None`.
-    pub(in crate::service::tantivy) fn make_index_schema(
+    pub(in crate::tantivy) fn make_index_schema(
         fts: &[String],
         index: &[String],
         arrow_schema: &Schema,

@@ -15,7 +15,7 @@
 
 use std::sync::Arc;
 
-use arrow_schema::Field;
+use arrow_schema::{Field, Schema};
 use config::{
     meta::{
         promql::Metadata,
@@ -23,7 +23,6 @@ use config::{
     },
     utils::json,
 };
-use datafusion::arrow::datatypes::Schema;
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise;
 use serde::{Deserialize, Serialize};

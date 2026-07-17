@@ -13,6 +13,19 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-pub mod infra;
-pub mod meta;
-pub mod utils;
+pub mod authz;
+pub mod grpc;
+pub mod http;
+pub mod ingestion_routes;
+pub mod loki;
+pub mod maxmind;
+pub mod middleware_data;
+pub mod organization;
+pub mod proxy;
+pub mod saved_view;
+pub mod service;
+pub mod service_account;
+pub mod stream;
+pub mod telemetry;
+pub mod traces;
+pub mod user;
