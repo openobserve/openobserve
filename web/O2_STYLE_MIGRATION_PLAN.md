@@ -855,3 +855,32 @@ keepers) · TenstackTable ×2 (table tokens) · PipelineEditor + ServiceGraphNod
 (D6 light code-bg `#ffffff` vs `#f6f8fa`) and the deferred `clearBodyValidation()` dead path (§11.1).
 
 Only D6's code-bg pick blocks a subset of W2.c; everything else is unblocked and mechanical.
+
+### 14.4 Direct serial progress after the agent stall (session-limit workaround)
+
+With the parallel agents blocked, the main loop continued W2.a directly on the **safe, single-file**
+subset — small leaf blocks where a full-corpus consumer check proves no cross-file coupling. Landed as
+4 further commits, each ratchet-re-baselined and type-check-clean:
+
+| Commit | Files | Change |
+|---|---|---|
+| `6349d58fbd` | OperationsList, PanelErrorButtons, ShowLegendsPopup, SummaryList, AssociatedRegexPatterns, FieldListPagination | `:active`→`active:cursor-grabbing`; dead empty pseudos deleted; parent-hover reveal→`group`/`group-hover:`; 3 unscoped child-`:deep` overrides→scoped+keep |
+| `8ad6676397` | main.ts + PatternCard, PatternDetailsDialog, EventDetailDrawerContent, LogsHighLighting, HomeChatHistory, DetailTable, logstream/explore/SearchBar, PermissionsTable | **log-highlighting.css globalised** (imported 6× → once in main.ts), 4 `@import` blocks removed; `::placeholder`→`placeholder:` utilities; 3 child/editor/table overrides→scoped+`:deep`+keep, px→rem |
+| `bc381988ac` | TracesSearchResultList, OTimeline, FieldExpansion, Stream/NodeForm | 4 unscoped child-`:deep` overrides→scoped+`:deep`+keep(complex-state), px→rem |
+
+**`unscopedStyle` 162 → 144** (−18 this session, all committed). Two structural findings for the resuming
+agents:
+1. **Cross-file "global" style blocks** — several unscoped blocks define classes consumed by *other*
+   files, so they can't just be scoped; they need a shared home (base-elements/utilities or a component).
+   Confirmed so far: `hideOnPrintMode` (3 files), `o2-table-hide-header` (2), `selectedLabel` (5),
+   `fade-*` Vue-transition classes (5), `date-time-arrow`/`date-time-*` (3, shared by DateTime +
+   DateTimePicker), `log-content` (12). **Deferred** — batch these into a "shared-global evacuation" pass
+   rather than per-file scoping.
+2. **`log-highlighting.css` still holds raw hex** (`.log-key{color:#B71C1C}` …, 89 selectors) — it's a
+   generated-content stylesheet (now global). Tokenising it onto `--color-syntax-*`/`--color-log-*` is a
+   W2.c-adjacent task; the 2 `TenstackTable` files still carry a now-redundant `@import` of it (remove
+   during their W2.c pass).
+
+**Remaining after this session:** `unscopedStyle` 144 (was 204 at plan start), `styleBlockHex` 469,
+`stylePxUnit` 974. The W2.a/W2.c batch wave (per §14.3) is still the efficient path for the bulk and
+should be re-dispatched once the account session limit resets.
