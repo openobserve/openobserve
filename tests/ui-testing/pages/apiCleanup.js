@@ -1,11 +1,17 @@
 const http = require('http');
+const https = require('https');
 const fetch = require('node-fetch');
 const testLogger = require('../playwright-tests/utils/test-logger.js');
 const { getAuthHeaders, getOrgIdentifier, isCloudEnvironment } = require('../playwright-tests/utils/cloud-auth.js');
 
 // node-fetch v2 keep-alive pooling + gzip decompression is the root cause of
 // "Premature close" / ECONNRESET flakiness in CI.
-const noKeepAliveAgent = new http.Agent({ keepAlive: false });
+// Pick the agent by protocol so both local (http://localhost) and cloud/alpha
+// (https://) URLs work — an http.Agent rejects https:// URLs.
+const noKeepAliveHttpAgent = new http.Agent({ keepAlive: false });
+const noKeepAliveHttpsAgent = new https.Agent({ keepAlive: false });
+const selectAgent = (parsedURL) =>
+    parsedURL.protocol === 'https:' ? noKeepAliveHttpsAgent : noKeepAliveHttpAgent;
 
 class APICleanup {
     constructor(page = null) {
@@ -58,7 +64,7 @@ class APICleanup {
                 testLogger.warn('page.evaluate fetch failed, falling back to node-fetch', { url: url.substring(0, 80), error: e.message });
             }
         }
-        return fetch(url, { ...options, compress: false, agent: noKeepAliveAgent });
+        return fetch(url, { ...options, compress: false, agent: selectAgent });
     }
 
     /**

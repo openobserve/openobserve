@@ -38,25 +38,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="mb-1.25">
             <div class="text-xs ml-1.25">
               <ul class="px-2.5 mt-2.5 mb-0 text-sm leading-[1.4375rem]">
+                <!-- The prose is translated; the PromQL samples beside it are
+                     NOT — they are syntax, and a translated `rate(...)` would be
+                     a query that does not run. -->
                 <li>
-                  For instant vector selectors, use
-                  <span class="bg-highlight-bg px-1.25"
+                  {{ t("metrics.syntaxGuide.instantVector") }}
+                  <span class="bg-highlight-bg px-1.25 rounded-sm"
                     >metric_name{label1="value1", label2="value2"}</span
                   >
                 </li>
                 <li>
-                  For range vector selectors, use
-                  <span class="bg-highlight-bg px-1.25">metric_name[5m]</span>
+                  {{ t("metrics.syntaxGuide.rangeVector") }}
+                  <span class="bg-highlight-bg px-1.25 rounded-sm"
+                    >metric_name[5m]</span
+                  >
                 </li>
                 <li>
-                  To aggregate data, use
-                  <span class="bg-highlight-bg px-1.25">sum by (label)(metric_name)</span>
-                  or
-                  <span class="bg-highlight-bg px-1.25"> avg by (label)(metric_name)</span>
+                  {{ t("metrics.syntaxGuide.aggregate") }}
+                  <span class="bg-highlight-bg px-1.25 rounded-sm"
+                    >sum by (label)(metric_name)</span
+                  >
+                  {{ t("metrics.syntaxGuide.or") }}
+                  <span class="bg-highlight-bg px-1.25 rounded-sm"
+                    >avg by (label)(metric_name)</span
+                  >
                 </li>
                 <li>
-                  For rate calculations over a range vector, use
-                  <span class="bg-highlight-bg px-1.25">rate(metric_name[5m])</span>
+                  {{ t("metrics.syntaxGuide.rate") }}
+                  <span class="bg-highlight-bg px-1.25 rounded-sm"
+                    >rate(metric_name[5m])</span
+                  >
                 </li>
               </ul>
             </div>
@@ -65,53 +76,59 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div v-else>
         <div class="w-105">
-          <div class="label text-sm font-bold">Syntax Guide: SQL Mode</div>
+          <div class="label text-sm font-bold">
+            {{ t("metrics.syntaxGuide.sqlTitle") }}
+          </div>
         </div>
         <div class="border-t my-1 border-dropdown-separator" />
         <div class="answers">
           <div class="mb-1.25">
             <div class="text-xs ml-1.25">
               <ul class="px-2.5 mt-2.5 mb-0 text-sm leading-[1.4375rem]">
+                <!-- As above: prose translated, SQL samples left literal. -->
                 <li>
-                  For full text search of value 'error' use
-                  <span class="bg-highlight-bg px-1.25"
+                  {{ t("metrics.syntaxGuide.sqlFullText") }}
+                  <span class="bg-highlight-bg px-1.25 rounded-sm"
                     >SELECT * FROM <b>stream</b> WHERE match_all('error')</span
                   >
                 </li>
                 <li>
-                  For column search of value 'error' use
-                  <span class="bg-highlight-bg px-1.25"
+                  {{ t("metrics.syntaxGuide.sqlColumn") }}
+                  <span class="bg-highlight-bg px-1.25 rounded-sm"
                     >SELECT * FROM <b>stream</b> WHERE
                     str_match(<b>fieldname</b>, 'error')</span
                   >
                 </li>
                 <li>
-                  To search value 200 for code column use
-                  <span class="bg-highlight-bg px-1.25"
+                  {{ t("metrics.syntaxGuide.sqlCode") }}
+                  <span class="bg-highlight-bg px-1.25 rounded-sm"
                     >SELECT * FROM <b>stream</b> WHERE code=200</span
                   >
                 </li>
                 <li>
-                  To search value 'stderr' for stream column use
-                  <span class="bg-highlight-bg px-1.25"
+                  {{ t("metrics.syntaxGuide.sqlStream") }}
+                  <span class="bg-highlight-bg px-1.25 rounded-sm"
                     >SELECT * FROM <b>stream</b> WHERE stream='stderr'</span
                   >
                 </li>
                 <li>
-                  To search and use query function <i>extract_ip</i> on column
-                  log use
-                  <span class="bg-highlight-bg px-1.25"
+                  <!-- The function name is a parameter, so the sentence can be
+                       reordered by a translator without stranding the `<i>`. -->
+                  {{
+                    t("metrics.syntaxGuide.sqlFunction", { fn: "extract_ip" })
+                  }}
+                  <span class="bg-highlight-bg px-1.25 rounded-sm"
                     >SELECT extract_ip(log) FROM <b>stream</b> WHERE
                     code=200</span
                   >
                 </li>
                 <li>
-                  For additional examples,
+                  {{ t("metrics.syntaxGuide.sqlMoreExamples") }}
                   <a
                     href="https://openobserve.ai/docs/example-queries/"
                     target="_blank"
                     class="hover:underline text-primary"
-                    >click here</a
+                    >{{ t("metrics.syntaxGuide.sqlClickHere") }}</a
                   >.
                 </li>
               </ul>

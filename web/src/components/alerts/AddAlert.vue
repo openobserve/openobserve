@@ -15,7 +15,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="w-full h-full">
+  <!-- AddAlert OWNS the ONE form (Rule ③ owner pattern): `form` is created in
+       setup() via useAlertForm's useOForm and handed to <OForm :form> so the
+       topbar OForm* fields and the already-migrated descendant steps
+       (QueryConfig / AlertSettings) bind by nested `name=` into it. -->
+  <OForm :form="form" class="w-full h-full">
 
     <!-- ═══════════════════════════════════════════════════════════════════ -->
     <!-- V3 "Single Pane of Glass" Layout (All alert types)                -->
@@ -66,7 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="anomalyConfig.last_detection_run && anomalyConfig.last_detection_run > 0"
               class="text-2xs whitespace-nowrap text-text-secondary"
             >
-              Last run: {{ anomalyFormatTs(anomalyConfig.last_detection_run) }}
+              {{ t('alerts.lastRun', { time: anomalyFormatTs(anomalyConfig.last_detection_run) }) }}
             </span>
             <OButton v-if="anomalyConfig.status === 'failed'" variant="ghost-destructive" size="xs" :loading="anomalyRetraining" @click="anomalyTriggerRetrain" icon-left="replay">
               {{ t('alerts.retry') }}
@@ -82,20 +86,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <div class="flex items-center gap-1.5 shrink-0">
               <div class="text-xs font-semibold whitespace-nowrap text-text-label">{{ isAnomalyMode ? t('alerts.anomalyName') : t('alerts.incidents.alertName') }} <span class="text-text-primary">*</span></div>
-              <OInput
+              <OFormInput
                 v-if="!isAnomalyMode"
                 ref="step1Ref"
-                v-model="formData.name"
+                name="name"
                 data-test="add-alert-name-input"
                 :placeholder="t('alerts.alertNamePlaceholder')"
                 class="topbar-name-input text-sm h-7! min-h-7! min-w-30 max-w-37.5 @max-[1300px]/topbar:min-w-25 @max-[850px]/topbar:min-w-22.5 @max-[680px]/topbar:min-w-17.5"
-                :class="alertNameError ? 'field-error' : ''"
-                @update:model-value="alertNameError = false"
               />
-              <OInput
+              <!-- Anomaly name binds the SAME `name` field as the alert name, not
+                   `anomalyConfig.name`: a bare OInput has no field for the schema
+                   to paint, so a blank name could only ever toast. useAlertForm's
+                   formData.name → anomalyConfig.name watcher still feeds the value
+                   saveAnomalyDetection reads, and anomaly edit-load already seeds
+                   it via setF("name", data.name). -->
+              <OFormInput
                 v-else
                 ref="anomalyNameRef"
-                v-model="anomalyConfig.name"
+                name="name"
+                data-test="add-anomaly-name-input"
                 :placeholder="t('alerts.anomalyNamePlaceholder')"
                 class="topbar-name-input text-sm h-7! min-h-7! min-w-30 max-w-37.5 @max-[1300px]/topbar:min-w-25 @max-[850px]/topbar:min-w-22.5 @max-[680px]/topbar:min-w-17.5"
               />
@@ -130,45 +139,43 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Stream Type -->
         <div class="flex items-center gap-1.5">
           <div class="text-xs font-semibold whitespace-nowrap text-text-label">{{ t("alerts.streamType") }} <span class="text-text-primary">*</span></div>
-          <OSelect
+          <OFormSelect
             ref="streamTypeRef"
+            name="stream_type"
             data-test="add-alert-stream-type-select-dropdown"
-            v-model="formData.stream_type"
             :options="streamTypes"
             :searchable="false"
-            class="stream-type-select h-7! min-h-7! w-37.5 @max-[900px]/stream-config:w-27.5 @max-[600px]/stream-config:w-17.5"
-            :class="streamTypeError ? 'field-error' : ''"
+            class="stream-type-select w-37.5 @max-[900px]/stream-config:w-27.5 @max-[600px]/stream-config:w-17.5"
             :disabled="beingUpdated || anomalyEditMode"
-            @update:model-value="streamTypeError = false; updateStreams()"
+            @update:model-value="onStreamTypeChange"
           />
         </div>
 
         <!-- Stream Name -->
         <div class="flex items-center gap-1.5">
           <div class="text-xs font-semibold whitespace-nowrap text-text-label">{{ t("alerts.stream_name") }} <span class="text-text-primary">*</span></div>
-          <OSelect
+          <OFormSelect
             ref="streamNameRef"
+            name="stream_name"
             data-test="add-alert-stream-name-select-dropdown"
-            v-model="formData.stream_name"
             :options="indexOptions"
             :loading="isFetchingStreams"
-            class="stream-name-select h-7! min-h-7! w-40 @max-[900px]/stream-config:w-30 @max-[750px]/stream-config:w-27.5 @max-[600px]/stream-config:w-20"
-            :class="streamNameError ? 'field-error' : ''"
+            class="stream-name-select w-40 @max-[900px]/stream-config:w-30 @max-[750px]/stream-config:w-27.5 @max-[600px]/stream-config:w-20"
             :disabled="beingUpdated || anomalyEditMode || !formData.stream_type"
-            @update:model-value="streamNameError = false; updateStreamFields($event)"
+            @update:model-value="updateStreamFields($event)"
           />
           <OTooltip v-if="!formData.stream_type" :content="t('alerts.selectStreamTypeFirst')" />
         </div>
 
         <!-- Alert Type -->
         <div class="flex items-center gap-1.5">
-          <div class="text-xs font-semibold whitespace-nowrap text-text-label">{{ t("alerts.alertType") || 'Alert Type' }}</div>
-          <OSelect
+          <div class="text-xs font-semibold whitespace-nowrap text-text-label">{{ t("alerts.alertType") }}</div>
+          <OFormSelect
             data-test="add-alert-type-select-dropdown"
-            v-model="formData.is_real_time"
+            name="is_real_time"
             :options="alertTypeOptions"
             :disabled="beingUpdated || anomalyEditMode"
-            class="alert-type-select h-7! min-h-7! min-w-27.5 @max-[900px]/stream-config:min-w-23.75 @max-[750px]/stream-config:min-w-21.25 @max-[600px]/stream-config:min-w-18.75"
+            class="alert-type-select min-w-27.5 @max-[900px]/stream-config:min-w-23.75 @max-[750px]/stream-config:min-w-21.25 @max-[600px]/stream-config:min-w-18.75"
             :searchable="false"
           />
         </div>
@@ -203,7 +210,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Tab Content -->
         <div class="flex-1 overflow-auto">
           <!-- Alert Rules Tab (Conditions + Alert Settings merged) -->
-          <div v-show="activeTab === 'condition'" class="flex flex-col gap-4">
+          <!-- data-tab-pane: lets focusOnFirstError find the tab owning an
+               invalid field and bring it forward before focusing it. -->
+          <div v-show="activeTab === 'condition'" data-tab-pane="condition" class="flex flex-col gap-4">
             <div>
               <QueryConfig
               ref="step2Ref"
@@ -228,17 +237,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @update-group="updateGroup"
               @remove-group="removeConditionGroup"
               @input:update="onInputUpdate"
-              @update:sqlQuery="(value) => (formData.query_condition.sql = value)"
-              @update:promqlQuery="(value) => (formData.query_condition.promql = value)"
-              @update:vrlFunction="(value) => (formData.query_condition.vrl_function = value)"
+              @update:sqlQuery="updateSqlQuery"
+              @update:promqlQuery="updatePromqlQuery"
+              @update:vrlFunction="updateVrlFunction"
               @validate-sql="validateSqlQuery"
               @clear-multi-windows="clearMultiWindows"
               @editor-closed="handleEditorClosed"
               @editor-state-changed="handleEditorStateChanged"
               @update:isAggregationEnabled="(value) => (isAggregationEnabled = value)"
-              @update:aggregation="(value) => (formData.query_condition.aggregation = value)"
-              @update:promqlCondition="(val) => (formData.query_condition.promql_condition = val)"
-              @update:triggerCondition="(val) => (formData.trigger_condition = val)"
+              @update:aggregation="updateAggregation"
+              @update:promqlCondition="updatePromqlCondition"
+              @update:triggerCondition="updateTriggerCondition"
             />
             </div>
 
@@ -251,17 +260,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :isAggregationEnabled="isAggregationEnabled"
               :destinations="formData.destinations"
               :formattedDestinations="getFormattedDestinations"
-              @update:trigger="(val) => (formData.trigger_condition = val)"
-              @update:aggregation="(val) => (formData.query_condition.aggregation = val)"
+              @update:trigger="updateTriggerCondition"
+              @update:aggregation="updateAggregation"
               @update:isAggregationEnabled="(val) => (isAggregationEnabled = val)"
-              @update:promqlCondition="(val) => (formData.query_condition.promql_condition = val)"
+              @update:promqlCondition="updatePromqlCondition"
               @update:destinations="updateDestinations"
               @refresh:destinations="refreshDestinations"
             />
             </div>
           </div>
 
-          <div v-show="activeTab === 'advanced'" class="flex flex-col gap-4">
+          <div v-show="activeTab === 'advanced'" data-tab-pane="advanced" class="flex flex-col gap-4">
 
             <!-- Additional Settings (first) -->
             <div>
@@ -279,12 +288,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :streamType="formData.stream_type"
                 :triggerCondition="formData.trigger_condition"
                 :streamFields="filteredColumns"
-                @update:template="(val) => (formData.template = val)"
+                @update:template="updateTemplate"
                 @refresh:templates="refreshTemplates"
-                @update:contextAttributes="(val) => (formData.context_attributes = val)"
-                @update:description="(val) => (formData.description = val)"
-                @update:rowTemplate="(val) => (formData.row_template = val)"
-                @update:rowTemplateType="(val) => (formData.row_template_type = val)"
+                @update:contextAttributes="updateContextAttributes"
+                @update:description="updateDescription"
+                @update:rowTemplate="updateRowTemplate"
+                @update:rowTemplateType="updateRowTemplateType"
               />
             </div>
 
@@ -298,7 +307,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :frequencyType="formData.trigger_condition.frequency_type"
                 :cron="formData.trigger_condition.cron"
                 :selectedTab="formData.query_condition.type || 'custom'"
-                @update:multiTimeRange="(val) => (formData.query_condition.multi_time_range = val)"
+                @update:multiTimeRange="updateMultiTimeRange"
               />
             </div>
 
@@ -307,19 +316,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <Deduplication
                 :deduplication="formData.deduplication"
                 :columns="filteredColumns"
-                @update:deduplication="(val) => (formData.deduplication = val)"
+                @update:deduplication="updateDeduplication"
               />
             </div>
           </div>
 
-          <div v-show="activeTab === 'anomaly-config'">
+          <div v-show="activeTab === 'anomaly-config'" data-tab-pane="anomaly-config">
             <AnomalyDetectionConfig
               ref="anomalyStep2Ref"
               :config="anomalyConfig"
             />
           </div>
 
-          <div v-show="activeTab === 'anomaly-alerting'">
+          <div v-show="activeTab === 'anomaly-alerting'" data-tab-pane="anomaly-alerting">
             <AnomalyAlerting
               :config="anomalyConfig"
               :destinations="destinations"
@@ -344,7 +353,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="primary"
           size="sm-action"
           :loading="isAnomalyMode ? anomalySaving : false"
-          :disabled="isAnomalyMode ? !canSaveAlert : false"
           @click="handleSave"
         >{{ isAnomalyMode && !anomalyEditMode ? t('alerts.saveAndTrain') : t('alerts.save') }}</OButton>
       </div>
@@ -359,7 +367,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             class="flex items-center px-3 py-2.5 select-none border-b border-border-default shrink-0 gap-2"
           >
-            <span class="text-sm font-medium">{{ isAnomalyMode ? t('alerts.sqlPreview') : (t('alerts.preview') || 'Preview') }}</span>
+            <span class="text-sm font-medium">{{ isAnomalyMode ? t('alerts.sqlPreview') : t('alerts.preview') }}</span>
             <template v-if="!isAnomalyMode && activeEvaluationStatus">
               <div class="w-px h-4 bg-border-default" />
               <OIcon :name="activeEvaluationStatus.wouldTrigger ? 'check-circle' : 'cancel'" :class="activeEvaluationStatus.wouldTrigger ? 'text-status-positive' : 'text-gray'" size="sm" />
@@ -402,7 +410,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             class="flex items-center px-3 py-2.5 select-none border-b border-border-default shrink-0"
           >
-            <span class="text-sm font-medium">{{ t('alerts.summary.title') || 'Summary' }}</span>
+            <span class="text-sm font-medium">{{ t('alerts.summary.title') }}</span>
           </div>
           <div class="flex-1 min-h-0 overflow-auto">
             <AnomalySummary class="h-full overflow-auto"
@@ -424,7 +432,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       </div>
       </div>
-  </div>
+  </OForm>
 
   <ODrawer data-test="add-alert-json-editor-drawer"
     v-model:open="showJsonEditorDialog"
@@ -433,7 +441,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     persistent
   >
     <JsonEditor
-      :data="formData"
+      :data="jsonEditorData"
       :title="t('alerts.editJson')"
       :type="'alerts'"
       :validation-errors="validationErrors"
@@ -468,7 +476,9 @@ import { useAlertForm, defaultAlertValue } from "@/composables/useAlertForm";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
-import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OForm from "@/lib/forms/Form/OForm.vue";
+import OFormInput from "@/lib/forms/Input/OFormInput.vue";
+import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
 
@@ -520,7 +530,9 @@ export default defineComponent({
     OTag,
     OTooltip,
     OInput,
-    OSelect,
+    OForm,
+    OFormInput,
+    OFormSelect,
     AppPageHeader,
   },
   setup(props, { emit }) {
@@ -569,7 +581,7 @@ export default defineComponent({
       const tabs = alertForm.isAnomalyMode.value
         ? [
             { key: "anomaly-config", label: alertForm.t("alerts.anomalyDetectionConfig"), required: true },
-            { key: "anomaly-alerting", label: alertForm.t("alerts.alerting") || "Alerting", required: alertForm.anomalyConfig.value.alert_enabled },
+            { key: "anomaly-alerting", label: alertForm.t("alerts.alerting"), required: alertForm.anomalyConfig.value.alert_enabled },
           ]
         : [
             { key: "condition", label: alertForm.t("alerts.alertRules"), required: true },
@@ -593,6 +605,15 @@ export default defineComponent({
       });
     };
 
+    // Stream-type change: write the value into the ONE form explicitly (so the
+    // synchronous form store is current before updateStreams reads it — not
+    // relying on the OFormSelect field-change flush order), then refresh streams
+    // (which also resets stream_name via setF).
+    const onStreamTypeChange = (value: any) => {
+      alertForm.setF("stream_type", value);
+      alertForm.updateStreams();
+    };
+
     return {
       ...alertForm,
       isAnomalyDetectionEnabled,
@@ -600,12 +621,44 @@ export default defineComponent({
       alertTabs,
       activeFolderName,
       goBackToAlertsList,
+      onStreamTypeChange,
       activeEvaluationStatus,
     };
   },
 
 });
 </script>
+
+<style scoped>
+/* keep(lib-override:o2-form): float each control's validation message out of
+   flow. A class passed to OInput/OFormSelect lands on the ROOT wrapper — the
+   flex-col holding the control AND its message — so an in-flow message would
+   grow these fixed-height topbar rows, escape the card, and be painted over by
+   the next card. `top:100%` resolves against the wrapper; the topbar input's
+   h-7 clamp genuinely compresses it, so it anchors correctly, while the three
+   selects deliberately carry NO h-7 clamp (it only ever shrank the wrapper box,
+   never the 2.125rem trigger, which mis-anchored the floating message).
+   pointer-events:none so the floating text can't swallow clicks on the tab bar
+   it overlaps. `:deep` because [role="alert"] renders inside the child
+   component. All widths and container-query steps are template utilities. */
+.topbar-name-input,
+.stream-type-select,
+.stream-name-select {
+  position: relative;
+}
+
+.topbar-name-input :deep([role="alert"]),
+.stream-type-select :deep([role="alert"]),
+.stream-name-select :deep([role="alert"]) {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: 0.125rem;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 10;
+}
+</style>
 
 <style scoped>
 /* keep(complex-state): `.alert-field-highlight` is a transient state class that

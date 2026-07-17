@@ -92,25 +92,26 @@ export const discordConfig: PrebuiltConfig = {
   credentialFields: [
     {
       key: 'webhookUrl',
-      label: 'Discord Webhook URL',
+      labelKey: 'alerts.prebuiltDestinations.discordWebhookUrl',
       type: 'text',
       required: true,
       hint: 'Get your webhook URL from Discord channel settings',
       validator: (url: string) => {
+        const invalid = { key: 'alerts.prebuiltDestinations.invalidDiscordWebhookUrl' };
         try {
           const parsed = new URL(url);
           const hostname = parsed.hostname.toLowerCase();
           return ((hostname === 'discord.com' || hostname.endsWith('.discord.com')) &&
                   parsed.pathname.startsWith('/api/webhooks/')) ||
-                 'Invalid Discord webhook URL';
+                 invalid;
         } catch {
-          return 'Invalid Discord webhook URL';
+          return invalid;
         }
       }
     },
     {
       key: 'username',
-      label: 'Bot Username (optional)',
+      labelKey: 'alerts.prebuiltDestinations.discordUsername',
       type: 'text',
       required: false,
       hint: 'Custom username for the webhook bot'

@@ -20,6 +20,7 @@ import {
 import OTableBodyCell from "./OTableBodyCell.vue";
 import OTableSelectCheckbox from "./OTableSelectCheckbox.vue";
 import OTableExpandButton from "./OTableExpandButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { OTableTreeContextKey } from "../composables/useTableTree";
 import {
   TABLE_CHECKBOX_COL_SIZE as TABLE_CHECKBOX_COL_WIDTH,
@@ -62,6 +63,10 @@ const props = defineProps<{
     row: any;
     value: any;
   }) => Record<string, any>;
+  /** When true, renders a drag handle grip icon as the first cell. */
+  enableRowReorder?: boolean;
+  /** Per-row predicate: when false, the drag handle is hidden for this row. */
+  rowDraggable?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -123,14 +128,16 @@ const showTreeWarning = computed(
  * Used to align the warning row's content + connector line under the chevron.
  */
 const treeConnectorX = computed(() => {
-  const selectionWidth = props.selectionEnabled ? TABLE_CHECKBOX_COL_WIDTH : 0;
   const expansionWidth = props.expansionEnabled ? 32 : 0; // w-8
+  const selectionWidth = props.selectionEnabled ? TABLE_CHECKBOX_COL_WIDTH : 0;
+  const dragWidth = props.enableRowReorder ? 16 : 0; // w-4
   const cellPaddingLeft = 8; // px-2
   const halfChevron = 9; // 18px / 2
   const parentDepth = treeMeta.value?.depth ?? 0;
   return (
-    selectionWidth +
     expansionWidth +
+    selectionWidth +
+    dragWidth +
     cellPaddingLeft +
     parentDepth * 16 +
     halfChevron
@@ -320,6 +327,20 @@ function onRowBlur() {
       </div>
     </td>
 
+    <!-- Drag handle cell -->
+    <td
+      v-if="enableRowReorder"
+      :class="[
+        'w-4 min-w-4 px-0 text-center align-middle',
+        bordered ? 'border-b border-table-row-divider' : '',
+        rowDraggable === false ? 'invisible' : '',
+      ]"
+      class="o2-table-drag-handle"
+      data-test="o2-table-row-drag-handle"
+    >
+      <OIcon name="drag-indicator" size="xs" class="text-text-secondary cursor-grab transition-opacity" />
+    </td>
+
     <!-- Data cells -->
     <OTableBodyCell
       v-for="cell in row.getVisibleCells()"
@@ -358,7 +379,8 @@ function onRowBlur() {
       :colspan="
         row.getVisibleCells().length +
         (expansionEnabled ? 1 : 0) +
-        (selectionEnabled ? 1 : 0)
+        (selectionEnabled ? 1 : 0) +
+        (enableRowReorder ? 1 : 0)
       "
       :class="[
         'o2-table-tree-warning-cell relative',
@@ -382,7 +404,8 @@ function onRowBlur() {
       :colspan="
         row.getVisibleCells().length +
         (expansionEnabled ? 1 : 0) +
-        (selectionEnabled ? 1 : 0)
+        (selectionEnabled ? 1 : 0) +
+        (enableRowReorder ? 1 : 0)
       "
       :class="bordered ? 'border-b border-table-row-divider' : ''"
     >

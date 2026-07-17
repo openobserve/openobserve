@@ -2571,6 +2571,25 @@
     "SearchSQLCancelled": "錯誤：搜尋 SQL 已取消。"
   },
   "alerts": {
+    "validation": {
+      "streamTypeRequired": "Stream 類型為必填項。",
+      "streamNameRequired": "Stream 名稱為必填項。",
+      "fieldRequired": "此欄位為必填項！",
+      "fieldRequiredPlain": "此欄位為必填項",
+      "nameInvalidChars": "不允許使用 :, ?, /, # 和空格等字元。",
+      "templateRequired": "範本為必填項！",
+      "validEmails": "請新增有效的電子郵件！",
+      "silenceNonNegative": "通知靜音應大於或等於 0",
+      "periodPositive": "週期應大於 0",
+      "destinationRequired": "至少需要一個目標。",
+      "thresholdPositive": "閾值應大於 0",
+      "frequencyPositive": "頻率應大於 0",
+      "groupByRequired": "至少需要一個分組欄位",
+      "minimumOneDay": "最少 1 天",
+      "detectionFunctionRequired": "偵測函式為必填項",
+      "timestampAliasBanned": "{column} 不能用作資料行別名。請改用 time_bucket。",
+      "credentialFieldRequired": "{field} 為必填項"
+    },
     "header": "警示",
     "add": "新增警示",
     "edit": "編輯",

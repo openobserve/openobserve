@@ -237,13 +237,17 @@ export const BADGE_GROUPS = {
     mode: "dot",
     shape: "pill",
     values: {
+      up: { variant: "success-soft" },
+      passed: { variant: "success-soft" },
       healthy: { variant: "success-soft" },
       online: { variant: "success-soft" },
       degraded: { variant: "warning-soft" },
       warning: { variant: "amber-soft" },
       critical: { variant: "error-soft" },
       offline: { variant: "error-soft" },
+      failed: { variant: "error-soft" },
       down: { variant: "error-soft" },
+      unknown: { variant: "default-soft" },
     },
   },
 
@@ -1303,6 +1307,21 @@ export const BADGE_GROUPS = {
       enterprise: { variant: "purple-soft" },
     },
     fallback: { variant: "default-soft" },
+  },
+
+  // Synthetic monitor type — plain, PILL.
+  syntheticType: {
+    mode: "plain",
+    shape: "pill",
+    size: "sm",
+    values: {
+      http:    { variant: "blue-soft",    label: "HTTP" },
+      browser: { variant: "purple-soft",  label: "Browser" },
+      api:     { variant: "success-soft", label: "API" },
+      tcp:     { variant: "orange-soft",  label: "TCP" },
+      ping:    { variant: "default-soft", label: "Ping" },
+      dns:     { variant: "amber-soft",   label: "DNS" },
+    },
   },
 
   // Billing AI usage mode — PILL. i18n labels.

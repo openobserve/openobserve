@@ -259,6 +259,12 @@ describe("resolveTab", () => {
       );
     });
 
+    it("ingestMetrics – vmagent", () => {
+      expect(resolveTab("ingestMetrics", "vmagent", "prometheus")).toBe(
+        "vmagent"
+      );
+    });
+
     it("ingestMetrics – otelCollector", () => {
       expect(resolveTab("ingestMetrics", "otelCollector", "prometheus")).toBe(
         "otelCollector"
@@ -516,8 +522,8 @@ describe("ROUTE_TAB_MAPS", () => {
       expect(Object.keys(ROUTE_TAB_MAPS.servers)).toHaveLength(2);
     });
 
-    it("ingestMetrics has 4 entries", () => {
-      expect(Object.keys(ROUTE_TAB_MAPS.ingestMetrics)).toHaveLength(4);
+    it("ingestMetrics has 5 entries", () => {
+      expect(Object.keys(ROUTE_TAB_MAPS.ingestMetrics)).toHaveLength(5);
     });
 
     it("ingestLogs has 8 entries", () => {

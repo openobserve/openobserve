@@ -40,16 +40,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Stream Type + Stream Name -->
           <div class="flex items-center gap-2">
             <div v-if="streamType" class="inline-flex flex-row items-center gap-1.25 py-0.75 px-2.5 rounded-md bg-[color-mix(in_srgb,var(--color-info)_10%,transparent)] border border-[color-mix(in_srgb,var(--color-info)_28%,transparent)]">
-              <span class="text-2xs font-semibold text-text-label">Stream Type</span>
+              <span class="text-2xs font-semibold text-text-label">{{ t("alerts.streamType") }}</span>
               <span class="text-2xs opacity-30 text-text-label">:</span>
               <span class="text-xs font-bold text-text-link">{{ streamType }}</span>
             </div>
             <span v-if="streamType && streamName" class="opacity-20 select-none">|</span>
             <div class="inline-flex flex-row items-center gap-1.25 py-0.75 px-2.5 rounded-md bg-[color-mix(in_srgb,var(--color-sql-accent)_10%,transparent)] border border-[color-mix(in_srgb,var(--color-sql-accent)_28%,transparent)]">
-              <span class="text-2xs font-semibold text-text-label">Stream Name</span>
+              <span class="text-2xs font-semibold text-text-label">{{ t("alerts.stream_name") }}</span>
               <span class="text-2xs opacity-30 text-text-label">:</span>
               <span v-if="streamName" class="text-xs font-bold text-sql-accent">{{ streamName }}</span>
-              <span v-else class="text-xs font-bold opacity-40 italic text-sql-accent">none</span>
+              <span v-else class="text-xs font-bold opacity-40 italic text-sql-accent">{{ t("alerts.queryEditor.noStream") }}</span>
             </div>
           </div>
         </div>
@@ -112,7 +112,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       <div class="flex items-center gap-2">
                         <div class="w-0.75 h-3.5 rounded-sm shrink-0 bg-theme-accent" />
-                        <span class="text-xs font-semibold">{{ localTab === 'sql' ? 'SQL Editor' : 'PromQL Editor' }}</span>
+                        <span class="text-xs font-semibold">{{ localTab === 'sql' ? t('alerts.sqlEditor') : t('alerts.promqlEditor') }}</span>
                       </div>
                       <div class="flex items-center gap-2">
                         <OSwitch
@@ -121,7 +121,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           class="o2-toggle-button-xs"
                           @update:model-value="(val) => val ? restoreVrlEditor() : (sqlEditorMaximized = true)"
                         >
-                          <OTooltip :delay="400" :content="sqlEditorMaximized ? 'show VRL editor' : 'hide VRL editor'" />
+                          <OTooltip :delay="400" :content="sqlEditorMaximized ? t('alerts.queryEditor.showVrlEditor') : t('alerts.queryEditor.hideVrlEditor')" />
                         </OSwitch>
                         <OButton
                           data-test="alert-run-query-btn"
@@ -180,23 +180,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </template>
                       <template v-else-if="sqlStatusState === 'sql-status-bar--loading'">
                         <OSpinner size="xs" class="shrink-0" />
-                        <span>Fetching results...</span>
+                        <span>{{ t('alerts.queryEditor.fetchingResults') }}</span>
                       </template>
                       <template v-else-if="sqlStatusState === 'sql-status-bar--hint'">
                         <OIcon name="edit" size="xs" class="shrink-0 opacity-60" />
-                        <span>Write a query to get started</span>
+                        <span>{{ t('alerts.queryEditor.writeQueryHint') }}</span>
                       </template>
                       <template v-else-if="sqlStatusState === 'sql-status-bar--idle'">
                         <OIcon name="play-arrow" size="xs" class="shrink-0 opacity-70" />
-                        <span>Press Run Query to see results</span>
+                        <span>{{ t('alerts.queryEditor.runQueryHint') }}</span>
                       </template>
                       <template v-else-if="sqlStatusState === 'sql-status-bar--empty'">
                         <OIcon name="search-off" size="xs" class="shrink-0" />
-                        <span>Query ran successfully — no matching events</span>
+                        <span>{{ t('alerts.queryEditor.noMatchingEvents') }}</span>
                       </template>
                       <template v-else-if="sqlStatusState === 'sql-status-bar--success'">
                         <OIcon name="check-circle" size="xs" class="shrink-0" />
-                        <span>{{ sqlResultCount }} event{{ sqlResultCount === 1 ? '' : 's' }} found</span>
+                        <span>{{ t('alerts.queryEditor.eventsFound', sqlResultCount) }}</span>
                       </template>
                     </div>
                     <OTooltip
@@ -223,7 +223,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     <div class="flex items-center gap-2">
                       <div class="w-0.75 h-3.5 rounded-sm shrink-0 bg-section-accent-secondary" />
-                      <span class="text-xs font-semibold">VRL Editor</span>
+                      <span class="text-xs font-semibold">{{ t('alerts.vrlEditor') }}</span>
                     </div>
                     <div v-if="!sqlEditorMaximized" class="flex gap-2 items-center">
                       <!-- Saved functions -->
@@ -233,7 +233,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         data-test="alert-saved-vrl-function-select"
                         labelKey="name"
                         valueKey="name"
-                        @filter="filterFunctionOptions"
                         @update:modelValue="onFunctionSelect"
                         class="mini-select alert-v3-select w-35!"
                         clearable
@@ -309,11 +308,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   <div class="flex items-center gap-2">
                     <div class="w-0.75 h-3.5 rounded-sm shrink-0 bg-theme-accent" />
-                    <span class="text-xs font-semibold">Query Result</span>
+                    <span class="text-xs font-semibold">{{ t('alerts.queryEditor.queryResult') }}</span>
                     <span
                       v-if="multiTimeRange && multiTimeRange.length > 0"
                       class="text-3xs font-bold py-px px-1.75 rounded-sm tracking-[0.04em] bg-status-info-bg border border-banner-info-border text-text-link"
-                    >results across all time windows</span>
+                    >{{ t('alerts.queryEditor.resultsAcrossWindows') }}</span>
                   </div>
                 </div>
 
@@ -362,7 +361,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   <div class="flex items-center gap-2">
                     <div class="w-0.75 h-3.5 rounded-sm shrink-0 bg-section-accent-secondary" />
-                    <span class="text-xs font-semibold">Combined Output</span>
+                    <span class="text-xs font-semibold">{{ t('alerts.queryEditor.combinedOutput') }}</span>
                     <span
                       class="text-3xs font-bold py-px px-1.75 rounded-sm tracking-[0.04em] bg-badge-purple-soft-bg border border-badge-purple-ol-border text-badge-purple-ol-text"
                     >SQL + VRL</span>
@@ -370,7 +369,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <!-- Running indicator -->
                   <div v-if="runFnQueryLoading" class="flex items-center gap-1">
                     <span class="query-editor-run-dot w-1.5 h-1.5 rounded-full bg-status-positive" />
-                    <span class="text-3xs font-semibold text-status-positive">Running</span>
+                    <span class="text-3xs font-semibold text-status-positive">{{ t('alerts.queryEditor.running') }}</span>
                   </div>
                 </div>
 
@@ -693,20 +692,6 @@ watch(() => props.savedFunctions, (newVal) => {
   functionOptions.value = [...newVal];
 });
 
-// Filter functions
-const filterFunctionOptions = (val: string, update: any) => {
-  update(() => {
-    if (val === "") {
-      functionOptions.value = [...props.savedFunctions];
-    } else {
-      const needle = val.toLowerCase();
-      functionOptions.value = props.savedFunctions.filter((v: any) =>
-        v.name.toLowerCase().indexOf(needle) > -1
-      );
-    }
-  });
-};
-
 // Update handlers
 const updateSqlQuery = (value: string) => {
   localSqlQuery.value = value;
@@ -766,11 +751,13 @@ const handleAlertFunctionEditorGenerationSuccess = (payload: {
   // Function code is already updated via @update:query handler
 };
 
-// Column and function selection
-const onFunctionSelect = (func: any) => {
-  if (func && func.function) {
-    vrlFunctionContent.value = func.function;
-    updateVrlFunction(func.function);
+// Column and function selection.
+// OSelect emits the resolved `valueKey` (the function name), not the option
+// object — look the function up before reading its body.
+const onFunctionSelect = (name: any) => {
+  const func = props.savedFunctions.find((f: any) => f.name === name);
+  if (func) {
+    updateVrlFunction(func.function || func.body || "");
   }
 };
 

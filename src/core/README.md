@@ -1,10 +1,11 @@
 # openobserve-core
 
-`openobserve-core` contains the application services and shared business logic used by OpenObserve frontends and background jobs.
+`openobserve-core` contains the application services and compatibility re-exports used by
+OpenObserve frontends and background jobs.
 
 Its main modules are:
 
-- `common`: shared application types and utilities.
+- `common`: compatibility namespace backed by the `common` crate.
 - `service`: business services used by APIs and jobs.
 - `cipher`: enterprise-only encryption support.
 

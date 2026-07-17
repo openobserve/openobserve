@@ -19,7 +19,7 @@
 import { mount, flushPromises } from "@vue/test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import General from "./General.vue";
-import i18n from "@/locales";
+import i18n, { loadLocaleMessages } from "@/locales";
 import { createRouter, createWebHistory } from "vue-router";
 
 vi.mock("@/lib/feedback/Toast/useToast", () => ({
@@ -153,6 +153,10 @@ describe("General settings Danger Zone", () => {
       ["ja", "危険ゾーン", "管理者のみ"],
       ["de", "Gefahrenzone", "Nur Administratoren"],
     ])("renders the panel in %s", async (locale, header, ownerFact) => {
+      // Only en-gb is bundled; every other locale is a lazy chunk. main.ts awaits
+      // this before mounting, so mirror that here rather than assuming the
+      // messages are already registered.
+      await loadLocaleMessages(locale);
       i18n.global.locale.value = locale;
       const wrapper = await mountGeneral();
       const text = wrapper
@@ -170,6 +174,7 @@ describe("General settings Danger Zone", () => {
     });
 
     it("resolves the member plural in a locale with no plural distinction", async () => {
+      await loadLocaleMessages("zh-cn");
       i18n.global.locale.value = "zh-cn";
       const wrapper = await mountGeneral();
       expect(

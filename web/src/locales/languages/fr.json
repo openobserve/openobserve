@@ -835,7 +835,11 @@
     "pipeline": "Canalisations",
     "language": "Langue",
     "actions": "Actions",
-    "keyboardShortcuts": "Raccourcis clavier"
+    "keyboardShortcuts": "Raccourcis clavier",
+    "incidents": "Incidents",
+    "evals": "Evals",
+    "aiObservability": "Observabilité de l'IA",
+    "synthetic": "Synthétique"
   },
   "rum": {
     "title": "Surveillance réelle des utilisateurs",
@@ -3130,6 +3134,25 @@
     "SearchSQLCancelled": "Erreur : Search SQL a été annulé."
   },
   "alerts": {
+    "validation": {
+      "streamTypeRequired": "Le type de Stream est requis.",
+      "streamNameRequired": "Le nom du Stream est requis.",
+      "fieldRequired": "Le champ est requis !",
+      "fieldRequiredPlain": "Le champ est requis",
+      "nameInvalidChars": "Les caractères comme :, ?, /, # et les espaces ne sont pas autorisés.",
+      "templateRequired": "Le modèle est requis !",
+      "validEmails": "Ajoutez des e-mails valides !",
+      "silenceNonNegative": "La mise en sourdine des notifications doit être supérieure ou égale à 0",
+      "periodPositive": "La période doit être supérieure à 0",
+      "destinationRequired": "Au moins une destination est requise.",
+      "thresholdPositive": "Le seuil doit être supérieur à 0",
+      "frequencyPositive": "La fréquence doit être supérieure à 0",
+      "groupByRequired": "Au moins un champ de regroupement est requis",
+      "minimumOneDay": "Minimum 1 jour",
+      "detectionFunctionRequired": "La fonction de détection est requise",
+      "timestampAliasBanned": "{column} ne peut pas être utilisé comme alias de colonne. Utilisez time_bucket à la place.",
+      "credentialFieldRequired": "{field} est requis"
+    },
     "header": "Alertes",
     "subtitle": "Règles d'alerte et canaux de notification",
     "searchThisFolder": "Ce dossier",
@@ -6532,6 +6555,70 @@
       "rumErrorsRefresh": "Actualiser la liste",
       "rumSessionsRefresh": "Actualiser la liste",
       "sourceMapsRefresh": "Actualiser la liste"
+    }
+  },
+  "synthetics": {
+    "scheduleAlert": {
+      "title": "Calendrier et alertes",
+      "frequency": "Fréquence",
+      "frequencyOptions": {
+        "1min": "1 minute",
+        "5min": "5 minutes",
+        "15min": "15 minutes",
+        "30min": "30 minutes",
+        "1hour": "1 heure",
+        "cron": "Cron"
+      },
+      "scheduleNow": "Planifiez dès maintenant",
+      "scheduleLater": "Planifier plus tard",
+      "scheduleNowTooltip": "La vérification devient active immédiatement à l'aide de la date et du fuseau horaire actuels.",
+      "scheduleLaterTooltip": "Choisissez une date et une heure futures pour activer le chèque.",
+      "startDate": "Date de début",
+      "startTime": "Heure de début",
+      "timezone": "Fuseau horaire",
+      "cronExpression": "Expression cron",
+      "cronPlaceholder": "*/5 * * *",
+      "retries": "Réessais",
+      "retriesOnFailure": "Réessaie en cas d'échec",
+      "retriesOnFailureSuffix": "fois.",
+      "retryDelay": "Attendre",
+      "retryDelaySuffix": "ms entre deux tentatives.",
+      "alert": "Alerte",
+      "alertedIfFails": "Alerté en cas d'échec du test",
+      "alertedIfFailsSuffix": "fois.",
+      "destinations": "Destinations",
+      "noDestinations": "Aucune destination disponible",
+      "refreshDestinations": "Actualiser les destinations",
+      "addNewDestination": "Ajouter une nouvelle destination",
+      "destinationRequired": "Au moins une destination est requise",
+      "cooldownPeriod": "Période de recharge",
+      "minutes": "minutes"
+    },
+    "locations": {
+      "title": "Localisations",
+      "locationAwsEast": "AWS · us-east-1",
+      "comingSoon": "Plus de régions et de sites privés — Prochainement"
+    },
+    "results": {
+      "title": "Surveiller les résultats",
+      "monitors": "Moniteurs",
+      "editMonitor": "Modifier le moniteur",
+      "uptime": "Disponibilité",
+      "p95Duration": "Durée P95",
+      "failedRuns": "Exécution échouée",
+      "lastRun": "Dernière course",
+      "responseTime": "Temps de réponse",
+      "responseTimeSubtitle": "Durée totale du trajet",
+      "recentRuns": "Courses récentes",
+      "runs": "Coule",
+      "noRuns": "Aucune course n'a été trouvée pour la période sélectionnée.",
+      "status": "État",
+      "started": "Commencé",
+      "duration": "Durée",
+      "location": "Lieu",
+      "trigger": "Gâchette",
+      "passed": "Passé",
+      "failed": "Échoué"
     }
   }
 }

@@ -442,4 +442,117 @@ describe("LabelFilterBar", () => {
       ]);
     });
   });
+
+  /**
+   * Chips are ANDed — PromQL matchers in one selector always are, and this
+   * engine rejects `or` matchers outright. Two adjacent chips read equally like
+   * "either of these", and that reading is always wrong, so the row says it.
+   */
+  describe("the AND between chips is stated, not inferred", () => {
+    const ands = (w: VueWrapper<any>) =>
+      w.findAll('[data-test="metrics-explorer-label-and"]');
+
+    it("says nothing for a single chip — there is no conjunction yet", () => {
+      wrapper = createWrapper({
+        filters: [{ label: "pod", operator: "=", value: "api-1" }],
+      });
+      expect(ands(wrapper)).toHaveLength(0);
+    });
+
+    it("separates each pair — N chips get N-1 ANDs", () => {
+      wrapper = createWrapper({
+        filters: [
+          { label: "pod", operator: "=", value: "api-1" },
+          { label: "status", operator: "=~", value: "5.." },
+          { label: "job", operator: "!=", value: "canary" },
+        ],
+      });
+      expect(ands(wrapper)).toHaveLength(2);
+      expect(ands(wrapper)[0].text()).toBe("and");
+    });
+
+    it("points at the regex escape hatch for anyone who wanted OR", () => {
+      wrapper = createWrapper({
+        filters: [
+          { label: "pod", operator: "=", value: "api-1" },
+          { label: "job", operator: "=", value: "web" },
+        ],
+      });
+      // A user who reads "and" and wanted "or" needs to be told what to do
+      // instead — `=~` is the only way to say it.
+      expect(ands(wrapper)[0].attributes("title")).toContain("=~");
+    });
+  });
+
+  /**
+   * The empty-row typewriter hint.
+   *
+   * It sits OUTSIDE the picker's v-if/v-else-if chain. An earlier attempt put it
+   * between the `+ Filter` button and the label step, which silently broke the
+   * chain and rendered the button and the value picker at once — so the last test
+   * here guards the structure, not just the hint.
+   */
+  describe("the empty filter row types a hint", () => {
+    const hint = (w: VueWrapper<any>) =>
+      w.find('[data-test="metrics-explorer-label-hint"]');
+
+    it("shows on an idle, unfiltered row", () => {
+      wrapper = createWrapper({ filters: [] });
+      expect(hint(wrapper).exists()).toBe(true);
+    });
+
+    it("is decorative — never announced, never clickable", () => {
+      wrapper = createWrapper({ filters: [] });
+      // It duplicates what `+ Filter` already says, and swallowing a click on the
+      // row's dead space would be worse than useless.
+      expect(hint(wrapper).attributes("aria-hidden")).toBe("true");
+      expect(hint(wrapper).classes()).toContain("pointer-events-none");
+    });
+
+    it("yields its width rather than pushing + Filter along the row", () => {
+      wrapper = createWrapper({ filters: [] });
+      const classes = hint(wrapper).classes();
+
+      // The shared typewriter rule is `nowrap` + `ellipsis`, which only clips
+      // once something BOUNDS the width. Without these the hint took its full
+      // intrinsic width and shoved the button — the hint must always be what
+      // gives, never the control.
+      expect(classes).toContain("min-w-0");
+      expect(classes).toContain("overflow-hidden");
+    });
+
+    it("yields the row once a filter exists — the chips are what the row is for", () => {
+      wrapper = createWrapper({
+        filters: [{ label: "pod", operator: "=", value: "api-1" }],
+      });
+      expect(hint(wrapper).exists()).toBe(false);
+    });
+
+    it("gets out of the way while the picker is open", async () => {
+      wrapper = createWrapper({ filters: [] });
+      await wrapper
+        .find('[data-test="metrics-explorer-label-add"]')
+        .trigger("click");
+      await flushPromises();
+
+      expect(hint(wrapper).exists()).toBe(false);
+    });
+
+    it("does not break the picker's v-if chain (+ Filter and the picker are exclusive)", async () => {
+      wrapper = createWrapper({ filters: [] });
+      // Both visible at once is the signature of a broken chain — it is exactly
+      // what happened when this hint was first placed inside it.
+      await wrapper
+        .find('[data-test="metrics-explorer-label-add"]')
+        .trigger("click");
+      await flushPromises();
+
+      expect(
+        wrapper.find('[data-test="metrics-explorer-label-add"]').exists(),
+      ).toBe(false);
+      expect(
+        wrapper.find('[data-test="metrics-explorer-label-picker-label"]').exists(),
+      ).toBe(true);
+    });
+  });
 });

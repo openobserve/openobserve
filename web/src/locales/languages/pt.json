@@ -835,7 +835,11 @@
     "pipeline": "Oleodutos",
     "language": "Idioma",
     "actions": "Ações",
-    "keyboardShortcuts": "Atalhos de teclado"
+    "keyboardShortcuts": "Atalhos de teclado",
+    "incidents": "Incidentes",
+    "evals": "Evals",
+    "aiObservability": "Observabilidade da IA",
+    "synthetic": "Sintético"
   },
   "rum": {
     "title": "Monitoramento de usuários reais",
@@ -3130,6 +3134,25 @@
     "SearchSQLCancelled": "Erro: a pesquisa SQL foi cancelada."
   },
   "alerts": {
+    "validation": {
+      "streamTypeRequired": "O tipo de Stream é obrigatório.",
+      "streamNameRequired": "O nome do Stream é obrigatório.",
+      "fieldRequired": "O campo é obrigatório!",
+      "fieldRequiredPlain": "O campo é obrigatório",
+      "nameInvalidChars": "Caracteres como :, ?, /, # e espaços não são permitidos.",
+      "templateRequired": "O modelo é obrigatório!",
+      "validEmails": "Adicione e-mails válidos!",
+      "silenceNonNegative": "O silenciamento de notificações deve ser maior ou igual a 0",
+      "periodPositive": "O período deve ser maior que 0",
+      "destinationRequired": "Pelo menos um destino é obrigatório.",
+      "thresholdPositive": "O limite deve ser maior que 0",
+      "frequencyPositive": "A frequência deve ser maior que 0",
+      "groupByRequired": "Pelo menos um campo de agrupamento é obrigatório",
+      "minimumOneDay": "Mínimo de 1 dia",
+      "detectionFunctionRequired": "A função de detecção é obrigatória",
+      "timestampAliasBanned": "{column} não pode ser usado como alias de coluna. Use time_bucket em vez disso.",
+      "credentialFieldRequired": "{field} é obrigatório"
+    },
     "header": "Alertas",
     "subtitle": "Regras de alerta e canais de notificação",
     "searchThisFolder": "Esta pasta",
@@ -6532,6 +6555,70 @@
       "rumErrorsRefresh": "Atualizar lista",
       "rumSessionsRefresh": "Atualizar lista",
       "sourceMapsRefresh": "Atualizar lista"
+    }
+  },
+  "synthetics": {
+    "scheduleAlert": {
+      "title": "Programação e alertas",
+      "frequency": "Frequência",
+      "frequencyOptions": {
+        "1min": "1 min",
+        "5min": "5 min",
+        "15min": "15 minutos",
+        "30min": "30 minutos",
+        "1hour": "1 hora",
+        "cron": "Cron"
+      },
+      "scheduleNow": "Agende agora",
+      "scheduleLater": "Agende mais tarde",
+      "scheduleNowTooltip": "O cheque se torna ativo imediatamente usando a data e o fuso horário atuais.",
+      "scheduleLaterTooltip": "Escolha uma data e hora futuras para ativar o cheque.",
+      "startDate": "Data de início",
+      "startTime": "Hora de início",
+      "timezone": "Fuso horário",
+      "cronExpression": "Expressão Cron",
+      "cronPlaceholder": "*/5 * * * *",
+      "retries": "Tentativas novamente",
+      "retriesOnFailure": "Tenta novamente em caso de falha",
+      "retriesOnFailureSuffix": "vezes.",
+      "retryDelay": "Aguarde",
+      "retryDelaySuffix": "ms entre as novas tentativas.",
+      "alert": "Alerta",
+      "alertedIfFails": "Alertado se o teste falhar",
+      "alertedIfFailsSuffix": "vezes.",
+      "destinations": "Destinos",
+      "noDestinations": "Nenhum destino disponível",
+      "refreshDestinations": "Atualizar destinos",
+      "addNewDestination": "Adicionar novo destino",
+      "destinationRequired": "É necessário pelo menos um destino",
+      "cooldownPeriod": "Período de recarga",
+      "minutes": "ata"
+    },
+    "locations": {
+      "title": "Localizações",
+      "locationAwsEast": "AWS · us-east-1",
+      "comingSoon": "Mais regiões e locais privados — Em breve"
+    },
+    "results": {
+      "title": "Monitore os resultados",
+      "monitors": "Monitores",
+      "editMonitor": "Monitor de edição",
+      "uptime": "Tempo de atividade",
+      "p95Duration": "Duração do P95",
+      "failedRuns": "Execuções com falha",
+      "lastRun": "Última corrida",
+      "responseTime": "Tempo de resposta",
+      "responseTimeSubtitle": "Duração total da viagem",
+      "recentRuns": "Execuções recentes",
+      "runs": "Corre",
+      "noRuns": "Nenhuma execução encontrada para o intervalo de tempo selecionado.",
+      "status": "Status",
+      "started": "Iniciado",
+      "duration": "Duração",
+      "location": "Localização",
+      "trigger": "Gatilho",
+      "passed": "Aprovado",
+      "failed": "Falhou"
     }
   }
 }

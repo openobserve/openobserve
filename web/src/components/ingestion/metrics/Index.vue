@@ -34,6 +34,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               label="Prometheus"
             />
             <ORouteTab
+              name="vmagent"
+              data-test="ingestion-metrics-tab-vmagent"
+              :to="{
+                name: 'vmagent',
+                query: {
+                  org_identifier: store.state.selectedOrganization.identifier,
+                },
+              }"
+              :icon="'img:' + getImageURL('images/ingestion/vmagent.svg')"
+              label="vmagent"
+            />
+            <ORouteTab
               name="otelCollector"
               :to="{
                 name: 'otelCollector',
@@ -123,6 +135,7 @@ export default defineComponent({
     onBeforeMount(() => {
       const ingestRoutes = [
         "prometheus",
+        "vmagent",
         "otelCollector",
         "telegraf",
         "cloudwatchMetrics",

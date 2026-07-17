@@ -1,6 +1,7 @@
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const PageManager = require('../../pages/page-manager.js');
 const testLogger = require('../utils/test-logger.js');
+const { isCloudEnvironment } = require('../../pages/cloudPages/cloud-env.js');
 
 test.describe.configure({ mode: "parallel" });
 
@@ -36,6 +37,12 @@ test.describe("Stream name casing preservation tests", () => {
   test("should preserve stream name casing after ingestion and show in stream explorer", {
     tag: ['@streamName', '@casing', '@all', '@streams']
   }, async ({ page }) => {
+    // Casing preservation needs the server started with
+    // ZO_FORMAT_STREAM_NAME_TO_LOWERCASE=false (the local playwright.yml does
+    // this); shared cloud deployments run the default (true) and lowercase
+    // every ingested stream name, so the feature under test is off there.
+    test.skip(isCloudEnvironment(), 'Cloud runs ZO_FORMAT_STREAM_NAME_TO_LOWERCASE=true (default) — stream names are always lowercased');
+
     testLogger.info('Testing stream name casing preservation');
 
     // Ingest data into streams
