@@ -106,19 +106,22 @@ export default defineComponent({
 </script>
 
 <style scoped>
+/* keep(lib-override:o2-select): narrows OSelect's own `w-full` root utility at three
+   breakpoints the theme registers no `--breakpoint-*` screens for; a plain `w-*` utility
+   would sit in the same layer as `w-full` and collide non-deterministically. */
 .folder-select {
-  width: 110px;
+  width: 6.875rem;
 }
 
-@media (max-width: 1500px) {
-  .folder-select { width: 90px; }
+@media (max-width: 93.75rem) {
+  .folder-select { width: 5.625rem; }
 }
 
-@media (max-width: 1100px) {
-  .folder-select { width: 75px; }
+@media (max-width: 68.75rem) {
+  .folder-select { width: 4.6875rem; }
 }
 
-@media (max-width: 950px) {
-  .folder-select { width: 65px; }
+@media (max-width: 59.375rem) {
+  .folder-select { width: 4.0625rem; }
 }
 </style>

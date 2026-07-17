@@ -487,14 +487,22 @@ describe("BuildFieldPopUp", () => {
   describe("Responsive Layout", () => {
     it("should apply flex layout", () => {
       wrapper = createWrapper();
-      const container = wrapper.find('div[style*="display: flex"]');
+      // Inline `display: flex` is now the `flex` utility.
+      const container = wrapper.find(
+        '[data-test="dashboard-build-field-popup-container"]',
+      );
       expect(container.exists()).toBe(true);
+      expect(container.classes()).toContain("flex");
     });
 
     it("should apply gap between sections", () => {
       wrapper = createWrapper();
-      const container = wrapper.find('div[style*="gap: 16px"]');
+      // Inline `gap: 16px` is now the `gap-4` utility (1rem).
+      const container = wrapper.find(
+        '[data-test="dashboard-build-field-popup-container"]',
+      );
       expect(container.exists()).toBe(true);
+      expect(container.classes()).toContain("gap-4");
     });
   });
 

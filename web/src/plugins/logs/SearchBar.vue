@@ -360,7 +360,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @select.prevent="searchObj.meta.showTransformEditor = !searchObj.meta.showTransformEditor"
             >
               <template #icon-left>
-                <span class="inline-flex items-center justify-center w-7 h-7 rounded-md bg-section-header-bg text-text-secondary shrink-0 [font-family:var(--font-mono,monospace)] text-[var(--text-compact)] italic [font-weight:var(--font-bold)] text-accent">fx</span>
+                <span class="inline-flex items-center justify-center w-7 h-7 rounded-md bg-section-header-bg text-text-secondary shrink-0 font-mono text-compact italic font-bold text-accent">fx</span>
               </template>
               {{ t('search.functionEditorLabel') }}
               <template #icon-right>
@@ -689,7 +689,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :size="toolbarToggleIconOnly ? 'sm' : 'md'"
             @click.stop
           />
-          <span class="[font-family:var(--font-mono,monospace)] text-sm italic font-bold text-accent shrink-0">fx</span>
+          <span class="font-mono text-sm italic font-bold text-accent shrink-0">fx</span>
           <OTooltip :content="t('search.functionEditorLabel')" />
         </OButton>
 
@@ -782,7 +782,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :title="t('search.cancel')"
                   variant="ghost"
                   size="sm-toolbar"
-                  class="p-0 h-[1.875rem]! [font-weight:var(--font-medium)]! leading-4! px-1! w-[5.875rem]! whitespace-normal break-words text-center [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] bg-cancel-query-bg! text-button-primary-foreground! element-box-shadow [border-radius:0.375rem_0_0_0.375rem]!"
+                  class="p-0 h-[1.875rem]! font-medium! leading-4! px-1! w-[5.875rem]! whitespace-normal break-words text-center [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] bg-cancel-query-bg! text-button-primary-foreground! element-box-shadow [border-radius:0.375rem_0_0_0.375rem]!"
                   @click="cancelVisualizeQueries"
                   >{{ t("search.cancel") }}</OButton
                 >
@@ -811,7 +811,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :class="[
                     isNaturalLanguageDetected && !searchObj.meta.nlpMode
                       ? 'o2-ai-generate-button [border-radius:0.375rem_0_0_0.375rem]!'
-                      : '[font-weight:var(--font-medium)]! leading-4! px-1! w-[5.875rem]! whitespace-normal break-words text-center [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] bg-button-primary! text-button-primary-foreground! hover:opacity-90 hover:[box-shadow:0_0_8px_color-mix(in_srgb,var(--color-button-primary),transparent_30%)]',
+                      : 'font-medium! leading-4! px-1! w-[5.875rem]! whitespace-normal break-words text-center [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] bg-button-primary! text-button-primary-foreground! hover:opacity-90 hover:[box-shadow:0_0_8px_color-mix(in_srgb,var(--color-button-primary),transparent_30%)]',
                     '[border-radius:0.375rem_0_0_0.375rem]!',
                   ]"
                   @click="
@@ -826,7 +826,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       : t("search.runQuery")
                   }}
                 </OButton>
-                <OSeparator class="h-[1.875rem]! w-[1px]" vertical />
+                <OSeparator class="h-[1.875rem]! w-px" vertical />
                 <ODropdown align="end" side="bottom">
                   <template #trigger>
                     <OButton
@@ -884,7 +884,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   variant="ghost"
                   :title="t('search.cancel')"
                   size="sm-toolbar"
-                  class="p-0 h-[1.875rem]! [font-weight:var(--font-medium)]! leading-4! px-1! w-[5.875rem]! whitespace-normal break-words text-center [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] bg-cancel-query-bg! text-button-primary-foreground! element-box-shadow [border-radius:0.375rem_0_0_0.375rem]!"
+                  class="p-0 h-[1.875rem]! font-medium! leading-4! px-1! w-[5.875rem]! whitespace-normal break-words text-center [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] bg-cancel-query-bg! text-button-primary-foreground! element-box-shadow [border-radius:0.375rem_0_0_0.375rem]!"
                   @click="cancelVisualizeQueries"
                   >{{ t("search.cancel") }}</OButton
                 >
@@ -914,7 +914,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :class="[
                     isNaturalLanguageDetected && !searchObj.meta.nlpMode
                       ? 'o2-ai-generate-button [border-radius:0.375rem_0_0_0.375rem]!'
-                      : '[font-weight:var(--font-medium)]! leading-4! px-1! w-[5.875rem]! whitespace-normal break-words text-center [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] bg-button-primary! text-button-primary-foreground! hover:opacity-90 hover:[box-shadow:0_0_8px_color-mix(in_srgb,var(--color-button-primary),transparent_30%)]',
+                      : 'font-medium! leading-4! px-1! w-[5.875rem]! whitespace-normal break-words text-center [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] bg-button-primary! text-button-primary-foreground! hover:opacity-90 hover:[box-shadow:0_0_8px_color-mix(in_srgb,var(--color-button-primary),transparent_30%)]',
                     '[border-radius:0.375rem_0_0_0.375rem]!',
                   ]"
                   @click="
@@ -929,7 +929,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       : t("search.runQuery")
                   }}
                 </OButton>
-                <OSeparator class="h-[1.875rem]! w-[1px]" vertical />
+                <OSeparator class="h-[1.875rem]! w-px" vertical />
                 <ODropdown align="end" side="bottom">
                   <template #trigger>
                     <OButton
@@ -991,7 +991,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 variant="ghost"
                 :title="t('search.cancel')"
                 size="sm-toolbar"
-                class="p-0 h-[1.875rem]! [font-weight:var(--font-medium)]! leading-4! px-1! w-[5.875rem]! whitespace-normal break-words text-center [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] bg-cancel-query-bg! text-button-primary-foreground! element-box-shadow rounded-md"
+                class="p-0 h-[1.875rem]! font-medium! leading-4! px-1! w-[5.875rem]! whitespace-normal break-words text-center [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] bg-cancel-query-bg! text-button-primary-foreground! element-box-shadow rounded-md"
                 @click="cancelPatterns"
                 >{{ t("search.cancel") }}</OButton
               >
@@ -1009,7 +1009,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 variant="primary"
                 :title="t('search.cancel')"
                 size="sm-toolbar"
-                class="p-0 h-[1.875rem]! [font-weight:var(--font-medium)]! leading-4! px-1! w-[5.875rem]! whitespace-normal break-words text-center [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] bg-cancel-query-bg! text-button-primary-foreground! element-box-shadow"
+                class="p-0 h-[1.875rem]! font-medium! leading-4! px-1! w-[5.875rem]! whitespace-normal break-words text-center [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] bg-cancel-query-bg! text-button-primary-foreground! element-box-shadow"
                 :class="
                   config.isEnterprise == 'true'
                     ? '[border-radius:0.375rem_0_0_0.375rem]!'
@@ -1038,7 +1038,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :class="[
                   isNaturalLanguageDetected && !searchObj.meta.nlpMode
                     ? 'o2-ai-generate-button'
-                    : '[font-weight:var(--font-medium)]! leading-4! px-1! w-[5.875rem]! whitespace-normal break-words text-center [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] bg-button-primary! text-button-primary-foreground! hover:opacity-90 hover:[box-shadow:0_0_8px_color-mix(in_srgb,var(--color-button-primary),transparent_30%)]',
+                    : 'font-medium! leading-4! px-1! w-[5.875rem]! whitespace-normal break-words text-center [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] bg-button-primary! text-button-primary-foreground! hover:opacity-90 hover:[box-shadow:0_0_8px_color-mix(in_srgb,var(--color-button-primary),transparent_30%)]',
                   store.state.zoConfig.auto_query_enabled
                     ? '[border-radius:0.375rem_0_0_0.375rem]!'
                     : 'rounded-md',
@@ -1086,7 +1086,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Dropdown: shown for enterprise or when live mode feature is enabled -->
               <OSeparator
                 v-if="store.state.zoConfig.auto_query_enabled"
-                class="h-[1.875rem]! w-[1px]"
+                class="h-[1.875rem]! w-px"
                 vertical
               />
               <ODropdown

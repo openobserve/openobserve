@@ -66,7 +66,7 @@
         <!-- Field row -->
         <div
           v-else
-          class="o-field-list__row group mt-[0.25rem] flex items-center w-full min-h-6 p-0 relative cursor-pointer rounded-[0.1875rem] text-xs leading-[0.8rem]"
+          class="o-field-list__row group mt-1 flex items-center w-full min-h-6 p-0 relative cursor-pointer rounded-sm text-xs leading-[0.8rem]"
           :class="{ 'o-field-list__row--draggable': draggable }"
           :data-test="`o-field-list-row-${row.name}`"
           :draggable="draggable && isDragEnabled(row, row._index ?? 0)"
@@ -101,7 +101,7 @@
               </OFieldRow>
             </slot>
           </div>
-          <div v-if="$slots['field-actions']" class="o-field-list__actions flex items-stretch shrink-0 invisible opacity-0 group-hover:visible group-hover:opacity-100 transition-[opacity,visibility] duration-[120ms] ease-[ease] absolute right-1 top-1/2 -translate-y-1/2 border border-field-list-actions-border rounded-[0.1875rem] overflow-hidden bg-field-list-actions-bg">
+          <div v-if="$slots['field-actions']" class="o-field-list__actions flex items-stretch shrink-0 invisible opacity-0 group-hover:visible group-hover:opacity-100 transition-[opacity,visibility] duration-[120ms] ease-[ease] absolute right-1 top-1/2 -translate-y-1/2 border border-field-list-actions-border rounded-sm overflow-hidden bg-field-list-actions-bg">
             <slot name="field-actions" :row="row" :index="row._index" />
           </div>
         </div>
@@ -109,7 +109,7 @@
         <!-- Expanded content -->
         <div
           v-if="isExpanded(row) && $slots.expansion"
-          class="w-full pt-1 pb-[0.375rem] border border-field-list-expansion-border border-t-0 rounded-b-[0.1875rem] mb-[0.375rem] relative z-[1] box-border"
+          class="w-full pt-1 pb-1.5 border border-field-list-expansion-border border-t-0 rounded-b-sm mb-1.5 relative z-[1] box-border"
         >
           <slot name="expansion" :row="row" />
         </div>
@@ -383,13 +383,15 @@ function scrollToTop() {
 defineExpose({ scrollToTop });
 </script>
 
-<style>
+<style scoped>
 /* keep(lib-override:OButton): the __actions rules flatten SLOT content (OButton
    roots rendered by consumers) — they need `!important` to beat the button's own
-   utilities and must stay unscoped to reach the slotted DOM. The group-header
-   sibling-combinator spacing is co-located here (adjacent/`:not(:first-child)`
-   selectors aren't expressible per-element as utilities). Row-hover reveal of
-   __actions is now handled by `group`/`group-hover` utilities in the template. */
+   utilities. Slotted nodes carry the CONSUMER's scope id, not ours, so the child
+   selectors go through `:deep()`; the block itself is scoped (the wrapper is our
+   own element, so it still gets our scope id). The group-header sibling-combinator
+   spacing is co-located here (adjacent/`:not(:first-child)` selectors aren't
+   expressible per-element as utilities). Row-hover reveal of __actions is handled
+   by `group`/`group-hover` utilities in the template. */
 
 /* Defensive: two adjacent group headers shouldn't double their separator. */
 .o-field-list__group-header + .o-field-list__group-header {
@@ -406,12 +408,12 @@ defineExpose({ scrollToTop });
 
 /* Make each chip flush (no individual border, no rounded-sm corners),
    and put a vertical separator between adjacent chips. */
-.o-field-list__actions > * {
+.o-field-list__actions > :deep(*) {
   border: 0 !important;
   border-radius: 0 !important;
   background-color: transparent !important;
 }
-.o-field-list__actions > *:not(:first-child) {
+.o-field-list__actions > :deep(*:not(:first-child)) {
   border-left: 1px solid var(--color-field-list-actions-border) !important;
 }
 </style>

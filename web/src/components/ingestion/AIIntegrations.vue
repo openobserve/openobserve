@@ -82,12 +82,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           v-if="(integration.logo || integration.logoDark) && !failedLogos.has(integration.slug)"
                           :src="(isDark && integration.logoDark) || integration.logo"
                           :alt="`${integration.name} logo`"
-                          class="ai-menu-logo"
+                          class="w-4.5 h-4.5 rounded-sm flex-none object-contain"
                           loading="lazy"
                           referrerpolicy="no-referrer"
                           @error="onLogoError(integration.slug)"
                         />
-                        <span v-else class="ai-menu-mono" aria-hidden="true">{{
+                        <span
+                          v-else
+                          class="w-4.5 h-4.5 rounded-sm flex-none grid place-items-center bg-theme-accent text-text-inverse text-3xs font-bold leading-none"
+                          aria-hidden="true"
+                        >{{
                           integration.name.charAt(0)
                         }}</span>
                       </template>
@@ -240,26 +244,3 @@ export default defineComponent({
 });
 </script>
 
-<style scoped lang="scss">
-/* Sidebar provider logo / monogram — every item gets a marker (logo URL from the
-   manifest, else a lettered tile in the app theme color, matching the card hero). */
-.ai-menu-logo,
-.ai-menu-mono {
-  width: 18px;
-  height: 18px;
-  border-radius: 5px;
-  flex: none;
-}
-.ai-menu-logo {
-  object-fit: contain;
-}
-.ai-menu-mono {
-  display: grid;
-  place-items: center;
-  background: var(--color-theme-accent, var(--color-accent));
-  color: var(--color-text-inverse);
-  font-size: 10.5px;
-  font-weight: 700;
-  line-height: 1;
-}
-</style>

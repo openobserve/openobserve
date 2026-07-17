@@ -16,13 +16,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="aws-marketplace-setup min-h-screen bg-surface-base">
-    <div class="flex relative-position tw-px-3 tw-pt-2">
+    <div class="flex relative-position px-3 pt-2">
       <img
         data-test="aws-marketplace-setup-logo"
         class="h-10"
         loading="lazy"
         :src="
-          store?.state?.theme === 'dark'
+          isDark
             ? getImageURL('images/common/openobserve_latest_dark_2.svg')
             : getImageURL('images/common/openobserve_latest_light_2.svg')
         "
@@ -197,6 +197,7 @@ import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
+import { useTheme } from "@/composables/useTheme";
 import { useI18n } from "vue-i18n";
 import { getImageURL, useLocalOrganization } from "@/utils/zincutils";
 import awsMarketplace from "@/services/awsMarketplace";
@@ -234,6 +235,7 @@ export default defineComponent({
 },
   setup() {
     const store = useStore();
+    const { isDark } = useTheme();
     const router = useRouter();
     const { t } = useI18n();
 
@@ -418,6 +420,7 @@ export default defineComponent({
 
     return {
       store,
+      isDark,
       state,
       errorMessage,
       eligibleOrganizations,

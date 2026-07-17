@@ -214,7 +214,7 @@
               <span
                 v-for="v in promptVariables"
                 :key="v"
-                class="py-[1px] px-1.5 rounded-sm text-2xs font-mono bg-[color-mix(in_srgb,var(--color-text-secondary)_10%,transparent)] text-text-primary"
+                class="py-px px-1.5 rounded-sm text-2xs font-mono bg-[color-mix(in_srgb,var(--color-text-secondary)_10%,transparent)] text-text-primary"
               >{{ formatTemplateVariable(v) }}</span>
             </div>
             <div class="text-2xs text-text-secondary mt-1">
@@ -590,7 +590,7 @@
               <span
                 v-for="v in promptVariables"
                 :key="v"
-                class="py-[1px] px-1.5 rounded-sm text-2xs font-mono bg-[color-mix(in_srgb,var(--color-text-secondary)_10%,transparent)] text-text-primary"
+                class="py-px px-1.5 rounded-sm text-2xs font-mono bg-[color-mix(in_srgb,var(--color-text-secondary)_10%,transparent)] text-text-primary"
               >{{ formatTemplateVariable(v) }}</span>
             </div>
           </div>

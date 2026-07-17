@@ -29,7 +29,7 @@
       </div>
       <!-- Moving circle indicator -->
       <div
-        class="absolute top-0 w-[3px] h-0.5 rounded-full shadow-[0_0_10px_2px_rgba(89,96,178,0.5)] transform translate-x-[-50%]"
+        class="absolute top-0 w-0.75 h-0.5 rounded-full shadow-[0_0_0.625rem_0.125rem_color-mix(in_srgb,var(--color-brand-indigo)_50%,transparent)] transform -translate-x-1/2"
         :class="
           'bg-brand-indigo'
         "

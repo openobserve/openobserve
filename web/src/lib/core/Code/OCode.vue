@@ -43,7 +43,7 @@ async function copy() {
     class="relative block w-full rounded-md border border-code-border bg-code-block-bg text-code-block-text overflow-x-auto"
   ><code
       ref="codeRef"
-      class="block px-3 py-2 text-xs [font-family:var(--font-mono)] leading-relaxed whitespace-pre"
+      class="block px-3 py-2 text-xs font-mono leading-relaxed whitespace-pre"
     ><slot /></code><button
       v-if="copyable"
       type="button"
@@ -64,7 +64,7 @@ async function copy() {
       'inline-flex items-center gap-1',
       'rounded-sm border border-code-border bg-code-bg text-code-text',
       'px-1 py-px',
-      'text-xs [font-family:var(--font-mono)] leading-none',
+      'text-xs font-mono leading-none',
       truncate ? 'max-w-full truncate' : '',
     ]"
   >

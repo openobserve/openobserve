@@ -39,9 +39,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               name="scrape_interval"
               type="number"
               min="0"
-              class="ml-2"
+              class="ml-2 w-30"
               data-test="general-settings-scrape-interval"
-              style="width: 120px"
             />
             <span class="individual-setting-description text-compact opacity-70">
               {{ t("settings.scrapeIntervalDescription") }}
@@ -58,10 +57,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               type="number"
               :min="1000"
               :max="1000000"
-              class="ml-2"
+              class="ml-2 w-45"
               :placeholder="'40000 (' + t('settings.systemDefault') + ')'"
               data-test="general-settings-max-series-per-query"
-              style="width: 180px"
             >
               <template v-slot:icon-right>
                 <OIcon name="info" size="sm" class="cursor-pointer">
@@ -80,56 +78,55 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t("settings.manageTheme") }}
             </span>
             <div
-              class="flex gap-2 items-center"
-              style="margin-left: -60px"
+              class="flex gap-2 items-center -ml-15"
             >
               <!-- Light Mode Theme -->
               <div
-                class="group/chip inline-flex items-center gap-2 py-1.5 pr-3 pl-1.5 rounded-full cursor-pointer transition-all duration-200 bg-[rgba(0,0,0,0.04)] border border-[rgba(0,0,0,0.1)] hover:bg-[rgba(0,0,0,0.06)] hover:border-accent hover:-translate-y-px hover:shadow-[0_2px_8px_rgba(0,0,0,0.1)] dark:bg-[rgba(255,255,255,0.05)] dark:border-[rgba(255,255,255,0.15)] dark:hover:bg-[rgba(255,255,255,0.08)] dark:hover:shadow-[0_2px_8px_rgba(0,0,0,0.3)]"
+                class="group/chip inline-flex items-center gap-2 py-1.5 pr-3 pl-1.5 rounded-full cursor-pointer transition-all duration-200 bg-surface-subtle border border-border-default hover:bg-surface-subtle-hover hover:border-accent hover:-translate-y-px hover:shadow-md"
                 @click="handleThemeChipClick('light')"
                 data-test="theme-light-chip"
               >
                 <div
-                  class="color-circle w-6 h-6 rounded-full shrink-0 flex items-center justify-center shadow-[0_1px_3px_rgba(0,0,0,0.2)] relative overflow-hidden"
+                  class="color-circle w-6 h-6 rounded-full shrink-0 flex items-center justify-center shadow-[0_1px_3px_color-mix(in_srgb,var(--color-black)_20%,transparent)] relative overflow-hidden"
                   :style="{ backgroundColor: customLightColor }"
                 >
                   <OIcon
                     name="palette"
                     size="xs"
-                    class="opacity-0 transition-opacity duration-200 [filter:drop-shadow(0_1px_1px_rgba(0,0,0,0.3))] group-hover/chip:opacity-90"
+                    class="opacity-0 transition-opacity duration-200 filter-[drop-shadow(0_1px_1px_color-mix(in_srgb,var(--color-black)_30%,transparent))] group-hover/chip:opacity-90"
                   />
                 </div>
-                <span class="chip-label text-2xs font-semibold opacity-50 tracking-[0.5px]">{{ t("settings.light") }}</span>
-                <span class="chip-value font-['SF_Mono','Monaco','Menlo',monospace] text-2xs font-medium opacity-70 tracking-[-0.2px]">{{ customLightColor }}</span>
+                <span class="chip-label text-2xs font-semibold opacity-50 tracking-wider">{{ t("settings.light") }}</span>
+                <span class="chip-value font-mono text-2xs font-medium opacity-70 tracking-tight">{{ customLightColor }}</span>
               </div>
 
               <!-- Dark Mode Theme -->
               <div
-                class="group/chip inline-flex items-center gap-2 py-1.5 pr-3 pl-1.5 rounded-full cursor-pointer transition-all duration-200 bg-[rgba(0,0,0,0.04)] border border-[rgba(0,0,0,0.1)] hover:bg-[rgba(0,0,0,0.06)] hover:border-accent hover:-translate-y-px hover:shadow-[0_2px_8px_rgba(0,0,0,0.1)] dark:bg-[rgba(255,255,255,0.05)] dark:border-[rgba(255,255,255,0.15)] dark:hover:bg-[rgba(255,255,255,0.08)] dark:hover:shadow-[0_2px_8px_rgba(0,0,0,0.3)]"
+                class="group/chip inline-flex items-center gap-2 py-1.5 pr-3 pl-1.5 rounded-full cursor-pointer transition-all duration-200 bg-surface-subtle border border-border-default hover:bg-surface-subtle-hover hover:border-accent hover:-translate-y-px hover:shadow-md"
                 @click="handleThemeChipClick('dark')"
                 data-test="theme-dark-chip"
               >
                 <div
-                  class="color-circle w-6 h-6 rounded-full shrink-0 flex items-center justify-center shadow-[0_1px_3px_rgba(0,0,0,0.2)] relative overflow-hidden"
+                  class="color-circle w-6 h-6 rounded-full shrink-0 flex items-center justify-center shadow-[0_1px_3px_color-mix(in_srgb,var(--color-black)_20%,transparent)] relative overflow-hidden"
                   :style="{ backgroundColor: customDarkColor }"
                 >
                   <OIcon
                     name="palette"
                     size="xs"
-                    class="opacity-0 transition-opacity duration-200 [filter:drop-shadow(0_1px_1px_rgba(0,0,0,0.3))] group-hover/chip:opacity-90"
+                    class="opacity-0 transition-opacity duration-200 filter-[drop-shadow(0_1px_1px_color-mix(in_srgb,var(--color-black)_30%,transparent))] group-hover/chip:opacity-90"
                   />
                 </div>
-                <span class="chip-label text-2xs font-semibold opacity-50 tracking-[0.5px]">{{ t("settings.dark") }}</span>
-                <span class="chip-value font-['SF_Mono','Monaco','Menlo',monospace] text-2xs font-medium opacity-70 tracking-[-0.2px]">{{ customDarkColor }}</span>
+                <span class="chip-label text-2xs font-semibold opacity-50 tracking-wider">{{ t("settings.dark") }}</span>
+                <span class="chip-value font-mono text-2xs font-medium opacity-70 tracking-tight">{{ customDarkColor }}</span>
               </div>
 
               <!-- Reset Button -->
               <div
-                class="group/resetChip inline-flex items-center justify-center w-8 h-8 rounded-full cursor-pointer transition-all duration-200 bg-transparent border border-dashed border-[rgba(0,0,0,0.2)] opacity-60 hover:bg-[rgba(239,68,68,0.08)] hover:border-[rgba(239,68,68,0.4)] hover:border-solid hover:opacity-100 hover:-translate-y-px hover:rotate-180 dark:border-[rgba(255,255,255,0.25)] dark:hover:bg-[rgba(239,68,68,0.15)] dark:hover:border-[rgba(239,68,68,0.5)]"
+                class="group/resetChip inline-flex items-center justify-center w-8 h-8 rounded-full cursor-pointer transition-all duration-200 bg-transparent border border-dashed border-border-strong opacity-60 hover:bg-[color-mix(in_srgb,var(--color-error-500)_10%,transparent)] hover:border-error-400 hover:border-solid hover:opacity-100 hover:-translate-y-px hover:rotate-180"
                 @click="resetThemeColors"
                 data-test="reset-theme-colors-btn"
               >
-                <OIcon name="refresh" size="sm" class="group-hover/resetChip:text-[rgb(239,68,68)] dark:group-hover/resetChip:text-[rgb(248,113,113)]" />
+                <OIcon name="refresh" size="sm" class="group-hover/resetChip:text-error-500 dark:group-hover/resetChip:text-error-400" />
                 <OTooltip :content="t('settings.resetToDefaultColors')" side="top" />
               </div>
             </div>
@@ -248,8 +245,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 `data:image; base64, ` + store.state.zoConfig.custom_logo_img
               "
               :alt="t('settings.logoLabel')"
-              style="max-width: 150px; max-height: 31px"
-              class="mx-3"
+              class="mx-3 max-w-37.5 max-h-7.75"
             />
             <OButton
               data-test="setting_ent_custom_logo_img_delete_btn"
@@ -295,7 +291,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </div>
           </div>
-          <span class="individual-setting-description -translate-y-[5px] text-compact opacity-70">
+          <span class="individual-setting-description -translate-y-1.25 text-compact opacity-70">
               {{ t("settings.customLogoLightDescription") }}
             </span>
           </div>
@@ -319,8 +315,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 store.state.zoConfig.custom_logo_dark_img
               "
               :alt="t('settings.logoLabel')"
-              style="max-width: 150px; max-height: 31px"
-              class="mx-3"
+              class="mx-3 max-w-37.5 max-h-7.75"
             />
             <OButton
               data-test="setting_ent_custom_logo_dark_img_delete_btn"
@@ -366,7 +361,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </div>
           </div>
-          <span class="individual-setting-description -translate-y-[5px] text-compact opacity-70">
+          <span class="individual-setting-description -translate-y-1.25 text-compact opacity-70">
               {{ t("settings.customLogoDarkDescription") }}
             </span>
           </div>
@@ -959,7 +954,7 @@ export default defineComponent({
       }
     };
 
-    const uploadImage = (fileList: any = null, theme: string = "light") => {
+    const uploadImage = (fileList: any = null, mode: string = "light") => {
       const selectedFiles = fileList || files.value;
       // Handle single file or file array
       //but mostly we will support single file because we only show one image at a time right
@@ -986,7 +981,7 @@ export default defineComponent({
           .createLogo(
             store.state.selectedOrganization?.identifier || orgIdentifier,
             formData,
-            theme,
+            mode,
           )
           .then(async (res) => {
             if (res.status == 200) {
@@ -994,7 +989,7 @@ export default defineComponent({
                 variant: "success",
                 message: t("settings.logoUpdatedSuccessfully", {
                   mode:
-                    theme === "dark"
+                    mode === "dark"
                       ? t("settings.darkMode")
                       : t("settings.lightMode"),
                 }),
@@ -1005,7 +1000,7 @@ export default defineComponent({
               });
 
               // Clear the appropriate file ref
-              if (theme === "dark") {
+              if (mode === "dark") {
                 filesDark.value = null;
               } else {
                 filesLight.value = null;
@@ -1040,7 +1035,7 @@ export default defineComponent({
       }
     };
 
-    const deleteLogo = (theme: string = "light") => {
+    const deleteLogo = (mode: string = "light") => {
       loadingState.value = true;
       let orgIdentifier = "default";
       for (let item of store.state.organizations) {
@@ -1051,7 +1046,7 @@ export default defineComponent({
       settingsService
         .deleteLogo(
           store.state.selectedOrganization?.identifier || orgIdentifier,
-          theme,
+          mode,
         )
         .then(async (res: any) => {
           if (res.status == 200) {
@@ -1059,7 +1054,7 @@ export default defineComponent({
               variant: "success",
               message: t("settings.logoDeletedSuccessfully", {
                 mode:
-                  theme === "dark"
+                  mode === "dark"
                     ? t("settings.darkMode")
                     : t("settings.lightMode"),
               }),

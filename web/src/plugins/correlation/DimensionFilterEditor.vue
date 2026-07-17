@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @click:primary="handleApply"
   >
         <!-- Description -->
-        <div class="mb-4 text-sm text-gray-600">
+        <div class="mb-4 text-sm text-text-secondary">
           {{ t('correlation.logs.filters.description') }}
         </div>
 
@@ -102,7 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     icon-left="all-inclusive"
                     variant="ghost"
                     size="sm-action"
-                    :class="pendingFilters[key] === SELECT_ALL_VALUE ? 'text-green-600' : ''"
+                    :class="pendingFilters[key] === SELECT_ALL_VALUE ? 'text-success-600' : ''"
                     @click="toggleWildcard(key)"
                     :data-test="`toggle-wildcard-${key}`"
                   >
@@ -112,7 +112,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         : t('correlation.logs.filters.setToAll')
                     }}
                   </OButton>
-                  <span class="ml-2 text-xs text-gray-500">
+                  <span class="ml-2 text-xs text-text-secondary">
                     {{ t('correlation.logs.filters.wildcardHelp') }}
                   </span>
                 </div>
@@ -127,7 +127,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- No Additional Dimensions Message -->
         <div
           v-else
-          class="p-3 border border-dashed border-gray-300 rounded-sm text-center text-sm text-gray-500"
+          class="p-3 border border-dashed border-border-default rounded-sm text-center text-sm text-text-secondary"
         >
           {{ t('correlation.logs.filters.noAdditionalDimensions') }}
         </div>

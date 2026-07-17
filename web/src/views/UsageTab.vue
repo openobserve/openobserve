@@ -1012,9 +1012,10 @@ watch(orgId, (newVal, oldVal) => {
 </script>
 
 <style scoped lang="scss">
-
-/*
- * UsageTab Styles
+/* keep(complex-state): the view-button arrow swap is a descendant hover
+   animation (.view-button:hover .view-arrow-icon{,-in}) paired with @keyframes,
+   :has(), :focus-visible and a prefers-reduced-motion escape — none of which a
+   template utility can express.
  *
  * Structure:
  * 1. CSS Variables
@@ -1103,13 +1104,13 @@ watch(orgId, (newVal, oldVal) => {
   }
 }
 
-@media (max-width: 1400px) {
+@media (max-width: 87.5rem) {
   .functions-dashboards-column {
     flex-direction: row;
   }
 }
 
-@media (max-width: 768px) {
+@media (max-width: 48rem) {
   .functions-dashboards-column {
     flex-direction: column;
   }
@@ -1118,15 +1119,15 @@ watch(orgId, (newVal, oldVal) => {
 /* ===== 4. Interactive States ===== */
 
 .view-button:focus-visible {
-  outline: 2px solid var(--color-focus-ring);
-  outline-offset: 2px;
+  outline: 0.125rem solid var(--color-focus-ring);
+  outline-offset: 0.125rem;
   border-radius: 0.25rem;
 }
 
 .usage-tab a:focus-visible,
 .usage-tab button:focus-visible {
-  outline: 2px solid var(--color-focus-ring);
-  outline-offset: 2px;
+  outline: 0.125rem solid var(--color-focus-ring);
+  outline-offset: 0.125rem;
 }
 
 *:focus:not(:focus-visible) {

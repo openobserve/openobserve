@@ -26,10 +26,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div class="px-[0.625rem] render-dashboard-charts-container">
       <!-- flag to check if dashboardVariablesAndPanelsDataLoaded which is used while print mode-->
-      <span
+      <span class="hidden"
         v-if="isDashboardVariablesAndPanelsDataLoadedDebouncedValue"
         id="dashboardVariablesAndPanelsDataLoaded"
-        style="display: none"
       >
       </span>
 
@@ -72,13 +71,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <slot name="before_panels" />
       <div class="displayDiv clear-both min-h-0 h-auto">
-        <div
+        <div class="h-full w-full"
           v-if="
             store.state.printMode &&
             panels.length === 1 &&
             panels[0]?.type === 'table'
           "
-          style="height: 100%; width: 100%"
         >
           <!-- Panel-scoped Variables (if any, if using manager) -->
           <VariablesValueSelector
@@ -97,7 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="panel-variables-selector"
           />
 
-          <PanelContainer
+          <PanelContainer class="h-full w-full"
             @onDeletePanel="onDeletePanel"
             @onViewPanel="onViewPanel"
             :viewOnly="viewOnly"
@@ -137,7 +135,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @update:initial-variable-values="updateInitialVariableValues"
             @onEditLayout="openEditLayout"
             @contextmenu="$emit('chart:contextmenu', $event)"
-            style="height: 100%; width: 100%"
           />
         </div>
         <div
@@ -272,7 +269,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Explicit height wrapper: fills the dialog body's available space
              (90vh − body padding) so ViewPanel can use height:100% and
              flex:1 works all the way down without causing a body scrollbar. -->
-        <div class="view-panel-height-wrapper h-[calc(90vh-var(--spacing-dialog-content-py)*2)] -my-(--spacing-dialog-content-py) -mx-(--spacing-dialog-content-px) flex flex-col overflow-hidden">
+        <div class="view-panel-height-wrapper h-[calc(90vh-var(--spacing-dialog-content-py)*2)] -my-dialog-content-py -mx-dialog-content-px flex flex-col overflow-hidden">
           <ViewPanel
             :folderId="folderId"
             :dashboardId="dashboardData.dashboardId"
@@ -1735,9 +1732,15 @@ export default defineComponent({
 }
 
 .grid-stack .grid-stack-item > .ui-resizable-handle.ui-resizable-se {
-  background: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'><path d='M8 2 L8 8 L2 8' stroke='%23999999' stroke-width='1.5' fill='none' stroke-linecap='round'/></svg>")
+  /* Drawn as a mask + background-color rather than a coloured SVG: a data: URI
+     cannot resolve var(), so this is the only way the handle takes a token. */
+  -webkit-mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'><path d='M8 2 L8 8 L2 8' stroke='black' stroke-width='1.5' fill='none' stroke-linecap='round'/></svg>")
     no-repeat center;
-  background-size: 0.5rem 0.5rem;
+  mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'><path d='M8 2 L8 8 L2 8' stroke='black' stroke-width='1.5' fill='none' stroke-linecap='round'/></svg>")
+    no-repeat center;
+  background-color: var(--color-grey-400);
+  -webkit-mask-size: 0.5rem 0.5rem;
+  mask-size: 0.5rem 0.5rem;
   width: 1rem;
   height: 1rem;
   bottom: 0.125rem;

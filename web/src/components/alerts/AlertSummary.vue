@@ -33,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         round
         variant="ghost"
         size="icon-circle-sm"
-        class="scroll-to-bottom-btn transition-all duration-300 ease-[ease] pointer-events-auto backdrop-blur-sm shadow-[0_2px_8px_rgba(0,0,0,0.2)] border-2! border-[var(--color-theme-accent)]! text-[var(--color-theme-accent)]! bg-[rgba(255,255,255,0.95)]! dark:bg-[rgba(30,30,30,0.9)]! hover:scale-110 hover:shadow-[0_4px_12px_rgba(0,0,0,0.3)] hover:bg-white! hover:opacity-80 dark:hover:bg-[rgba(40,40,40,0.95)]! dark:hover:opacity-80 active:scale-100"
+        class="scroll-to-bottom-btn transition-all duration-300 ease-[ease] pointer-events-auto backdrop-blur-sm shadow-[0_2px_8px_rgba(0,0,0,0.2)] border-2! border-theme-accent! text-theme-accent! bg-[rgba(255,255,255,0.95)]! dark:bg-[rgba(30,30,30,0.9)]! hover:scale-110 hover:shadow-[0_4px_12px_rgba(0,0,0,0.3)] hover:bg-white! hover:opacity-80 dark:hover:bg-[rgba(40,40,40,0.95)]! dark:hover:opacity-80 active:scale-100"
         @click="scrollToBottomSmooth"
       >
         <OIcon name="arrow-downward" size="sm" />

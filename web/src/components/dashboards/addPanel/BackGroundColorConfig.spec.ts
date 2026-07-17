@@ -390,10 +390,12 @@ describe("BackGroundColorConfig", () => {
   describe("Template Rendering and UI", () => {
     it("should render main container with correct styling", () => {
       wrapper = createWrapper();
-      const container = wrapper.find("div[style*='display: flex']");
+      // The root container's inline flex/align/width style is now utilities.
+      const container = wrapper.find("div");
       expect(container.exists()).toBeTruthy();
-      expect(container.attributes("style")).toContain("align-items: center");
-      expect(container.attributes("style")).toContain("width: 100%");
+      expect(container.classes()).toContain("flex");
+      expect(container.classes()).toContain("items-center");
+      expect(container.classes()).toContain("w-full");
     });
 
     it("should render OSelect with correct props", () => {
@@ -439,8 +441,9 @@ describe("BackGroundColorConfig", () => {
       const colorWrapper = wrapper.find('[data-test="dashboard-config-color-input-wrapper"]');
 
       expect(colorWrapper.exists()).toBeTruthy();
-      expect(colorWrapper.attributes("style")).toContain("margin-top: 36px");
-      expect(colorWrapper.attributes("style")).toContain("margin-left: 5px");
+      // Inline `margin-top: 36px; margin-left: 5px` -> mt-9 (2.25rem) / ml-1.25 (0.3125rem).
+      expect(colorWrapper.classes()).toContain("mt-9");
+      expect(colorWrapper.classes()).toContain("ml-1.25");
     });
 
     it("should bind color input value correctly", () => {

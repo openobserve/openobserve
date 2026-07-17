@@ -416,7 +416,8 @@ describe("CommonAutoComplete", () => {
       wrapper = createWrapper();
       const container = wrapper.find('[data-test="common-auto-complete-container"]');
       expect(container.exists()).toBeTruthy();
-      expect(container.attributes("style")).toContain("margin-top: 5px");
+      // Inline `margin-top: 5px` is now the mt-1.25 utility (0.3125rem).
+      expect(container.classes()).toContain("mt-1.25");
     });
 
     it("should apply option styling", async () => {

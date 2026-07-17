@@ -118,7 +118,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Current Range Display -->
     <div
-      class="p-3 border border-solid border-card-glass-border rounded-sm bg-blue-50"
+      class="p-3 border border-solid border-card-glass-border rounded-sm bg-status-info-bg"
     >
       <div class="text-xs font-semibold mb-2 opacity-70">
         {{ t("correlation.logs.timeRange.currentRange") }}

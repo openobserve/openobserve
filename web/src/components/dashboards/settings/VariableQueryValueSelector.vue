@@ -18,14 +18,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div>
     <OSelect
       ref="selectRef"
-      style="min-width: 9.375rem; max-width: 40rem"
       :model-value="oSelectModelValue"
       :label="variableItem?.label || variableItem?.name"
       label-position="inside"
       :options="computedOptions"
       labelKey="label"
       valueKey="value"
-      class="textbox flex flex-col no-case o2-custom-select-dashboard"
+      class="textbox flex flex-col no-case o2-custom-select-dashboard min-w-37.5 max-w-160"
       :loading="variableItem.isLoading && !isOpen"
       :data-test="`variable-selector-${variableItem.name}-inner`"
       :multiple="variableItem.multiSelect"

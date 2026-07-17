@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="flex items-center gap-[0.325rem] min-w-0 flex-nowrap!">
       <span
         data-test="trace-row-service-name"
-        class="font-bold truncate min-w-0 text-text-secondary! text-compact! tracking-[0.03rem]! [font-family:var(--font-mono)]"
+        class="font-bold truncate min-w-0 text-text-secondary! text-compact! tracking-[0.03rem]! font-mono"
       >
         {{ item.service_name }}
         <OTooltip side="bottom" align="center">

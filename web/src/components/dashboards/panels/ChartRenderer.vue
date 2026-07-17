@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="chart-renderer"
     ref="chartRef"
     id="chart1"
-    class="chart-container"
+    class="chart-container h-full w-full"
     @mouseover="
       () => {
         // if hoveredSeriesState is not null then set panelId
@@ -35,7 +35,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       }
     "
     @contextmenu="handleNativeContextMenu"
-    style="height: 100%; width: 100%"
   ></div>
 </template>
 
@@ -872,7 +871,7 @@ export default defineComponent({
 
 <style scoped>
 /* keep(lib-override:echarts): print-only overrides for ECharts' inline pixel
-   dimensions (e.g. width: 740px) so charts scale to their container when
+   dimensions, which it writes onto its own DOM, so charts scale to their container when
    GridStack shrinks panels to fit the printed page. Targets ECharts-generated
    DOM (wrapper div / canvas / svg) that utilities can't reach. */
 @media print {

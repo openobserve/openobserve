@@ -42,7 +42,7 @@
         <div class="qcs-item__main flex-1 min-w-0 flex flex-col gap-1">
           <div class="flex items-center gap-1.5">
             <span class="qcs-item__name flex-1 min-w-0 font-semibold text-compact text-text-primary truncate font-mono">{{ row.name }}</span>
-            <span class="qcs-item__type shrink-0 px-1 rounded-sm font-bold text-[4px] leading-[1.4] tracking-[0.02em]" :class="{ 'bg-[color-mix(in_srgb,#6b76e3_14%,transparent)] text-[#4f5bcf]': row.dataType === 'numeric', 'bg-[color-mix(in_srgb,#9333ea_14%,transparent)] text-[#7c3aed]': row.dataType === 'categorical', 'bg-[color-mix(in_srgb,#16a34a_14%,transparent)] text-[#15803d]': row.dataType === 'boolean' }">
+            <span class="qcs-item__type shrink-0 px-1 rounded-sm font-bold text-3xs leading-[1.4] tracking-[0.02em]" :class="{ 'bg-badge-indigo-soft-bg text-badge-indigo-soft-text': row.dataType === 'numeric', 'bg-badge-purple-soft-bg text-badge-purple-soft-text': row.dataType === 'categorical', 'bg-badge-success-soft-bg text-badge-success-soft-text': row.dataType === 'boolean' }">
               {{ shortType(row.dataType) }}
             </span>
           </div>

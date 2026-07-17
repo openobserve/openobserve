@@ -16,9 +16,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="scroll"
+    class="scroll w-full h-full overflow-auto"
     data-test="markdown-renderer-scroll-container"
-    style="width: 100%; height: 100%; overflow: auto"
   >
     <div
       :class="[

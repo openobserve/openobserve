@@ -23,7 +23,7 @@
             class="flex"
             :style="{ marginLeft: isChild ? '-48px' : '0px' }"
           >
-            <div class="mr-2 relative w-3" style="min-height: 50px">
+            <div class="mr-2 relative w-3 min-h-12.5">
               <!-- Vertical Line using top & bottom instead of height -->
               <div
                 class="absolute top-0 w-px bg-accent opacity-50"
@@ -37,7 +37,7 @@
               ></div>
 
               <!-- SubTask Arrow -->
-              <div class="absolute" style="top: 30px; left: 5px">
+              <div class="absolute top-7.5 left-1.25">
                 <SubTaskArrow />
               </div>
             </div>

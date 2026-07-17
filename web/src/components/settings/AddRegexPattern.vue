@@ -103,7 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ t("regex_patterns.unsupported_lookaround_note") }}
                 {{ t("regex_patterns.unsupported_lookaround_example") }}
                 <code
-                  class="font-mono text-xs px-1 py-[1px] rounded-sm bg-banner-info-border"
+                  class="font-mono text-xs px-1 py-px rounded-sm bg-banner-info-border"
                   >(?=openobserve)\w+</code
                 >
                 <OIcon
@@ -112,7 +112,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="inline-block align-middle mx-1"
                 />
                 <code
-                  class="font-mono text-xs px-1 py-[1px] rounded-sm bg-banner-info-border"
+                  class="font-mono text-xs px-1 py-px rounded-sm bg-banner-info-border"
                   >openobserve\w*</code
                 >
               </div>
@@ -184,7 +184,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-model:is-expanded="expandState.regexTestString"
                 label="Input string"
                 class="mt-1 py-md h-6"
-                labelClass="text-text-secondary font-medium text-xs leading-[21px] -ml-1"
+                labelClass="text-text-secondary font-medium text-xs leading-5.25 -ml-1"
               >
                 <template #right> </template>
               </FullViewContainer>
@@ -209,7 +209,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-model:is-expanded="expandState.outputString"
                 label="Output"
                 class="mt-1 py-md h-6"
-                labelClass="text-text-secondary font-medium text-xs leading-[21px] -ml-1"
+                labelClass="text-text-secondary font-medium text-xs leading-5.25 -ml-1"
               >
               </FullViewContainer>
               <div v-if="expandState.outputString" class="regex-pattern-input">
@@ -226,7 +226,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
                 <div
                   v-else
-                  class="flex flex-col items-center justify-center h-[111px] rounded-md border border-input-border bg-input-bg"
+                  class="flex flex-col items-center justify-center h-27.75 rounded-md border border-input-border bg-input-bg"
                 >
                   <div v-if="!testLoading && outputStringValue.length === 0">
                     <OIcon
@@ -242,7 +242,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                   <div v-else-if="testLoading">
                     <span
-                      class="flex items-center justify-center h-[111px]"
+                      class="flex items-center justify-center h-27.75"
                     >
                       <OSpinner size="sm" />
                     </span>

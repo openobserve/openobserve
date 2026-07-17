@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         class="section-header flex items-center gap-0 py-2.5 px-3 border-b border-border-default"
       >
-        <div class="section-header-accent w-0.75 h-4 rounded-sm mr-2 shrink-0 bg-[var(--color-theme-accent)]" />
+        <div class="section-header-accent w-0.75 h-4 rounded-sm mr-2 shrink-0 bg-theme-accent" />
         <span
           class="section-header-title text-compact font-semibold text-text-primary"
         >{{

@@ -23,18 +23,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
   <div
     data-test="dashboard-settings-main-container"
-    class="p-0 bg-surface-panel"
-    style="min-height: inherit; height: 100%"
+    class="p-0 bg-surface-panel [min-height:inherit] h-full"
+   
   >
 
-    <OSplitter
+    <OSplitter class="h-full"
       v-model="splitterModel"
       unit="px"
-      style="height: 100%"
       disabled
     >
       <template v-slot:before>
-        <div class="functions-tabs" style="width: 100%">
+        <div class="functions-tabs w-full">
           <OTabs
             v-model="activeTab"
             orientation="vertical"
@@ -146,7 +145,7 @@ export default defineComponent({
 </script>
 
 <style scoped>
-/* keep(lib-override:OTabs+OSplitter): vertical-tab label/active styling, the
+/* keep(lib-override:o2-tabs.o2-splitter): vertical-tab label/active styling, the
    splitter before-pane divider, and full-height tab panels — all target O2
    component internals reached via :deep(). */
 .functions-tabs :deep(.o-tabs--vertical .o-tab__content.tab_content .o-tab__icon + .o-tab__label) {

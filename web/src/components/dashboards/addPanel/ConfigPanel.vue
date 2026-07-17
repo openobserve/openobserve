@@ -33,15 +33,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="sticky p-1 top-0 z-20 bg-card-glass-solid border-b border-solid border-card-glass-border"
       data-test="dashboard-config-search-wrapper"
     >
-      <div class="flex flex-nowrap items-center" style="gap: 4px">
+      <div class="flex flex-nowrap items-center gap-1">
         <OButton
           variant="ghost"
           size="icon"
           @click="toggleAllSections"
           data-test="dashboard-config-toggle-all-sections-btn"
         >
-          <template #icon-left
-            ><OIcon
+          <template #icon-left><OIcon
               :name="allSectionsExpanded ? 'unfold-less' : 'unfold-more'"
               size="sm"
           /></template>
@@ -162,10 +161,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OTooltip :content="formattedPickerValue" max-width="320px" />
               </div>
               <OIcon
-                class="mr-1 ml-2 flex-shrink-0"
+                class="mr-1 ml-2 flex-shrink-0 cursor-pointer shrink-0"
                 size="sm"
                 name="close"
-                style="cursor: pointer; flex-shrink: 0"
                 data-test="dashboard-config-cancel-panel-time"
                 @click="onCancelPanelTime"
               />
@@ -176,7 +174,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 size="sm"
                 @click="showTimePicker = true"
                 data-test="dashboard-config-set-panel-time"
-                >{{ t("common.set") }}</OButton
+              >{{ t("common.set") }}</OButton
               >
             </div>
           </div>
@@ -286,9 +284,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="dashboard-config-legends-scrollable"
         />
 
-        <div
+        <div class="flex gap-2 flex-wrap"
           v-show="isConfigOptionVisible('legend', 'legend-size')"
-          style="display: flex; gap: 8px; flex-wrap: wrap"
         >
           <!-- Legend Width + unit selector -->
           <div
@@ -304,7 +301,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="flex-1 min-w-0"
             />
             <div
-              class="flex items-center gap-1 mt-[9px] shrink-0"
+              class="flex items-center gap-1 mt-2.25 shrink-0"
               v-if="shouldShowLegendWidthUnitContainer(dashboardPanelData)"
             >
               <OButton
@@ -356,7 +353,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="flex-1 min-w-0"
             />
             <div
-              class="flex items-center gap-1 mt-[9px] shrink-0"
+              class="flex items-center gap-1 mt-2.25 shrink-0"
               v-if="shouldShowLegendHeightUnitContainer(dashboardPanelData)"
             >
               <OButton
@@ -413,8 +410,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             dashboardPanelData.data.type != 'maps'
           "
           v-show="isConfigOptionVisible('legend', 'promql-legend')"
-          class="showLabelOnTop"
-          style="font-weight: 600"
+          class="showLabelOnTop font-semibold"
         >
           {{ t("dashboard.query") }}
           <OTabs
@@ -543,8 +539,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             dashboardPanelData.data.type != 'geomap' &&
             dashboardPanelData.data.type != 'maps'
           "
-          class="showLabelOnTop"
-          style="font-weight: 600"
+          class="showLabelOnTop font-semibold"
         >
           {{ t("dashboard.query") }}
           <OTabs
@@ -575,7 +570,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-show="isConfigOptionVisible('data', 'query-label')"
           class="mt-3"
         >
-          <div class="flex items-center gap-1 mb-2" style="font-weight: 600">
+          <div class="flex items-center gap-1 mb-2 font-semibold">
             {{ t("dashboard.multiSqlQueryLabel") }}
             <OIcon name="info-outline" size="sm" />
             <OTooltip
@@ -1741,22 +1736,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :isFirstEntry="false"
             />
             <OIcon
-              class="mr-1 ml-2"
+              class="mr-1 ml-2 cursor-pointer"
               size="sm"
               name="close"
-              style="cursor: pointer"
               @click="removeTimeShift(index)"
               :data-test="`dashboard-addpanel-config-time-shift-remove-${index}`"
             />
           </div>
         </div>
-        <div style="align-self: flex-start">
+        <div class="self-start">
           <OButton
             variant="outline"
             size="sm"
             @click="addTimeShift"
             data-test="dashboard-addpanel-config-time-shift-add-btn"
-            >{{ t("dashboard.addButton") }}</OButton
+          >{{ t("dashboard.addButton") }}</OButton
           >
         </div>
       </div>

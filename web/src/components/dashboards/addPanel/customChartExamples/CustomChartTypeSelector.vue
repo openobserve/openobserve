@@ -15,16 +15,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <OCard
+  <OCard class="p-0 w-full h-[calc(100vh_-_3.5625rem)] overflow-hidden flex flex-col"
     data-test="custom-chart-type-selector-popup"
-    style="
-      padding: 0;
-      width: 100%;
-      height: calc(100vh - 57px);
-      overflow: hidden;
-      display: flex;
-      flex-direction: column;
-    "
   >
     <!-- Header -->
     <OCardSection role="header">
@@ -35,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model="searchQuery"
           placeholder="Search charts..."
           clearable
-          style="width: 280px; flex: 0 0 280px; margin-left: 16px;"
+          class="w-70 flex-[0_0_17.5rem] ml-4"
           @clear="searchQuery = ''"
         />
         <div class="flex-1" />
@@ -54,14 +46,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Main Content -->
     <OCardSection
-      class="flex"
-      style="height: calc(100% - 60px); overflow: hidden; padding: 0"
+      class="flex h-[calc(100%_-_3.75rem)] overflow-hidden p-0"
     >
-      <div class="flex flex-nowrap" style="height: 100%; width: 100%">
+      <div class="flex flex-nowrap h-full w-full">
         <!-- Left Sidebar -->
         <OCard
-          class="p-4"
-          style="width: 160px; height: 100%; flex-shrink: 0; overflow-y: auto"
+          class="p-4 w-40 h-full shrink-0 overflow-y-auto"
         >
           <div class="text-sm font-medium mb-3 font-bold">Chart Types</div>
           <ul class="flex flex-col list-none p-0 m-0">
@@ -83,18 +73,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Right Content Area -->
         <div
           ref="contentArea"
-          class="p-3"
-          style="flex: 1; height: 100%; overflow-y: auto; overflow-x: hidden"
+          class="p-3 flex-1 h-full overflow-y-auto overflow-x-hidden"
           @scroll="handleScroll"
         >
           <!-- No Results Message -->
           <div
             v-if="filteredCategories.length === 0"
-            class="flex justify-center items-center"
-            style="height: 100%"
+            class="flex justify-center items-center h-full"
           >
             <div class="text-center">
-              <OIcon name="search-off" style="width: 4rem; height: 4rem;" />
+              <OIcon class="w-16 h-16" name="search-off" />
               <div class="text-xl font-semibold text-text-muted mt-3">No results found</div>
               <div class="text-sm text-text-muted mt-2">
                 Try searching with different keywords
@@ -120,7 +108,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="col-xs-12 col-sm-6 col-md-4 col-lg-3"
               >
                 <OCard
-                  class="cursor-pointer transition-all duration-200 h-full hover:shadow-[0_4px_12px_rgba(0,0,0,0.15)] hover:-translate-y-0.5"
+                  class="cursor-pointer transition-all duration-200 h-full hover:shadow-[0_4px_12px_color-mix(in_srgb,var(--color-black)_15%,transparent)] hover:-translate-y-0.5"
                   :class="{
                     'border-2 border-theme-accent shadow-[0_4px_12px_color-mix(in_srgb,var(--color-theme-accent)_30%,transparent)]': selectedChart?.value === chart.value,
                   }"

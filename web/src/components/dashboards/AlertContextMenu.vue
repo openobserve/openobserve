@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       v-if="visible"
       ref="menuRef"
-      class="fixed z-9999 bg-dropdown-bg border border-dropdown-border rounded-sm shadow-[0_2px_8px_rgba(0,0,0,0.15)] dark:shadow-[0_2px_8px_rgba(0,0,0,0.4)] min-w-70 py-1 px-0"
+      class="fixed z-9999 bg-dropdown-bg border border-dropdown-border rounded-sm shadow-[0_2px_8px_color-mix(in_srgb,var(--color-black)_15%,transparent)] dark:shadow-[0_2px_8px_color-mix(in_srgb,var(--color-black)_40%,transparent)] min-w-70 py-1 px-0"
       :style="menuStyle"
       @click.stop
       data-test="alert-context-menu"

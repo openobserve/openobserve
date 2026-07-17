@@ -16,17 +16,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="scroll"
+    class="scroll w-full h-full overflow-auto"
     data-test="html-renderer-scroll-container"
-    style="width: 100%; height: 100%; overflow: auto"
   >
-    <div
+    <div class="min-h-full shrink-0"
       :id="scopeId"
       :class="[
         'prose prose-sm max-w-none px-2 py-1',
         isDark && 'prose-invert',
       ]"
-      style="min-height: 100%; flex-shrink: 0"
       v-html="sanitizedContent"
       data-test="html-renderer"
     ></div>

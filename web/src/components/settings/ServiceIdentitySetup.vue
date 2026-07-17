@@ -26,8 +26,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div v-else>
       <!-- Section 1: Service Configuration -->
       <div
-        class="mb-3 rounded-lg overflow-hidden"
-        style="border: 1px solid var(--color-card-glass-border)"
+        class="mb-3 rounded-lg overflow-hidden border border-card-glass-border"
+       
       >
         <div class="p-3 flex flex-col gap-3">
           <!-- Service name source banner -->
@@ -111,8 +111,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div
                     v-for="field in detectedServiceFields"
                     :key="field.name"
-                    class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md font-mono text-xs font-medium"
-                    style="border: 1px solid var(--color-card-glass-border)"
+                    class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md font-mono text-xs font-medium border border-card-glass-border"
+                   
                     :class="
                       'bg-surface-base text-text-secondary shadow-sm'
                     "
@@ -137,8 +137,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div
                     v-for="field in unseenServiceFields"
                     :key="field"
-                    class="inline-flex items-center px-2.5 py-1 rounded-md border-dashed font-mono text-xs"
-                    style="border: 1px dashed var(--color-card-glass-border)"
+                    class="inline-flex items-center px-2.5 py-1 rounded-md border-dashed font-mono text-xs border border-dashed border-card-glass-border"
+                   
                     :class="
                       'text-text-secondary'
                     "
@@ -193,7 +193,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                   <!-- Customize link -->
                   <a
-                    class="config-link-btn cursor-pointer inline-flex items-center gap-1 px-2 py-0.5 rounded-sm text-xs font-semibold no-underline border border-text-link text-text-link bg-badge-blue-soft-bg transition-[background] hover:bg-[rgba(59,130,246,0.18)] dark:hover:bg-[rgba(96,165,250,0.22)]"
+                    class="config-link-btn cursor-pointer inline-flex items-center gap-1 px-2 py-0.5 rounded-sm text-xs font-semibold no-underline border border-text-link text-text-link bg-badge-blue-soft-bg transition-[background] hover:bg-[color-mix(in_srgb,var(--color-badge-blue-ol-border)_18%,transparent)]"
                     @click.prevent="emit('navigate-to-aliases', 'service')"
                   >
                     {{ t("settings.correlation.customizeFieldMappings") }}
@@ -334,8 +334,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       Boolean,
                     )"
                     :key="fieldId"
-                    class="flex items-center gap-1 pl-3 pr-1 py-1 rounded-md text-xs font-medium transition-colors"
-                    style="border: 1px solid var(--color-card-glass-border)"
+                    class="flex items-center gap-1 pl-3 pr-1 py-1 rounded-md text-xs font-medium transition-colors border border-card-glass-border"
+                   
                     :class="
                       'bg-surface-base text-text-secondary shadow-sm'
                     "
@@ -438,8 +438,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-if="addingToEnv && !allConfiguredEnvs.includes(addingToEnv)"
               >
                 <div
-                  class="flex flex-wrap items-center gap-2 pt-2"
-                  style="border-top: 1px solid var(--color-card-glass-border)"
+                  class="flex flex-wrap items-center gap-2 pt-2 border-t border-card-glass-border"
+                 
                 >
                   <OSelect
                     ref="addFieldSelectRef"
@@ -520,13 +520,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Section 3: Workload Detection -->
       <div
         v-if="workloadDetectedGroups.length > 0"
-        class="mb-3 rounded-lg overflow-hidden"
-        style="border: 1px solid var(--color-card-glass-border)"
+        class="mb-3 rounded-lg overflow-hidden border border-card-glass-border"
+       
       >
         <!-- Section header -->
         <div
-          class="px-4 py-3 flex items-center gap-2"
-          style="border-bottom: 1px solid var(--color-card-glass-border)"
+          class="px-4 py-3 flex items-center gap-2 border-b border-card-glass-border"
+         
         >
           <OIcon name="radar" size="sm" class="text-teal-6" />
           <span class="font-bold text-sm">Workload Detection</span>
@@ -584,7 +584,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 and recommendations. Fields not in this list will not influence
                 service discovery results. Cannot be empty.
                 <a
-                  class="config-link-btn cursor-pointer inline-block mx-1 px-2 py-0.5 rounded-sm text-xs font-semibold no-underline align-middle border border-text-link text-text-link bg-badge-blue-soft-bg transition-[background] hover:bg-[rgba(59,130,246,0.18)] dark:hover:bg-[rgba(96,165,250,0.22)]"
+                  class="config-link-btn cursor-pointer inline-block mx-1 px-2 py-0.5 rounded-sm text-xs font-semibold no-underline align-middle border border-text-link text-text-link bg-badge-blue-soft-bg transition-[background] hover:bg-[color-mix(in_srgb,var(--color-badge-blue-ol-border)_18%,transparent)]"
                   @click.prevent="emit('navigate-to-aliases', 'service')"
                   >Go to Field Aliases</a
                 >
@@ -595,8 +595,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div
                   v-for="alias in resolvedTrackedAliases"
                   :key="alias.id"
-                  class="flex items-center gap-1 pl-3 pr-1 py-1 rounded-md text-xs font-medium transition-colors"
-                  style="border: 1px solid var(--color-card-glass-border)"
+                  class="flex items-center gap-1 pl-3 pr-1 py-1 rounded-md text-xs font-medium transition-colors border border-card-glass-border"
+                 
                   :class="
                     'bg-surface-base text-text-secondary shadow-sm'
                   "
@@ -703,7 +703,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             We discovered these deployment patterns in your streams. Use them to
             configure service correlation.
             <a
-              class="config-link-btn cursor-pointer inline-block mx-1 px-2 py-0.5 rounded-sm text-xs font-semibold no-underline align-middle border border-text-link text-text-link bg-badge-blue-soft-bg transition-[background] hover:bg-[rgba(59,130,246,0.18)] dark:hover:bg-[rgba(96,165,250,0.22)]"
+              class="config-link-btn cursor-pointer inline-block mx-1 px-2 py-0.5 rounded-sm text-xs font-semibold no-underline align-middle border border-text-link text-text-link bg-badge-blue-soft-bg transition-[background] hover:bg-[color-mix(in_srgb,var(--color-badge-blue-ol-border)_18%,transparent)]"
               @click.prevent="emit('navigate-to-services')"
               >Go to Services</a
             >
@@ -713,8 +713,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Environment Tabs (Chrome-style) -->
         <div
-          class="flex items-end gap-0 px-4"
-          style="border-bottom: 1px solid var(--color-card-glass-border)"
+          class="flex items-end gap-0 px-4 border-b border-card-glass-border"
+         
         >
           <div
             v-for="env in detectedEnvironments"
@@ -1008,8 +1008,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <div class="mb-3 shrink-0">
               <div
-                class="text-2xs tracking-wide font-medium mb-2"
-                style="color: var(--color-text-primary)"
+                class="text-2xs tracking-wide font-medium mb-2 text-text-primary"
+               
               >
                 Stream Sources
               </div>

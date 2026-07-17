@@ -7,9 +7,9 @@
         : 'flex flex-col gap-y-2'
     "
   >
-    <div style="width: auto; flex-shrink: 0;">
+    <div class="w-auto shrink-0">
       <div class="font-semibold text-compact pb-3" data-test="dynamic-function-popup-property-label">Property</div>
-      <div style="display: flex; flex-direction: column; gap: 14px">
+      <div class="flex flex-col gap-3.5">
         <div>
           <div class="text-compact font-normal leading-[70%] pb-0.75" data-test="dynamic-function-popup-label-text">Label</div>
           <OInput
@@ -72,7 +72,7 @@
         animated
       >
         <OTabPanel name="build">
-          <div class="pt-2" style="max-height: 26.25rem; overflow: auto;">
+          <div class="pt-2 max-h-105 overflow-auto">
             <div class="font-semibold text-compact pb-3">Configuration</div>
             <SelectFunction
               v-model="fields"
@@ -83,8 +83,8 @@
         </OTabPanel>
         <OTabPanel name="raw">
           <div class="pt-2">
-            <div style="display: flex; width: 100%">
-              <div style="width: 100%; padding-right: 0.75rem">
+            <div class="flex w-full">
+              <div class="w-full pr-3">
                 <RawQueryBuilder
                   v-model="fields"
                   data-test="dynamic-function-popup-raw-query-builder"

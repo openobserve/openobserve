@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/no-unused-components -->
 <template>
-  <div style="overflow-y: auto" class="scroll flex flex-col h-full">
+  <div class="scroll flex flex-col h-full overflow-y-auto">
     <!-- Header Section -->
     <AppPageHeader
       :back="{ label: currentDashboardData.data?.title || t('dashboard.header'), onClick: goBack, dataTest: 'dashboard-back-btn' }"
@@ -42,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="sm"
               @click="showTutorial"
               data-test="dashboard-panel-tutorial-btn"
-              >Dashboard Tutorial</OButton
+            >Dashboard Tutorial</OButton
             >
             <OButton
               v-if="
@@ -71,7 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="sm-action"
               @click="goBackToDashboardList"
               data-test="dashboard-panel-discard"
-              >{{ t("panel.discard") }}</OButton
+            >{{ t("panel.discard") }}</OButton
             >
             <OButton
               variant="outline"
@@ -80,7 +80,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               type="submit"
               form="add-panel-form"
               :loading="isSavingPanel"
-              >{{ t("panel.save") }}</OButton
+            >{{ t("panel.save") }}</OButton
             >
             <template
               v-if="!['html', 'markdown'].includes(dashboardPanelData.data.type)"
@@ -93,7 +93,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :loading="searchRequestTraceIds.length > 0"
                 :disabled="searchRequestTraceIds.length > 0"
                 @click="() => runQuery(false)"
-                >{{ t("panel.apply") }}</OButton
+              >{{ t("panel.apply") }}</OButton
               >
               <OButtonGroup v-if="config.isEnterprise === 'true'" radius="lg">
                 <OButton
@@ -169,11 +169,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Add Variable Drawer -->
     <div
       v-if="isAddVariableOpen"
-      class="add-variable-drawer-overlay fixed top-0 left-0 right-0 bottom-0 z-6000 flex justify-end"
-      style="background-color: rgba(0, 0, 0, 0.5)"
+      class="add-variable-drawer-overlay fixed top-0 left-0 right-0 bottom-0 z-6000 flex justify-end bg-overlay-scrim"
+     
       @click.self="handleCloseAddVariable"
     >
-      <div class="add-variable-drawer-panel px-6 pt-4 w-225 h-screen shadow-[-2px_0_8px_rgba(0,0,0,0.15)] overflow-hidden rounded-none! bg-surface-base">
+      <div class="add-variable-drawer-panel px-6 pt-4 w-225 h-screen shadow-[-2px_0_8px_color-mix(in_srgb,var(--color-black)_15%,transparent)] overflow-hidden rounded-none! bg-surface-base">
         <AddSettingVariable
           @save="handleSaveVariable"
           @close="handleCloseAddVariable"

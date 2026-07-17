@@ -15,19 +15,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div
+  <div class="flex items-center"
     data-test="dashboard-tab-list-container"
-    style="display: flex; align-items: center"
     @mouseover="isHovered = true"
     @mouseleave="isHovered = false"
   >
-    <OTabs
+    <OTabs class="max-w-[calc(100%_-_2.5rem)]"
       v-model="selectedTabId"
       :align="'left'"
       dense
       mobile-arrows
       @click.stop
-      style="max-width: calc(100% - 40px)"
       data-test="dashboard-tab-list"
     >
       <OTab
@@ -38,17 +36,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :data-test="`dashboard-tab-${tab.tabId}`"
       >
         <div class="w-full flex justify-between flex-nowrap">
-          <span
-            style="
-              white-space: nowrap;
-              overflow: hidden;
-              text-overflow: ellipsis;
-              width: 100%;
-            "
+          <span class="whitespace-nowrap overflow-hidden text-ellipsis w-full"
             :title="tab?.name"
             :data-test="`dashboard-tab-${tab.tabId}-name`"
             :data-test-tab-name="tab?.name"
-            >{{ tab?.name }}</span
+          >{{ tab?.name }}</span
           >
         </div>
       </OTab>

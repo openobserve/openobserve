@@ -341,44 +341,42 @@ describe("AlertWizardRightColumn - computed styles", () => {
     vi.clearAllMocks();
   });
 
-  it("previewSectionStyle has flex:1 when preview is expanded", async () => {
+  // The sections are sized with utility classes rather than inline styles.
+  // `flex-none` is `flex: none`, i.e. the computed `0 0 auto` these previously set.
+  it("previewSectionClass is flex-1 when preview is expanded", async () => {
     const w = await mountComp();
     w.vm.expandState.preview = true;
-    const style = w.vm.previewSectionStyle;
-    expect(style.flex).toBe("1");
+    expect(w.vm.previewSectionClass).toContain("flex-1");
     w.unmount();
   });
 
-  it("previewSectionStyle has flex:0 0 auto when preview is collapsed", async () => {
+  it("previewSectionClass is flex-none when preview is collapsed", async () => {
     const w = await mountComp();
     w.vm.expandState.preview = false;
-    const style = w.vm.previewSectionStyle;
-    expect(style.flex).toBe("0 0 auto");
+    expect(w.vm.previewSectionClass).toBe("flex-none");
     w.unmount();
   });
 
-  it("summarySectionStyle has flex:1 when summary is expanded", async () => {
+  it("summarySectionClass is flex-1 when summary is expanded", async () => {
     const w = await mountComp();
     w.vm.expandState.summary = true;
-    const style = w.vm.summarySectionStyle;
-    expect(style.flex).toBe("1");
+    expect(w.vm.summarySectionClass).toContain("flex-1");
     w.unmount();
   });
 
-  it("summarySectionStyle has flex:0 0 auto when summary is collapsed", async () => {
+  it("summarySectionClass is flex-none when summary is collapsed", async () => {
     const w = await mountComp();
     w.vm.expandState.summary = false;
-    const style = w.vm.summarySectionStyle;
-    expect(style.flex).toBe("0 0 auto");
+    expect(w.vm.summarySectionClass).toBe("flex-none");
     w.unmount();
   });
 
-  it("both expanded → both have minHeight:250px", async () => {
+  it("both expanded → both carry the min-h-62.5 (250px) floor", async () => {
     const w = await mountComp();
     w.vm.expandState.preview = true;
     w.vm.expandState.summary = true;
-    expect(w.vm.previewSectionStyle.minHeight).toBe("250px");
-    expect(w.vm.summarySectionStyle.minHeight).toBe("250px");
+    expect(w.vm.previewSectionClass).toContain("min-h-62.5");
+    expect(w.vm.summarySectionClass).toContain("min-h-62.5");
     w.unmount();
   });
 });

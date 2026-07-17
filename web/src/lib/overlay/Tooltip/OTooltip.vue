@@ -217,6 +217,12 @@ const contentClasses = computed(() => [
         @update:open="childOpen = $event"
       >
         <!-- Hidden trigger span; reference overrides positioning anchor to parentEl -->
+        <!-- NOTE: `style="display:none"` here is a FUNCTIONAL CONTRACT, not
+             decoration — do NOT convert it to `class="hidden"`. The anchor
+             resolution in onMounted() skips hidden siblings by testing
+             `.style.display === "none"`, which only sees an INLINE style. With a
+             class, that loop stops on this span and anchors every child-mode
+             tooltip to a zero-size hidden element, so it never opens on hover. -->
         <TooltipTrigger
           as="span"
           :reference="parentEl ?? undefined"
@@ -252,7 +258,8 @@ const contentClasses = computed(() => [
         </TooltipPortal>
       </TooltipRoot>
     </TooltipProvider>
-    <!-- Anchor placeholder: inserted at the real DOM position to resolve parentElement -->
+    <!-- Anchor placeholder: inserted at the real DOM position to resolve parentElement.
+         `style="display:none"` is required, not decorative — see the note above. -->
     <span ref="childAnchorRef" style="display:none" aria-hidden="true" />
   </template>
 </template>

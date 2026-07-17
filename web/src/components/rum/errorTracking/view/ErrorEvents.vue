@@ -127,6 +127,9 @@ const getFormattedDate = (timestamp: number) =>
 </script>
 
 <style scoped lang="scss">
+/* keep(generated-content): the timeline rail is a ::before pseudo-element on
+   .event-timeline (and the dots are absolutely positioned against it), so there
+   is no element for a utility class to land on. */
 .event-timeline {
   position: relative;
 
@@ -148,7 +151,7 @@ const getFormattedDate = (timestamp: number) =>
   top: 0.3125rem;
   width: 0.5625rem;
   height: 0.5625rem;
-  border-radius: 9999px;
+  border-radius: var(--radius-full);
   border: 1px solid var(--color-card-glass-border);
 
   &--default {

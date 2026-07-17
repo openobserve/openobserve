@@ -14,14 +14,7 @@
         <div class="flex items-center gap-3">
           <div class="flex items-center gap-2.5 shrink-0">
             <div
-              class="flex items-center justify-center w-8 h-8 rounded-lg shrink-0"
-              style="
-                background: color-mix(
-                  in srgb,
-                  var(--color-accent) 12%,
-                  transparent
-                );
-              "
+              class="flex items-center justify-center w-8 h-8 rounded-lg shrink-0 bg-[color-mix(in_srgb,var(--color-accent)_12%,transparent)]"
             >
               <OIcon
                 name="key"

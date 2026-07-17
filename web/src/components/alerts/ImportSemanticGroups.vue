@@ -21,8 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     test-prefix="semantic-groups"
     :is-importing="isImporting"
     :show-splitter="false"
-    container-class=""
-    container-style="height: calc(100vh - var(--navbar-height));"
+    container-class="h-[calc(100vh-var(--navbar-height))]!"
     @back="handleBack"
     @cancel="handleBack"
     @import="handleImport"
@@ -231,7 +230,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-else-if="!isImporting && !diffData"
           class="bg-card-glass-bg p-4 text-center"
         >
-          <OIcon name="cloud-upload" class="mb-3" style="width: 64px; height: 64px;" />
+          <OIcon name="cloud-upload" class="mb-3 size-16!" />
           <div class="text-xl font-semibold text-text-muted mb-2">
             Upload a JSON file to get started
           </div>

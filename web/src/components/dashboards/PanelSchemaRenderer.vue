@@ -15,14 +15,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div
-    style="width: 100%; height: 100%"
+  <div class="w-full h-full"
     @mouseleave="hidePopupsAndOverlays"
     @mouseenter="showPopupsAndOverlays"
   >
-    <div
+    <div class="h-full relative"
       ref="chartPanelRef"
-      style="height: 100%; position: relative"
       :class="chartPanelClass"
     >
       <div
@@ -70,13 +68,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <div
           v-else-if="panelSchema.type == 'html'"
-          class="flex flex-col column"
-          style="width: 100%; height: 100%; flex: 1"
+          class="flex flex-col column w-full h-full flex-1"
         >
           <HTMLRenderer
             :htmlContent="panelSchema.htmlContent"
-            style="width: 100%; height: 100%"
-            class="flex flex-col"
+            class="flex flex-col w-full h-full"
             :variablesData="currentVariablesData || variablesData"
             :tabId="tabId"
             :panelId="panelSchema.id"
@@ -84,13 +80,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div
           v-else-if="panelSchema.type == 'markdown'"
-          class="flex flex-col column"
-          style="width: 100%; height: 100%; flex: 1"
+          class="flex flex-col column w-full h-full flex-1"
         >
           <MarkdownRenderer
             :markdownContent="panelSchema.markdownContent"
-            style="width: 100%; height: 100%"
-            class="flex flex-col"
+            class="flex flex-col w-full h-full"
             :variablesData="currentVariablesData || variablesData"
             :tabId="tabId"
             :panelId="panelSchema.id"
@@ -100,8 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <CustomChartRenderer
           v-else-if="panelSchema.type == 'custom_chart'"
           :data="panelData"
-          style="width: 100%; height: 100%"
-          class="flex flex-col"
+          class="flex flex-col w-full h-full"
           @error="errorDetail = $event"
         />
         <ChartRenderer
@@ -119,22 +112,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div
         v-if="metricItems.length && !noData && !loading"
-        style="position: absolute; inset: 0; pointer-events: none; z-index: 8"
+        class="absolute inset-0 pointer-events-none z-8"
         data-test="dashboard-metric-copy-overlay"
       >
-        <div
+        <div class="absolute pointer-events-auto"
           v-for="m in metricItems"
           :key="m.idx"
-          style="position: absolute; pointer-events: auto"
           :style="metricZoneStyle(m)"
           @mouseenter="hoveredMetricIdx = m.idx"
           @mouseleave="hoveredMetricIdx = null"
         >
-          <OButton
+          <OButton class="absolute"
             v-show="hoveredMetricIdx === m.idx || metricCopiedIdx === m.idx"
             variant="ghost"
             size="icon-xs-sq"
-            style="position: absolute"
             :style="m.iconStyle"
             @click="copyMetricItem(m)"
             data-test="dashboard-metric-copy-btn"
@@ -171,7 +162,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="panel-schema-renderer-error-message"
       >
         <OIcon size="md" name="warning" />
-        <div style="height: 80%; width: 100%">
+        <div class="h-4/5 w-full">
           {{
             errorDetail?.code?.toString().startsWith("4")
               ? errorDetail.message
@@ -192,8 +183,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ panelSchema?.error_config?.custom_error_message }}
       </div>
       <div
-        class="flex"
-        style="position: absolute; top: 0px; width: 100%; z-index: 999"
+        class="flex absolute top-0 w-full z-999"
+       
       >
         <LoadingProgress
           :loading="loading"
@@ -202,7 +193,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <div
-        class="absolute z-9999999 min-w-50 py-1 px-0 hidden whitespace-nowrap top-0 left-0 rounded-sm border border-dropdown-border bg-dropdown-bg shadow-[0_2px_8px_rgba(0,0,0,0.15)] dark:shadow-[0_2px_8px_rgba(0,0,0,0.4)]"
+        class="absolute z-9999999 min-w-50 py-1 px-0 hidden whitespace-nowrap top-0 left-0 rounded-sm border border-dropdown-border bg-dropdown-bg shadow-[0_2px_8px_color-mix(in_srgb,var(--color-black)_15%,transparent)] dark:shadow-[0_2px_8px_color-mix(in_srgb,var(--color-black)_40%,transparent)]"
         data-test="drilldown-menu"
         ref="drilldownPopUpRef"
         @mouseleave="hidePopupsAndOverlays"
@@ -233,34 +224,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </div>
       <div
-        style="
-          border: 1px solid var(--color-border-default);
-          border-radius: 4px;
-          padding: 3px;
-          position: absolute;
-          top: 0px;
-          left: 0px;
-          display: none;
-          max-width: 200px;
-          white-space: normal;
-          word-wrap: break-word;
-          overflow-wrap: break-word;
-          z-index: 9999999;
-        "
-        :class="'bg-surface-base'"
+        class="border border-border-default rounded-sm p-0.75 absolute top-0 left-0 hidden max-w-50 whitespace-normal [word-wrap:break-word] [overflow-wrap:break-word] z-9999999 bg-surface-base"
         ref="annotationPopupRef"
       >
         <div
-          class="px-2 py-1"
-          style="
-            display: flex;
-            flex-direction: row;
-            align-items: center;
-            position: relative;
-            word-break: break-word;
-          "
+          class="px-2 py-1 flex flex-row items-center relative break-words"
         >
-          <span style="word-break: break-word">{{
+          <span class="break-words">{{
             selectedAnnotationData.text
           }}</span>
         </div>

@@ -1,7 +1,6 @@
 <template>
   <div
-    class="relative"
-    style="margin-top: 5px"
+    class="relative mt-1.25"
     data-no-autofocus
     data-test="common-auto-complete-container"
   >

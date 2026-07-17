@@ -266,7 +266,10 @@ describe('OTabs', () => {
 
   it('applies horizontal tablist horizontal padding for focus spacing', () => {
     const wrapper = mountTabs()
-    expect(wrapper.find('.o-tabs').classes()).toContain('px-[3px]')
+    // The hardcoded arbitrary px-[3px] is now px-0.75 (0.1875rem = 3px) on the
+    // rem-based scale, matching the pt-0.75 on the scroll container above.
+    expect(wrapper.find('.o-tabs').classes()).toContain('px-0.75')
+    expect(wrapper.html()).not.toContain('px-[3px]')
   })
 
   // --- Numeric modelValue ---

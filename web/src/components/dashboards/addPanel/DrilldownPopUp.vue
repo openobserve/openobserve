@@ -36,7 +36,7 @@
       required
       data-test="dashboard-config-panel-drilldown-name"
     />
-    <div style="margin-top: 0.75rem">
+    <div class="mt-3">
       <OFormToggleGroup name="type" :label="t('dashboard.goTo')">
         <OToggleGroupItem
           value="byDashboard"
@@ -65,7 +65,7 @@
       </OFormToggleGroup>
     </div>
 
-    <div v-if="drilldownData.type === 'logs'" style="margin-top: 10px">
+    <div class="mt-2.5" v-if="drilldownData.type === 'logs'">
       <div>
         <OFormToggleGroup
           name="data.logsMode"
@@ -81,13 +81,12 @@
         v-if="drilldownData.data.logsMode === 'custom'"
       >
         <template #default="{ field }">
-          <div style="margin-top: 10px">
+          <div class="mt-2.5">
             <label class="o-input-label text-compact font-medium leading-tight text-input-label-text">{{ t("dashboard.enterCustomQuery") }}</label>
-            <query-editor
+            <query-editor class="h-20"
               data-test="scheduled-alert-sql-editor"
               ref="queryEditorRef"
               editor-id="alerts-query-editor"
-              style="height: 80px"
               :debounceTime="300"
               :query="drilldownData.data.logsQuery"
               @update:query="updateQueryValue"
@@ -105,7 +104,7 @@
       </component>
     </div>
     <div v-if="drilldownData.type == 'byUrl'">
-      <div style="margin-top: 10px; display: flex; flex-direction: column">
+      <div class="mt-2.5 flex flex-col">
         <OFormTextarea
           name="data.url"
           :label="t('dashboard.enterUrl')"
@@ -116,7 +115,7 @@
     </div>
 
     <div v-if="drilldownData.type == 'byDashboard'">
-      <div style="margin-top: 10px">
+      <div class="mt-2.5">
         <div class="flex items-center my-2.5 w-full">
           <OFormSelect
             name="data.folder"
@@ -152,14 +151,8 @@
         </div>
 
         <!-- array of variables name and its values -->
-        <div style="margin-top: 30px">
-          <div
-            style="
-              display: flex;
-              justify-content: space-between;
-              margin-bottom: 10px;
-              align-items: center;
-            "
+        <div class="mt-7.5">
+          <div class="flex justify-between mb-2.5 items-center"
           >
             <span class="o-input-label text-compact font-medium leading-tight text-input-label-text">{{ t("dashboard.variables") }}</span>
             <OButton
@@ -176,8 +169,7 @@
             v-for="(variable, index) in drilldownData.data.variables"
             :key="index"
           >
-            <div
-              style="display: flex; gap: 0.625rem; margin-bottom: 0.625rem; align-items: center"
+            <div class="flex gap-2.5 mb-2.5 items-center"
               :key="JSON.stringify(variableNamesFn ?? {})"
             >
               <OFormCombobox
@@ -193,10 +185,9 @@
                 :items="options.selectedValue"
               />
 
-              <OIcon
+              <OIcon class="cursor-pointer shrink-0"
                 size="sm"
                 name="close"
-                style="cursor: pointer; flex-shrink: 0"
                 @click="() => removeVariableRow(index)"
                 :data-test="`dashboard-drilldown-variable-remove-${index}`"
               />
@@ -205,7 +196,7 @@
         </div>
       </div>
       <!-- radio button for new tab -->
-      <div style="margin-top: 10px">
+      <div class="mt-2.5">
         <OFormSwitch
           name="data.passAllVariables"
           :label="t('dashboard.passAllCurrentVariables')"
@@ -217,7 +208,7 @@
     </div>
 
     <!-- radio button for new tab -->
-    <div style="margin-top: 10px">
+    <div class="mt-2.5">
       <OFormSwitch
         name="targetBlank"
         :label="t('dashboard.openInNewTab')"

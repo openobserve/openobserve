@@ -320,7 +320,7 @@ const jumpTargetSublabel = computed(() => {
 }
 
 @keyframes pattern-skel-row-in {
-  from { opacity: 0; transform: translateY(2px); }
+  from { opacity: 0; transform: translateY(0.125rem); }
   to   { opacity: 1; transform: translateY(0); }
 }
 

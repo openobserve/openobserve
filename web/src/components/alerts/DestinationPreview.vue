@@ -67,7 +67,7 @@ limitations under the License.
         <!-- MS Teams Preview -->
         <div v-if="type === 'msteams'" data-test="msteams-preview" class="teams-card max-w-150 mx-auto bg-white border border-[var(--color-brand-msg-border-2)] rounded-lg overflow-hidden shadow-[0_2px_8px_rgba(0,0,0,0.1)]">
           <div data-test="msteams-card-content" class="teams-card-content">
-            <div class="teams-header bg-[var(--color-brand-teams-hover)] text-white p-4">
+            <div class="teams-header bg-brand-teams-hover text-white p-4">
               <div class="teams-title text-lg font-bold mb-1">🚨 Alert: High CPU Usage</div>
               <div class="teams-subtitle text-sm opacity-90">OpenObserve Alert Notification</div>
             </div>

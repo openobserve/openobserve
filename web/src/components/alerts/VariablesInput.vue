@@ -62,12 +62,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
         <div class="ml-0">
-          <OInput
+          <OInput class="min-w-62.5"
             data-test="alert-variables-value-input"
             v-model="variable.value"
             :placeholder="t('common.value')"
             tabindex="0"
-            style="min-width: 250px"
           />
         </div>
         <div class="w-1/6 ml-0">

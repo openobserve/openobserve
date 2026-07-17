@@ -38,8 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div v-else-if="item.type == 'constant'" class="max-w-[40rem] min-w-37.5">
         <OInput
           v-show="!item.hideOnDashboard"
-          class="mr-4 mt-1"
-          style="max-width: 150px !important"
+          class="mr-4 mt-1 max-w-37.5!"
           v-model="item.value"
           :label="item.label || item.name"
           label-position="inside"
@@ -51,8 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div v-else-if="item.type == 'textbox'" class="max-w-[40rem] min-w-37.5">
         <OInput
           v-show="!item.hideOnDashboard"
-          class="mr-4 mt-1"
-          style="max-width: 150px !important"
+          class="mr-4 mt-1 max-w-37.5!"
           :debounce="1000"
           v-model="item.value"
           :label="item.label || item.name"

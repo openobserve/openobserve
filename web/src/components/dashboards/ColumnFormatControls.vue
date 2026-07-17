@@ -15,7 +15,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="divide-y divide-[rgba(128,128,128,0.08)]">
+  <div
+    class="divide-y divide-[color-mix(in_srgb,var(--color-grey-500)_8%,transparent)]"
+  >
     <!-- Field type -->
     <div class="px-3 py-2">
       <div class="o-input-label text-compact font-medium leading-tight text-input-label-text block mb-1.5">
@@ -101,8 +103,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <button
         type="button"
-        class="inline-flex items-center gap-2 py-1.5 px-2.5 mt-3 rounded-md border border-[rgba(128,128,128,0.28)] bg-transparent cursor-pointer text-left transition-colors hover:border-primary-600"
-        :class="{ 'cf-toggle-active': col.autoColor }"
+        class="inline-flex items-center gap-2 py-1.5 px-2.5 mt-3 rounded-md border cursor-pointer text-left transition-colors hover:border-primary-600"
+        :class="
+          col.autoColor
+            ? 'border-primary-600 bg-[color-mix(in_srgb,var(--color-primary-600)_7%,transparent)]'
+            : 'border-[color-mix(in_srgb,var(--color-grey-500)_28%,transparent)] bg-transparent'
+        "
         :data-test="`o2-format-unique-color-${col.field}`"
         @click="col.autoColor = !col.autoColor"
       >
@@ -120,14 +126,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div
         v-if="!col.conditions.length"
-        class="text-[length:var(--text-compact)] text-text-secondary mb-1.5"
+        class="text-compact text-text-secondary mb-1.5"
       >
         {{ t("dashboard.conditionNoRules") }}
       </div>
       <div
         v-for="(rule, ruleIdx) in col.conditions"
         :key="ruleIdx"
-        class="flex flex-col gap-2 py-2 px-2.5 mb-1.5 rounded-md bg-[rgba(128,128,128,0.04)] border border-[rgba(128,128,128,0.1)]"
+        class="flex flex-col gap-2 py-2 px-2.5 mb-1.5 rounded-md bg-[color-mix(in_srgb,var(--color-grey-500)_4%,transparent)] border border-[color-mix(in_srgb,var(--color-grey-500)_10%,transparent)]"
       >
         <div class="flex items-center gap-2 flex-wrap">
           <span class="o-input-label text-compact font-medium leading-tight text-input-label-text shrink-0 w-28">{{ t("dashboard.conditionIfValue") }}</span>
@@ -247,15 +253,11 @@ export default defineComponent({
 </script>
 
 <style lang="scss" scoped>
-// Segmented switchers: child buttons fill the 32px outer height.
+/* keep(lib-override:o2-toggle-group): OToggleGroup renders its own <button>
+   children, so their intrinsic min-height can only be reset from the parent via
+   :deep() — no utility on this component can reach that generated element. */
 .cf-seg :deep(button) {
   height: 100% !important;
   min-height: 0 !important;
-}
-
-// "Unique value color" toggle — active tint (color-mix has no Tailwind form).
-.cf-toggle-active {
-  border-color: var(--color-primary-600) !important;
-  background: color-mix(in srgb, var(--color-primary-600) 7%, transparent) !important;
 }
 </style>

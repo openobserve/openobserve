@@ -122,11 +122,9 @@ describe("GroupHeader.vue", () => {
       expect(wrapper.find("img").attributes("src")).toBe("/mocked-assets/custom/path.png");
     });
 
-    it("sets width and height style on image", () => {
+    it("sizes the image via the size-6 utility (24px)", () => {
       const wrapper = createWrapper({ showIcon: true });
-      const style = wrapper.find("img").attributes("style") ?? "";
-      expect(style).toContain("width: 24px");
-      expect(style).toContain("height: 24px");
+      expect(wrapper.find("img").classes()).toContain("size-6");
     });
 
     it("calls getImageURL with the provided iconPath", async () => {

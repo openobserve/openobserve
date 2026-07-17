@@ -218,7 +218,7 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
   // pricing-chip: Pill-shaped toggle chip for model pricing quick-setup template selection
   "pricing-chip": [
     "bg-transparent text-inherit border border-border-default",
-    "!rounded-full !text-xs !font-medium !h-auto !py-[5px] !px-3.5 !gap-1.5",
+    "!rounded-full !text-xs !font-medium !h-auto !py-1.25 !px-3.5 !gap-1.5",
     "transition-colors duration-150",
     "enabled:hover:border-primary-600 enabled:hover:text-primary-600 enabled:hover:bg-button-ghost-hover-bg",
     "disabled:opacity-60",

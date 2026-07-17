@@ -77,9 +77,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :is-in-view = false
       />
     </template>
+      <!-- Drag-over highlight: same role as OFile's drop target, so it shares
+           --color-file-drag-bg (theme-aware; the old raw blue had no dark step).
+           Stays a binding because the fill is driven by isDragOver at runtime. -->
       <DropzoneBackground
         :style="{
-          backgroundColor: isDragOver ? '#e7f3ff' : 'transparent',
+          backgroundColor: isDragOver
+            ? 'var(--color-file-drag-bg)'
+            : 'transparent',
           transition: 'background-color 0.2s ease',
         }"
       >
@@ -236,7 +241,7 @@ function resetTransform() {
 @keyframes pipeline-flow-slide-down {
   from {
     opacity: 0;
-    transform: translateX(-50%) translateY(-10px);
+    transform: translateX(-50%) translateY(-0.625rem);
   }
   to {
     opacity: 1;

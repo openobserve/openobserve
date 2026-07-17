@@ -18,50 +18,52 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="flex flex-col gap-1.5 w-full shrink-0 px-1 py-2">
     <!-- Header row: oldest … legend … newest -->
     <div class="flex items-center justify-between px-1">
-      <span class="text-2xs tabular-nums" style="color: var(--color-text-caption)">
+      <span class="text-2xs tabular-nums text-text-caption">
         {{ oldestLabel }}
       </span>
 
       <div class="flex items-center gap-3">
         <span v-if="firingCount > 0" class="flex items-center gap-1 text-2xs">
-          <span class="inline-block w-2 h-2 rounded-sm" style="background: var(--color-badge-error-solid-bg)" />
-          <span class="font-medium" style="color: var(--color-badge-error-soft-text)">{{ firingCount }} Firing</span>
+          <span class="inline-block w-2 h-2 rounded-sm bg-badge-error-solid-bg" />
+          <span class="font-medium text-badge-error-soft-text">{{ firingCount }} Firing</span>
         </span>
-        <span class="flex items-center gap-1 text-2xs" style="color: var(--color-text-secondary)">
-          <span class="inline-block w-2 h-2 rounded-sm" style="background: var(--color-badge-success-solid-bg)" />
+        <span class="flex items-center gap-1 text-2xs text-text-secondary">
+          <span class="inline-block w-2 h-2 rounded-sm bg-badge-success-solid-bg" />
           {{ okCount }} Ok
         </span>
-        <span v-if="skippedCount > 0" class="flex items-center gap-1 text-2xs" style="color: var(--color-text-muted)">
-          <span class="inline-block w-2 h-2 rounded-sm" style="background: var(--color-border-default)" />
+        <span v-if="skippedCount > 0" class="flex items-center gap-1 text-2xs text-text-muted">
+          <span class="inline-block w-2 h-2 rounded-sm bg-border-default" />
           {{ skippedCount }} Skipped
         </span>
-        <span v-if="hasFlappingZone" class="flex items-center gap-1 text-2xs font-semibold" style="color: var(--color-badge-purple-ol-text); filter: brightness(0.9)">
+        <span v-if="hasFlappingZone" class="flex items-center gap-1 text-2xs font-semibold text-badge-purple-ol-text brightness-90">
           <span class="inline-block w-2 h-2 rounded-sm o2-flap-swatch" />
           Flapping
         </span>
       </div>
 
-      <span class="text-2xs tabular-nums" style="color: var(--color-text-caption)">
+      <span class="text-2xs tabular-nums text-text-caption">
         {{ newestLabel }}
       </span>
     </div>
 
     <!-- Timeline strip + transition labels -->
-    <div class="flex flex-col gap-[3px] w-full px-1">
+    <div class="flex flex-col gap-0.75 w-full px-1">
 
     <!-- Strip -->
-    <div class="flex gap-0.5 w-full h-6 items-stretch" style="overflow: visible">
+    <div class="flex gap-0.5 w-full h-6 items-stretch overflow-visible">
       <template v-for="(seg, i) in segments" :key="i">
         <!-- Flapping zone — alternating hatched red/green cells + callout pill -->
         <div
           v-if="seg.type === 'flapping'"
-          class="flex gap-0.5 items-stretch relative"
-          :style="{ flex: seg.weight, minWidth: '12px' }"
+          class="flex gap-0.5 items-stretch relative min-w-3"
+          :style="{ flex: seg.weight }"
           @mouseenter="hoveredIndex = i"
           @mouseleave="hoveredIndex = null"
         >
           <!-- Persistent callout pill above the zone -->
-          <div class="o2-flap-pill">
+          <div
+            class="o2-flap-pill absolute bottom-full mb-2 left-1/2 -translate-x-1/2 z-30 flex items-center gap-1.25 whitespace-nowrap px-3 py-1 rounded-full text-xs font-semibold pointer-events-none shadow-md text-badge-purple-solid-text bg-badge-purple-solid-bg"
+          >
             <span class="font-semibold">⚡ Flapping</span>
             <span class="opacity-60 font-normal">•</span>{{ seg.flips }} flips
             <span class="opacity-60 font-normal">•</span>{{ seg.durationLabel }}
@@ -69,8 +71,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             v-for="(cell, c) in seg.cells"
             :key="c"
-            class="flex-1 rounded-sm min-w-1.5"
-            :style="flapCellStyle(cell.status)"
+            class="flex-1 rounded-sm min-w-1.5 o2-flap-cell"
+            :style="{ backgroundColor: blockColor(cell.status) }"
           />
         </div>
 
@@ -82,7 +84,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @mouseenter="hoveredIndex = i"
           @mouseleave="hoveredIndex = null"
         >
-          <div v-if="hoveredIndex === i" class="o2-timeline-tooltip">
+          <div
+            v-if="hoveredIndex === i"
+            class="absolute top-full mt-1.5 left-1/2 -translate-x-1/2 z-50 whitespace-nowrap rounded-md px-2.5 py-1.5 text-2xs leading-[1.4] pointer-events-none shadow-md bg-surface-overlay border border-border-default text-text-body"
+          >
             <div class="font-semibold capitalize flex items-center gap-1.5">
               <span
                 class="inline-block w-2 h-2 rounded-sm shrink-0"
@@ -103,8 +108,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <span
         v-for="(tick, i) in tickLabels"
         :key="i"
-        class="absolute top-0 text-3xs tabular-nums whitespace-nowrap translate-x-[-50%]"
-        :style="{ left: tick.leftPct + '%', color: 'var(--color-text-caption)' }"
+        class="absolute top-0 text-3xs tabular-nums whitespace-nowrap -translate-x-1/2 text-text-caption"
+        :style="{ left: tick.leftPct + '%' }"
       >
         {{ tick.label }}
       </span>
@@ -373,77 +378,46 @@ function formatDuration(ms: number): string {
   if (h) return `${h}h`;
   return `${m}m`;
 }
-
-// Diagonal-hatch fill for a flapping cell, tinted by its real status colour.
-function flapCellStyle(status: string) {
-  return {
-    background:
-      "repeating-linear-gradient(45deg, rgba(255,255,255,0.32) 0, rgba(255,255,255,0.32) 2px, transparent 2px, transparent 6px), " +
-      blockColor(status),
-    boxShadow: "inset 0 0 0 1px rgba(124, 58, 237, 0.55)",
-  };
-}
 </script>
 
 <style scoped>
+/* keep(generated-content): the pill's ::after arrow and the two repeating-linear-gradient hatch fills — a pseudo-element and multi-stop gradients have no utility equivalent. */
+
 /* Hatched purple swatch used in the legend for the flapping key */
 .o2-flap-swatch {
   background:
     repeating-linear-gradient(
       45deg,
-      rgba(255, 255, 255, 0.4) 0,
-      rgba(255, 255, 255, 0.4) 1px,
+      color-mix(in srgb, var(--color-white) 40%, transparent) 0,
+      color-mix(in srgb, var(--color-white) 40%, transparent) 1px,
       transparent 1px,
-      transparent 3px
+      transparent 0.1875rem
     ),
     var(--color-badge-purple-solid-bg);
 }
 
-/* Persistent purple callout pill above a flapping zone */
-.o2-flap-pill {
-  position: absolute;
-  bottom: calc(100% + 8px);
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 30;
-  white-space: nowrap;
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  padding: 4px 12px;
-  border-radius: 9999px;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--color-badge-purple-solid-text);
-  background: var(--color-badge-purple-solid-bg);
-  box-shadow: var(--shadow-md);
-  pointer-events: none;
+/* Diagonal-hatch overlay for a flapping cell. The base colour is bound
+   per-instance inline (status-derived); this only paints the hatch on top. */
+.o2-flap-cell {
+  background-image: repeating-linear-gradient(
+    45deg,
+    color-mix(in srgb, var(--color-white) 32%, transparent) 0,
+    color-mix(in srgb, var(--color-white) 32%, transparent) 0.125rem,
+    transparent 0.125rem,
+    transparent 0.375rem
+  );
+  box-shadow: inset 0 0 0 1px
+    color-mix(in srgb, var(--color-badge-purple-solid-bg) 55%, transparent);
 }
+
+/* Downward arrow under the flapping callout pill */
 .o2-flap-pill::after {
   content: "";
   position: absolute;
   top: 100%;
   left: 50%;
   transform: translateX(-50%);
-  border: 5px solid transparent;
+  border: 0.3125rem solid transparent;
   border-top-color: var(--color-badge-purple-solid-bg);
-}
-
-.o2-timeline-tooltip {
-  position: absolute;
-  top: calc(100% + 6px);
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 50;
-  white-space: nowrap;
-  border-radius: var(--radius-md);
-  padding: 6px 10px;
-  font-size: 11px;
-  line-height: 1.4;
-  box-shadow: var(--shadow-md);
-  pointer-events: none;
-  background: var(--color-surface-overlay);
-  border: 1px solid var(--color-border-default);
-  color: var(--color-text-body);
 }
 </style>

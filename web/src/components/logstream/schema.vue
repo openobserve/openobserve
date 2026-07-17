@@ -305,7 +305,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <OIcon
                           name="info"
                           size="sm"
-                          style="color: var(--color-status-warning-text); cursor: pointer"
+                          class="text-status-warning-text cursor-pointer"
                         />
                         <OTooltip
                           side="right"
@@ -502,7 +502,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                       <!-- Data Retention -->
                       <div v-if="showDataRetention" class="flex flex-col gap-1 p-3">
-                        <label class="text-compact font-[500]" style="color: var(--color-text-heading)">
+                        <label class="text-compact font-[500] text-text-heading">
                           Data Retention (days)
                         </label>
                         <OInput
@@ -523,7 +523,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                       <!-- Max Query Range -->
                       <div class="flex flex-col gap-1 p-3">
-                        <label class="text-compact font-[500]" style="color: var(--color-text-heading)">
+                        <label class="text-compact font-[500] text-text-heading">
                           Max Query Range (hours)
                         </label>
                         <OInput
@@ -539,7 +539,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                       <!-- Flatten Level -->
                       <div class="flex flex-col gap-1 p-3">
-                        <label class="text-compact font-[500]" style="color: var(--color-text-heading)">
+                        <label class="text-compact font-[500] text-text-heading">
                           {{ t("logStream.flattenLevel") }}
                         </label>
                         <OInput

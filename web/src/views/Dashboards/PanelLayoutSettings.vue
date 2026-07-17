@@ -27,21 +27,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div
     data-test="panel-layout-settings-content"
-    class="p-0"
-    style="min-height: inherit"
-  >
+    class="p-0 [min-height:inherit]"
+   
+    >
     <div>
       <div
         data-test="panel-layout-settings-height"
         class="o2-input"
       >
         <OForm id="panel-layout-settings-form" :form="form">
-          <OFormInput
+          <OFormInput class="min-w-55"
             name="h"
             :label="t('dashboard.panelHeight')"
             required
             type="number"
-            style="min-width: 220px"
             data-test="panel-layout-settings-height-input"
           />
         </OForm>
@@ -52,7 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             name="info-outline"
             class="cursor-pointer shrink-0"
             size="xs"
-           />
+          />
             <OTooltip content="1 unit = 30px" />
         </div>
 

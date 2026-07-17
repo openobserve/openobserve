@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </DashboardHeader>
 
       <div
-        class="overflow-y-auto px-[3px] pb-4 flex-1 min-h-0 [scrollbar-width:thin] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-sm [scrollbar-color:var(--color-border-strong)_transparent] [&::-webkit-scrollbar-thumb]:bg-border-strong"
+        class="overflow-y-auto px-0.75 pb-4 flex-1 min-h-0 [scrollbar-width:thin] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-sm [scrollbar-color:var(--color-border-strong)_transparent] [&::-webkit-scrollbar-thumb]:bg-border-strong"
       >
         <OForm
           greedy
@@ -183,7 +183,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="dashboard-variable-max-record-size"
                 >
                   <template #tooltip
-                    ><OTooltip :content="t('dashboard.maxRecordSize')"
+><OTooltip :content="t('dashboard.maxRecordSize')"
                   /></template>
                 </OFormInput>
               </div>
@@ -228,7 +228,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       <template #empty>
                         <span class="italic text-text-secondary"
-                          >{{ t('dashboard.noDataFound') }}</span
+>{{ t('dashboard.noDataFound') }}</span
                         >
                       </template>
                     </OFormSelect>
@@ -299,7 +299,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
 
                 <!-- show error if filter has cycle -->
-                <div v-show="filterCycleError" style="color: red" data-test="dashboard-variable-cycle-error">
+                <div v-show="filterCycleError" class="text-status-error-text" data-test="dashboard-variable-cycle-error">
                   {{ filterCycleError }}
                 </div>
               </div>
@@ -338,7 +338,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @click="onCustomSelectAllClick"
                 >
                   <template #tooltip
-                    ><OTooltip :content="t('dashboard.defaultSelectAll')"
+><OTooltip :content="t('dashboard.defaultSelectAll')"
                   /></template>
                 </OCheckbox>
               </div>
@@ -416,19 +416,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   value="first"
                   size="sm"
                   data-test="dashboard-multi-select-default-value-toggle-first-value"
-                  >{{ t('dashboard.firstValue') }}</OToggleGroupItem
+                >{{ t('dashboard.firstValue') }}</OToggleGroupItem
                 >
                 <OToggleGroupItem
                   value="all"
                   size="sm"
                   data-test="dashboard-multi-select-default-value-toggle-all-values"
-                  >{{ t('dashboard.allValues') }}</OToggleGroupItem
+                >{{ t('dashboard.allValues') }}</OToggleGroupItem
                 >
                 <OToggleGroupItem
                   value="custom"
                   size="sm"
                   data-test="dashboard-multi-select-default-value-toggle-custom"
-                  >{{ t('dashboard.customValue') }}</OToggleGroupItem
+                >{{ t('dashboard.customValue') }}</OToggleGroupItem
                 >
               </OFormToggleGroup>
             </div>
@@ -444,10 +444,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   ? variableData.customMultiSelectValue
                   : [variableData.customMultiSelectValue[0]]"
                 :key="index"
-                class="mt-3"
-                style="flex-wrap: wrap"
+                class="mt-3 flex-wrap"
               >
-                <div class="flex mr-2" style="width: 50%">
+                <div class="flex mr-2 w-1/2">
                   <OFormInput
                     :name="`customMultiSelectValue[${index}]`"
                     placeholder="Enter value"
@@ -467,8 +466,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <div
                 v-if="variableData.multiSelect"
-                class="flex"
-                style="width: 50%"
+                class="flex w-1/2"
               >
                 <OButton
                   variant="outline"
@@ -512,7 +510,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OForm>
       </div>
       <div
-        class="sticky bottom-0 left-0 w-full py-3 px-4 flex justify-end gap-3 z-10 border-t border-t-border-default [box-shadow:rgb(240,240,240)_0px_-4px_7px_0px] dark:[box-shadow:rgb(20,20,20)_0px_-4px_7px_0px]"
+        class="sticky bottom-0 left-0 w-full py-3 px-4 flex justify-end gap-3 z-10 border-t border-t-border-default [box-shadow:var(--color-grey-150)_0_-0.25rem_0.4375rem_0] dark:[box-shadow:var(--color-grey-900)_0_-0.25rem_0.4375rem_0]"
       >
         <OButton
           variant="outline"
@@ -520,7 +518,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :disabled="isSavingVariable"
           @click="close"
           data-test="dashboard-variable-cancel-btn"
-          >{{ t("dashboard.cancel") }}</OButton
+        >{{ t("dashboard.cancel") }}</OButton
         >
         <OButton
           variant="primary"
@@ -529,7 +527,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           form="add-setting-variable-form"
           :loading="isSavingVariable"
           data-test="dashboard-variable-save-btn"
-          >{{ t("dashboard.save") }}</OButton
+        >{{ t("dashboard.save") }}</OButton
         >
       </div>
     </div>

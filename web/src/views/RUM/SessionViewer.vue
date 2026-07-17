@@ -52,13 +52,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OIcon
               name="sentiment-very-dissatisfied"
               size="sm"
-              class="pr-1"
-              style="color: #fb923c"
+              class="pr-1 text-severity-warning-color"
               data-test="frustration-summary-icon"
             />
             <span
-              class="font-semibold"
-              style="color: #fb923c"
+              class="font-semibold text-severity-warning-color"
               data-test="frustration-summary-text"
               >{{ frustrationCount }} Frustration{{
                 frustrationCount > 1 ? "s" : ""
@@ -76,7 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :limits="[200, 1400]"
         unit="px"
         class="w-full h-full"
-        separatorClass="bg-card-glass-border w-[1px]! hover:bg-theme-accent"
+        separatorClass="bg-card-glass-border w-px! hover:bg-theme-accent"
       >
         <template #before>
           <VideoPlayer

@@ -26,12 +26,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <!-- x axis container -->
     <div
-      style="display: flex; flex-direction: row; width: 100%"
-      class="pl-3"
+      class="pl-3 flex flex-row w-full"
       v-if="dashboardPanelData.data.type != 'metric'"
     >
-      <div style="flex: 1">
-        <div style="display: flex; flex-direction: row">
+      <div class="flex-1">
+        <div class="flex flex-row">
           <div class="layout-name whitespace-nowrap min-w-32.5 flex items-center">
             {{ currentXLabel }}
             <OIcon name="info-outline" size="sm" class="ml-1" />
@@ -79,7 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 &nbsp;
               </div>
               <OButtonGroup
-                class="axis-field overflow-hidden [--tw-divide-color:rgba(255,255,255,0.25)]"
+                class="axis-field overflow-hidden"
                 radius="sm"
                 :draggable="true"
                 @dragstart="onFieldDragStart($event, itemX, 'x', index)"
@@ -105,7 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       {{ xLabel[index] }}
                       <template #icon-right
-                        ><OIcon name="arrow-drop-down" size="sm"
+><OIcon name="arrow-drop-down" size="sm"
                       /></template>
                     </OButton>
                   </template>
@@ -151,17 +150,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OButtonGroup>
             </div>
             <div
-              class="text-xs font-bold text-center py-1"
+              class="text-xs font-bold text-center py-1 w-full flex justify-center items-center"
               v-if="
                 dashboardPanelData.data.queries[
                   dashboardPanelData.layout.currentQueryIndex
                 ].fields?.x?.length < 1
-              "
-              style="
-                width: 100%;
-                display: flex;
-                justify-content: center;
-                align-items: center;
               "
             >
               <div class="mt-1">{{ xAxisHint }}</div>
@@ -170,8 +163,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       <!-- b axis container -->
-      <div
-        style="flex: 1"
+      <div class="flex-1"
         v-if="
           dashboardPanelData.data.type == 'table' ||
           dashboardPanelData.data.type == 'area' ||
@@ -184,10 +176,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           dashboardPanelData.data.type == 'stacked'
         "
       >
-        <div style="display: flex; flex-direction: row" class="pl-3 h-full">
+        <div class="pl-3 h-full flex flex-row">
           <!-- Separator between X and Breakdown/Pivot -->
           <OSeparator vertical class="mr-4" />
-          <div class="layout-name whitespace-nowrap min-w-32.5 flex items-center" style="min-width: 0 !important">
+          <div class="layout-name whitespace-nowrap min-w-0 flex items-center">
             {{
               dashboardPanelData.data.type == "table"
                 ? t("panel.pivotField")
@@ -204,7 +196,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       dashboardPanelData.data.type == 'h-bar' ||
                       dashboardPanelData.data.type == 'h-stacked'
                     "
-                    >{{ t("panel.breakdownTooltipHBar") }}</span
+                  >{{ t("panel.breakdownTooltipHBar") }}</span
                   >
                   <span v-else>{{ t("panel.breakdownTooltipDefault") }}</span>
                 </template>
@@ -254,7 +246,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 &nbsp;
               </div>
               <OButtonGroup
-                class="axis-field overflow-hidden [--tw-divide-color:rgba(255,255,255,0.25)]"
+                class="axis-field overflow-hidden"
                 radius="sm"
                 :draggable="true"
                 @dragstart="onFieldDragStart($event, itemB, 'breakdown', index)"
@@ -280,7 +272,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       {{ bLabel[index] }}
                       <template #icon-right
-                        ><OIcon name="arrow-drop-down" size="sm"
+><OIcon name="arrow-drop-down" size="sm"
                       /></template>
                     </OButton>
                   </template>
@@ -326,17 +318,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OButtonGroup>
             </div>
             <div
-              class="text-xs font-bold text-center py-1"
+              class="text-xs font-bold text-center py-1 w-full flex justify-center items-center"
               v-if="
                 !dashboardPanelData.data.queries[
                   dashboardPanelData.layout.currentQueryIndex
                 ].fields?.breakdown?.length
-              "
-              style="
-                width: 100%;
-                display: flex;
-                justify-content: center;
-                align-items: center;
               "
             >
               <div class="mt-1">{{ bAxisHint }}</div>
@@ -347,7 +333,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <OSeparator />
     <!-- y axis container -->
-    <div style="display: flex; flex-direction: row" class="pl-3">
+    <div class="pl-3 flex flex-row">
       <div class="layout-name whitespace-nowrap min-w-32.5 flex items-center">
         {{ currentYLabel }}
         <OIcon name="info-outline" size="sm" class="ml-1" />
@@ -394,7 +380,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             &nbsp;
           </div>
           <OButtonGroup
-            class="axis-field overflow-hidden [--tw-divide-color:rgba(255,255,255,0.25)]"
+            class="axis-field overflow-hidden"
             radius="sm"
             :draggable="true"
             @dragstart="onFieldDragStart($event, itemY, 'y', index)"
@@ -420,7 +406,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   {{ yLabel[index] }}
                   <template #icon-right
-                    ><OIcon name="arrow-drop-down" size="sm"
+><OIcon name="arrow-drop-down" size="sm"
                   /></template>
                 </OButton>
               </template>
@@ -470,17 +456,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButtonGroup>
         </div>
         <div
-          class="text-xs font-bold text-center py-1"
+          class="text-xs font-bold text-center py-1 w-full flex justify-center items-center"
           v-if="
             dashboardPanelData.data.queries[
               dashboardPanelData.layout.currentQueryIndex
             ].fields?.y?.length < 1
-          "
-          style="
-            width: 100%;
-            display: flex;
-            justify-content: center;
-            align-items: center;
           "
         >
           <div class="mt-1">{{ yAxisHint }}</div>
@@ -491,7 +471,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- z axis container -->
     <span v-if="dashboardPanelData.data.type === 'heatmap'">
-      <div style="display: flex; flex-direction: row" class="pl-3">
+      <div class="pl-3 flex flex-row">
         <div class="layout-name whitespace-nowrap min-w-32.5 flex items-center">
           {{
             dashboardPanelData.data.type == "heatmap" ? t("panel.zAxis") : ""
@@ -540,7 +520,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               &nbsp;
             </div>
             <OButtonGroup
-              class="axis-field overflow-hidden [--tw-divide-color:rgba(255,255,255,0.25)]"
+              class="axis-field overflow-hidden"
               radius="sm"
               :draggable="true"
               @dragstart="onFieldDragStart($event, itemZ, 'z', index)"
@@ -566,7 +546,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     {{ zLabel[index] }}
                     <template #icon-right
-                      ><OIcon name="arrow-drop-down" size="sm"
+><OIcon name="arrow-drop-down" size="sm"
                     /></template>
                   </OButton>
                 </template>
@@ -612,17 +592,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButtonGroup>
           </div>
           <div
-            class="text-xs font-bold text-center py-1"
+            class="text-xs font-bold text-center py-1 w-full flex justify-center items-center"
             v-if="
               dashboardPanelData.data.queries[
                 dashboardPanelData.layout.currentQueryIndex
               ].fields?.z?.length < 1
-            "
-            style="
-              width: 100%;
-              display: flex;
-              justify-content: center;
-              align-items: center;
             "
           >
             <div class="mt-1">{{ zAxisHint }}</div>

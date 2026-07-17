@@ -17,13 +17,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <div
+  <div class="h-full w-full"
     data-test="chart-renderer"
     ref="chartRef"
     id="chart"
     @mouseover="handleMouseOver"
     @mouseleave="handleMouseLeave"
-    style="height: 100%; width: 100%"
   ></div>
 </template>
 

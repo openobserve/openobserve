@@ -99,7 +99,7 @@ const variantClasses: Record<NonNullable<TextProps["variant"]>, string> = {
   // Uses IBM Plex Mono via the --font-mono CSS custom property.
   // For actual executable code / query content, prefer OCode instead.
   "mono": [
-    "text-xs [font-family:var(--font-mono)]",
+    "text-xs font-mono",
     // HANDOFF §2.1: tabular figures + tight tracking for IDs/counts/timestamps.
     "[font-feature-settings:'tnum'] tracking-[-0.2px]",
     "text-typography-mono",

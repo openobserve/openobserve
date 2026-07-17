@@ -214,7 +214,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <span>{{ formatTimestamp(traceStartTime, store.state.timezone) }}</span>
                 <div
-                  class="bg-text-label py-[0rem] w-[1px] h-4"
+                  class="bg-text-label py-[0rem] w-px h-4"
                 />
                 <span class="mr-[0.25rem]">
                   {{ t("traces.traceId") }}:
@@ -250,7 +250,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <!-- Session ID (LLM traces) -->
                 <template v-if="sessionId">
                   <div
-                    class="bg-text-label py-[0rem] w-[1px] h-4"
+                    class="bg-text-label py-[0rem] w-px h-4"
                   />
                   <span class="mr-[0.25rem]">
                     Session ID:
@@ -285,7 +285,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
               <div
-                class="bg-text-label py-[0rem] w-[1px] h-4"
+                class="bg-text-label py-[0rem] w-px h-4"
               />
               <!-- Span Count Badge -->
               <span class="inline-flex">
@@ -303,7 +303,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </span>
 
               <div
-                class="bg-text-label py-[0rem] w-[1px] h-4"
+                class="bg-text-label py-[0rem] w-px h-4"
               />
 
               <!-- Error Count Badge -->
@@ -465,7 +465,7 @@ size="sm">
                 />
               </div>
               <!-- Search Results Navigation -->
-              <div class="inline-flex items-center bg-transparent px-[0.125rem] [transition:all_0.2s_ease] rounded-[var(--radius-md)] border border-input-border dark:hover:border-theme-accent h-8.2! py-[0.125px]!">
+              <div class="inline-flex items-center bg-transparent px-[0.125rem] [transition:all_0.2s_ease] rounded-md border border-input-border dark:hover:border-theme-accent h-8.2! py-0!">
                 <div
                   class="flex items-center text-xs font-medium px-1 gap-[0.0625rem] select-none"
                   data-test="trace-details-search-results"
@@ -611,7 +611,7 @@ size="sm">
                           backgroundColor: 'var(--color-border-default)',
                           zIndex: 999,
                         }"
-                        class="absolute resize h-full cursor-col-resize top-0 w-[1px] after:content-[''] after:absolute after:h-full after:-left-2.5 after:-right-2.5 after:top-0 after:bottom-0 after:z-999"
+                        class="absolute resize h-full cursor-col-resize top-0 w-px after:content-[''] after:absolute after:h-full after:-left-2.5 after:-right-2.5 after:top-0 after:bottom-0 after:z-999"
                         @mousedown="startResize"
                       />
                       <trace-tree

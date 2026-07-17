@@ -118,12 +118,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="flex flex-1 min-h-0">
 
       <!-- LEFT column wrapper (flex: 6.5) -->
-      <div style="flex: 6.5; min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 8px; padding: 8px 0;">
+      <div class="flex-[6.5] min-w-0 min-h-0 flex flex-col gap-2 py-2">
 
       <!-- Stream Name & Stream Type -->
       <div class="bg-card-glass-bg shrink-0 stream-config-card [container-type:inline-size] [container-name:stream-config]">
         <div class="flex items-center gap-0 py-2.5 px-3 border-b border-border-default">
-          <div class="w-[3px] h-4 rounded-sm mr-2 shrink-0 bg-[var(--color-theme-accent)]" />
+          <div class="w-0.75 h-4 rounded-sm mr-2 shrink-0 bg-theme-accent" />
           <span class="text-compact font-semibold tracking-[0.01em]">{{ t('alerts.streamConfig') }} <span class="text-text-primary">*</span></span>
         </div>
         <div class="flex items-center gap-4 px-3 py-2">
@@ -176,7 +176,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- TIER 3: Configuration Tabs -->
-      <div class="alert-v3-tabs bg-card-glass-bg" style="flex: 1; min-height: 0; display: flex; flex-direction: column; margin: 0 8px;">
+      <div class="alert-v3-tabs bg-card-glass-bg flex-1 min-h-0 flex flex-col mx-2">
         <!-- Tab Headers -->
         <OToggleGroup
           :model-value="activeTab"
@@ -353,11 +353,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- TIER 2: Preview + Summary (RIGHT 30%) -->
       <!-- border-l: full-height vertical divider flush against the Preview/Summary pane -->
-      <div class="flex flex-col gap-2 border-l border-border-default pt-2 pb-2" style="flex: 3.5; min-width: 0; min-height: 0; overflow: hidden;">
+      <div class="flex flex-col gap-2 border-l border-border-default pt-2 pb-2 flex-[3.5] min-w-0 min-h-0 overflow-hidden">
         <!-- Preview Card -->
-        <div class="bg-card-glass-bg overflow-hidden flex flex-col" style="flex: 1; min-height: 0;">
+        <div class="bg-card-glass-bg overflow-hidden flex flex-col flex-1 min-h-0">
           <div
-            class="flex items-center px-3 py-[0.625rem] select-none border-b border-border-default shrink-0 gap-2"
+            class="flex items-center px-3 py-2.5 select-none border-b border-border-default shrink-0 gap-2"
           >
             <span class="text-sm font-medium">{{ isAnomalyMode ? t('alerts.sqlPreview') : (t('alerts.preview') || 'Preview') }}</span>
             <template v-if="!isAnomalyMode && activeEvaluationStatus">
@@ -369,9 +369,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span class="text-xs opacity-60">{{ activeEvaluationStatus.reason }}</span>
             </template>
           </div>
-          <div class="flex-1 min-h-0" style="overflow: hidden;">
+          <div class="flex-1 min-h-0 overflow-hidden">
             <template v-if="isAnomalyMode">
-              <QueryEditor editor-id="anomaly-sql-preview" language="sql" :read-only="true" :show-auto-complete="false" :hide-nl-toggle="true" :query="anomalyPreviewSql" style="height: 100%" />
+              <!-- editor-height is QueryEditor's own API for this; a class cannot
+                   win against the inline height its rootStyle always sets. -->
+              <QueryEditor editor-id="anomaly-sql-preview" language="sql" :read-only="true" :show-auto-complete="false" :hide-nl-toggle="true" :query="anomalyPreviewSql" editor-height="100%" />
             </template>
             <template v-else>
               <div v-if="!formData.stream_name" class="flex flex-col items-center justify-center h-full gap-2">
@@ -380,10 +382,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   {{ t('alerts.previewEmptyState') }}
                 </span>
               </div>
-              <preview-alert
+              <preview-alert class="w-full h-full"
                 v-else
                 ref="previewAlertRef"
-                style="width: 100%; height: 100%;"
                 :formData="formData"
                 :query="previewQuery"
                 :selectedTab="formData.query_condition.type || 'custom'"
@@ -397,23 +398,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Summary Card -->
-        <div class="bg-card-glass-bg overflow-hidden flex flex-col" style="flex: 1; min-height: 0;">
+        <div class="bg-card-glass-bg overflow-hidden flex flex-col flex-1 min-h-0">
           <div
-            class="flex items-center px-3 py-[0.625rem] select-none border-b border-border-default shrink-0"
+            class="flex items-center px-3 py-2.5 select-none border-b border-border-default shrink-0"
           >
             <span class="text-sm font-medium">{{ t('alerts.summary.title') || 'Summary' }}</span>
           </div>
-          <div class="flex-1 min-h-0" style="overflow: auto;">
-            <AnomalySummary
+          <div class="flex-1 min-h-0 overflow-auto">
+            <AnomalySummary class="h-full overflow-auto"
               v-if="isAnomalyMode"
-              style="height: 100%; overflow: auto;"
               :config="anomalyConfig"
               :destinations="destinations"
               :wizard-step="3"
             />
-            <alert-summary
+            <alert-summary class="h-full"
               v-else
-              style="height: 100%;"
               :formData="formData"
               :destinations="destinations"
               :previewQuery="previewQuery"

@@ -404,8 +404,7 @@ function onHorizCancel() {
       <!-- Value labels on left (labelAlways) -->
       <div
         v-if="labelAlways"
-        class="relative h-full shrink-0"
-        style="width: 1.5rem"
+        class="relative h-full shrink-0 w-6"
         aria-hidden="true"
       >
         <span
@@ -494,8 +493,7 @@ function onHorizCancel() {
       <!-- Marker labels on right -->
       <div
         v-if="markerLabels?.length"
-        class="relative h-full pl-1 shrink-0"
-        style="width: 1.5rem"
+        class="relative h-full pl-1 shrink-0 w-6"
         aria-hidden="true"
       >
         <span

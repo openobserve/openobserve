@@ -64,13 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div
           v-if="feature.price !== ''"
-          class="mx-2"
-          style="
-            flex: 1;
-            border-top: 1px dotted #454f5b;
-            height: 0;
-            opacity: 0.4;
-          "
+          class="mx-2 flex-1 h-0 opacity-40 border-t border-dotted border-border-default"
         ></div>
         <div class="text-base leading-5.5 text-text-body font-bold">{{ feature.price }}</div>
       </div>

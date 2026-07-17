@@ -401,7 +401,7 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
               'rounded-full transition-all duration-150',
               header.column.getIsResizing()
                 ? 'w-0.5 h-full bg-table-resize-handle'
-                : 'w-px h-4 bg-border-default group-hover/resizer:w-0.5 group-hover/resizer:h-full group-hover/resizer:bg-[var(--color-table-resize-handle)]',
+                : 'w-px h-4 bg-border-default group-hover/resizer:w-0.5 group-hover/resizer:h-full group-hover/resizer:bg-table-resize-handle',
             ]"
           />
         </div>
@@ -534,7 +534,7 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
               'rounded-full transition-all duration-150',
               header.column.getIsResizing()
                 ? 'w-0.5 h-full bg-table-resize-handle'
-                : 'w-px h-4 bg-border-default group-hover/resizer:w-0.5 group-hover/resizer:h-full group-hover/resizer:bg-[var(--color-table-resize-handle)]',
+                : 'w-px h-4 bg-border-default group-hover/resizer:w-0.5 group-hover/resizer:h-full group-hover/resizer:bg-table-resize-handle',
             ]"
           />
         </div>

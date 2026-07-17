@@ -98,7 +98,7 @@
             variant="ghost-primary"
             @click="addCondition(props.group.groupId)"
             >
-            <OIcon class="mr-1 font-bold" size="xs" style="border-radius: 50%; border: 1px solid;" name="add" />
+            <OIcon class="mr-1 font-bold rounded-full border" size="xs" name="add" />
             <span class="text-xs font-bold">Condition</span>
             <OTooltip :delay="300" :content="t('alerts.conditions.addConditionTooltip')" />
         </OButton>
@@ -110,7 +110,7 @@
             @click="addGroup(props.group.groupId)"
             :disabled="depth >= 2"
             >
-            <OIcon class="mr-1 font-bold" size="xs" style="border-radius: 50%; border: 1px solid;" name="add" />
+            <OIcon class="mr-1 font-bold rounded-full border" size="xs" name="add" />
             <span class="text-xs font-bold">{{ t('alerts.conditions.conditionGroup') }}</span>
             <OTooltip v-if="depth < 2" :delay="300" :content="t('alerts.conditions.addConditionGroupTooltip')" />
             <OTooltip v-else :delay="300" :content="t('alerts.conditions.maxDepthReachedTooltip')" />
@@ -487,6 +487,7 @@ defineExpose({
   </script>
 
   <style scoped>
+    /* keep(scrollbar): ::-webkit-scrollbar pseudo-elements and scrollbar-color have no utility equivalent. */
 
     .group-container {
       scrollbar-color: var(--color-border-strong) var(--color-surface-base); /* thumb color, track color */
@@ -494,8 +495,8 @@ defineExpose({
 
     /* For more control using WebKit scrollbar styling */
     .group-container::-webkit-scrollbar {
-      width: 8px;
-      height: 4px !important;
+      width: 0.5rem;
+      height: 0.25rem !important;
     }
 
     .group-container::-webkit-scrollbar-track {
@@ -504,7 +505,7 @@ defineExpose({
 
     .group-container::-webkit-scrollbar-thumb {
       background-color: var(--color-border-strong);
-      border-radius: 4px;
+      border-radius: var(--radius-sm);
     }
 
   </style>

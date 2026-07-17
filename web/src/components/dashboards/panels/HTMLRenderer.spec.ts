@@ -435,9 +435,10 @@ describe("HTMLRenderer", () => {
     it("should give the content wrapper min-height 100% so it fills the panel yet grows with content", () => {
       wrapper = createWrapper();
 
+      // Was inline `style="min-height:100%"`; now the `min-h-full` utility.
       expect(
-        wrapper.find('[data-test="html-renderer"]').attributes("style"),
-      ).toContain("min-height: 100%");
+        wrapper.find('[data-test="html-renderer"]').classes(),
+      ).toContain("min-h-full");
     });
 
     it("should enforce iframe hook restrictions", () => {
@@ -484,9 +485,10 @@ describe("HTMLRenderer", () => {
       
       const container = wrapper.find('[data-test="html-renderer-scroll-container"]');
       expect(container.exists()).toBe(true);
-      expect(container.attributes('style')).toContain('width: 100%');
-      expect(container.attributes('style')).toContain('height: 100%');
-      expect(container.attributes('style')).toContain('overflow: auto');
+      // Sizing/overflow moved from an inline style to Tailwind utilities.
+      expect(container.classes()).toContain('w-full');
+      expect(container.classes()).toContain('h-full');
+      expect(container.classes()).toContain('overflow-auto');
     });
 
     it("should maintain responsive design classes", () => {
@@ -504,7 +506,7 @@ describe("HTMLRenderer", () => {
       wrapper = createWrapper({ htmlContent: longContent });
       
       const container = wrapper.find('[data-test="html-renderer-scroll-container"]');
-      expect(container.attributes('style')).toContain('overflow: auto');
+      expect(container.classes()).toContain('overflow-auto');
     });
   });
 

@@ -30,7 +30,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             x="100"
             y="115"
             text-anchor="middle"
-            class="text-[3.5rem] font-bold fill-accent font-[inherit]"
+            font-size="56"
+            class="font-bold fill-accent font-[inherit]"
           >
             404
           </text>

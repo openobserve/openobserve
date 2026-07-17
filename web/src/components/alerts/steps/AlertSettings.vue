@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       class="flex items-center py-2.5 px-3 border-b border-border-default"
     >
-      <div class="w-0.75 h-4 rounded-xs mr-2 shrink-0 bg-[var(--color-theme-accent)]" />
+      <div class="w-0.75 h-4 rounded-xs mr-2 shrink-0 bg-theme-accent" />
       <span
         class="text-compact font-semibold tracking-[0.01em] text-text-primary"
       >{{
@@ -36,8 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Silence Notification (Cooldown) -->
           <div class="flex justify-start items-start pb-3 mb-4">
             <div
-              class="font-semibold flex items-center"
-              style="width: 190px; height: 28px"
+              class="font-semibold flex items-center w-47.5 h-7"
             >
               {{ t("alerts.silenceNotification") + " *" }}
               <OIcon name="info" size="sm" class="ml-1 cursor-pointer" />
@@ -47,10 +46,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
             </div>
             <div>
-              <div class="flex items-center mr-2" style="width: fit-content">
+              <div class="flex items-center mr-2 w-fit">
                 <div
-                  style="width: 87px; margin-left: 0 !important"
-                  class="silence-notification-input"
+                  class="silence-notification-input w-21.75 ml-0"
                 >
                   <OInput
                     v-model="formData.trigger_condition.silence"
@@ -63,13 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                 </div>
                 <div
-                  style="
-                    min-width: 90px;
-                    margin-left: 0 !important;
-                    height: 28px;
-                    font-size: 13px;
-                  "
-                  class="flex justify-center items-center bg-input-addon-bg text-input-addon-text"
+                  class="flex justify-center items-center bg-input-addon-bg text-input-addon-text min-w-22.5 ml-0 h-7 text-compact"
                 >
                   {{ t("alerts.minutes") }}
                 </div>
@@ -81,8 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   formData.trigger_condition.silence === null ||
                   formData.trigger_condition.silence === ''
                 "
-                class="text-status-error-text pt-1"
-                style="font-size: 11px; line-height: 12px"
+                class="text-status-error-text pt-1 text-2xs leading-3"
               >
                 {{ t("alerts.alertSettings.fieldRequired") }}
               </div>
@@ -92,8 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Destinations -->
           <div class="flex items-start pb-4 mb-4">
             <div
-              style="width: 190px; height: 28px"
-              class="flex items-center font-semibold"
+              class="flex items-center font-semibold w-47.5 h-7"
             >
               <span>{{ t("alerts.destination") }} *</span>
             </div>
@@ -135,8 +125,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   destinationsTouched &&
                   (!localDestinations || localDestinations.length === 0)
                 "
-                class="text-status-error-text pt-1"
-                style="font-size: 11px; line-height: 12px"
+                class="text-status-error-text pt-1 text-2xs leading-3"
               >
                 {{ t("alerts.alertSettings.fieldRequired") }}
               </div>
@@ -149,8 +138,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Period -->
           <div class="flex items-start mr-2 mb-4!">
             <div
-              class="font-semibold flex items-center"
-              style="width: 190px; height: 28px"
+              class="font-semibold flex items-center w-47.5 h-7"
             >
               {{ t("alerts.period") + " *" }}
               <OIcon name="info" size="sm" class="ml-1 cursor-pointer" />
@@ -162,12 +150,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div>
               <div
                 ref="periodFieldRef"
-                class="flex items-center mr-2"
-                style="width: fit-content"
+                class="flex items-center mr-2 w-fit"
               >
                 <div
-                  style="width: 87px; margin-left: 0 !important"
-                  class="period-input-container"
+                  class="period-input-container w-21.75 ml-0"
                 >
                   <OInput
                     v-model="formData.trigger_condition.period"
@@ -179,22 +165,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                 </div>
                 <div
-                  style="
-                    min-width: 90px;
-                    margin-left: 0 !important;
-                    height: 28px;
-                    font-weight: normal;
-                    font-size: 13px;
-                  "
-                  class="flex justify-center items-center bg-input-addon-bg text-input-addon-text"
+                  class="flex justify-center items-center bg-input-addon-bg text-input-addon-text min-w-22.5 ml-0 h-7 font-normal text-compact"
                 >
                   {{ t("alerts.minutes") }}
                 </div>
               </div>
               <div
                 v-if="!Number(formData.trigger_condition.period)"
-                class="text-status-error-text pt-1"
-                style="font-size: 11px; line-height: 12px"
+                class="text-status-error-text pt-1 text-2xs leading-3"
               >
                 {{ t("alerts.alertSettings.fieldRequired") }}
               </div>
@@ -204,8 +182,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Silence Notification (Cooldown) for Scheduled Alerts -->
           <div class="flex items-start mr-2 mb-4!">
             <div
-              class="font-semibold flex items-center"
-              style="width: 190px; height: 28px"
+              class="font-semibold flex items-center w-47.5 h-7"
             >
               {{ t("alerts.silenceNotification") + " *" }}
               <OIcon name="info" size="sm" class="ml-1 cursor-pointer" />
@@ -217,10 +194,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div>
               <div
                 ref="silenceFieldRef"
-                class="flex items-center mr-2"
-                style="width: fit-content"
+                class="flex items-center mr-2 w-fit"
               >
-                <div style="width: 87px; margin-left: 0 !important">
+                <div class="w-21.75 ml-0">
                   <OInput
                     v-model="formData.trigger_condition.silence"
                     type="number"
@@ -231,13 +207,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                 </div>
                 <div
-                  style="
-                    min-width: 90px;
-                    margin-left: 0 !important;
-                    height: 28px;
-                    font-size: 13px;
-                  "
-                  class="flex justify-center items-center bg-input-addon-bg text-input-addon-text"
+                  class="flex justify-center items-center bg-input-addon-bg text-input-addon-text min-w-22.5 ml-0 h-7 text-compact"
                 >
                   {{ t("alerts.minutes") }}
                 </div>
@@ -249,8 +219,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   formData.trigger_condition.silence === null ||
                   formData.trigger_condition.silence === ''
                 "
-                class="text-status-error-text pt-1"
-                style="font-size: 11px; line-height: 12px"
+                class="text-status-error-text pt-1 text-2xs leading-3"
               >
                 {{ t("alerts.alertSettings.fieldRequired") }}
               </div>
@@ -260,8 +229,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Destinations -->
           <div class="flex items-start mr-2 mb-4!">
             <div
-              class="font-semibold flex items-center"
-              style="width: 190px; height: 28px"
+              class="font-semibold flex items-center w-47.5 h-7"
             >
               {{ t("alerts.destination") + " *" }}
               <OIcon name="info" size="sm" class="ml-1 cursor-pointer" />
@@ -313,8 +281,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   destinationsTouched &&
                   (!localDestinations || localDestinations.length === 0)
                 "
-                class="text-status-error-text pt-1"
-                style="font-size: 11px; line-height: 12px"
+                class="text-status-error-text pt-1 text-2xs leading-3"
               >
                 {{ t("alerts.alertSettings.fieldRequired") }}
               </div>
@@ -325,8 +292,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Creates Incident toggle — shown for all alert types -->
         <div class="flex items-start mb-4!">
           <div
-            class="font-semibold flex items-center"
-            style="width: 190px; height: 28px"
+            class="font-semibold flex items-center w-47.5 h-7"
           >
             {{ t("alerts.alertSettings.createsIncident") }}
             <OIcon name="info" size="sm" class="ml-1 cursor-pointer" />

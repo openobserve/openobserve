@@ -753,7 +753,7 @@ defineExpose({ applyTemplate, previewTemplate });
 }
 
 .preview-box--result {
-  border-left: 2px solid var(--color-primary-500);
+  border-left: 0.125rem solid var(--color-primary-500);
 }
 
 .help-empty {
@@ -813,7 +813,7 @@ defineExpose({ applyTemplate, previewTemplate });
     padding: 0.75rem;
     border: 1px solid var(--color-border-default);
     border-radius: var(--radius-lg);
-    border-left-width: 2px;
+    border-left-width: 0.125rem;
 
     &--bad {
       border-left-color: var(--color-warning-500);

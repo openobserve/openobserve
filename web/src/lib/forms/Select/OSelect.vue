@@ -990,13 +990,13 @@ const triggerEndPadding = computed(() =>
 const fieldWidthClass = computed(() => {
   switch (props.width) {
     case "xs":
-      return "w-[var(--spacing-field-width-xs)]";
+      return "w-field-width-xs";
     case "sm":
-      return "w-[var(--spacing-field-width-sm)]";
+      return "w-field-width-sm";
     case "md":
-      return "w-[var(--spacing-field-width-md)]";
+      return "w-field-width-md";
     case "lg":
-      return "w-[var(--spacing-field-width-lg)]";
+      return "w-field-width-lg";
     default:
       return "w-full";
   }
@@ -1454,8 +1454,7 @@ const fieldWidthClass = computed(() => {
                           <!-- Separator between checkbox zone and label zone (rowClickSingleSelect only) -->
                           <span
                             v-if="rowClickSingleSelect"
-                            class="w-px shrink-0 bg-card-glass-border mx-1 my-1"
-                            style="align-self: stretch"
+                            class="w-px shrink-0 bg-card-glass-border mx-1 my-1 self-stretch"
                             aria-hidden="true"
                             data-select-separator
                           />

@@ -15,9 +15,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div
+  <div class="pt-0.75 pr-4 pb-4 pl-4 flex gap-4"
     data-test="dashboard-build-field-popup-container"
-    style="padding: 3px 16px 16px 16px; display: flex; gap: 16px"
   >
     <div data-test="dashboard-build-field-popup-left-section">
       <OForm

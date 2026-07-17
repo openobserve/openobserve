@@ -38,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="text-center p-6 text-text-muted"
         data-test="dashboard-column-order-empty-state"
       >
-        <OIcon name="view-column" class="mb-3" style="width: 48px; height: 48px;" />
+        <OIcon name="view-column" class="mb-3 w-12 h-12" />
         <div class="text-base">{{ t("dashboard.noColumnsOrdered") }}</div>
         <div class="text-xs">
           {{ t("dashboard.columnsDefaultOrder") }}

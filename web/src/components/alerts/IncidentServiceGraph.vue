@@ -16,8 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="incident-service-graph min-h-100 flex flex-col m-3 p-5 rounded-xl overflow-hidden transition-all duration-200 bg-[linear-gradient(135deg,#f9fafb_0%,#ffffff_100%)] border border-border-default shadow-[0_1px_3px_0_rgba(0,0,0,0.08),0_1px_2px_0_rgba(0,0,0,0.04),inset_0_0_0_1px_rgba(255,255,255,0.5)] hover:shadow-[0_4px_6px_-1px_rgba(0,0,0,0.1),0_2px_4px_-1px_rgba(0,0,0,0.06),inset_0_0_0_1px_rgba(255,255,255,0.5)] dark:bg-[linear-gradient(135deg,var(--color-grey-800)_0%,var(--color-grey-900)_100%)] dark:border-grey-700 dark:shadow-[0_1px_3px_0_color-mix(in_srgb,var(--color-black)_30%,transparent),0_1px_2px_0_color-mix(in_srgb,var(--color-black)_20%,transparent),inset_0_0_0_1px_color-mix(in_srgb,var(--color-grey-700)_30%,transparent)] dark:hover:shadow-[0_4px_6px_-1px_color-mix(in_srgb,var(--color-black)_40%,transparent),0_2px_4px_-1px_color-mix(in_srgb,var(--color-black)_30%,transparent),inset_0_0_0_1px_color-mix(in_srgb,var(--color-grey-700)_30%,transparent)]"
-    style="height: calc(100vh - 202px); position: relative;"
+    class="incident-service-graph relative h-[calc(100vh-12.625rem)] min-h-100 flex flex-col m-3 p-5 rounded-xl overflow-hidden transition-all duration-200 bg-[linear-gradient(135deg,#f9fafb_0%,#ffffff_100%)] border border-border-default shadow-[0_1px_3px_0_rgba(0,0,0,0.08),0_1px_2px_0_rgba(0,0,0,0.04),inset_0_0_0_1px_rgba(255,255,255,0.5)] hover:shadow-[0_4px_6px_-1px_rgba(0,0,0,0.1),0_2px_4px_-1px_rgba(0,0,0,0.06),inset_0_0_0_1px_rgba(255,255,255,0.5)] dark:bg-[linear-gradient(135deg,var(--color-grey-800)_0%,var(--color-grey-900)_100%)] dark:border-grey-700 dark:shadow-[0_1px_3px_0_color-mix(in_srgb,var(--color-black)_30%,transparent),0_1px_2px_0_color-mix(in_srgb,var(--color-black)_20%,transparent),inset_0_0_0_1px_color-mix(in_srgb,var(--color-grey-700)_30%,transparent)] dark:hover:shadow-[0_4px_6px_-1px_color-mix(in_srgb,var(--color-black)_40%,transparent),0_2px_4px_-1px_color-mix(in_srgb,var(--color-black)_30%,transparent),inset_0_0_0_1px_color-mix(in_srgb,var(--color-grey-700)_30%,transparent)]"
   >
     <!-- Info Icon → Graph Legend popover (hover to show, like the previous behavior) -->
     <span
@@ -33,20 +32,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <div class="font-semibold text-sm mb-2.5">Graph Legend</div>
         <div class="graph-legend__row flex items-center gap-2 py-1">
-          <span class="graph-legend__dot text-sm leading-none w-3.5 text-center shrink-0" style="color: var(--color-status-negative);">●</span>
+          <span class="graph-legend__dot text-sm leading-none w-3.5 text-center shrink-0 text-status-negative">●</span>
           Red = Potential Root Cause
         </div>
         <div class="graph-legend__row flex items-center gap-2 py-1">
-          <span class="graph-legend__dot text-sm leading-none w-3.5 text-center shrink-0" style="color: var(--color-status-warning-text);">●</span>
+          <span class="graph-legend__dot text-sm leading-none w-3.5 text-center shrink-0 text-status-warning-text">●</span>
           Orange = High Frequency
         </div>
         <div class="graph-legend__row flex items-center gap-2 py-1">
-          <span class="graph-legend__dot text-sm leading-none w-3.5 text-center shrink-0" style="color: var(--color-text-link);">●</span>
+          <span class="graph-legend__dot text-sm leading-none w-3.5 text-center shrink-0 text-text-link">●</span>
           Blue = Normal
         </div>
         <div class="graph-legend__divider h-px bg-border-default my-2 dark:bg-[color-mix(in_srgb,var(--color-white)_15%,transparent)]" />
         <div class="graph-legend__row flex items-center gap-2 py-1">
-          <span class="graph-legend__dot text-sm leading-none w-3.5 text-center shrink-0" style="color: #a78bfa;">→</span>
+          <span class="graph-legend__dot text-sm leading-none w-3.5 text-center shrink-0 text-badge-purple-ol-text">→</span>
           Purple arrows show temporal flow
         </div>
       </div>
@@ -65,7 +64,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-else-if="!graphData || !graphData.nodes || graphData.nodes.length === 0"
       class="flex flex-col items-center justify-center gap-3 h-full"
     >
-      <OIcon name="hub" class="text-text-muted" style="width: 48px; height: 48px;" />
+      <!-- size-12! (48px) exceeds OIcon's largest `size` prop (xl = 40px); the `!`
+           is required because OIcon's own `size-6` default sits in the same layer. -->
+      <OIcon name="hub" class="text-text-muted size-12!" />
       <div class="text-center">
         <div class="text-sm font-medium text-text-secondary">
           Service Graph Unavailable
@@ -79,7 +80,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Graph Canvas using ECharts -->
     <div
       v-if="!loading && graphData && graphData.nodes && graphData.nodes.length > 0"
-      style="width: 100%; height: 100%;"
+      class="w-full h-full"
     >
       <ChartRenderer
         ref="chartRendererRef"
@@ -512,8 +513,8 @@ export default defineComponent({
               const firstTime = new Date(originalNode.first_fired_at / 1000).toLocaleString();
               const lastTime = originalNode.alert_count > 1 ? new Date(originalNode.last_fired_at / 1000).toLocaleString() : null;
 
-              let html = `<div style="padding: 8px; font-size: 12px;">`;
-              html += `<strong style="font-size: 14px;">${originalNode.alert_name}</strong><br/>`;
+              let html = `<div style="padding: 0.5rem; font-size: 0.75rem;">`;
+              html += `<strong style="font-size: 0.875rem;">${originalNode.alert_name}</strong><br/>`;
               html += `Service: <strong>${originalNode.service_name}</strong><br/><br/>`;
               html += `Alert Count: <strong>${originalNode.alert_count}</strong><br/>`;
               html += `First Fired: ${firstTime}<br/>`;
@@ -552,8 +553,8 @@ export default defineComponent({
           },
           tooltip: {
             formatter: () => {
-              let html = `<div style="padding: 8px; font-size: 12px; text-align: center;">`;
-              html += `<strong>${sourceNode.alert_name}</strong> <span style="color: #a78bfa;">→</span> <strong>${targetNode.alert_name}</strong><br/><br/>`;
+              let html = `<div style="padding: 0.5rem; font-size: 0.75rem; text-align: center;">`;
+              html += `<strong>${sourceNode.alert_name}</strong> <span style="color: var(--color-badge-purple-ol-text);">→</span> <strong>${targetNode.alert_name}</strong><br/><br/>`;
 
               if (edge.edge_type === "temporal") {
                 const sourceTime = new Date(sourceNode.first_fired_at / 1000);
@@ -572,12 +573,12 @@ export default defineComponent({
                 else if (minutes > 0) timeStr = `${minutes}m ${seconds % 60}s`;
                 else timeStr = `${seconds}s`;
 
-                html += `<span style="color: #a78bfa;">⏱ Time difference: <strong>${timeStr}</strong></span><br/>`;
+                html += `<span style="color: var(--color-badge-purple-ol-text);">⏱ Time difference: <strong>${timeStr}</strong></span><br/>`;
                 html += `From: ${sourceTime.toLocaleString()}<br/>`;
                 html += `To: ${targetTime.toLocaleString()}<br/>`;
-                html += `<br/><span style="color: #a78bfa;">Temporal correlation</span>`;
+                html += `<br/><span style="color: var(--color-badge-purple-ol-text);">Temporal correlation</span>`;
               } else {
-                html += `<span style="color: #9ca3af;">Service dependency</span>`;
+                html += `<span style="color: var(--color-text-muted);">Service dependency</span>`;
               }
 
               html += `</div>`;

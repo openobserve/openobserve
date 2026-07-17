@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-else-if="events.length === 0"
       class="flex flex-col items-center justify-center py-16 text-text-muted"
     >
-      <OIcon name="forum" class="mb-3 opacity-40" style="width: 56px; height: 56px;" />
+      <OIcon name="forum" class="mb-3 opacity-40 size-14!" />
       <div class="text-base font-medium mb-1">No activity yet</div>
       <div class="text-sm text-text-muted">Events and comments will appear here</div>
     </div>
@@ -54,12 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="relative">
         <!-- Vertical Timeline Line -->
         <div
-          class="absolute left-3 top-0 bottom-0 w-0.5"
-          :style="{
-            backgroundColor: 'var(--color-border-default)',
-            marginTop: '12px',
-            marginBottom: '12px'
-          }"
+          class="absolute left-3 top-0 bottom-0 w-0.5 bg-border-default my-3"
         ></div>
 
         <!-- Events -->
@@ -77,11 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <!-- User Avatar -->
                   <div
                     v-if="getUserId(event) !== 'System'"
-                    class="w-6 h-6 rounded-full flex items-center justify-center z-10 relative"
-                    :style="{
-                      backgroundColor: 'var(--color-surface-base)',
-                      border: '1px solid var(--color-border-default)'
-                    }"
+                    class="w-6 h-6 rounded-full flex items-center justify-center z-10 relative bg-surface-base border border-border-default"
                   >
                     <OIcon
                       name="person"
@@ -92,11 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <!-- System Event Icon -->
                   <div
                     v-else
-                    class="w-6 h-6 rounded-full flex items-center justify-center z-10 relative"
-                    :style="{
-                      backgroundColor: 'var(--color-surface-subtle)',
-                      border: '1px solid var(--color-border-default)'
-                    }"
+                    class="w-6 h-6 rounded-full flex items-center justify-center z-10 relative bg-surface-subtle border border-border-default"
                   >
                     <OIcon
                       :name="getEventIcon(event)"
@@ -189,11 +176,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <!-- Avatar -->
                 <div class="flex-shrink-0">
                   <div
-                    class="w-6 h-6 rounded-full flex items-center justify-center z-10 relative"
-                    :style="{
-                      backgroundColor: 'var(--color-surface-base)',
-                      border: '1px solid var(--color-border-default)'
-                    }"
+                    class="w-6 h-6 rounded-full flex items-center justify-center z-10 relative bg-surface-base border border-border-default"
                   >
                     <OIcon
                       name="person"
@@ -207,13 +190,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="flex-1 min-w-0">
                   <!-- Comment Box -->
                   <div
-                    class="rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow"
-                    :style="{ backgroundColor: 'var(--color-surface-base)', border: '1px solid var(--color-border-default)' }"
+                    class="rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow bg-surface-base border border-border-default"
                   >
                     <!-- Header -->
                     <div
-                      class="px-4 py-2 flex items-center gap-2 border-b"
-                      :style="{ backgroundColor: 'var(--color-surface-subtle)', borderBottomColor: 'var(--color-border-default)' }"
+                      class="px-4 py-2 flex items-center gap-2 border-b bg-surface-subtle border-b-border-default"
                     >
                       <span class="font-semibold text-sm"
                         :class="'text-text-heading'"
@@ -251,11 +232,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Current User Avatar -->
         <div class="flex-shrink-0 pt-1">
           <div
-            class="w-6 h-6 rounded-full flex items-center justify-center"
-            :style="{
-              backgroundColor: 'var(--color-surface-base)',
-              border: '1px solid var(--color-border-default)'
-            }"
+            class="w-6 h-6 rounded-full flex items-center justify-center bg-surface-base border border-border-default"
           >
             <OIcon
               name="person"

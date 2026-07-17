@@ -35,14 +35,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="sm"
               @click="showVariablesDependenciesGraphPopUp = true"
               data-test="dashboard-variable-dependencies-btn"
-              >{{ t('dashboard.showDependencies') }}</OButton
+            >{{ t('dashboard.showDependencies') }}</OButton
             >
             <OButton
               variant="primary"
               size="sm"
               @click="addVariables"
               data-test="dashboard-add-variable-btn"
-              >{{ t("dashboard.newVariable") }}</OButton
+            >{{ t("dashboard.newVariable") }}</OButton
             >
           </div>
         </template>
@@ -175,7 +175,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model="confirmDeleteDialog"
         />
         <ODialog data-test="variable-settings-dependencies-graph-dialog" v-model:open="showVariablesDependenciesGraphPopUp" :width="60" title="Variables Dependency Graph">
-          <div style="height: 60vh">
+          <div class="h-[60vh]">
             <VariablesDependenciesGraph
               :variablesList="dashboardVariablesList"
               :class="'bg-surface-base'"

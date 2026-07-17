@@ -18,7 +18,7 @@
            (right-aligned) so it reads as a page-level control, not a per-tab
            filter. Refresh re-queries everything. -->
       <div
-        class="flex items-center justify-end gap-[0.5rem] px-5 pt-3"
+        class="flex items-center justify-end gap-2 px-5 pt-3"
       >
         <DateTimePickerDashboard
           ref="dateTimePickerRef"
@@ -44,7 +44,7 @@
            consistent. Pinned band (shrink-0) with a bottom divider; the cards
            below carry their own chrome via Tailwind. -->
       <section
-        class="flex-shrink-0 grid grid-cols-4 gap-[0.625rem] px-5 py-4 border-b border-b-dialog-header-border"
+        class="shrink-0 grid grid-cols-4 gap-2.5 px-5 py-4 border-b border-b-dialog-header-border"
       >
         <!-- While the KPI query is in flight, show skeleton tiles in place of
              the cards (matches the LLM Insights dashboard pattern). -->
@@ -53,14 +53,14 @@
           v-for="card in kpiCards"
           v-else
           :key="card.label"
-          class="rounded-lg flex flex-col px-[0.875rem] pt-[0.625rem] pb-[0.625rem] gap-[0.25rem] bg-surface-base border border-border-default transition-shadow duration-200 hover:shadow-[0_0.0625rem_0.375rem_rgba(0,0,0,0.08)]"
+          class="rounded-lg flex flex-col px-3.5 pt-2.5 pb-2.5 gap-1 bg-surface-base border border-border-default transition-shadow duration-200 hover:shadow-md"
         >
           <div
-            class="kpi-label text-2xs leading-normal font-semibold mb-[0.25rem] text-text-secondary"
+            class="kpi-label text-2xs leading-normal font-semibold mb-1 text-text-secondary"
           >
             {{ card.label }}
           </div>
-          <div class="flex items-baseline gap-[0.2rem]">
+          <div class="flex items-baseline gap-0.75">
             <span
               class="text-2xl font-bold leading-none text-text-secondary"
             >
@@ -80,7 +80,7 @@
       <OTabs
         :model-value="activeTab"
         bordered
-        class="flex-shrink-0 px-5"
+        class="shrink-0 px-5"
         data-test="scorer-detail-tabs"
         @update:model-value="activeTab = $event as TabId"
       >
@@ -104,8 +104,8 @@
 
       <!-- ── Body ── -->
       <div
-        class="flex-1 overflow-auto flex flex-col gap-[1.125rem] min-h-0 pt-[1.125rem]"
-        :class="{ 'pb-[1.125rem]': activeTab !== 'runs' }"
+        class="flex-1 overflow-auto flex flex-col gap-4.5 min-h-0 pt-4.5"
+        :class="{ 'pb-4.5': activeTab !== 'runs' }"
       >
         <!-- Runs filter row — agent filter, right-aligned. The date picker +
              refresh live in the global toolbar above the cards, so they're not
@@ -115,7 +115,7 @@
           v-show="runsEnabled"
           class="flex items-center justify-end gap-2 flex-wrap px-5"
         >
-          <div class="w-[14rem] flex-shrink-0">
+          <div class="w-56 shrink-0">
             <OSelect
               v-model="agentKey"
               :options="agentOptions"
@@ -166,7 +166,7 @@
 
           <section class="flex flex-col gap-2 px-5">
             <h4
-              class="m-0 pb-[0.375rem] inline-flex items-center gap-[0.375rem] text-compact font-semibold leading-[1.5] text-text-primary border-b border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)]"
+              class="m-0 pb-1.5 inline-flex items-center gap-1.5 text-compact font-semibold leading-normal text-text-primary border-b border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)]"
             >
               {{ t("onlineEvals.scorer.detail.producesSection") }}
             </h4>
@@ -197,7 +197,7 @@
 
           <section v-if="row.template" class="flex flex-col gap-2 px-5">
             <h4
-              class="m-0 pb-[0.375rem] inline-flex items-center gap-[0.375rem] text-compact font-semibold leading-[1.5] text-text-primary border-b border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)]"
+              class="m-0 pb-1.5 inline-flex items-center gap-1.5 text-compact font-semibold leading-normal text-text-primary border-b border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)]"
             >
               {{
                 scorerType === "llm_judge"
@@ -216,7 +216,7 @@
 
           <section v-if="outputSchemaPretty" class="flex flex-col gap-2 px-5">
             <h4
-              class="m-0 pb-[0.375rem] inline-flex items-center gap-[0.375rem] text-compact font-semibold leading-[1.5] text-text-primary border-b border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)]"
+              class="m-0 pb-1.5 inline-flex items-center gap-1.5 text-compact font-semibold leading-normal text-text-primary border-b border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)]"
             >
               {{ t("onlineEvals.scorer.detail.outputSchemaSection") }}
             </h4>
@@ -225,7 +225,7 @@
 
           <section class="flex flex-col gap-2 px-5">
             <h4
-              class="m-0 pb-[0.375rem] inline-flex items-center gap-[0.375rem] text-compact font-semibold leading-[1.5] text-text-primary border-b border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)]"
+              class="m-0 pb-1.5 inline-flex items-center gap-1.5 text-compact font-semibold leading-normal text-text-primary border-b border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)]"
             >
               {{ t("onlineEvals.scorer.detail.metadataSection") }}
             </h4>
@@ -791,6 +791,10 @@ function relativeTime(timestampMs: number): string {
 </script>
 
 <style lang="scss" scoped>
+/* keep(complex-state): what's left is the <dl>/<dt>/<dd> element-selector grid,
+   the used-by list's hover/:deep(button) overrides, and the status-cell dot
+   variants — descendant and pseudo-class selectors with no element of their own
+   to carry a utility. */
 // Page layout, spacing, colors, and text styling are Tailwind utilities in the
 // template (matching SessionDetails.vue). Only cohesive blocks that rely on
 // descendant/element selectors or hover state remain here. Font-family is never
@@ -839,13 +843,13 @@ function relativeTime(timestampMs: number): string {
   border-radius: 0.1875rem;
   font-size: 0.6875rem;
   font-weight: 600;
-  background: color-mix(in srgb, #6b76e3 14%, transparent);
-  color: #4f5bcf;
+  background: var(--color-badge-indigo-soft-bg);
+  color: var(--color-badge-indigo-soft-text);
 }
 
 .sd-type-chip--remote {
-  background: color-mix(in srgb, #b25400 14%, transparent);
-  color: #b25400;
+  background: var(--color-badge-orange-soft-bg);
+  color: var(--color-badge-orange-soft-text);
 }
 
 .sd-version-chip {
@@ -866,11 +870,11 @@ function relativeTime(timestampMs: number): string {
   padding: 0.625rem 0.75rem;
   background: color-mix(
     in srgb,
-    var(--color-primary-600, #3f7994) 8%,
+    var(--color-primary-600) 8%,
     transparent
   );
   border: 0.0625rem solid
-    color-mix(in srgb, var(--color-primary-600, #3f7994) 30%, transparent);
+    color-mix(in srgb, var(--color-primary-600) 30%, transparent);
   border-radius: 0.3125rem;
   font-size: 0.75rem;
   color: var(--color-text-primary, currentColor);
@@ -930,12 +934,12 @@ function relativeTime(timestampMs: number): string {
 .sd-versions__item--active {
   border-color: color-mix(
     in srgb,
-    var(--color-primary-600, #3f7994) 30%,
+    var(--color-primary-600) 30%,
     transparent
   );
   background: color-mix(
     in srgb,
-    var(--color-primary-600, #3f7994) 5%,
+    var(--color-primary-600) 5%,
     var(--color-card-bg)
   );
 }
@@ -1034,12 +1038,12 @@ function relativeTime(timestampMs: number): string {
 .sd-used-list__item:hover {
   border-color: color-mix(
     in srgb,
-    var(--color-primary-600, #3f7994) 35%,
+    var(--color-primary-600) 35%,
     transparent
   ) !important;
   background: color-mix(
     in srgb,
-    var(--color-primary-600, #3f7994) 5%,
+    var(--color-primary-600) 5%,
     transparent
   ) !important;
 }
@@ -1067,7 +1071,7 @@ function relativeTime(timestampMs: number): string {
 }
 
 .sd-used-list__item:hover .sd-used-list__chevron {
-  color: var(--color-primary-600, #3f7994);
+  color: var(--color-primary-600);
   opacity: 1;
 }
 </style>

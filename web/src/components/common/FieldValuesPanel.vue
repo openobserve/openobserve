@@ -94,8 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Loading state (only shown when there are no interim cached results) -->
       <div
         v-show="fieldValues?.isLoading && !displayValues.length"
-        class="relative pl-3 py-1"
-        style="height: 3.75rem"
+        class="relative pl-3 py-1 h-15"
       >
         <!-- scrim off: this box is empty while loading, so there is nothing to
              dim — and the scrim is 70% of surface-base (white), which on this
@@ -159,23 +158,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <div
               class="flex flex-row flex-wrap justify-between min-w-0 pl-1"
-              :style="
-                showMultiSelect ? 'width: calc(100% - 1.5rem)' : 'width: 100%'
-              "
+              :class="showMultiSelect ? 'w-[calc(100%-1.5rem)]' : 'w-full'"
             >
               <div
                 :title="value.key"
-                class="truncate pr-1 text-field-list-label-text text-3!"
-                style="width: calc(100% - 3.125rem)"
+                class="truncate pr-1 text-field-list-label-text text-3! w-[calc(100%-3.125rem)]"
               >
                 {{ value.label ?? value.key }}
               </div>
               <div
                 v-if="value.count != null"
                 :title="String(value.count)"
-                class="truncate text-right pr-0 text-3!"
-                style="display: contents"
-                :style="showMultiSelect ? 'width: 3.125rem' : ''"
+                class="truncate text-right pr-0 text-3! contents"
+                :class="showMultiSelect ? 'w-[3.125rem]' : ''"
               >
                 {{ formatLargeNumber(value.count) }}
               </div>
@@ -191,7 +186,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="w-full flex justify-center border-t border-card-glass-border pt-1 px-1"
     >
       <button
-        class="inline-flex items-center gap-1 bg-transparent border-0 text-accent text-2xs font-[inherit] py-0.5 px-1 cursor-pointer rounded-[0.1875rem] transition-opacity duration-150 hover:opacity-80 hover:bg-interactive-hover-bg disabled:opacity-50 disabled:cursor-default"
+        class="inline-flex items-center gap-1 bg-transparent border-0 text-accent text-2xs font-[inherit] py-0.5 px-1 cursor-pointer rounded-sm transition-opacity duration-150 hover:opacity-80 hover:bg-interactive-hover-bg disabled:opacity-50 disabled:cursor-default"
         :disabled="isLoadingMore"
         @click="handleLoadMoreClick"
         :data-test="`log-search-subfield-load-more-${fieldName}`"

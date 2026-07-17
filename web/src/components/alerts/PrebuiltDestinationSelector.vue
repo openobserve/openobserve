@@ -28,7 +28,7 @@ limitations under the License. -->
         <!-- Card Content -->
         <div class="card-content flex flex-col items-center text-center h-full relative">
           <!-- Icon/Image -->
-          <div data-test="destination-type-icon" class="mb-2 text-icon-color group-[.selected]/dest-card:text-[var(--color-accent)]">
+          <div data-test="destination-type-icon" class="mb-2 text-icon-color group-[.selected]/dest-card:text-accent">
             <img
               v-if="type.image"
               :src="type.image"
@@ -71,7 +71,7 @@ limitations under the License. -->
         @click="selectType('custom')"
       >
         <div class="card-content flex flex-col items-center text-center h-full relative">
-          <div data-test="destination-type-icon" class="mb-2 text-icon-color group-[.selected]/dest-card:text-[var(--color-accent)]">
+          <div data-test="destination-type-icon" class="mb-2 text-icon-color group-[.selected]/dest-card:text-accent">
             <OIcon name="settings" size="md" />
           </div>
           <div data-test="destination-type-name" class="card-title text-compact font-medium mt-1 mb-0 text-text-primary [line-height:1.3] text-center">

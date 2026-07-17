@@ -78,6 +78,17 @@ withDefaults(
 </script>
 
 <style scoped>
+/* keep(keyframes): SVG illustration animation. Scoped on purpose (W2.b): the
+   illustrations reuse generic keyframe names (es-pulse, es-twinkle, …) with
+   DIFFERENT bodies, so an unscoped block lets the last-loaded illustration
+   hijack the others' animations. Vue rewrites scoped keyframe names per
+   component, which ends the collision. All selectors and the es-static gate
+   live in this file's own template.
+   The px in these keyframes are SVG USER-SPACE units (viewBox), not layout px:
+   each translate lands the packet on a vertex of the connector path drawn in
+   the template. They must stay px — rem is font-relative, so it would decouple
+   the motion from the fixed-unit path geometry whenever the root font-size is
+   not the browser default. */
 .es-packet-top {
   transform-box: view-box;
   animation: es-packet-top 3s ease-in-out infinite;

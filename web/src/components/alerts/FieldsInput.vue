@@ -43,12 +43,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OSelect
             v-model="field.column"
             :options="props.streamFields"
-            class="py-2"
+            class="py-2 min-w-55"
             :placeholder="t('alerts.column')"
             :creatable="props.enableNewValueMode"
             :error="!!fieldErrors[`${field.uuid}-column`]"
             :error-message="fieldErrors[`${field.uuid}-column`] || ''"
-            style="min-width: 220px"
             data-test="alert-conditions-select-column"
             @create="(val: string) => { field.column = val; emits('input:update', 'conditions', field); }"
             @update:model-value="(v: any) => { fieldErrors[`${field.uuid}-column`] = v ? '' : 'Field is required!'; emits('input:update', 'conditions', field); }"
@@ -58,10 +57,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OSelect
             v-model="field.operator"
             :options="triggerOperators"
-            class="py-2"
+            class="py-2 min-w-30"
             :error="!!fieldErrors[`${field.uuid}-operator`]"
             :error-message="fieldErrors[`${field.uuid}-operator`] || ''"
-            style="min-width: 120px"
             data-test="alert-conditions-operator-select"
             @update:model-value="(v: any) => { fieldErrors[`${field.uuid}-operator`] = v ? '' : 'Field is required!'; emits('input:update', 'conditions', field); }"
           />
@@ -70,17 +68,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OInput
             v-model="field.value"
             :placeholder="t('common.value')"
-            class="py-2"
+            class="py-2 min-w-37.5"
             :error="!!fieldErrors[`${field.uuid}-value`]"
             :error-message="fieldErrors[`${field.uuid}-value`] || ''"
-            style="min-width: 150px"
             data-test="alert-conditions-value-input"
             @update:model-value="(v: any) => { fieldErrors[`${field.uuid}-value`] = v ? '' : 'Field is required!'; emits('input:update', 'conditions', field); }"
           />
         </div>
         <div
-          class="ml-0 alerts-condition-action"
-          style="margin-bottom: 12px"
+          class="ml-0 alerts-condition-action mb-3"
         >
           <OButton
             data-test="alert-conditions-delete-condition-btn"

@@ -34,9 +34,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
     <div
-      class="flex"
+      class="flex overflow-hidden"
       :style="!showErrors ? 'height: 0px;' : 'height: auto;'"
-      style="overflow: hidden"
     >
       <div class="flex flex-col">
         <div data-test="dashboard-error">
@@ -47,8 +46,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <li
               v-for="(item, index) in props.errors.errors"
               :key="index"
-              style="color: var(--color-status-error-text)"
-              class="py-1"
+              class="text-status-error-text py-1"
+             
               data-test="dashboard-errors-list-item"
             >
               {{ item }}

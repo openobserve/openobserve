@@ -226,7 +226,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Empty State -->
       <div v-else class="empty-state text-center p-4">
-        <OIcon name="cloud-upload" class="mb-3" style="width: 64px; height: 64px;" />
+        <OIcon name="cloud-upload" class="mb-3 size-16!" />
         <div class="text-xl font-semibold text-text-muted mb-2">Upload a JSON file</div>
         <div class="text-sm text-text-secondary">
           The system will analyze the file and show you what will change
@@ -277,7 +277,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="text-xs mb-1">
           {{ selectedModification?.current.fields.length }} fields
         </div>
-        <div class="max-h-62.5 overflow-y-auto p-2 bg-[var(--color-surface-subtle)] rounded-sm">
+        <div class="max-h-62.5 overflow-y-auto p-2 bg-surface-subtle rounded-sm">
           <OTag
             v-for="field in selectedModification?.current.fields"
             :key="`current-${field}`"
@@ -294,7 +294,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="text-xs mb-1">
           {{ selectedModification?.proposed.fields.length }} fields
         </div>
-        <div class="max-h-62.5 overflow-y-auto p-2 bg-[var(--color-surface-subtle)] rounded-sm">
+        <div class="max-h-62.5 overflow-y-auto p-2 bg-surface-subtle rounded-sm">
           <OTag
             v-for="field in selectedModification?.proposed.fields"
             :key="`proposed-${field}`"

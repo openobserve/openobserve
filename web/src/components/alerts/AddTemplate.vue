@@ -14,8 +14,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <div class="p-0 overflow-hidden [background:linear-gradient(to_bottom_right,var(--color-theme-body-bg-primary),var(--color-theme-body-bg-secondary))]"
-    style="height: calc(100vh - 48px); min-height: inherit"
+  <div class="p-0 overflow-hidden [background:linear-gradient(to_bottom_right,var(--color-theme-body-bg-primary),var(--color-theme-body-bg-secondary))] h-[calc(100vh-3rem)] min-h-[inherit]"
   >
     <AppPageHeader
       :title="isUpdatingTemplate ? t('alert_templates.updateTitle') : isClone ? t('alert_templates.cloneTitle') : t('alert_templates.addTitle')"
@@ -27,11 +26,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="px-3 border-b border-border-default"
     />
 
-    <OSplitter
+    <OSplitter class="h-[calc(100vh-6.625rem)]"
       v-model="splitterModel"
       unit="%"
       :horizontal="false"
-      style="height: calc(100vh - 106px)"
     >
       <template v-slot:before>
         <div class="bg-card-glass-bg h-full flex flex-col">
@@ -99,7 +97,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
           <div
-            class="flex justify-end gap-2 px-4 py-4 w-full bg-[var(--color-surface-base)] border-t border-border-default"
+            class="flex justify-end gap-2 px-4 py-4 w-full bg-surface-base border-t border-border-default"
           >
             <OButton
               v-close-popup

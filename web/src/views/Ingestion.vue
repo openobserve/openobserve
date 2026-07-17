@@ -160,7 +160,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         store.state.zoConfig.restricted_routes_on_empty_data == true &&
         store.state.organizationData.isDataIngested == false
       "
-      class="text-subtitle bg-amber-500 p-2 font-bold mx-2.5 mt-1 rounded-md"
+      class="text-subtitle bg-warning p-2 font-bold mx-2.5 mt-1 rounded-md"
     >
       {{ t("ingestion.redirectionIngestionMsg") }}
     </div>

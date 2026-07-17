@@ -1,6 +1,5 @@
 <template>
   <div class="flex flex-wrap items-center">
-    <!-- <div class="mb-2 title" class="bg-surface-subtle-hover" no-caps no-outline rounded>{{ variableItem?.name }}</div> -->
     <div
       class="flex flex-nowrap items-center mb-1 gap-x-1"
       v-for="(item, index) in adhocVariables"
@@ -14,17 +13,15 @@
         @update:model-value="updateModelValueOfSelect(index, $event)"
         class="flex-1"
       />
-      <OSelect
+      <OSelect class="w-auto"
         v-model="adhocVariables[index].operator"
         :options="operatorOptions"
-        style="width: auto"
         data-test="dashboard-variable-adhoc-operator-selector"
       />
-      <OInput
+      <OInput class="w-31.25"
         v-model="adhocVariables[index].value"
         placeholder="Enter Value"
         :debounce="1000"
-        style="width: 125px"
         data-test="dashboard-variable-adhoc-value-selector"
         @update:model-value="emitValue()"
       />

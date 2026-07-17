@@ -80,7 +80,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           {{ t("settings.correlation.discoveredServicesDescription") }}
           <a
-            class="cursor-pointer inline-block mx-1 px-2 py-0.5 rounded-sm text-xs font-semibold no-underline align-middle border border-text-link text-text-link bg-[rgba(59,130,246,0.08)] transition-[background] duration-[150ms] hover:bg-[rgba(59,130,246,0.18)] dark:bg-[rgba(96,165,250,0.12)] dark:hover:bg-[rgba(96,165,250,0.22)]"
+            class="cursor-pointer inline-block mx-1 px-2 py-0.5 rounded-sm text-xs font-semibold no-underline align-middle border border-text-link text-text-link bg-badge-blue-soft-bg transition-[background] duration-150 hover:bg-[color-mix(in_srgb,var(--color-badge-blue-ol-border)_18%,transparent)]"
             @click.prevent="$emit('navigate-to-configuration')"
             >{{ t("settings.correlation.goToConfiguration") }}</a
           >

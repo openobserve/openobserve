@@ -328,7 +328,7 @@
                       />
                       <div
                         v-else
-                        class="flex flex-col items-center justify-center h-[111px] bg-surface-base [border-left:1px_solid_var(--color-border-default)] [border-right:1px_solid_var(--color-border-default)] [border-bottom:1px_solid_var(--color-border-default)]"
+                        class="flex flex-col items-center justify-center h-27.75 bg-surface-base [border-left:1px_solid_var(--color-border-default)] [border-right:1px_solid_var(--color-border-default)] [border-bottom:1px_solid_var(--color-border-default)]"
                       >
                         <div v-if="!testLoading && outputString.length === 0">
                           <OIcon
@@ -344,7 +344,7 @@
                         </div>
                         <div v-else-if="testLoading">
                           <span
-                            class="flex items-center justify-center h-[111px]"
+                            class="flex items-center justify-center h-27.75"
                           >
                             <OSpinner size="sm" />
                           </span>

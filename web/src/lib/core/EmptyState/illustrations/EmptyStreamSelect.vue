@@ -75,6 +75,12 @@ withDefaults(
 </script>
 
 <style scoped>
+/* keep(keyframes): SVG illustration animation. Scoped on purpose (W2.b): the
+   illustrations reuse generic keyframe names (es-pulse, es-twinkle, …) with
+   DIFFERENT bodies, so an unscoped block lets the last-loaded illustration
+   hijack the others' animations. Vue rewrites scoped keyframe names per
+   component, which ends the collision. All selectors and the es-static gate
+   live in this file's own template. */
 .es-dot {
   transform-box: fill-box;
   transform-origin: center;

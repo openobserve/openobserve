@@ -56,7 +56,7 @@
                   style="min-height: 200px"
                 />
                 <div v-if="isLicenseKeyAutoFilled" class="mt-2 mb-3">
-                  <div class="flex items-center py-3 px-4 bg-[rgba(34,197,94,0.08)] border border-solid border-[rgba(34,197,94,0.2)] rounded-lg [backdrop-filter:blur(10px)] transition-all duration-200 dark:bg-[rgba(34,197,94,0.15)] dark:border-[rgba(34,197,94,0.3)] dark:shadow-[0_2px_8px_rgba(0,0,0,0.2)]">
+                  <div class="flex items-center py-3 px-4 bg-banner-success-bg border border-solid border-banner-success-border rounded-lg backdrop-blur-md transition-all duration-200 dark:shadow-md">
                     <OIcon
                       name="check-circle"
                       class="text-status-positive mr-2"
@@ -219,7 +219,7 @@
                   style="min-height: 150px"
                 />
                 <div v-if="isLicenseKeyAutoFilled" class="mt-2 mb-3">
-                  <div class="flex items-center py-3 px-4 bg-[rgba(34,197,94,0.08)] border border-solid border-[rgba(34,197,94,0.2)] rounded-lg [backdrop-filter:blur(10px)] transition-all duration-200 dark:bg-[rgba(34,197,94,0.15)] dark:border-[rgba(34,197,94,0.3)] dark:shadow-[0_2px_8px_rgba(0,0,0,0.2)]">
+                  <div class="flex items-center py-3 px-4 bg-banner-success-bg border border-solid border-banner-success-border rounded-lg backdrop-blur-md transition-all duration-200 dark:shadow-md">
                     <OIcon
                       name="check-circle"
                       class="text-status-positive mr-2"

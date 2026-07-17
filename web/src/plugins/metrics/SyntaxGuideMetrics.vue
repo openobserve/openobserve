@@ -35,9 +35,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div class="border-t my-1 border-dropdown-separator" />
         <div class="answers">
-          <div class="mb-[5px]">
-            <div class="text-xs ml-[5px]">
-              <ul class="px-2.5 mt-2.5 mb-0 text-sm leading-[23px]">
+          <div class="mb-1.25">
+            <div class="text-xs ml-1.25">
+              <ul class="px-2.5 mt-2.5 mb-0 text-sm leading-[1.4375rem]">
                 <li>
                   For instant vector selectors, use
                   <span class="bg-highlight-bg px-1.25"
@@ -69,9 +69,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div class="border-t my-1 border-dropdown-separator" />
         <div class="answers">
-          <div class="mb-[5px]">
-            <div class="text-xs ml-[5px]">
-              <ul class="px-2.5 mt-2.5 mb-0 text-sm leading-[23px]">
+          <div class="mb-1.25">
+            <div class="text-xs ml-1.25">
+              <ul class="px-2.5 mt-2.5 mb-0 text-sm leading-[1.4375rem]">
                 <li>
                   For full text search of value 'error' use
                   <span class="bg-highlight-bg px-1.25"

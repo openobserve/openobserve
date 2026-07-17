@@ -112,7 +112,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OSpinner size="xs" />
             </div>
 
-            <div v-else-if="recentErrors.length === 0" class="text-center py-2" style="color: var(--color-text-muted)">
+            <div v-else-if="recentErrors.length === 0" class="text-center py-2 text-text-muted">
               {{ t("settings.noRecentErrors") }}
             </div>
 
@@ -126,7 +126,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OIcon name="error" size="xs" class="mr-1 mt-1" />
                   <div class="flex-1">
                     <div class="text-xs font-medium">{{ error.error_type }}</div>
-                    <div class="text-xs" style="color: var(--color-text-muted)">{{ formatTimestamp(error._timestamp) }}</div>
+                    <div class="text-xs text-text-muted">{{ formatTimestamp(error._timestamp) }}</div>
                   </div>
                 </div>
                 <div class="text-xs wrap-break-word text-text-secondary">{{ error.error }}</div>
@@ -395,12 +395,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         v-if="isDirty"
         data-test="domain-management-unsaved-indicator"
-        class="flex items-center gap-2 text-sm"
-        style="color: var(--color-text-muted)"
+        class="flex items-center gap-2 text-sm text-text-muted"
+       
       >
         <span
-          class="inline-block w-2 h-2 rounded-full shrink-0"
-          style="background: var(--color-accent)"
+          class="inline-block w-2 h-2 rounded-full shrink-0 bg-accent"
+         
         ></span>
         {{ t('common.unsavedChanges') }}
       </div>

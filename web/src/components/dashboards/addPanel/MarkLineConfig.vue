@@ -23,7 +23,7 @@
       <div
         class="flex justify-between pb-3 mb-3 border-b border-border-strong"
       >
-        <div style="width: 90%" class="flex flex-col gap-2">
+        <div class="w-[90%] flex flex-col gap-2">
           <OSelect
             v-model="dashboardPanelData.data.config.mark_line[index].type"
             :label="t('dashboard.markLineType')"

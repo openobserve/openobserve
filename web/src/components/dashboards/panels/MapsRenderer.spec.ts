@@ -280,8 +280,9 @@ describe("MapsRenderer", () => {
       await waitForChartInit(wrapper);
       
       const chartContainer = wrapper.find('#chart-map');
-      expect(chartContainer.attributes('style')).toContain('height: 100%');
-      expect(chartContainer.attributes('style')).toContain('width: 100%');
+      // Sizing moved from an inline style to Tailwind utilities.
+      expect(chartContainer.classes()).toContain('h-full');
+      expect(chartContainer.classes()).toContain('w-full');
     });
   });
 

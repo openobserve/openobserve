@@ -452,14 +452,19 @@ function onChildMouseenter(event: MouseEvent) {
 </template>
 
 <style scoped>
-/* Reveal animation for the flyout — a quick fade + slight slide from the rail. */
+/* keep(keyframes): reveal animation for the flyout — a quick fade + slight slide
+   from the rail. A @keyframes body cannot be expressed as a utility. The
+   `animation:` declaration is co-located here on purpose: Vue rewrites the
+   keyframe name and the animation shorthand together only when both live in the
+   same scoped block — moving either out (e.g. to a template `[animation:…]`
+   arbitrary value) would break the rename and the animation would not resolve. */
 .nav-group-flyout {
   animation: nav-group-flyout-in 140ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 @keyframes nav-group-flyout-in {
   from {
     opacity: 0;
-    transform: translateX(-4px);
+    transform: translateX(-0.25rem);
   }
   to {
     opacity: 1;

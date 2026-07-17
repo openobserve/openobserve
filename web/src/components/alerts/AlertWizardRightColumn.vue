@@ -16,11 +16,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <!-- Right Column: Preview & Summary (calc to account for gap) -->
-  <div class="flex-[0_0_calc(32%-0.625rem)] flex flex-col gap-2 overflow-y-auto overflow-x-clip" style="height: calc(100vh - 302px); position: sticky; top: 0;">
+  <div class="flex-[0_0_calc(32%-0.625rem)] flex flex-col gap-2 overflow-y-auto overflow-x-clip h-[calc(100vh-18.875rem)] sticky top-0">
     <!-- Preview Section -->
     <div
       class="collapsible-section preview-section flex flex-col transition-all duration-300 bg-card-glass-bg rounded-md shadow-[0_0_5px_1px_var(--color-hover-shadow)] border border-card-glass-border"
-      :style="previewSectionStyle"
+      :class="previewSectionClass"
     >
       <div
         class="flex items-center justify-between px-4 py-3 cursor-pointer shrink-0 border-b border-card-glass-border transition-all duration-200 rounded-t-md select-none hover:bg-black/4 active:bg-black/[0.06]"
@@ -62,8 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div v-show="expandState.preview" class="section-content flex-1 flex flex-col">
         <keep-alive>
-          <preview-alert
-            style="height: 100%;"
+          <preview-alert class="h-full"
             ref="previewAlertRef"
             :formData="formData"
             :query="previewQuery"
@@ -79,7 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Summary Section -->
     <div
       class="collapsible-section flex flex-col transition-all duration-300 bg-card-glass-bg rounded-md shadow-[0_0_5px_1px_var(--color-hover-shadow)] border border-card-glass-border"
-      :style="summarySectionStyle"
+      :class="summarySectionClass"
     >
       <div
         class="flex items-center justify-between px-4 py-3 cursor-pointer shrink-0 border-b border-card-glass-border transition-all duration-200 rounded-t-md select-none hover:bg-black/4 active:bg-black/[0.06]"
@@ -96,8 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
       </div>
       <div v-show="expandState.summary" class="summary-section-content flex-1 overflow-hidden flex flex-col">
-        <alert-summary
-          style="height: 100%; overflow: auto;"
+        <alert-summary class="h-full overflow-auto"
           :formData="formData"
           :destinations="destinations"
           :focusManager="focusManager"
@@ -232,31 +230,15 @@ export default defineComponent({
     };
 
     // Calculate section heights based on expand state
-    const previewSectionStyle = computed(() => {
-      if (!expandState.preview) {
-        // Preview collapsed: only show header
-        return { flex: "0 0 auto" };
-      } else if (expandState.summary) {
-        // Both expanded: 50% each
-        return { flex: "1", minHeight: "250px" };
-      } else {
-        // Preview expanded, summary collapsed: take all space
-        return { flex: "1", minHeight: "250px" };
-      }
-    });
+    // Collapsed: header only (flex-none === `flex: 0 0 auto`).
+    // Expanded: share the space, whether or not the other section is open.
+    const previewSectionClass = computed(() =>
+      expandState.preview ? "flex-1 min-h-62.5" : "flex-none",
+    );
 
-    const summarySectionStyle = computed(() => {
-      if (!expandState.summary) {
-        // Summary collapsed: only show header
-        return { flex: "0 0 auto" };
-      } else if (expandState.preview) {
-        // Both expanded: 50% each
-        return { flex: "1", minHeight: "250px" };
-      } else {
-        // Summary expanded, preview collapsed: take all space
-        return { flex: "1", minHeight: "250px" };
-      }
-    });
+    const summarySectionClass = computed(() =>
+      expandState.summary ? "flex-1 min-h-62.5" : "flex-none",
+    );
 
 
     // Expose refreshData method from PreviewAlert
@@ -316,8 +298,8 @@ export default defineComponent({
       expandState,
       togglePreview,
       toggleSummary,
-      previewSectionStyle,
-      summarySectionStyle,
+      previewSectionClass,
+      summarySectionClass,
       evaluationStatus,
       isRealTime,
     };

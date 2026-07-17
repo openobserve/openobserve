@@ -24,8 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="flex flex-row items-center flex-1 min-w-0"
         data-test="dashboard-query-data"
       >
-        <div
-          style="max-width: 600px; overflow: hidden"
+        <div class="max-w-150 overflow-hidden"
         >
           <OTabs
             v-model="dashboardPanelData.layout.currentQueryIndex"
@@ -66,8 +65,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span
                 v-else
                 @dblclick.stop.prevent="startEditQueryName(index, tab)"
-                class="cursor-pointer select-none whitespace-nowrap"
-                style="font-size: 12px"
+                class="cursor-pointer select-none whitespace-nowrap text-xs"
+               
                 :title="'Double-click to rename'"
                 :data-test="`dashboard-panel-query-tab-name-${index}`"
               >{{ tab.tabName || ('Query ' + (index + 1)) }}</span>
@@ -83,11 +82,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       ? 'visibility-off'
                       : 'visibility'
                   "
-                  class="ml-1 opacity-[0.7] transition-all duration-150 hover:opacity-100 hover:bg-hover-gray hover:rounded-full"
+                  class="ml-1 opacity-[0.7] transition-all duration-150 hover:opacity-100 hover:bg-hover-gray hover:rounded-full cursor-pointer"
                   @click.stop="toggleQueryVisibility(index)"
                   @mousedown.stop.prevent
                   @pointerdown.stop.prevent
-                  style="cursor: pointer"
                   size="sm"
                   :data-test="`dashboard-panel-query-tab-visibility-${index}`"
                   :data-test-hidden="
@@ -111,11 +109,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 "
                 name="close"
                 size="sm"
-                class="opacity-60 transition-all duration-150 hover:opacity-100 hover:bg-hover-gray hover:rounded-full"
+                class="opacity-60 transition-all duration-150 hover:opacity-100 hover:bg-hover-gray hover:rounded-full cursor-pointer"
                 @click.stop.prevent="removeTab(index)"
                 @mousedown.stop.prevent
                 @pointerdown.stop.prevent
-                style="cursor: pointer"
                 :data-test="`dashboard-panel-query-tab-remove-${index}`"
               />
             </OTab>
@@ -161,18 +158,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
   </div>
   <div
-    class="flex flex-col flex-1"
+    class="flex flex-col flex-1 overflow-hidden"
     :style="
       !dashboardPanelData.layout.showQueryBar ? 'height: 0px; flex: none;' : ''
     "
-    style="overflow: hidden"
     data-test="dashboard-query"
   >
-      <div class="flex flex-col" style="width: 100%; height: 100%">
-      <div class="flex flex-col" style="width: 100%; height: 100%">
-        <div class="flex" style="height: 100%">
-          <OSplitter
-            style="width: 100%; height: 100%"
+      <div class="flex flex-col w-full h-full">
+      <div class="flex flex-col w-full h-full">
+        <div class="flex h-full">
+          <OSplitter class="w-full h-full"
             v-model="splitterModel"
             :disable="
               promqlMode || !dashboardPanelData.layout.vrlFunctionToggle
@@ -221,14 +216,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </template>
             <template #after>
-              <div style="display: flex; flex-direction: column; height: 100%; width: 100%">
-                <div style="flex: 1; min-height: 0; width: 100%">
-                  <UnifiedQueryEditor
+              <div class="flex flex-col h-full w-full">
+                <div class="flex-1 min-h-0 w-full">
+                  <UnifiedQueryEditor class="w-full h-full"
                     v-if="
                       !promqlMode && dashboardPanelData.layout.vrlFunctionToggle
                     "
                     data-test="dashboard-vrl-function-editor"
-                    style="width: 100%; height: 100%"
                     ref="vrlFnEditorRef"
                     :languages="['vrl']"
                     default-language="vrl"
@@ -257,8 +251,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <span class="font-mono text-[var(--text-sm)] [line-height:1.3125rem] text-text-placeholder whitespace-nowrap overflow-hidden text-ellipsis">{{ vrlPlaceholder }}</span>
                   </div>
                 </div>
-                <div style="flex-shrink: 0; width: 100%">
-                  <div style="display: flex;" class="items-center">
+                <div class="shrink-0 w-full">
+                  <div class="items-center flex">
                     <OSelect
                       v-model="selectedFunction"
                       :label="t('dashboard.useSavedFunction')"
@@ -277,7 +271,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       data-test="dashboard-addpanel-config-drilldown-info"
                     >
                       <template #icon-left
-                        ><OIcon name="info-outline" size="sm"
+><OIcon name="info-outline" size="sm"
                       /></template>
                       <OTooltip
                         :content="t('dashboard.vrlExtractionTooltip')"
@@ -291,7 +285,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OSplitter>
         </div>
       </div>
-      <div style="color: red; z-index: 100000" class="mx-2 col-auto">
+      <div class="text-status-error-text z-100000 mx-2 col-auto">
         {{ dashboardPanelData.meta.errors.queryErrors.join(", ") }}
       </div>
     </div>

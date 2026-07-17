@@ -42,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="sm"
           data-test="alert-list-add-alert-btn"
           @click="createScheduledReport"
-          >{{ t("dashboard.newReport") }}</OButton
+        >{{ t("dashboard.newReport") }}</OButton
         >
       </div>
     </template>
@@ -51,7 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="scheduled-dashboards-container"
       class="scheduled-dashboards h-fit bg-surface-panel"
     >
-    <OTable
+    <OTable class="w-full"
       data-test="scheduled-dashboard-table"
       :data="displayReports"
       :columns="columns"
@@ -62,7 +62,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :show-global-filter="false"
       :default-columns="false"
       :loading="loading"
-      style="width: 100%"
     >
       <template #cell-name="{ row }">
         <span class="cursor-pointer" @click="openReport(row)">{{ row.name }}</span>
@@ -400,7 +399,7 @@ const getTimeRangeValue = (dateTime: any) => {
 </script>
 
 <style scoped>
-/* keep(lib-override:OTable+tabs): table header-row background and the pill-style
+/* keep(lib-override:o2-table.rum-tabs): table header-row background and the pill-style
    time-range tabs — target OTable / tab child DOM reached via :deep(). */
 .scheduled-dashboards :deep(thead tr) {
   background-color: var(--color-table-header-bg);

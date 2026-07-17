@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <template #header-right>
       <div class="flex items-center">
-        <span class="legend-count mr-3" style="font-size: 14px" data-test="dashboard-show-legends-count">
+        <span class="legend-count mr-3 text-sm" data-test="dashboard-show-legends-count">
           {{ t("dashboard.totalLegends", { count: legends.length }) }}
         </span>
         <OButton
@@ -33,8 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click.stop="copyAllLegends"
           data-test="dashboard-show-legends-copy-all"
         >
-          <template #icon-left
-            ><OIcon :name="isAllCopied ? 'check' : 'content-copy'" size="sm"
+          <template #icon-left><OIcon :name="isAllCopied ? 'check' : 'content-copy'" size="sm"
           /></template>
           {{ isAllCopied ? "Copied" : "Copy all" }}
         </OButton>
@@ -45,7 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       data-test="dashboard-show-legends-popup"
     >
-      <div class="scroll max-h-100 overflow-y-auto py-[3px]">
+      <div class="scroll max-h-100 overflow-y-auto py-0.75">
         <div v-if="legends.length === 0" class="p-3 text-center min-h-25 flex items-center justify-center">
           {{ t("dashboard.noLegendsAvailable") }}
         </div>
@@ -59,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="flex items-center flex-nowrap w-full">
               <div
                 class="w-5 h-3 rounded-sm mr-2.5 shrink-0"
-                :style="{ backgroundColor: legend.color || '#5960b2' }"
+                :style="{ backgroundColor: legend.color || DEFAULT_LEGEND_COLOR }"
               ></div>
               <div class="break-all overflow-wrap-anywhere whitespace-normal leading-[1.4] text-xs" data-test="dashboard-legend-item-text">
                 {{ legend.name }}
@@ -72,8 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :data-copied="isLegendCopied(index) ? 'true' : undefined"
                 @click.stop="copyLegend(legend.name, index)"
               >
-                <template #icon-left
-                  ><OIcon
+                <template #icon-left><OIcon
                     :name="isLegendCopied(index) ? 'check' : 'content-copy'" size="sm"
                 /></template>
                 <OTooltip :content="isLegendCopied(index) ? 'Copied!' : 'Copy legend'" />
@@ -100,6 +98,10 @@ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+// Fallback swatch colour for a legend entry that carries no series colour.
+// A :style binding is resolved by the DOM, so it takes the brand token directly.
+const DEFAULT_LEGEND_COLOR = "var(--color-brand-indigo)";
+
 export default defineComponent({
   name: "ShowLegendsPopup",
   components: { OButton, ODialog, OIcon, OTooltip },
@@ -264,6 +266,7 @@ export default defineComponent({
 
     return {
       t,
+      DEFAULT_LEGEND_COLOR,
       legends,
       closePopup,
       copyLegend,

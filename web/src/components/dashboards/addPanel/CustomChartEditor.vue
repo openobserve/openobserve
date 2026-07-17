@@ -17,23 +17,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     data-test="dashboard-custom-chart-editor-container"
-    class="bg-card-glass-bg"
-    style="
-      width: 100%;
-      height: 100%;
-      overflow: hidden;
-      display: flex;
-      flex-direction: column;
-    "
+    class="bg-card-glass-bg w-full h-full overflow-hidden flex flex-col"
   >
-    <div
+    <div class="w-full h-full flex flex-col"
       data-test="dashboard-custom-chart-editor-inner"
-      style="width: 100%; height: 100%; display: flex; flex-direction: column"
     >
       <div
         data-test="dashboard-custom-chart-editor-flex-col"
-        class="flex flex-col"
-        style="height: 100%; display: flex; flex-direction: column"
+        class="flex flex-col h-full"
       >
         <QueryEditor
           v-model:query="javascriptCodeContent"
@@ -41,8 +32,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @update:query="onEditorValueChange"
           data-test="dashboard-markdown-editor-query-editor"
           language="javascript"
-          class="javascript-query-editor"
-          style="padding-left: 20px; height: 100%; flex: 1; background-color: var(--color-code-block-bg)"
+          class="javascript-query-editor pl-5 h-full flex-1 bg-code-block-bg"
+         
         />
       </div>
     </div>

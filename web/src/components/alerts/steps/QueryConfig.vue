@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="step-content rounded-lg min-h-full w-full min-w-0 overflow-hidden box-border bg-surface-overlay border border-border-default">
       <!-- Section header -->
       <div class="section-header flex items-center gap-0 py-2.5 px-3 border-b border-border-default">
-        <div class="section-header-accent w-0.75 h-4 rounded-sm mr-2 shrink-0 bg-[var(--color-theme-accent)]" />
+        <div class="section-header-accent w-0.75 h-4 rounded-sm mr-2 shrink-0 bg-theme-accent" />
         <span class="section-header-title text-compact font-semibold tracking-[0.01em] text-text-primary">{{ t('alerts.queryConfig.sectionTitle') }}</span>
       </div>
       <div class="px-3 py-2 min-w-0 w-full box-border">
@@ -155,12 +155,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :key="index"
                   >
                     <div class="flex items-center gap-1">
-                      <OSelect
+                      <OSelect class="min-w-30 max-w-45"
                         v-model="logGroupBy[index]"
                         :options="columns"
                         searchable
                         :placeholder="t('alerts.placeholders.selectColumn')"
-                        style="min-width: 120px; max-width: 180px;"
                         :data-test="`alert-group-by-select-${index}`"
                         @update:model-value="onLogGroupByChange"
                       />
@@ -232,7 +231,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <!-- "of [field]" hidden for count mode -->
                   <template v-if="selectedFunction !== 'total_events'">
                     <span class="font-semibold text-text-secondary text-compact whitespace-nowrap">{{ t('alerts.conditionOf') }}</span>
-                    <div style="position: relative; display: inline-flex;">
+                    <div class="relative inline-flex">
                       <OSelect
                         v-model="inputData.aggregation.having.column"
                         :options="columns"
@@ -242,7 +241,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :readonly="inputData.aggregation.having.column === 'value' && columns.some((c: any) => (typeof c === 'string' ? c : c.value) === 'value')"
                         :disable="inputData.aggregation.having.column === 'value' && columns.some((c: any) => (typeof c === 'string' ? c : c.value) === 'value')"
                         @update:model-value="columnSelectError = false; emitAggregationUpdate()"
-                        style="min-width: 140px; max-width: 200px;"
+                        class="min-w-35 max-w-50"
                       />
                       <OTooltip v-if="inputData.aggregation.having.column === 'value' && columns.some((c: any) => (typeof c === 'string' ? c : c.value) === 'value')" :content="t('alerts.metricsValueFieldTooltip')" :delay="300" side="bottom" />
                     </div>
@@ -251,17 +250,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                   <!-- Count mode for metrics -->
                   <template v-if="selectedFunction === 'total_events'">
-                    <OSelect
+                    <OSelect class="min-w-17.5 max-w-30"
                       v-model="triggerOperator"
                       :options="numericOperators"
                       :searchable="false"
-                      style="min-width: 70px; max-width: 120px;"
                       @update:model-value="onTriggerOperatorChange"
                     />
-                    <OInput
+                    <OInput class="min-w-20 max-w-30"
                       v-model="triggerThreshold"
                       type="number"
-                      style="min-width: 80px; max-width: 120px;"
                       :error="!!triggerThresholdError"
                       :error-message="triggerThresholdError"
                       @update:model-value="triggerThresholdError = ''; onTriggerThresholdChange($event)"
@@ -271,18 +268,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                   <!-- Measure mode for metrics -->
                   <template v-else>
-                    <OSelect
+                    <OSelect class="min-w-17.5 max-w-30"
                       v-model="conditionOperator"
                       :options="numericOperators"
                       :searchable="false"
-                      style="min-width: 70px; max-width: 120px;"
                       @update:model-value="onConditionOperatorChange"
                     />
-                    <OInput
+                    <OInput class="min-w-20 max-w-30"
                       v-model="conditionValue"
                       type="number"
                       :placeholder="t('alerts.placeholders.value')"
-                      style="min-width: 80px; max-width: 120px;"
                       :error="!!conditionValueError"
                       :error-message="conditionValueError"
                       @update:model-value="conditionValueError = ''; onConditionValueChange($event)"
@@ -303,12 +298,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :key="index"
                   >
                     <div class="flex items-center gap-1">
-                      <OSelect
+                      <OSelect class="min-w-30 max-w-45"
                         v-model="inputData.aggregation.group_by[index]"
                         :options="columns"
                         searchable
                         :placeholder="t('alerts.placeholders.selectColumn')"
-                        style="min-width: 120px; max-width: 180px;"
                         @update:model-value="emitAggregationUpdate"
                       />
                       <OButton
@@ -361,7 +355,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Check every row -->
             <div class="flex items-center
              gap-3 py-2 px-3 rounded-md text-compact">
-              <span class="font-bold text-text-body text-compact whitespace-nowrap min-w-22.5 shrink-0" style="line-height: 28px;">
+              <span class="font-bold text-text-body text-compact whitespace-nowrap min-w-22.5 shrink-0 leading-7">
                 Check every *
                 <OTooltip :content="t('alerts.howOftenCheckTooltip')" :delay="300" side="top" />
               </span>
@@ -369,10 +363,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="flex items-center gap-2">
                   <!-- Minutes/hours mode: number input -->
                   <template v-if="frequencyMode !== 'cron'">
-                    <OInput
+                    <OInput class="min-w-25 max-w-25"
                       v-model="checkEveryFrequency"
                       type="number"
-                      style="min-width: 100px; max-width: 100px;"
                       min="1"
                       :error="!!checkEveryFrequencyError"
                       :error-message="checkEveryFrequencyError"
@@ -382,34 +375,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </template>
                   <!-- Cron mode: expression input + timezone -->
                   <template v-else>
-                    <OInput
+                    <OInput class="min-w-25 max-w-25"
                       v-model="cronExpression"
                       placeholder="0 */10 * * * *"
-                      style="min-width: 100px; max-width: 100px;"
                       @update:model-value="onCronExpressionChange"
                     />
                   </template>
 
                   <!-- Unit dropdown: minutes / hours / cron -->
-                  <OSelect
+                  <OSelect class="min-w-20 max-w-25"
                     :model-value="frequencyMode"
                     :options="frequencyUnitOptions"
                     labelKey="label"
                     valueKey="value"
                     :searchable="false"
-                    style="min-width: 80px; max-width: 100px;"
                     @update:model-value="onFrequencyUnitChange"
                   />
 
                   <!-- Timezone (only for cron, inline) -->
                   <template v-if="frequencyMode === 'cron'">
-                    <span class="inline-block" style="min-width: 150px; max-width: 150px;">
-                      <OSelect
+                    <span class="inline-block min-w-37.5 max-w-37.5">
+                      <OSelect class="min-w-37.5 max-w-37.5"
                         v-model="cronTimezone"
                         :options="filteredTimezones"
                         searchable
                         placeholder="timezone"
-                        style="min-width: 150px; max-width: 150px;"
                         @update:model-value="onCronTimezoneChange"
                       />
                       <OTooltip
@@ -430,12 +420,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       name="filter-alt"
                       size="xs"
                       :class="filterCount > 0
-                        ? 'text-[var(--color-theme-accent)]'
+                        ? 'text-theme-accent'
                         : ('text-text-secondary')"
                     />
                     <span class="text-xs font-semibold"
                           :class="filterCount > 0
-                            ? 'text-[var(--color-theme-accent)]'
+                            ? 'text-theme-accent'
                             : ('text-text-body')">
                       filters
                     </span>
@@ -451,7 +441,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     />
                     <!-- Review your SQL query hint -->
                     <span v-if="generatedSqlQuery && !showFilters"
-                          class="text-xs italic ml-1 whitespace-nowrap cursor-help underline decoration-dotted underline-offset-[2px]"
+                          class="text-xs italic ml-1 whitespace-nowrap cursor-help underline decoration-dotted underline-offset-2"
                           :class="'text-text-secondary'">
                       view the alert query
                       <OTooltip :delay="200" side="bottom">
@@ -505,12 +495,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   name="filter-alt"
                   size="xs"
                   :class="filterCount > 0
-                    ? 'text-[var(--color-theme-accent)]'
+                    ? 'text-theme-accent'
                     : ('text-text-secondary')"
                 />
                 <span class="text-xs font-semibold"
                       :class="filterCount > 0
-                        ? 'text-[var(--color-theme-accent)]'
+                        ? 'text-theme-accent'
                         : ('text-text-body')">
                   filters
                 </span>
@@ -526,7 +516,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
                 <!-- Review your SQL query hint -->
                 <span v-if="generatedSqlQuery && !showFilters"
-                      class="text-xs italic ml-1 whitespace-nowrap cursor-help underline decoration-dotted underline-offset-[2px]"
+                      class="text-xs italic ml-1 whitespace-nowrap cursor-help underline decoration-dotted underline-offset-2"
                       :class="'text-text-secondary'">
                   view the alert query
                   <OTooltip :delay="200" side="bottom">
@@ -562,12 +552,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="w-full flex flex-col gap-2 overflow-hidden">
 
           <!-- Editor area — position:relative shell owns the size; inner absolute never leaks -->
-          <div style="position: relative; height: 320px;">
-            <div style="position: absolute; inset: 0; display: flex; overflow: hidden;">
+          <div class="relative h-80">
+            <div class="absolute inset-0 flex overflow-hidden">
 
               <!-- SQL/PromQL pane — with its own header -->
-              <div style="display: flex; flex-direction: column; flex-shrink: 0; overflow: hidden;"
-                :style="{ width: showVrl && localTab === 'sql' ? '50%' : '100%' }">
+              <div class="flex flex-col shrink-0 overflow-hidden"
+                :class="showVrl && localTab === 'sql' ? 'w-1/2' : 'w-full'">
                 <div class="flex items-center justify-between shrink-0 h-9 px-2.5"
                   :class="'bg-surface-subtle border-b border-border-default'">
                   <div class="flex items-center gap-2">
@@ -582,8 +572,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OTooltip content="Show VRL editor" :delay="300" />
                   </OSwitch>
                 </div>
-                <div style="position: relative; flex: 1; min-height: 0;">
-                  <div style="position: absolute; inset: 0;">
+                <div class="relative flex-1 min-h-0">
+                  <div class="absolute inset-0">
                     <UnifiedQueryEditor
                       ref="inlineQueryEditorRef"
                       data-test-prefix="alert-inline-sql"
@@ -609,9 +599,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
               <!-- VRL pane — with its own header, side-by-side with SQL pane -->
-              <div v-if="showVrl && localTab === 'sql'"
-                style="display: flex; flex-direction: column; flex-shrink: 0; overflow: hidden; width: 50%;"
-                :style="{ borderLeft: '1px solid var(--color-border-default)' }">
+              <div class="flex flex-col shrink-0 overflow-hidden w-1/2 border-l border-border-default" v-if="showVrl && localTab === 'sql'">
                 <div class="flex items-center justify-between shrink-0 h-9 px-2.5"
                   :class="'bg-surface-subtle border-b border-border-default'">
                   <div class="flex items-center gap-2">
@@ -619,13 +607,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <span class="text-xs font-semibold">VRL Editor</span>
                   </div>
                   <div class="flex items-center gap-1">
-                    <OSelect
+                    <OSelect class="w-32.5!"
                       v-model="selectedSavedFunctionName"
                       :options="functionsList"
                       labelKey="name"
                       valueKey="name"
                       clearable
-                      style="width: 130px;"
                       :placeholder="t('alerts.placeholders.savedFunctions')"
                       @update:model-value="(name: any) => { const fn = functionsList.find((f: any) => f.name === name); if (fn) vrlFunctionContent = fn.function || fn.body || ''; }"
                     >
@@ -638,8 +625,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </OSwitch>
                   </div>
                 </div>
-                <div style="position: relative; flex: 1; min-height: 0;">
-                  <div style="position: absolute; inset: 0;">
+                <div class="relative flex-1 min-h-0">
+                  <div class="absolute inset-0">
                     <UnifiedQueryEditor
                       data-test-prefix="alert-inline-vrl"
                       :languages="['vrl']"
@@ -673,16 +660,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <div class="absolute inset-0 flex items-center gap-1.25 px-2.5 overflow-hidden">
               <template v-if="inlineStatusState === 'sql-status-bar--error'">
-                <OIcon name="error-outline" size="xs" style="flex-shrink:0;" />
+                <OIcon class="shrink-0" name="error-outline" size="xs" />
                 <span class="truncate min-w-0 flex-1">{{ sqlQueryErrorMsg }}</span>
-                <OTooltip side="top" style="font-size:11px;white-space:pre-wrap;word-break:break-word;">{{ sqlQueryErrorMsg }}</OTooltip>
+                <OTooltip side="top">{{ sqlQueryErrorMsg }}</OTooltip>
               </template>
               <template v-else-if="inlineStatusState === 'sql-status-bar--hint'">
-                <OIcon name="edit" size="xs" style="flex-shrink:0;opacity:0.6;" />
+                <OIcon class="shrink-0 opacity-60" name="edit" size="xs" />
                 <span>{{ t('alerts.queryConfig.writeQueryHint') }}</span>
               </template>
               <template v-else-if="inlineStatusState === 'sql-status-bar--idle'">
-                <OIcon name="check-circle-outline" size="xs" style="flex-shrink:0;opacity:0.7;" />
+                <OIcon class="shrink-0 opacity-70" name="check-circle-outline" size="xs" />
                 <span>{{ t('alerts.queryConfig.sqlEditorHint') }}</span>
               </template>
             </div>
@@ -693,17 +680,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- Check every -->
             <div class="flex items-start gap-3 py-2 px-3 rounded-md text-compact">
-              <span class="font-bold text-text-body text-compact whitespace-nowrap min-w-40 w-40 shrink-0" style="line-height: 28px;">
+              <span class="font-bold text-text-body text-compact whitespace-nowrap min-w-40 w-40 shrink-0 leading-7">
                 Check every *
                 <OTooltip :content="t('alerts.howOftenCheckTooltip')" :delay="300" side="top" />
               </span>
               <div class="flex flex-col gap-1">
                 <div class="flex items-center gap-2">
                   <template v-if="frequencyMode !== 'cron'">
-                    <OInput
+                    <OInput class="min-w-25 max-w-25"
                       v-model="checkEveryFrequency"
                       type="number"
-                      style="min-width: 100px; max-width: 100px;"
                       min="1"
                       :error="!!checkEveryFrequencyError"
                       :error-message="checkEveryFrequencyError"
@@ -712,30 +698,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     />
                   </template>
                   <template v-else>
-                    <OInput
+                    <OInput class="min-w-25 max-w-25"
                       v-model="cronExpression"
                       placeholder="0 */10 * * * *"
-                      style="min-width: 100px; max-width: 100px;"
                       @update:model-value="onCronExpressionChange"
                     />
                   </template>
-                  <OSelect
+                  <OSelect class="min-w-20 max-w-25"
                     :model-value="frequencyMode"
                     :options="frequencyUnitOptions"
                     labelKey="label"
                     valueKey="value"
                     :searchable="false"
-                    style="min-width: 80px; max-width: 100px;"
                     @update:model-value="onFrequencyUnitChange"
                   />
                   <template v-if="frequencyMode === 'cron'">
-                    <span class="inline-block" style="min-width: 150px; max-width: 150px;">
-                      <OSelect
+                    <span class="inline-block min-w-37.5 max-w-37.5">
+                      <OSelect class="min-w-37.5 max-w-37.5"
                         v-model="cronTimezone"
                         :options="filteredTimezones"
                         searchable
                         placeholder="timezone"
-                        style="min-width: 150px; max-width: 150px;"
                         @update:model-value="onCronTimezoneChange"
                       />
                       <OTooltip
@@ -761,19 +744,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div v-if="localTab === 'sql'" class="flex items-center gap-3 py-2 px-3 rounded-md text-compact">
               <span class="font-bold text-text-body text-compact whitespace-nowrap min-w-40 w-40 shrink-0">{{ t('alerts.alertIfNoOfEvents') }} *</span>
               <div class="flex items-center gap-2">
-                <OSelect
+                <OSelect class="min-w-17.5 max-w-30"
                   v-model="triggerOperator"
                   :options="numericOperators"
                   :searchable="false"
                   data-test="alert-trigger-operator-select"
-                  style="min-width: 70px; max-width: 120px;"
                   @update:model-value="onTriggerOperatorChange"
                 />
-                <OInput
+                <OInput class="min-w-15 max-w-20"
                   v-model="triggerThreshold"
                   type="number"
                   data-test="alert-trigger-threshold-input"
-                  style="min-width: 60px; max-width: 80px;"
                   min="1"
                   :error="!!triggerThresholdError"
                   :error-message="triggerThresholdError"
@@ -790,21 +771,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OTooltip content="Alert when the PromQL expression evaluates to this condition for a time series. Example: &gt;= 100 triggers when the result is 100 or more." :delay="300" side="top" />
                 </span>
                 <div class="flex items-center gap-2">
-                  <OSelect
+                  <OSelect class="min-w-17.5 max-w-30"
                     v-model="promqlCondition.operator"
                     :options="numericOperators"
                     :searchable="false"
                     data-test="alert-threshold-operator-select"
-                    style="min-width: 70px; max-width: 120px;"
                     :error="!!promqlOperatorError"
                     :error-message="promqlOperatorError"
                     @update:model-value="promqlOperatorError = ''; emitPromqlConditionUpdate()"
                   />
-                  <OInput
+                  <OInput class="min-w-15 max-w-30"
                     v-model.number="promqlCondition.value"
                     type="number"
                     data-test="alert-threshold-value-input"
-                    style="min-width: 60px; max-width: 120px;"
                     :debounce="300"
                     :error="!!promqlValueError"
                     :error-message="promqlValueError"
@@ -817,17 +796,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OTooltip content="Minimum number of time series that must satisfy the condition above to trigger the alert." :delay="300" side="top" />
                 </span>
                 <div class="flex items-center gap-2">
-                  <OSelect
+                  <OSelect class="min-w-17.5 max-w-30"
                     v-model="triggerOperator"
                     :options="numericOperators"
                     :searchable="false"
-                    style="min-width: 70px; max-width: 120px;"
                     @update:model-value="onTriggerOperatorChange"
                   />
-                  <OInput
+                  <OInput class="min-w-15 max-w-20"
                     v-model="triggerThreshold"
                     type="number"
-                    style="min-width: 60px; max-width: 80px;"
                     min="1"
                     :error="!!triggerThresholdError"
                     :error-message="triggerThresholdError"

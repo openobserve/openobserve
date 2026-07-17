@@ -175,8 +175,7 @@ const wrapperClasses = computed(() => [
         <PopoverContent
           :side-offset="6"
           align="start"
-          class="z-[10001] rounded-lg border shadow-md p-3 flex flex-col gap-3 bg-colorpicker-popup-bg border-colorpicker-popup-border"
-          style="width: 220px"
+          class="z-[10001] rounded-lg border shadow-md p-3 flex flex-col gap-3 bg-colorpicker-popup-bg border-colorpicker-popup-border w-55"
         >
           <!-- Saturation / Brightness area -->
           <!-- ColorAreaRoot passes gradient styles via scoped slot -->
@@ -185,8 +184,7 @@ const wrapperClasses = computed(() => [
             color-space="hsb"
             x-channel="saturation"
             y-channel="brightness"
-            class="w-full rounded-sm overflow-hidden relative"
-            style="height: 140px"
+            class="w-full rounded-sm overflow-hidden relative h-35"
             @update:model-value="handlePickerChange"
             v-slot="{ style: areaStyle }"
           >

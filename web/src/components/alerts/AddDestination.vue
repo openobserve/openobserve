@@ -15,13 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="p-0 overflow-hidden [background:linear-gradient(to_bottom_right,var(--color-theme-body-bg-primary),var(--color-theme-body-bg-secondary))]"
-    style="
-      height: calc(100vh - 48px);
-      min-height: inherit;
-      display: flex;
-      flex-direction: column;
-    "
+  <div class="p-0 overflow-hidden [background:linear-gradient(to_bottom_right,var(--color-theme-body-bg-primary),var(--color-theme-body-bg-secondary))] h-[calc(100vh-3rem)] min-h-[inherit] flex flex-col"
   >
     <AppPageHeader
       :title="destination ? t('alert_destinations.updateTitle') : t('alert_destinations.addTitle')"
@@ -30,13 +24,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         label: t('alert_destinations.header'),
         onClick: () => emit('cancel:hideform'),
       }"
-      class="px-3 border-b border-border-default"
-      style="flex-shrink: 0"
+      class="px-3 border-b border-border-default shrink-0"
     >
     </AppPageHeader>
     <div
-      class="bg-card-glass-bg py-2"
-      style="flex: 1; overflow-y: auto; overflow-x: hidden"
+      class="bg-card-glass-bg py-2 flex-1 overflow-y-auto overflow-x-hidden"
     >
       <div>
         <div class="flex flex-col gap-2 px-3 mt-2 mb-1">
@@ -432,7 +424,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-model="formData.emails"
               :label="t('reports.recipients') + ' *'"
               tabindex="0"
-              style="width: 100%"
               :placeholder="t('user.inviteByEmail')"
               :error="!!emailsError"
               :error-message="emailsError"

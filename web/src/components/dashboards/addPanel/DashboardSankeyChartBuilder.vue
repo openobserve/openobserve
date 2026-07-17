@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div v-if="!promqlMode && dashboardPanelData.data.type == 'sankey'">
     <!-- source container -->
-    <div style="display: flex; flex-direction: row" class="pl-3">
+    <div class="pl-3 flex flex-row">
       <div class="layout-name whitespace-nowrap min-w-32.5 flex items-center">
         {{ t("panel.source") }}
         <OIcon name="info-outline" size="sm" class="ml-1" />
@@ -75,17 +75,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :data-test="`dashboard-source-item-${sourceLabel}`"
               >
                 {{ sourceLabel }}
-                <template #icon-right
-                  ><OIcon name="arrow-drop-down" size="sm"
+                <template #icon-right><OIcon name="arrow-drop-down" size="sm"
                 /></template>
               </OButton>
             </template>
             <div
-              class="field-function-menu-popup dashboard-sankey-chart-builder-dropdown w-[771px]! h-[323px] shadow-[0px_4px_4px_0px_rgba(0,0,0,0.05)] p-4 shadow-[0px_3px_15px_rgba(0,0,0,0.1)] translate-y-2 rounded-none"
+              class="field-function-menu-popup dashboard-sankey-chart-builder-dropdown w-[48.1875rem]! h-[20.1875rem] shadow-md p-4 translate-y-2 rounded-none"
               :data-test="`dashboard-source-item-${sourceLabel}-menu`"
             >
-              <div
-                style="padding: 3px 16px 16px 16px"
+              <div class="pt-0.75 pr-4 pb-4 pl-4"
                 :style="{
                   width:
                     dashboardPanelData.data.queries[
@@ -143,7 +141,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <OSeparator />
     <!-- target container -->
-    <div style="display: flex; flex-direction: row" class="pl-3">
+    <div class="pl-3 flex flex-row">
       <div class="layout-name whitespace-nowrap min-w-32.5 flex items-center">
         {{ t("panel.target") }}
         <OIcon name="info-outline" size="sm" class="ml-1" />
@@ -201,17 +199,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :data-test="`dashboard-target-item-${targetLabel}`"
               >
                 {{ targetLabel }}
-                <template #icon-right
-                  ><OIcon name="arrow-drop-down" size="sm"
+                <template #icon-right><OIcon name="arrow-drop-down" size="sm"
                 /></template>
               </OButton>
             </template>
             <div
-              class="field-function-menu-popup dashboard-sankey-chart-builder-dropdown w-[771px]! h-[323px] shadow-[0px_4px_4px_0px_rgba(0,0,0,0.05)] p-4 shadow-[0px_3px_15px_rgba(0,0,0,0.1)] translate-y-2 rounded-none"
+              class="field-function-menu-popup dashboard-sankey-chart-builder-dropdown w-[48.1875rem]! h-[20.1875rem] shadow-md p-4 translate-y-2 rounded-none"
               :data-test="`dashboard-target-item-${targetLabel}-menu`"
             >
-              <div
-                style="padding: 3px 16px 16px 16px"
+              <div class="pt-0.75 pr-4 pb-4 pl-4"
                 :style="{
                   width:
                     dashboardPanelData.data.queries[
@@ -268,7 +264,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <OSeparator />
     <!-- value container -->
-    <div style="display: flex; flex-direction: row" class="pl-3">
+    <div class="pl-3 flex flex-row">
       <div class="layout-name whitespace-nowrap min-w-32.5 flex items-center">
         {{ t("panel.value") }}
         <OIcon name="info-outline" size="sm" class="ml-1" />
@@ -326,17 +322,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :data-test="`dashboard-value-item-${valueLabel}`"
               >
                 {{ valueLabel }}
-                <template #icon-right
-                  ><OIcon name="arrow-drop-down" size="sm"
+                <template #icon-right><OIcon name="arrow-drop-down" size="sm"
                 /></template>
               </OButton>
             </template>
             <div
-              class="field-function-menu-popup dashboard-sankey-chart-builder-dropdown w-[771px]! h-[323px] shadow-[0px_4px_4px_0px_rgba(0,0,0,0.05)] p-4 shadow-[0px_3px_15px_rgba(0,0,0,0.1)] translate-y-2 rounded-none"
+              class="field-function-menu-popup dashboard-sankey-chart-builder-dropdown w-[48.1875rem]! h-[20.1875rem] shadow-md p-4 translate-y-2 rounded-none"
               :data-test="`dashboard-value-item-${valueLabel}-menu`"
             >
-              <div
-                style="padding: 3px 16px 16px 16px"
+              <div class="pt-0.75 pr-4 pb-4 pl-4"
                 :style="{
                   width:
                     dashboardPanelData.data.queries[

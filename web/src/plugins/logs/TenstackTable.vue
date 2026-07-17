@@ -311,7 +311,7 @@ class="mr-1" />
                   ? 'log-row-base bg-log-table-row-bg'
                   : '',
               !(formattedRows[virtualRow.index]?.original as any)?.isExpandedRow
-                ? 'table-row-hover table-row-focus focus-visible:outline-none transition-[background-color,box-shadow] duration-[120ms] [transition-timing-function:ease-in-out] border-b-log-table-row-border!'
+                ? 'table-row-hover table-row-focus focus-visible:outline-none transition-[background-color,box-shadow] duration-120 [transition-timing-function:ease-in-out] border-b-log-table-row-border!'
                 : '',
             ]"
             @click="

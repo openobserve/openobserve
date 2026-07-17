@@ -1,8 +1,9 @@
 <template>
   <div
     data-test="dashboard-group"
-    :style="`--group-index: ${groupNestedIndex}; padding-left: ${groupNestedIndex > 0 ? '0.3125rem' : '0'}; background-color: rgba(89, 96, 178, calc(0.12 * var(--group-index)));`"
-    class="flex p-0 rounded-md"
+    :style="`--group-index: ${groupNestedIndex};`"
+    class="flex p-0 rounded-md bg-[color-mix(in_srgb,var(--color-brand-indigo)_calc(12%*var(--group-index)),transparent)]"
+    :class="groupNestedIndex > 0 ? 'pl-1.25' : 'pl-0'"
   >
     <div class="flex flex-row flex-wrap items-center" data-test="dashboard-group-conditions">
       <div

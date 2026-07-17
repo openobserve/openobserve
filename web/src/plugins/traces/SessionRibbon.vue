@@ -63,7 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <div
-          class="relative flex-1 min-w-0 min-h-0 flex items-end gap-[3px] border-l border-b border-border-default"
+          class="relative flex-1 min-w-0 min-h-0 flex items-end gap-0.75 border-l border-b border-border-default"
         >
           <!-- gridlines (top + mid) to echo the dashboard chart grid -->
           <div class="absolute inset-x-0 top-0 border-t border-border-default opacity-60" />
@@ -78,7 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :delay="40"
           >
             <div
-              class="relative flex-1 min-w-0 rounded-t-[2px] cursor-pointer transition-[height] duration-300 ease-out hover:brightness-110"
+              class="relative flex-1 min-w-0 rounded-t-xs cursor-pointer transition-[height] duration-300 ease-out hover:brightness-110"
               :style="{ height: bar.pct + '%', background: bar.color }"
               @click="emit('jump', bar.index + 1)"
             />
@@ -92,7 +92,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="flex gap-[0.5rem] flex-shrink-0">
         <div class="w-[2.75rem] flex-shrink-0" />
         <div class="flex-1 min-w-0">
-          <div class="flex gap-[3px] mt-[0.25rem]">
+          <div class="flex gap-0.75 mt-[0.25rem]">
             <span
               v-for="bar in detailBars"
               :key="bar.index"
@@ -126,7 +126,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="w-[2.75rem] flex-shrink-0" />
       <div
         ref="overviewTrackRef"
-        class="relative flex-1 min-w-0 h-6.5 flex items-end gap-[1px] select-none touch-none"
+        class="relative flex-1 min-w-0 h-6.5 flex items-end gap-px select-none touch-none"
         :class="dragging ? 'cursor-grabbing' : 'cursor-grab'"
         @pointerdown="onTrackPointerDown"
         data-test="session-ribbon-overview"
@@ -150,14 +150,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <!-- left resize handle (overhangs the edge so it's easy to grab) -->
           <div
-            class="absolute top-0 bottom-0 -left-1 w-[9px] cursor-ew-resize flex items-center justify-center"
+            class="absolute top-0 bottom-0 -left-1 w-2.25 cursor-ew-resize flex items-center justify-center"
             @pointerdown.stop="(e) => beginDrag('resize-left', e)"
           >
             <div class="w-0.5 h-[55%] rounded-sm bg-[color-mix(in_srgb,var(--color-text-heading)_60%,transparent)]" />
           </div>
           <!-- right resize handle -->
           <div
-            class="absolute top-0 bottom-0 -right-1 w-[9px] cursor-ew-resize flex items-center justify-center"
+            class="absolute top-0 bottom-0 -right-1 w-2.25 cursor-ew-resize flex items-center justify-center"
             @pointerdown.stop="(e) => beginDrag('resize-right', e)"
           >
             <div class="w-0.5 h-[55%] rounded-sm bg-[color-mix(in_srgb,var(--color-text-heading)_60%,transparent)]" />

@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
 
     <!-- Loading state -->
-    <div v-if="loading" class="flex justify-center items-center" style="min-height: calc(100vh - var(--navbar-height) - 120px)">
+    <div v-if="loading" class="flex justify-center items-center min-h-[calc(100vh-var(--navbar-height)-7.5rem)]">
       <OSpinner size="md" data-test="org-storage-settings-loading-indicator" />
     </div>
 
@@ -40,18 +40,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- ========== NOT CONFIGURED: cloud hero ========== -->
     <div
       v-else-if="!isConfigured && isCloud"
-      class="hero-page flex flex-col"
-      :style="{ minHeight: 'calc(100vh - var(--navbar-height) - 100px)' }"
+      class="hero-page flex flex-col min-h-[calc(100vh-var(--navbar-height)-6.25rem)]"
     >
-      <div class="hero-page__body flex items-center justify-between flex-1 py-18 px-20" style="gap: 56px;">
+      <div class="hero-page__body flex items-center justify-between flex-1 py-18 px-20 gap-14">
         <!-- left -->
         <div class="hero-page__left flex-1 max-w-120">
 
-          <div class="hero-page__headline font-bold leading-tight mb-4.5 text-text-heading" style="font-size: 2.6rem; letter-spacing: -0.6px; line-height: 1.2;">
+          <div class="hero-page__headline font-bold leading-tight mb-4.5 text-text-heading text-4xl tracking-tight">
             {{ t("storage_settings.heroHeadline") }} <span class="hero-page__brand-text text-theme-accent">OpenObserve.</span>
           </div>
 
-          <div class="hero-page__sub leading-[1.7] text-text-secondary mb-9 max-w-100" style="font-size: 0.97rem;">
+          <div class="hero-page__sub leading-[1.7] text-text-secondary mb-9 max-w-100 text-base">
             {{ t("storage_settings.heroSub") }}
           </div>
 
@@ -59,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               data-test="storage-settings-configure-btn"
               variant="primary"
-              class="no-border o2-primary-button hero-cta-btn h-11 px-7 font-semibold" style="font-size: 0.95rem;"
+              class="no-border o2-primary-button hero-cta-btn h-11 px-7 font-semibold text-base"
               @click="navigateToCreate"
             >
               {{ t("storage_settings.configureStorage") }}
@@ -68,12 +67,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- supported infrastructure -->
           <div class="hero-page__inline-providers flex items-center gap-3">
-            <span class="hero-page__inline-label font-medium whitespace-nowrap text-text-muted" style="font-size: 0.8rem; letter-spacing: 0px;">{{ t("storage_settings.supportedProviders") }}</span>
-            <div class="hero-page__inline-logos flex items-center" style="gap: 10px;">
+            <span class="hero-page__inline-label font-medium whitespace-nowrap text-text-muted text-compact">{{ t("storage_settings.supportedProviders") }}</span>
+            <div class="hero-page__inline-logos flex items-center gap-2.5">
               <div
                 v-for="p in availableProviders"
                 :key="p.value"
-                class="hero-page__inline-logo-wrap w-7 h-7 flex items-center justify-center shrink-0 cursor-default opacity-70 transition-opacity duration-150"
+                class="hero-page__inline-logo-wrap w-7 h-7 flex items-center justify-center shrink-0 cursor-default opacity-70 hover:opacity-100 transition-opacity duration-150"
               >
                 <img :src="p.image" :alt="p.label" class="hero-page__inline-logo w-7 h-7 max-w-7 max-h-7 object-contain block" />
                 <OTooltip :content="p.label" />
@@ -83,18 +82,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- right: feature cards -->
-        <div class="hero-page__right w-85 shrink-0 flex flex-col" style="gap: 14px;">
+        <div class="hero-page__right w-85 shrink-0 flex flex-col gap-3.5">
           <div
             v-for="feature in features"
             :key="feature.title"
-            class="feature-card flex items-start rounded-[16px] border border-[rgba(0,0,0,0.07)] bg-white dark:bg-[rgba(255,255,255,0.05)] dark:border-[rgba(255,255,255,0.08)] dark:[box-shadow:0_2px_12px_rgba(0,0,0,0.3)] transition-all duration-200" style="gap: 16px; padding: 20px 22px; box-shadow: 0 2px 12px rgba(0,0,0,0.05), 0 1px 3px rgba(0,0,0,0.04);"
+            class="feature-card flex items-start rounded-xl border border-border-default bg-surface-base shadow-md transition-all duration-200 gap-4 py-5 px-5.5 hover:shadow-lg hover:-translate-y-px"
           >
-            <div class="feature-card__icon-box w-10 h-10 rounded-lg bg-[rgba(66,133,244,0.08)] dark:bg-[rgba(66,133,244,0.15)] flex items-center justify-center shrink-0">
+            <div class="feature-card__icon-box w-10 h-10 rounded-lg bg-[color-mix(in_srgb,var(--color-theme-accent)_8%,transparent)] flex items-center justify-center shrink-0">
               <OIcon :name="feature.icon" size="md" class="feature-card__icon text-theme-accent opacity-85" />
             </div>
             <div class="feature-card__content pt-0.5 flex-1">
-              <div class="feature-card__title font-bold text-text-heading mb-[5px]" style="font-size: 0.92rem;">{{ feature.title }}</div>
-              <div class="feature-card__desc text-text-secondary leading-[1.55]" style="font-size: 0.8rem;">{{ feature.desc }}</div>
+              <div class="feature-card__title font-bold text-text-heading mb-1.25 text-sm">{{ feature.title }}</div>
+              <div class="feature-card__desc text-text-secondary leading-[1.55] text-compact">{{ feature.desc }}</div>
             </div>
           </div>
         </div>
@@ -104,8 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- ========== NOT CONFIGURED: enterprise empty state ========== -->
     <div
       v-else-if="!isConfigured && !isCloud"
-      class="w-full"
-      :style="{ minHeight: 'calc(100vh - var(--navbar-height) - 160px)' }"
+      class="w-full min-h-[calc(100vh-var(--navbar-height)-10rem)]"
     >
       <OEmptyState
         size="hero"
@@ -153,19 +151,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <div class="p-3">
       <OCard
-        class="storage-card rounded-xl bg-surface-base"
-        style="max-width: 680px;"
+        class="storage-card rounded-xl bg-surface-base max-w-170"
       >
         <!-- Card header: logo + name + badge | update button -->
         <OCardSection role="header">
-          <div class="flex items-center flex-nowrap flex-1" style="gap: 14px;">
+          <div class="flex items-center flex-nowrap flex-1 gap-3.5">
             <img
               :src="configuredProviderImage"
               :alt="configuredProviderLabel"
-              style="width: 44px; height: 44px; object-fit: contain; flex-shrink: 0;"
+              class="w-11 h-11 object-contain shrink-0"
             />
             <div>
-              <div class="text-base font-medium" style="font-weight: 700; line-height: 1.3;">
+              <div class="text-base font-bold leading-tight">
                 {{ configuredProviderLabel }}
               </div>
               <OTag type="activeFlag" class="mt-1" />
@@ -186,30 +183,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Field grid -->
         <OCardSection role="body">
-          <div class="storage-detail-grid grid gap-x-8 gap-y-5" style="grid-template-columns: repeat(2, 1fr);">
+          <div class="storage-detail-grid grid gap-x-8 gap-y-5 grid-cols-2">
             <div v-if="storageData.bucket_name" class="storage-field">
-              <div class="storage-field__label text-xs text-text-label capitalize mb-[3px] font-medium">{{ t("storage_settings.bucketName") }}</div>
-              <div class="storage-field__value text-text-secondary break-all" style="font-size: 0.9rem; color: var(--color-text-primary);">{{ storageData.bucket_name }}</div>
+              <div class="storage-field__label text-xs text-text-label capitalize mb-0.75 font-medium">{{ t("storage_settings.bucketName") }}</div>
+              <div class="storage-field__value break-all text-sm text-text-primary">{{ storageData.bucket_name }}</div>
             </div>
             <div v-if="storageData.region" class="storage-field">
-              <div class="storage-field__label text-xs text-text-label capitalize mb-[3px] font-medium">{{ t("storage_settings.region") }}</div>
-              <div class="storage-field__value break-all" style="font-size: 0.9rem; color: var(--color-text-primary);">{{ storageData.region }}</div>
+              <div class="storage-field__label text-xs text-text-label capitalize mb-0.75 font-medium">{{ t("storage_settings.region") }}</div>
+              <div class="storage-field__value break-all text-sm text-text-primary">{{ storageData.region }}</div>
             </div>
             <div v-if="storageData.server_url && !isCloud" class="storage-field">
-              <div class="storage-field__label text-xs text-text-label capitalize mb-[3px] font-medium">{{ t("storage_settings.serverUrl") }}</div>
-              <div class="storage-field__value break-all" style="font-size: 0.9rem; color: var(--color-text-primary);">{{ storageData.server_url }}</div>
+              <div class="storage-field__label text-xs text-text-label capitalize mb-0.75 font-medium">{{ t("storage_settings.serverUrl") }}</div>
+              <div class="storage-field__value break-all text-sm text-text-primary">{{ storageData.server_url }}</div>
             </div>
             <div v-if="storageData.access_key" class="storage-field">
-              <div class="storage-field__label text-xs text-text-label capitalize mb-[3px] font-medium">{{ t("storage_settings.accessKey") }}</div>
-              <div class="storage-field__value break-all" style="font-size: 0.9rem; color: var(--color-text-primary);">{{ storageData.access_key }}</div>
+              <div class="storage-field__label text-xs text-text-label capitalize mb-0.75 font-medium">{{ t("storage_settings.accessKey") }}</div>
+              <div class="storage-field__value break-all text-sm text-text-primary">{{ storageData.access_key }}</div>
             </div>
             <div v-if="storageData.secret_key" class="storage-field">
-              <div class="storage-field__label text-xs text-text-label capitalize mb-[3px] font-medium">{{ t("storage_settings.secretKey") }}</div>
-              <div class="storage-field__value break-all" style="font-size: 0.9rem; color: var(--color-text-primary);">{{ storageData.secret_key }}</div>
+              <div class="storage-field__label text-xs text-text-label capitalize mb-0.75 font-medium">{{ t("storage_settings.secretKey") }}</div>
+              <div class="storage-field__value break-all text-sm text-text-primary">{{ storageData.secret_key }}</div>
             </div>
             <div v-if="storageData.role_arn" class="storage-field">
-              <div class="storage-field__label text-xs text-text-label capitalize mb-[3px] font-medium">{{ t("storage_settings.roleArn") }}</div>
-              <div class="storage-field__value break-all" style="font-size: 0.9rem; color: var(--color-text-primary); word-break: break-all;">{{ storageData.role_arn }}</div>
+              <div class="storage-field__label text-xs text-text-label capitalize mb-0.75 font-medium">{{ t("storage_settings.roleArn") }}</div>
+              <div class="storage-field__value break-all text-sm text-text-primary">{{ storageData.role_arn }}</div>
             </div>
           </div>
         </OCardSection>
@@ -218,13 +215,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Timestamps -->
         <OCardSection v-if="configTimestamps">
-          <div class="flex" style="gap: 40px;">
-            <div v-if="configTimestamps.created_at" class="flex items-center" style="gap: 6px;">
-              <span class="storage-field__label text-xs text-text-label capitalize font-medium" style="margin-bottom: 0;">{{ t("storage_settings.createdAt") }}</span>
+          <div class="flex gap-10">
+            <div v-if="configTimestamps.created_at" class="flex items-center gap-1.5">
+              <span class="storage-field__label text-xs text-text-label capitalize font-medium mb-0">{{ t("storage_settings.createdAt") }}</span>
               <span class="text-sm">{{ configTimestamps.created_at }}</span>
             </div>
-            <div v-if="configTimestamps.updated_at" class="flex items-center" style="gap: 6px;">
-              <span class="storage-field__label text-xs text-text-label capitalize font-medium" style="margin-bottom: 0;">{{ t("storage_settings.updatedAt") }}</span>
+            <div v-if="configTimestamps.updated_at" class="flex items-center gap-1.5">
+              <span class="storage-field__label text-xs text-text-label capitalize font-medium mb-0">{{ t("storage_settings.updatedAt") }}</span>
               <span class="text-sm">{{ configTimestamps.updated_at }}</span>
             </div>
           </div>
@@ -393,14 +390,3 @@ onMounted(() => {
   fetchExistingConfig();
 });
 </script>
-
-<style scoped>
-.hero-page__inline-logo-wrap:hover {
-  opacity: 1;
-}
-
-.feature-card:hover {
-  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.1);
-  transform: translateY(-1px);
-}
-</style>

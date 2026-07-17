@@ -202,7 +202,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
               {{ t("search.runQuery") }}
             </OButton>
-            <OSeparator class="h-[1.875rem]! w-[1px]" vertical />
+            <OSeparator class="h-[1.875rem]! w-px" vertical />
             <ODropdown
               v-if="store.state.zoConfig.auto_query_enabled"
               side="bottom"

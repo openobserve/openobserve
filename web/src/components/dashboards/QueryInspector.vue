@@ -23,7 +23,7 @@
         v-if="queryData.length === 0"
         class="flex flex-col items-center justify-center h-64 text-text-muted"
       >
-        <OIcon name="info" style="width: 48px; height: 48px;" />
+        <OIcon class="w-12 h-12" name="info" />
         <p class="mt-2">No queries executed for this panel.</p>
       </div>
 
@@ -38,7 +38,8 @@
             class="p-2 gap-3 bg-theme-body-bg-primary border-b border-card-glass-border flex items-start justify-start"
           >
             <span class="text-sm font-bold rounded-md"
-                :data-test="`query-inspector-query-name-${index}`">
+                :data-test="`query-inspector-query-name-${index}`"
+            >
               {{ query.tabName || ('Query ' + (index + 1)) }}
             </span>
             <span
@@ -53,8 +54,7 @@
             <!-- Original Query -->
             <div v-if="query.originalQuery">
               <div class="flex items-center justify-between">
-                <label class="text-xs font-bold tracking-wider"
-                  >Original Query</label
+                <label class="text-xs font-bold tracking-wider">Original Query</label
                 >
                 <OButton
                   variant="ghost-primary"
@@ -67,7 +67,7 @@
               </div>
               <div class="relative group mt-1">
                 <div
-                  class="p-2 rounded-lg bg-theme-body-bg-primary border border-card-glass-border font-mono text-sm max-h-40 overflow-y-auto whitespace-pre-wrap break-all [scrollbar-width:thin] [scrollbar-color:rgba(128,128,128,0.2)_transparent] inspector-query-editor"
+                  class="p-2 rounded-lg bg-theme-body-bg-primary border border-card-glass-border font-mono text-sm max-h-40 overflow-y-auto whitespace-pre-wrap break-all [scrollbar-width:thin] [scrollbar-color:color-mix(in_srgb,var(--color-grey-500)_20%,transparent)_transparent] inspector-query-editor"
                   :data-test="`query-inspector-original-query-${index}`"
                   v-html="
                     highlightSearch(
@@ -83,8 +83,7 @@
             <!-- Executed Query -->
             <div>
               <div class="flex items-center justify-between">
-                <label class="text-xs font-bold tracking-wider"
-                  >Executed Query</label
+                <label class="text-xs font-bold tracking-wider">Executed Query</label
                 >
                 <OButton
                   variant="ghost-primary"
@@ -97,7 +96,7 @@
               </div>
               <div class="relative group mt-1">
                 <div
-                  class="p-2 rounded-lg bg-theme-body-bg-primary border border-card-glass-border font-mono text-sm max-h-40 overflow-y-auto whitespace-pre-wrap break-all [scrollbar-width:thin] [scrollbar-color:rgba(128,128,128,0.2)_transparent] inspector-query-editor"
+                  class="p-2 rounded-lg bg-theme-body-bg-primary border border-card-glass-border font-mono text-sm max-h-40 overflow-y-auto whitespace-pre-wrap break-all [scrollbar-width:thin] [scrollbar-color:color-mix(in_srgb,var(--color-grey-500)_20%,transparent)_transparent] inspector-query-editor"
                   :data-test="`query-inspector-executed-query-${index}`"
                   v-html="
                     highlightSearch(
@@ -116,8 +115,7 @@
               <div class="space-y-1"
                 :data-test="`dashboard-query-inspector-start-time-${index}`"
               >
-                <label class="text-xs font-bold tracking-wider"
-                  >Start Time</label
+                <label class="text-xs font-bold tracking-wider">Start Time</label
                 >
                 <div
                   class="text-xs text-text-secondary font-medium flex items-center gap-2"
@@ -133,8 +131,7 @@
               <div class="space-y-1"
                 :data-test="`dashboard-query-inspector-end-time-${index}`"
               >
-                <label class="text-xs font-bold tracking-wider"
-                  >End Time</label
+                <label class="text-xs font-bold tracking-wider">End Time</label
                 >
                 <div
                   class="text-xs text-text-secondary font-medium flex items-center gap-2"
@@ -155,8 +152,7 @@
             >
               <!-- Standard Variables -->
               <div class="pt-2">
-                <label class="text-xs font-bold tracking-wider"
-                  >Variable(s)</label
+                <label class="text-xs font-bold tracking-wider">Variable(s)</label
                 >
                 <div class="flex flex-wrap gap-2 mt-1">
                   <template v-if="getVariablesByType(query, 'variable').length">
@@ -167,25 +163,23 @@
                     >
                       <span
                         class="font-bold text-text-primary"
-                        >{{ v.name }}</span
+                      >{{ v.name }}</span
                       >
                       <span class="text-text-muted">:</span>
                       <span
                         class="text-text-secondary italic"
-                        >{{ v.value }}</span
+                      >{{ v.value }}</span
                       >
                     </div>
                   </template>
-                  <span v-else class="text-xs text-text-muted"
-                    >-</span
+                  <span v-else class="text-xs text-text-muted">-</span
                   >
                 </div>
               </div>
 
               <!-- Fixed Variables -->
               <div>
-                <label class="text-xs font-bold tracking-wider"
-                  >Fixed Variable(s)</label
+                <label class="text-xs font-bold tracking-wider">Fixed Variable(s)</label
                 >
                 <div class="flex flex-wrap gap-2 mt-1">
                   <template v-if="getVariablesByType(query, 'fixed').length">
@@ -196,25 +190,23 @@
                     >
                       <span
                         class="font-bold text-text-primary"
-                        >{{ v.name }}</span
+                      >{{ v.name }}</span
                       >
                       <span class="text-text-muted">:</span>
                       <span
                         class="text-text-secondary italic"
-                        >{{ v.value }}</span
+                      >{{ v.value }}</span
                       >
                     </div>
                   </template>
-                  <span v-else class="text-xs text-text-muted"
-                    >-</span
+                  <span v-else class="text-xs text-text-muted">-</span
                   >
                 </div>
               </div>
 
               <!-- Dynamic Variables -->
               <div>
-                <label class="text-xs font-bold tracking-wider"
-                  >Dynamic Variable(s)</label
+                <label class="text-xs font-bold tracking-wider">Dynamic Variable(s)</label
                 >
                 <div class="flex flex-wrap gap-2 mt-1">
                   <template
@@ -227,19 +219,18 @@
                     >
                       <span
                         class="font-bold text-text-primary"
-                        >{{ v.name }}</span
+                      >{{ v.name }}</span
                       >
                       <span class="text-text-muted">{{
                         v.operator
                       }}</span>
                       <span
                         class="text-text-secondary italic"
-                        >{{ v.value }}</span
+                      >{{ v.value }}</span
                       >
                     </div>
                   </template>
-                  <span v-else class="text-xs text-text-muted"
-                    >-</span
+                  <span v-else class="text-xs text-text-muted">-</span
                   >
                 </div>
               </div>

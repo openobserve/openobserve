@@ -157,19 +157,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
         <template #bottom />
         <template v-for="col in apiLimitCrudColumnIds" :key="col" #[`cell-${col}`]="{ row, value }">
-          <div v-if="editTable" :style="{ backgroundColor: editTable ? (isDark ? '#212121' : '#f1f1ee') : 'transparent' }">
+          <div v-if="editTable" class="bg-surface-subtle">
             <div
               v-if="value != '-'"
               contenteditable="true"
               debounce="500"
               :class="{
                 'editable-cell': editTable,
-                'px-2.5 py-0': editTable && !isDark,
-                'bg-[#f1f1ee]': editTable && !isDark,
-                'px-2.5': editTable && isDark,
+                'px-2.5': editTable,
+                'py-0': editTable && !isDark,
                 'edited-input': isEdited(row.module_name, col),
-                'bg-[#bfc3f4] text-black font-medium': isEdited(row.module_name, col) && !isDark,
-                'bg-[#f6f6f6] text-black font-medium [padding:0px!important]': isEdited(row.module_name, col) && isDark,
+                'bg-table-row-selected-bg text-table-highlight-text font-medium': isEdited(row.module_name, col),
+                'p-0!': isEdited(row.module_name, col) && isDark,
               }"
               @input="(event: any) => handleInputChange('', row.module_name, value, col, event.target.innerText)"
               @keypress="restrictToNumbers"
@@ -252,12 +251,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     debounce="500"
                     :class="{
                       'editable-cell': true,
-                      'px-2.5 py-0': !isDark,
-                      'bg-[#f1f1ee]': !isDark,
-                      'px-2.5': isDark,
+                      'px-2.5': true,
+                      'py-0': !isDark,
+                      'bg-surface-subtle': !isEdited(moduleRow.module_name, col),
                       'edited-input': isEdited(moduleRow.module_name, col),
-                      'bg-[#bfc3f4] text-black font-medium': isEdited(moduleRow.module_name, col) && !isDark,
-                      'bg-[#f6f6f6] text-black font-medium [padding:0px!important]': isEdited(moduleRow.module_name, col) && isDark,
+                      'bg-table-row-selected-bg text-table-highlight-text font-medium': isEdited(moduleRow.module_name, col),
+                      'p-0!': isEdited(moduleRow.module_name, col) && isDark,
                     }"
                     @input="(event: any) => handleInputChange(row.role_name, moduleRow.module_name, moduleRow[col], col, event.target.innerText)"
                     @keypress="restrictToNumbers"

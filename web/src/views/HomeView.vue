@@ -426,7 +426,7 @@ export default defineComponent({
 
 /* Gradient border on the prompt input — home tab only.
    Uses the dual-background trick: bg color for padding-box, gradient for border-box.
-   2px border for stronger presence + layered shadows for depth. */
+   Heavier border for stronger presence + layered shadows for depth. */
 .home-ai-panel :deep(.unified-input-box) {
   --color-ai-input-bg: var(--color-white);
   position: relative;

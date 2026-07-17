@@ -36,15 +36,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             v-for="[s, sv] in serviceEntries"
             :key="s"
-            class="grid items-center gap-x-[0.5rem] py-[0.1rem]"
+            class="grid items-center gap-x-[0.5rem] py-[0.1rem] grid-cols-[0.5rem_1fr_auto_auto]"
             :class="
               s === service ? 'font-bold' : 'font-normal opacity-75'
             "
-            style="grid-template-columns: 0.5rem 1fr auto auto"
           >
             <span
               class="inline-block w-[0.5rem] h-[0.5rem] rounded-full shrink-0"
-              :style="{ backgroundColor: serviceColors[s] || '#9e9e9e' }"
+              :style="serviceDotStyle(s)"
             />
             <span class="truncate">{{ s }}</span>
             <span class="text-right">{{
@@ -65,6 +64,14 @@ import { computed } from "vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import useTraces from "@/composables/useTraces";
 import { formatTimeWithSuffix } from "@/utils/zincutils";
+
+// TODO(design-tokens): the "unknown service" grey has no semantic token. It is the
+// shared fallback for a service the colour allocator never assigned (also in
+// TraceServiceCell + TraceDetailsSidebar, and asserted by their specs), so it is
+// NOT --color-dag-node-default (same value, but that token means "LLM span type:
+// default"). Needs e.g. --color-trace-service-unknown; then this const is the only
+// site in this file to change.
+const UNKNOWN_SERVICE_COLOR = "#9e9e9e";
 
 const props = defineProps<{
   item: Record<string, any>;
@@ -93,10 +100,20 @@ function segmentPercent(svc: any): number {
   return ((svc.duration ?? 0) / totalDuration.value) * 100;
 }
 
+function serviceColor(service: string): string {
+  return serviceColors.value[service] || UNKNOWN_SERVICE_COLOR;
+}
+
+/** Legend dot — per-service colour, so it can only be a runtime binding. */
+function serviceDotStyle(service: string): Record<string, string> {
+  return { backgroundColor: serviceColor(service) };
+}
+
+/** Segment — runtime width (share of total duration) + per-service colour. */
 function segmentStyle(service: string, svc: any): Record<string, string> {
   return {
     width: `${segmentPercent(svc)}%`,
-    backgroundColor: serviceColors.value[service] || "#9e9e9e",
+    backgroundColor: serviceColor(service),
   };
 }
 </script>

@@ -34,8 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :options="categoryOptions"
           :label="t('correlation.category')"
           :hint="t('correlation.categoryHint')"
-          class="showLabelOnTop"
-          style="max-width: 100%"
+          class="showLabelOnTop max-w-full"
         />
       </div>
       <div class="w-full col-md-8 flex items-center justify-end gap-2">

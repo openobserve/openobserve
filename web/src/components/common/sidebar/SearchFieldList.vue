@@ -21,7 +21,7 @@
         <!-- Group header (only rendered for grouped/label rows) -->
         <template #group-header="{ row, groupName }">
           <div
-            class="field-group-header h-full w-full flex justify-between items-center rounded-lg"
+            class="field-group-header h-full w-full flex justify-between items-center rounded-lg font-semibold text-xs leading-7 px-[0.325rem] cursor-pointer bg-surface-subtle text-field-list-group-text"
             :data-test="`search-field-list-group-${row.group}-header`"
             @click="toggleGroup(row.group)"
           >
@@ -694,6 +694,10 @@ const copyContentValue = (value: string) => {
 </script>
 
 <style lang="scss" scoped>
+/* keep(lib-override:o2-field-list): reaches into OFieldList/FieldValuesPanel internals
+   via :deep() — those elements are owned by the child component, so no utility on this
+   template can reach them. */
+
 // Expanded field values should read as inline content, not a selected card —
 // drop the bordered/rounded panel treatment so no border or background lingers
 // once the row is expanded and the pointer moves away.
@@ -712,55 +716,4 @@ const copyContentValue = (value: string) => {
   padding-bottom: 0;
 }
 
-.field-list-pagination {
-  display: flex;
-  align-items: center;
-  gap: 0.25rem;
-  margin-left: auto;
-}
-
-.pagination-nav-btn {
-  padding: 0.375rem 0.25rem !important;
-  margin: 0 !important;
-  min-width: 1.5rem !important;
-  width: 1.5rem !important;
-  min-height: 1.375rem !important;
-  height: 1.375rem !important;
-  border-radius: 0.25rem !important;
-  overflow: visible !important;
-}
-
-.pagination-page-btn {
-  padding: 0.375rem 0.25rem !important;
-  margin: 0 !important;
-  min-width: 1.5rem !important;
-  width: 1.5rem !important;
-  min-height: 1.375rem !important;
-  height: 1.375rem !important;
-  font-size: 0.75rem !important;
-  font-weight: 500;
-  line-height: 1;
-  color: var(--color-text-primary) !important;
-  border-radius: 0.25rem !important;
-  overflow: visible !important;
-}
-
-.field-group-header {
-  font-weight: 600;
-  font-size: 0.75rem;
-  line-height: 1.75rem;
-  padding: 0 0.325rem;
-  cursor: pointer;
-  background-color: var(--color-surface-subtle);
-  color: var(--color-field-list-group-text);
-}
-
-.index-menu {
-  width: 100%;
-
-  .index-table {
-    width: 100%;
-  }
-
-}
 </style>

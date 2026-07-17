@@ -8,8 +8,7 @@
           ].customQuery && dashboardPanelData.data.queryType == 'sql'
         )
       "
-      style="display: flex; flex-direction: row"
-      class="pl-3"
+      class="pl-3 flex flex-row"
     >
       <div class="text-sm whitespace-nowrap min-w-32.5 flex items-center" data-test="dashboard-filter-layout-label">{{ t("panel.filters") }}</div>
       <span class="flex items-center mx-0.5" data-test="dashboard-filter-layout-separator">:</span>

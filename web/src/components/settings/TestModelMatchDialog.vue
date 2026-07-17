@@ -91,7 +91,7 @@
               class="flex flex-col gap-3"
               data-test="test-match-no-result"
             >
-              <div class="flex items-center gap-3 py-3 px-3.5 rounded-lg border bg-[rgba(239,68,68,0.04)] border-[rgba(239,68,68,0.15)] dark:bg-[rgba(239,68,68,0.08)] dark:border-[rgba(239,68,68,0.2)]">
+              <div class="flex items-center gap-3 py-3 px-3.5 rounded-lg border bg-banner-error-soft-bg border-banner-error-soft-border">
                 <div class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-status-error-bg text-status-error-text">
                   <OIcon name="error-outline" size="md" />
                 </div>
@@ -108,7 +108,7 @@
                   </div>
                 </div>
               </div>
-              <div class="py-3 px-3.5 rounded-lg bg-[rgba(0,0,0,0.02)] dark:bg-[rgba(255,255,255,0.02)] border border-card-glass-border">
+              <div class="py-3 px-3.5 rounded-lg bg-surface-panel border border-card-glass-border">
                 <div class="text-2xs font-semibold opacity-55 mb-1.5">
                   {{ t("modelPricing.troubleshootingTitle") }}
                 </div>
@@ -128,7 +128,7 @@
               data-test="test-match-result"
             >
               <!-- Match status -->
-              <div class="flex items-center gap-3 py-3 px-3.5 rounded-lg border bg-[rgba(22,163,74,0.05)] border-[rgba(22,163,74,0.2)] dark:bg-[rgba(22,163,74,0.08)] dark:border-[rgba(22,163,74,0.25)]">
+              <div class="flex items-center gap-3 py-3 px-3.5 rounded-lg border bg-banner-success-bg border-banner-success-border">
                 <div class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-status-success-bg text-status-success-text">
                   <OIcon name="check-circle" size="md" />
                 </div>
@@ -137,7 +137,7 @@
                     {{ t("modelPricing.matchFound") }}
                   </div>
                   <div class="text-xs mt-0.5 opacity-70 truncate">
-                    <code class="inline py-px px-1.5 rounded-sm text-xs font-semibold font-[SF_Mono,JetBrains_Mono,monospace] bg-[rgba(22,163,74,0.08)] border border-[rgba(22,163,74,0.2)] text-inherit">{{
+                    <code class="inline py-px px-1.5 rounded-sm text-xs font-semibold font-mono bg-banner-success-bg border border-banner-success-border text-inherit">{{
                       testResult.matched.name
                     }}</code>
                   </div>
@@ -152,7 +152,7 @@
               </div>
 
               <!-- Priority flow -->
-              <div class="py-3 px-3.5 border border-card-glass-border rounded-lg bg-[rgba(0,0,0,0.015)] dark:bg-[rgba(255,255,255,0.02)]">
+              <div class="py-3 px-3.5 border border-card-glass-border rounded-lg bg-surface-panel">
                 <div class="text-3xs font-semibold opacity-40 mb-2">
                   {{ t("modelPricing.matchPriority") }}
                 </div>
@@ -165,9 +165,9 @@
                       <OIcon name="arrow-forward" size="xs" />
                     </div>
                     <div
-                      class="flex items-center gap-[5px] py-[5px] px-2.5 rounded-md border border-card-glass-border text-2xs font-medium bg-transparent"
+                      class="flex items-center gap-1.25 py-1.25 px-2.5 rounded-md border border-card-glass-border text-2xs font-medium bg-transparent"
                       :class="{
-                        'border-status-positive bg-[rgba(22,163,74,0.06)] font-bold dark:bg-[rgba(22,163,74,0.1)]': step.key === winnerSource,
+                        'border-status-positive bg-banner-success-bg font-bold': step.key === winnerSource,
                         'opacity-40': step.key !== winnerSource,
                       }"
                     >
@@ -190,7 +190,7 @@
 
               <!-- Tier + cost card -->
               <div class="border border-card-glass-border rounded-lg overflow-hidden">
-                <div class="py-3 px-3.5 bg-[rgba(0,0,0,0.02)] dark:bg-[rgba(255,255,255,0.03)] border-b border-card-glass-border">
+                <div class="py-3 px-3.5 bg-surface-panel border-b border-card-glass-border">
                   <div>
                     <div class="text-compact font-bold">
                       {{ testResult.tier || "Default" }}
@@ -200,7 +200,7 @@
                       v-if="matchedTierDef?.condition"
                     >
                       Condition:
-                      <code class="tmm-cost-tier-desc-code py-px px-1 rounded-sm bg-[rgba(0,0,0,0.05)] dark:bg-[rgba(255,255,255,0.08)] text-2xs"
+                      <code class="tmm-cost-tier-desc-code py-px px-1 rounded-sm bg-surface-subtle text-2xs"
                         >{{ matchedTierDef.condition.usage_key }}
                         {{ operatorSymbol(matchedTierDef.condition.operator) }}
                         {{ matchedTierDef.condition.value }}</code
@@ -213,7 +213,7 @@
                 </div>
 
                 <div class="text-xs" v-if="pricingRows.length > 0">
-                  <div class="grid gap-2 py-[7px] px-3.5 border-b border-card-glass-border bg-[rgba(0,0,0,0.015)] dark:bg-[rgba(255,255,255,0.02)] grid-cols-[1.5fr_1fr]">
+                  <div class="grid gap-2 py-1.75 px-3.5 border-b border-card-glass-border bg-surface-panel grid-cols-[1.5fr_1fr]">
                     <span class="text-3xs font-semibold opacity-40">{{ t("modelPricing.usageType") }}</span>
                     <span class="text-3xs font-semibold opacity-40 text-right">{{
                       t("modelPricing.pricePerMTokens")
@@ -222,15 +222,15 @@
                   <div
                     v-for="row in pricingRows"
                     :key="row.key"
-                    class="tmm-cost-table-row grid gap-2 py-2 px-3.5 text-xs border-b border-[rgba(0,0,0,0.04)] dark:border-[rgba(255,255,255,0.04)] last:border-b-0 hover:bg-[rgba(0,0,0,0.015)] dark:hover:bg-[rgba(255,255,255,0.02)] grid-cols-[1.5fr_1fr]"
+                    class="tmm-cost-table-row grid gap-2 py-2 px-3.5 text-xs border-b border-border-subtle last:border-b-0 hover:bg-hover-gray grid-cols-[1.5fr_1fr]"
                   >
-                    <span class="font-semibold font-[SF_Mono,JetBrains_Mono,monospace] text-2xs">{{ row.key }}</span>
-                    <span class="font-semibold [font-variant-numeric:tabular-nums] text-right"
+                    <span class="font-semibold font-mono text-2xs">{{ row.key }}</span>
+                    <span class="font-semibold tabular-nums text-right"
                       >${{ formatRate(row.rate) }}</span
                     >
                   </div>
                 </div>
-                <div v-else class="flex items-center gap-[7px] p-3.5 text-xs opacity-40 italic">
+                <div v-else class="flex items-center gap-1.75 p-3.5 text-xs opacity-40 italic">
                   <OIcon name="info-outline" size="sm" />
                   {{ t("modelPricing.noPricingForTier") }}
                 </div>
@@ -404,7 +404,7 @@ function formatRate(rate: number) {
 
 .tmm-fade-enter-from {
   opacity: 0;
-  transform: translateY(5px);
+  transform: translateY(0.3125rem);
 }
 
 .tmm-fade-leave-to {

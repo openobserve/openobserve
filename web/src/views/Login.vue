@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="w-auto max-w-50 h-10 max-h-10 cursor-pointer"
         loading="lazy"
         :src="
-          store?.state?.theme == 'dark'
+          isDark
             ? getImageURL('images/common/openobserve_latest_dark_2.svg')
             : getImageURL('images/common/openobserve_latest_light_2.svg')
         "
@@ -44,6 +44,7 @@ import InvitationList from "@/components/iam/users/InvitationList.vue";
 import config from "@/aws-exports";
 import configService from "@/services/config";
 import { useStore } from "vuex";
+import { useTheme } from "@/composables/useTheme";
 import {
   getUserInfo,
   getDecodedUserInfo,
@@ -69,6 +70,7 @@ export default defineComponent({
   },
   setup() {
     const store = useStore();
+    const { isDark } = useTheme();
     let orgOptions = ref([{ label: Number, value: String }]);
     const selectedOrg = ref({});
     const router: any = useRouter();
@@ -272,6 +274,7 @@ export default defineComponent({
 
     return {
       store,
+      isDark,
       config,
       router,
       redirectUser,

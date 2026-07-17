@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- this will be unlocked when we get the actionscripts , rum sessions , error tracking from BE -->
         <div v-if="false" class="grid grid-cols-3 gap-4 w-full">
             <div class="bg-card-glass-bg border border-card-glass-border rounded-lg p-4 min-h-32 flex flex-col justify-between transition-shadow duration-200 ease-in-out hover:shadow-sm">
-              <div class="flex flex-col justify-between rounded-[0.325rem] h-full gap-4 ">
+              <div class="flex flex-col justify-between rounded-md h-full gap-4 ">
               <!-- Top Section (60%) -->
               <div class="flex flex-col justify-between">
                 <!-- Title row -->
@@ -51,7 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             </div>
             <div class="bg-card-glass-bg border border-card-glass-border rounded-lg p-4 min-h-32 flex flex-col justify-between transition-shadow duration-200 ease-in-out hover:shadow-sm">
-              <div class="flex flex-col justify-between rounded-[0.325rem] h-full gap-4 ">
+              <div class="flex flex-col justify-between rounded-md h-full gap-4 ">
               <!-- Top Section (60%) -->
               <div class="flex flex-col justify-between">
                 <!-- Title row -->
@@ -70,7 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             </div>
             <div class="bg-card-glass-bg border border-card-glass-border rounded-lg p-4 min-h-32 flex flex-col justify-between transition-shadow duration-200 ease-in-out hover:shadow-sm">
-              <div class="flex flex-col justify-between rounded-[0.325rem] h-full gap-4 ">
+              <div class="flex flex-col justify-between rounded-md h-full gap-4 ">
               <!-- Top Section (60%) -->
               <div class="flex flex-col justify-between">
                 <!-- Title row -->
@@ -111,7 +111,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 {{ tile.label }}
               </div>
-              <div class="usage-tile__icon shrink-0 flex items-center justify-center rounded-lg">
+              <div class="h-7 w-7 bg-bg-gray shrink-0 flex items-center justify-center rounded-lg">
                 <img :src="tile.icon" class="h-4 w-4" />
               </div>
             </div>
@@ -150,11 +150,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="text-(length:--text-sm) font-semibold text-text-heading mb-2">
           {{ t("billing.usageTrends.dailyUsage") }}
         </div>
-        <div class="usage-daily-chart__body w-full">
+        <div class="h-90 relative w-full">
           <PanelSchemaRenderer
             v-if="combinedSchema && dailyTimeObj"
             :key="'chart-r-' + dailyChartKey"
-            class="usage-daily-chart__renderer"
+            class="h-full w-full"
             :panelSchema="combinedSchema"
             :selectedTimeObj="dailyTimeObj"
             :variablesData="{}"
@@ -170,7 +170,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             v-if="usageStreamMissing"
             data-test="usage-waiting-for-data"
-            class="usage-daily-chart__waiting absolute inset-0 bg-card-glass-bg"
+            class="flex items-center justify-center z-2 absolute inset-0 bg-card-glass-bg"
           >
             <OEmptyState
               size="block"
@@ -1151,30 +1151,3 @@ import { buildUsageCombinedLinePanelSchema } from "./usageDailyPanelSchema";
   });
   </script>
 
-<style lang="scss" scoped>
-/* Compact stat cards (six across): label + icon badge, then the value. */
-.usage-tile__icon {
-  height: 1.75rem;
-  width: 1.75rem;
-  background: var(--color-bg-gray);
-}
-
-/* PanelSchemaRenderer fills its container and needs an explicit height, or the
-   echarts canvas collapses to a sliver. */
-.usage-daily-chart__body {
-  height: 22.5rem;
-  position: relative;
-}
-.usage-daily-chart__renderer {
-  height: 100%;
-  width: 100%;
-}
-/* "Waiting for usage data" overlay sits over the (still-mounted) chart until
-   the org's usage stream exists and the search stops erroring. */
-.usage-daily-chart__waiting {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 2;
-}
-</style>

@@ -77,24 +77,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 Once configured, only credential fields can be updated. All other fields will be locked.
               </div>
             </div>
-            <div class="text-sm font-medium mb-2" style="font-weight: 500">
-              Select Storage Provider <span class="text-red">*</span>
+            <div class="text-sm font-medium mb-2">
+              Select Storage Provider <span class="text-status-negative">*</span>
             </div>
-            <div class="destination-type-grid grid gap-3" style="grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));">
+            <div class="destination-type-grid grid gap-3 grid-cols-[repeat(auto-fill,minmax(8.75rem,1fr))]">
               <div
                 v-for="provider in availableProviders"
                 :key="provider.value"
                 :data-test="`storage-settings-provider-card-${provider.value}`"
-                class="group/card relative flex flex-col items-center justify-center py-5 px-3 border-2 rounded-xl cursor-pointer transition-all duration-300 min-h-30 hover:-translate-y-0.5"
-                :class="[
-                  { selected: selectedProvider === provider.value },
-                  'bg-surface-base border-border-default hover:border-card-glass-border hover:shadow-[0_4px_12px_rgba(25,118,210,0.15)]'
-                ]"
-                :style="selectedProvider === provider.value && !isDark
-                  ? 'border-color: var(--color-card-glass-border); background: linear-gradient(135deg, #e3f2fd 0%, #ffffff 100%); box-shadow: 0 4px 16px rgba(25,118,210,0.2);'
-                  : selectedProvider === provider.value && isDark
-                  ? 'border-color: #5d9cec; background: linear-gradient(135deg, #1a3a52 0%, #1e1e1e 100%); box-shadow: 0 4px 16px rgba(93,156,236,0.25);'
-                  : ''"
+                class="group/card relative flex flex-col items-center justify-center py-5 px-3 border-2 rounded-xl cursor-pointer transition-all duration-300 min-h-30 hover:-translate-y-0.5 hover:shadow-md"
+                :class="
+                  selectedProvider === provider.value
+                    ? 'selected bg-table-row-selected-bg border-accent shadow-md'
+                    : 'bg-surface-base border-border-default hover:border-card-glass-border'
+                "
                 @click="selectedProvider = provider.value"
               >
                 <img

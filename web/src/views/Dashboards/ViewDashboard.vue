@@ -71,17 +71,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="ml-2"
             ref="refDateTime"
             v-model="selectedDate"
-          /> -->
+            /> -->
             <!-- for Print Mode -->
             <!-- if time is relative, show start and end time -->
             <!-- format: YYYY/MM/DD HH:mm - YYYY/MM/DD HH:mm (TIMEZONE) -->
-            <div
+            <div class="pt-1.25"
               v-if="
                 store.state.printMode === true &&
                 currentTimeObj.start_time &&
                 currentTimeObj.end_time
               "
-              style="padding-top: 5px"
             >
               {{ timeString }} ({{ store.state.timezone }})
             </div>
@@ -163,8 +162,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="printDashboard"
               data-test="dashboard-print-btn"
             >
-              <template #icon-left
-                ><OIcon
+              <template #icon-left><OIcon
                   :name="store.state.printMode === true ? 'close' : 'print'" size="sm"
               /></template>
               <OTooltip :content="store.state.printMode === true ? t('common.close') : t('dashboard.print')" />
@@ -176,8 +174,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="toggleFullscreen"
               data-test="dashboard-fullscreen-btn"
             >
-              <template #icon-left
-                ><OIcon
+              <template #icon-left><OIcon
                   :name="
                     isFullscreen ? 'fullscreen-exit' : 'fullscreen'
                   " size="sm"
@@ -192,8 +189,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="openScheduledReports"
               data-test="view-dashboard-scheduled-reports"
             >
-              <template #icon-left
-                ><OIcon name="description" size="sm"
+              <template #icon-left><OIcon name="description" size="sm"
               /></template>
               <OTooltip :content="t('dashboard.scheduledDashboards')" />
             </OButton>
@@ -273,7 +269,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @searchRequestTraceIds="searchRequestTraceIds"
         :runId="runId"
         @update:runId="updateRunId"
-      />
+        />
       <DashboardSettings
         v-model:open="showDashboardSettingsDialog"
         @refresh="loadDashboard"

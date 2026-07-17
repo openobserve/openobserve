@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="font-semibold px-2 py-2">
           {{ t("billing.billingGroup.currentOrgTitle") }}
         </div>
-        <OSeparator class="mb-1 mt-[3px]" />
+        <OSeparator class="mb-1 mt-0.75" />
 
         <OTabs
           orientation="vertical"
@@ -53,7 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="font-semibold px-2 py-2">
           {{ t("billing.billingGroup.memberOrgsTitle") }}
         </div>
-        <OSeparator class="mb-1 mt-[3px]" />
+        <OSeparator class="mb-1 mt-0.75" />
 
         <div class="flex items-center py-1 w-full">
           <OInput

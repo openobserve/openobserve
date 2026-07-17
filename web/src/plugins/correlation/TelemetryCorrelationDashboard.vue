@@ -510,7 +510,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <span class="text-sm font-semibold">{{
                     t("correlation.dimensionBasedCorrelation")
                   }}</span>
-                  <span class="text-xs text-gray-500">{{
+                  <span class="text-xs text-text-secondary">{{
                     t("correlation.tracesFromService", { service: serviceName })
                   }}</span>
                 </div>
@@ -953,7 +953,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="text-base mb-2">
             {{ t("correlation.tracesError") }}
           </div>
-          <div class="text-sm text-gray-500">{{ tracesError }}</div>
+          <div class="text-sm text-text-secondary">{{ tracesError }}</div>
           <OButton
             variant="outline"
             size="sm-action"
@@ -1013,7 +1013,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <span class="text-sm font-semibold">{{
                   t("correlation.dimensionBasedCorrelation")
                 }}</span>
-                <span class="text-xs text-gray-500">{{
+                <span class="text-xs text-text-secondary">{{
                   t("correlation.tracesFromService", { service: serviceName })
                 }}</span>
               </div>
@@ -1073,7 +1073,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="text-base">
             {{ t("correlation.correlatedTraces") }}
           </div>
-          <div class="text-sm text-gray-500 mt-2">
+          <div class="text-sm text-text-secondary mt-2">
             {{ t("correlation.correlatedTracesFor", { service: serviceName }) }}
           </div>
         </div>

@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
     <span
       v-if="sourceEvent.message"
-      class="text-xs flex-1 font-mono text-typography-meta source-event-message"
+      class="text-xs flex-1 font-mono text-typography-meta line-clamp-2 text-ellipsis whitespace-normal wrap-break-word leading-[1.4]"
       :title="sourceEvent.message"
     >
       {{ sourceEvent.message }}
@@ -317,16 +317,3 @@ const formatEventTimestamp = (ts: number | string | undefined): string => {
   }
 };
 </script>
-
-<style scoped>
-.source-event-message {
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: normal;
-  word-break: break-word;
-  line-height: 1.4;
-}
-</style>

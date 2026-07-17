@@ -97,7 +97,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template #header-right>
       <div class="col-auto flex items-center gap-1">
         <DateTime
-          :style="activeTab !== 'history' ? 'visibility: hidden' : ''"
+          :class="activeTab !== 'history' ? 'invisible' : ''"
           ref="dateTimeRef"
           auto-apply
           :default-type="dateTimeType"
@@ -118,8 +118,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OTabPanels
         v-model="activeTab"
         animated
-        class="flex-1 overflow-hidden bg-transparent"
-        style="display: flex; flex-direction: column"
+        class="flex-1 overflow-hidden bg-transparent flex flex-col"
       >
         <!-- History Panel -->
         <OTabPanel
@@ -194,7 +193,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @click="toggleFlappingGroup(row.timestamp)"
                       />
                       <OTag type="alertState" value="flapping" class="cursor-pointer shrink-0" @click="toggleFlappingGroup(row.timestamp)" />
-                      <span class="text-2xs truncate" style="color: var(--color-text-secondary)">
+                      <span class="text-2xs truncate text-text-secondary">
                         {{ row._children.length }} rows · {{ row._duration }}
                       </span>
                     </div>

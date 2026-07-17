@@ -96,8 +96,7 @@
       >
         Performing
         <span
-          class="inline-flex items-center rounded-sm px-1.5 py-0.5 text-xs font-semibold"
-          style="background-color: color-mix(in srgb, var(--color-accent) 15%, transparent); color: var(--color-accent);"
+          class="inline-flex items-center rounded-sm px-1.5 py-0.5 text-xs font-semibold bg-[color-mix(in_srgb,var(--color-accent)_15%,transparent)] text-accent"
         >{{ joinTypeLabel }} Join</span> between
         <span class="font-semibold">{{ mainStream }}</span> and
         <span class="font-semibold">{{ modelValue.stream }}</span>

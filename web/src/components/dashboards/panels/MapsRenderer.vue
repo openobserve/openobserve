@@ -11,8 +11,8 @@
 -->
 
 <template>
-  <div style="padding: 5px; height: 100%; width: 100%">
-    <div ref="chartRef" id="chart-map" style="height: 100%; width: 100%"></div>
+  <div class="p-1.25 h-full w-full">
+    <div class="h-full w-full" ref="chartRef" id="chart-map"></div>
   </div>
 </template>
 

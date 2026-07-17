@@ -168,7 +168,7 @@ function updateScrollState(): void {
       const right = tab.offsetLeft + tab.offsetWidth
       if (right > contentWidth) contentWidth = right
     }
-    if (contentWidth > 0) contentWidth += 3 // tablist px-[3px] right padding
+    if (contentWidth > 0) contentWidth += 3 // tablist px-0.75 (3px) right padding
   }
   hasOverflow.value = contentWidth > el.clientWidth + 1
   canScrollLeft.value = el.scrollLeft > 1
@@ -311,7 +311,7 @@ const alignClasses: Record<NonNullable<OTabsProps['align']>, string> = {
         <TabsList as-child :loop="true">
           <div
             ref="tablistRef"
-            :class="['o-tabs flex flex-row relative px-[3px]', alignClasses[align]]"
+            :class="['o-tabs flex flex-row relative px-0.75', alignClasses[align]]"
             @focusin="handleFocusin"
             @dragstart="onTabDragStart"
             @dragover="onTabDragOver"

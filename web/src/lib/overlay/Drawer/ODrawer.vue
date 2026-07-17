@@ -388,7 +388,7 @@ watch(internalOpen, (open) => {
           v-if="hasHeader"
           :class="[
             'flex items-center gap-2 shrink-0',
-            'px-(--spacing-dialog-header-px) py-(--spacing-dialog-header-py)',
+            'px-dialog-header-px py-dialog-header-py',
             'bg-dialog-header-bg text-dialog-header-text',
             'border-b border-dialog-header-border',
           ]"
@@ -493,7 +493,7 @@ watch(internalOpen, (open) => {
           v-if="hasFooter"
           :class="[
             'shrink-0',
-            'px-(--spacing-dialog-footer-px) py-(--spacing-dialog-footer-py)',
+            'px-dialog-footer-px py-dialog-footer-py',
             'bg-dialog-footer-bg',
             'border-t border-dialog-footer-border',
             'border-b border-dialog-footer-border',

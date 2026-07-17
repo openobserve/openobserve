@@ -467,7 +467,7 @@ watch(internalOpen, (open) => {
           v-if="hasHeader"
           :class="[
             'flex items-center gap-2 shrink-0',
-            'px-(--spacing-dialog-header-px) py-(--spacing-dialog-header-py)',
+            'px-dialog-header-px py-dialog-header-py',
             'bg-dialog-header-bg text-dialog-header-text',
             'border-b border-dialog-header-border',
             !isFullSize && 'rounded-t-xl',
@@ -557,7 +557,7 @@ watch(internalOpen, (open) => {
           :class="[
             'min-h-0 overflow-x-hidden',
             isFullSize ? 'flex-1 overflow-hidden p-0' : 'overflow-y-auto',
-            !isFullSize && 'px-(--spacing-dialog-content-px) py-(--spacing-dialog-content-py)',
+            !isFullSize && 'px-dialog-content-px py-dialog-content-py',
             'text-dialog-content-text',
             !isFullSize && canScrollUp && '[box-shadow:inset_0_8px_6px_-6px_rgba(0,0,0,0.1)]',
             !isFullSize && canScrollDown && '[box-shadow:inset_0_-8px_6px_-6px_rgba(0,0,0,0.1)]',
@@ -573,7 +573,7 @@ watch(internalOpen, (open) => {
           v-if="hasFooter"
           :class="[
             'shrink-0',
-            'px-(--spacing-dialog-footer-px) py-(--spacing-dialog-footer-py)',
+            'px-dialog-footer-px py-dialog-footer-py',
             'bg-dialog-footer-bg',
             'border-t border-dialog-footer-border',
             !isFullSize && 'rounded-b-xl',

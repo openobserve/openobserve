@@ -211,7 +211,7 @@ function handleClick() {
        isPinned
         ? (rowSelected
             ? 'bg-table-row-selected-bg group-hover/row:bg-table-row-hover-bg transition-colors duration-150'
-            : 'bg-table-cell-bg group-hover/row:bg-[var(--color-table-row-hover-bg)] transition-colors duration-150')
+            : 'bg-table-cell-bg group-hover/row:bg-table-row-hover-bg transition-colors duration-150')
         : '',
       wrap
         ? 'break-words whitespace-normal'
@@ -263,7 +263,7 @@ function handleClick() {
         </button>
         <span
           v-else
-          class="w-[7px] h-[7px] bg-theme-accent opacity-75 rounded-[1px] shadow-[0_0_0_2px_var(--color-table-cell-bg)] z-3 relative"
+          class="size-1.75 bg-theme-accent opacity-75 rounded-xs ring-2 ring-table-cell-bg z-3 relative"
           aria-hidden="true"
         />
       </span>

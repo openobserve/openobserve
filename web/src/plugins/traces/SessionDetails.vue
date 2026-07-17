@@ -626,9 +626,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                    covering the rows above it. -->
               <OTooltip side="left" :delay="120" max-width="220px" content-class="p-0!">
                 <template #content>
-                  <div class="w-50 py-[9px] px-3 text-xs text-text-heading">
+                  <div class="w-50 py-2.25 px-3 text-xs text-text-heading">
                     <div class="font-bold mb-0.5 break-words">{{ row.name }}</div>
-                    <div class="text-3xs text-text-muted mb-[7px]">
+                    <div class="text-3xs text-text-muted mb-1.75">
                       {{ t(row.calls === 1 ? 'traces.sessionDetail.rail.call' : 'traces.sessionDetail.rail.calls', { n: row.calls }) }}
                     </div>
                     <div class="text-3xs font-bold tracking-[0.05em] text-text-secondary mb-1">
@@ -1584,10 +1584,11 @@ onMounted(load);
 </script>
 
 <style scoped lang="scss">
-/* Markdown styling for the assistant message (v-html). Scoped CSS is the one
-   sanctioned case (§5a): you can't target innerHTML-injected elements with
-   Tailwind utility classes, so `:deep()` rules are used. All colours map to
-   --color-* tokens so it adapts to the theme. */
+/* keep(generated-content): markdown styling for the assistant message injected
+   with v-html. Those nodes carry no scope attribute and no classes of their own,
+   so :deep() element selectors are the only expressible form — a Tailwind
+   utility cannot reach them. All colours map to --color-* tokens, so this one
+   rule set covers light and dark. */
 .markdown-body {
   line-height: 1.55;
 
@@ -1629,7 +1630,7 @@ onMounted(load);
     margin: 0.15rem 0;
   }
   :deep(a) {
-    color: var(--color-primary-500, #3b82f6);
+    color: var(--color-text-link);
     text-decoration: none;
 
     &:hover {
@@ -1637,17 +1638,17 @@ onMounted(load);
     }
   }
   :deep(code) {
-    font-family: monospace;
+    font-family: var(--font-mono);
     font-size: 0.72rem;
     background: color-mix(in srgb, var(--color-text-heading) 8%, transparent);
     padding: 0.1rem 0.3rem;
-    border-radius: 3px;
+    border-radius: 0.1875rem;
   }
   :deep(pre) {
     background: color-mix(in srgb, var(--color-text-heading) 5%, transparent);
     border: 1px solid var(--color-border-default);
     padding: 0.5rem 0.625rem;
-    border-radius: 4px;
+    border-radius: var(--radius-sm);
     overflow-x: auto;
     margin: 0.5rem 0;
   }
@@ -1656,7 +1657,7 @@ onMounted(load);
     padding: 0;
   }
   :deep(blockquote) {
-    border-left: 3px solid var(--color-border-default);
+    border-left: 0.1875rem solid var(--color-border-default);
     margin: 0.5rem 0;
     padding-left: 0.75rem;
     color: var(--color-text-secondary);

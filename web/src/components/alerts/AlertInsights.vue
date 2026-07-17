@@ -214,7 +214,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="ml-3">Loading insights...</div>
           </div>
 
-          <div :style="{ visibility: isLoading ? 'hidden' : 'visible' }">
+          <div :class="isLoading ? 'invisible' : 'visible'">
             <div v-if="!dashboardData" class="p-5 text-center text-text-muted">
               {{ t("alerts.insights.loading.dashboardConfig") }}
             </div>

@@ -82,13 +82,13 @@ const isTextarea = computed(() => props.type === "textarea");
 const fieldWidthClass = computed(() => {
   switch (props.width) {
     case "xs":
-      return "w-[var(--spacing-field-width-xs)]";
+      return "w-field-width-xs";
     case "sm":
-      return "w-[var(--spacing-field-width-sm)]";
+      return "w-field-width-sm";
     case "md":
-      return "w-[var(--spacing-field-width-md)]";
+      return "w-field-width-md";
     case "lg":
-      return "w-[var(--spacing-field-width-lg)]";
+      return "w-field-width-lg";
     default:
       return "w-full";
   }

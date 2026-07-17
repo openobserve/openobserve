@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <!-- Summary toolbar — sidebar-style badge chips. Hidden in the Session
          Detail Pretty view (those metrics already show in the KPI cards). -->
-    <div v-if="props.showSummary" class="thread-summary flex flex-wrap items-center gap-[0.4rem] py-2 px-4 bg-(--color-surface-base,transparent) border-b border-border-default">
+    <div v-if="props.showSummary" class="thread-summary flex flex-wrap items-center gap-[0.4rem] py-2 px-4 bg-surface-base border-b border-border-default">
       <OTag
         type="metricChip"
         class="thread-chip thread-chip--steps h-6.5! px-[0.625rem]! py-0! bg-surface-base! border border-border-default rounded-sm! text-xs! text-text-body! border-l-[3px]! border-l-[color-mix(in_srgb,var(--color-orange-700)_75%,var(--color-grey-300))]!"
@@ -101,14 +101,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       No LLM turns detected. The trace doesn't contain spans with
       <code>gen_ai.operation.name = chat</code>.
     </div>
-    <div v-else class="thread-scroll-body flex-1 overflow-auto px-[1rem] py-[0.75rem] bg-(--color-surface-base,var(--color-surface-base))">
+    <div v-else class="thread-scroll-body flex-1 overflow-auto px-4 py-3 bg-surface-base">
       <!-- System prompt (global — identical across traces in a session). -->
       <div
         v-if="head.systemPrompt"
         class="thread-system mb-4 border border-border-default border-l-[3px] border-l-ai-accent dark:border-l-(--color-purple-400) rounded-md bg-surface-base overflow-hidden"
       >
         <div
-          class="thread-system__head flex items-center gap-[0.625rem] py-2 px-3 cursor-pointer transition-all duration-[120ms] hover:bg-[color-mix(in_srgb,var(--color-ai-accent)_4%,transparent)] dark:hover:bg-[color-mix(in_srgb,var(--color-ai-accent)_8%,transparent)]"
+          class="thread-system__head flex items-center gap-[0.625rem] py-2 px-3 cursor-pointer transition-all duration-120 hover:bg-[color-mix(in_srgb,var(--color-ai-accent)_4%,transparent)] dark:hover:bg-[color-mix(in_srgb,var(--color-ai-accent)_8%,transparent)]"
           @click="showSystemFull = !showSystemFull"
         >
           <span class="thread-system__badge inline-flex items-center py-[0.15rem] px-2 bg-[color-mix(in_srgb,var(--color-ai-accent)_10%,transparent)] dark:bg-[color-mix(in_srgb,var(--color-ai-accent)_18%,transparent)] text-ai-accent dark:text-(--color-purple-400) rounded-sm text-2xs font-semibold tracking-[0.02rem] shrink-0">
@@ -131,7 +131,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div
           v-if="showSystemFull"
-          class="thread-system__content py-3 px-[0.875rem] border-t border-border-default bg-(--color-surface-base,var(--color-surface-base)) text-compact leading-[1.55] text-text-secondary whitespace-pre-wrap break-words max-h-90 overflow-auto"
+          class="thread-system__content py-3 px-[0.875rem] border-t border-border-default bg-surface-base text-compact leading-[1.55] text-text-secondary whitespace-pre-wrap break-words max-h-90 overflow-auto"
         >
           {{ head.systemPrompt }}
         </div>
@@ -242,7 +242,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               Error
             </span>
             <button
-              class="thread-turn__view-span ml-auto inline-flex items-center gap-[0.2rem] py-[0.2rem] px-[0.55rem] rounded-md text-theme-accent text-xs font-medium bg-transparent border border-transparent cursor-pointer transition-all duration-[120ms] shrink-0 hover:bg-[color-mix(in_srgb,var(--color-blue-500)_8%,transparent)] hover:border-[color-mix(in_srgb,var(--color-blue-500)_25%,transparent)] dark:hover:bg-[color-mix(in_srgb,var(--color-blue-400)_12%,transparent)] dark:hover:border-[color-mix(in_srgb,var(--color-blue-400)_30%,transparent)]"
+              class="thread-turn__view-span ml-auto inline-flex items-center gap-[0.2rem] py-[0.2rem] px-[0.55rem] rounded-md text-theme-accent text-xs font-medium bg-transparent border border-transparent cursor-pointer transition-all duration-120 shrink-0 hover:bg-[color-mix(in_srgb,var(--color-blue-500)_8%,transparent)] hover:border-[color-mix(in_srgb,var(--color-blue-500)_25%,transparent)] dark:hover:bg-[color-mix(in_srgb,var(--color-blue-400)_12%,transparent)] dark:hover:border-[color-mix(in_srgb,var(--color-blue-400)_30%,transparent)]"
               @click="emit('span-selected', turn.span.span_id)"
             >
               View span
@@ -550,7 +550,7 @@ function formatTime(ns: number): string {
     }
   }
   :deep(code) {
-    font-family: monospace;
+    font-family: var(--font-mono);
     font-size: 0.78rem;
     background: color-mix(in srgb, var(--color-text-body) 8%, transparent);
     padding: 0.1rem 0.3rem;

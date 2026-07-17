@@ -22,8 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div
       v-if="position === 'bottom' && maxRecords"
-      class="flex items-center whitespace-nowrap w-50 justify-center"
-      style="justify-content: start"
+      class="flex items-center whitespace-nowrap w-50 justify-center justify-start"
     >
       <span class="mr-4 text-xs font-semibold">{{ t("search.maxRecords") }}</span>
       <OInput

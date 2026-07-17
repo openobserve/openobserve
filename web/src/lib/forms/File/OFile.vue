@@ -274,7 +274,7 @@ const wrapperClasses = computed(() => [
         <span
           v-for="(file, i) in files"
           :key="`${file.name}-${i}`"
-          class="inline-flex items-center gap-1 rounded-md bg-file-chip-bg text-file-chip-text px-2 py-0.5 text-xs max-w-[12rem] shrink-0"
+          class="inline-flex items-center gap-1 rounded-md bg-file-chip-bg text-file-chip-text px-2 py-0.5 text-xs max-w-48 shrink-0"
           :data-test="`o-file-chip-${i}`"
         >
           <span class="truncate" :title="`${file.name} (${formatSize(file.size)})`">
@@ -352,8 +352,11 @@ const wrapperClasses = computed(() => [
 </template>
 
 <style scoped>
-/* Single-line file chips: keep horizontal scrolling but hide the scrollbar so
-   the row stays a clean one-line input regardless of how many files are chosen. */
+/* keep(scrollbar): single-line file chips — keep horizontal scrolling but hide
+   the scrollbar so the row stays a clean one-line input regardless of how many
+   files are chosen. `scrollbar-width`/`-ms-overflow-style` and the
+   `::-webkit-scrollbar` pseudo-element are native-control surfaces with no
+   Tailwind utility equivalent. */
 .o-file-chips {
   scrollbar-width: none; /* Firefox */
   -ms-overflow-style: none; /* IE/Edge legacy */

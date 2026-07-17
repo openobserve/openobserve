@@ -58,8 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <OSeparator class="-mt-px shrink-0" data-test="panel-sidebar-separator" />
     <div
-      class="scroll"
-      style="height: calc(100vh - 176px); overflow-y: auto;"
+      class="scroll h-[calc(100vh_-_11rem)] overflow-y-auto"
       data-test="panel-sidebar-content"
       v-if="isOpen"
       @scroll.passive="onSidebarScroll"

@@ -312,11 +312,11 @@ describe("CustomHTMLEditor", () => {
       wrapper = createWrapper();
 
       const container = wrapper.find('[data-test="dashboard-custom-html-editor-container"]');
-      const style = container.element.getAttribute('style');
 
-      expect(style).toContain('width: 100%');
-      expect(style).toContain('height: 100%');
-      expect(style).toContain('overflow: hidden');
+      // Sizing/overflow moved from an inline style to Tailwind utilities.
+      expect(container.classes()).toContain('w-full');
+      expect(container.classes()).toContain('h-full');
+      expect(container.classes()).toContain('overflow-hidden');
     });
 
     it("should render splitter with correct configuration", () => {

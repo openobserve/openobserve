@@ -12,18 +12,8 @@
   </div>
   <Teleport to="body">
   <div
-    class="user-guide p-2.5 overflow-y-auto bg-surface-base [scrollbar-width:thin] [scrollbar-color:rgba(0,0,0,0.25)_rgba(0,0,0,0.05)]"
+    class="user-guide fixed z-9999 w-125 max-h-75 p-2.5 overflow-y-auto pointer-events-auto border border-border-default rounded-sm bg-surface-base [&_ul]:m-0 [&_li]:m-0 [&_p]:m-0 [&_div]:m-0 [scrollbar-width:thin] [scrollbar-color:color-mix(in_srgb,var(--color-grey-950)_25%,transparent)_color-mix(in_srgb,var(--color-grey-950)_5%,transparent)]"
     v-show="showUserGuide"
-    style="
-      position: fixed;
-      z-index: 9999;
-      width: 500px;
-      max-height: 300px;
-      overflow-y: auto;
-      border: 1px solid var(--color-border-default);
-      border-radius: 5px;
-      pointer-events: auto;
-    "
     @mouseleave="showUserGuide = false"
     ref="userGuideDivRef"
   >
@@ -65,8 +55,7 @@
     <span class="bg-highlight-bg px-1.25">from=${start_time}&to=${end_time}</span>
     <br />
     <span class="font-bold">Note: </span>
-    <span
-      >Even with a relative time period, you can still use
+    <span>Even with a relative time period, you can still use
       <span class="bg-highlight-bg px-1.25">start_time</span> and
       <span class="bg-highlight-bg px-1.25">end_time</span>.</span
     >
@@ -98,8 +87,7 @@
     </p>
     <ul>
       <li>
-        <span class="bg-highlight-bg px-1.25"
-          >${row.field["field_label"]} or ${row.field.field_label}</span
+        <span class="bg-highlight-bg px-1.25">${row.field["field_label"]} or ${row.field.field_label}</span
         >
         <br />
         (For Example, if your want to use "test" column's value of clicked row,
@@ -178,22 +166,16 @@ export default {
 </script>
 
 <style scoped>
-/* Override global transparent-by-default scrollbar so it is always visible */
+/* keep(scrollbar): ::-webkit-scrollbar pseudo-elements have no utility form.
+   Overrides the global transparent-by-default scrollbar so it stays visible. */
 .user-guide::-webkit-scrollbar {
-  width: 6px;
+  width: 0.375rem;
 }
 .user-guide::-webkit-scrollbar-thumb {
   background: var(--color-border-strong);
-  border-radius: 3px;
+  border-radius: 0.1875rem;
 }
 .user-guide::-webkit-scrollbar-track {
   background: var(--color-surface-subtle);
-}
-
-.user-guide ul,
-.user-guide li,
-.user-guide p,
-.user-guide div {
-  margin: 0;
 }
 </style>

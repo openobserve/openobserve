@@ -78,7 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="font-semibold">{{ value }}</div>
           <div
             v-if="row.description"
-            class="text-xs max-w-65 whitespace-normal leading-tight text-text-muted"
+            class="text-xs max-w-65 whitespace-normal leading-tight text-text-muted"
           >
             {{ row.description }}
           </div>
@@ -151,8 +151,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
             <span
               v-if="selectedIds.length > 0"
-              class="text-accent"
-              class="font-semibold"
+              class="text-accent font-semibold"
             >
               {{ selectedIds.length }} selected
             </span>

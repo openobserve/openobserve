@@ -123,7 +123,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OIcon name="verified" size="xs" />
               {{ t("billing.billingGroup.statusActive") }}
             </div>
-            <div class="text-[2.4rem] font-bold leading-[1.2] tracking-[-0.6px] mb-4">
+            <div class="text-4xl font-bold leading-[1.2] tracking-[-0.6px] mb-4">
               {{ t("billing.billingGroup.childHeadline") }}
               <span class="text-tabs-active-text cursor-pointer inline-block max-w-full overflow-hidden text-ellipsis whitespace-nowrap align-bottom">
                 {{ payerName }}
@@ -157,7 +157,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Right: membership facts -->
           <div class="w-85 shrink-0 flex flex-col gap-3.5" data-test="org-group-child-details">
-            <div class="og-feature flex items-start gap-4 p-[18px_20px] rounded-2xl bg-(--tile-bg) border border-(--color-card-glass-border,rgba(0,0,0,0.08)) transition-all duration-200 hover:shadow-[0_8px_28px_rgba(0,0,0,0.1)] hover:-translate-y-px">
+            <div class="og-feature flex items-start gap-4 py-4.5 px-5 rounded-2xl bg-surface-base border border-card-glass-border transition-all duration-200 hover:shadow-lg hover:-translate-y-px">
               <div class="w-10 h-10 rounded-lg shrink-0 flex items-center justify-center bg-[color-mix(in_srgb,var(--color-primary-600)_10%,transparent)] text-primary-600">
                 <OIcon name="person-add" />
               </div>
@@ -170,7 +170,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
             </div>
-            <div class="og-feature flex items-start gap-4 p-[18px_20px] rounded-2xl bg-(--tile-bg) border border-(--color-card-glass-border,rgba(0,0,0,0.08)) transition-all duration-200 hover:shadow-[0_8px_28px_rgba(0,0,0,0.1)] hover:-translate-y-px">
+            <div class="og-feature flex items-start gap-4 py-4.5 px-5 rounded-2xl bg-surface-base border border-card-glass-border transition-all duration-200 hover:shadow-lg hover:-translate-y-px">
               <div class="w-10 h-10 rounded-lg shrink-0 flex items-center justify-center bg-[color-mix(in_srgb,var(--color-primary-600)_10%,transparent)] text-primary-600">
                 <OIcon name="how-to-reg" />
               </div>
@@ -186,7 +186,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
             </div>
-            <div class="og-feature flex items-start gap-4 p-[18px_20px] rounded-2xl bg-(--tile-bg) border border-(--color-card-glass-border,rgba(0,0,0,0.08)) transition-all duration-200 hover:shadow-[0_8px_28px_rgba(0,0,0,0.1)] hover:-translate-y-px">
+            <div class="og-feature flex items-start gap-4 py-4.5 px-5 rounded-2xl bg-surface-base border border-card-glass-border transition-all duration-200 hover:shadow-lg hover:-translate-y-px">
               <div class="w-10 h-10 rounded-lg shrink-0 flex items-center justify-center bg-[color-mix(in_srgb,var(--color-primary-600)_10%,transparent)] text-primary-600">
                 <OIcon name="schedule" />
               </div>
@@ -286,11 +286,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <template v-if="allowedForBillingGroup">
             <div class="flex items-center gap-2 flex-wrap justify-center mb-8">
-              <span class="inline-flex items-center gap-[5px] text-xs font-medium opacity-85 bg-[color-mix(in_srgb,currentColor_6%,transparent)] border border-(--color-card-glass-border,rgba(0,0,0,0.1)) rounded-full py-1 px-3">
+              <span class="inline-flex items-center gap-1.25 text-xs font-medium opacity-85 bg-[color-mix(in_srgb,currentColor_6%,transparent)] border border-card-glass-border rounded-full py-1 px-3">
                 <OIcon name="receipt-long" size="xs" />
                 {{ t("billing.billingGroup.chipConsolidatedBill") }}
               </span>
-              <span class="inline-flex items-center gap-[5px] text-xs font-medium opacity-85 bg-[color-mix(in_srgb,currentColor_6%,transparent)] border border-(--color-card-glass-border,rgba(0,0,0,0.1)) rounded-full py-1 px-3">
+              <span class="inline-flex items-center gap-1.25 text-xs font-medium opacity-85 bg-[color-mix(in_srgb,currentColor_6%,transparent)] border border-card-glass-border rounded-full py-1 px-3">
                 <OIcon name="groups" size="xs" />
                 {{ t("billing.billingGroup.chipLinkOrgs") }}
               </span>

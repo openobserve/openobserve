@@ -133,12 +133,15 @@ const renderedSections = computed(() =>
 </template>
 
 <style scoped lang="scss">
+/* keep(generated-content): .o2-card-md wraps markdown rendered at runtime — the
+   :deep(:not(pre) > code)::before/::after backtick strip and :deep(table) rules
+   target nodes this template never writes, so they cannot be utilities. */
 .o2-card {
   padding: 1.5rem 1.75rem;
 }
 
 .o2-card-inner {
-  max-width: 980px;
+  max-width: 61.25rem;
 }
 
 .o2-section {
@@ -173,7 +176,7 @@ const renderedSections = computed(() =>
 .o2-card-md :deep(:not(pre) > code) {
   background: var(--color-code-bg);
   padding: 0.1rem 0.35rem;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   font-weight: 400;
 }
 

@@ -407,9 +407,10 @@ describe("MarkdownRenderer", () => {
       
       const container = wrapper.find('[data-test="markdown-renderer-scroll-container"]');
       expect(container.exists()).toBe(true);
-      expect(container.attributes('style')).toContain('width: 100%');
-      expect(container.attributes('style')).toContain('height: 100%');
-      expect(container.attributes('style')).toContain('overflow: auto');
+      // Sizing/overflow moved from an inline style to Tailwind utilities.
+      expect(container.classes()).toContain('w-full');
+      expect(container.classes()).toContain('h-full');
+      expect(container.classes()).toContain('overflow-auto');
       // default padding lives on the content div via tailwind utilities
       expect(wrapper.find('[data-test="markdown-renderer"]').classes()).toEqual(
         expect.arrayContaining(['px-2', 'py-1']),
@@ -431,7 +432,7 @@ describe("MarkdownRenderer", () => {
       wrapper = createWrapper({ markdownContent: longContent });
       
       const container = wrapper.find('[data-test="markdown-renderer-scroll-container"]');
-      expect(container.attributes('style')).toContain('overflow: auto');
+      expect(container.classes()).toContain('overflow-auto');
     });
   });
 

@@ -81,7 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
                 <OText variant="page-title" as="h2" class="text-xl font-medium">{{ t("about.os_libraries") }}</OText>
             </div>
-            <div class="text-sm" style="color: var(--color-text-secondary)">{{ t("about.os_libraries_msg") }}</div>
+            <div class="text-sm text-text-secondary">{{ t("about.os_libraries_msg") }}</div>
             <div class="grid grid-cols-4 gap-2.5">
               <a
                 href="https://github.com/openobserve/openobserve/blob/main/Cargo.toml"
@@ -278,8 +278,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- Ingestion usage panel -->
             <div class="bg-[color-mix(in_srgb,var(--color-accent)_4%,var(--color-card-glass-bg))] border border-card-glass-border rounded-lg p-5">
-              <p class="text-sm font-semibold m-0 mb-1" style="color: var(--color-text-heading)">{{ t("about.usage_limits") }}</p>
-              <p class="text-xs m-0 mb-4" style="color: var(--color-text-muted)">
+              <p class="text-sm font-semibold m-0 mb-1 text-text-heading">{{ t("about.usage_limits") }}</p>
+              <p class="text-xs m-0 mb-4 text-text-muted">
                 {{ licenseData.license.limits?.Ingestion?.typ || 'PerDayCount' }}
                 · limit {{ licenseData.license.limits?.Ingestion?.value || 50 }} GB / day
               </p>

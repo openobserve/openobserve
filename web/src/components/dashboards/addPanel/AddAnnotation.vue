@@ -34,11 +34,10 @@
             hint="If no panel is selected, annotations will be applied to all the panels of the dashboard."
             :options="groupedPanelsOptions"
             multiple
-            style="min-width: 150px"
             label="Select Panels"
-            class="textbox flex flex-col no-case showLabelOnTop"
+            class="textbox flex flex-col no-case showLabelOnTop min-w-37.5"
             data-test="dashboard-add-annotation-panels-select"
-          />
+        />
         <div class="text-xs mt-3">
           Timestamp: {{ annotationDateString }}
         </div>

@@ -64,7 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
     <div class="flex h-[calc(100%-40px)]!">
-      <div class="flex flex-col" style="border-top: 1px solid var(--color-border-default); height: 100px">
+      <div class="flex flex-col border-t border-border-default h-25">
         <b>Query Editor:</b>
         <code-query-editor
           editor-id="logsStreamQueryEditor"

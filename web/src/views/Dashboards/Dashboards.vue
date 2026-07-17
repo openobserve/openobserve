@@ -69,8 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <div class="flex flex-col">
               <span>{{ t('dashboard.importCustom') }}</span>
-              <span class="text-xs text-dropdown-item-text opacity-60"
-                >{{ t('dashboard.importCustomDesc') }}</span
+              <span class="text-xs text-dropdown-item-text opacity-60">{{ t('dashboard.importCustomDesc') }}</span
               >
             </div>
           </ODropdownItem>
@@ -80,8 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <div class="flex flex-col">
               <span>{{ t('dashboard.importTemplates') }}</span>
-              <span class="text-xs text-dropdown-item-text opacity-60"
-                >{{ t('dashboard.importTemplatesDesc') }}</span
+              <span class="text-xs text-dropdown-item-text opacity-60">{{ t('dashboard.importTemplatesDesc') }}</span
               >
             </div>
           </ODropdownItem>
@@ -114,7 +112,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Right: dashboards table -->
       <div class="flex-1 min-w-0 h-full">
         <div class="h-full bg-card-glass-bg">
-          <OTable
+          <OTable class="w-full h-full"
             ref="oTableRef"
             :data="dashboards"
             :columns="columns"
@@ -134,7 +132,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             table-id="dashboards-dashboard-list"
             @row-click="onRowClick"
             data-test="dashboard-table"
-            style="width: 100%; height: 100%"
           >
             <!-- Toolbar inside the table frame: scoped search (fills the bar) + refresh -->
             <template #toolbar>
@@ -201,7 +198,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="text-text-primary"
                   :data-test="`dashboard-name-cell-${value}`"
                   :title="value"
-                  >{{ value }}</span
+                >{{ value }}</span
                 >
                 <!-- At-a-glance indicator: shows which dashboard is the org
                      home dashboard without an interactive icon on every row. -->
@@ -223,14 +220,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span
                 class="font-mono text-xs text-text-primary"
                 :title="value"
-                >{{ value }}</span
+              >{{ value }}</span
               >
             </template>
             <template #cell-description="{ value }">
               <span
                 class="text-text-primary"
                 :title="value"
-                >{{ value || "—" }}</span
+              >{{ value || "—" }}</span
               >
             </template>
             <template #cell-owner="{ value }">
@@ -350,7 +347,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   <span
                     class="text-sm text-text-primary mr-1"
-                    >{{ selectedIds.length }} selected</span
+                  >{{ selectedIds.length }} selected</span
                   >
                   <OButton
                     variant="outline"

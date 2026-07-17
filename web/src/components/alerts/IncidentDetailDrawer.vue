@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <template #title>
         <!-- Incident name (inline-editable) -->
-        <input
+        <input class="min-w-75 max-w-125"
           v-if="incidentDetails && isEditingTitle"
           v-model="editableTitle"
           ref="titleInputRef"
@@ -39,7 +39,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             'font-bold px-2 py-1 rounded-md outline-none border-2',
             'text-text-link bg-status-info-bg border-text-link'
           ]"
-          style="min-width: 300px; max-width: 500px;"
         />
         <span
           v-else-if="incidentDetails"
@@ -185,7 +184,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Tab Content Container -->
       <div class="flex flex-1 overflow-hidden">
       <!-- Left Column: Incident Details (only show on Incident Analysis tab, HIDDEN for Overview) -->
-      <div v-if="activeTab === 'incidentAnalysis'" class="w-100 min-w-100 max-w-100 flex-shrink-0 flex flex-col h-full" style="order: 1;">
+      <div v-if="activeTab === 'incidentAnalysis'" class="w-100 min-w-100 max-w-100 flex-shrink-0 flex flex-col h-full order-1">
 
         <!-- Table of Contents (only on Incident Analysis) -->
         <IncidentTableOfContents
@@ -198,14 +197,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- Right Column: Content -->
-      <div class="flex-1 min-w-0 flex flex-col overflow-hidden" style="order: 2;">
+      <div class="flex-1 min-w-0 flex flex-col overflow-hidden order-2">
         <!-- Tab Content Area -->
         <div class="flex-1 flex flex-col px-2 pt-4 pb-2 overflow-hidden relative">
 
         <!-- Overview Tab Content - REDESIGNED -->
         <div v-if="activeTab === 'overview'" class="flex flex-col flex-1 overflow-hidden">
           <!-- SECTION 1: Hero Metrics (100px height) -->
-          <div class="flex gap-3 mb-3" style="height: 100px;">
+          <div class="flex gap-3 mb-3 h-25">
             <!-- 1. Total Alerts Card -->
             <div
               class="flex-1 flex flex-col justify-between border border-card-glass-border rounded-md bg-card-glass-bg transition-all duration-200 cursor-pointer p-3"
@@ -216,7 +215,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   Total Alerts
                 </div>
                 <div class="w-8 h-8 rounded-lg flex items-center justify-center bg-badge-amber-soft-bg">
-                  <OIcon name="bolt" size="sm" class="text-badge-amber-soft-text" style="font-size: 20px;" />
+                  <OIcon name="bolt" size="sm" class="text-badge-amber-soft-text" />
                 </div>
               </div>
 
@@ -236,7 +235,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   {{ t('alerts.incidents.uniqueAlerts') }}
                 </div>
                 <div class="w-8 h-8 rounded-lg flex items-center justify-center bg-badge-blue-soft-bg">
-                  <OIcon name="notifications-active" size="sm" class="text-badge-blue-soft-text" style="font-size: 20px;" />
+                  <OIcon name="notifications-active" size="sm" class="text-badge-blue-soft-text" />
                 </div>
               </div>
 
@@ -256,7 +255,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   Affected Services
                 </div>
                 <div class="w-8 h-8 rounded-lg flex items-center justify-center bg-badge-purple-soft-bg">
-                  <OIcon name="dns" size="sm" class="text-badge-purple-soft-text" style="font-size: 20px;" />
+                  <OIcon name="dns" size="sm" class="text-badge-purple-soft-text" />
                 </div>
               </div>
 
@@ -276,7 +275,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   Active Duration
                 </div>
                 <div class="w-8 h-8 rounded-lg flex items-center justify-center bg-badge-success-soft-bg">
-                  <OIcon name="schedule" size="sm" class="text-badge-success-soft-text" style="font-size: 20px;" />
+                  <OIcon name="schedule" size="sm" class="text-badge-success-soft-text" />
                 </div>
               </div>
 
@@ -298,7 +297,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   Alert Frequency
                 </div>
                 <div class="w-8 h-8 rounded-lg flex items-center justify-center bg-badge-error-soft-bg">
-                  <OIcon name="show-chart" size="sm" class="text-badge-error-soft-text" style="font-size: 20px;" />
+                  <OIcon name="show-chart" size="sm" class="text-badge-error-soft-text" />
                 </div>
               </div>
 
@@ -310,17 +309,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- SECTION 2: Main Content (2:1 Ratio Layout) with calc(100vh - 236px) height (was 276px) -->
-          <div class="flex gap-3 flex-1" style="height: calc(100vh - 380px);">
+          <div class="flex gap-3 flex-1 h-[calc(100vh-23.75rem)]">
             <!-- PART 1: Primary Content (66.67% width) -->
-            <div class="flex flex-col gap-3" style="width: 66.67%;">
+            <div class="flex flex-col gap-3 w-2/3">
                 <!-- 2.1A: Top Row - Incident Details (2/3) + Incident Timeline (1/3) -->
-              <div class="flex gap-3" style="height: 50%;">
+              <div class="flex gap-3 h-1/2">
                                <!-- Incident Timeline (33.33% width) -->
                 <div
-                  class="border border-card-glass-border rounded-md bg-card-glass-bg flex flex-col overflow-hidden"
-                  :style="{
-                    width: '33.33%'
-                  }"
+                  class="border border-card-glass-border rounded-md bg-card-glass-bg flex flex-col overflow-hidden w-1/3"
                 >
                   <!-- Header -->
                   <div class="flex items-center justify-between px-4 py-3">
@@ -328,11 +324,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       {{ t('alerts.incidents.incidentTimeline') }}
                     </div>
                     <div
-                      class="px-2 py-0.5 rounded-sm text-xs font-medium"
-                      :style="{
-                        backgroundColor: 'var(--color-surface-panel)',
-                        color: 'var(--color-text-secondary)'
-                      }"
+                      class="px-2 py-0.5 rounded-sm text-xs font-medium bg-surface-panel text-text-secondary"
                     >
                       UTC
                     </div>
@@ -342,22 +334,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div class="flex flex-col gap-6 px-4 py-2 overflow-y-auto relative">
                     <!-- Vertical line -->
                     <div
-                      class="absolute w-0.5"
-                      :style="{
-                        left: '21px',
-                        top: '21px',
-                        bottom: '21px',
-                        backgroundColor: 'var(--color-surface-panel)'
-                      }"
+                      class="absolute w-0.5 left-5.25 top-5.25 bottom-5.25 bg-surface-panel"
                     ></div>
 
                     <!-- First Alert Received -->
                     <div class="flex items-start gap-3 relative">
                       <div
-                        class="w-2.5 h-2.5 rounded-full flex-shrink-0 z-10 mt-2"
-                        :style="{
-                          backgroundColor: 'var(--color-timeline-dot-success)'
-                        }"
+                        class="w-2.5 h-2.5 rounded-full flex-shrink-0 z-10 mt-2 bg-timeline-dot-success"
                       ></div>
                       <div class="flex-1">
                         <div :class="'text-text-primary'" class="text-sm font-medium mb-1">
@@ -374,10 +357,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <!-- Peak Activity (if available) -->
                     <div v-if="peakActivity" class="flex items-start gap-3 relative">
                       <div
-                        class="w-2.5 h-2.5 rounded-full flex-shrink-0 z-10 mt-2"
-                        :style="{
-                          backgroundColor: 'var(--color-status-warning-text)'
-                        }"
+                        class="w-2.5 h-2.5 rounded-full flex-shrink-0 z-10 mt-2 bg-status-warning-text"
                       ></div>
                       <div class="flex-1">
                         <div :class="'text-text-primary'" class="text-sm font-medium mb-1">
@@ -395,9 +375,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div class="flex items-start gap-3 relative">
                       <div
                         class="w-2.5 h-2.5 rounded-full flex-shrink-0 z-10 mt-2"
-                        :style="{
-                          backgroundColor: incidentDetails?.status === 'resolved' ? 'var(--color-timeline-dot-success)' : 'var(--color-timeline-dot-destructive)'
-                        }"
+                        :class="incidentDetails?.status === 'resolved' ? 'bg-timeline-dot-success' : 'bg-timeline-dot-destructive'"
                       ></div>
                       <div class="flex-1">
                         <div :class="'text-text-primary'" class="text-sm font-medium mb-1">
@@ -424,10 +402,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <!-- Incident Details (66.67% width) -->
                 <div
-                  class="border border-card-glass-border rounded-md bg-card-glass-bg flex flex-col overflow-hidden"
-                  :style="{
-                    width: '66.67%'
-                  }"
+                  class="border border-card-glass-border rounded-md bg-card-glass-bg flex flex-col overflow-hidden w-2/3"
                 >
                   <!-- Header -->
                   <div class="px-4 pt-2 pb-1">
@@ -439,79 +414,61 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <!-- Content -->
                   <div class="flex flex-col gap-3 p-4 overflow-y-auto">
                     <!-- Incident ID -->
-                    <div class="grid gap-2" style="grid-template-columns: 120px 1fr;">
+                    <div class="grid gap-2 grid-cols-[7.5rem_1fr]">
                       <div :class="'text-text-secondary'" class="text-xs font-medium">
                         {{ t('alerts.incidents.incidentId') }}
                       </div>
                       <div
-                        class="flex items-center gap-2 px-2.5 py-1 rounded-sm border text-xs font-mono min-w-0"
-                        :style="{
-                          backgroundColor: 'var(--color-surface-panel)',
-                          borderColor: 'var(--color-border-default)',
-                          color: 'var(--color-text-body)'
-                        }"
+                        class="flex items-center gap-2 px-2.5 py-1 rounded-sm border text-xs font-mono min-w-0 bg-surface-panel border-border-default text-text-body"
                       >
                         <span class="truncate flex-1 min-w-0">{{ incidentDetails?.id || 'N/A' }}</span>
                         <OIcon
                           :name="copiedField === 'incident_id' ? 'check' : 'content-copy'" size="sm"
                           :class="copiedField === 'incident_id' ? 'text-status-positive' : 'opacity-60 hover:opacity-100 hover:text-text-link'"
                           class="cursor-pointer transition-all flex-shrink-0"
-                          style="font-size: 14px; cursor: pointer;"
                           @click="copyToClipboard(incidentDetails?.id, 'incident_id')"
                         />
                       </div>
                     </div>
 
                     <!-- Incident Name -->
-                    <div class="grid gap-2" style="grid-template-columns: 120px 1fr;">
+                    <div class="grid gap-2 grid-cols-[7.5rem_1fr]">
                       <div :class="'text-text-secondary'" class="text-xs font-medium">
                         {{ t('alerts.incidents.incidentName') }}
                       </div>
                       <div
-                        class="flex items-center gap-2 px-2.5 py-1 rounded-sm border text-xs min-w-0"
-                        :style="{
-                          backgroundColor: 'var(--color-surface-panel)',
-                          borderColor: 'var(--color-border-default)',
-                          color: 'var(--color-text-body)'
-                        }"
+                        class="flex items-center gap-2 px-2.5 py-1 rounded-sm border text-xs min-w-0 bg-surface-panel border-border-default text-text-body"
                       >
                         <span class="truncate flex-1 min-w-0">{{ incidentDetails?.title || 'N/A' }}</span>
                         <OIcon
                           :name="copiedField === 'incident_title' ? 'check' : 'content-copy'" size="sm"
                           :class="copiedField === 'incident_title' ? 'text-status-positive' : 'opacity-60 hover:opacity-100 hover:text-text-link'"
                           class="cursor-pointer transition-all flex-shrink-0"
-                          style="font-size: 14px; cursor: pointer;"
                           @click="copyToClipboard(incidentDetails?.title, 'incident_title')"
                         />
                       </div>
                     </div>
 
                     <!-- Correlated By -->
-                    <div class="grid gap-2" style="grid-template-columns: 120px 1fr;">
+                    <div class="grid gap-2 grid-cols-[7.5rem_1fr]">
                       <div :class="'text-text-secondary'" class="text-xs font-medium">
                         Correlated By
                       </div>
                       <div
-                        class="flex items-center gap-2 px-2.5 py-1 rounded-sm border text-xs min-w-0"
-                        :style="{
-                          backgroundColor: 'var(--color-surface-panel)',
-                          borderColor: 'var(--color-border-default)',
-                          color: 'var(--color-text-body)'
-                        }"
+                        class="flex items-center gap-2 px-2.5 py-1 rounded-sm border text-xs min-w-0 bg-surface-panel border-border-default text-text-body"
                       >
                         <span class="truncate flex-1 min-w-0">{{ getCorrelationMethodLabel(incidentDetails?.key_type) }}</span>
                         <OIcon
                           :name="copiedField === 'key_type' ? 'check' : 'content-copy'" size="sm"
                           :class="copiedField === 'key_type' ? 'text-status-positive' : 'opacity-60 hover:opacity-100 hover:text-text-link'"
                           class="cursor-pointer transition-all flex-shrink-0"
-                          style="font-size: 14px; cursor: pointer;"
                           @click="copyToClipboard(getCorrelationMethodLabel(incidentDetails?.key_type), 'key_type')"
                         />
                       </div>
                     </div>
 
                     <!-- Created At -->
-                    <div class="grid gap-2" style="grid-template-columns: 120px 1fr;">
+                    <div class="grid gap-2 grid-cols-[7.5rem_1fr]">
                       <div :class="'text-text-secondary'" class="text-xs font-medium">
                         Created At
                       </div>
@@ -521,7 +478,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
 
                     <!-- Updated At -->
-                    <div class="grid gap-2" style="grid-template-columns: 120px 1fr;">
+                    <div class="grid gap-2 grid-cols-[7.5rem_1fr]">
                       <div :class="'text-text-secondary'" class="text-xs font-medium">
                         Updated At
                       </div>
@@ -535,10 +492,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <!-- alert activity -->
                <!-- 2.1B: Alert Activity Chart (50% height, full width) -->
               <div
-                class="border border-card-glass-border rounded-md bg-card-glass-bg flex flex-col overflow-hidden"
-                :style="{
-                  height: '50%'
-                }"
+                class="border border-card-glass-border rounded-md bg-card-glass-bg flex flex-col overflow-hidden h-1/2"
               >
                 <!-- Header -->
                 <div class="px-4 pt-2 pb-1">
@@ -563,13 +517,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <!-- PART 2: Sidebar Content (33.33% width) - 3 sections -->
-            <div class="flex flex-col gap-2" style="width: 33.33%; height: 100%;">
+            <div class="flex flex-col gap-2 w-1/3 h-full">
               <!-- 2.2A: Manage Panel (40% of available height after gaps) -->
               <div
-                class="border border-card-glass-border rounded-md bg-card-glass-bg flex flex-col overflow-hidden"
-                :style="{
-                  height: 'calc(35% - 6.4px)'
-                }"
+                class="border border-card-glass-border rounded-md bg-card-glass-bg flex flex-col overflow-hidden h-[calc(35%-0.4rem)]"
               >
                 <!-- Header -->
                 <div class="px-4 pt-2 pb-1">
@@ -642,14 +593,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <!-- 2.2B: Dimensions Panel (35% when Alert Flow present, 60% when absent, or when no triggers) -->
               <div
-                class="border border-card-glass-border rounded-md bg-card-glass-bg flex flex-col overflow-hidden"
-                :style="{
-                  height: (sortedAlertsByTriggerCount?.length)
-                    ? 'calc(35% - 5.6px)'
-                    : 'calc(65% - 2px)',
-                  minHeight: 0,
-                  flexShrink: 0
-                }"
+                class="border border-card-glass-border rounded-md bg-card-glass-bg flex flex-col overflow-hidden min-h-0 shrink-0"
+                :class="(sortedAlertsByTriggerCount?.length) ? 'h-[calc(35%-0.35rem)]' : 'h-[calc(65%-0.125rem)]'"
               >
                 <!-- Header -->
                 <div class="px-4 pt-2 pb-1">
@@ -662,7 +607,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
 
                 <!-- Content -->
-                <div class="flex flex-col p-3 overflow-y-auto gap-0 flex-1" style="min-height: 0;">
+                <div class="flex flex-col p-3 overflow-y-auto gap-0 flex-1 min-h-0">
                   <div
                     v-if="incidentDetails?.group_values && Object.keys(incidentDetails.group_values).length > 0"
                     class="flex flex-col"
@@ -670,10 +615,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div
                       v-for="(value, key) in incidentDetails.group_values"
                       :key="key"
-                      class="py-2.5 border-b flex gap-2"
-                      :style="{
-                        borderColor: 'var(--color-border-default)'
-                      }"
+                      class="py-2.5 border-b flex gap-2 border-border-default"
                       :class="{ 'border-b-0': key === Object.keys(incidentDetails.group_values)[Object.keys(incidentDetails.group_values).length - 1] }"
                     >
                       <div
@@ -703,10 +645,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- 2.2C: Alert Flow Panel (25% of available height after gaps) - Conditional -->
               <div
                 v-if="sortedAlertsByTriggerCount?.length"
-                class="border border-card-glass-border rounded-md bg-card-glass-bg flex flex-col overflow-hidden"
-                :style="{
-                  height: 'calc(30% - 4px)'
-                }"
+                class="border border-card-glass-border rounded-md bg-card-glass-bg flex flex-col overflow-hidden h-[calc(30%-0.25rem)]"
               >
                 <!-- Header -->
                 <div class="px-4 pt-2 pb-1">
@@ -719,15 +658,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
 
                 <!-- Content - Vertical list -->
-                <div class="px-3 pb-3 overflow-y-auto flex-1" style="min-height: 0;">
+                <div class="px-3 pb-3 overflow-y-auto flex-1 min-h-0">
                   <div class="flex flex-col gap-0">
                     <div
                       v-for="(alert, index) in sortedAlertsByTriggerCount"
                       :key="alert.id"
-                      class="py-2.5 border-b"
-                      :style="{
-                        borderColor: 'var(--color-border-default)'
-                      }"
+                      class="py-2.5 border-b border-border-default"
                       :class="{ 'border-b-0': index === sortedAlertsByTriggerCount.length - 1 }"
                     >
                       <div
@@ -746,7 +682,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             {{ alert.name.length > 30 ? alert.name.substring(0, 30) + '...' : alert.name }}
                           </span>
                         </div>
-                        <div class="flex-shrink-0" style="width: 120px;">
+                        <div class="flex-shrink-0 w-30">
                           <span
                             :class="'text-text-secondary'"
                           >
@@ -917,7 +853,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
 
                   <!-- Alert Conditions Section -->
-                  <div :class="['rounded-sm border flex flex-col border-card-glass-border rounded-md',]" class="overflow-hidden" style="height: 392px;">
+                  <div :class="['rounded-sm border flex flex-col border-card-glass-border rounded-md',]" class="overflow-hidden h-98">
                     <div :class="['!bg-[var(--color-theme-table-header-bg)] px-2.5 py-1.5 border-b flex items-center justify-between flex-shrink-0', 'border-border-default']">
                       <span :class="'text-text-secondary'" class="text-2xs font-semibold uppercase tracking-wide">
                         {{ alerts[selectedAlertIndex]?.query_condition?.type === 'sql' ? 'SQL Query' : alerts[selectedAlertIndex]?.query_condition?.type === 'promql' ? 'PromQL Query' : 'Conditions' }}
@@ -2631,21 +2567,26 @@ export default defineComponent({
 
             const id = 'section-' + rawText.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
 
+            // Colours/backgrounds for these rca-* classes come from the
+            // `:deep(.rca-report-content)` rules in IncidentRCAAnalysis.vue (the
+            // component that v-htmls this string). Those rules are unlayered, so
+            // they beat any layered colour utility named here — only structural
+            // utilities (spacing, size, weight, border-width) are live.
             const classes = [
               'rca-h1 font-bold text-lg text-center mb-4 pb-2 border-b-2',
               // TODO: Discuss with team - h2 section separators with background and left border
-              // Remove 'rca-section-bg px-4 py-3 rounded-sm border-l-4 border-blue-600' if not approved
-              'rca-h2 font-bold text-lg mt-5 mb-3 text-blue-600 rca-section-bg px-4 py-3 rounded-sm border-l-4 border-blue-600',
+              // Remove 'rca-section-bg px-4 py-3 rounded-sm border-l-4' if not approved
+              'rca-h2 font-bold text-lg mt-5 mb-3 rca-section-bg px-4 py-3 rounded-sm border-l-4',
               'rca-h3 font-semibold text-base mt-4 mb-2',
-              'rca-h4 font-semibold text-sm mt-3 mb-2 text-gray-700',
+              'rca-h4 font-semibold text-sm mt-3 mb-2',
             ];
             return `<div id="${id}" class="${classes[depth - 1] || ''}">${parsedText}</div>`;
           },
           code({ text }: any) {
-            return `<div class="rca-code-block bg-gray-100 border border-gray-300 rounded-sm p-3 my-3 overflow-x-auto"><pre class="text-sm font-mono whitespace-pre m-0"><code>${text}</code></pre></div>`;
+            return `<div class="rca-code-block border rounded-sm p-3 my-3 overflow-x-auto"><pre class="text-sm font-mono whitespace-pre m-0"><code>${text}</code></pre></div>`;
           },
           codespan({ text }: any) {
-            return `<code class="rca-inline-code bg-gray-100 px-1.5 py-0.5 rounded-sm text-sm font-mono">${text}</code>`;
+            return `<code class="rca-inline-code px-1.5 py-0.5 rounded-sm text-sm font-mono">${text}</code>`;
           },
           list(token: any) {
             const body = token.items.map((item: any) => this.listitem(item)).join('');
@@ -2683,7 +2624,7 @@ export default defineComponent({
           },
           blockquote({ tokens }: any) {
             const text = this.parser.parse(tokens);
-            return `<blockquote class="rca-blockquote border-l-4 border-blue-500 pl-4 py-2 my-3 bg-blue-50 italic">${text}</blockquote>`;
+            return `<blockquote class="rca-blockquote border-l-4 pl-4 py-2 my-3 italic">${text}</blockquote>`;
           },
           paragraph({ tokens }: any) {
             const text = this.parser.parseInline(tokens);
@@ -2698,7 +2639,7 @@ export default defineComponent({
             return `<em class="italic">${text}</em>`;
           },
           hr() {
-            return `<hr class="my-4 border-t border-gray-300" />`;
+            return `<hr class="my-4 border-t" />`;
           },
         }
       });

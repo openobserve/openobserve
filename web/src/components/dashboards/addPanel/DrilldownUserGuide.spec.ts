@@ -412,13 +412,14 @@ describe("DrilldownUserGuide", () => {
 
       const userGuide = getUserGuideEl();
       expect(userGuide).toBeTruthy();
-      const style = userGuide!.getAttribute("style") ?? "";
+      const classes = Array.from(userGuide!.classList);
 
-      // Updated to match migrated styles
-      expect(style).toContain("position: fixed");
-      expect(style).toContain("z-index: 9999");
-      expect(style).toContain("width: 500px");
-      expect(style).toContain("max-height: 300px");
+      // The inline positioning/sizing block is now utilities:
+      // fixed / z-9999 / w-125 (31.25rem = 500px) / max-h-75 (18.75rem = 300px).
+      expect(classes).toContain("fixed");
+      expect(classes).toContain("z-9999");
+      expect(classes).toContain("w-125");
+      expect(classes).toContain("max-h-75");
     });
 
     it("should highlight code examples correctly", async () => {

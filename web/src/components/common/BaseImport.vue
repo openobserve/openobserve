@@ -116,8 +116,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="mx-2 mt-1 pb-2 flex flex-col flex-1 min-h-0">
                   <!-- Slot for custom file input section -->
                   <slot name="file-input-section" :jsonFiles="jsonFiles" :updateFiles="updateFiles">
-                    <div style="width: calc(100% - 10px)" class="mb-1 flex shrink-0">
-                      <div style="width: 100%" class="pr-2">
+                    <div class="mb-1 flex shrink-0 w-[calc(100%-0.625rem)]">
+                      <div class="pr-2 w-full">
                         <OFile
                           :data-test="`${testPrefix}-import-json-file-input`"
                           v-model="jsonFiles"

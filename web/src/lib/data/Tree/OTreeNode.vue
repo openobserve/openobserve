@@ -152,21 +152,17 @@ function onTickChange(newVal: CheckboxModelValue) {
       -->
       <span
         v-else
-        class="relative shrink-0 self-stretch opacity-35"
-        style="width: 1rem;"
+        class="relative shrink-0 self-stretch opacity-35 w-4"
         aria-hidden="true"
       >
+        <!-- Elbow connector. The 0.75px offsets are half the 1.5px hairline, so
+             the stroke lands on the same physical line as the sibling connectors.
+             `- -0.75px` is deliberate and means `+ 0.75px`: Tailwind's candidate
+             scanner drops any class containing a literal `+`, so `w-[calc(…+…)]`
+             silently compiles to NOTHING. Subtracting a negative is the only form
+             that survives extraction. Verified against the compiled stylesheet. -->
         <span
-          style="
-            position: absolute;
-            left: calc(-0.75rem - 0.75px);
-            top: 0;
-            width: calc(1.75rem + 0.75px);
-            height: calc(50% + 0.75px);
-            border-left: 1.5px solid currentColor;
-            border-bottom: 1.5px solid currentColor;
-            border-bottom-left-radius: 3px;
-          "
+          class="absolute top-0 left-[calc(-0.75rem_-_0.75px)] w-[calc(1.75rem_-_-0.75px)] h-[calc(50%_-_-0.75px)] border-l-[1.5px] border-b-[1.5px] rounded-bl-sm"
         />
       </span>
 
