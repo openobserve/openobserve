@@ -291,12 +291,17 @@ export default defineComponent({
 
     const onStreamChange = (selectedValue: SelectModelValue) => {
       const streamValue = typeof selectedValue === "string" ? selectedValue : null;
-      const stream = streamValue
-        ? searchObj.data.stream.streamLists.find((s: any) => s.value === streamValue) ?? null
-        : null;
-      // Runtime clears the selection to null (read via optional-chaining); useTraces types the
-      // field non-null, so cast to preserve the existing null-clearing behavior.
-      searchObj.data.stream.selectedStream = stream as { label: string; value: string };
+      const matched = streamValue
+        ? searchObj.data.stream.streamLists.find(
+            (s: any) => s.value === streamValue,
+          )
+        : undefined;
+      // No match clears to the empty-stream sentinel (the codebase's "cleared"
+      // convention everywhere else — resetSearchObj, SearchBar, Index).
+      searchObj.data.stream.selectedStream = matched ?? {
+        label: "",
+        value: "",
+      };
       searchObj.data.query = "";
       searchObj.data.editorValue = "";
       searchObj.data.resultGrid.currentPage = 0;

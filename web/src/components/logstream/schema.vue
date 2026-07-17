@@ -1415,10 +1415,11 @@ export default defineComponent({
           (v: any) => !v.disabled && v.field === property.name,
         )
       ) {
-        const [level, partition] = Object.entries(settings.partition_keys).find(
-          ([, partition]: [string, { field: string }]) =>
-            partition["field"] === property.name,
-        ) as [string, any];
+        const matchedEntry = Object.entries(settings.partition_keys).find(
+          ([, partition]) => partition["field"] === property.name,
+        );
+        if (!matchedEntry) return fieldIndices;
+        const [level, partition] = matchedEntry;
 
         property.level = level;
 
@@ -1670,7 +1671,7 @@ export default defineComponent({
         settings["flatten_level"] = Number(flattenLevel.value);
       }
 
-      const newSchemaFieldSet = new Set(
+      const newSchemaFieldSet = new Set<{ name: string; type: string }>(
         newSchemaFields.value.map((field: NewSchemaField) => {
           return {
             name: field.name
@@ -1682,7 +1683,7 @@ export default defineComponent({
           };
         }),
       );
-      const newSchemaFieldNameSet = new Set(
+      const newSchemaFieldNameSet = new Set<string>(
         newSchemaFields.value.map((field: NewSchemaField) =>
           field.name.trim().toLowerCase().replace(/ /g, "_").replace(/-/g, "_"),
         ),
@@ -2315,7 +2316,7 @@ export default defineComponent({
       if (activeTab.value === "schemaFields") {
         indexData.value.defined_schema_fields =
           indexData.value.defined_schema_fields.filter(
-            (field) => !selectedFieldsSet.has(field),
+            (field: string) => !selectedFieldsSet.has(field),
           );
 
         if (!indexData.value.defined_schema_fields.length) {

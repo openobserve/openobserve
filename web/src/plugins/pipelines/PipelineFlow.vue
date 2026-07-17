@@ -107,9 +107,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Add UI elements or buttons to interact with the methods -->
 </template>
 
-<script>
+<script lang="ts">
 import { ref, onMounted, watch, computed } from "vue";
+import type { Ref } from "vue";
 import { VueFlow, useVueFlow } from "@vue-flow/core";
+import type { VueFlowStore } from "@vue-flow/core";
 import { Controls } from '@vue-flow/controls'
 // import vueFlowConfig from "./vueFlowConfig";
 import CustomNode from "./CustomNode.vue";
@@ -131,7 +133,6 @@ export default {
       onDragOver,
       onDrop,
       onDragLeave,
-      isDragOver,
       onNodeChange,
       onNodesChange,
       onEdgesChange,
@@ -141,10 +142,12 @@ export default {
     } = useDragAndDrop();
     const store = useStore();
 
-    const vueFlowRef = ref(null);
+    // Hook doesn't return isDragOver, so it was always undefined here; preserved.
+    const isDragOver = undefined;
+    const vueFlowRef: Ref<VueFlowStore | null> = ref(null);
     const isCanvasEmpty = computed(() => pipelineObj.currentSelectedPipeline.nodes.length === 0);
     const showEdgeHelpNotification = ref(false);
-    let notificationTimeout = null;
+    let notificationTimeout: ReturnType<typeof setTimeout> | null = null;
 
     const { setViewport } = useVueFlow()
 
@@ -191,11 +194,11 @@ function resetTransform() {
   setViewport({ x: 0, y: 0, zoom: 1 })
 }
     const zoomIn = () => {
-      vueFlowRef.value.zoomIn();
+      if (vueFlowRef.value) vueFlowRef.value.zoomIn();
     };
 
     const zoomOut = () => {
-      vueFlowRef.value.zoomOut();
+      if (vueFlowRef.value) vueFlowRef.value.zoomOut();
     };
 
     return {

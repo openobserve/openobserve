@@ -187,7 +187,7 @@ export default defineComponent({
     watch(
       () => previewAlertRef.value?.evaluationStatus,
       (newStatus) => {
-        evaluationStatus.value = newStatus;
+        evaluationStatus.value = newStatus ?? null;
       },
       { deep: true, immediate: true }
     );

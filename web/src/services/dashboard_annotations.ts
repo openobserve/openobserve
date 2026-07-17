@@ -30,7 +30,7 @@ export const annotationService = {
     org_id: string,
     dashboard_id: string,
     timed_annotation_id: string,
-    annotations: any[],
+    annotations: Record<string, unknown>,
   ) => {
     return http().put(
       `/api/${org_id}/dashboards/${dashboard_id}/annotations/${timed_annotation_id}`,

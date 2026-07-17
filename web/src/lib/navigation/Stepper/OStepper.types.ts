@@ -11,8 +11,9 @@ import type { IconName } from '@/lib/core/Icon/OIcon.types'
 export type StepperOrientation = 'horizontal' | 'vertical'
 
 /** Step indicator icon: a registered icon name, a component, or none.
- * Named alias so `withDefaults` doesn't expand the large IconName union. */
-export type StepIcon = IconName | Component | null
+ * `IconName | string` collapses to `string` so `withDefaults` doesn't expand
+ * the large IconName union (mirrors OIcon's `name?: IconName | string`). */
+export type StepIcon = IconName | string | Component | null
 
 export interface OStepperProps {
   /** Currently active step number ΓÇö required, drives v-model */

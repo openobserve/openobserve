@@ -63,7 +63,7 @@ const defaultObject = {
     type:"",
   },
   dialog: dialogObj,
-  nodeTypes: [],
+  nodeTypes: [] as Array<{ label: string; icon: string; isSectionHeader: boolean; subtype?: string; io_type?: string; tooltip?: string }>,
   currentSelectedPipeline: defaultPipelineObj,
   pipelineWithoutChange: defaultPipelineObj,
   functions: {},

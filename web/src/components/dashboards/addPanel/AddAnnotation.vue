@@ -61,8 +61,8 @@
   </ODialog>
 </template>
 
-<script setup>
-import { ref, computed, watch } from "vue";
+<script setup lang="ts">
+import { ref, computed, watch, type PropType } from "vue";
 import { useStore } from "vuex";
 import { useLoading } from "@/composables/useLoading";
 import { annotationService } from "@/services/dashboard_annotations";
@@ -72,14 +72,33 @@ import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormTextarea from "@/lib/forms/Input/OFormTextarea.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
-import { addAnnotationSchema } from "./AddAnnotation.schema";
+import { addAnnotationSchema, type AddAnnotationForm } from "./AddAnnotation.schema";
+
+interface DashboardPanelItem {
+  id: string;
+  title: string;
+  tabName?: string;
+}
+
 const props = defineProps({
   dashboardId: { type: String, required: true },
   annotation: { type: Object, default: null, required: false },
-  panelsList: { type: Array, default: () => [], required: true },
+  panelsList: {
+    type: Array as PropType<DashboardPanelItem[]>,
+    default: () => [],
+    required: true,
+  },
 });
 
 const emit = defineEmits(["remove", "close"]);
+
+const errorMessageOf = (error: unknown): string | undefined => {
+  if (typeof error === "object" && error !== null && "message" in error) {
+    const message: unknown = error.message;
+    if (typeof message === "string") return message;
+  }
+  return undefined;
+};
 
 const store = useStore();
 const isOpen = ref(true);
@@ -106,7 +125,9 @@ const addAnnotationDefaults = computed(() => ({
   panels: annotationData.value.panels ?? [],
 }));
 
-const groupedPanels = ref({});
+type GroupedPanelItem = Pick<DashboardPanelItem, "id" | "title">;
+
+const groupedPanels = ref<Record<string, GroupedPanelItem[]>>({});
 
 const groupedPanelsOptions = computed(() =>
   Object.entries(groupedPanels.value).flatMap(([tab, panels]) => [
@@ -120,12 +141,15 @@ const groupedPanelsOptions = computed(() =>
 );
 
 const groupPanels = () => {
-  groupedPanels.value = props.panelsList.reduce((acc, panel) => {
-    const tabName = panel.tabName || "Unknown Tab";
-    if (!acc[tabName]) acc[tabName] = [];
-    acc[tabName].push({ id: panel.id, title: panel.title });
-    return acc;
-  }, {});
+  groupedPanels.value = props.panelsList.reduce(
+    (acc: Record<string, GroupedPanelItem[]>, panel) => {
+      const tabName = panel.tabName || "Unknown Tab";
+      if (!acc[tabName]) acc[tabName] = [];
+      acc[tabName].push({ id: panel.id, title: panel.title });
+      return acc;
+    },
+    {},
+  );
 };
 
 watch(
@@ -183,9 +207,10 @@ const handleSave = async () => {
           annotationData.value.annotation_id,
           annotationToUpdate,
         );
-      } catch (error) {
+      } catch (error: unknown) {
+        const message = errorMessageOf(error);
         showErrorNotification(
-          error?.message ?? "Failed to update annotation: " + error.message,
+          message ?? "Failed to update annotation: " + message,
         );
         return;
       }
@@ -197,9 +222,10 @@ const handleSave = async () => {
           props.dashboardId,
           [annotationData.value],
         );
-      } catch (error) {
+      } catch (error: unknown) {
+        const message = errorMessageOf(error);
         showErrorNotification(
-          error?.message ?? "Failed to create annotation: " + error.message,
+          message ?? "Failed to create annotation: " + message,
         );
         return;
       }
@@ -228,7 +254,7 @@ const confirmDelete = async () => {
 // those three back onto annotationData so handleSave (and the edit-update path)
 // reads consistent values. Plain async — OForm awaits it, and the ODialog
 // built-in primary button (form-id) auto-shows the Save spinner (no useLoading).
-const saveAnnotation = async (value) => {
+const saveAnnotation = async (value: AddAnnotationForm) => {
   if (value?.title != null) annotationData.value.title = value.title;
   annotationData.value.text = value?.text ?? "";
   annotationData.value.panels = value?.panels ?? [];

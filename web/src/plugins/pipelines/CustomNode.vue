@@ -14,8 +14,9 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-<script setup>
-import { Handle } from "@vue-flow/core";
+<script setup lang="ts">
+import { Handle, Position } from "@vue-flow/core";
+import type { PropType } from "vue";
 import useDragAndDrop from "./useDnD";
 import { ref, computed } from "vue";
 import { useI18n } from "vue-i18n";
@@ -29,12 +30,65 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 
+// Data payload carried by a pipeline node (shape varies by node_type).
+interface NodeData {
+  node_type?: string;
+  name?: string;
+  after_flatten?: boolean;
+  stream_type?: string;
+  stream_name?: string | { label?: string; value?: string };
+  destination_name?: string;
+  sampling_rate?: number;
+  condition?: unknown;
+  conditions?: unknown;
+}
+
+interface PipelineNode {
+  id: string;
+  io_type?: string;
+  data: NodeData;
+}
+
+interface PipelineEdge {
+  source: string;
+  style?: Record<string, unknown>;
+  markerEnd?: Record<string, unknown>;
+}
+
+interface NodeErrorInfo {
+  errors?: string[];
+  error_count?: number;
+}
+
+interface NodeType {
+  subtype?: string;
+  io_type?: string;
+  icon?: string;
+}
+
+// One condition group / node in a saved condition tree (multiple legacy formats).
+interface ConditionNode {
+  filterType?: string;
+  conditions?: ConditionNode[];
+  column?: string;
+  operator?: string;
+  value?: string | number | boolean | null;
+  logicalOperator?: string;
+  or?: ConditionNode[];
+  and?: ConditionNode[];
+  not?: ConditionNode;
+  items?: ConditionNode[];
+  label?: string;
+}
+
 const props = defineProps({
   id: {
     type: String,
+    required: true,
   },
   data: {
-    type: Object,
+    type: Object as PropType<NodeData>,
+    required: true,
   },
   io_type: {
     type: String,
@@ -49,22 +103,38 @@ const {
 } = useDragAndDrop();
 const showButtons = ref(false);
 const showDeleteTooltip = ref(false);
-let hideButtonsTimeout = null;
+let hideButtonsTimeout: ReturnType<typeof window.setTimeout> | null = null;
+
+// last_error is set at runtime but absent from the base pipeline literal type;
+// narrow the dynamic value instead of asserting a shape.
+const getLastError = (): {
+  node_errors?: Record<string, NodeErrorInfo>;
+} | null => {
+  const pipeline: unknown = pipelineObj.currentSelectedPipeline;
+  if (!pipeline || typeof pipeline !== "object" || !("last_error" in pipeline))
+    return null;
+  const lastError: unknown = pipeline.last_error;
+  if (!lastError || typeof lastError !== "object") return null;
+  const nodeErrors =
+    "node_errors" in lastError ? lastError.node_errors : undefined;
+  return { node_errors: nodeErrors as Record<string, NodeErrorInfo> };
+};
 
 // Check if current node has errors
 const hasNodeError = computed(() => {
-  const lastError = pipelineObj.currentSelectedPipeline?.last_error;
+  const lastError = getLastError();
   if (!lastError || !lastError.node_errors) return false;
 
   // node_errors is a JSON object with node IDs as keys
   const nodeErrors = lastError.node_errors;
-  return nodeErrors && nodeErrors[props.id];
+  return nodeErrors && props.id !== undefined && nodeErrors[props.id];
 });
 
 // Get error info for current node
 const getNodeErrorInfo = computed(() => {
-  const lastError = pipelineObj.currentSelectedPipeline?.last_error;
-  if (!lastError || !lastError.node_errors) return null;
+  const lastError = getLastError();
+  if (!lastError || !lastError.node_errors || props.id === undefined)
+    return null;
 
   const nodeError = lastError.node_errors[props.id];
   if (!nodeError) return null;
@@ -76,8 +146,9 @@ const getNodeErrorInfo = computed(() => {
     nodeError.errors.length > 0
   ) {
     const errorText = nodeError.errors.join("\n\n");
-    if (nodeError.error_count > nodeError.errors.length) {
-      return `${errorText}\n\n... and ${nodeError.error_count - nodeError.errors.length} more errors`;
+    const errorCount = nodeError.error_count ?? 0;
+    if (errorCount > nodeError.errors.length) {
+      return `${errorText}\n\n... and ${errorCount - nodeError.errors.length} more errors`;
     }
     return errorText;
   }
@@ -85,20 +156,37 @@ const getNodeErrorInfo = computed(() => {
   return null;
 });
 
+// stream_name is either a plain string or a { label, value } object.
+const streamNameLabel = computed(() => {
+  const streamName = props.data.stream_name;
+  return typeof streamName === "object" ? streamName?.label : "";
+});
+
+// Error count for the current node's badge (read via the typed last_error view).
+const nodeErrorCount = computed(() => {
+  const lastError = getLastError();
+  if (!lastError?.node_errors || props.id === undefined) return undefined;
+  return lastError.node_errors[props.id]?.error_count;
+});
+
 // Edge color mapping for different node types
-const getNodeColor = (ioType) => {
-  const colorMap = {
+const getNodeColor = (ioType: string | undefined) => {
+  const colorMap: Record<string, string> = {
     input: "#3b82f6", // Blue
     output: "#22c55e", // Green
     default: "#f59e0b", // Orange/Amber
   };
-  return colorMap[ioType] || "#6b7280";
+  return (ioType && colorMap[ioType]) || "#6b7280";
 };
 
 // Function to update edge colors on node hover
-const updateEdgeColors = (nodeId, color, reset = false) => {
+const updateEdgeColors = (
+  nodeId: string | undefined,
+  color: string | null,
+  reset = false,
+) => {
   if (pipelineObj.currentSelectedPipeline?.edges) {
-    pipelineObj.currentSelectedPipeline.edges.forEach((edge) => {
+    pipelineObj.currentSelectedPipeline.edges.forEach((edge: PipelineEdge) => {
       if (edge.source === nodeId) {
         if (reset) {
           // Reset to default color
@@ -129,7 +217,10 @@ const updateEdgeColors = (nodeId, color, reset = false) => {
 };
 
 // Node hover handlers
-const handleNodeHover = (nodeId, ioType) => {
+const handleNodeHover = (
+  nodeId: string | undefined,
+  ioType: string | undefined,
+) => {
   const color = getNodeColor(ioType);
   updateEdgeColors(nodeId, color, false);
 
@@ -142,7 +233,7 @@ const handleNodeHover = (nodeId, ioType) => {
   showButtons.value = true;
 };
 
-const handleNodeLeave = (nodeId) => {
+const handleNodeLeave = (nodeId: string | undefined) => {
   updateEdgeColors(nodeId, null, true);
 
   // Add delay before hiding buttons
@@ -176,9 +267,14 @@ const handleDeleteTooltipLeave = () => {
 };
 
 // Navigate to function page to fix the error
-const navigateToFunction = (functionName) => {
+const navigateToFunction = (functionName: string | undefined) => {
   const errorInfo = getNodeErrorInfo.value;
-  const query = {
+  const query: {
+    action: string;
+    name: string | undefined;
+    org_identifier: string;
+    error?: string;
+  } = {
     action: "update",
     name: functionName,
     org_identifier: store.state.selectedOrganization.identifier,
@@ -199,10 +295,10 @@ const { t } = useI18n();
 const router = useRouter();
 const store = useStore();
 
-const editNode = (id) => {
+const editNode = (id: string) => {
   //from id find the node from pipelineObj.currentSelectedPipelineData.nodes
   const fullNode = pipelineObj.currentSelectedPipeline.nodes.find(
-    (node) => node.id === id,
+    (node: PipelineNode) => node.id === id,
   );
   pipelineObj.isEditNode = true;
   pipelineObj.currentSelectedNodeData = fullNode;
@@ -211,28 +307,47 @@ const editNode = (id) => {
   pipelineObj.dialog.show = true;
 };
 
-const deleteNode = (id) => {
+const deleteNode = (id: string) => {
   openCancelDialog(id);
 };
 
-const getTruncatedConditions = (conditionData) => {
+const getTruncatedConditions = (conditionData: unknown) => {
   // Handle null/undefined
   if (!conditionData) return "";
 
   // Build preview string recursively
-  const buildPreviewString = (node) => {
+  const buildPreviewString = (node: unknown): string => {
     if (!node) return "";
+
+    // V0 Format: Array (checked first so the rest narrows to a single node)
+    if (Array.isArray(node)) {
+      const parts = node
+        .filter((c: ConditionNode) => c.column && c.operator)
+        .map((c: ConditionNode) => {
+          const column = c.column || "field";
+          const operator = c.operator || "=";
+          const value =
+            c.value !== undefined && c.value !== null && c.value !== ""
+              ? `'${c.value}'`
+              : "''";
+          return `${column} ${operator} ${value}`;
+        });
+      return parts.join(" and ");
+    }
+
+    if (typeof node !== "object") return "";
+    const conditionNode = node as ConditionNode;
 
     // V2 Format: Group
     if (
-      node.filterType === "group" &&
-      node.conditions &&
-      Array.isArray(node.conditions)
+      conditionNode.filterType === "group" &&
+      conditionNode.conditions &&
+      Array.isArray(conditionNode.conditions)
     ) {
-      if (node.conditions.length === 0) return "";
+      if (conditionNode.conditions.length === 0) return "";
 
-      const parts = [];
-      node.conditions.forEach((item, index) => {
+      const parts: string[] = [];
+      conditionNode.conditions.forEach((item: ConditionNode, index: number) => {
         let conditionStr = "";
 
         if (item.filterType === "group") {
@@ -264,9 +379,9 @@ const getTruncatedConditions = (conditionData) => {
     }
 
     // V1 Backend Format: OR node
-    if (node.or && Array.isArray(node.or)) {
-      const parts = node.or
-        .map((item) => {
+    if (conditionNode.or && Array.isArray(conditionNode.or)) {
+      const parts = conditionNode.or
+        .map((item: ConditionNode) => {
           const nested = buildPreviewString(item);
           return nested ? `(${nested})` : "";
         })
@@ -275,9 +390,9 @@ const getTruncatedConditions = (conditionData) => {
     }
 
     // V1 Backend Format: AND node
-    if (node.and && Array.isArray(node.and)) {
-      const parts = node.and
-        .map((item) => {
+    if (conditionNode.and && Array.isArray(conditionNode.and)) {
+      const parts = conditionNode.and
+        .map((item: ConditionNode) => {
           const nested = buildPreviewString(item);
           return nested ? `(${nested})` : "";
         })
@@ -286,45 +401,31 @@ const getTruncatedConditions = (conditionData) => {
     }
 
     // V1 Backend Format: NOT node
-    if (node.not) {
-      const nested = buildPreviewString(node.not);
+    if (conditionNode.not) {
+      const nested = buildPreviewString(conditionNode.not);
       return nested ? `not (${nested})` : "";
     }
 
     // V1 Frontend Format: items array
-    if (node.items && Array.isArray(node.items)) {
-      const operator = node.label?.toLowerCase() || "and";
-      const parts = node.items
-        .map((item) => buildPreviewString(item))
+    if (conditionNode.items && Array.isArray(conditionNode.items)) {
+      const operator = conditionNode.label?.toLowerCase() || "and";
+      const parts = conditionNode.items
+        .map((item: ConditionNode) => buildPreviewString(item))
         .filter(Boolean);
       return parts.join(` ${operator} `);
     }
 
     // Single condition
-    if (node.column && node.operator) {
-      const column = node.column || "field";
-      const operator = node.operator || "=";
+    if (conditionNode.column && conditionNode.operator) {
+      const column = conditionNode.column || "field";
+      const operator = conditionNode.operator || "=";
       const value =
-        node.value !== undefined && node.value !== null && node.value !== ""
-          ? `'${node.value}'`
+        conditionNode.value !== undefined &&
+        conditionNode.value !== null &&
+        conditionNode.value !== ""
+          ? `'${conditionNode.value}'`
           : "''";
       return `${column} ${operator} ${value}`;
-    }
-
-    // V0 Format: Array
-    if (Array.isArray(node)) {
-      const parts = node
-        .filter((c) => c.column && c.operator)
-        .map((c) => {
-          const column = c.column || "field";
-          const operator = c.operator || "=";
-          const value =
-            c.value !== undefined && c.value !== null && c.value !== ""
-              ? `'${c.value}'`
-              : "''";
-          return `${column} ${operator} ${value}`;
-        });
-      return parts.join(" and ");
     }
 
     return "";
@@ -347,7 +448,7 @@ const confirmDialogMeta = ref({
   onConfirm: () => {},
 });
 
-const openCancelDialog = (id) => {
+const openCancelDialog = (id: string) => {
   confirmDialogMeta.value.show = true;
   confirmDialogMeta.value.title = t("common.delete");
   confirmDialogMeta.value.message = "Are you sure you want to delete node?";
@@ -374,10 +475,14 @@ const resetConfirmDialog = () => {
   confirmDialogMeta.value.onConfirm = () => {};
 };
 
-function getIcon(data, ioType) {
-  const searchTerm = data.node_type;
-  const node = pipelineObj.nodeTypes.find(
-    (node) => node.subtype === searchTerm && node.io_type === ioType,
+function getIcon(data: NodeData | undefined, ioType: string | undefined) {
+  const searchTerm = data?.node_type;
+  // nodeTypes is declared as an empty literal (never[]) in the shared store;
+  // narrow through unknown to its runtime element shape.
+  const nodeTypes = pipelineObj.nodeTypes as unknown as NodeType[];
+  const node = nodeTypes.find(
+    (node: NodeType) =>
+      node.subtype === searchTerm && node.io_type === ioType,
   );
   return node ? node.icon : undefined;
 }
@@ -390,7 +495,7 @@ function getIcon(data, ioType) {
       v-if="io_type == 'output' || io_type === 'default'"
       id="input"
       type="target"
-      :position="'top'"
+      :position="Position.Top"
       :class="`node_handle_custom handle_${io_type}`"
       :data-test="`pipeline-node-${io_type}-input-handle`"
     />
@@ -451,16 +556,10 @@ function getIcon(data, ioType) {
         <OIcon name="error" size="sm" />
         <span
           data-test="pipeline-node-error-count"
-          v-if="
-            pipelineObj.currentSelectedPipeline?.last_error?.node_errors?.[id]
-              ?.error_count
-          "
+          v-if="nodeErrorCount"
           class="absolute top-[-6px] right-[-6px] bg-[#dc2626] text-white text-[9px] font-bold min-w-[14px] h-[14px] rounded-[7px] flex items-center justify-center px-[3px] border-[1.5px] border-solid border-white shadow-[0_1px_3px_rgba(0,0,0,0.4)]"
         >
-          {{
-            pipelineObj.currentSelectedPipeline.last_error.node_errors[id]
-              .error_count
-          }}
+          {{ nodeErrorCount }}
         </span>
         <OTooltip side="top" align="center" :sideOffset="10" max-width="600px">
           <template #content>
@@ -542,7 +641,7 @@ function getIcon(data, ioType) {
             text-overflow: ellipsis;
           "
         >
-          {{ data.stream_type }} - {{ data.stream_name.label }}
+          {{ data.stream_type }} - {{ streamNameLabel }}
         </div>
         <div
           v-else
@@ -920,7 +1019,7 @@ function getIcon(data, ioType) {
       v-if="io_type === 'input' || io_type === 'default'"
       id="output"
       type="source"
-      :position="'bottom'"
+      :position="Position.Bottom"
       :class="`node_handle_custom handle_${io_type}`"
       :data-test="`pipeline-node-${io_type}-output-handle`"
     />

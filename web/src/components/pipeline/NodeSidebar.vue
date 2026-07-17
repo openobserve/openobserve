@@ -14,14 +14,25 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-<script>
+<script lang="ts">
+import { type PropType } from "vue";
 import useDragAndDrop from "@/plugins/pipelines/useDnD";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+
+interface PipelineNodeType {
+  label: string;
+  icon: string;
+  isSectionHeader: boolean;
+  subtype?: string;
+  io_type?: string;
+  tooltip?: string;
+}
+
 export default {
   props: {
-    nodeTypes: Array,
+    nodeTypes: Array as PropType<PipelineNodeType[]>,
     hasInputType: Boolean,
   },
   components: { OButton, OTooltip, OIcon },

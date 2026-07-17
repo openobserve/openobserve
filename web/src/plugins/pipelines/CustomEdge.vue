@@ -11,9 +11,9 @@
   </EdgeLabelRenderer>
 </template>
 
-<script setup>
-import { BaseEdge, getBezierPath,EdgeLabelRenderer,useVueFlow } from '@vue-flow/core'
-import { computed } from 'vue'
+<script setup lang="ts">
+import { BaseEdge, getBezierPath, EdgeLabelRenderer, useVueFlow, Position } from '@vue-flow/core'
+import { computed, type PropType } from 'vue'
 
 
 const props = defineProps({
@@ -38,11 +38,11 @@ const props = defineProps({
     required: true,
   },
   sourcePosition: {
-    type: String,
+    type: String as PropType<Position>,
     required: true,
   },
   targetPosition: {
-    type: String,
+    type: String as PropType<Position>,
     required: true,
   },
   data: {
