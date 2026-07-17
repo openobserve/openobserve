@@ -199,6 +199,9 @@ size="xs" class="warning" />{{
         {{ enterpriseButtonText }}
       </OButton>
 
+      <!-- SOLUTION SWITCHER: flip the app shell between Observability and Security (SIEM) -->
+      <SolutionSwitcher />
+
       <!-- ORGANIZATION SELECTOR: Dropdown to switch between organizations -->
       <OrganizationSelector
         :organizations="organizations"
@@ -445,6 +448,7 @@ import { useI18n } from "vue-i18n";
 import ThemeSwitcher from "./ThemeSwitcher.vue";
 import EnterpriseUpgradeDialog from "./EnterpriseUpgradeDialog.vue";
 import OrganizationSelector from "./OrganizationSelector.vue";
+import SolutionSwitcher from "./SolutionSwitcher.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -459,6 +463,7 @@ export default defineComponent({
   name: "HeaderComponent",
   components: {
     ThemeSwitcher,
+    SolutionSwitcher,
     EnterpriseUpgradeDialog,
     OrganizationSelector,
     OButton,

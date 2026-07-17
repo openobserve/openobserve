@@ -89,6 +89,13 @@ export default createStore({
     currentuser: useLocalCurrentUser() ? useLocalCurrentUser() : {},
     searchCollapsibleSection: 20,
     theme: "",
+    // Product "solution mode" within an org: "observability" (default) or
+    // "security" (SIEM). Switching flips the entire app shell (left nav, search
+    // context, chrome accent). Persisted so a refresh keeps the analyst in place.
+    solutionMode:
+      (typeof localStorage !== "undefined" &&
+        localStorage.getItem("o2SolutionMode")) ||
+      "observability",
     printMode: false,
     organizationData: JSON.parse(JSON.stringify(organizationObj)),
     zoConfig: <{ [key: string]: any }>{},
@@ -254,6 +261,14 @@ export default createStore({
     },
     appTheme(state, payload) {
       state.theme = payload;
+    },
+    setSolutionMode(state, payload) {
+      state.solutionMode = payload;
+      try {
+        localStorage.setItem("o2SolutionMode", payload);
+      } catch (e) {
+        // ignore storage failures (private mode, quota)
+      }
     },
     setPrintMode(state, payload) {
       state.printMode = payload;
@@ -469,6 +484,9 @@ export default createStore({
     },
     appTheme(context, payload) {
       context.commit("appTheme", payload);
+    },
+    setSolutionMode(context, payload) {
+      context.commit("setSolutionMode", payload);
     },
     setPrintMode(context, payload) {
       context.commit("setPrintMode", payload);

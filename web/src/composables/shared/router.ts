@@ -82,6 +82,8 @@ const ImportPipeline = () => import("@/components/pipeline/ImportPipeline.vue");
 import useIngestionRoutes from "./useIngestionRoutes";
 import useEnterpriseRoutes from "./useEnterpriseRoutes";
 import useManagementRoutes from "./useManagementRoutes";
+import useSecurityRoutes from "./useSecurityRoutes";
+import useFleetRoutes from "./useFleetRoutes";
 import Login from "@/views/Login.vue";
 
 const useRoutes = () => {
@@ -661,6 +663,8 @@ const useRoutes = () => {
     },
     ...useIngestionRoutes(),
     ...useEnterpriseRoutes(),
+    ...useSecurityRoutes(),
+    ...useFleetRoutes(),
     {
       path: "/:catchAll(.*)*",
       component: Error404,

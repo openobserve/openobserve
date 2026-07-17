@@ -306,6 +306,7 @@ import Folder from "~icons/material-symbols/folder";
 import FolderOutline from "~icons/material-symbols/folder-outline";
 import Widgets from "~icons/material-symbols/widgets-outline";
 import Lan from "~icons/material-symbols/lan-outline";
+import Router from "~icons/material-symbols/router";
 import CheckCircleOutline from "~icons/material-symbols/check-circle-outline";
 import TrendingUpFilled from "~icons/material-symbols/trending-up";
 import ErrorOutlineFilled from "~icons/material-symbols/error-outline";
@@ -489,6 +490,7 @@ export const iconRegistry = {
   "folder-outline": FolderOutline,
   "widgets": Widgets,
   "lan": Lan,
+  "router": Router,
   "trending-up-filled": TrendingUpFilled,
   "view-in-ar": ViewInAr,
   "input": Input,

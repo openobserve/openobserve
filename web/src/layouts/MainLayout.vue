@@ -552,6 +552,7 @@ export default defineComponent({
     });
 
     const updateIncidentsMenu = () => {
+      if (["security","fleet"].includes(store.state.solutionMode)) return;
       if (isIncidentsEnabled.value) {
         const alertIndex = linksList.value.findIndex(
           (link) => link.name === "alertList",
@@ -573,6 +574,7 @@ export default defineComponent({
     };
 
     const updateActionsMenu = () => {
+      if (["security","fleet"].includes(store.state.solutionMode)) return;
       if (isActionsEnabled.value) {
         const incidentIndex = linksList.value.findIndex(
           (link) => link.name === "incidentList",
@@ -600,6 +602,7 @@ export default defineComponent({
     // flag. Position: directly after Traces. Idempotent — safe to call from
     // multiple lifecycle hooks.
     const updateAIObservabilityMenu = () => {
+      if (["security","fleet"].includes(store.state.solutionMode)) return;
       const existingIndex = linksList.value.findIndex(
         (link: any) => link.name === "aiObservability",
       );
@@ -698,6 +701,57 @@ export default defineComponent({
       });
       filterMenus();
     }
+
+    // ---- Solution mode nav lists ----
+    // When the org switches solution via the SolutionSwitcher the entire left
+    // nav is swapped for that solution's IA. Switching back restores the
+    // observability nav that was in effect at the time.
+    const securityLinksList = [
+      { title: "Overview", icon: "dashboard", link: "/security", name: "securityOverview", exact: true },
+      { title: "Explore Events", icon: "search", link: "/security/events", name: "securityEvents" },
+      { title: "Detections", icon: "shield-alert-outline", link: "/security/detections", name: "securityDetections" },
+      { title: "Alerts", icon: "notifications-active", link: "/security/alerts", name: "securityAlerts" },
+      { title: "Cases", icon: "description", link: "/security/cases", name: "securityCases" },
+      { title: "Threat Intel", icon: "auto-awesome", link: "/security/threat-intel", name: "securityIntel" },
+      { title: "Entities", icon: "manage-accounts", link: "/security/entities", name: "securityEntities" },
+      { title: "UEBA", icon: "insights", link: "/security/ueba", name: "securityUeba" },
+      { title: "MITRE ATT&CK", icon: "window", link: "/security/mitre", name: "securityMitre" },
+      { title: "Compliance", icon: "bar-chart", link: "/security/compliance", name: "securityCompliance" },
+      { title: "Data Sources", icon: "data-plus-line", link: "/security/sources", name: "securitySources" },
+      { title: "Content & Rules", icon: "code", link: "/security/content", name: "securityContent" },
+    ];
+
+    const fleetLinksList = [
+      { title: "Overview",      icon: "dashboard",       link: "/fleet",          name: "fleetOverview",    exact: true },
+      { title: "Agents",        icon: "router",          link: "/fleet/agents",   name: "fleetAgents" },
+      { title: "Data Sources",  icon: "data-plus-line",  link: "/fleet/sources",  name: "fleetSources" },
+      { title: "Collectors",    icon: "hub",             link: "/fleet/collectors", name: "fleetCollectors" },
+      { title: "Pipelines",     icon: "account-tree",    link: "/fleet/pipelines", name: "fleetPipelines" },
+      { title: "Configuration", icon: "settings",        link: "/fleet/config",   name: "fleetConfig" },
+      { title: "Health",        icon: "monitor-heart",   link: "/fleet/health",   name: "fleetHealth" },
+    ];
+
+    const observabilityLinksBackup = ref<any>(null);
+    const applySolutionMode = () => {
+      const mode = store.state.solutionMode;
+      if (mode === "security") {
+        if (!observabilityLinksBackup.value) {
+          observabilityLinksBackup.value = linksList.value;
+        }
+        linksList.value = securityLinksList;
+      } else if (mode === "fleet") {
+        if (!observabilityLinksBackup.value) {
+          observabilityLinksBackup.value = linksList.value;
+        }
+        linksList.value = fleetLinksList;
+      } else if (observabilityLinksBackup.value) {
+        linksList.value = observabilityLinksBackup.value;
+        observabilityLinksBackup.value = null;
+      }
+    };
+    watch(() => store.state.solutionMode, applySolutionMode, {
+      immediate: true,
+    });
 
     //orgIdentifier query param exists then clear the localstorage and store.
     if (store.state.selectedOrganization != null) {
