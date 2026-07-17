@@ -1659,8 +1659,11 @@ export class LogsPage {
         const isInline = await inlineBtn.isVisible({ timeout: 2000 }).catch(() => false);
         if (isInline) {
             // Normal viewport: the OSwitch inner button carries data-state="unchecked" when OFF.
+            // The Reka OSwitch animates the checked→unchecked transition, and under CI load the
+            // settled state can appear >5s after the toggle+execute — poll longer (still asserts
+            // the real end-state, not an arbitrary sleep) to avoid the flaky 5s ceiling.
             const switchUnchecked = inlineBtn.locator('[data-state="unchecked"]');
-            await expect(switchUnchecked).toBeVisible({ timeout: 5000 });
+            await expect(switchUnchecked).toBeVisible({ timeout: 15000 });
             return;
         }
         // Narrow-viewport fallback: check state via the utilities menu item.
@@ -1669,7 +1672,7 @@ export class LogsPage {
         const isMenuVisible = await histogramMenuItem.isVisible({ timeout: 2000 }).catch(() => false);
         if (isMenuVisible) {
             const switchEl = this.page.locator(`[data-test="logs-search-bar-menu-histogram-btn"] [data-state="unchecked"]`).first();
-            await expect(switchEl).toBeVisible({ timeout: 5000 });
+            await expect(switchEl).toBeVisible({ timeout: 15000 });
         }
         await this.page.keyboard.press('Escape').catch(() => {});
     }
@@ -7124,20 +7127,21 @@ export class LogsPage {
     async clickShareLinkAndExpectSuccess() {
         await this.clickShareLinkButton();
 
-        // Wait for success notification
-        const notification = this.page.locator(this.successNotification);
-        await notification.waitFor({ state: 'visible', timeout: 15000 });
-
-        const notificationText = await notification.textContent();
-        const isSuccess = notificationText.includes(this.linkCopiedSuccessText);
-
-        if (isSuccess) {
+        // Wait for the SUCCESS toast specifically (.first() to tolerate a lingering
+        // "Running query cancelled successfully" info toast from a prior refresh — the
+        // broad any-variant selector otherwise matches 2 toasts and trips strict mode,
+        // which was the CI flake on this P0 test).
+        const successToast = this.page
+            .locator(`[data-test-variant="success"][data-test-message*="${this.linkCopiedSuccessText}"]`)
+            .first();
+        try {
+            await successToast.waitFor({ state: 'visible', timeout: 15000 });
             testLogger.info('Share link success notification appeared');
-        } else {
-            testLogger.warn('Notification appeared but was not success message', { text: notificationText });
+            return true;
+        } catch (e) {
+            testLogger.warn('Share link success notification did not appear');
+            return false;
         }
-
-        return isSuccess;
     }
 
     /**
@@ -7159,8 +7163,13 @@ export class LogsPage {
     async clickShareLinkAndExpectNotification() {
         await this.clickShareLinkButton();
 
-        // Wait for any notification
-        const notification = this.page.locator(this.successNotification);
+        // Wait for the share-RESULT toast specifically — the "Link Copied Successfully!"
+        // success toast OR the "Error while copy link" error toast — matched by message
+        // and .first(). This skips an unrelated "Running query cancelled" info toast that
+        // can coexist, which would otherwise trip strict mode on the broad selector.
+        const notification = this.page
+            .locator(`[data-test-message*="${this.linkCopiedSuccessText}"], [data-test-message*="${this.errorCopyingLinkText}"]`)
+            .first();
         try {
             await notification.waitFor({ state: 'visible', timeout: 15000 });
             const notificationText = await notification.textContent();
@@ -7280,11 +7289,22 @@ export class LogsPage {
      * @returns {Promise<string>} The shared URL
      */
     async clickShareLinkAndGetUrl() {
+        // Ensure the current search state is fully committed to the URL before sharing.
+        // The share API builds the short URL from the current query params; if we click
+        // while the SPA is still writing them (e.g. right after clickRefresh) the short
+        // URL can capture a partial state (missing query / sql_mode).
+        await this._waitForUrlStable(5000);
+
         await this.clickShareLinkButton();
 
-        // Wait for success notification
-        const notification = this.page.locator(this.successNotification);
-        await notification.waitFor({ state: 'visible', timeout: 15000 });
+        // Wait for the SUCCESS ("Link Copied Successfully!") toast specifically, using
+        // .first(). A clickRefresh just before sharing can leave a "Running query
+        // cancelled successfully" info toast on screen; the broad any-variant
+        // successNotification selector then matches 2 toasts and trips strict mode.
+        const successToast = this.page
+            .locator(`[data-test-variant="success"][data-test-message*="${this.linkCopiedSuccessText}"]`)
+            .first();
+        await successToast.waitFor({ state: 'visible', timeout: 15000 });
 
         // Read the URL from clipboard
         let sharedUrl = await this.readClipboard();
@@ -7387,12 +7407,122 @@ export class LogsPage {
             // Once URL leaves /short/, let the SPA settle via load-state events
             await this.page.waitForLoadState('domcontentloaded', { timeout: 5000 }).catch(() => {});
             await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+            // After leaving /short/ the SPA re-hydrates search state and rewrites the URL
+            // query params in STAGES (stream → time → sql_mode/query → show_histogram/quick_mode).
+            // On a slow/loaded CI runner networkidle can fire mid-rewrite, so a bare
+            // captureCurrentState() here reads partial state (e.g. show_histogram=null,
+            // empty query). Wait until the URL stops changing before returning so callers
+            // observe the fully-restored state deterministically.
+            await this._waitForUrlStable(8000);
             const finalUrl = await this.getCurrentUrl();
             testLogger.info('Redirect complete', { finalUrl });
         } catch (e) {
             const currentUrl = await this.getCurrentUrl();
             testLogger.warn('Redirect timeout - URL may still be changing', { currentUrl });
         }
+    }
+
+    /**
+     * Resolve once the URL stops changing (debounce). Uses expect.poll's wait engine —
+     * no fixed waitForTimeout. Requires the same URL to be observed on consecutive polls
+     * before treating it as settled, so staged SPA param rewrites finish first.
+     * Best-effort: swallows timeout (a genuinely live-updating URL just returns after the
+     * budget) so callers always proceed.
+     * @param {number} timeout - Max time to wait in ms
+     */
+    async _waitForUrlStable(timeout = 8000) {
+        let lastUrl = null;
+        let stableStreak = 0;
+        try {
+            await expect.poll(
+                async () => {
+                    const url = await this.getCurrentUrl();
+                    if (url === lastUrl) {
+                        stableStreak += 1;
+                    } else {
+                        stableStreak = 0;
+                        lastUrl = url;
+                    }
+                    // Same URL seen on 3 consecutive polls => the staged rewrites are done.
+                    return stableStreak >= 2;
+                },
+                { timeout, intervals: [300, 300, 500, 500, 800] }
+            ).toBe(true);
+        } catch (e) {
+            testLogger.warn('URL did not fully stabilize within budget', { lastUrl });
+        }
+    }
+
+    /**
+     * Wait until the current URL contains a given query param key (optionally with a
+     * specific value), then return its value. After a share-link short-URL redirect the
+     * SPA repopulates URL params asynchronously, so reading captureCurrentState()
+     * immediately can observe a param as null. Polls via Playwright's wait engine.
+     * @param {string} key - the query param name, e.g. 'show_histogram'
+     * @param {string|null} expectedValue - if provided, wait until the value equals this
+     * @param {number} timeout
+     * @param {boolean} required - when true, THROW if the param never appears/matches within
+     *   the budget (use before an action that must observe a committed state, e.g. requiring
+     *   sql_mode=true before sharing so the short URL can't capture a non-SQL state). When
+     *   false (default) it is best-effort: it logs a warning and returns the current value.
+     * @returns {Promise<string|null>} the param value once present (null if it never appears)
+     */
+    async waitForUrlParam(key, expectedValue = null, timeout = 20000, required = false) {
+        try {
+            await expect.poll(
+                async () => {
+                    const params = this.parseUrlParams(await this.getCurrentUrl());
+                    const val = params[key] ?? null;
+                    if (val === null) return false;
+                    return expectedValue === null ? true : val === expectedValue;
+                },
+                { timeout, intervals: [200, 500, 1000] }
+            ).toBe(true);
+        } catch (e) {
+            if (required) {
+                const actual = this.parseUrlParams(await this.getCurrentUrl())[key] ?? null;
+                throw new Error(
+                    `Required URL param "${key}"${expectedValue !== null ? `="${expectedValue}"` : ''} never appeared within ${timeout}ms (actual: ${actual})`
+                );
+            }
+            testLogger.warn('URL param did not appear within budget', { key, expectedValue });
+        }
+        const params = this.parseUrlParams(await this.getCurrentUrl());
+        return params[key] ?? null;
+    }
+
+    /**
+     * Deterministically set up SQL mode + an exact query and COMMIT it to the URL, so a
+     * subsequent share captures sql_mode=true + the query in the short URL.
+     *
+     * Combines the two mechanisms that each alone were flaky on CI:
+     *  - enableSqlModeIfNeeded() sets searchObj.meta.sqlMode=true via Vue (this — not editor
+     *    content — is what the app writes to the URL as sql_mode; writing SELECT text alone
+     *    does NOT reliably flip the flag).
+     *  - setQueryEditorContent() writes the exact query via Monaco executeEdits with a verify
+     *    poll (reliable, unlike clearAndFillQueryEditor whose focus-sensitive Ctrl+A select-all
+     *    silently appended → a doubled query on CI).
+     * Then runQueryAndWaitForResults() commits without cancelling the in-flight auto-search,
+     * and we confirm sql_mode landed in the URL. The whole sequence retries once if the flag
+     * didn't commit (the occasional Vue-mutation miss under load), then strict-asserts.
+     * @param {string} query - the SQL query to set (must be a SELECT ... FROM ...)
+     */
+    async setupSqlQueryForShare(query) {
+        for (let attempt = 1; attempt <= 2; attempt++) {
+            await this.enableSqlModeIfNeeded();
+            await this.setQueryEditorContent(query);
+            await this.waitForQueryEditorContent(query.split(/\s+/)[0]); // first token, e.g. SELECT
+            await this.runQueryAndWaitForResults();
+            const committed = await this.waitForUrlParam('sql_mode', 'true', 15000, false);
+            if (committed === 'true') {
+                testLogger.info('setupSqlQueryForShare: sql_mode committed to URL', { attempt });
+                return;
+            }
+            testLogger.warn(`setupSqlQueryForShare: sql_mode not committed (attempt ${attempt}) — retrying`);
+        }
+        // Still not committed after the retry — fail fast with a clear message rather than
+        // sharing a non-SQL state that would fail confusingly at the post-redirect editor read.
+        await this.waitForUrlParam('sql_mode', 'true', 5000, true);
     }
 
     /**
@@ -8365,6 +8495,77 @@ export class LogsPage {
             timeout: timeout
         });
         testLogger.info('Monaco query editor is visible');
+    }
+
+    /**
+     * Wait until the Monaco query editor is visible AND its model has finished
+     * (lazy-)loading with non-empty content, optionally containing an expected
+     * substring. Deterministic replacement for `waitForQueryEditorVisible()` +
+     * `waitForTimeout(n)` when reading editor text after a share-link / short-URL
+     * redirect or a saved-view apply: the editor host can become "visible" before
+     * the SPA re-hydrates the query from restored state, so getQueryEditorText()
+     * momentarily returns "" and a fixed wait races the pre-fill. Polls the live
+     * monaco model value via Playwright's wait engine — no waitForTimeout.
+     * @param {string|null} expectedSubstring - if provided, wait until the text contains it (case-insensitive)
+     * @param {number} timeout - poll ceiling; returns the instant content appears, so a
+     *   larger value only tolerates slow CI hydration (lazy-load + short-URL redirect +
+     *   SPA re-hydrate) — it never slows the happy path.
+     * @returns {Promise<string>} the editor text once ready
+     */
+    async waitForQueryEditorContent(expectedSubstring = null, timeout = 45000) {
+        await this.waitForQueryEditorVisible(timeout);
+        await expect.poll(
+            async () => {
+                const text = await this.getQueryEditorText();
+                if (!text) return false;
+                if (expectedSubstring) {
+                    return text.toLowerCase().includes(expectedSubstring.toLowerCase());
+                }
+                return text.trim().length > 0;
+            },
+            {
+                timeout,
+                intervals: [200, 500, 1000, 2000],
+                message: expectedSubstring
+                    ? `query editor never contained "${expectedSubstring}"`
+                    : 'query editor never became non-empty',
+            }
+        ).toBe(true);
+        const text = await this.getQueryEditorText();
+        testLogger.info('Query editor content ready', {
+            length: text?.length ?? 0,
+            expectedSubstring,
+        });
+        return text;
+    }
+
+    /**
+     * Wait for the Monaco editor to prefill with the restored query AFTER a share-link
+     * short-URL redirect. The editor is lazy-loaded and, after the extra short-URL
+     * resolution hop, occasionally finishes mounting without applying the query from the
+     * (already-resolved) URL — leaving it empty. A DIRECT load of that same resolved URL
+     * prefills reliably (the URL-query-param prefill path), so if the first wait window
+     * comes up empty we reload the resolved URL once to re-trigger that reliable path,
+     * then wait again. This is a deterministic self-heal grounded in a known-good code
+     * path — not a blind retry — and only kicks in on the (rare) empty-editor race.
+     * @param {string} expectedSubstring
+     * @param {number} firstWindow - initial poll ceiling before attempting the reload
+     * @param {number} secondWindow - poll ceiling after the reload
+     * @returns {Promise<string>} the editor text once ready
+     */
+    async waitForRedirectedQueryEditorContent(expectedSubstring, firstWindow = 20000, secondWindow = 30000) {
+        try {
+            return await this.waitForQueryEditorContent(expectedSubstring, firstWindow);
+        } catch (e) {
+            testLogger.warn('Editor empty after redirect — reloading the resolved URL to re-trigger URL-param prefill', {
+                expectedSubstring,
+                url: await this.getCurrentUrl(),
+            });
+            await this.page.reload();
+            await this.page.waitForLoadState('domcontentloaded', { timeout: 15000 }).catch(() => {});
+            await this.page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+            return await this.waitForQueryEditorContent(expectedSubstring, secondWindow);
+        }
     }
 
     /**

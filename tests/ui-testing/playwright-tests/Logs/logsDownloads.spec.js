@@ -9,25 +9,8 @@ test.describe("Logs Downloads testcases", () => {
   let pageManager;
   let downloadDir;
 
-  // Helper function to set up logs page after navigation
-  async function setupLogsPage(page) {
-    await page.goto(
-      `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
-    );
-    await pageManager.logsPage.selectStream("e2e_automate");
-    // Selecting the stream fires an auto-search. A bare refresh-button click force-cancels
-    // that in-flight search (the button is in "Cancel query" mode while it runs), leaving
-    // the results stuck in `data-search-state="loading"` with 0 hits — the download click
-    // then reads an empty hits array and `logs-search-result-title` never becomes visible.
-    // runQueryAndWaitForResults waits for the Cancel state to clear before clicking, then
-    // waits for the search to fully complete (same fix as setupSQLMode below).
-    await pageManager.logsPage.runQueryAndWaitForResults();
-    // Wait for results to load by checking the results summary text shows non-zero records
-    await pageManager.logsPage.expectPaginationRowCountVisible();
-  }
-
   // Helper function to set up SQL mode with LIMIT 2000
-  async function setupSQLMode(page) {
+  async function setupSQLMode() {
     await pageManager.logsPage.clickSQLModeToggle();
     await pageManager.logsPage.clickQueryEditor();
     await pageManager.logsPage.clearQueryEditor();
@@ -42,10 +25,90 @@ test.describe("Logs Downloads testcases", () => {
     // Wait deterministically for the SQL results to fully load — the download click
     // reads `searchObj.data.queryResults.hits` directly, so we must wait until the
     // pagination title reports >= 2000 records before triggering the download.
-    // (HEAD's strict check kept — the lenient `expectPaginationRowCountVisible`
-    // from main would mask the documented §7a in-memory hits replace race.)
     await pageManager.logsPage.expectPaginationTotalAtLeast(2000);
   }
+
+  // ---- Individual download scenarios (each asserts and throws on its own failure) ----
+
+  async function downloadNormalCsv() {
+    await pageManager.logsPage.clickMoreOptionsButton();
+    await pageManager.logsPage.hoverDownloadResults();
+    const csvDownloadPromise = pageManager.logsPage.waitForDownload();
+    await pageManager.logsPage.clickDownloadCsv();
+
+    const csvDownload = await csvDownloadPromise;
+    expect(csvDownload).toBeDefined();
+    await pageManager.logsPage.verifyDownload(csvDownload, 'download_normal.csv', downloadDir);
+  }
+
+  async function downloadNormalJson() {
+    await pageManager.logsPage.clickMoreOptionsButton();
+    await pageManager.logsPage.hoverDownloadResults();
+    const jsonDownloadPromise = pageManager.logsPage.waitForDownload();
+    await pageManager.logsPage.clickDownloadJson();
+
+    const jsonDownload = await jsonDownloadPromise;
+    expect(jsonDownload).toBeDefined();
+    await pageManager.logsPage.verifyJsonDownload(jsonDownload, 'download_normal.json', downloadDir);
+  }
+
+  async function downloadCustomRangeCsv(range) {
+    await pageManager.logsPage.clickMoreOptionsButton();
+    await pageManager.logsPage.clickDownloadResultsForCustom();
+    await pageManager.logsPage.expectCustomDownloadDialogVisible();
+    await pageManager.logsPage.clickCustomDownloadRangeSelect();
+    await pageManager.logsPage.selectCustomDownloadRange(range);
+
+    const csvDownloadPromise = pageManager.logsPage.waitForDownload();
+    await pageManager.logsPage.clickConfirmDialogOkButton();
+    const csvDownload = await csvDownloadPromise;
+
+    expect(csvDownload).toBeDefined();
+    await pageManager.logsPage.verifyDownload(csvDownload, `download_custom_${range}.csv`, downloadDir);
+  }
+
+  async function downloadCustomRangeJson(range) {
+    await pageManager.logsPage.clickMoreOptionsButton();
+    await pageManager.logsPage.clickDownloadResultsForCustom();
+    await pageManager.logsPage.expectCustomDownloadDialogVisible();
+    await pageManager.logsPage.clickCustomDownloadRangeSelect();
+    await pageManager.logsPage.selectCustomDownloadRange(range);
+
+    await pageManager.logsPage.clickCustomDownloadFileTypeJson();
+
+    const jsonDownloadPromise = pageManager.logsPage.waitForDownload();
+    await pageManager.logsPage.clickConfirmDialogOkButton();
+    const jsonDownload = await jsonDownloadPromise;
+
+    expect(jsonDownload).toBeDefined();
+    await pageManager.logsPage.verifyJsonDownloadWithCount(jsonDownload, `download_custom_${range}.json`, downloadDir, parseInt(range));
+  }
+
+  async function downloadSqlModeCsv() {
+    await pageManager.logsPage.clickMoreOptionsButton();
+    await pageManager.logsPage.hoverDownloadResults();
+    const csvDownloadPromise = pageManager.logsPage.waitForDownload();
+    await pageManager.logsPage.clickDownloadCsv();
+    const csvDownload = await csvDownloadPromise;
+
+    expect(csvDownload).toBeDefined();
+    await pageManager.logsPage.verifyDownload(csvDownload, 'download_sql_2000.csv', downloadDir);
+  }
+
+  async function downloadSqlModeJson() {
+    await pageManager.logsPage.clickMoreOptionsButton();
+    await pageManager.logsPage.hoverDownloadResults();
+    const jsonDownloadPromise = pageManager.logsPage.waitForDownload();
+    await pageManager.logsPage.clickDownloadJson();
+    const jsonDownload = await jsonDownloadPromise;
+
+    expect(jsonDownload).toBeDefined();
+    // SQL mode downloads searchObj.data.queryResults.hits (current page), not the
+    // full LIMIT-2000 result set — verify valid JSON with records, not exact count.
+    await pageManager.logsPage.verifyJsonDownload(jsonDownload, 'download_sql_2000.json', downloadDir);
+  }
+
+  const CUSTOM_RANGES = ['100', '500', '1000', '5000', '10000'];
 
   test.beforeEach(async ({ page }, testInfo) => {
     // Initialize test setup
@@ -63,7 +126,8 @@ test.describe("Logs Downloads testcases", () => {
     await pageManager.logsPage.ingestLogs(process.env["ORGNAME"], "e2e_automate", logsdata);
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
-    // Ingest additional data to ensure we have at least 10000 records
+    // Ingest additional data to ensure we have at least 10000 records (needed for the
+    // Custom Range 10000 download scenario).
     for (let i = 0; i < 5; i++) {
       await pageManager.logsPage.ingestLogs(process.env["ORGNAME"], "e2e_automate", logsdata);
       await page.waitForLoadState('domcontentloaded');
@@ -74,8 +138,8 @@ test.describe("Logs Downloads testcases", () => {
       `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
     );
     await pageManager.logsPage.selectStream("e2e_automate");
-    // See setupLogsPage: use runQueryAndWaitForResults (not a bare refresh click) so the
-    // stream-selection auto-search isn't force-cancelled into a stuck 0-hit loading state.
+    // Use runQueryAndWaitForResults (not a bare refresh click) so the stream-selection
+    // auto-search isn't force-cancelled into a stuck 0-hit loading state.
     await pageManager.logsPage.runQueryAndWaitForResults();
     // Wait for results to load by checking the results summary text shows non-zero records
     await pageManager.logsPage.expectPaginationRowCountVisible();
@@ -92,173 +156,56 @@ test.describe("Logs Downloads testcases", () => {
     await pageManager.logsPage.cleanupDownloadDirectory(downloadDir);
   });
 
-  test("should download all formats and scenarios with detailed error handling", {
-    tag: ['@downloadAll', '@all', '@logs', '@logsDownloads']
-  }, async ({ page }) => {
-    // Set timeout for this specific test to 6 minutes
-    test.setTimeout(360000);
+  // NOTE: The former single "download all formats and scenarios" test ran ALL 14 download
+  // scenarios sequentially inside ONE test body (each with a full page.reload + re-setup).
+  // That reliably exceeded the 360s test timeout on CI — Playwright then tore down the page,
+  // so the remaining scenarios failed with "Target page/context closed" (a cascade from the
+  // timeout, not a real download bug). It also swallowed per-scenario errors (try/catch +
+  // aggregate throw), hiding the real stack.
+  //
+  // Each scenario is now its own test. The beforeEach already leaves a fresh logs page with
+  // results loaded, so no per-scenario reload is needed — every test is short, isolated
+  // (one failing download can't close the page for the others), and parallelizes across
+  // workers. The @downloadAll tag is preserved on every test for suite selection.
 
-    testLogger.info('🚀 Starting comprehensive download test: All formats and scenarios');
-
-    const testResults = [];
-    let totalTests = 0;
-    let passedTests = 0;
-
-    // Helper function to execute download with error handling
-    async function executeDownloadTest(testName, downloadFunction) {
-      totalTests++;
-      try {
-        testLogger.info(`Testing: ${testName}`);
-        await downloadFunction();
-        testLogger.info(`✅ PASSED: ${testName}`);
-        testResults.push({ test: testName, status: 'PASSED', error: null });
-        passedTests++;
-      } catch (error) {
-        testLogger.error(`❌ FAILED: ${testName}`, { error: error.message });
-        testResults.push({ test: testName, status: 'FAILED', error: error.message });
-        // Don't throw, continue with other tests
-      }
-    }
-
-    // 1. Normal Downloads
-    await executeDownloadTest('Normal CSV Download', async () => {
-      await pageManager.logsPage.clickMoreOptionsButton();
-      await pageManager.logsPage.hoverDownloadResults();
-      const csvDownloadPromise = pageManager.logsPage.waitForDownload();
-      await pageManager.logsPage.clickDownloadCsv();
-
-      const csvDownload = await csvDownloadPromise;
-      expect(csvDownload).toBeDefined();
-      await pageManager.logsPage.verifyDownload(csvDownload, 'download_normal.csv', downloadDir);
-    });
-
-    await executeDownloadTest('Normal JSON Download', async () => {
-      testLogger.debug('🔄 Refreshing for Normal JSON');
-      await page.reload();
-      await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-      await setupLogsPage(page);
-
-      await pageManager.logsPage.clickMoreOptionsButton();
-      await pageManager.logsPage.hoverDownloadResults();
-      const jsonDownloadPromise = pageManager.logsPage.waitForDownload();
-      await pageManager.logsPage.clickDownloadJson();
-
-      const jsonDownload = await jsonDownloadPromise;
-      expect(jsonDownload).toBeDefined();
-      await pageManager.logsPage.verifyJsonDownload(jsonDownload, 'download_normal.json', downloadDir);
-    });
-
-    // 2. Custom Range Downloads
-    const ranges = ['100', '500', '1000', '5000', '10000'];
-    for (const range of ranges) {
-
-      await executeDownloadTest(`Custom Range ${range} CSV Download`, async () => {
-        testLogger.debug(`🔄 Refreshing for Custom Range ${range} CSV`);
-        await page.reload();
-        await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-        await setupLogsPage(page);
-
-        await pageManager.logsPage.clickMoreOptionsButton();
-        await pageManager.logsPage.clickDownloadResultsForCustom();
-        await pageManager.logsPage.expectCustomDownloadDialogVisible();
-        await pageManager.logsPage.clickCustomDownloadRangeSelect();
-        await pageManager.logsPage.selectCustomDownloadRange(range);
-
-        const csvDownloadPromise = pageManager.logsPage.waitForDownload();
-        await pageManager.logsPage.clickConfirmDialogOkButton();
-        const csvDownload = await csvDownloadPromise;
-
-        expect(csvDownload).toBeDefined();
-        await pageManager.logsPage.verifyDownload(csvDownload, `download_custom_${range}.csv`, downloadDir);
-      });
-
-      await executeDownloadTest(`Custom Range ${range} JSON Download`, async () => {
-        testLogger.debug(`🔄 Refreshing for Custom Range ${range} JSON`);
-        await page.reload();
-        await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-        await setupLogsPage(page);
-
-        await pageManager.logsPage.clickMoreOptionsButton();
-        await pageManager.logsPage.clickDownloadResultsForCustom();
-        await pageManager.logsPage.expectCustomDownloadDialogVisible();
-        await pageManager.logsPage.clickCustomDownloadRangeSelect();
-        await pageManager.logsPage.selectCustomDownloadRange(range);
-
-        await pageManager.logsPage.clickCustomDownloadFileTypeJson();
-
-        const jsonDownloadPromise = pageManager.logsPage.waitForDownload();
-        await pageManager.logsPage.clickConfirmDialogOkButton();
-        const jsonDownload = await jsonDownloadPromise;
-
-        expect(jsonDownload).toBeDefined();
-        await pageManager.logsPage.verifyJsonDownloadWithCount(jsonDownload, `download_custom_${range}.json`, downloadDir, parseInt(range));
-      });
-    }
-
-    // 3. SQL Mode Downloads
-    await executeDownloadTest('SQL Mode LIMIT 2000 CSV Download', async () => {
-      testLogger.debug('🔄 Refreshing for SQL Mode CSV');
-      await page.reload();
-      await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-      await setupLogsPage(page);
-      await setupSQLMode(page);
-
-      await pageManager.logsPage.clickMoreOptionsButton();
-      await pageManager.logsPage.hoverDownloadResults();
-      const csvDownloadPromise = pageManager.logsPage.waitForDownload();
-      await pageManager.logsPage.clickDownloadCsv();
-      const csvDownload = await csvDownloadPromise;
-
-      expect(csvDownload).toBeDefined();
-      await pageManager.logsPage.verifyDownload(csvDownload, 'download_sql_2000.csv', downloadDir);
-    });
-
-    await executeDownloadTest('SQL Mode LIMIT 2000 JSON Download', async () => {
-      testLogger.debug('🔄 Refreshing for SQL Mode JSON');
-      await page.reload();
-      await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-      await setupLogsPage(page);
-      await setupSQLMode(page);
-
-      await pageManager.logsPage.clickMoreOptionsButton();
-      await pageManager.logsPage.hoverDownloadResults();
-      const jsonDownloadPromise = pageManager.logsPage.waitForDownload();
-      await pageManager.logsPage.clickDownloadJson();
-      const jsonDownload = await jsonDownloadPromise;
-
-      expect(jsonDownload).toBeDefined();
-      // SQL mode downloads searchObj.data.queryResults.hits (current page), not the
-      // full LIMIT-2000 result set — verify valid JSON with records, not exact count.
-      await pageManager.logsPage.verifyJsonDownload(jsonDownload, 'download_sql_2000.json', downloadDir);
-    });
-
-    // Final Results Summary
-    testLogger.info('\n📊 COMPREHENSIVE TEST RESULTS SUMMARY:');
-    testLogger.info('='.repeat(50));
-    testLogger.info(`Total Tests: ${totalTests}`);
-    testLogger.info(`Passed: ${passedTests}`);
-    testLogger.info(`Failed: ${totalTests - passedTests}`);
-    testLogger.info('='.repeat(50));
-
-    testResults.forEach(result => {
-      const status = result.status === 'PASSED' ? '✅' : '❌';
-      testLogger.info(`${status} ${result.test}`);
-      if (result.error) {
-        testLogger.error(`   Error: ${result.error}`);
-      }
-    });
-
-    testLogger.info('='.repeat(50));
-
-    // Fail the test if any individual test failed
-    const failedTests = testResults.filter(r => r.status === 'FAILED');
-    if (failedTests.length > 0) {
-      const failedTestNames = failedTests.map(f => f.test).join(', ');
-      throw new Error(`${failedTests.length} test(s) failed: ${failedTestNames}`);
-    }
-
-    testLogger.info('🎉 ALL DOWNLOAD TESTS PASSED SUCCESSFULLY!');
+  test("Normal CSV download", {
+    tag: ['@downloadAll', '@downloadNormal', '@all', '@logs', '@logsDownloads']
+  }, async () => {
+    await downloadNormalCsv();
   });
 
+  test("Normal JSON download", {
+    tag: ['@downloadAll', '@downloadNormal', '@all', '@logs', '@logsDownloads']
+  }, async () => {
+    await downloadNormalJson();
+  });
+
+  for (const range of CUSTOM_RANGES) {
+    test(`Custom Range ${range} CSV download`, {
+      tag: ['@downloadAll', '@downloadCustomCsv', '@all', '@logs', '@logsDownloads']
+    }, async () => {
+      await downloadCustomRangeCsv(range);
+    });
+
+    test(`Custom Range ${range} JSON download`, {
+      tag: ['@downloadAll', '@downloadCustomJson', '@all', '@logs', '@logsDownloads']
+    }, async () => {
+      await downloadCustomRangeJson(range);
+    });
+  }
+
+  test("SQL Mode LIMIT 2000 CSV download", {
+    tag: ['@downloadAll', '@downloadSql', '@all', '@logs', '@logsDownloads']
+  }, async () => {
+    await setupSQLMode();
+    await downloadSqlModeCsv();
+  });
+
+  test("SQL Mode LIMIT 2000 JSON download", {
+    tag: ['@downloadAll', '@downloadSql', '@all', '@logs', '@logsDownloads']
+  }, async () => {
+    await setupSQLMode();
+    await downloadSqlModeJson();
+  });
 
 });
