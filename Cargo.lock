@@ -6954,6 +6954,7 @@ dependencies = [
  "resources",
  "runtime-services",
  "serde_json",
+ "tantivy_utils",
  "tokio",
  "tonic",
  "transform",
@@ -10575,6 +10576,8 @@ name = "tantivy_utils"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "arrow",
+ "arrow-schema",
  "async-trait",
  "bitflags 2.11.0",
  "byteorder",
@@ -10587,10 +10590,12 @@ dependencies = [
  "log",
  "object_store",
  "parking_lot 0.12.5",
+ "parquet",
  "serde",
  "serde_json",
  "tantivy",
  "tokio",
+ "vortex",
  "zstd",
 ]
 

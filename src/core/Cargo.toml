@@ -26,6 +26,7 @@ enterprise = [
     "transform/enterprise",
     "promql/enterprise",
     "search/enterprise",
+    "tantivy_utils/enterprise",
 ]
 cloud = [
     "infra/cloud",
@@ -40,6 +41,7 @@ vortex = [
     "config/vortex",
     "o2_enterprise?/vortex",
     "search/vortex",
+    "tantivy_utils/vortex",
 ]
 
 [dependencies]

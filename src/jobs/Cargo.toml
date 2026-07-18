@@ -19,6 +19,7 @@ enterprise = [
     "dep:o2_enterprise",
     "dep:o2_openfga",
     "openobserve-core/enterprise",
+    "tantivy_utils/enterprise",
 ]
 cloud = [
     "enterprise",
@@ -27,7 +28,7 @@ cloud = [
     "organization-domain/cloud",
 ]
 vectorscan = ["openobserve-core/vectorscan"]
-vortex = ["openobserve-core/vortex"]
+vortex = ["openobserve-core/vortex", "tantivy_utils/vortex"]
 
 [dependencies]
 openobserve-core.workspace = true
@@ -38,6 +39,7 @@ organization-domain.workspace = true
 resources.workspace = true
 runtime-services.workspace = true
 search.workspace = true
+tantivy_utils.workspace = true
 anyhow.workspace = true
 arrow.workspace = true
 arrow-schema.workspace = true
