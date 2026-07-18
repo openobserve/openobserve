@@ -108,7 +108,7 @@ export default defineComponent({
     const rumRoutes = ["frontendMonitoring"];
     const logRoutes = [
       "curl", "fluentbit", "fluentd", "kinesisfirehose", "vector",
-      "filebeat", "gcpLogs", "logstash", "syslogNg", "ingestLogsFromOtel",
+      "filebeat", "gcpLogs", "logstash", "syslogNg", "loongcollector", "ingestLogsFromOtel",
     ];
     const tabs = ref(
       logRoutes.includes(router.currentRoute.value.name as string)

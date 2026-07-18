@@ -113,6 +113,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               icon="plagiarism"
               label="Syslog-ng"
             />
+            <ORouteTab
+              name="loongcollector"
+              data-test="ingestion-logs-tab-loongcollector"
+              :to="{
+                name: 'loongcollector',
+                query: {
+                  org_identifier: store.state.selectedOrganization.identifier,
+                },
+              }"
+              :icon="'img:' + getImageURL('images/ingestion/loongcollector.svg')"
+              label="LoongCollector"
+            />
     </template>
 
       <div class="w-full h-full">
@@ -168,6 +180,7 @@ export default defineComponent({
       "fluentd",
       "vector",
       "syslogNg",
+      "loongcollector",
     ];
 
     onBeforeMount(() => {
