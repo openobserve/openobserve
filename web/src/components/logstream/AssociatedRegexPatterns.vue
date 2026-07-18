@@ -46,7 +46,7 @@
               clearable
             />
           </div>
-          <div style="height: calc(100vh - 130px); overflow-y: auto">
+          <div style="height: calc(100vh - 130px)" class="overflow-y-auto">
             <div class="pattern-list-wrapper">
               <OCollapsible
                 v-model="appliedPatternsExpandedRef"
@@ -296,11 +296,10 @@
                       <OInput
                         data-test="add-regex-test-string-input"
                         v-model="testString"
-                        class="regex-test-string-input"
+                        class="regex-test-string-input w-full"
                         type="textarea"
                         :placeholder="t('regex_patterns.input_string_placeholder')"
                         :rows="5"
-                        style="width: 100%"
                       />
                     </div>
                   </div>
@@ -320,11 +319,10 @@
                         v-if="outputString.length > 0"
                         data-test="add-regex-test-string-input"
                         v-model="outputString"
-                        class="regex-test-string-input"
+                        class="regex-test-string-input w-full"
                         type="textarea"
                         :placeholder="t('regex_patterns.output_string_placeholder')"
                         :rows="5"
-                        style="width: 100%"
                       />
                       <div
                         v-else

@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
       <div class="w-75 p-2">
         <div class="flex">
-          <div class="flex flex-col w-full p-2" style="text-align: center">
+          <div class="flex flex-col w-full p-2 text-center">
             <OButton
               data-test="logs-search-off-refresh-interval"
               :variant="modelValue.toString() === '0' ? 'primary' : 'ghost'"
@@ -57,8 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             v-for="(item, j) in items"
             :key="'col_' + i + '_' + j"
-            class="flex flex-col w-1/3 p-2"
-            style="text-align: center"
+            class="flex flex-col w-1/3 p-2 text-center"
           >
             <OButton
               :data-test="`logs-search-bar-refresh-time-${item.value}`"
@@ -112,7 +111,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
       <div class="w-75 p-2">
         <div class="flex">
-          <div class="flex flex-col w-full p-2" style="text-align: center">
+          <div class="flex flex-col w-full p-2 text-center">
             <OButton
               data-test="logs-search-off-refresh-interval"
               :variant="modelValue.toString() === '0' ? 'primary' : 'ghost'"
@@ -134,8 +133,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             v-for="(item, j) in items"
             :key="'col_' + i + '_' + j"
-            class="flex flex-col w-1/3 p-2"
-            style="text-align: center"
+            class="flex flex-col w-1/3 p-2 text-center"
           >
             <OButton
               :data-test="`logs-search-bar-refresh-time-${item.value}`"

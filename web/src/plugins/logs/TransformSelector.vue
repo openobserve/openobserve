@@ -51,8 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Search Input -->
           <div
             data-test="logs-search-bar-transform-type-select"
-            class="logs-transform-type o2-input mx-2"
-            style="padding-top: 0"
+            class="logs-transform-type o2-input mx-2 pt-0"
           >
             <OSelect
               v-if="isActionsEnabled"

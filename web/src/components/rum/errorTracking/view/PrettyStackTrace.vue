@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :style="{ 'background-color': backgroundColor, 'border': `1px solid ${borderColor}` }"
     >
       <OSpinner variant="dots" size="lg" />
-      <div class="mt-3 text-text-secondary" style="font-size: 14px; font-weight: 500;">
+      <div class="mt-3 text-text-secondary font-medium" style="font-size: 14px;">
         Translating stack trace with source maps...
       </div>
       <div class="mt-1 text-text-secondary" style="font-size: 12px;">
@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :style="{ 'background-color': backgroundColor, 'border': `1px solid ${borderColor}` }"
     >
       <OIcon name="code-off" size="lg" class="mb-2" />
-      <div class="text-base font-medium text-text-secondary mb-1" style="font-weight: 500;">
+      <div class="text-base font-medium text-text-secondary mb-1">
         Source Maps Not Available
       </div>
       <div class="text-sm text-text-secondary" style="max-width: 500px; margin: 0 auto; font-size: 13px;">

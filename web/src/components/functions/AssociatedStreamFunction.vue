@@ -89,12 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <template #top>
               <div
-                style="
-                  display: flex;
-                  flex-direction: row;
-                  width: 100%;
-                  justify-content: space-between;
-                "
+                class="flex flex-row w-full justify-between"
               >
                 <div
                   class="text-sm font-[600] flex items-center"
@@ -163,7 +158,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #empty>
               <div
                 v-if="!addFunctionInProgress"
-                style="width: 100%; text-align: center"
+                class="w-full text-center"
               >
                 No functions found
               </div>

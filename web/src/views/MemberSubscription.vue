@@ -17,14 +17,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="rounded-default">
     <div
-      style="text-align: center; width: 100%; font-size: 30px; margin: 40px 0px"
+      class="text-center w-full"
+      style="font-size: 30px; margin: 40px 0px"
     >
       Member Subscription
     </div>
     <div v-if="status == 'processing'">{{ message }}</div>
     <div
       v-else-if="status == 'error' && error == ''"
-      style="text-align: center"
+      class="text-center"
     >
       Error while processing member subscription request.<br /><br />
     </div>

@@ -41,8 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="create-report-form"
           >
             <div
-              class="flex items-start gap-4 px-2"
-              style="padding-top: 0.75rem"
+              class="flex items-start gap-4 px-2 pt-3"
             >
               <div data-test="add-report-name-input" class="o2-input">
                 <OFormInput
@@ -154,8 +153,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div class="flex items-start justify-start">
                       <div
                         data-test="add-report-folder-select"
-                        class="o2-input mr-2"
-                        style="padding-top: 0; width: 30%"
+                        class="o2-input mr-2 pt-0"
+                        style="width: 30%"
                       >
                         <OFormSelect
                           data-test="add-report-dashboard-folder-select"
@@ -172,8 +171,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </div>
                       <div
                         data-test="add-report-dashboard-select"
-                        class="o2-input mr-2"
-                        style="padding-top: 0; width: 30%"
+                        class="o2-input mr-2 pt-0"
+                        style="width: 30%"
                       >
                         <OFormSelect
                           data-test="add-report-dashboard-name-select"
@@ -190,8 +189,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </div>
                       <div
                         data-test="add-report-tab-select"
-                        class="o2-input"
-                        style="padding-top: 0; width: 30%"
+                        class="o2-input pt-0"
+                        style="width: 30%"
                       >
                         <OFormSelect
                           data-test="add-report-dashboard-tab-select"
@@ -413,8 +412,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div class="flex items-start justify-start mt-3">
                       <div
                         data-test="add-report-schedule-custom-interval-input"
-                        class="o2-input mr-2"
-                        style="padding-top: 0; width: 320px"
+                        class="o2-input mr-2 pt-0"
+                        style="width: 320px"
                       >
                         <div class="mb-1 font-bold text-text-secondary">
                           {{ t("reports.cronExpression") + " *" }}
@@ -447,7 +446,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           color="input-border"
                           type="text"
                           outlined
-                          style="width: 100%"
+                          class="w-full"
                           :debounce="400"
                         />
                       </div>
@@ -499,24 +498,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       <div
                         data-test="add-report-schedule-custom-interval-input"
-                        class="o2-input mr-2"
-                        style="padding-top: 0; width: 160px"
+                        class="o2-input mr-2 pt-0"
+                        style="width: 160px"
                       >
                         <OFormInput
                           name="customInterval"
                           label="Repeat every"
                           required
                           color="input-border"
-                          class="showLabelOnTop"
+                          class="showLabelOnTop w-full"
                           type="number"
-                          style="width: 100%"
                         />
                       </div>
 
                       <div
                         data-test="add-report-schedule-custom-frequency-select"
-                        class="o2-input"
-                        style="padding-top: 0; width: 160px"
+                        class="o2-input pt-0"
+                        style="width: 160px"
                       >
                         <OFormSelect
                           name="customPeriod"
@@ -634,7 +632,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :label="t('reports.recipients')"
                       required
                       tabindex="0"
-                      style="width: 100%"
+                      class="w-full"
                       :placeholder="t('user.inviteByEmail')"
                     />
                   </div>

@@ -5,10 +5,10 @@
 <template>
   <div
     class="flame-graph-view flex flex-col h-full bg-white w-full bg-card-glass-bg!"
-    style="min-height: 400px; height: 100%"
+    style="min-height: 400px"
   >
     <!-- Upper area: controls + ruler + chart -->
-    <div class="flex flex-col flex-1" style="min-height: 0">
+    <div class="flex flex-col flex-1 min-h-0">
       <!-- Controls Bar -->
       <div
         class="px-6 py-3 border-b border-border-default flex items-center justify-between bg-card-glass-bg!"
@@ -29,8 +29,7 @@
       <!-- Ruler + chart: outer flex column, mousemove for cursor badge on ruler -->
       <div
         data-test="flame-graph-view-chart-wrapper"
-        class="flex flex-col flex-1"
-        style="min-height: 0"
+        class="flex flex-col flex-1 min-h-0"
         @mousemove="handleChartMouseMove"
         @mouseleave="cursorVisible = false"
       >
@@ -64,8 +63,8 @@
           <!-- Cursor time badge with downward arrow -->
           <div
             v-if="cursorVisible"
-            class="absolute pointer-events-none flex flex-col items-center"
-            style="top: 2px; z-index: 20; transform: translateX(-50%)"
+            class="absolute pointer-events-none flex flex-col items-center z-20"
+            style="top: 2px; transform: translateX(-50%)"
             :style="{ left: cursorX + 'px' }"
           >
             <div
@@ -90,8 +89,7 @@
         <!-- Scrollable chart area: grows to fit all rows, scrolls vertically -->
         <div
           ref="chartScrollRef"
-          class="flex-1 overflow-y-auto relative"
-          style="min-height: 0"
+          class="flex-1 overflow-y-auto relative min-h-0"
         >
           <div
             :style="{
@@ -103,18 +101,17 @@
             <ChartRenderer
               v-if="hasData"
               :data="chartData"
-              style="height: 100%; width: 100%"
+              class="h-full w-full"
               @click="handleChartClick"
             />
 
             <!-- Vertical cursor line -->
             <div
               v-if="cursorVisible"
-              class="absolute top-0 bottom-0 pointer-events-none"
+              class="absolute top-0 bottom-0 pointer-events-none z-10"
               style="
                 width: 1px;
                 background: rgba(80, 80, 80, 0.6);
-                z-index: 10;
               "
               :style="{ left: cursorX + 'px' }"
             ></div>

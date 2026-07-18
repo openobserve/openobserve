@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :form="form"
       v-slot="{ isSubmitting }"
     >
-      <div style="height: calc(100vh - 120px); overflow: auto">
+      <div style="height: calc(100vh - 120px)" class="overflow-auto">
         <div class="max-w-2xl mx-4 mt-4">
           <!-- Name -->
           <div class="o2-input mb-4">

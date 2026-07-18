@@ -31,11 +31,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:model-value="(v: number) => splitterModel = v"
       :limits="[0, 250]"
       unit="px"
-      class="flex-1 min-h-0"
-      style="overflow: hidden"
+      class="flex-1 min-h-0 overflow-hidden"
     >
       <template #before>
-        <div class="flex flex-col border-r4 border-r border-border-default " style="height: 100%">
+        <div class="flex flex-col border-r4 border-r border-border-default h-full">
           <div class="sticky top-0 px-2 shrink-0">
             <div class="flex items-center justify-between p-2 " style="font-size: 18px">
               <span class="flex items-center gap-1">

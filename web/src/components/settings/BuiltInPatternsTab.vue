@@ -160,7 +160,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @click:secondary="showPreview = false"
       @click:primary="importSinglePattern"
     >
-      <div style="max-height: 60vh; overflow-y: auto">
+      <div style="max-height: 60vh" class="overflow-y-auto">
         <div class="mb-3">
           <div class="font-bold mb-1">
             {{ t('regex_patterns.description') }}

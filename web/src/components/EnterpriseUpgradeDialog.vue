@@ -47,8 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Loading State: Show skeleton -->
               <template v-if="isLoadingLicense && dialogConfig.showUsageIndicator">
                 <OSkeleton
-                  class="shrink-0 rounded-full"
-                  style="width: 40px; height: 40px;"
+                  class="shrink-0 rounded-full w-10 h-10"
                   data-test="enterprise-upgrade-usage-indicator-skeleton"
                 />
                 <OSkeleton
@@ -80,13 +79,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Loaded chart -->
               <template v-else-if="chartData">
                 <div class="relative w-full">
-                  <div class="usage-chart-container w-full overflow-visible p-0 mx-auto min-h-37.5 max-h-37.5" style="height: 150px; width: 100%;">
+                  <div class="usage-chart-container w-full overflow-visible p-0 mx-auto min-h-37.5 max-h-37.5" style="height: 150px;">
                     <ChartRenderer
                       :key="dashboardRenderKey"
                       :data="chartData"
                     />
                   </div>
-                  <div v-if="isIngestionUnlimited" class="text-xs" style="color: rgba(255, 255, 255, 0.7); font-size: 10px; text-align: center; margin-top: 4px;">
+                  <div v-if="isIngestionUnlimited" class="text-xs text-center mt-1" style="color: rgba(255, 255, 255, 0.7); font-size: 10px;">
                     {{ t('about.usage_shows_zero_unlimited') }}
                   </div>
                 </div>

@@ -146,7 +146,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     {{ errorMessage.message }}
                     <div>
                       <query-editor
-                        style="width: 100%; height: 200px"
+                        class="w-full"
+                        style="height: 200px"
                         data-test="pipeline-import-sql-query-input"
                         :model-value="userSelectedSqlQuery[index] || ''"
                         :label="'SQL Query'"
@@ -317,15 +318,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   'text-green': val.success,
                   'text-status-negative': !val.success,
                 }"
+                class="whitespace-pre-wrap"
                 style="
-                  white-space: pre-wrap;
                   word-wrap: break-word;
                   overflow-wrap: break-word;
                 "
                 :data-test="`pipeline-import-creation-${index}-message`"
               >
                 <pre
-                  style="white-space: pre-wrap; word-break: break-word"
+                  class="whitespace-pre-wrap"
+                  style="word-break: break-word"
                   >{{ val.message }}</pre
                 >
               </div>

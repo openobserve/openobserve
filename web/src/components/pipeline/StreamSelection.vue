@@ -44,8 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="px-3">
           <div
             data-test="add-pipeline-name-input"
-            class="alert-name-input o2-input"
-            style="padding-top: 12px"
+            class="alert-name-input o2-input pt-3"
           >
             <OFormInput
               name="name"
@@ -70,8 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div
             data-test="add-pipeline-stream-type-select"
-            class="alert-stream-type o2-input mr-2 mb-2"
-            style="padding-top: 0"
+            class="alert-stream-type o2-input mr-2 mb-2 pt-0"
           >
             <OFormSelect
               name="stream_type"
@@ -88,8 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div
             data-test="add-pipeline-stream-select"
-            class="o2-input"
-            style="padding-top: 0"
+            class="o2-input pt-0"
           >
             <OFormSelect
               name="stream_name"

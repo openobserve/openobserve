@@ -1,6 +1,6 @@
 <template>
   <div data-test="promql-labelfilter-editor">
-    <div style="display: flex; flex-direction: row" class="pl-2">
+    <div class="pl-2 flex flex-row">
       <div
         data-test="promql-labelfilter-editor-label"
         class="text-sm whitespace-nowrap flex items-center min-w-21.5"

@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="rounded-default px-4 pt-3" style="min-height: inherit; overflow: auto">
+  <div class="rounded-default px-4 pt-3 overflow-auto" style="min-height: inherit">
     <!-- Page title is supplied by the parent Billing.vue AppPageHeader; no local title here. -->
     <!-- Managed billing empty state for child orgs -->
     <div
@@ -77,7 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="flex flex-col justify-between">
             <div class="flex justify-between items-center">
               <div class="text-base font-medium leading-5 text-text-heading text-left">{{ t("billing.aiCredits") }}</div>
-              <div style="opacity: 0.8;">
+              <div class="opacity-80">
                 <img :src="aiIcon" />
               </div>
             </div>

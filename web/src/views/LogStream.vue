@@ -68,7 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :enable-column-resize="true"
         :persist-columns="true"
         table-id="streams-log-stream-list"
-        style="width: 100%; height: 100%"
+        class="w-full h-full"
       >
           <!-- Toolbar inside the table frame: stream-type filter + search. -->
           <template #toolbar>

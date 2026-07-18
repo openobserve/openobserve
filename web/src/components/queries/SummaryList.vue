@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     selection="multiple"
     v-model:selected-ids="selectedIds"
     @row-click="getAllUserQueries"
-    style="width: 100%"
+    class="w-full"
     :show-global-filter="false"
     :default-columns="false"
     :enable-column-resize="true"

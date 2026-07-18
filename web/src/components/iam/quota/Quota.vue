@@ -66,7 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 Edit Quota
                 <template #icon-right>
-                  <OIcon name="edit" size="sm" style="font-weight: 200; opacity: 0.7" />
+                  <OIcon name="edit" size="sm" class="opacity-70" style="font-weight: 200" />
                 </template>
               </OButton>
             </div>
@@ -95,8 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 searchable
                 clearable
                 placeholder="Select API Category"
-                style="padding: 0px"
-                class="no-case mr-3 w-75 input-width ml-3 category-select"
+                class="no-case mr-3 w-75 input-width ml-3 category-select p-0"
                 labelKey="label"
                 valueKey="value"
                 @update:model-value="handleApiCategorySelect"
@@ -196,7 +195,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :debounceTime="300"
           v-model:query="jsonStrToDisplay"
           language="json"
-          style="height: 100%"
+          class="h-full"
           :read-only="!editTable"
         />
       </div>
@@ -285,7 +284,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :debounceTime="300"
           v-model:query="jsonStrToDisplay"
           language="json"
-          style="height: 100%"
+          class="h-full"
           :read-only="!editTable"
         />
       </div>

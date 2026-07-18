@@ -117,7 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 }"
                 :data-test="`model-pricing-import-creation-${index}-message`"
               >
-                <pre class="creators-message" style="white-space: pre-wrap; word-wrap: break-word; overflow-wrap: break-word; word-break: break-word; max-width: 100%;">{{ val.message }}</pre>
+                <pre class="creators-message whitespace-pre-wrap max-w-full" style="word-wrap: break-word; overflow-wrap: break-word; word-break: break-word;">{{ val.message }}</pre>
               </div>
             </div>
           </div>

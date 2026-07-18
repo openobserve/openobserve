@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div style="overflow-y: auto" class="scroll flex flex-col h-full" data-test="metrics-page">
+  <div class="scroll flex flex-col h-full overflow-y-auto" data-test="metrics-page">
     <!-- Standard page header: title + icon + all query controls on ONE line
          (syntax guide, legends, date range, refresh, Run). No extra toolbar row. -->
     <AppPageHeader

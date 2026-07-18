@@ -407,11 +407,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="rounded-default border border-solid border-status-negative/30 p-2 mt-2 bg-status-error-bg"
               >
                 <pre
-                  class="text-sm"
+                  class="text-sm whitespace-pre-wrap m-0"
                   style="
-                    white-space: pre-wrap;
                     word-break: break-word;
-                    margin: 0;
                     font-family: var(--font-mono);
                     font-size: 12px;
                   "
@@ -433,11 +431,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="rounded-default border border-solid border-status-positive/30 p-2 mt-2 bg-status-success-bg"
               >
                 <pre
-                  class="text-sm"
+                  class="text-sm whitespace-pre-wrap m-0"
                   style="
-                    white-space: pre-wrap;
                     word-break: break-word;
-                    margin: 0;
                     font-family: var(--font-mono);
                     font-size: 12px;
                   "

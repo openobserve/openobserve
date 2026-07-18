@@ -152,7 +152,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     }"
                     :data-test="`regex-pattern-import-creation-${index}-message`"
                   >
-                    <pre style="white-space: pre-wrap; word-wrap: break-word; overflow-wrap: break-word; word-break: break-word; max-width: 100%;">{{ val.message }}</pre>
+                    <pre class="whitespace-pre-wrap max-w-full" style="word-wrap: break-word; overflow-wrap: break-word; word-break: break-word;">{{ val.message }}</pre>
                   </div>
                 </div>
               </div>

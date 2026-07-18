@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-    <div class="p-3 " style="height: calc(100vh - 130px); width: 100%;" >
+    <div class="p-3 w-full" style="height: calc(100vh - 130px);" >
       <!-- Billing usage tiles (always shown). When self-usage reporting is
            enabled, the calendar in the toolbar drives the range and a daily
            chart is appended below. -->
@@ -38,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <!-- Title row -->
                 <div class="flex justify-between items-center">
                   <div class="text-(length:--text-sm) font-semibold leading-(--leading-base) tracking-normal text-text-heading text-left"> Action Scripts</div>
-                  <div style="opacity: 0.8;">
+                  <div class="opacity-80">
                     <img :src="actionScriptIcon" />
                   </div>
                 </div>
@@ -57,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <!-- Title row -->
                 <div class="flex justify-between items-center">
                   <div class="text-(length:--text-sm) font-semibold leading-(--leading-base) tracking-normal text-text-heading text-left">Error Tracking</div>
-                  <div style="opacity: 0.8;">
+                  <div class="opacity-80">
                     <img :src="errorTrackingIcon" />
                   </div>
                 </div>
@@ -76,7 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <!-- Title row -->
                 <div class="flex justify-between items-center">
                   <div class="text-(length:--text-sm) font-semibold leading-(--leading-base) tracking-normal text-text-heading text-left" data-test="billings-usage-tile-title">RUM Session</div>
-                  <div style="opacity: 0.8;">
+                  <div class="opacity-80">
                     <img :src="rumSessionIcon" />
                   </div>
                 </div>

@@ -53,8 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <div
                 data-test="add-action-script-name-input-wrapper"
-                class="report-name-input"
-                style="padding-top: 12px"
+                class="report-name-input pt-3"
               >
                 <OFormInput
                   data-test="add-action-script-name-input"
@@ -216,8 +215,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <div class="flex">
                         <div
                           data-test="add-action-script-cron-input"
-                          class="mr-2"
-                          style="padding-top: 8px; width: 320px"
+                          class="mr-2 pt-2"
+                          style="width: 320px"
                         >
                           <div
                             class="mb-1 font-bold text-text-secondary"
@@ -252,10 +251,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                           <OFormInput
                             name="cron"
-                            class="showLabelOnTop"
+                            class="showLabelOnTop w-full"
                             type="text"
                             debounce="300"
-                            style="width: 100%"
                             :disabled="isEditingActionScript"
                             :readonly="isEditingActionScript"
                           />
@@ -427,8 +425,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div class="mx-2">
         <div
-          class="flex justify-end gap-2 px-3 w-full py-2.5 bg-card-glass-bg"
-          style="position: sticky; bottom: 0px; z-index: 2"
+          class="flex justify-end gap-2 px-3 w-full py-2.5 bg-card-glass-bg sticky"
+          style="bottom: 0px; z-index: 2"
         >
           <OButton
             data-test="add-action-script-cancel-btn"

@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @submit="onSubmit"
         v-slot="{ isSubmitting }"
       >
-        <div style="position: relative">
+        <div class="relative">
           <OFormInput
             name="email"
             :placeholder="t('user.inviteByEmail')"

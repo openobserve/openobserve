@@ -41,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :done="step > 1"
           :navigable="step > 1"
         >
-          <div class="text-sm font-medium mb-3" style="font-weight: 500">
+          <div class="text-sm font-medium mb-3">
             Select Destination Type <span class="text-status-error-text">*</span>
           </div>
           <div class="grid grid-cols-[repeat(auto-fill,minmax(140px,1fr))] gap-3 mb-4">
@@ -87,7 +87,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :done="step > 2"
           :navigable="step > 2"
         >
-          <div class="text-sm font-medium mb-4" style="font-weight: 500">
+          <div class="text-sm font-medium mb-4">
             Connection Details
           </div>
 

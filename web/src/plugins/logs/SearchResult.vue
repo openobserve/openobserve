@@ -301,7 +301,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               ref="histogramChart"
               data-test="logs-search-result-bar-chart"
               :data="plotChart"
-              style="width: 100%; height: 100%"
+              class="w-full h-full"
               @updated:dataZoom="onChartUpdate"
             />
           </div>

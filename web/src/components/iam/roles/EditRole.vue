@@ -70,8 +70,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div
               v-show="permissionsUiType === 'table'"
               data-test="edit-role-permissions-filters"
-              class="flex items-start px-3 py-2 justify-start gap-3"
-              style="position: sticky; top: 0px; z-index: 2"
+              class="flex items-start px-3 py-2 justify-start gap-3 sticky"
+              style="top: 0px; z-index: 2"
             >
               <div
                 data-test="edit-role-permissions-show-toggle"

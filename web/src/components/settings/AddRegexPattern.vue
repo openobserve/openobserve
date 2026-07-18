@@ -154,9 +154,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OFormTextarea
                   name="pattern"
                   data-test="add-regex-pattern-input"
-                  class="regex-pattern-input"
+                  class="regex-pattern-input w-full"
                   tabindex="0"
-                  style="width: 100%; resize: none"
+                  style="resize: none"
                   placeholder="Eg. \d....\d "
                   :rows="5"
                 />
@@ -195,9 +195,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OFormTextarea
                   name="testString"
                   data-test="add-regex-test-string-input"
-                  class="regex-test-string-input"
+                  class="regex-test-string-input w-full"
                   tabindex="0"
-                  style="width: 100%; resize: none"
+                  style="resize: none"
                   placeholder="Eg. 1234567890"
                   :rows="5"
                 />
@@ -218,9 +218,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   name="outputString"
                   :readonly="true"
                   data-test="add-regex-output-string-input"
-                  class="regex-test-string-input"
+                  class="regex-test-string-input w-full"
                   tabindex="0"
-                  style="width: 100%; resize: none"
+                  style="resize: none"
                   placeholder="Output String"
                   :rows="5"
                 />
@@ -254,11 +254,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OForm>
       </div>
       <div
-        class="ml-2"
+        class="ml-2 max-w-full"
         v-if="store.state.isAiChatEnabled"
         style="
           width: 35%;
-          max-width: 100%;
           min-width: 75px;
           height: calc(100vh - 90px) !important;
         "

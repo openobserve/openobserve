@@ -119,8 +119,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div
                 data-test="action-scripts-loading"
                 v-if="alertStateLoadingMap[row.uuid]"
-                style="display: inline-block; width: 33.14px; height: auto"
-                class="flex justify-center items-center ml-1"
+                style="display: inline-block; width: 33.14px"
+                class="flex justify-center items-center ml-1 h-auto"
                 :title="`Turning ${row.enabled ? 'Off' : 'On'}`"
               >
                 <OSpinner size="xs" />

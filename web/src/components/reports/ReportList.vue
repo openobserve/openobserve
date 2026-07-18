@@ -70,7 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 pagination="client"
                 selection="multiple"
                 v-model:selected-ids="selectedReportIds"
-                style="width: 100%; height: 100%"
+                class="w-full h-full"
                 :show-global-filter="false"
                 :enable-column-resize="true"
                 :persist-columns="true"
@@ -197,8 +197,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div
                     v-if="reportsStateLoadingMap[row.report_id]"
                     data-test="report-list-toggle-report-state-loader"
-                    style="display: inline-block; width: 33.14px; height: auto"
-                    class="flex justify-center items-center"
+                    style="display: inline-block; width: 33.14px"
+                    class="flex justify-center items-center h-auto"
                   >
                     <OSpinner size="xs" />
                   </div>

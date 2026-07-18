@@ -114,10 +114,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OSplitter
               v-model="searchObj.config.splitterModel"
               :limits="searchObj.config.splitterLimit"
-              style="width: 100%"
               separatorClass="w-px"
               @update:model-value="onSplitterUpdate"
-              class="h-full"
+              class="h-full w-full"
             >
               <template #before>
                 <div class="h-full border-r border-border-default bg-surface-panel">

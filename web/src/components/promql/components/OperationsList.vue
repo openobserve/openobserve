@@ -1,5 +1,5 @@
 <template>
-    <div style="display: flex; flex-direction: row" class="pl-2">
+    <div class="pl-2 flex flex-row">
       <div
         data-test="promql-operations-list-label"
         class="text-sm whitespace-nowrap flex items-center min-w-21.5"
@@ -140,7 +140,7 @@
         clearable
       />
 
-      <div style="max-height: 400px; overflow-y: auto">
+      <div class="overflow-y-auto" style="max-height: 400px">
         <div class="border border-border rounded-default divide-y divide-border">
           <div
             v-for="category in categories"

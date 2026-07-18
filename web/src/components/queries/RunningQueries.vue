@@ -22,8 +22,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="flex-none">
       <div class="bg-card-glass-bg">
         <div
-          class="flex flex-col px-4 py-3 border-b-[1px]"
-          style="position: sticky; top: 0; z-index: 1000;"
+          class="flex flex-col px-4 py-3 border-b-[1px] sticky"
+          style="top: 0; z-index: 1000;"
         >
           <!-- Standard section header: title + actions only. Filters live in the
                band below (directly above the table). -->

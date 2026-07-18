@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            whole form. Inline form → the footer Save is type="submit" (Enter
            works natively) and its spinner is form-driven via v-slot. -->
       <OForm :form="form" v-slot="{ isSubmitting }">
-        <div style="height: calc(100vh -  var(--navbar-height) - 155px); overflow: auto">
+        <div class="overflow-auto" style="height: calc(100vh -  var(--navbar-height) - 155px)">
           <!-- Constrain the whole form to a sensible reading width on wide screens
                while staying fluid below the breakpoint. Uses Tailwind's design-system
                max-width token (max-w-3xl ≈ 48rem) instead of arbitrary px values. -->
@@ -132,8 +132,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
         <div class="mx-2">
-          <div class="flex justify-end px-2 py-4 w-full gap-2 border-t border-border-default"
-            style="position: sticky; bottom: 0px; z-index: 2"
+          <div class="flex justify-end px-2 py-4 w-full gap-2 border-t border-border-default sticky"
+            style="bottom: 0px; z-index: 2"
           >
             <OButton
               data-test="add-cipher-key-cancel-btn"

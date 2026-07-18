@@ -15,8 +15,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-    <div ref="chartPanelRef" style="height: 100%; position: relative">
-      <div style="height: calc(100vh - 220px); width: 100%;" data-test="alert-preview-chart">
+    <div ref="chartPanelRef" class="h-full relative">
+      <div class="w-full" style="height: calc(100vh - 220px)" data-test="alert-preview-chart">
         <PanelSchemaRenderer
           :panelSchema="chartData"
           :selectedTimeObj="dashboardPanelData.meta.dateTime"

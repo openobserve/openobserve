@@ -24,8 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          search-class). The scrolling list itself deliberately does NOT: it runs
          flush to the divider so its scrollbar lands on the panel edge. -->
     <div
-      class="flex items-center gap-2 pr-2.5"
-      style="max-width: 100%; overflow: hidden"
+      class="flex items-center gap-2 pr-2.5 max-w-full overflow-hidden"
     >
       <OButton
         v-if="

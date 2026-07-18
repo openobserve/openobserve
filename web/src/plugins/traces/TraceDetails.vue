@@ -381,8 +381,7 @@ size="xs"
         </header>
       </div>
       <div
-        class="bg-card-glass-bg overflow-hidden h-full"
-        style="display: flex; flex-direction: column; min-height: 0"
+        class="bg-card-glass-bg overflow-hidden h-full flex flex-col min-h-0"
       >
         <!-- Tabs & Search Bar -->
         <div
@@ -679,7 +678,7 @@ size="sm">
             <!-- DAG View - only for LLM traces -->
             <div
               v-if="hasLLMSpans && activeTab === 'dag'"
-              style="display: flex; flex: 1; min-height: 0"
+              class="flex flex-1 min-h-0"
             >
               <div
                 class="h-[calc(100vh-200px)] p-4 min-w-0 overflow-hidden"
@@ -745,8 +744,7 @@ size="sm">
             <!-- Flame Graph View -->
             <div
               v-if="activeTab === 'flame-graph'"
-              style="display: flex; flex: 1; min-height: 0"
-              class="w-full bg-card-glass-bg!"
+              class="w-full bg-card-glass-bg! flex flex-1 min-h-0"
             >
               <FlameGraphView
                 :spans="flatSpans"
@@ -776,8 +774,7 @@ size="sm">
             -->
             <div
               v-if="config.showLLMUI !== 'false' && activeTab === 'thread'"
-              style="display: flex; flex: 1; min-height: 0"
-              class="w-full bg-card-glass-bg!"
+              class="w-full bg-card-glass-bg! flex flex-1 min-h-0"
             >
               <div
                 class="thread-left-panel"
@@ -799,8 +796,8 @@ size="sm">
               </div>
               <div
                 v-if="isSidebarOpen && (selectedSpanId || showTraceDetails)"
-                class="border-l border-l-solid border-l-card-glass-border"
-                style="width: 40%; min-width: 300px; height: 100%; overflow: hidden;"
+                class="border-l border-l-solid border-l-card-glass-border h-full overflow-hidden"
+                style="width: 40%; min-width: 300px;"
               >
                 <trace-details-sidebar
                   data-test="trace-details-thread-sidebar"
@@ -826,27 +823,22 @@ size="sm">
             <!-- Spans Table View Placeholder -->
             <div
               v-if="activeTab === 'spans'"
-              style="
-                display: flex;
-                flex: 1;
-                min-height: 0;
-                align-items: center;
-                justify-content: center;
-              "
+              class="flex flex-1 min-h-0 items-center justify-center"
             >
               <div
+                class="text-center p-10"
                 style="
-                  text-align: center;
                   color: var(--color-text-secondary);
-                  padding: 40px;
                 "
               >
                 <OIcon
                   name="table-chart"
-                  style="margin-bottom: 16px; width: 48px; height: 48px;"
+                  class="mb-4"
+                  style="width: 48px; height: 48px;"
                  />
                 <div
-                  style="font-size: 16px; font-weight: 600; margin-bottom: 8px"
+                  class="font-semibold mb-2"
+                  style="font-size: 16px"
                 >
                   {{ t("traces.spansTableView") }}
                 </div>
@@ -857,27 +849,14 @@ size="sm">
             <!-- Map View with Pattern/Span Toggle -->
             <div
               v-if="activeTab === 'map'"
-              style="
-                display: flex;
-                flex: 1;
-                min-height: 0;
-                flex-direction: column;
-              "
-              class="w-full h-full"
+              class="w-full h-full flex flex-1 min-h-0 flex-col"
             >
               <!-- Chart Container -->
               <div
-                style="
-                  display: flex;
-                  flex: 1;
-                  min-height: 0;
-                  align-items: center;
-                  justify-content: center;
-                "
+                class="flex flex-1 min-h-0 items-center justify-center"
               >
                 <div
-                  style="text-align: center"
-                  class="w-full h-full p-2.5"
+                  class="w-full h-full p-2.5 text-center"
                 >
                   <ChartRenderer
                     ref="chartRendererRef"

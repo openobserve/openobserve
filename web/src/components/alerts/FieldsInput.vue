@@ -79,8 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </div>
           <div
-            class="ml-0 alerts-condition-action"
-            style="margin-bottom: 12px"
+            class="ml-0 alerts-condition-action mb-3"
           >
             <OButton
               data-test="alert-conditions-delete-condition-btn"

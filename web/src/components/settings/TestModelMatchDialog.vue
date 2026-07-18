@@ -15,7 +15,7 @@
   >
 
     <!-- Two-column body -->
-    <div class="flex flex-1 overflow-hidden min-h-0" style="height: 100%">
+    <div class="flex flex-1 overflow-hidden min-h-0 h-full">
         <!-- ── Left: Inputs ── -->
         <div class="w-85 shrink-0 overflow-y-auto py-5 pr-5 pl-6 flex flex-col gap-5">
           <!-- Model Name -->

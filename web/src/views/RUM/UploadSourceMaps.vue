@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-slot="{ isSubmitting }"
     >
       <!-- Form Content Area -->
-      <div class="flex-1 overflow-y-auto bg-card-glass-bg mb-[0.675rem] p-6" style="height: calc(100vh - 172px); overflow: auto">
+      <div class="flex-1 overflow-y-auto bg-card-glass-bg mb-[0.675rem] p-6 overflow-auto" style="height: calc(100vh - 172px)">
         <div class="max-w-300 mx-auto">
           <!-- Input Fields -->
           <div class="grid grid-cols-1 gap-4 mb-6">
@@ -72,8 +72,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- Bottom Action Bar -->
-      <div class="action-bar shrink-0 bg-card-glass-bg flex items-center justify-end gap-3 py-3 pr-3 border-t border-card-glass-border"
-        style="position: sticky; z-index: 2">
+      <div class="action-bar shrink-0 bg-card-glass-bg flex items-center justify-end gap-3 py-3 pr-3 border-t border-card-glass-border sticky"
+        style="z-index: 2">
         <OButton
           data-test="rum-upload-source-maps-cancel-btn"
           variant="outline"

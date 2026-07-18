@@ -609,7 +609,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <div
         v-if="activeTab == 'logs'"
-        style="display: flex; flex-direction: column; flex: 1; min-height: 0"
+        class="flex flex-col flex-1 min-h-0"
       >
           <!-- Refresh Button (embedded mode) -->
           <div
@@ -630,8 +630,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Loading State -->
         <div
           v-if="loading"
-          class="flex flex-col items-center justify-center gap-3"
-          style="flex: 1; min-height: 300px"
+          class="flex flex-col items-center justify-center gap-3 flex-1"
+          style="min-height: 300px"
         >
           <OSpinner size="sm" />
           <div class="text-sm opacity-70">

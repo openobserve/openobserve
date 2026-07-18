@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/no-unused-components -->
 <template>
-  <div style="height: 100%; width: 100%">
+  <div class="h-full w-full">
     <!-- PanelEditor Content Area (no header for logs visualization) -->
     <PanelEditor
       ref="panelEditorRef"

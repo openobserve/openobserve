@@ -556,8 +556,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Threshold / Sensitivity -->
         <div class="flex items-start mb-4! pb-0!">
           <div
-            class="font-semibold flex items-center"
-            style="width: 190px; padding-top: 4px"
+            class="font-semibold flex items-center pt-1"
+            style="width: 190px"
           >
             {{ t("alerts.sensitivity") }}
             <OIcon
@@ -639,7 +639,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :variablesData="{}"
                     :forceLoad="true"
                     searchType="ui"
-                    style="height: 180px; width: 100%"
+                    class="w-full"
+                    style="height: 180px"
                     data-test="anomaly-sensitivity-chart"
                     @series-data-update="onSeriesDataUpdate"
                   />

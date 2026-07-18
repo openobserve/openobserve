@@ -257,12 +257,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     <div
                       v-if="indexData.defaultFts"
-                      style="font-weight: 400"
-                      class="mt-3"
+                      class="mt-3 font-normal"
                     >
                       <label
-                        style="font-weight: 600"
-                        class="bg-banner-warning-bg py-1 px-4 rounded-default border border-banner-warning-border text-banner-warning-text"
+                        class="bg-banner-warning-bg py-1 px-4 rounded-default border border-banner-warning-border text-banner-warning-text font-semibold"
                       >
                         {{ t("logStream.mapping") }} Default FTS keys used (no
                         custom keys set).</label
@@ -358,12 +356,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </OCardSection>
                       <!-- Main Content (Scrollable if necessary) -->
                       <OCardSection
-                        class="p-0"
+                        class="p-0 flex-1 overflow-y-auto mb-0.5"
                         style="
-                          flex: 1;
-                          overflow-y: auto;
                           padding: 0px 16px 0px 16px;
-                          margin-bottom: 2px;
                         "
                       >
                         <OForm
@@ -593,7 +588,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="bg-banner-warning-bg py-1 px-4 rounded-default border border-banner-warning-border text-banner-warning-text mt-2"
                     style="width: fit-content"
                   >
-                    <span style="font-weight: 600">
+                    <span class="font-semibold">
                       <OIcon name="info" class="mr-1" size="sm" />
 
                       Additional

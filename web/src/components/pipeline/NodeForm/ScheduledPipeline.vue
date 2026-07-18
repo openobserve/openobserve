@@ -21,13 +21,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="mb-2 stepper-header w-full flex h-full">
       <div
         :class="store.state.isAiChatEnabled ? 'w-[75%]' : 'w-full'"
-        style="height: 100% !important; display: flex;"
+        class="flex"
+        style="height: 100% !important;"
       >
         <!-- Collapsed field list bar (shown when hidden) -->
         <div
           v-if="collapseFields"
-          class="bg-surface-panel! shrink-0 cursor-pointer flex flex-col items-center justify-start pt-2 gap-1.5"
-          style="width: 50px; height: 100%"
+          class="bg-surface-panel! shrink-0 cursor-pointer flex flex-col items-center justify-start pt-2 gap-1.5 h-full"
+          style="width: 50px"
           data-test="scheduled-pipeline-field-list-collapsed-bar"
           @click="collapseFieldList"
         >
@@ -41,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="o2-custom-splitter"
         >
           <template #before>
-            <div style="display: flex; flex-direction: column; height: 100%;">
+            <div class="flex flex-col h-full">
             <!-- Left panel header with collapse button -->
             <div class="flex items-center justify-between shrink-0 px-2 py-1.5 border-b border-border-default bg-surface-panel">
               <span class="font-semibold text-sm">{{ t("pipeline.buildQuery") }}</span>
@@ -57,16 +58,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <div class="pl-2 flex flex-col flex-1 min-h-0">
             <div
-              style="width: 100%; overflow-y: auto;"
-              class="flex-1 min-h-0"
+              class="flex-1 min-h-0 w-full overflow-y-auto"
             >
                 <!-- fieldlist section -->
                 <div
-                  style="
-                    display: flex;
-                    flex-direction: column;
-                    overflow: hidden;
-                  "
+                  class="flex flex-col overflow-hidden"
                 >
                   <span
                     @click.stop="
@@ -81,13 +77,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </span>
                   <div
                     v-show="expandState.buildQuery"
-                    style="
-                      display: flex;
-                      flex-direction: column;
-                      padding-top: 8px;
-                    "
+                    class="flex flex-col pt-2"
                   >
-                    <div style="flex-shrink: 0">
+                    <div class="shrink-0">
                       <OFormSelect
                         name="stream_type"
                         :options="streamTypes"
@@ -113,8 +105,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                     <!-- FieldList scrolls within a capped height -->
                     <div
-                      style="max-height: 40vh; overflow-y: auto;"
-                      class="pipeline-field-list-wrapper"
+                      style="max-height: 40vh;"
+                      class="pipeline-field-list-wrapper overflow-y-auto"
                     >
                       <GroupedFieldList
                         :fields="streamFields"
@@ -491,9 +483,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                   min-width: 90px;
                                   margin-left: 0 !important;
                                   height: 40px;
-                                  font-weight: normal;
                                 "
-                                class="flex justify-center items-center bg-surface-subtle"
+                                class="flex justify-center items-center bg-surface-subtle font-normal"
                               >
                                 {{ t("alerts.times") }}
                               </div>
@@ -790,10 +781,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             ></div>
           </template>
           <template #after>
-            <div class="w-full flex flex-col border-l border-border-default" style="height: 100%">
+            <div class="w-full flex flex-col border-l border-border-default h-full">
               <div
-                class="flex-1 overflow-auto"
-                style="height: calc(100vh - 200px) !important; width: 100%"
+                class="flex-1 overflow-auto w-full"
+                style="height: calc(100vh - 200px) !important"
               >
                 <div class="query-editor-container scheduled-pipelines">
                   <span @click.stop="expandState.query = !expandState.query">
@@ -963,11 +954,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <div
-        class="ml-2"
+        class="ml-2 w-1/4 max-w-full"
         v-if="store.state.isAiChatEnabled"
         style="
-          width: 25%;
-          max-width: 100%;
           min-width: 75px;
           height: calc(100vh - 70px) !important;
         "

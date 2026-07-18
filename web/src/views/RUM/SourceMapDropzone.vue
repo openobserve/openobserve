@@ -46,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="rum-upload-source-maps-file-input"
             type="file"
             accept=".zip"
-            style="display: none"
+            class="hidden"
             @change="onFileInput(field, $event)"
           />
 
