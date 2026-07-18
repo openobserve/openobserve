@@ -184,7 +184,7 @@ const resolvedSize = computed(() => props.size ?? "md");
 
       <span
         :class="[
-          'absolute rounded-full pointer-events-none shadow-sm border-2 border-slider-thumb-border',
+          'absolute rounded-full pointer-events-none border-2 border-slider-thumb-border',
           thumbSize[resolvedSize],
           disabled ? 'bg-slider-disabled-thumb' : 'bg-slider-thumb',
         ]"

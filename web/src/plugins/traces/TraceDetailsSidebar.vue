@@ -68,7 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Service Badge -->
           <OTag
             type="metricChip"
-            class="text-2xs h-5.5 px-1.5 mr-[0.325rem] bg-surface-base border border-solid border-border-default border-l-[0.1875rem] border-l-badge-blue-ol-border shrink-0 transition-all duration-200 hover:-translate-y-px hover:shadow-sm hover:bg-surface-panel"
+            class="text-2xs h-5.5 px-1.5 mr-[0.325rem] bg-surface-base border border-solid border-border-default border-l-[0.1875rem] border-l-badge-blue-ol-border shrink-0 transition-all duration-200 hover:-translate-y-px hover:bg-surface-panel"
             :title="span.service_name"
             data-test="trace-details-sidebar-header-toolbar-service"
           >
@@ -92,7 +92,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Duration Badge -->
           <OTag
             type="metricChip"
-            class="text-2xs h-5.5 px-1.5 mr-[0.325rem] bg-surface-base border border-solid border-border-default border-l-[0.1875rem] border-l-badge-indigo-ol-border shrink-0 transition-all duration-200 hover:-translate-y-px hover:shadow-sm hover:bg-surface-panel"
+            class="text-2xs h-5.5 px-1.5 mr-[0.325rem] bg-surface-base border border-solid border-border-default border-l-[0.1875rem] border-l-badge-indigo-ol-border shrink-0 transition-all duration-200 hover:-translate-y-px hover:bg-surface-panel"
             :title="getDuration"
             data-test="trace-details-sidebar-header-toolbar-duration"
           >
@@ -105,7 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTag
             v-if="getTTFT"
             type="metricChip"
-            class="text-2xs h-5.5 px-1.5 mr-[0.325rem] bg-surface-base border border-solid border-border-default border-l-[0.1875rem] border-l-badge-purple-ol-border shrink-0 transition-all duration-200 hover:-translate-y-px hover:shadow-sm hover:bg-surface-panel"
+            class="text-2xs h-5.5 px-1.5 mr-[0.325rem] bg-surface-base border border-solid border-border-default border-l-[0.1875rem] border-l-badge-purple-ol-border shrink-0 transition-all duration-200 hover:-translate-y-px hover:bg-surface-panel"
             :title="getTTFT"
             data-test="trace-details-sidebar-header-toolbar-ttft"
           >
@@ -117,7 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Start Time Badge -->
           <OTag
             type="metricChip"
-            class="text-2xs h-5.5 px-1.5 mr-[0.325rem] bg-surface-base border border-solid border-border-default border-l-[0.1875rem] border-l-badge-amber-ol-border shrink-0 transition-all duration-200 hover:-translate-y-px hover:shadow-sm hover:bg-surface-panel"
+            class="text-2xs h-5.5 px-1.5 mr-[0.325rem] bg-surface-base border border-solid border-border-default border-l-[0.1875rem] border-l-badge-amber-ol-border shrink-0 transition-all duration-200 hover:-translate-y-px hover:bg-surface-panel"
             :title="getStartTime"
             data-test="trace-details-sidebar-header-toolbar-start-time"
           >
@@ -130,7 +130,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTag
             v-if="spanHttpResendCount"
             type="metricChip"
-            class="text-2xs h-5.5 px-1.5 mr-[0.325rem] bg-surface-base border border-solid border-border-default shrink-0 transition-all duration-200 hover:-translate-y-px hover:shadow-sm hover:bg-surface-panel"
+            class="text-2xs h-5.5 px-1.5 mr-[0.325rem] bg-surface-base border border-solid border-border-default shrink-0 transition-all duration-200 hover:-translate-y-px hover:bg-surface-panel"
             :title="`Request resent ${spanHttpResendCount} time(s)`"
             data-test="trace-details-sidebar-header-toolbar-resend-count"
           >
@@ -145,7 +145,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTag
             type="metricChip"
             clickable
-            class="group text-2xs h-5.5 px-1.5 mr-[0.325rem] bg-surface-base border border-solid border-border-default border-l-[0.1875rem] border-l-badge-teal-ol-border shrink-0 cursor-pointer transition-all duration-200 hover:-translate-y-px hover:shadow-sm hover:bg-surface-panel"
+            class="group text-2xs h-5.5 px-1.5 mr-[0.325rem] bg-surface-base border border-solid border-border-default border-l-[0.1875rem] border-l-badge-teal-ol-border shrink-0 cursor-pointer transition-all duration-200 hover:-translate-y-px hover:bg-surface-panel"
             :title="`Span ID: ${span.span_id}`"
             @click="copySpanId"
             data-test="trace-details-sidebar-header-toolbar-span-id"
@@ -194,7 +194,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTag
             type="metricChip"
             icon="psychology"
-            class="text-3xs h-5 px-1.5 bg-surface-base border border-solid border-border-default border-l-[0.1875rem] border-l-badge-purple-ol-border shrink-0 transition-all duration-200 hover:-translate-y-px hover:shadow-sm"
+            class="text-3xs h-5 px-1.5 bg-surface-base border border-solid border-border-default border-l-[0.1875rem] border-l-badge-purple-ol-border shrink-0 transition-all duration-200 hover:-translate-y-px"
             :title="span.gen_ai_response_model"
           >
             <span class="text-3xs font-semibold text-badge-purple-ol-text">{{ span.gen_ai_response_model }}</span>
@@ -205,7 +205,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Input Tokens -->
             <OTag
               type="metricChip"
-              class="text-3xs h-5 px-1.5 min-w-15 justify-center bg-surface-base border border-solid border-border-default border-l-[0.1875rem] border-l-badge-blue-ol-border text-badge-blue-ol-text shrink-0 transition-all duration-200 hover:-translate-y-px hover:shadow-sm"
+              class="text-3xs h-5 px-1.5 min-w-15 justify-center bg-surface-base border border-solid border-border-default border-l-[0.1875rem] border-l-badge-blue-ol-border text-badge-blue-ol-text shrink-0 transition-all duration-200 hover:-translate-y-px"
               title="Input Tokens"
             >
               <template #icon><OIcon name="arrow-upward" size="xs" /></template>
@@ -216,7 +216,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Output Tokens -->
             <OTag
               type="metricChip"
-              class="text-3xs h-5 px-1.5 min-w-15 justify-center bg-surface-base border border-solid border-border-default border-l-[0.1875rem] border-l-badge-success-ol-border text-badge-success-ol-text shrink-0 transition-all duration-200 hover:-translate-y-px hover:shadow-sm"
+              class="text-3xs h-5 px-1.5 min-w-15 justify-center bg-surface-base border border-solid border-border-default border-l-[0.1875rem] border-l-badge-success-ol-border text-badge-success-ol-text shrink-0 transition-all duration-200 hover:-translate-y-px"
               title="Output Tokens"
             >
               <template #icon><OIcon name="arrow-downward" size="xs" /></template>
@@ -229,7 +229,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTag
             type="metricChip"
             icon="attach-money"
-            class="text-3xs h-5 px-1.5 bg-surface-base border border-solid border-border-default border-l-[0.1875rem] border-l-badge-orange-ol-border shrink-0 transition-all duration-200 hover:-translate-y-px hover:shadow-sm"
+            class="text-3xs h-5 px-1.5 bg-surface-base border border-solid border-border-default border-l-[0.1875rem] border-l-badge-orange-ol-border shrink-0 transition-all duration-200 hover:-translate-y-px"
             title="Total Cost"
           >
             <span class="text-3xs font-semibold text-badge-orange-ol-text"

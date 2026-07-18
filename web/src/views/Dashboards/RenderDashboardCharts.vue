@@ -1708,7 +1708,7 @@ export default defineComponent({
   border: 1px solid var(--color-border-default);
   border-radius: 0.375rem;
   overflow: visible;
-  box-shadow: var(--shadow-sm);
+  box-shadow: none;
 }
 
 /* GridStack theme overrides */

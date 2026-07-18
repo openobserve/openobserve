@@ -53,10 +53,9 @@ const iconSize: Record<NonNullable<ToggleGroupItemProps["size"]>, "xs" | "sm"> =
         'outline-none cursor-pointer',
         // Hover (inactive only)
         'hover:bg-toggle-item-hover-bg',
-        // Active / pressed state (data-state=on) — white chip with shadow
+        // Active / pressed state (data-state=on) — white chip
         'data-[state=on]:bg-toggle-item-active-bg',
         'data-[state=on]:text-toggle-item-active-text',
-        'data-[state=on]:shadow-sm',
         // Focus ring
         'focus-visible:ring-2 focus-visible:ring-toggle-focus-ring focus-visible:ring-inset',
         // Disabled — cursor is on the wrapper span; pointer-events-none prevents hover/active styles

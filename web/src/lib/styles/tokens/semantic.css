@@ -59,9 +59,24 @@
   /* Overlay scrim â€” semi-transparent backdrop */
   --color-overlay-scrim: color-mix(in srgb, var(--color-grey-950) 50%, transparent);
 
-  /* Accent â€” brand-primary color for accent borders/icons/rings. Flips one
-     shade lighter in dark mode (600â†’400, see dark.css) so it stays legible
-     on dark surfaces. Replaces the legacy primary-color token. */
+  /* ── Accent = THE single brand colour, app-facing handle ──────────────────
+     This is NOT a second colour. It is the SAME brand hue as the primary ramp
+     (light: primary-600 / #3F7994) — just the one shade, exposed as a semantic
+     knob for feature code so pages never hardcode `primary-600`.
+
+     Two different exposures of ONE brand colour, by role:
+       • primary-* ramp   → BUTTON FILLS & large controls that need multiple
+                            shades (600 bg, 700 hover, 800 active, 300 disabled).
+                            Stays at 600 in dark — a big filled block reads fine.
+       • --color-accent   → SMALL brand marks: accent text, 1px borders, icons,
+                            rings, underlines, small badge dots.
+                            Flips to primary-400 (lighter) in dark mode (dark.css)
+                            because a thin/small mark in primary-600 is too dark
+                            to read on a dark surface. THIS DARK FLIP is why accent
+                            exists and cannot be replaced by raw `bg-primary-600`.
+
+     Use `text-accent` / `bg-accent` / `border-accent`. Rebrand = change the one
+     line below. Keep it a single colour — do not introduce a second accent hue. */
   --color-accent: var(--color-primary-600);
 }
 
@@ -182,7 +197,6 @@
   --radius-xl:   var(--radius-xl);
   --radius-full: var(--radius-full);
 
-  --shadow-sm: var(--shadow-sm);
   --shadow-md: var(--shadow-md);
   --shadow-lg: var(--shadow-lg);
 

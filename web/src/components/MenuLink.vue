@@ -184,8 +184,8 @@ export default defineComponent({
     const { isDark } = useTheme();
     const activePillClass = computed(() =>
       isDark.value
-        ? "text-tabs-active-text bg-tabs-active-bg shadow-sm border-l-2 border-primary-400"
-        : "text-primary-700 bg-surface-base shadow-sm border-l-2 border-primary-600",
+        ? "text-tabs-active-text bg-tabs-active-bg border-l-2 border-primary-400"
+        : "text-primary-700 bg-surface-base border-l-2 border-primary-600",
     );
     const activeIconClass = computed(() =>
       isDark.value ? "text-tabs-active-text!" : "text-primary-700!",

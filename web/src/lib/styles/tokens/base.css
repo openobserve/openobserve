@@ -768,11 +768,10 @@
   --radius-full: 9999px;
 
   /* --- Shadow scale — hairline-border philosophy ---
-     sm is intentionally none: cards use a 1px border, not a drop shadow.
-     md/lg retained for overlays (dialogs, menus) that need real elevation. */
-  --shadow-sm: none;
-  /* --shadow-xs retired (A6): only md/lg render real elevation. Its single use
-     was codemodded to shadow-md. */
+     Only md/lg render real elevation (overlays: dialogs, menus). Cards use a
+     1px border, not a drop shadow — a flat surface needs NO shadow class.
+     --shadow-sm (was `none`, A6) and --shadow-xs retired: they were no-op
+     tokens; their classes were stripped rather than shipping dead utilities. */
   --shadow-md: 0 4px 12px -2px rgb(0 0 0 / 0.08), 0 2px 6px -2px rgb(0 0 0 / 0.06);
   --shadow-lg: 0 12px 24px -4px rgb(0 0 0 / 0.10), 0 4px 8px -4px rgb(0 0 0 / 0.06);
 }

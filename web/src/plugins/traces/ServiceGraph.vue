@@ -226,7 +226,7 @@
       class="flex-1 min-h-0 relative overflow-hidden service-graph-container bg-surface-base!"
     >
       <!-- Graph Visualization -->
-      <OCard class="rounded-lg shadow-sm h-full">
+      <OCard class="rounded-lg h-full">
         <OCardSection class="p-0 h-full" style="height: 100%">
           <div
             data-test="service-graph-container"
@@ -290,7 +290,7 @@
                    these explicit buttons drive zoom + fit-to-screen. Floated
                    bottom-right like a map control. -->
               <div
-                class="absolute bottom-3 right-3 z-10 flex flex-col rounded-md border border-border-default bg-surface-panel shadow-sm overflow-hidden"
+                class="absolute bottom-3 right-3 z-10 flex flex-col rounded-md border border-border-default bg-surface-panel overflow-hidden"
                 data-test="service-graph-zoom-controls"
               >
                 <OButton

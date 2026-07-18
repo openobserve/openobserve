@@ -80,7 +80,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="docs-count-tile"
               >
                 <div
-                  class="tile-content rounded-lg p-3 text-center border shadow-sm h-20 flex flex-col justify-between bg-surface-base border-border-default"
+                  class="tile-content rounded-lg p-3 text-center border h-20 flex flex-col justify-between bg-surface-base border-border-default"
                 >
                   <div
                     class="tile-header flex justify-between items-start"
@@ -110,7 +110,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Storage Size Tile -->
               <div class="tile" data-test="storage-size-tile">
                 <div
-                  class="tile-content rounded-lg p-3 text-center border shadow-sm h-20 flex flex-col justify-between bg-surface-base border-border-default"
+                  class="tile-content rounded-lg p-3 text-center border h-20 flex flex-col justify-between bg-surface-base border-border-default"
                 >
                   <div
                     class="tile-header flex justify-between items-start"
@@ -142,7 +142,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="compressed-size-tile"
               >
                 <div
-                  class="tile-content rounded-lg p-3 text-center border shadow-sm h-20 flex flex-col justify-between bg-surface-base border-border-default"
+                  class="tile-content rounded-lg p-3 text-center border h-20 flex flex-col justify-between bg-surface-base border-border-default"
                 >
                   <div
                     class="tile-header flex justify-between items-start"
@@ -174,7 +174,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="index-size-tile"
               >
                 <div
-                  class="tile-content rounded-lg p-3 text-center border shadow-sm h-20 flex flex-col justify-between bg-surface-base border-border-default"
+                  class="tile-content rounded-lg p-3 text-center border h-20 flex flex-col justify-between bg-surface-base border-border-default"
                 >
                   <div
                     class="tile-header flex justify-between items-start"
@@ -203,7 +203,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="w-full flex flex-1 min-h-0 gap-2">
               <!--  left section(includes tabs and schema settings) -->
               <div
-                class="w-[100%] h-full min-h-0 rounded-lg border shadow-sm p-2 flex flex-col overflow-hidden bg-surface-base border-border-default"
+                class="w-[100%] h-full min-h-0 rounded-lg border p-2 flex flex-col overflow-hidden bg-surface-base border-border-default"
               >
                 <div>
                   <div class="flex justify-start">

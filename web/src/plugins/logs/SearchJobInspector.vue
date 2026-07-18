@@ -55,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Results Returned -->
           <div class="stat-tile">
             <div
-              class="rounded-lg p-3 border shadow-sm h-28 flex flex-col justify-between bg-surface-base border-border-default"
+              class="rounded-lg p-3 border h-28 flex flex-col justify-between bg-surface-base border-border-default"
             >
               <div class="flex justify-between items-start">
                 <div
@@ -88,7 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Events Scanned -->
           <div class="stat-tile">
             <div
-              class="rounded-lg p-3 border shadow-sm h-28 flex flex-col justify-between bg-surface-base border-border-default"
+              class="rounded-lg p-3 border h-28 flex flex-col justify-between bg-surface-base border-border-default"
             >
               <div class="flex justify-between items-start">
                 <div
@@ -121,7 +121,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Time Taken -->
           <div class="stat-tile">
             <div
-              class="rounded-lg p-3 border shadow-sm h-28 flex flex-col justify-between bg-surface-base border-border-default"
+              class="rounded-lg p-3 border h-28 flex flex-col justify-between bg-surface-base border-border-default"
             >
               <div class="flex justify-between items-start">
                 <div
@@ -158,7 +158,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Trace ID -->
           <div class="stat-tile">
             <div
-              class="rounded-lg p-3 border shadow-sm h-28 flex flex-col justify-between bg-surface-base border-border-default"
+              class="rounded-lg p-3 border h-28 flex flex-col justify-between bg-surface-base border-border-default"
             >
               <div class="flex justify-between items-start">
                 <div
@@ -191,7 +191,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- View Query -->
           <div class="stat-tile">
             <div
-              class="rounded-lg p-3 border shadow-sm h-28 flex flex-col items-center justify-center transition-all bg-surface-base border-border-default"
+              class="rounded-lg p-3 border h-28 flex flex-col items-center justify-center transition-all bg-surface-base border-border-default"
               :class="hasNoData ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:border-primary hover:shadow-lg'"
               @click="!hasNoData && (showSqlDialog = true)"
             >

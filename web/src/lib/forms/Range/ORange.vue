@@ -456,7 +456,7 @@ function onHorizCancel() {
         <span
           data-thumb="min"
           :class="[
-            'absolute rounded-full shadow-sm border-2 border-slider-thumb-border',
+            'absolute rounded-full border-2 border-slider-thumb-border',
             'left-1/2 -translate-x-1/2 touch-none select-none',
             thumbSize[resolvedSize],
             vertMinZClass,
@@ -474,7 +474,7 @@ function onHorizCancel() {
         <span
           data-thumb="max"
           :class="[
-            'absolute rounded-full shadow-sm border-2 border-slider-thumb-border',
+            'absolute rounded-full border-2 border-slider-thumb-border',
             'left-1/2 -translate-x-1/2 touch-none select-none',
             thumbSize[resolvedSize],
             vertMaxZClass,
@@ -630,7 +630,7 @@ function onHorizCancel() {
            overflow-y:auto ancestor containers. -->
       <span
         :class="[
-          'absolute rounded-full pointer-events-none shadow-sm border-2 border-slider-thumb-border z-30',
+          'absolute rounded-full pointer-events-none border-2 border-slider-thumb-border z-30',
           thumbSize[resolvedSize],
           disabled ? 'bg-slider-disabled-thumb' : 'bg-slider-thumb',
         ]"
@@ -639,7 +639,7 @@ function onHorizCancel() {
       />
       <span
         :class="[
-          'absolute rounded-full pointer-events-none shadow-sm border-2 border-slider-thumb-border z-30',
+          'absolute rounded-full pointer-events-none border-2 border-slider-thumb-border z-30',
           thumbSize[resolvedSize],
           disabled ? 'bg-slider-disabled-thumb' : 'bg-slider-thumb',
         ]"

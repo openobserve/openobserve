@@ -114,7 +114,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md font-mono text-xs font-medium border border-card-glass-border"
                    
                     :class="
-                      'bg-surface-base text-text-secondary shadow-sm'
+                      'bg-surface-base text-text-secondary'
                     "
                   >
                     <div class="flex items-center gap-0.5 mr-0.5">
@@ -337,7 +337,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="flex items-center gap-1 pl-3 pr-1 py-1 rounded-md text-xs font-medium transition-colors border border-card-glass-border"
                    
                     :class="
-                      'bg-surface-base text-text-secondary shadow-sm'
+                      'bg-surface-base text-text-secondary'
                     "
                   >
                     <span>{{
@@ -598,7 +598,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="flex items-center gap-1 pl-3 pr-1 py-1 rounded-md text-xs font-medium transition-colors border border-card-glass-border"
                  
                   :class="
-                    'bg-surface-base text-text-secondary shadow-sm'
+                    'bg-surface-base text-text-secondary'
                   "
                 >
                   <span>{{ alias.label }}</span>

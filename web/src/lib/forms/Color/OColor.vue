@@ -163,7 +163,7 @@ const wrapperClasses = computed(() => [
         >
           <span
             :class="[
-              'rounded-sm border border-datepicker-border shadow-sm',
+              'rounded-sm border border-datepicker-border',
               swatchSize[size ?? 'md'],
             ]"
             :style="{ background: swatchHex }"

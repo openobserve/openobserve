@@ -190,7 +190,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="flex-1 min-w-0">
                   <!-- Comment Box -->
                   <div
-                    class="rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow bg-surface-base border border-border-default"
+                    class="rounded-lg overflow-hidden hover:shadow-md transition-shadow bg-surface-base border border-border-default"
                   >
                     <!-- Header -->
                     <div

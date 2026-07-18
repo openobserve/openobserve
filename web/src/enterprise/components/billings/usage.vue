@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- tab-info-section -->
       <!-- this will be unlocked when we get the actionscripts , rum sessions , error tracking from BE -->
         <div v-if="false" class="grid grid-cols-3 gap-4 w-full">
-            <div class="bg-card-glass-bg border border-card-glass-border rounded-lg p-4 min-h-32 flex flex-col justify-between transition-shadow duration-200 ease-in-out hover:shadow-sm">
+            <div class="bg-card-glass-bg border border-card-glass-border rounded-lg p-4 min-h-32 flex flex-col justify-between transition-shadow duration-200 ease-in-out">
               <div class="flex flex-col justify-between rounded-md h-full gap-4 ">
               <!-- Top Section (60%) -->
               <div class="flex flex-col justify-between">
@@ -50,7 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             </div>
             </div>
-            <div class="bg-card-glass-bg border border-card-glass-border rounded-lg p-4 min-h-32 flex flex-col justify-between transition-shadow duration-200 ease-in-out hover:shadow-sm">
+            <div class="bg-card-glass-bg border border-card-glass-border rounded-lg p-4 min-h-32 flex flex-col justify-between transition-shadow duration-200 ease-in-out">
               <div class="flex flex-col justify-between rounded-md h-full gap-4 ">
               <!-- Top Section (60%) -->
               <div class="flex flex-col justify-between">
@@ -69,7 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             </div>
             </div>
-            <div class="bg-card-glass-bg border border-card-glass-border rounded-lg p-4 min-h-32 flex flex-col justify-between transition-shadow duration-200 ease-in-out hover:shadow-sm">
+            <div class="bg-card-glass-bg border border-card-glass-border rounded-lg p-4 min-h-32 flex flex-col justify-between transition-shadow duration-200 ease-in-out">
               <div class="flex flex-col justify-between rounded-md h-full gap-4 ">
               <!-- Top Section (60%) -->
               <div class="flex flex-col justify-between">
@@ -101,7 +101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-for="tile in usageTiles"
             :key="tile.key"
             data-test="billings-usage-tile"
-            class="usage-tile bg-card-glass-bg border border-card-glass-border rounded-lg px-3 py-3 flex flex-col gap-2 transition-shadow duration-200 ease-in-out hover:shadow-sm"
+            class="usage-tile bg-card-glass-bg border border-card-glass-border rounded-lg px-3 py-3 flex flex-col gap-2 transition-shadow duration-200 ease-in-out"
           >
             <div class="flex items-center justify-between gap-2">
               <div

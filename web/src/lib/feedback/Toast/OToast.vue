@@ -258,7 +258,7 @@ onUnmounted(() => {
             v-if="action"
             type="button"
             :class="[
-              'inline-flex items-center gap-1 justify-center rounded-sm px-2.5 py-0.5 text-xs font-semibold shadow-sm transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1',
+              'inline-flex items-center gap-1 justify-center rounded-sm px-2.5 py-0.5 text-xs font-semibold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1',
               actionSucceeded
                 ? 'bg-toast-success-icon text-white focus-visible:ring-toast-success-icon'
                 : 'bg-toast-action-text text-white hover:bg-toast-action-hover focus-visible:ring-toast-action-text',

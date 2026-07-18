@@ -31,7 +31,7 @@
         <div
           v-for="(query, index) in queryData"
           :key="query?.originalQuery + index"
-          class="bg-card-glass-bg rounded-xl border border-card-glass-border shadow-sm overflow-hidden"
+          class="bg-card-glass-bg rounded-xl border border-card-glass-border overflow-hidden"
         >
           <!-- Query Header -->
           <div
@@ -345,7 +345,7 @@ export default defineComponent({
         return safeHtml.replace(
           regex,
           (match) =>
-            `<mark class="rounded-sm shadow-sm">${match}</mark>`,
+            `<mark class="rounded-sm">${match}</mark>`,
         );
       } catch (e) {
         return safeHtml;

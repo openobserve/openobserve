@@ -360,7 +360,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                   />
                                 </OButton>
                                 <div
-                                  class="absolute top-2 right-2 flex items-center justify-center w-7 h-7 rounded-md bg-surface-base/80 opacity-0 group-hover:opacity-100 transition-opacity shadow-sm pointer-events-none"
+                                  class="absolute top-2 right-2 flex items-center justify-center w-7 h-7 rounded-md bg-surface-base/80 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"
                                   aria-hidden="true"
                                 >
                                   <OIcon name="fullscreen" size="sm" class="text-text-body" />

@@ -144,7 +144,7 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
   ].join(" "),
   // Sidebar toggle: bg-surface border shadow — for persistent panel collapse/expand buttons
   "sidebar-toggle": [
-    "bg-surface-panel text-button-ghost-text border border-border-default shadow-sm",
+    "bg-surface-panel text-button-ghost-text border border-border-default",
     "enabled:hover:bg-button-ghost-hover-bg enabled:hover:border-button-border-hover",
     "enabled:active:bg-button-ghost-active-bg",
     "focus-visible:ring-[3px] focus-visible:ring-button-ghost-focus-ring",
