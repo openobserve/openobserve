@@ -109,6 +109,7 @@ import Heroku from "@/components/ingestion/others/Heroku.vue";
 import AIIntegrations from "@/components/ingestion/AIIntegrations.vue";
 import AIIntegrationDetail from "@/components/ingestion/ai/AIIntegrationDetail.vue";
 import { aiCategories } from "@/components/ingestion/ai/data";
+import McpCrossLink from "@/components/ingestion/McpCrossLink.vue";
 
 const useIngestionRoutes = () => {
   // One route per AI integration across all tabs. `aiCategories` is already
@@ -373,6 +374,22 @@ const useIngestionRoutes = () => {
                 routeGuard(to, from, next);
               },
             },
+            // Discoverability pointer → the MCP setup home in IAM. Enterprise/
+            // Cloud only (matches where the tab is shown in Recommended.vue and
+            // where the target "mcpServer" route exists), so an OSS deep-link
+            // can't land here and push to a route that doesn't exist.
+            ...(config.isEnterprise == "true" || config.isCloud == "true"
+              ? [
+                  {
+                    path: "mcp",
+                    name: "recommendedMcp",
+                    component: McpCrossLink,
+                    beforeEnter(to: any, from: any, next: any) {
+                      routeGuard(to, from, next);
+                    },
+                  },
+                ]
+              : []),
           ],
         },
         {

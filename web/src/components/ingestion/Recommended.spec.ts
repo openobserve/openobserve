@@ -40,6 +40,9 @@ describe("Recommended", () => {
         userInfo: {
           email: "test@example.com",
         },
+        zoConfig: {
+          ai_enabled: false,
+        },
       },
     });
 
