@@ -510,8 +510,8 @@ describe("ROUTE_TAB_MAPS", () => {
       expect(Object.keys(ROUTE_TAB_MAPS.others)).toHaveLength(4);
     });
 
-    it("recommended has 8 entries", () => {
-      expect(Object.keys(ROUTE_TAB_MAPS.recommended)).toHaveLength(8);
+    it("recommended has 9 entries", () => {
+      expect(Object.keys(ROUTE_TAB_MAPS.recommended)).toHaveLength(9);
     });
 
     it("security has 7 entries", () => {

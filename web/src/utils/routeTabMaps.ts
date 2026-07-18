@@ -82,6 +82,7 @@ const ROUTE_TAB_MAPS: Record<string, Record<string, string>> = {
     AzureConfig: "AzureConfig",
     ingestFromTraces: "ingestFromTraces",
     frontendMonitoring: "frontendMonitoring",
+    recommendedMcp: "recommendedMcp",
   },
 
   security: {
