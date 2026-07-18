@@ -186,27 +186,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="storage-detail-grid grid gap-x-8 gap-y-5 grid-cols-2">
             <div v-if="storageData.bucket_name" class="storage-field">
               <div class="storage-field__label text-xs text-text-label capitalize mb-0.75 font-medium">{{ t("storage_settings.bucketName") }}</div>
-              <div class="storage-field__value break-all text-sm text-text-heading">{{ storageData.bucket_name }}</div>
+              <div class="storage-field__value break-all text-sm text-text-body">{{ storageData.bucket_name }}</div>
             </div>
             <div v-if="storageData.region" class="storage-field">
               <div class="storage-field__label text-xs text-text-label capitalize mb-0.75 font-medium">{{ t("storage_settings.region") }}</div>
-              <div class="storage-field__value break-all text-sm text-text-heading">{{ storageData.region }}</div>
+              <div class="storage-field__value break-all text-sm text-text-body">{{ storageData.region }}</div>
             </div>
             <div v-if="storageData.server_url && !isCloud" class="storage-field">
               <div class="storage-field__label text-xs text-text-label capitalize mb-0.75 font-medium">{{ t("storage_settings.serverUrl") }}</div>
-              <div class="storage-field__value break-all text-sm text-text-heading">{{ storageData.server_url }}</div>
+              <div class="storage-field__value break-all text-sm text-text-body">{{ storageData.server_url }}</div>
             </div>
             <div v-if="storageData.access_key" class="storage-field">
               <div class="storage-field__label text-xs text-text-label capitalize mb-0.75 font-medium">{{ t("storage_settings.accessKey") }}</div>
-              <div class="storage-field__value break-all text-sm text-text-heading">{{ storageData.access_key }}</div>
+              <div class="storage-field__value break-all text-sm text-text-body">{{ storageData.access_key }}</div>
             </div>
             <div v-if="storageData.secret_key" class="storage-field">
               <div class="storage-field__label text-xs text-text-label capitalize mb-0.75 font-medium">{{ t("storage_settings.secretKey") }}</div>
-              <div class="storage-field__value break-all text-sm text-text-heading">{{ storageData.secret_key }}</div>
+              <div class="storage-field__value break-all text-sm text-text-body">{{ storageData.secret_key }}</div>
             </div>
             <div v-if="storageData.role_arn" class="storage-field">
               <div class="storage-field__label text-xs text-text-label capitalize mb-0.75 font-medium">{{ t("storage_settings.roleArn") }}</div>
-              <div class="storage-field__value break-all text-sm text-text-heading">{{ storageData.role_arn }}</div>
+              <div class="storage-field__value break-all text-sm text-text-body">{{ storageData.role_arn }}</div>
             </div>
           </div>
         </OCardSection>

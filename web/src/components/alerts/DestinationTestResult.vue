@@ -63,7 +63,7 @@ limitations under the License. -->
         </div>
 
         <!-- Suggested Fix -->
-        <div v-if="getSuggestedFix(result)" class="result-suggestion flex items-start gap-2 mt-2 p-2 bg-[rgba(255,193,7,0.1)] dark:bg-[rgba(255,193,7,0.15)] rounded-sm text-2xs text-text-heading leading-[1.4]">
+        <div v-if="getSuggestedFix(result)" class="result-suggestion flex items-start gap-2 mt-2 p-2 bg-[rgba(255,193,7,0.1)] dark:bg-[rgba(255,193,7,0.15)] rounded-sm text-2xs text-text-secondary leading-[1.4]">
           <OIcon name="lightbulb" size="sm" />
           <span>{{ getSuggestedFix(result) }}</span>
         </div>
@@ -85,17 +85,17 @@ limitations under the License. -->
           <div data-test="test-failure-details" class="pt-2">
             <div v-if="result.error" data-test="test-error-message" class="error-item mb-3">
               <div class="text-3xs font-semibold uppercase tracking-[0.5px] text-text-secondary mb-1">{{ t('alerts.error') }}</div>
-              <div class="text-2xs text-text-heading leading-[1.5] break-words">{{ result.error }}</div>
+              <div class="text-2xs text-text-body leading-[1.5] break-words">{{ result.error }}</div>
             </div>
 
             <div v-if="result.statusCode" data-test="test-http-status" class="error-item mb-3">
               <div class="text-3xs font-semibold uppercase tracking-[0.5px] text-text-secondary mb-1">{{ t('alerts.httpStatus') }}</div>
-              <div class="text-2xs text-text-heading leading-[1.5] break-words">{{ result.statusCode }} {{ getStatusText(result.statusCode) }}</div>
+              <div class="text-2xs text-text-body leading-[1.5] break-words">{{ result.statusCode }} {{ getStatusText(result.statusCode) }}</div>
             </div>
 
             <div v-if="result.responseBody" data-test="test-response-body" class="error-item mb-3">
               <div class="text-3xs font-semibold uppercase tracking-[0.5px] text-text-secondary mb-1">{{ t('alerts.responseBody') }}</div>
-              <pre class="bg-[rgba(0,0,0,0.05)] dark:bg-[rgba(255,255,255,0.05)] border border-[rgba(0,0,0,0.1)] dark:border-[rgba(255,255,255,0.1)] rounded-sm p-2 font-['Monaco','Consolas','Courier_New',monospace] text-3xs leading-[1.5] max-h-37.5 overflow-y-auto m-0 whitespace-pre text-text-heading">{{ formatResponseBody(result.responseBody) }}</pre>
+              <pre class="bg-[rgba(0,0,0,0.05)] dark:bg-[rgba(255,255,255,0.05)] border border-[rgba(0,0,0,0.1)] dark:border-[rgba(255,255,255,0.1)] rounded-sm p-2 font-['Monaco','Consolas','Courier_New',monospace] text-3xs leading-[1.5] max-h-37.5 overflow-y-auto m-0 whitespace-pre text-text-body">{{ formatResponseBody(result.responseBody) }}</pre>
             </div>
           </div>
         </OCollapsible>

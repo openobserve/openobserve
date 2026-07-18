@@ -44,7 +44,7 @@ async function handleCopy(e: MouseEvent) {
 <template>
   <span
     v-if="text === null"
-    class="text-text-heading text-xs"
+    class="text-text-muted text-xs"
   >{{ emptyLabel }}</span>
   <span
     v-else
@@ -57,7 +57,7 @@ async function handleCopy(e: MouseEvent) {
     <button
       v-if="copy"
       type="button"
-      class="shrink-0 opacity-0 group-hover/code:opacity-60 hover:opacity-100! cursor-pointer text-text-heading transition-opacity leading-none"
+      class="shrink-0 opacity-0 group-hover/code:opacity-60 hover:opacity-100! cursor-pointer text-text-body transition-opacity leading-none"
       :title="copied ? 'Copied!' : 'Copy'"
       @click="handleCopy"
     >

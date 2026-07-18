@@ -220,7 +220,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
               <!-- Bottom: Large Number -->
-              <div :class="'text-text-heading'" class="text-3xl font-semibold leading-none">
+              <div :class="'text-text-body'" class="text-3xl font-semibold leading-none">
                 {{ triggers.length }}
               </div>
             </div>
@@ -240,7 +240,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
               <!-- Bottom: Large Number -->
-              <div :class="'text-text-heading'" class="text-3xl font-semibold leading-none">
+              <div :class="'text-text-body'" class="text-3xl font-semibold leading-none">
                 {{ uniqueAlertsCount }}
               </div>
             </div>
@@ -260,7 +260,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
               <!-- Bottom: Large Number -->
-              <div :class="'text-text-heading'" class="text-3xl font-semibold leading-none">
+              <div :class="'text-text-body'" class="text-3xl font-semibold leading-none">
                 {{ affectedServicesCount }}
               </div>
             </div>
@@ -280,7 +280,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
               <!-- Bottom: Large Number -->
-              <div :class="'text-text-heading'" class="text-2xl font-semibold leading-none">
+              <div :class="'text-text-body'" class="text-2xl font-semibold leading-none">
                 {{ incidentDetails?.first_alert_at && incidentDetails?.last_alert_at
                    ? calculateDuration(incidentDetails.first_alert_at, incidentDetails.last_alert_at)
                    : 'N/A' }}
@@ -302,7 +302,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
               <!-- Bottom: Large Text -->
-              <div :class="'text-text-heading'" class="text-lg font-semibold leading-tight">
+              <div :class="'text-text-body'" class="text-lg font-semibold leading-tight">
                 {{ alertFrequency }}
               </div>
             </div>
@@ -472,7 +472,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <div :class="'text-text-secondary'" class="text-xs font-medium">
                         Created At
                       </div>
-                      <div :class="'text-text-heading'" class="text-sm">
+                      <div :class="'text-text-body'" class="text-sm">
                         {{ incidentDetails?.created_at ? formatTimestamp(incidentDetails.created_at) : 'N/A' }}
                       </div>
                     </div>
@@ -482,7 +482,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <div :class="'text-text-secondary'" class="text-xs font-medium">
                         Updated At
                       </div>
-                      <div :class="'text-text-heading'" class="text-sm">
+                      <div :class="'text-text-body'" class="text-sm">
                         {{ incidentDetails?.updated_at ? formatTimestamp(incidentDetails.updated_at) : 'N/A' }}
                       </div>
                     </div>
@@ -625,7 +625,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         {{ getSemanticGroupDisplayName(key) }}:
                       </div>
                       <div
-                        :class="'text-text-heading'"
+                        :class="'text-text-body'"
                         class="text-xs break-words flex-1"
                       >
                         {{ value }}
@@ -784,7 +784,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <span :class="'text-text-secondary'" class="text-3xs uppercase tracking-wide">
                           Alert Name
                         </span>
-                        <span :class="'text-text-heading'" class="text-sm font-medium">
+                        <span :class="'text-text-body'" class="text-sm font-medium">
                           {{ alerts[selectedAlertIndex]?.name || 'N/A' }}
                         </span>
                       </div>
@@ -805,7 +805,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <span :class="'text-text-secondary'" class="text-3xs uppercase tracking-wide">
                             Stream Name
                           </span>
-                          <span :class="'text-text-heading'" class="text-sm font-medium truncate">
+                          <span :class="'text-text-body'" class="text-sm font-medium truncate">
                             {{ alerts[selectedAlertIndex]?.stream_name || 'N/A' }}
                           </span>
                         </div>
@@ -817,7 +817,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <span :class="'text-text-secondary'" class="text-3xs uppercase tracking-wide">
                             Threshold
                           </span>
-                          <span :class="'text-text-heading'" class="text-sm font-medium">
+                          <span :class="'text-text-body'" class="text-sm font-medium">
                             {{ alerts[selectedAlertIndex]?.trigger_condition?.operator || '' }} {{ alerts[selectedAlertIndex]?.trigger_condition?.threshold || 'N/A' }}
                           </span>
                         </div>
@@ -825,7 +825,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <span :class="'text-text-secondary'" class="text-3xs uppercase tracking-wide">
                             Period
                           </span>
-                          <span :class="'text-text-heading'" class="text-sm font-medium">
+                          <span :class="'text-text-body'" class="text-sm font-medium">
                             {{ formatPeriod(alerts[selectedAlertIndex]?.trigger_condition?.period) }}
                           </span>
                         </div>
@@ -837,7 +837,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <span :class="'text-text-secondary'" class="text-3xs uppercase tracking-wide">
                             Frequency
                           </span>
-                          <span :class="'text-text-heading'" class="text-sm font-medium">
+                          <span :class="'text-text-body'" class="text-sm font-medium">
                             {{ alerts[selectedAlertIndex]?.trigger_condition?.frequency || 'N/A' }} {{ alerts[selectedAlertIndex]?.trigger_condition?.frequency_type || 'min' }}
                           </span>
                         </div>
@@ -845,7 +845,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <span :class="'text-text-secondary'" class="text-3xs uppercase tracking-wide">
                             Silence
                           </span>
-                          <span :class="'text-text-heading'" class="text-sm font-medium">
+                          <span :class="'text-text-body'" class="text-sm font-medium">
                             {{ alerts[selectedAlertIndex]?.trigger_condition?.silence || 'N/A' }} min
                           </span>
                         </div>

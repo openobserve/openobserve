@@ -9,7 +9,7 @@
   >
     <div
       ref="editableDiv"
-      class="rich-text-input relative outline-none text-sm leading-[1.6] min-h-10 max-h-75 overflow-y-auto break-words whitespace-pre-wrap text-text-heading"
+      class="rich-text-input relative outline-none text-sm leading-[1.6] min-h-10 max-h-75 overflow-y-auto break-words whitespace-pre-wrap text-text-body"
       :class="disabled ? 'cursor-not-allowed' : ''"
       contenteditable="true"
       :data-placeholder="placeholder"
@@ -31,7 +31,7 @@
       }"
       @click.stop
     >
-      <div class="card-content overflow-y-auto max-h-75 py-1 px-2 font-[Monaco,Menlo,'Courier_New',monospace] text-2xs leading-[1.5] whitespace-pre-wrap break-words text-text-heading"
+      <div class="card-content overflow-y-auto max-h-75 py-1 px-2 font-[Monaco,Menlo,'Courier_New',monospace] text-2xs leading-[1.5] whitespace-pre-wrap break-words text-text-body"
         v-html="formatContent(detailCardContent)"></div>
     </div>
   </div>

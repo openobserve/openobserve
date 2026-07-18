@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="w-3/4 flex items-center flex-nowrap">
             <code
               data-test="trace-correlation-card-trace-id-text"
-              class="font-mono text-sm py-1 px-2 bg-surface-accent rounded-sm text-text-heading"
+              class="font-mono text-sm py-1 px-2 bg-surface-accent rounded-sm text-text-body"
             >{{ formatTraceId(traceId) }}</code>
             <OButton
               icon-left="content-copy"
@@ -59,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="w-3/4">
             <code
               data-test="trace-correlation-card-span-id-text"
-              class="font-mono text-sm py-1 px-2 bg-surface-accent rounded-sm text-text-heading"
+              class="font-mono text-sm py-1 px-2 bg-surface-accent rounded-sm text-text-body"
             >{{ formatSpanId(spanId) }}</code>
           </div>
         </div>

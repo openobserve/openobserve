@@ -119,7 +119,7 @@
               type="providerDefaultFlag"
               value="default"
             />
-            <span v-else class="text-text-heading">—</span>
+            <span v-else class="text-text-body">—</span>
           </template>
 
           <template #cell-actions="{ row }">

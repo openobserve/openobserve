@@ -97,12 +97,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <template #cell-type="{ row }">
             <OTag v-if="row.type" :value="row.type" />
-            <span v-else class="text-text-heading">—</span>
+            <span v-else class="text-text-body">—</span>
           </template>
 
           <template #cell-plan="{ row }">
             <OTag v-if="row.plan && row.plan !== '-'" type="subscriptionPlan" :value="row.plan" />
-            <span v-else class="text-text-heading">—</span>
+            <span v-else class="text-text-body">—</span>
           </template>
 
           <template #cell-status="{ row }">

@@ -388,7 +388,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         class="text-text-secondary flex-none"
                       />
                       <span
-                        class="w-20 flex-none font-semibold text-xs text-text-heading"
+                        class="w-20 flex-none font-semibold text-xs text-text-body"
                       >
                         {{ b.name }}
                       </span>
@@ -438,7 +438,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         class="text-text-secondary flex-none"
                       />
                       <span
-                        class="w-27.5 flex-none font-semibold text-xs text-text-heading"
+                        class="w-27.5 flex-none font-semibold text-xs text-text-body"
                       >
                         {{ l.name }}
                       </span>
@@ -483,7 +483,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         class="text-text-secondary flex-none"
                       />
                       <span
-                        class="w-20 flex-none font-semibold text-xs text-text-heading"
+                        class="w-20 flex-none font-semibold text-xs text-text-body"
                       >
                         {{ d.name }}
                       </span>
@@ -655,7 +655,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
                 <template #cell-location="{ row }">
                   <span
-                    class="inline-flex items-center gap-1 text-sm text-text-heading"
+                    class="inline-flex items-center gap-1 text-sm text-text-body"
                   >
                     <OIcon
                       :name="locationIcon((row as VisibleRun).location)"
@@ -666,7 +666,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
                 <template #cell-browser="{ row }">
                   <span
-                    class="inline-flex items-center gap-1 text-sm text-text-heading"
+                    class="inline-flex items-center gap-1 text-sm text-text-body"
                   >
                     <OIcon
                       :name="browserIcon((row as VisibleRun).browser)"
@@ -677,7 +677,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
                 <template #cell-device="{ row }">
                   <span
-                    class="inline-flex items-center gap-1 text-sm text-text-heading"
+                    class="inline-flex items-center gap-1 text-sm text-text-body"
                   >
                     <OIcon
                       :name="deviceIconName((row as VisibleRun).device)"
@@ -704,7 +704,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </span>
                 </template>
                 <template #cell-trigger_type="{ row }">
-                  <span class="text-sm text-text-heading">
+                  <span class="text-sm text-text-body">
                     {{ (row as VisibleRun).triggerType }}
                   </span>
                 </template>
@@ -936,7 +936,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @click="filterByErrorPattern(e.pattern)"
               >
                 <span
-                  class="font-mono tabular-nums text-xs text-text-heading truncate"
+                  class="font-mono tabular-nums text-xs text-text-body truncate"
                 >
                   {{ e.pattern }}
                 </span>

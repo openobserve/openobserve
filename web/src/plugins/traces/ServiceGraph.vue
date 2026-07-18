@@ -42,7 +42,7 @@
         >
           <!-- Border Color -->
           <div
-            class="mb-0! whitespace-nowrap text-text-heading! font-bold text-xs"
+            class="mb-0! whitespace-nowrap text-text-label! font-bold text-xs"
           >
             {{ t("traces.serviceGraph.borderColor") }}
             <span class="font-normal opacity-55">| {{ t("traces.serviceGraph.borderColorMetric") }}</span>
@@ -86,7 +86,7 @@
               icon-right="expand-more"
             >
               <span class="font-bold text-text-secondary">{{ totalEntities }}</span>
-              <span class="ml-1 text-text-heading">{{ t("traces.serviceGraph.entities") }}</span>
+              <span class="ml-1 text-text-body">{{ t("traces.serviceGraph.entities") }}</span>
             </OButton>
           </template>
           <div class="min-w-48" data-test="service-graph-entity-distribution">
@@ -203,7 +203,7 @@
         >
           <!-- Node Size â€” Graph View only (Tree View uses fixed sizes) -->
           <div
-            class="mb-0! whitespace-nowrap text-text-heading! font-bold text-xs"
+            class="mb-0! whitespace-nowrap text-text-label! font-bold text-xs"
           >
             {{ t("traces.serviceGraph.nodeSize") }}
             <span class="font-normal opacity-55">| {{ t("traces.serviceGraph.nodeSizeMetric") }}</span>

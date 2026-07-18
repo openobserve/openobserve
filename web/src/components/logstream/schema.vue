@@ -99,7 +99,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                   </div>
                   <div
-                    class="tile-value text-lg flex items-end justify-start text-text-heading"
+                    class="tile-value text-lg flex items-end justify-start text-text-body"
                   >
                     {{
                       parseInt(indexData.stats.doc_num).toLocaleString("en-US")
@@ -129,7 +129,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                   </div>
                   <div
-                    class="tile-value text-lg flex items-end justify-start text-text-heading"
+                    class="tile-value text-lg flex items-end justify-start text-text-body"
                   >
                     {{ formatSizeFromMB(indexData.stats.storage_size) }}
                   </div>
@@ -161,7 +161,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                   </div>
                   <div
-                    class="tile-value text-lg flex items-end justify-start text-text-heading"
+                    class="tile-value text-lg flex items-end justify-start text-text-body"
                   >
                     {{ formatSizeFromMB(indexData.stats.compressed_size) }}
                   </div>
@@ -193,7 +193,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                   </div>
                   <div
-                    class="tile-value text-lg flex items-end justify-start text-text-heading"
+                    class="tile-value text-lg flex items-end justify-start text-text-body"
                   >
                     {{ formatSizeFromMB(indexData.stats.index_size) }}
                   </div>
@@ -502,7 +502,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                       <!-- Data Retention -->
                       <div v-if="showDataRetention" class="flex flex-col gap-1 p-3">
-                        <label class="text-compact font-[500] text-text-heading">
+                        <label class="text-compact font-[500] text-text-label">
                           Data Retention (days)
                         </label>
                         <OInput
@@ -523,7 +523,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                       <!-- Max Query Range -->
                       <div class="flex flex-col gap-1 p-3">
-                        <label class="text-compact font-[500] text-text-heading">
+                        <label class="text-compact font-[500] text-text-label">
                           Max Query Range (hours)
                         </label>
                         <OInput
@@ -539,7 +539,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                       <!-- Flatten Level -->
                       <div class="flex flex-col gap-1 p-3">
-                        <label class="text-compact font-[500] text-text-heading">
+                        <label class="text-compact font-[500] text-text-label">
                           {{ t("logStream.flattenLevel") }}
                         </label>
                         <OInput

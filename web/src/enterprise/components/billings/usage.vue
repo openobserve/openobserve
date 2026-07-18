@@ -45,7 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
             <!-- Bottom Section (40%) -->
-            <div class="text-(length:--text-2xl) font-semibold leading-(--leading-xl) tracking-normal text-text-heading text-left flex items-end ">
+            <div class="text-(length:--text-2xl) font-semibold leading-(--leading-xl) tracking-normal text-text-body text-left flex items-end ">
               2
             </div>
             </div>
@@ -64,7 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
             <!-- Bottom Section (40%) -->
-            <div class="text-(length:--text-2xl) font-semibold leading-(--leading-xl) tracking-normal text-text-heading text-left flex items-end ">
+            <div class="text-(length:--text-2xl) font-semibold leading-(--leading-xl) tracking-normal text-text-body text-left flex items-end ">
               300
             </div>
             </div>
@@ -83,7 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
             <!-- Bottom Section (40%) -->
-            <div class="text-(length:--text-2xl) font-semibold leading-(--leading-xl) tracking-normal text-text-heading text-left flex items-end ">
+            <div class="text-(length:--text-2xl) font-semibold leading-(--leading-xl) tracking-normal text-text-body text-left flex items-end ">
               20
             </div>
             </div>
@@ -116,7 +116,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
             <div class="flex items-baseline gap-1 whitespace-nowrap">
-              <span class="text-(length:--text-xl) font-bold text-text-heading leading-none">
+              <span class="text-(length:--text-xl) font-bold text-text-body leading-none">
                 {{ tile.value }}
               </span>
               <span class="text-(length:--text-xs) font-medium text-text-secondary">

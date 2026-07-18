@@ -87,7 +87,7 @@
             </template>
 
             <template #cell-sql="{ row }">
-              <span class="text-text-heading">{{ row.sql }}</span>
+              <span class="text-text-body">{{ row.sql }}</span>
             </template>
 
             <template #expansion="{ row }">
@@ -160,7 +160,7 @@
                   </div>
                   <div class="flex items-start justify-center">
                     <div
-                      class="w-full overflow-y-auto p-2.5 h-full max-h-50 border border-border-default border-l-3 border-l-sql-accent bg-surface-subtle text-text-heading o2-colorized-query"
+                      class="w-full overflow-y-auto p-2.5 h-full max-h-50 border border-border-default border-l-3 border-l-sql-accent bg-surface-subtle text-text-body o2-colorized-query"
                     >
                       <!-- Monaco-colorized SQL (sanitized in colorizeRow), same
                            as the dashboard Query Inspector. Falls back to plain
@@ -203,7 +203,7 @@
 
                   <div class="flex items-start justify-center">
                     <div
-                      class="w-full overflow-y-auto p-2.5 h-full max-h-50 border border-border-default border-l-3 border-l-function-accent bg-surface-subtle text-text-heading o2-colorized-query"
+                      class="w-full overflow-y-auto p-2.5 h-full max-h-50 border border-border-default border-l-3 border-l-function-accent bg-surface-subtle text-text-body o2-colorized-query"
                     >
                       <pre
                         v-if="colorizedFunction[row.uuid]"

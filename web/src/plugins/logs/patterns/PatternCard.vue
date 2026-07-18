@@ -83,7 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Count & Percentage Column -->
     <div class="w-24 flex-shrink-0 px-2 text-right">
       <div
-        class="text-text-heading font-bold"
+        class="text-text-body font-bold"
         :data-test="`pattern-card-${index}-frequency`"
       >
         {{ pattern.frequency.toLocaleString() }}

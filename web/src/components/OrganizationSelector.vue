@@ -211,7 +211,7 @@ const rowStateClass = (row: { org: OrgOption; index: number }) => {
           variant="outline-primary"
           size="xs"
           data-test="navbar-organizations-select-trigger"
-          class="w-56 text-text-heading!"
+          class="w-56 text-text-body!"
           :class="open ? 'ring-1 ring-inset ring-primary-300' : ''"
         >
           <template #icon-left>

@@ -27,10 +27,10 @@ const displayText = computed(() =>
 </script>
 
 <template>
-  <span v-if="isEmpty" class="text-text-heading">{{ emptyLabel }}</span>
+  <span v-if="isEmpty" class="text-text-body">{{ emptyLabel }}</span>
   <span
     v-else
-    class="whitespace-nowrap text-text-heading"
+    class="whitespace-nowrap text-text-body"
     :title="raw"
   >{{ displayText }}</span>
 </template>

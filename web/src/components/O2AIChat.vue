@@ -858,7 +858,7 @@
                           <OTooltip content="Copy content" />
                         </OButton>
                         <code
-                          class="log-entry-code block font-mono text-2xs leading-relaxed p-3 pr-10 whitespace-pre-wrap [word-wrap:break-word] select-text cursor-text max-h-75 overflow-y-auto bg-surface-base text-text-heading dark:[background:var(--color-syntax-bg)] dark:text-text-secondary"
+                          class="log-entry-code block font-mono text-2xs leading-relaxed p-3 pr-10 whitespace-pre-wrap [word-wrap:break-word] select-text cursor-text max-h-75 overflow-y-auto bg-surface-base text-text-body dark:[background:var(--color-syntax-bg)] dark:text-text-secondary"
                           v-html="formatLogEntryContent(block.content)"
                         ></code>
                       </div>

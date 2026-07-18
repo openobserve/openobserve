@@ -135,7 +135,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >{{ t("traces.servicesCatalog.status.healthy") }}</span
             >
             <span
-              class="text-3xs opacity-55 text-text-heading"
+              class="text-3xs opacity-55 text-text-label"
               >&lt;&nbsp;1%</span
             >
           </div>
@@ -149,7 +149,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >{{ t("traces.servicesCatalog.status.degraded") }}</span
             >
             <span
-              class="text-3xs opacity-55 text-text-heading"
+              class="text-3xs opacity-55 text-text-label"
               >1&nbsp;–&nbsp;5%</span
             >
           </div>
@@ -163,7 +163,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >{{ t("traces.servicesCatalog.status.warning") }}</span
             >
             <span
-              class="text-3xs opacity-55 text-text-heading"
+              class="text-3xs opacity-55 text-text-label"
               >5&nbsp;–&nbsp;10%</span
             >
           </div>
@@ -177,7 +177,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >{{ t("traces.servicesCatalog.status.critical") }}</span
             >
             <span
-              class="text-3xs opacity-55 text-text-heading"
+              class="text-3xs opacity-55 text-text-label"
               >&gt;&nbsp;10%</span
             >
           </div>

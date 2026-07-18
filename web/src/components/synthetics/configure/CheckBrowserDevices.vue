@@ -98,7 +98,7 @@ function toggle(browserId: string, deviceId: string) {
         <div
           v-for="device in activeDevices"
           :key="device.id"
-          class="flex items-center gap-1 text-xs font-semibold capitalize w-20 text-text-heading"
+          class="flex items-center gap-1 text-xs font-semibold capitalize w-20 text-text-label"
         >
           <OIcon :name="DEVICE_ICONS[device.id] ?? 'devices'" size="sm" />
           {{ t(deviceLabelKey(device.label)) }}
@@ -113,7 +113,7 @@ function toggle(browserId: string, deviceId: string) {
       >
         <div class="flex items-center gap-2 w-32 shrink-0">
           <img :src="BROWSER_ICONS[browser.id]" class="size-5" alt="" />
-          <span class="text-sm font-medium text-text-heading capitalize">{{ browser.label }}</span>
+          <span class="text-sm font-medium text-text-body capitalize">{{ browser.label }}</span>
         </div>
         <div
           v-for="device in activeDevices"

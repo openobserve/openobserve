@@ -24,7 +24,7 @@
     <OForm id="score-config-form" class="py-3.5 px-5.5" :form="form">
       <div
         v-if="mode === 'edit'"
-        class="flex gap-2.5 items-start px-3 py-2.5 bg-[color-mix(in_srgb,var(--color-status-info-text)_14%,transparent)] border border-[color-mix(in_srgb,var(--color-status-info-text)_20%,transparent)] rounded-md text-xs leading-normal text-text-heading mb-4"
+        class="flex gap-2.5 items-start px-3 py-2.5 bg-[color-mix(in_srgb,var(--color-status-info-text)_14%,transparent)] border border-[color-mix(in_srgb,var(--color-status-info-text)_20%,transparent)] rounded-md text-xs leading-normal text-text-body mb-4"
       >
         <OIcon name="info" size="xs" class="shrink-0 mt-px text-status-info-text" />
         <div class="flex flex-col gap-0.5 min-w-0">
@@ -161,7 +161,7 @@
       <!-- Boolean info banner -->
       <div
         v-if="formValues.dataType === 'boolean'"
-        class="flex gap-2.5 items-start px-3 py-2.5 bg-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] border border-dialog-header-border rounded-md text-xs leading-normal text-text-heading mb-4"
+        class="flex gap-2.5 items-start px-3 py-2.5 bg-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] border border-dialog-header-border rounded-md text-xs leading-normal text-text-body mb-4"
       >
         <OIcon name="info" size="xs" class="shrink-0 mt-px text-text-secondary" />
         <span>
@@ -206,8 +206,8 @@
                 :checked="formValues.healthyDirection === 'gte'"
                 @change="form.setFieldValue('healthyDirection', 'gte')"
               />
-              <span class="font-mono text-lg font-bold text-text-heading text-center">≥</span>
-              <span class="text-compact text-text-heading">{{ t("onlineEvals.scoreConfig.gteLabel") }}</span>
+              <span class="font-mono text-lg font-bold text-text-body text-center">≥</span>
+              <span class="text-compact text-text-body">{{ t("onlineEvals.scoreConfig.gteLabel") }}</span>
               <OFormInput
                 name="healthyGteValue"
                 type="number"
@@ -233,8 +233,8 @@
                 :checked="formValues.healthyDirection === 'lte'"
                 @change="form.setFieldValue('healthyDirection', 'lte')"
               />
-              <span class="font-mono text-lg font-bold text-text-heading text-center">≤</span>
-              <span class="text-compact text-text-heading">{{ t("onlineEvals.scoreConfig.lteLabel") }}</span>
+              <span class="font-mono text-lg font-bold text-text-body text-center">≤</span>
+              <span class="text-compact text-text-body">{{ t("onlineEvals.scoreConfig.lteLabel") }}</span>
               <OFormInput
                 name="healthyLteValue"
                 type="number"
@@ -301,7 +301,7 @@
                 @change="form.setFieldValue('healthyBool', true)"
               />
               <div>
-                <div class="text-text-heading font-mono">{{ t("onlineEvals.scoreConfig.trueIsHealthy") }}</div>
+                <div class="text-text-body font-mono">{{ t("onlineEvals.scoreConfig.trueIsHealthy") }}</div>
                 <div class="text-2xs text-text-secondary mt-0.5 leading-[1.4]">{{ t("onlineEvals.scoreConfig.trueIsHealthyHint") }}</div>
               </div>
             </label>
@@ -321,7 +321,7 @@
                 @change="form.setFieldValue('healthyBool', false)"
               />
               <div>
-                <div class="text-text-heading font-mono">{{ t("onlineEvals.scoreConfig.falseIsHealthy") }}</div>
+                <div class="text-text-body font-mono">{{ t("onlineEvals.scoreConfig.falseIsHealthy") }}</div>
                 <div class="text-2xs text-text-secondary mt-0.5 leading-[1.4]">{{ t("onlineEvals.scoreConfig.falseIsHealthyHint") }}</div>
               </div>
             </label>

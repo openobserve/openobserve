@@ -84,7 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template #content>
                 <div class="py-0.5 min-w-50">
                   <div
-                    class="px-1 font-semibold text-text-heading mb-1.5 text-xs flex items-center gap-1.5 flex-wrap border-b pb-1"
+                    class="px-1 font-semibold text-text-secondary mb-1.5 text-xs flex items-center gap-1.5 flex-wrap border-b pb-1"
                   >
                     <span
                       class="w-2 h-2 rounded-full shrink-0 bg-[var(--color-badge-success-solid-bg)]"

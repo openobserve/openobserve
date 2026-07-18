@@ -48,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ store.state.zoConfig.build_type }}
               </span>
               <!-- commit -->
-              <span class="inline-flex items-center gap-1.5 text-sm text-text-heading whitespace-nowrap py-2 px-3.5 rounded-sm border border-[color-mix(in_srgb,var(--color-info)_28%,transparent)] bg-[color-mix(in_srgb,var(--color-info)_8%,var(--color-card-glass-bg))]">
+              <span class="inline-flex items-center gap-1.5 text-sm text-text-body whitespace-nowrap py-2 px-3.5 rounded-sm border border-[color-mix(in_srgb,var(--color-info)_28%,transparent)] bg-[color-mix(in_srgb,var(--color-info)_8%,var(--color-card-glass-bg))]">
                 <OIcon name="code" size="sm" class="text-info shrink-0" />
                 <span class="text-xs font-semibold uppercase tracking-wide text-info">{{ t("about.commit_lbl") }}</span>
                 <OText variant="mono">{{ store.state.zoConfig.commit_hash }}</OText>
@@ -61,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </button>
               </span>
               <!-- built date -->
-              <span class="inline-flex items-center gap-1.5 text-sm text-text-heading whitespace-nowrap py-2 px-3.5 rounded-sm border border-[color-mix(in_srgb,var(--color-warning)_28%,transparent)] bg-[color-mix(in_srgb,var(--color-warning)_8%,var(--color-card-glass-bg))]">
+              <span class="inline-flex items-center gap-1.5 text-sm text-text-body whitespace-nowrap py-2 px-3.5 rounded-sm border border-[color-mix(in_srgb,var(--color-warning)_28%,transparent)] bg-[color-mix(in_srgb,var(--color-warning)_8%,var(--color-card-glass-bg))]">
                 <OIcon name="event" size="sm" class="text-warning shrink-0" />
                 <span class="text-xs font-semibold uppercase tracking-wide text-warning">{{ t("about.build_lbl") }}</span>
                 {{ formatDate(store.state.zoConfig.build_date) }}
@@ -286,7 +286,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div v-if="licenseData.ingestion_used !== undefined">
                 <div class="flex items-baseline gap-2 mb-3">
                   <span
-                    class="text-4xl font-bold text-text-heading leading-none"
+                    class="text-4xl font-bold text-text-body leading-none"
                     :class="licenseData.ingestion_used > 90 ? 'text-status-error-text' : licenseData.ingestion_used > 70 ? 'text-status-warning-text' : ''"
                   >{{ licenseData.ingestion_used.toFixed(2) }}%</span>
                   <span class="text-xs text-text-secondary">of daily limit used today</span>

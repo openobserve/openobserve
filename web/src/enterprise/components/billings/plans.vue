@@ -95,7 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :variant="aiUsageRatio >= 1 ? 'danger' : aiUsageRatio >= 0.9 ? 'warning' : 'default'"
             />
           </div>
-          <div class="text-2xl font-semibold leading-7 text-text-heading text-left flex items-end">
+          <div class="text-2xl font-semibold leading-7 text-text-body text-left flex items-end">
             {{ aiUsage.credits_used }} / {{ aiUsage.credits_limit }} credits used
           </div>
           <div v-if="aiUsage.mode === 'exhausted'" class="text-status-error-text mt-2" style="font-size: 13px;">

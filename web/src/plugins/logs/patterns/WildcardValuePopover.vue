@@ -46,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="wcp__header-right flex items-baseline gap-1 shrink-0"
       >
         <span
-          class="wcp__unique-count text-sm font-bold text-text-heading [font-variant-numeric:tabular-nums]"
+          class="wcp__unique-count text-sm font-bold text-text-body [font-variant-numeric:tabular-nums]"
         >{{ displayValues.length }}</span>
         <span
           class="wcp__unique-label text-2xs text-text-secondary"
@@ -73,7 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="wcp__row-value text-xs font-semibold font-mono text-text-body truncate flex-1 min-w-0"
           >{{ item.value || "(empty)" }}</span>
           <span
-            class="wcp__row-count text-compact font-bold text-text-heading [font-variant-numeric:tabular-nums] shrink-0"
+            class="wcp__row-count text-compact font-bold text-text-body [font-variant-numeric:tabular-nums] shrink-0"
           >{{ item.count.toLocaleString() }}</span>
         </div>
         <!-- Full-width progress bar -->

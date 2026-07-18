@@ -182,7 +182,7 @@
                   bottomProps.currentPage === page ? 'primary' : 'ghost'
                 "
                 size="icon-panel"
-                class="py-1.5 px-1! m-0! min-w-6! w-6! min-h-5.5! h-5.5! text-xs! font-medium leading-none text-text-heading! rounded-sm! overflow-visible!"
+                class="py-1.5 px-1! m-0! min-w-6! w-6! min-h-5.5! h-5.5! text-xs! font-medium leading-none text-text-body! rounded-sm! overflow-visible!"
                 @click="setPage(page)"
                 >{{ page }}</OButton
               >

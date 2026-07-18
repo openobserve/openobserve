@@ -140,7 +140,7 @@ const cards = computed(() => [
     key: "sessions" as const,
     label: t("rum.sessions"),
     value: props.total.toLocaleString(),
-    valueClass: "text-text-heading",
+    valueClass: "text-text-body",
     rate: "",
     ...deltaCaption(props.sessionsDeltaPct, t("rum.inTimeRange"), "%"),
     selectable: true,
@@ -152,7 +152,7 @@ const cards = computed(() => [
     valueClass:
       props.errorSessions > 0
         ? "text-severity-error-color"
-        : "text-text-heading",
+        : "text-text-body",
     rate: rate(props.errorSessions),
     ...deltaCaption(props.errorsDelta, t("rum.sessionsWithErrors")),
     selectable: true,
@@ -164,7 +164,7 @@ const cards = computed(() => [
     valueClass:
       props.frustratedSessions > 0
         ? "text-severity-warning-color"
-        : "text-text-heading",
+        : "text-text-body",
     rate: rate(props.frustratedSessions),
     ...deltaCaption(props.frustratedDelta, t("rum.rageDeadClicks")),
     selectable: true,
@@ -173,7 +173,7 @@ const cards = computed(() => [
     key: "duration" as const,
     label: t("rum.avgDuration"),
     value: formatMs(props.avgDurationMs),
-    valueClass: "text-text-heading",
+    valueClass: "text-text-body",
     rate: "",
     caption: `${t("rum.median")} ${formatMs(props.medianDurationMs)}`,
     captionClass: "",
@@ -183,7 +183,7 @@ const cards = computed(() => [
     key: "bounced" as const,
     label: t("rum.bounceRate"),
     value: bounceRate.value,
-    valueClass: "text-text-heading",
+    valueClass: "text-text-body",
     rate: "",
     caption: t("rum.ofTotal", {
       count: props.bouncedSessions,

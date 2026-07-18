@@ -33,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OTooltip :side="side" :delay="delay" max-width="260px" content-class="p-0!">
       <template #content>
         <div
-          class="w-63 py-2.75 px-3 text-xs text-text-heading"
+          class="w-63 py-2.75 px-3 text-xs text-text-body"
           :data-test="`turn-preview-${index + 1}`"
         >
           <!-- Header: Turn N · time · status -->

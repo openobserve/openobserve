@@ -10,7 +10,7 @@
       <!-- Variable inputs -->
       <div v-if="variables.length" class="eval-test-panel__fields flex flex-col gap-3">
         <div v-for="variable in variables" :key="variable" class="flex flex-col gap-1.5">
-          <label class="text-text-heading font-semibold text-xs font-mono">{{ formatTemplateVariable(variable) }}</label>
+          <label class="text-text-label font-semibold text-xs font-mono">{{ formatTemplateVariable(variable) }}</label>
           <textarea
             :value="inputs[variable]"
             :rows="variable === 'metadata' ? 2 : 3"
@@ -20,14 +20,14 @@
               })
             "
             :data-test="`scorer-test-input-${variable}`"
-            class="w-full box-border border border-border-default rounded-sm bg-surface-base text-text-heading font-normal text-xs font-sans leading-normal py-2 px-2.25 [resize:vertical] max-h-40 overflow-y-auto placeholder:text-text-muted focus:outline-none focus:border-primary-600"
+            class="w-full box-border border border-border-default rounded-sm bg-surface-base text-text-body font-normal text-xs font-sans leading-normal py-2 px-2.25 [resize:vertical] max-h-40 overflow-y-auto placeholder:text-text-muted focus:outline-none focus:border-primary-600"
             @input="
               updateInput(variable, ($event.target as HTMLTextAreaElement).value)
             "
           />
         </div>
       </div>
-      <div v-else class="eval-test-panel__empty text-text-secondary text-xs py-2.5 px-3 border border-border-default rounded-md bg-surface-base [&_code]:font-mono [&_code]:font-semibold [&_code]:text-text-heading">
+      <div v-else class="eval-test-panel__empty text-text-secondary text-xs py-2.5 px-3 border border-border-default rounded-md bg-surface-base [&_code]:font-mono [&_code]:font-semibold [&_code]:text-text-body">
         {{ t("onlineEvals.scorer.testPanel.emptyPrefix") }}<code v-text="'{{ input }}'" />{{ t("onlineEvals.scorer.testPanel.emptySuffix") }}
       </div>
 
@@ -73,15 +73,15 @@
             </template>
             <template v-if="latencyLabel">
               <dt class="text-text-secondary font-medium">{{ t("onlineEvals.scorer.testPanel.resultLatency") }}</dt>
-              <dd class="m-0 text-text-heading">{{ latencyLabel }}</dd>
+              <dd class="m-0 text-text-body">{{ latencyLabel }}</dd>
             </template>
             <template v-if="modelLabel">
               <dt class="text-text-secondary font-medium">{{ t("onlineEvals.scorer.testPanel.resultModel") }}</dt>
-              <dd class="eval-test-panel__result-mono m-0 text-text-heading font-medium text-xs font-mono">{{ modelLabel }}</dd>
+              <dd class="eval-test-panel__result-mono m-0 text-text-body font-medium text-xs font-mono">{{ modelLabel }}</dd>
             </template>
             <template v-if="tokensLabel">
               <dt class="text-text-secondary font-medium">{{ t("onlineEvals.scorer.testPanel.resultTokens") }}</dt>
-              <dd class="m-0 text-text-heading">{{ tokensLabel }}</dd>
+              <dd class="m-0 text-text-body">{{ tokensLabel }}</dd>
             </template>
           </dl>
           <details v-if="reasoningText" class="eval-test-panel__details border-t border-border-default pt-2 text-text-secondary">

@@ -100,7 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <template v-if="getUserId(event) !== 'System'">
                       <span
                         class="font-semibold text-sm"
-                        :class="'text-text-heading'"
+                        :class="'text-text-body'"
                       >
                         {{ getUserId(event) }}
                       </span>
@@ -197,7 +197,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="px-4 py-2 flex items-center gap-2 border-b bg-surface-subtle border-b-border-default"
                     >
                       <span class="font-semibold text-sm"
-                        :class="'text-text-heading'"
+                        :class="'text-text-body'"
                       >
                         {{ getUserId(event) }}
                       </span>

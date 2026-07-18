@@ -67,7 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 size="lg"
                 class="card-icon mb-2 text-icon-color [transition:color_0.3s_ease] group-[.selected]:text-card-glass-border"
               />
-              <div class="card-label text-compact font-medium text-center leading-[1.3] mt-1 text-text-heading group-[.selected]:text-text-body">{{ destType.label }}</div>
+              <div class="card-label text-compact font-medium text-center leading-[1.3] mt-1 text-text-body group-[.selected]:text-text-body">{{ destType.label }}</div>
               <div
                 v-if="destinationType === destType.value"
                 class="absolute top-[0.375rem] right-[0.375rem] w-5 h-5 rounded-full overflow-hidden bg-status-positive text-text-inverse flex items-center justify-center z-[1]"

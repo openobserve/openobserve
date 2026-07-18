@@ -722,7 +722,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="relative px-4 py-2 cursor-pointer transition-all text-xs font-medium min-w-17.5 text-center rounded-t-lg border border-b-0"
             :class="
               activeEnvironment === env.key
-                ? 'text-text-heading'
+                ? 'text-text-body'
                 : 'bg-transparent text-text-muted border-transparent hover:text-text-secondary'
             "
             :style="
@@ -1008,7 +1008,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <div class="mb-3 shrink-0">
               <div
-                class="text-2xs tracking-wide font-medium mb-2 text-text-heading"
+                class="text-2xs tracking-wide font-medium mb-2 text-text-label"
                
               >
                 Stream Sources

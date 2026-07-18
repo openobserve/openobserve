@@ -64,7 +64,7 @@
         </template>
 
         <template #cell-name="{ row }">
-          <div class="text-text-heading">{{ row.name }}</div>
+          <div class="text-text-body">{{ row.name }}</div>
         </template>
 
         <template #cell-type="{ row }">

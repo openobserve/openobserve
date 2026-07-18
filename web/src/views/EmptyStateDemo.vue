@@ -14,7 +14,7 @@
           </h1>
           <p class="text-sm text-text-secondary mt-1 max-w-2xl">
             Every preset below is a real
-            <code class="text-text-heading">&lt;OEmptyState&gt;</code> with its
+            <code class="text-text-body">&lt;OEmptyState&gt;</code> with its
             production copy, illustration, and action. Each detailed scene has its
             own character micro-animation and pauses under OS "reduce motion".
             Nothing is wired into real pages yet.
@@ -62,7 +62,7 @@
         <p class="text-sm text-text-secondary mb-3 max-w-2xl">
           The illustration is just a named choice, so a scene can opt into a
           character (e.g. a prominent first-run hero) while everything else stays
-          object-only. Same component, <code class="text-text-heading">illustration="explorer"</code>.
+          object-only. Same component, <code class="text-text-body">illustration="explorer"</code>.
         </p>
         <div class="rounded-xl border border-border-default h-110 overflow-hidden">
           <OEmptyState

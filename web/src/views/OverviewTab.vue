@@ -13,7 +13,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <div class="flex flex-col gap-0 pt-[0.625rem] pr-[0.875rem] pb-[0.625rem] pl-[0.625rem] h-full overflow-y-auto text-text-heading">
+  <div class="flex flex-col gap-0 pt-[0.625rem] pr-[0.875rem] pb-[0.625rem] pl-[0.625rem] h-full overflow-y-auto text-text-body">
     <!-- Header: refresh + time picker -->
     <div class="flex justify-end mb-4">
       <div class="flex items-center gap-2">
@@ -110,14 +110,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t('overview.services') }}
           <OTag type="countChip" value="warning">{{ services.length }}</OTag>
           <span v-if="servicePanelVisible && selectedService" class="text-xs font-normal text-text-secondary ml-1">
-            — viewing <strong class="font-semibold text-text-heading">{{ selectedService.label ?? selectedService.id }}</strong>
+            — viewing <strong class="font-semibold text-text-body">{{ selectedService.label ?? selectedService.id }}</strong>
           </span>
         </div>
         <button class="text-xs font-medium text-primary-600 bg-none border-none p-0 cursor-pointer whitespace-nowrap transition-opacity duration-150 opacity-80 hover:opacity-100 hover:underline" @click="goToServiceGraph">{{ t('overview.viewAll') }} →</button>
       </div>
       <div class="flex items-stretch gap-2">
         <button
-          class="shrink-0 w-6 flex items-center justify-center cursor-pointer border border-[0.0625em] border-border-default rounded-lg bg-surface-base text-text-secondary shadow-[0_1px_3px_rgba(0,0,0,0.06)] transition-all duration-150 hover:not-disabled:bg-table-row-hover-bg hover:not-disabled:text-text-heading hover:not-disabled:shadow-[0_2px_6px_rgba(0,0,0,0.12)] hover:not-disabled:-translate-y-px active:not-disabled:translate-y-0 active:not-disabled:shadow-[0_1px_2px_rgba(0,0,0,0.08)] disabled:opacity-25 disabled:cursor-not-allowed disabled:shadow-none"
+          class="shrink-0 w-6 flex items-center justify-center cursor-pointer border border-[0.0625em] border-border-default rounded-lg bg-surface-base text-text-secondary shadow-[0_1px_3px_rgba(0,0,0,0.06)] transition-all duration-150 hover:not-disabled:bg-table-row-hover-bg hover:not-disabled:text-text-body hover:not-disabled:shadow-[0_2px_6px_rgba(0,0,0,0.12)] hover:not-disabled:-translate-y-px active:not-disabled:translate-y-0 active:not-disabled:shadow-[0_1px_2px_rgba(0,0,0,0.08)] disabled:opacity-25 disabled:cursor-not-allowed disabled:shadow-none"
           :disabled="!svcScrollCanLeft"
           @click="scrollServices(-1)"
         >
@@ -170,7 +170,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         </div>
         <button
-          class="shrink-0 w-6 flex items-center justify-center cursor-pointer border border-[0.0625em] border-border-default rounded-lg bg-surface-base text-text-secondary shadow-[0_1px_3px_rgba(0,0,0,0.06)] transition-all duration-150 hover:not-disabled:bg-table-row-hover-bg hover:not-disabled:text-text-heading hover:not-disabled:shadow-[0_2px_6px_rgba(0,0,0,0.12)] hover:not-disabled:-translate-y-px active:not-disabled:translate-y-0 active:not-disabled:shadow-[0_1px_2px_rgba(0,0,0,0.08)] disabled:opacity-25 disabled:cursor-not-allowed disabled:shadow-none"
+          class="shrink-0 w-6 flex items-center justify-center cursor-pointer border border-[0.0625em] border-border-default rounded-lg bg-surface-base text-text-secondary shadow-[0_1px_3px_rgba(0,0,0,0.06)] transition-all duration-150 hover:not-disabled:bg-table-row-hover-bg hover:not-disabled:text-text-body hover:not-disabled:shadow-[0_2px_6px_rgba(0,0,0,0.12)] hover:not-disabled:-translate-y-px active:not-disabled:translate-y-0 active:not-disabled:shadow-[0_1px_2px_rgba(0,0,0,0.08)] disabled:opacity-25 disabled:cursor-not-allowed disabled:shadow-none"
           :disabled="!svcScrollCanRight"
           @click="scrollServices(1)"
         >

@@ -183,11 +183,11 @@ function toggleSteps(executionId: string) {
         <div class="grid grid-cols-3 gap-x-6 px-5 py-4 border-b border-border-default bg-surface-panel shrink-0">
           <div>
             <p class="text-3xs font-semibold uppercase tracking-[0.06em] text-text-muted mb-[0.2rem]">{{ t('synthetics.runDetail.maxDuration') }}</p>
-            <p class="text-sm font-semibold text-text-heading">{{ fmtDuration(overallDurationMs) }}</p>
+            <p class="text-sm font-semibold text-text-body">{{ fmtDuration(overallDurationMs) }}</p>
           </div>
           <div>
             <p class="text-3xs font-semibold uppercase tracking-[0.06em] text-text-muted mb-[0.2rem]">{{ t('synthetics.runDetail.locations') }}</p>
-            <p class="text-sm font-semibold text-text-heading">{{ locations.length }}</p>
+            <p class="text-sm font-semibold text-text-body">{{ locations.length }}</p>
           </div>
           <div>
             <p class="text-3xs font-semibold uppercase tracking-[0.06em] text-text-muted mb-[0.2rem]">{{ t('synthetics.runDetail.runId') }}</p>
@@ -210,7 +210,7 @@ function toggleSteps(executionId: string) {
               <span class="text-sm font-semibold text-text-heading truncate">{{ loc.location || '—' }}</span>
               <div class="ml-auto flex items-center gap-3 shrink-0">
                 <span class="text-xs text-text-muted">{{ [loc.browserEngine, loc.device].filter(Boolean).join(' · ') }}</span>
-                <span class="text-sm font-medium tabular-nums text-text-heading">{{ fmtDuration(loc.durationMs) }}</span>
+                <span class="text-sm font-medium tabular-nums text-text-body">{{ fmtDuration(loc.durationMs) }}</span>
               </div>
             </div>
 
@@ -233,7 +233,7 @@ function toggleSteps(executionId: string) {
                 <OButton
                   variant="ghost"
                   size="xs"
-                  class="flex items-center gap-1.5 font-semibold text-text-heading mb-2"
+                  class="flex items-center gap-1.5 font-semibold text-text-body mb-2"
                   :data-test="`synthetics-run-detail-toggle-steps-${loc.executionId}-btn`"
                   @click="toggleSteps(loc.executionId)"
                 >

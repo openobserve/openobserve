@@ -82,7 +82,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
             <span class="text-3xs font-medium mr-0.75 text-text-secondary">Service</span>
             <span
-              class="text-3xs font-semibold text-text-heading"
+              class="text-3xs font-semibold text-text-body"
               data-test="trace-details-sidebar-header-toolbar-service-name"
             >
               {{ span.service_name }}
@@ -98,7 +98,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <template #icon><OIcon name="schedule" size="xs" /></template>
             <span class="text-3xs font-medium mr-0.75 text-text-secondary">Duration</span>
-            <span class="text-3xs font-semibold text-text-heading">{{ getDuration }}</span>
+            <span class="text-3xs font-semibold text-text-body">{{ getDuration }}</span>
           </OTag>
 
           <!-- TTFT Badge -->
@@ -111,7 +111,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <template #icon><OIcon name="speed" size="xs" /></template>
             <span class="text-3xs font-medium mr-0.75 text-text-secondary">TTFT</span>
-            <span class="text-3xs font-semibold text-text-heading">{{ getTTFT }}</span>
+            <span class="text-3xs font-semibold text-text-body">{{ getTTFT }}</span>
           </OTag>
 
           <!-- Start Time Badge -->
@@ -123,7 +123,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <template #icon><OIcon name="access-time" size="xs" /></template>
             <span class="text-3xs font-medium mr-0.75 text-text-secondary">Start</span>
-            <span class="text-3xs font-semibold text-text-heading">{{ getStartTime }}</span>
+            <span class="text-3xs font-semibold text-text-body">{{ getStartTime }}</span>
           </OTag>
 
           <!-- Resend Count Badge -->
@@ -136,7 +136,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <template #icon><OIcon name="replay" size="xs" /></template>
             <span class="text-3xs font-medium mr-0.75 text-text-secondary">Resends</span>
-            <span class="text-3xs font-semibold text-text-heading">{{ spanHttpResendCount }}</span>
+            <span class="text-3xs font-semibold text-text-body">{{ spanHttpResendCount }}</span>
           </OTag>
         </div>
 
@@ -151,7 +151,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="trace-details-sidebar-header-toolbar-span-id"
           >
             <template #icon><OIcon name="tag" size="xs" /></template>
-            <span class="text-3xs font-semibold text-text-heading">{{ span.span_id }}</span>
+            <span class="text-3xs font-semibold text-text-body">{{ span.span_id }}</span>
             <OIcon
               name="content-copy"
               size="xs"

@@ -132,7 +132,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #cell-is_realtime="{ value }">
             <OIcon
               :name="value ? 'check-circle' : 'schedule'"
-              :class="value ? 'text-status-positive' : 'text-text-heading'"
+              :class="value ? 'text-status-positive' : 'text-text-body'"
               size="xs"
             >
               <OTooltip :content="value ? 'Real-time' : 'Scheduled'" />
@@ -142,7 +142,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #cell-is_silenced="{ value }">
             <OIcon
               :name="value ? 'volume-off' : 'volume-up'"
-              :class="value ? 'text-text-heading' : 'text-status-positive'"
+              :class="value ? 'text-text-body' : 'text-status-positive'"
               size="md"
             >
               <OTooltip :content="value ? 'Silenced' : 'Not Silenced'" />
@@ -154,7 +154,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <template #cell-dedup="{ row }">
-            <span v-if="!row.dedup_enabled" class="text-text-heading">-</span>
+            <span v-if="!row.dedup_enabled" class="text-text-secondary">-</span>
             <div v-else-if="row.dedup_suppressed" class="text-status-error-text">
               <OIcon name="block" size="sm">
                 <OTooltip>

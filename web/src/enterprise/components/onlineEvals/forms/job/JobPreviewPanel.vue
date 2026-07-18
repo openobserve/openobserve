@@ -30,7 +30,7 @@
         <OIcon name="info" size="xs" />
         <span class="m-0 text-compact font-semibold text-(--color-text-heading,currentColor)">{{ t("onlineEvals.job.preview.summaryTitle") }}</span>
       </header>
-      <dl class="grid grid-cols-[96px_1fr] gap-x-3 gap-y-2 m-0 text-xs [&_dt]:text-text-secondary [&_dd]:m-0 [&_dd]:text-text-heading">
+      <dl class="grid grid-cols-[96px_1fr] gap-x-3 gap-y-2 m-0 text-xs [&_dt]:text-text-secondary [&_dd]:m-0 [&_dd]:text-text-body">
         <dt>{{ t("onlineEvals.job.preview.summaryName") }}</dt>
         <dd>{{ name || t("onlineEvals.job.preview.emptyValue") }}</dd>
         <dt>{{ t("onlineEvals.job.preview.summaryType") }}</dt>

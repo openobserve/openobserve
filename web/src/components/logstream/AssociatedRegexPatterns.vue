@@ -141,7 +141,7 @@
                     {{ t('regex_patterns.pattern_name') }}
                   </span>
                   <span
-                    class="individual-section-value text-sm font-[700] text-text-heading"
+                    class="individual-section-value text-sm font-[700] text-text-body"
                     data-test="associated-regex-patterns-pattern-name"
                   >
                     {{ userClickedPattern.pattern_name }}
@@ -155,7 +155,7 @@
                     {{ t('regex_patterns.description') }}
                   </span>
                   <span
-                    class="individual-section-value text-sm font-[700] text-text-heading"
+                    class="individual-section-value text-sm font-[700] text-text-body"
                     data-test="associated-regex-patterns-pattern-description"
                   >
                     {{

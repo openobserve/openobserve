@@ -112,7 +112,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="selectedKeys.length > 0"
           #bottom
         >
-          <span class="text-xs text-text-heading font-medium">
+          <span class="text-xs text-text-body font-medium">
             {{ selectedKeys.length }} selected
           </span>
           <OButton

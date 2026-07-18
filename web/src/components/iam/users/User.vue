@@ -107,7 +107,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Auth type badge (Native / SSO / LDAP) — enterprise/cloud only -->
           <template #cell-auth="{ row }">
             <OTag v-if="row.auth_type" type="authType" :value="row.auth_type" />
-            <span v-else class="text-text-heading">—</span>
+            <span v-else class="text-text-body">—</span>
           </template>
 
           <!-- Roles badges — typed userRole tags for built-in roles, custom

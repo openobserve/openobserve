@@ -134,7 +134,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             `dashboard-name-cell-<name>` pattern in Dashboards.vue.
           -->
           <template #cell-name="{ row }">
-            <span :data-test="`log-stream-name-cell-${row.name}`" class="text-text-heading">{{ row.name }}</span>
+            <span :data-test="`log-stream-name-cell-${row.name}`" class="text-text-body">{{ row.name }}</span>
           </template>
           <template #cell-actions="{ row }">
              <div class="flex items-center actions-container">

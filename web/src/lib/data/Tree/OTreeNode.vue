@@ -178,7 +178,7 @@ function onTickChange(newVal: CheckboxModelValue) {
 
       <!-- Label -->
       <span
-        class="text-sm text-text-heading leading-snug truncate"
+        class="text-sm text-text-body leading-snug truncate"
         :class="isDisabled ? 'opacity-50' : ''"
       >
         {{ node.label }}

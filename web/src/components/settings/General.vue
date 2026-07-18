@@ -400,7 +400,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="max-w-3xl text-sm text-text-secondary"
           >
             <template #name>
-              <span class="font-semibold text-text-heading">{{ deleteOrgName }}</span>
+              <span class="font-semibold text-text-body">{{ deleteOrgName }}</span>
             </template>
           </i18n-t>
         </div>
@@ -482,7 +482,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div class="flex flex-col gap-3">
       <!-- What will happen -->
-      <p class="text-sm text-text-heading">
+      <p class="text-sm text-text-body">
         {{
           t("settings.deleteOrganizationConfirm", {
             name: deleteOrgName,
@@ -502,7 +502,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <p
         v-else-if="orgScope"
         data-test="general-delete-org-scope"
-        class="text-xs font-semibold text-text-heading"
+        class="text-xs font-semibold text-text-body"
       >
         {{ orgScope }}
       </p>
@@ -531,7 +531,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <label class="block text-xs text-text-secondary">
           <i18n-t keypath="settings.deleteOrganizationTypeToConfirm" tag="span">
             <template #name>
-              <span class="font-semibold text-text-heading">{{ deleteOrgName }}</span>
+              <span class="font-semibold text-text-body">{{ deleteOrgName }}</span>
             </template>
           </i18n-t>
         </label>

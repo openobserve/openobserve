@@ -162,7 +162,7 @@
                       class="flex items-center gap-2 p-1 rounded-md border border-card-glass-border bg-card-glass-bg text-xs"
                     >
                       <span
-                        class="font-bold text-text-heading"
+                        class="font-bold text-text-label"
                       >{{ v.name }}</span
                       >
                       <span class="text-text-muted">:</span>
@@ -189,7 +189,7 @@
                       class="flex items-center gap-2 p-1 rounded-md border border-card-glass-border bg-card-glass-bg text-xs"
                     >
                       <span
-                        class="font-bold text-text-heading"
+                        class="font-bold text-text-label"
                       >{{ v.name }}</span
                       >
                       <span class="text-text-muted">:</span>
@@ -218,7 +218,7 @@
                       class="flex items-center gap-2 p-1 rounded-md border border-card-glass-border bg-card-glass-bg text-xs"
                     >
                       <span
-                        class="font-bold text-text-heading"
+                        class="font-bold text-text-label"
                       >{{ v.name }}</span
                       >
                       <span class="text-text-muted">{{

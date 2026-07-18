@@ -610,7 +610,7 @@ function openChromeExtensions() {
     >
       <OIcon name="sync" size="sm" class="animate-spin text-primary-500" aria-hidden="true" />
       <span
-        class="text-sm text-text-heading"
+        class="text-sm text-text-body"
         data-test="synthetics-journey-replay-banner-text"
       >
         {{ t('synthetics.journey.replaying') }}
@@ -660,7 +660,7 @@ function openChromeExtensions() {
       data-test="synthetics-journey-stopped-banner"
     >
       <OIcon name="stop" size="sm" class="text-text-secondary" aria-hidden="true" />
-      <span class="text-sm text-text-heading">{{ t('synthetics.journey.replayStopped', { completed: stepResults?.size ?? 0, total: modelValue.length }) }}</span>
+      <span class="text-sm text-text-body">{{ t('synthetics.journey.replayStopped', { completed: stepResults?.size ?? 0, total: modelValue.length }) }}</span>
       <span class="flex-1" />
       <OButton variant="outline" size="xs" data-test="synthetics-journey-stopped-retry-btn" @click="emit('replay')">
         {{ t('synthetics.journey.reRun') }}

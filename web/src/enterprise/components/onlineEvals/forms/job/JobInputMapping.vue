@@ -36,7 +36,7 @@
             :key="`${entityId(scorer)}-${variable}`"
             class="grid grid-cols-[minmax(130px,0.35fr)_minmax(0,1fr)] items-center gap-2.5"
           >
-            <code class="overflow-hidden py-1.25 px-2 rounded-sm bg-[color-mix(in_srgb,var(--color-text-secondary)_10%,transparent)] text-text-heading font-semibold text-2xs font-mono truncate">{{ formatTemplateVariable(variable) }}</code>
+            <code class="overflow-hidden py-1.25 px-2 rounded-sm bg-[color-mix(in_srgb,var(--color-text-secondary)_10%,transparent)] text-text-label font-semibold text-2xs font-mono truncate">{{ formatTemplateVariable(variable) }}</code>
             <input
               class="w-full h-7 py-0 px-2.5 border border-input-border rounded-sm bg-input-bg text-input-text font-normal text-xs font-mono outline-none transition-colors duration-120 focus:border-primary-600"
               :value="inputMappings[entityId(scorer)]?.[variable] || ''"

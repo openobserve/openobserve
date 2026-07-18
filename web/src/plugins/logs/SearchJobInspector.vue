@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ store.state.timezone || 'UTC' }}
             </span>
             <div
-              class="text-xs font-semibold text-text-heading"
+              class="text-xs font-semibold text-text-body"
             >
               {{ formatTimeRange(profileData.start_time, profileData.end_time) }}
             </div>
@@ -72,7 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div class="flex flex-col gap-1">
                 <div
-                  class="text-2xl font-bold text-text-heading"
+                  class="text-2xl font-bold text-text-body"
                 >
                   {{ hasNoData ? 'NA' : (profileData?.data_records || 0).toLocaleString() }}
                 </div>
@@ -105,7 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div class="flex flex-col gap-1">
                 <div
-                  class="text-2xl font-bold text-text-heading"
+                  class="text-2xl font-bold text-text-body"
                 >
                   {{ hasNoData ? 'NA' : (profileData?.scan_records || 0).toLocaleString() }}
                 </div>
@@ -141,7 +141,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div class="flex flex-col gap-1">
                 <div
-                  class="text-2xl font-bold text-text-heading"
+                  class="text-2xl font-bold text-text-body"
                 >
                   {{ hasNoData ? 'NA' : formatDuration(profileData?.time_taken || profileData?.total_duration) }}
                 </div>

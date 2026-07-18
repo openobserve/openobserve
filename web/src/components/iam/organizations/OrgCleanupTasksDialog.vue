@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Progress header: overall state chip + bar -->
       <div v-if="tasks.length" class="mb-4">
         <div class="flex items-center justify-between mb-2">
-          <span class="text-sm font-medium text-text-heading">
+          <span class="text-sm font-medium text-text-body">
             {{ doneCount }} of {{ tasks.length }} steps complete
           </span>
           <OBadge
@@ -93,7 +93,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
 
               <!-- Group label + child count -->
-              <span class="flex-1 font-medium text-sm text-text-heading min-w-0 truncate">
+              <span class="flex-1 font-medium text-sm text-text-body min-w-0 truncate">
                 {{ row.label }}
                 <span class="text-text-secondary font-normal">({{ row.children.length }})</span>
               </span>
@@ -128,7 +128,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       'text-text-secondary': child.status === 'pending',
                     }"
                   />
-                  <span class="flex-1 text-sm text-text-heading min-w-0 truncate">
+                  <span class="flex-1 text-sm text-text-body min-w-0 truncate">
                     {{ streamChildLabel(child.step) }}
                   </span>
                   <span
@@ -172,7 +172,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
 
               <!-- Step name -->
-              <span class="flex-1 font-medium text-sm text-text-heading min-w-0 truncate">
+              <span class="flex-1 font-medium text-sm text-text-body min-w-0 truncate">
                 {{ formatStepName(row.task.step) }}
               </span>
 

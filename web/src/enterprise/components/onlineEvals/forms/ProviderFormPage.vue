@@ -42,7 +42,7 @@
 
         <div class="grid grid-cols-2 max-[56.25rem]:grid-cols-1 gap-3.5">
           <div class="mb-3">
-            <div class="flex items-center text-xs font-semibold text-text-heading mb-1">
+            <div class="flex items-center text-xs font-semibold text-text-label mb-1">
               {{ t("onlineEvals.provider.nameLabel") }}
               <span class="text-status-error-text ml-0.5">*</span>
               <OIcon v-if="mode === 'edit'" name="lock" size="xs" class="ml-1.5 text-text-secondary" />
@@ -60,7 +60,7 @@
           </div>
 
           <div class="mb-3">
-            <div class="flex items-center text-xs font-semibold text-text-heading mb-1">
+            <div class="flex items-center text-xs font-semibold text-text-label mb-1">
               {{ t("onlineEvals.provider.typeLabel") }}
               <span class="text-status-error-text ml-0.5">*</span>
               <OIcon v-if="mode === 'edit'" name="lock" size="xs" class="ml-1.5 text-text-secondary" />
@@ -76,7 +76,7 @@
         </div>
 
         <div class="mb-3">
-          <div class="flex items-center text-xs font-semibold text-text-heading mb-1">{{ t("onlineEvals.provider.endpointLabel") }}</div>
+          <div class="flex items-center text-xs font-semibold text-text-label mb-1">{{ t("onlineEvals.provider.endpointLabel") }}</div>
           <OFormInput
             name="endpoint"
             :placeholder="endpointPlaceholder"
@@ -87,7 +87,7 @@
 
         <div class="grid grid-cols-2 max-[56.25rem]:grid-cols-1 gap-3.5">
           <div class="mb-3">
-            <div class="flex items-center text-xs font-semibold text-text-heading mb-1">
+            <div class="flex items-center text-xs font-semibold text-text-label mb-1">
               {{ t("onlineEvals.provider.defaultModelLabel") }}
               <span class="text-status-error-text ml-0.5">*</span>
             </div>
@@ -100,7 +100,7 @@
           </div>
 
           <div class="mb-3">
-            <div class="flex items-center text-xs font-semibold text-text-heading mb-1">{{ t("onlineEvals.provider.availableModelsLabel") }}</div>
+            <div class="flex items-center text-xs font-semibold text-text-label mb-1">{{ t("onlineEvals.provider.availableModelsLabel") }}</div>
             <OFormInput
               name="availableModels"
               :placeholder="t('onlineEvals.provider.availableModelsPlaceholder')"
@@ -119,13 +119,13 @@
           <div class="m-0 text-sm font-semibold text-text-heading">{{ t("onlineEvals.provider.authSection") }}</div>
         </div>
 
-        <div v-if="mode === 'edit'" class="provider-callout flex gap-2 items-start px-3 py-2 mb-3 bg-[color-mix(in_srgb,var(--color-status-info-text)_12%,transparent)] border border-[color-mix(in_srgb,var(--color-status-info-text)_30%,transparent)] rounded-md text-2xs text-text-heading leading-[1.4]">
+        <div v-if="mode === 'edit'" class="provider-callout flex gap-2 items-start px-3 py-2 mb-3 bg-[color-mix(in_srgb,var(--color-status-info-text)_12%,transparent)] border border-[color-mix(in_srgb,var(--color-status-info-text)_30%,transparent)] rounded-md text-2xs text-text-secondary leading-[1.4]">
           <OIcon name="lock" size="xs" class="shrink-0 mt-px text-status-info-text" />
           <span>{{ t("onlineEvals.provider.authEditNote") }}</span>
         </div>
 
         <div class="mb-3">
-          <div class="flex items-center text-xs font-semibold text-text-heading mb-1">
+          <div class="flex items-center text-xs font-semibold text-text-label mb-1">
             {{ t("onlineEvals.provider.apiKeyLabel") }}
             <span v-if="mode === 'create'" class="text-status-error-text ml-0.5">*</span>
           </div>

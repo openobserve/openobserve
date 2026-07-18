@@ -266,7 +266,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </OTooltip>
               </OTag>
             </template>
-            <span v-else class="text-text-heading">&mdash;</span>
+            <span v-else class="text-text-muted">&mdash;</span>
           </div>
         </template>
         <template #cell-actions="{ row }">

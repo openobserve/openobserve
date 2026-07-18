@@ -59,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="inlineDetails"
         class="inline-details text-text-secondary font-normal text-xs italic"
         :class="{
-          'cursor-pointer hover:text-text-heading': hasLongDetails,
+          'cursor-pointer hover:text-text-body': hasLongDetails,
           'whitespace-nowrap overflow-hidden [text-overflow:ellipsis] max-w-150 truncated': !detailsExpanded && hasLongDetails,
         }"
         data-test="query-plan-node-inline-details"

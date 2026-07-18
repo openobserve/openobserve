@@ -150,7 +150,7 @@ const contentStyle = computed(() => ({
 const contentClasses = computed(() => [
   "z-[10100] px-2.5 py-1.5",
   "bg-surface-overlay rounded-md",
-  "text-xs text-text-heading font-medium leading-relaxed",
+  "text-xs text-text-body font-medium leading-relaxed",
   // Force long unbreakable tokens (file paths, hashes, URLs) to wrap inside the
   // max-width box instead of overflowing onto the content behind the tooltip.
   // overflow-wrap is inherited, so nested content (e.g. pre-wrap divs) wraps too.

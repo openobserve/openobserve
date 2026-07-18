@@ -126,7 +126,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #cell-created_at="{ row }">
               <span
                 :data-test="`service-accounts-created-${row.email}`"
-                class="text-text-heading"
+                class="text-text-body"
               >{{ formatCreatedAt(row.created_at) }}</span>
             </template>
 
@@ -260,17 +260,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <OTabPanels v-model="tokenTab" animated>
             <OTabPanel name="curl">
-              <pre class="bg-surface-subtle text-text-heading p-3 rounded-sm text-xs overflow-auto whitespace-pre-wrap">{{
+              <pre class="bg-surface-subtle text-text-body p-3 rounded-sm text-xs overflow-auto whitespace-pre-wrap">{{
                 tokenCurlSnippet
               }}</pre>
             </OTabPanel>
             <OTabPanel name="header">
-              <pre class="bg-surface-subtle text-text-heading p-3 rounded-sm text-xs overflow-auto whitespace-pre-wrap">{{
+              <pre class="bg-surface-subtle text-text-body p-3 rounded-sm text-xs overflow-auto whitespace-pre-wrap">{{
                 tokenHeaderSnippet
               }}</pre>
             </OTabPanel>
             <OTabPanel name="env">
-              <pre class="bg-surface-subtle text-text-heading p-3 rounded-sm text-xs overflow-auto whitespace-pre-wrap">{{
+              <pre class="bg-surface-subtle text-text-body p-3 rounded-sm text-xs overflow-auto whitespace-pre-wrap">{{
                 tokenEnvSnippet
               }}</pre>
             </OTabPanel>
@@ -332,7 +332,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <router-link
               data-test="service-accounts-list-token-add-to-role"
               :to="roleLinkTarget"
-              class="group inline-flex items-center gap-1.5 rounded-md border border-border-default px-2.5 py-1.5 text-xs text-text-heading transition-colors hover:border-primary hover:bg-primary/5"
+              class="group inline-flex items-center gap-1.5 rounded-md border border-border-default px-2.5 py-1.5 text-xs text-text-body transition-colors hover:border-primary hover:bg-primary/5"
               @click="isShowToken = false"
             >
               <OIcon name="shield" size="sm" class="text-primary shrink-0" />
@@ -346,7 +346,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <router-link
               data-test="service-accounts-list-token-add-to-group"
               :to="groupLinkTarget"
-              class="group inline-flex items-center gap-1.5 rounded-md border border-border-default px-2.5 py-1.5 text-xs text-text-heading transition-colors hover:border-primary hover:bg-primary/5"
+              class="group inline-flex items-center gap-1.5 rounded-md border border-border-default px-2.5 py-1.5 text-xs text-text-body transition-colors hover:border-primary hover:bg-primary/5"
               @click="isShowToken = false"
             >
               <OIcon name="group" size="sm" class="text-primary shrink-0" />

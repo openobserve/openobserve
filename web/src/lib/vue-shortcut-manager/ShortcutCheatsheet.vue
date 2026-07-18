@@ -130,7 +130,7 @@
                   :data-test="`shortcut-cheatsheet-row-${entry.id}`"
                 >
                   <span
-                    class="text-compact text-text-heading truncate leading-snug"
+                    class="text-compact text-text-body truncate leading-snug"
                     >{{ entry.label }}</span
                   >
                   <div
@@ -203,7 +203,7 @@
                   :data-test="`shortcut-cheatsheet-row-${entry.id}`"
                 >
                   <span
-                    class="text-compact text-text-heading truncate leading-snug"
+                    class="text-compact text-text-body truncate leading-snug"
                     >{{ entry.label }}</span
                   >
                   <div

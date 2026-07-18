@@ -222,7 +222,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         class="flex items-center justify-between gap-3 text-2xs"
                       >
                         <span class="text-text-secondary">{{ row.label }}</span>
-                        <span class="font-semibold tabular-nums text-text-heading">{{ row.value }}</span>
+                        <span class="font-semibold tabular-nums text-text-body">{{ row.value }}</span>
                       </div>
                     </div>
                     <div class="text-2xs leading-snug text-text-secondary">
@@ -245,7 +245,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :cache-pct="cacheRatio"
               >
                 <span
-                  class="inline-flex items-center justify-center min-w-[1rem] h-[1.05rem] px-[0.3rem] rounded-md border border-border-default bg-surface-base text-text-heading text-2xs font-bold leading-none cursor-pointer transition-colors hover:bg-[color-mix(in_srgb,var(--color-text-heading)_8%,var(--color-surface-base))] hover:border-[color-mix(in_srgb,var(--color-text-heading)_25%,var(--color-border-default))]"
+                  class="inline-flex items-center justify-center min-w-[1rem] h-[1.05rem] px-[0.3rem] rounded-md border border-border-default bg-surface-base text-text-body text-2xs font-bold leading-none cursor-pointer transition-colors hover:bg-[color-mix(in_srgb,var(--color-text-heading)_8%,var(--color-surface-base))] hover:border-[color-mix(in_srgb,var(--color-text-heading)_25%,var(--color-border-default))]"
                   @click="jumpToTurn(chip.n)"
                 >{{ chip.label }}</span>
               </TurnPreviewCard>
@@ -356,7 +356,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                turn row, sticky so they persist on scroll. -->
           <div
             v-if="filteredTraces.length"
-            class="sticky top-0 z-[5] grid grid-cols-[auto_auto_minmax(0,1fr)_5rem_5rem_5rem] items-center gap-[0.75rem] px-[0.75rem] py-[0.4rem] bg-surface-base border-b border-border-default text-xs font-medium text-text-heading"
+            class="sticky top-0 z-[5] grid grid-cols-[auto_auto_minmax(0,1fr)_5rem_5rem_5rem] items-center gap-[0.75rem] px-[0.75rem] py-[0.4rem] bg-surface-base border-b border-border-default text-xs font-medium text-text-label"
             data-test="session-turn-columns"
           >
             <span></span>
@@ -366,7 +366,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-for="col in sortableColumns"
               :key="col.key"
               type="button"
-              class="flex items-center justify-end gap-[0.15rem] cursor-pointer select-none hover:text-text-heading"
+              class="flex items-center justify-end gap-[0.15rem] cursor-pointer select-none hover:text-text-body"
               :data-test="`session-turn-sort-${col.key}`"
               @click="toggleSort(col.key)"
             >
@@ -464,11 +464,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       v-if="turnDetail(trace.traceId)?.userMessage"
                       name="content-copy"
                       size="xs"
-                      class="cursor-pointer text-text-muted hover:text-text-heading"
+                      class="cursor-pointer text-text-muted hover:text-text-body"
                       @click="copyText(turnDetail(trace.traceId)?.userMessage?.content)"
                     />
                   </div>
-                  <div class="px-[0.75rem] py-[0.625rem] text-compact leading-relaxed text-text-heading whitespace-pre-wrap break-words max-h-[12rem] overflow-y-auto">
+                  <div class="px-[0.75rem] py-[0.625rem] text-compact leading-relaxed text-text-body whitespace-pre-wrap break-words max-h-[12rem] overflow-y-auto">
                     {{ turnDetail(trace.traceId)?.userMessage?.content || t('traces.sessionDetail.noUserMessage') }}
                   </div>
                 </div>
@@ -493,7 +493,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       v-if="turnDetail(trace.traceId)?.assistantMessage"
                       name="content-copy"
                       size="xs"
-                      class="cursor-pointer text-text-muted hover:text-text-heading"
+                      class="cursor-pointer text-text-muted hover:text-text-body"
                       @click="copyText(turnDetail(trace.traceId)?.assistantMessage?.content)"
                     />
                   </div>
@@ -501,7 +501,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                        code, bold). v-html is sanitized in renderMarkdown(). -->
                   <div
                     v-if="turnDetail(trace.traceId)?.assistantMessage?.content"
-                    class="markdown-body px-[0.75rem] py-[0.625rem] text-compact text-text-heading break-words max-h-[16rem] overflow-auto"
+                    class="markdown-body px-[0.75rem] py-[0.625rem] text-compact text-text-body break-words max-h-[16rem] overflow-auto"
                     v-html="renderMarkdown(turnDetail(trace.traceId)?.assistantMessage?.content)"
                   />
                   <div
@@ -626,7 +626,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                    covering the rows above it. -->
               <OTooltip side="left" :delay="120" max-width="220px" content-class="p-0!">
                 <template #content>
-                  <div class="w-50 py-2.25 px-3 text-xs text-text-heading">
+                  <div class="w-50 py-2.25 px-3 text-xs text-text-body">
                     <div class="font-bold mb-0.5 break-words">{{ row.name }}</div>
                     <div class="text-3xs text-text-muted mb-1.75">
                       {{ t(row.calls === 1 ? 'traces.sessionDetail.rail.call' : 'traces.sessionDetail.rail.calls', { n: row.calls }) }}
