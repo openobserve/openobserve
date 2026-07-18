@@ -21,6 +21,33 @@
 
 ## Execution Status (2026-07-18)
 
+### Follow-up round — text/border/radius/shadow standardisation (2026-07-18, later)
+
+Six user-requested changes, each committed + pushed separately on `fix/token`, verified green
+(`lint:tokens`/`lint:design`/`lint:token-purity`/`lint:styles`, targeted specs, Tailwind compile probes):
+
+- **Heading over-application fixed (the reported bug).** The Tier-1 `text-primary→heading` merge had
+  poured ~357 general-text sites into `text-text-heading`, so changing `--color-text-heading`
+  recoloured almost all app text. Context-aware re-split across 174 files (6 parallel passes):
+  **301 of 525** `text-text-heading` uses reclassified to `text-body` / `text-label` /
+  `text-secondary` / `text-muted`; **224** genuine titles kept. `--color-text-heading` now drives
+  only real headings.
+- **`--color-accent` documented** as the single brand colour with two exposures (primary-* ramp for
+  button fills; `accent` for small marks with its dark-mode flip to primary-400). Not a second colour.
+- **Radius → one knob.** `--radius-default` (4px, the max-used value) is the single app corner radius;
+  `sm/md/lg/xl` kept as **aliases** of it (for scoped `var()` refs + the OTag/OSkeleton `shape` API);
+  `full` kept for pills. 1317 template class tokens codemodded `rounded-{sm,md,lg,xl}`→`rounded-default`
+  across 324 files; 2 specs realigned. See A5.
+- **Shadow → `shadow-sm` removed.** It was `none` (a no-op utility on 51 elements); token + 51 classes
+  stripped (Tailwind's built-in `shadow-sm` would otherwise have leaked a real shadow). `md`/`lg` stay. See A6.
+- **Border → one app utility.** `border-strong`/`border-subtle` unregistered from `@theme` (kept as
+  `:root` tokens for component internals); only `border-border-default` is app-facing. See A3.
+- **~150 domain/brand literal tokens relocated** semantic.css → base.css (label-chip, dag-node, syntax,
+  brand-*, json, service-health, wildcard, gradients …); semantic.css 497→275 lines. Token name set
+  verified identical (425 defs) before/after — a pure move.
+
+---
+
 Verified green after every step: `lint:tokens`, `lint:styles`, `lint:token-purity`,
 `lint:design` all pass; `type-check` and `lint:ci` clean; the 3 codemod-touched specs
 (221 tests) pass; the app compiles and renders correctly in **both light and dark** in the
@@ -249,6 +276,11 @@ Legend: **✅ keep** · **➕ add/register** (see Part D) · **⛔ retire** (see
 
 ### A3 · Border — `border-*`
 
+> **✅ EXECUTED (2026-07-18):** `border-strong`/`border-subtle` **unregistered** from `@theme` — no
+> `border-border-strong/subtle` utility exists anymore. Both stay as `:root` tokens consumed by
+> component internals (checkbox, table row-divider, tooltip) via `var()`. `border-border-default` is
+> the only app-facing border utility. The lone lib usage (OCodeBlock toolbar) was routed to `default`.
+
 **One app-facing border knob.** Measured usage: `border-default` **466**, `border-strong` **10**,
 `border-subtle` **11**. The three are *not* the same literal (default = grey-200, strong = grey-400,
 subtle = grey-150, distinct in dark too) — but feature code overwhelmingly reaches for `default`, and
@@ -286,7 +318,15 @@ AUDIT §8.3). Register the whole ladder and delete the hand-pinned `.text-sm`/`.
 
 ### A5 · Corner radius — `rounded-*`
 
-**Standardise on a 4-step scale: `sm / md / lg / full`.** Measured usage makes the case decisively —
+> **✅ EXECUTED (2026-07-18) — superseded to ONE radius.** Per the owner's call, the scale was
+> collapsed past the 4-step proposal below to a **single** app corner radius:
+> **`--radius-default` = 4px** (the max-used value) → `rounded-default`, plus **`rounded-full`** for
+> pills/circles. `sm/md/lg/xl` are kept only as **aliases** of `--radius-default` (so scoped
+> `var(--radius-*)` refs and the OTag/OSkeleton `shape` API keep resolving — all to the one value).
+> 1317 template class tokens were codemodded `rounded-{sm,md,lg,xl}` (incl. directional) →
+> `rounded-default` across 324 files. Change `--radius-default` to retune every corner at once.
+
+**~~Standardise on a 4-step scale: `sm / md / lg / full`.~~** *(superseded — see EXECUTED note above)* Measured usage makes the case decisively —
 `sm` **487**, `md` **336**, `lg` **290**, `full` **184** cover **96%** of all 1352 `rounded-*` uses.
 The remaining steps are long-tail noise: `xl` 40, `xs` 10, `2xl` 4, `3xl` 1. Do **not** register the
 unregistered ones (reverses the earlier "register xs/2xl/3xl" proposal) — retire them instead.
@@ -306,7 +346,13 @@ unregistered ones (reverses the earlier "register xs/2xl/3xl" proposal) — reti
 
 ### A6 · Elevation — `shadow-*`
 
-**Two real elevations, plus one "flat" baseline.** Only `md` and `lg` actually render a shadow —
+> **✅ EXECUTED (2026-07-18) — `shadow-sm` removed entirely.** Since it rendered `none`, the owner
+> chose to drop it rather than keep a no-op token: the `--shadow-sm` token + its `@theme` registration
+> were removed and all **51** `shadow-sm` classes stripped (removing the token was required — Tailwind
+> v4 ships a built-in `shadow-sm`, which would otherwise have leaked a real shadow). `--shadow-xs`
+> (1 use) retired too. **`md` and `lg` are the only shadow utilities**; a flat surface uses no shadow class.
+
+**~~Two real elevations, plus one "flat" baseline.~~** *(superseded — `shadow-sm` removed, see above)* Only `md` and `lg` actually render a shadow —
 that is the whole vocabulary the app needs. Measured usage: `shadow-sm` **50**, `shadow-md` **37**,
 `shadow-lg` **13**, `shadow-xs` **1**. Note `shadow-sm` is defined as `none` (the hairline-border
 philosophy), so those 50 uses paint nothing — it's the explicit "no elevation" token, not a shadow.
