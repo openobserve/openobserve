@@ -835,7 +835,11 @@
     "pipeline": "パイプライン",
     "language": "言語",
     "actions": "アクション",
-    "keyboardShortcuts": "キーボードショートカット"
+    "keyboardShortcuts": "キーボードショートカット",
+    "incidents": "インシデント",
+    "evals": "評価",
+    "aiObservability": "AI オブザーバビリティ",
+    "synthetic": "合成繊維"
   },
   "rum": {
     "title": "リアルユーザーモニタリング",
@@ -3130,6 +3134,25 @@
     "SearchSQLCancelled": "エラー:検索 SQL はキャンセルされました。"
   },
   "alerts": {
+    "validation": {
+      "streamTypeRequired": "Streamタイプは必須です。",
+      "streamNameRequired": "Stream名は必須です。",
+      "fieldRequired": "フィールドは必須です！",
+      "fieldRequiredPlain": "フィールドは必須です",
+      "nameInvalidChars": ":, ?, /, # やスペースなどの文字は使用できません。",
+      "templateRequired": "テンプレートは必須です！",
+      "validEmails": "有効なメールアドレスを追加してください！",
+      "silenceNonNegative": "通知のサイレンスは0以上である必要があります",
+      "periodPositive": "期間は0より大きい必要があります",
+      "destinationRequired": "少なくとも1つの宛先が必要です。",
+      "thresholdPositive": "しきい値は0より大きい必要があります",
+      "frequencyPositive": "頻度は0より大きい必要があります",
+      "groupByRequired": "少なくとも1つのグループ化フィールドが必要です",
+      "minimumOneDay": "最低1日",
+      "detectionFunctionRequired": "検出関数は必須です",
+      "timestampAliasBanned": "{column} は列のエイリアスとして使用できません。代わりに time_bucket を使用してください。",
+      "credentialFieldRequired": "{field} は必須です"
+    },
     "header": "アラート",
     "subtitle": "アラートルールと通知チャネル",
     "searchThisFolder": "このフォルダー",
@@ -6532,6 +6555,70 @@
       "rumErrorsRefresh": "リストを更新",
       "rumSessionsRefresh": "リストを更新",
       "sourceMapsRefresh": "リストを更新"
+    }
+  },
+  "synthetics": {
+    "scheduleAlert": {
+      "title": "スケジュールとアラート",
+      "frequency": "周波数",
+      "frequencyOptions": {
+        "1min": "1 分",
+        "5min": "5 分",
+        "15min": "15 分",
+        "30min": "30 分",
+        "1hour": "1 時間",
+        "cron": "クロン"
+      },
+      "scheduleNow": "今すぐスケジュールする",
+      "scheduleLater": "後でスケジュールする",
+      "scheduleNowTooltip": "チェックは、現在の日付とタイムゾーンを使用してすぐに有効になります。",
+      "scheduleLaterTooltip": "チェックを有効にする将来の日付と時刻を選択してください。",
+      "startDate": "開始日",
+      "startTime": "開始時間",
+      "timezone": "タイムゾーン",
+      "cronExpression": "クラウン表現",
+      "cronPlaceholder": "*/5 * * *",
+      "retries": "リトライ",
+      "retriesOnFailure": "失敗時に再試行",
+      "retriesOnFailureSuffix": "回。",
+      "retryDelay": "お待ちください",
+      "retryDelaySuffix": "再試行の間隔はミリ秒です。",
+      "alert": "アラート",
+      "alertedIfFails": "テストが失敗した場合はアラートを通知します",
+      "alertedIfFailsSuffix": "回。",
+      "destinations": "目的地",
+      "noDestinations": "目的地はありません",
+      "refreshDestinations": "デスティネーションを更新",
+      "addNewDestination": "新しい目的地を追加",
+      "destinationRequired": "少なくとも 1 つの目的地が必要です",
+      "cooldownPeriod": "クールダウン期間",
+      "minutes": "分"
+    },
+    "locations": {
+      "title": "ロケーション",
+      "locationAwsEast": "AWS · 米国東部-1",
+      "comingSoon": "その他の地域とプライベートロケーション — 近日公開予定"
+    },
+    "results": {
+      "title": "モニター結果",
+      "monitors": "モニター",
+      "editMonitor": "モニターを編集",
+      "uptime": "アップタイム",
+      "p95Duration": "P95 所要時間",
+      "failedRuns": "失敗した実行",
+      "lastRun": "ラストラン",
+      "responseTime": "レスポンス・タイム",
+      "responseTimeSubtitle": "合計旅行時間",
+      "recentRuns": "最近実行した記事",
+      "runs": "走る",
+      "noRuns": "選択した時間範囲での実行は見つかりませんでした。",
+      "status": "ステータス",
+      "started": "開始",
+      "duration": "所要時間",
+      "location": "ロケーション",
+      "trigger": "トリガー",
+      "passed": "合格",
+      "failed": "失敗"
     }
   }
 }

@@ -350,6 +350,16 @@ export default defineComponent({
       );
     });
 
+    // Backend `/config` flag `synthetics_enabled` — controlled by enterprise
+    // `O2_SYNTHETICS_ENABLED`. Reactive so the menu picks it up regardless of
+    // whether the config response arrived before or after mount.
+    const isSyntheticsEnabled = computed(() => {
+      return (
+        (config.isEnterprise == "true" || config.isCloud == "true") &&
+        Boolean(store.state.zoConfig?.synthetics_enabled)
+      );
+    });
+
     const orgOptions = ref([{ label: Number, value: String }]);
     let slackURL = "https://short.openobserve.ai/community";
     if (
@@ -615,9 +625,47 @@ export default defineComponent({
     // ever flips at runtime), keep the menu in sync.
     watch(isOnlineEvalsEnabled, () => updateAIObservabilityMenu(), { immediate: false });
 
+    const updateSyntheticMenu = () => {
+      const existingIndex = linksList.value.findIndex(
+        (l: any) => l.name === "synthetic",
+      );
+
+      if (!isSyntheticsEnabled.value) {
+        if (existingIndex !== -1) linksList.value.splice(existingIndex, 1);
+        return;
+      }
+      if (existingIndex !== -1) return;
+
+      const incidentIndex = linksList.value.findIndex(
+        (l: any) => l.name === "incidentList",
+      );
+      const alertIndex = linksList.value.findIndex(
+        (l: any) => l.name === "alertList",
+      );
+      const insertAt =
+        incidentIndex !== -1
+          ? incidentIndex + 1
+          : alertIndex !== -1
+            ? alertIndex + 1
+            : linksList.value.length;
+
+      linksList.value.splice(insertAt, 0, {
+        title: t("menu.synthetic"),
+        icon: "radar",
+        link: "/synthetic",
+        name: "synthetic",
+      });
+    };
+
+    // Keep the menu in sync if /config resolves after mount.
+    watch(isSyntheticsEnabled, () => updateSyntheticMenu(), {
+      immediate: false,
+    });
+
     const filterMenus = () => {
       updateIncidentsMenu();
       updateActionsMenu();
+      updateSyntheticMenu();
       updateAIObservabilityMenu();
 
       const disableMenus = new Set(
@@ -648,6 +696,7 @@ export default defineComponent({
         link: "/reports",
         name: "reports",
       });
+      filterMenus();
     }
 
     //orgIdentifier query param exists then clear the localstorage and store.

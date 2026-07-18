@@ -38,7 +38,11 @@ vi.mock("@/utils/storage", () => ({
 
 vi.mock("@/utils/uuid", () => ({
   getUUID: vi.fn(() => "aaaabbbb-cccc-dddd-0000-111122223333"),
-  getUUIDv7: vi.fn(() => "01234567-89ab-7def-8123-456789abcdef"),
+  getUUIDv7: vi.fn((compact?: boolean) =>
+    compact
+      ? "0123456789ab7def8123456789abcdef"
+      : "01234567-89ab-7def-8123-456789abcdef",
+  ),
 }));
 
 // Imports AFTER mocks

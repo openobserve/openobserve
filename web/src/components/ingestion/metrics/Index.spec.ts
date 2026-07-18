@@ -193,6 +193,18 @@ describe("IngestMetrics Component", () => {
       });
     });
 
+    it("should push with org_identifier query when route is 'vmagent'", () => {
+      mockRouter.currentRoute.value.name = "vmagent";
+      const tw = mount(IngestMetrics, buildMountOptions());
+      expect(mockRouter.push).toHaveBeenCalledWith({
+        name: "vmagent",
+        query: {
+          org_identifier: store.state.selectedOrganization.identifier,
+        },
+      });
+      tw.unmount();
+    });
+
     it("should push with org_identifier query when route is 'otelCollector'", () => {
       mockRouter.currentRoute.value.name = "otelCollector";
       const tw = mount(IngestMetrics, buildMountOptions());

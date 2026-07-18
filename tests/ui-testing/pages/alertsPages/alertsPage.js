@@ -1118,16 +1118,14 @@ export class AlertsPage {
         await this.page.locator(this.locators.alertSubmitButton).click();
         await this.page.waitForTimeout(500);
 
-        // v3 shows a toast notification when name is empty
-        // OToast renders the message in 3 elements (sr-only ARIA span, sr-only title div,
-        // visible message div) — scope to the visible `o-toast-message` data-test to avoid
-        // strict-mode violation per AGENT_RULES §2.
-        await expect(
-            this.page
-                .locator('[data-test="o-toast-message"]')
-                .filter({ hasText: 'Alert name is required.' })
-                .first()
-        ).toBeVisible({ timeout: 10000 });
+        // Post-migration the alert form validates via useOForm (revalidateLogic):
+        // an empty name surfaces an INLINE schema error on the name OFormInput
+        // (data-test="add-alert-name-input" → auto-derived `-error` element), not a
+        // toast. Message is `alerts.nameRequired` = "Alert name is required." — the
+        // same copy the old toast used; only the delivery (toast → inline) changed.
+        const nameError = this.page.locator('[data-test="add-alert-name-input-error"]').first();
+        await expect(nameError).toBeVisible({ timeout: 10000 });
+        await expect(nameError).toContainText('Alert name is required');
         testLogger.info('Invalid alert name validation working');
 
         // Close with robust handling for dialog backdrops

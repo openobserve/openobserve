@@ -116,12 +116,14 @@ export const msteamsConfig: PrebuiltConfig = {
   credentialFields: [
     {
       key: 'webhookUrl',
-      label: 'Microsoft Teams Webhook URL',
+      labelKey: 'alerts.prebuiltDestinations.msteamsWebhookUrl',
       type: 'text',
       required: true,
       hint: 'Get your webhook URL from Teams channel connectors or Workflows',
       validator: (url: string) =>
-        isValidTeamsWebhookUrl(url) || 'Invalid Microsoft Teams webhook URL'
+        isValidTeamsWebhookUrl(url) || {
+          key: 'alerts.prebuiltDestinations.invalidMsteamsWebhookUrl'
+        }
     }
   ]
 };

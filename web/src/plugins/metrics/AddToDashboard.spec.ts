@@ -513,6 +513,31 @@ describe("AddToDashboard — onSubmit validation", () => {
     );
   });
 
+  it("multi-panel mode: adds one panel per `panels` entry (convert-to-dashboard)", async () => {
+    // With a non-empty `panels` prop the component adds each as a separate panel
+    // in one submit. The single-panel path (no `panels`) is unchanged — see above.
+    const wrapper = createWrapper({
+      panels: [
+        { title: "cpu", queries: [] },
+        { title: "mem", queries: [] },
+      ],
+    });
+    await flushPromises();
+
+    wrapper.vm.selectedDashboard = "dash-1";
+    wrapper.vm.activeTabId = "tab-1";
+
+    await wrapper.vm.onSubmit({ panelTitle: "" });
+    await flushPromises();
+
+    // One addPanel call per pinned metric.
+    expect(mockAddPanel).toHaveBeenCalledTimes(2);
+    // Each carries its own title and a freshly-assigned id.
+    const titles = mockAddPanel.mock.calls.map((c: any[]) => c[2].title);
+    expect(titles).toEqual(["cpu", "mem"]);
+    expect(mockAddPanel.mock.calls[0][2].id).toBeDefined();
+  });
+
   it("emits 'save' event after successful panel addition", async () => {
     const wrapper = createWrapper();
     await flushPromises();

@@ -16,6 +16,17 @@
 import config from "@/aws-exports";
 import ServiceAccountsList from "@/components/iam/serviceAccounts/ServiceAccountsList.vue";
 import { routeGuard } from "@/utils/zincutils";
+import store from "@/stores";
+
+// Synthetics routes are gated on the backend /config flag `synthetics_enabled`
+// (enterprise O2_SYNTHETICS_ENABLED). Direct URL access redirects home when off.
+const syntheticsRouteGuard = (to: any, from: any, next: any) => {
+  if (store.state.zoConfig?.synthetics_enabled === false) {
+    next("/");
+    return;
+  }
+  routeGuard(to, from, next);
+};
 
 const IdentityAccessManagement = () =>
   import("@/views/IdentityAccessManagement.vue");
@@ -115,6 +126,63 @@ const useEnterpriseRoutes = () => {
   //the above are the routes that we support for oss including both enterprise and cloud
 
   if (config.isCloud == "true" || config.isEnterprise == "true") {
+    // Inbound MCP server setup — lives under IAM as a credentialed-access
+    // surface, alongside Service Accounts / Ingestion Tokens. MCP is an AI
+    // feature, gated on ai_enabled like the rest of the app — but that gate is
+    // enforced by the sidebar item's reactive `visible` (isEnterprise &&
+    // ai_enabled), NOT here: `window.store` is unset at runtime, so a guard read
+    // is unreliable and must never fail-closed (it would bounce every click to
+    // Users). The route itself is already limited to the enterprise/cloud build.
+    routes[0].children.push({
+      path: "mcpServer",
+      name: "mcpServer",
+      meta: { title: "MCP Server" },
+      component: () => import("@/components/iam/McpServer.vue"),
+      beforeEnter(to: any, from: any, next: any) {
+        routeGuard(to, from, next);
+      },
+    });
+
+    routes.push({
+      path: "synthetic",
+      name: "synthetic",
+      component: () => import("@/views/SyntheticMonitoring.vue"),
+      meta: { title: "Synthetic Monitoring" },
+      beforeEnter(to: any, from: any, next: any) {
+        syntheticsRouteGuard(to, from, next);
+      },
+    });
+
+    routes.push(
+      {
+        path: "synthetic/new",
+        name: "synthetic-new",
+        component: () => import("@/views/synthetics/CreateCheck.vue"),
+        meta: { title: "New Check" },
+        beforeEnter(to: any, from: any, next: any) {
+          syntheticsRouteGuard(to, from, next);
+        },
+      },
+      {
+        path: "synthetic/:id/results",
+        name: "synthetic-monitor-results",
+        component: () => import("@/views/synthetics/MonitorResults.vue"),
+        meta: { title: "Monitor Results" },
+        beforeEnter(to: any, from: any, next: any) {
+          syntheticsRouteGuard(to, from, next);
+        },
+      },
+      {
+        path: "synthetic/:id/results/run/:runId/:executionId",
+        name: "synthetic-run-detail",
+        component: () => import("@/views/synthetics/RunDetail.vue"),
+        meta: { title: "Run Detail" },
+        beforeEnter(to: any, from: any, next: any) {
+          syntheticsRouteGuard(to, from, next);
+        },
+      }
+    );
+
     routes.push(
       {
         path: "incidents",

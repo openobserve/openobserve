@@ -2099,6 +2099,51 @@ dependencies = [
 ]
 
 [[package]]
+name = "common"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "arrow-schema",
+ "axum",
+ "bytes",
+ "chrono",
+ "config",
+ "dashmap",
+ "expect-test",
+ "hashbrown 0.16.1",
+ "http 1.4.0",
+ "http-body-util",
+ "infra",
+ "jsonwebtoken",
+ "log",
+ "maxminddb",
+ "o2_dex",
+ "o2_enterprise",
+ "o2_openfga",
+ "openobserve-vrl",
+ "opentelemetry",
+ "parking_lot 0.12.5",
+ "prost 0.14.3",
+ "regex",
+ "reqwest 0.13.2",
+ "rquickjs",
+ "segment",
+ "serde",
+ "serde_json",
+ "snap",
+ "strum 0.28.0",
+ "thiserror 2.0.18",
+ "time",
+ "tokio",
+ "tonic",
+ "tracing",
+ "tracing-opentelemetry",
+ "uaparser",
+ "url",
+ "utoipa",
+]
+
+[[package]]
 name = "community-id"
 version = "0.2.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2159,7 +2204,6 @@ dependencies = [
  "axum",
  "axum-client-ip",
  "base64 0.22.1",
- "byteorder",
  "bytes",
  "chromiumoxide",
  "chrono",
@@ -2211,14 +2255,10 @@ dependencies = [
  "tempfile",
  "thiserror 2.0.18",
  "tokio",
- "tokio-util",
- "tonic",
- "tonic-prost",
  "tower",
  "tower-http",
  "tracing",
  "tracing-log",
- "tracing-opentelemetry",
  "tracing-subscriber",
  "url",
  "urlencoding",
@@ -2374,17 +2414,6 @@ name = "core-foundation-sys"
 version = "0.8.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "773648b94d0e5d620f64f280777445740e61fe701025087ec8b57f45c791888b"
-
-[[package]]
-name = "core_affinity"
-version = "0.8.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a034b3a7b624016c6e13f5df875747cc25f884156aad2abd12b6c46797971342"
-dependencies = [
- "libc",
- "num_cpus",
- "winapi",
-]
 
 [[package]]
 name = "cpp_demangle"
@@ -4056,7 +4085,6 @@ dependencies = [
  "parking_lot 0.12.5",
  "serde",
  "serde_json",
- "tokio",
  "tonic",
 ]
 
@@ -4994,7 +5022,6 @@ dependencies = [
 name = "infra"
 version = "0.1.0"
 dependencies = [
- "ahash 0.8.12",
  "anyhow",
  "arc-swap",
  "arrow",
@@ -5028,11 +5055,10 @@ dependencies = [
  "tempfile",
  "thiserror 2.0.18",
  "tokio",
- "tokio-stream",
  "tonic",
  "tracing",
  "tracing-opentelemetry",
- "zstd",
+ "url",
 ]
 
 [[package]]
@@ -5042,16 +5068,13 @@ dependencies = [
  "arrow",
  "arrow-schema",
  "byteorder",
- "bytes",
  "chrono",
  "config",
- "core_affinity",
  "datafusion",
  "futures",
  "hashbrown 0.16.1",
  "indexmap",
  "infra",
- "itertools 0.14.0",
  "log",
  "parquet",
  "serde",
@@ -6214,16 +6237,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "num_cpus"
-version = "1.17.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "91df4bbde75afed763b708b7eee1e8e7651e02d97f6d5dd763e89367e957b23b"
-dependencies = [
- "hermit-abi",
- "libc",
-]
-
-[[package]]
 name = "num_threads"
 version = "0.1.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6574,9 +6587,7 @@ dependencies = [
  "bytes",
  "chrono",
  "config",
- "cron",
  "datafusion",
- "enrichment",
  "expect-test",
  "flate2",
  "flight",
@@ -6607,7 +6618,6 @@ dependencies = [
  "opentelemetry-proto",
  "parking_lot 0.12.5",
  "pprof",
- "promql-parser",
  "prost 0.14.3",
  "proto",
  "rand 0.10.1",
@@ -6632,7 +6642,6 @@ dependencies = [
  "url",
  "utoipa",
  "utoipa-swagger-ui",
- "vrl",
  "web",
  "zip 8.2.0",
 ]
@@ -6719,11 +6728,8 @@ dependencies = [
 name = "openobserve-core"
 version = "0.1.0"
 dependencies = [
- "ahash 0.8.12",
  "anyhow",
- "argon2",
  "arrow",
- "arrow-flight",
  "arrow-json",
  "arrow-schema",
  "async-recursion",
@@ -6736,6 +6742,7 @@ dependencies = [
  "bytes",
  "chromiumoxide",
  "chrono",
+ "common",
  "config",
  "cron",
  "csv",
@@ -6751,9 +6758,7 @@ dependencies = [
  "futures-util",
  "hashbrown 0.16.1",
  "hashlink 0.11.0",
- "hex",
  "http 1.4.0",
- "http-body 1.0.1",
  "http-body-util",
  "infra",
  "ingester",
@@ -6783,21 +6788,16 @@ dependencies = [
  "rayon",
  "rcgen",
  "regex",
- "report_server",
  "reqwest 0.13.2",
- "rquickjs",
  "rustls",
  "rustls-native-certs",
  "sea-orm",
  "search",
- "segment",
  "serde",
  "serde_json",
- "sha256",
  "snap",
  "sourcemap",
  "sqlparser",
- "strum 0.28.0",
  "svix-ksuid",
  "tantivy",
  "tantivy_utils",
@@ -6808,12 +6808,10 @@ dependencies = [
  "tonic",
  "tracing",
  "tracing-opentelemetry",
- "uaparser",
  "url",
  "utoipa",
  "version-compare",
  "vortex",
- "vortex-datafusion",
  "vrl",
  "wal",
  "webpki-roots 1.0.6",
@@ -7820,16 +7818,13 @@ dependencies = [
 name = "proto"
 version = "0.1.0"
 dependencies = [
- "async-trait",
  "cargo_metadata",
- "datafusion",
  "datafusion-proto",
  "prost 0.14.3",
  "prost-build",
  "prost-wkt-types",
  "serde",
  "serde_json",
- "tokio",
  "tonic",
  "tonic-prost",
  "tonic-prost-build",
@@ -8484,7 +8479,6 @@ dependencies = [
  "chromiumoxide",
  "chrono",
  "config",
- "env_logger",
  "futures",
  "lettre",
  "log",
@@ -8492,8 +8486,6 @@ dependencies = [
  "serde_json",
  "tempfile",
  "tokio",
- "tower",
- "tower-http",
 ]
 
 [[package]]
@@ -10733,7 +10725,6 @@ checksum = "9ae9cec805b01e8fc3fd2fe289f89149a9b66dd16786abd8b19cfa7b48cb0098"
 dependencies = [
  "bytes",
  "futures-core",
- "futures-io",
  "futures-sink",
  "pin-project-lite",
  "tokio",
@@ -11571,12 +11562,10 @@ name = "wal"
 version = "0.1.0"
 dependencies = [
  "byteorder",
- "bytes",
  "config",
  "crc32fast",
  "criterion",
  "log",
- "parking_lot 0.12.5",
  "snafu 0.9.0",
  "snap",
  "tempfile",
