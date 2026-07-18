@@ -146,13 +146,11 @@ mod tests {
 
     #[test]
     fn test_postgres_schema_history_new() {
-        let s = PostgresSchemaHistory::new();
-        drop(s);
+        let _ = PostgresSchemaHistory::new();
     }
 
     #[test]
     fn test_postgres_schema_history_default() {
-        let s = PostgresSchemaHistory::default();
-        drop(s);
+        let _ = PostgresSchemaHistory::default();
     }
 }

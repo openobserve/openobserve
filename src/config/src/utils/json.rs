@@ -285,8 +285,8 @@ mod tests {
         assert_eq!(get_float_value(&Value::String("invalid".to_string())), 0.0);
         assert_eq!(get_float_value(&Value::Number(Number::from(42))), 42.0);
         assert_eq!(
-            get_float_value(&Value::Number(Number::from_f64(3.14).unwrap())),
-            3.14
+            get_float_value(&Value::Number(Number::from_f64(3.125).unwrap())),
+            3.125
         );
         assert_eq!(get_float_value(&Value::Bool(true)), 1.0);
         assert_eq!(get_float_value(&Value::Bool(false)), 0.0);
@@ -298,7 +298,7 @@ mod tests {
         assert_eq!(get_int_value(&Value::String("invalid".to_string())), 0);
         assert_eq!(get_int_value(&Value::Number(Number::from(42))), 42);
         assert_eq!(
-            get_int_value(&Value::Number(Number::from_f64(3.14).unwrap())),
+            get_int_value(&Value::Number(Number::from_f64(3.125).unwrap())),
             3
         );
         assert_eq!(get_int_value(&Value::Bool(true)), 1);
@@ -311,7 +311,7 @@ mod tests {
         assert_eq!(get_uint_value(&Value::String("invalid".to_string())), 0);
         assert_eq!(get_uint_value(&Value::Number(Number::from(42u64))), 42);
         assert_eq!(
-            get_uint_value(&Value::Number(Number::from_f64(3.14).unwrap())),
+            get_uint_value(&Value::Number(Number::from_f64(3.125).unwrap())),
             3
         );
         assert_eq!(get_uint_value(&Value::Bool(true)), 1);
@@ -320,16 +320,16 @@ mod tests {
         assert_eq!(get_uint_value(&Value::Array(vec![])), 0);
 
         // Test get_bool_value
-        assert_eq!(get_bool_value(&Value::String("true".to_string())), true);
-        assert_eq!(get_bool_value(&Value::String("false".to_string())), false);
-        assert_eq!(get_bool_value(&Value::String("invalid".to_string())), false);
-        assert_eq!(get_bool_value(&Value::Number(Number::from(1))), true);
-        assert_eq!(get_bool_value(&Value::Number(Number::from(0))), false);
-        assert_eq!(get_bool_value(&Value::Number(Number::from(42))), true);
-        assert_eq!(get_bool_value(&Value::Bool(true)), true);
-        assert_eq!(get_bool_value(&Value::Bool(false)), false);
-        assert_eq!(get_bool_value(&Value::Null), false);
-        assert_eq!(get_bool_value(&Value::Array(vec![])), false);
+        assert!(get_bool_value(&Value::String("true".to_string())));
+        assert!(!get_bool_value(&Value::String("false".to_string())));
+        assert!(!get_bool_value(&Value::String("invalid".to_string())));
+        assert!(get_bool_value(&Value::Number(Number::from(1))));
+        assert!(!get_bool_value(&Value::Number(Number::from(0))));
+        assert!(get_bool_value(&Value::Number(Number::from(42))));
+        assert!(get_bool_value(&Value::Bool(true)));
+        assert!(!get_bool_value(&Value::Bool(false)));
+        assert!(!get_bool_value(&Value::Null));
+        assert!(!get_bool_value(&Value::Array(vec![])));
 
         // Test get_string_value
         assert_eq!(
@@ -338,8 +338,8 @@ mod tests {
         );
         assert_eq!(get_string_value(&Value::Number(Number::from(42))), "42");
         assert_eq!(
-            get_string_value(&Value::Number(Number::from_f64(3.14).unwrap())),
-            "3.14"
+            get_string_value(&Value::Number(Number::from_f64(3.125).unwrap())),
+            "3.125"
         );
         assert_eq!(get_string_value(&Value::Bool(true)), "true");
         assert_eq!(get_string_value(&Value::Bool(false)), "false");

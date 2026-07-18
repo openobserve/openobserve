@@ -682,10 +682,10 @@ mod tests {
         // Test update
         let result = Entity::update_many()
             .col_expr(Column::Org, Expr::value(&rule.org))
-            .col_expr(Column::RuleType, Expr::value(&rule.rule_type.unwrap()))
-            .col_expr(Column::UserRole, Expr::value(&rule.user_role.unwrap()))
+            .col_expr(Column::RuleType, Expr::value(rule.rule_type.unwrap()))
+            .col_expr(Column::UserRole, Expr::value(rule.user_role.unwrap()))
             .col_expr(Column::Threshold, Expr::value(rule.threshold))
-            .filter(Column::RuleId.eq(&rule.rule_id.unwrap()))
+            .filter(Column::RuleId.eq(rule.rule_id.unwrap()))
             .exec(&db)
             .await;
 
@@ -736,15 +736,15 @@ mod tests {
     #[test]
     fn test_ratelimit_rule_type() {
         assert!(matches!(
-            RatelimitRuleType::try_from("exact"),
-            Ok(RatelimitRuleType::Exact)
+            RatelimitRuleType::from("exact"),
+            RatelimitRuleType::Exact
         ));
         assert!(matches!(
-            RatelimitRuleType::try_from("regex"),
-            Ok(RatelimitRuleType::Regex)
+            RatelimitRuleType::from("regex"),
+            RatelimitRuleType::Regex
         ));
         assert_eq!(
-            RatelimitRuleType::try_from("invalid").unwrap().to_string(),
+            RatelimitRuleType::from("invalid").to_string(),
             RatelimitRuleType::Exact.to_string()
         );
         assert_eq!(RatelimitRuleType::Exact.to_string(), "exact");

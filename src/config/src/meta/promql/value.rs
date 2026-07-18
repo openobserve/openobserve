@@ -1030,7 +1030,7 @@ mod tests {
 
         use std::iter::zip;
         for (expect, got) in zip(expected, output.clone()) {
-            assert_eq!(expect.name, got.name, "{:?}", &output);
+            assert_eq!(expect.name, got.name, "{:?}", output);
         }
     }
 
@@ -1047,7 +1047,7 @@ mod tests {
 
         use std::iter::zip;
         for (expect, got) in zip(expected, output.clone()) {
-            assert_eq!(expect.name, got.name, "{:?}", &output);
+            assert_eq!(expect.name, got.name, "{:?}", output);
         }
     }
 
@@ -1062,10 +1062,10 @@ mod tests {
 
         use std::iter::zip;
         for (expect, got) in zip(expected.clone(), output_deleted.clone()) {
-            assert_eq!(expect.name, got.name, "{:?}", &output_deleted);
+            assert_eq!(expect.name, got.name, "{:?}", output_deleted);
         }
         for (expect, got) in zip(expected, output_kept.clone()) {
-            assert_eq!(expect.name, got.name, "{:?}", &output_kept);
+            assert_eq!(expect.name, got.name, "{:?}", output_kept);
         }
     }
 
@@ -1551,8 +1551,8 @@ mod tests {
 
     #[test]
     fn test_value_get_float() {
-        let val = Value::Float(3.14);
-        assert_eq!(val.get_float(), Some(3.14));
+        let val = Value::Float(3.125);
+        assert_eq!(val.get_float(), Some(3.125));
 
         assert!(Value::String("x".to_string()).get_float().is_none());
         assert!(Value::None.get_float().is_none());

@@ -67,7 +67,7 @@ mod tests {
     fn test_sysinfo_get_cpu_usage() {
         let usage = get_cpu_usage();
         assert!(
-            usage >= 0.0 && usage <= 100.0,
+            (0.0..=100.0).contains(&usage),
             "CPU usage should be between 0 and 100, got {}",
             usage
         );

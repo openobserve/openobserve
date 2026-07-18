@@ -447,11 +447,11 @@ mod tests {
 
         // Allow for some tolerance (within last hour and next hour)
         assert!(
-            timestamp >= now - 3600_000_000,
+            timestamp >= now - 3_600_000_000,
             "Timestamp should not be too far in past"
         );
         assert!(
-            timestamp <= now + 3600_000_000,
+            timestamp <= now + 3_600_000_000,
             "Timestamp should not be too far in future"
         );
 
@@ -465,8 +465,8 @@ mod tests {
 
         // Verify both formats give reasonable timestamps
         let standard_timestamp = standard_result.unwrap();
-        assert!(standard_timestamp >= now - 3600_000_000);
-        assert!(standard_timestamp <= now + 3600_000_000);
+        assert!(standard_timestamp >= now - 3_600_000_000);
+        assert!(standard_timestamp <= now + 3_600_000_000);
     }
 
     #[test]
@@ -582,7 +582,7 @@ mod tests {
         ];
         for (id, ts) in data {
             let id_ts = to_timestamp_millis(id);
-            let t = chrono::Utc.timestamp_nanos(id_ts * 1000_000);
+            let t = chrono::Utc.timestamp_nanos(id_ts * 1_000_000);
             let td = t.format("%Y-%m-%d").to_string();
             assert_eq!(td, ts.to_string());
         }

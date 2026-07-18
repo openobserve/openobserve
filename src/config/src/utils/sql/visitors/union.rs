@@ -107,7 +107,7 @@ mod tests {
         let is_not_union_all = is_multi_search_eligible_for_histogram(sql1).unwrap();
         let is_union_all = is_multi_search_eligible_for_histogram(sql2).unwrap();
 
-        assert_eq!(is_not_union_all, false);
-        assert_eq!(is_union_all, true);
+        assert!(!is_not_union_all);
+        assert!(is_union_all);
     }
 }

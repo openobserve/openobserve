@@ -262,16 +262,8 @@ mod tests {
         assert_eq!(total1, total2);
 
         // Used size and length may change due to concurrent tests, but should not vary wildly
-        let used_diff = if used2 > used1 {
-            used2 - used1
-        } else {
-            used1 - used2
-        };
-        let len_diff = if len2 > len1 {
-            len2 - len1
-        } else {
-            len1 - len2
-        };
+        let used_diff = used2.abs_diff(used1);
+        let len_diff = len2.abs_diff(len1);
         assert!(used_diff < 100000 || used1 == 0 || used2 == 0);
         assert!(len_diff < 100 || len1 == 0 || len2 == 0);
     }
@@ -296,16 +288,8 @@ mod tests {
         assert_eq!(total1, total2);
 
         // Used size and length may change due to concurrent tests, but should not vary wildly
-        let used_diff = if used2 > used1 {
-            used2 - used1
-        } else {
-            used1 - used2
-        };
-        let len_diff = if len2 > len1 {
-            len2 - len1
-        } else {
-            len1 - len2
-        };
+        let used_diff = used2.abs_diff(used1);
+        let len_diff = len2.abs_diff(len1);
         assert!(used_diff < 100000 || used1 == 0 || used2 == 0);
         assert!(len_diff < 100 || len1 == 0 || len2 == 0);
     }

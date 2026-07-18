@@ -141,13 +141,11 @@ mod tests {
 
     #[test]
     fn test_sqlite_schema_history_new() {
-        let s = SqliteSchemaHistory::new();
-        drop(s);
+        let _ = SqliteSchemaHistory::new();
     }
 
     #[test]
     fn test_sqlite_schema_history_default() {
-        let s = SqliteSchemaHistory::default();
-        drop(s);
+        let _ = SqliteSchemaHistory::default();
     }
 }

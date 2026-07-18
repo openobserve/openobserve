@@ -425,7 +425,7 @@ mod tests {
         assert_eq!(active.anomaly_id.unwrap(), "anom-all");
         assert_eq!(active.org_id.unwrap(), "org-all");
         assert_eq!(active.stream_name.unwrap(), "default");
-        assert_eq!(active.enabled.unwrap(), true);
+        assert!(active.enabled.unwrap());
         assert_eq!(active.threshold.unwrap(), 95);
     }
 }

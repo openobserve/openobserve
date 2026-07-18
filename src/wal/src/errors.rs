@@ -175,7 +175,7 @@ mod tests {
     #[test]
     fn test_file_sync_display() {
         let err = Error::FileSync {
-            source: io::Error::new(io::ErrorKind::Other, "sync failed"),
+            source: io::Error::other("sync failed"),
             path: PathBuf::from("/tmp/sync.wal"),
         };
         let display = format!("{err}");

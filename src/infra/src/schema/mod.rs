@@ -917,6 +917,11 @@ pub fn is_widening_conversion(from: &DataType, to: &DataType) -> bool {
 
 #[cfg(test)]
 mod tests {
+    #![allow(
+        clippy::field_reassign_with_default,
+        clippy::unnecessary_literal_unwrap
+    )]
+
     use super::*;
 
     #[test]

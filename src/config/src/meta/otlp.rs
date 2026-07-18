@@ -44,7 +44,7 @@ mod tests {
     fn test_otlp_request_type_copy_clone() {
         let a = OtlpRequestType::HttpJson;
         let b = a;
-        let c = a.clone();
+        let c = a;
         assert_eq!(a, b);
         assert_eq!(a, c);
     }

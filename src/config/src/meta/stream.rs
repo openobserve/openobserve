@@ -1405,6 +1405,8 @@ impl From<&str> for FileListBookKeepMode {
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::field_reassign_with_default, clippy::needless_update)]
+
     use super::*;
 
     #[test]

@@ -335,7 +335,7 @@ mod tests {
         assert_eq!(alert.org_id, "");
         assert_eq!(alert.stream_type, StreamType::default());
         assert_eq!(alert.stream_name, "");
-        assert_eq!(alert.is_real_time, false);
+        assert!(!alert.is_real_time);
         assert_eq!(alert.query_condition, QueryCondition::default());
         assert_eq!(alert.trigger_condition, TriggerCondition::default());
         assert!(alert.destinations.is_empty());
@@ -343,7 +343,7 @@ mod tests {
         assert_eq!(alert.row_template, "");
         assert_eq!(alert.row_template_type, RowTemplateType::String);
         assert_eq!(alert.description, "");
-        assert_eq!(alert.enabled, false);
+        assert!(!alert.enabled);
         assert_eq!(alert.tz_offset, 0);
         assert_eq!(alert.last_triggered_at, None);
         assert_eq!(alert.last_satisfied_at, None);
@@ -654,7 +654,7 @@ mod tests {
             "tz_offset": 0
         }"#;
         let alert: Alert = serde_json::from_str(json).unwrap();
-        assert_eq!(alert.creates_incident, false);
+        assert!(!alert.creates_incident);
     }
 
     #[test]

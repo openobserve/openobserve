@@ -409,13 +409,11 @@ mod tests {
 
     #[test]
     fn test_sqlite_pipeline_table_new() {
-        let t = SqlitePipelineTable::new();
-        drop(t);
+        let _ = SqlitePipelineTable::new();
     }
 
     #[test]
     fn test_sqlite_pipeline_table_default() {
-        let t = SqlitePipelineTable::default();
-        drop(t);
+        let _ = SqlitePipelineTable::default();
     }
 }

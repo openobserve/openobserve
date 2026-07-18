@@ -1877,7 +1877,7 @@ mod test {
         // New York is west of UTC (negative offset)
         assert!(ny_offset < 0);
         // London is close to UTC (0 or +60 during BST)
-        assert!(london_offset >= 0 && london_offset <= 60);
+        assert!((0..=60).contains(&london_offset));
     }
 
     #[test]

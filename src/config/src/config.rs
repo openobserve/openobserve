@@ -4138,7 +4138,7 @@ mod tests {
         let mut cfg = Config::default();
         cfg.nats.queue_max_size = 1;
         check_nats_config(&mut cfg).unwrap();
-        assert_eq!(cfg.nats.queue_max_size, 1 * 1024 * 1024);
+        assert_eq!(cfg.nats.queue_max_size, 1024 * 1024);
     }
 
     #[test]
@@ -4295,7 +4295,7 @@ mod tests {
         cfg.limit.ingest_allowed_upto = 1;
         cfg.limit.ingest_allowed_in_future = 2;
         check_limit_config(&mut cfg).unwrap();
-        assert_eq!(cfg.limit.ingest_allowed_upto_micro, 1 * 3600 * 1_000_000);
+        assert_eq!(cfg.limit.ingest_allowed_upto_micro, 3600 * 1_000_000);
         assert_eq!(
             cfg.limit.ingest_allowed_in_future_micro,
             2 * 3600 * 1_000_000

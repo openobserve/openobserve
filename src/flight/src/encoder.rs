@@ -745,7 +745,7 @@ mod tests {
         let values: ArrayRef = Arc::new(StringViewArray::from(
             (0..200_usize).map(|i| format!("v{i}")).collect::<Vec<_>>(),
         ));
-        let offsets = OffsetBuffer::from_lengths(std::iter::repeat(2).take(100));
+        let offsets = OffsetBuffer::from_lengths(std::iter::repeat_n(2, 100));
         let list_col: ArrayRef = Arc::new(ListArray::new(item_field, offsets, values, None));
         let batch = RecordBatch::try_new(schema, vec![list_col]).unwrap();
         assert_large_splits_slice_does_not(batch, 5);
@@ -761,7 +761,7 @@ mod tests {
         let values: ArrayRef = Arc::new(StringArray::from(
             (0..200_usize).map(|i| format!("w{i}")).collect::<Vec<_>>(),
         ));
-        let offsets = OffsetBuffer::from_lengths(std::iter::repeat(2).take(100));
+        let offsets = OffsetBuffer::from_lengths(std::iter::repeat_n(2, 100));
         let list_col: ArrayRef = Arc::new(ListArray::new(item_field, offsets, values, None));
         let batch = RecordBatch::try_new(schema, vec![list_col]).unwrap();
         assert_large_splits_slice_does_not(batch, 5);

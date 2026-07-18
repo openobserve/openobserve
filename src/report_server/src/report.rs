@@ -686,7 +686,7 @@ mod tests {
 
     #[test]
     fn test_dashboard_variables_generation() {
-        let variables = vec![
+        let variables = [
             ReportDashboardVariable {
                 key: "env".to_string(),
                 value: "prod".to_string(),

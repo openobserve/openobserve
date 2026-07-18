@@ -116,11 +116,11 @@ mod tests {
     fn test_sample_from_rpc() {
         let rpc = cluster_rpc::Sample {
             time: 1_700_000_000,
-            value: 3.14,
+            value: 3.125,
         };
         let sample = Sample::from(&rpc);
         assert_eq!(sample.timestamp, 1_700_000_000);
-        assert_eq!(sample.value, 3.14);
+        assert_eq!(sample.value, 3.125);
     }
 
     #[test]
