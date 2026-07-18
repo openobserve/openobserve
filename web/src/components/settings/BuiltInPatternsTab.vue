@@ -84,7 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Pattern Cards -->
-        <ul class="flex flex-col divide-y divide-border border rounded-md">
+        <ul class="flex flex-col divide-y divide-border border rounded-default">
           <li
             v-for="(pattern, index) in filteredPatterns"
             :key="`${pattern.name}-${pattern.pattern.substring(0, 20)}`"
@@ -205,7 +205,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="font-bold mb-1">
             {{ t('regex_patterns.valid_examples') }}
           </div>
-          <ul class="flex flex-col divide-y divide-border border rounded-md">
+          <ul class="flex flex-col divide-y divide-border border rounded-default">
             <li
               v-for="(example, idx) in previewedPattern.examples.Valid.slice(0, 3)"
               :key="idx"

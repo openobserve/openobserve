@@ -3,7 +3,7 @@
     <div class="pb-1 flex justify-start px-3 copy-log-btn">
       <app-tabs
         v-if="filteredTabs.length"
-        class="mb-[0.375rem] mr-2 h-fit overflow-hidden border-t border-l border-r border-solid border-card-glass-border rounded-sm"
+        class="mb-[0.375rem] mr-2 h-fit overflow-hidden border-t border-l border-r border-solid border-card-glass-border rounded-default"
         data-test="logs-json-preview-tabs"
         :tabs="filteredTabs"
         v-model:active-tab="activeTab"
@@ -188,7 +188,7 @@
       }
       <div
         v-if="showMenu"
-        class="context-menu shadow-lg rounded-sm min-w-50 py-1 [font-size:0.8125rem] bg-surface-overlay border border-border-default text-text-body"
+        class="context-menu shadow-lg rounded-default min-w-50 py-1 [font-size:0.8125rem] bg-surface-overlay border border-border-default text-text-body"
         :style="{
           position: 'fixed',
           top: `${menuY}px`,

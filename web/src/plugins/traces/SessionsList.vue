@@ -87,7 +87,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :options="availableStreams.map((s) => ({ label: s, value: s }))"
                 labelKey="label"
                 valueKey="value"
-                class="w-full rounded-sm"
+                class="w-full rounded-default"
                 @update:model-value="onStreamChange"
               />
             </div>
@@ -108,7 +108,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :options="agentSelectOptions"
                 labelKey="label"
                 valueKey="value"
-                class="w-full rounded-sm"
+                class="w-full rounded-default"
                 @update:model-value="onAgentChange"
               />
             </div>

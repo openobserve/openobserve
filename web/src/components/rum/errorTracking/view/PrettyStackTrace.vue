@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       v-if="isLoadingTranslation"
       data-test="rum-pretty-stack-trace-loading"
-      class="loading-container p-6 text-center min-h-50 flex flex-col items-center justify-center rounded-md"
+      class="loading-container p-6 text-center min-h-50 flex flex-col items-center justify-center rounded-default"
       :style="{ 'background-color': backgroundColor, 'border': `1px solid ${borderColor}` }"
     >
       <OSpinner variant="dots" size="lg" />
@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       v-else-if="allSourceInfoNull"
       data-test="rum-pretty-stack-trace-unavailable"
-      class="no-source-maps-container p-3 text-center flex flex-col items-center justify-center rounded-md py-5 px-6"
+      class="no-source-maps-container p-3 text-center flex flex-col items-center justify-center rounded-default py-5 px-6"
       :style="{ 'background-color': backgroundColor, 'border': `1px solid ${borderColor}` }"
     >
       <OIcon name="code-off" size="lg" class="mb-2" />
@@ -49,14 +49,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div v-if="props.error.service || props.error.version" class="flex items-center justify-center gap-2 mt-2 mb-2">
         <span
           v-if="props.error.service"
-          class="service-version-badge service-badge inline-flex items-center gap-1 py-1 px-2.5 rounded-sm text-xs font-medium bg-badge-purple-soft-bg text-badge-purple-soft-text"
+          class="service-version-badge service-badge inline-flex items-center gap-1 py-1 px-2.5 rounded-default text-xs font-medium bg-badge-purple-soft-bg text-badge-purple-soft-text"
         >
           <span class="badge-label opacity-80">Service:</span>
           <span class="badge-value font-semibold">{{ props.error.service }}</span>
         </span>
         <span
           v-if="props.error.version"
-          class="service-version-badge version-badge inline-flex items-center gap-1 py-1 px-2.5 rounded-sm text-xs font-medium bg-badge-blue-soft-bg text-badge-blue-soft-text"
+          class="service-version-badge version-badge inline-flex items-center gap-1 py-1 px-2.5 rounded-default text-xs font-medium bg-badge-blue-soft-bg text-badge-blue-soft-text"
         >
           <span class="badge-label opacity-80">Version:</span>
           <span class="badge-value font-semibold">{{ props.error.version }}</span>
@@ -83,7 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Error message -->
         <div
           v-if="stackTrace.error"
-          class="error-header px-3 py-2 font-bold border border-solid rounded-t-md text-sm font-semibold [letter-spacing:0.01em] !px-4 !py-2.5 [box-shadow:0_1px_2px_rgba(0,0,0,0.05)] -mb-px"
+          class="error-header px-3 py-2 font-bold border border-solid rounded-t-default text-sm font-semibold [letter-spacing:0.01em] !px-4 !py-2.5 [box-shadow:0_1px_2px_rgba(0,0,0,0.05)] -mb-px"
           :style="{
             'background-color': errorHeaderBackground,
             'color': errorHeaderColor,
@@ -96,7 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- First stack frame - expandable/collapsible -->
         <div
           v-if="stackTrace.stack.length > 0"
-          class="stack-frame-wrapper rounded-b-md [box-shadow:0_1px_3px_rgba(0,0,0,0.08)] overflow-hidden mt-0"
+          class="stack-frame-wrapper rounded-b-default [box-shadow:0_1px_3px_rgba(0,0,0,0.08)] overflow-hidden mt-0"
           :style="{
             'border-top': `1px solid ${borderColor}`,
             'border-bottom': `1px solid ${borderColor}`,
@@ -143,7 +143,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <!-- Source code snippet with syntax highlighting -->
-            <div class="source-code-box border border-solid rounded-md h-50 overflow-hidden [box-shadow:0_2px_6px_rgba(0,0,0,0.1)]" :style="{ 'border-color': borderColor }">
+            <div class="source-code-box border border-solid rounded-default h-50 overflow-hidden [box-shadow:0_2px_6px_rgba(0,0,0,0.1)]" :style="{ 'border-color': borderColor }">
               <CodeQueryEditor
                 :ref="(el: any) => setEditorRef(traceIndex, 0, el)"
                 :editor-id="`source-frame-${traceIndex}-0`"
@@ -159,7 +159,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Remaining frames - collapsed by default -->
         <div
           v-if="stackTrace.stack.length > 1"
-          class="remaining-frames rounded-b-md [box-shadow:0_1px_3px_rgba(0,0,0,0.08)]"
+          class="remaining-frames rounded-b-default [box-shadow:0_1px_3px_rgba(0,0,0,0.08)]"
           :style="{
             'border-bottom': `1px solid ${borderColor}`,
             'border-left': `1px solid ${borderColor}`,
@@ -228,7 +228,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </span>
                 </div>
 
-                <div class="source-code-box ml-4 border border-solid rounded-md h-50 overflow-hidden [box-shadow:0_2px_6px_rgba(0,0,0,0.1)]" :style="{ 'border-color': borderColor }">
+                <div class="source-code-box ml-4 border border-solid rounded-default h-50 overflow-hidden [box-shadow:0_2px_6px_rgba(0,0,0,0.1)]" :style="{ 'border-color': borderColor }">
                   <CodeQueryEditor
                     :ref="(el: any) => setEditorRef(traceIndex, frameIndex + 1, el)"
                     :editor-id="`source-frame-${traceIndex}-${frameIndex + 1}`"

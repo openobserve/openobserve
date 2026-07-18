@@ -119,7 +119,7 @@
           <div class="m-0 text-sm font-semibold text-text-heading">{{ t("onlineEvals.provider.authSection") }}</div>
         </div>
 
-        <div v-if="mode === 'edit'" class="provider-callout flex gap-2 items-start px-3 py-2 mb-3 bg-[color-mix(in_srgb,var(--color-status-info-text)_12%,transparent)] border border-[color-mix(in_srgb,var(--color-status-info-text)_30%,transparent)] rounded-md text-2xs text-text-secondary leading-[1.4]">
+        <div v-if="mode === 'edit'" class="provider-callout flex gap-2 items-start px-3 py-2 mb-3 bg-[color-mix(in_srgb,var(--color-status-info-text)_12%,transparent)] border border-[color-mix(in_srgb,var(--color-status-info-text)_30%,transparent)] rounded-default text-2xs text-text-secondary leading-[1.4]">
           <OIcon name="lock" size="xs" class="shrink-0 mt-px text-status-info-text" />
           <span>{{ t("onlineEvals.provider.authEditNote") }}</span>
         </div>

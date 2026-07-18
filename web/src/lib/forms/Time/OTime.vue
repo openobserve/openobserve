@@ -223,7 +223,7 @@ const heightClasses: Record<NonNullable<TimeProps["size"]>, string> = {
 };
 
 const fieldClasses = computed(() => [
-  "flex items-center w-full rounded-md border transition-[color,background-color,border-color,box-shadow] duration-150",
+  "flex items-center w-full rounded-default border transition-[color,background-color,border-color,box-shadow] duration-150",
   "ring-offset-1 ring-offset-surface-base",
   "bg-datepicker-bg",
   hasError.value
@@ -314,7 +314,7 @@ const fieldClasses = computed(() => [
         :side-offset="4"
         align="start"
         :class="[
-          'z-60 rounded-lg border shadow-md overflow-hidden bg-datepicker-popup-bg border-datepicker-popup-border outline-none',
+          'z-60 rounded-default border shadow-md overflow-hidden bg-datepicker-popup-bg border-datepicker-popup-border outline-none',
           withSeconds ? 'w-64' : 'w-56',
         ]"
         data-test="otime-popup"
@@ -326,7 +326,7 @@ const fieldClasses = computed(() => [
             <button
               type="button"
               :class="[
-                'text-2xl font-semibold tabular-nums rounded-sm px-1 pb-0.5 outline-none ring-offset-1 ring-offset-surface-base transition-[color,background-color,border-color,box-shadow] duration-150 border-b-2 focus-visible:ring-2 focus-visible:ring-datepicker-focus-ring',
+                'text-2xl font-semibold tabular-nums rounded-default px-1 pb-0.5 outline-none ring-offset-1 ring-offset-surface-base transition-[color,background-color,border-color,box-shadow] duration-150 border-b-2 focus-visible:ring-2 focus-visible:ring-datepicker-focus-ring',
                 clockMode === 'hour'
                   ? 'text-datepicker-day-selected-bg border-datepicker-day-selected-bg'
                   : 'text-datepicker-heading-text border-transparent hover:text-datepicker-day-selected-bg',
@@ -338,7 +338,7 @@ const fieldClasses = computed(() => [
             <button
               type="button"
               :class="[
-                'text-2xl font-semibold tabular-nums rounded-sm px-1 pb-0.5 outline-none ring-offset-1 ring-offset-surface-base transition-[color,background-color,border-color,box-shadow] duration-150 border-b-2 focus-visible:ring-2 focus-visible:ring-datepicker-focus-ring',
+                'text-2xl font-semibold tabular-nums rounded-default px-1 pb-0.5 outline-none ring-offset-1 ring-offset-surface-base transition-[color,background-color,border-color,box-shadow] duration-150 border-b-2 focus-visible:ring-2 focus-visible:ring-datepicker-focus-ring',
                 clockMode === 'minute'
                   ? 'text-datepicker-day-selected-bg border-datepicker-day-selected-bg'
                   : 'text-datepicker-heading-text border-transparent hover:text-datepicker-day-selected-bg',
@@ -351,7 +351,7 @@ const fieldClasses = computed(() => [
               <button
                 type="button"
                 :class="[
-                  'text-2xl font-semibold tabular-nums rounded-sm px-1 pb-0.5 outline-none ring-offset-1 ring-offset-surface-base transition-[color,background-color,border-color,box-shadow] duration-150 border-b-2 focus-visible:ring-2 focus-visible:ring-datepicker-focus-ring',
+                  'text-2xl font-semibold tabular-nums rounded-default px-1 pb-0.5 outline-none ring-offset-1 ring-offset-surface-base transition-[color,background-color,border-color,box-shadow] duration-150 border-b-2 focus-visible:ring-2 focus-visible:ring-datepicker-focus-ring',
                   clockMode === 'second'
                     ? 'text-datepicker-day-selected-bg border-datepicker-day-selected-bg'
                     : 'text-datepicker-heading-text border-transparent hover:text-datepicker-day-selected-bg',
@@ -364,7 +364,7 @@ const fieldClasses = computed(() => [
 
           <!-- AM / PM horizontal pill -->
           <div
-            class="flex rounded-md border border-datepicker-border overflow-hidden ms-3 shrink-0"
+            class="flex rounded-default border border-datepicker-border overflow-hidden ms-3 shrink-0"
           >
             <button
               type="button"

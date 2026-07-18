@@ -33,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       v-if="analysisInFlight || rcaLoading"
       data-test="rca-inflight-container"
-      class="flex items-center gap-3 rounded-lg px-4 py-3 mb-2 flex-shrink-0 bg-status-info-bg border border-banner-info-border"
+      class="flex items-center gap-3 rounded-default px-4 py-3 mb-2 flex-shrink-0 bg-status-info-bg border border-banner-info-border"
     >
       <OSpinner variant="dots" size="xs" />
       <div>
@@ -54,7 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       v-if="rcaLoading && rcaStreamContent"
       data-test="rca-stream-container"
-      class="rca-container rounded-sm p-3 flex-1 overflow-auto border bg-surface-base border-border-default"
+      class="rca-container rounded-default p-3 flex-1 overflow-auto border bg-surface-base border-border-default"
     >
       <div
         data-test="rca-stream-content"
@@ -64,7 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Existing analysis content -->
-    <div v-else-if="hasExistingRca && !rcaLoading" data-test="rca-existing-container" class="rca-container rounded-sm p-3 flex-1 overflow-auto border bg-surface-base border-border-default">
+    <div v-else-if="hasExistingRca && !rcaLoading" data-test="rca-existing-container" class="rca-container rounded-default p-3 flex-1 overflow-auto border bg-surface-base border-border-default">
       <div
         data-test="rca-existing-content"
         class="text-sm whitespace-pre-wrap rca-content"

@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="semantic-group-item p-3 mb-2 rounded-lg transition-all duration-200 w-full max-w-full bg-card-glass-bg border border-card-glass-border">
+  <div class="semantic-group-item p-3 mb-2 rounded-default transition-all duration-200 w-full max-w-full bg-card-glass-bg border border-card-glass-border">
     <OForm :form="form">
       <div class="grid grid-cols-[200px_1fr_auto] gap-4 items-start w-full overflow-hidden">
         <!-- Left Column: Display Name only (ID is internal/read-only) -->

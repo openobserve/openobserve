@@ -79,7 +79,7 @@
             </h4>
             <div
               v-if="healthyLabel"
-              class="flex items-baseline gap-2 p-[12px_14px] border border-[color-mix(in_srgb,var(--color-status-success-text)_35%,transparent)] bg-[color-mix(in_srgb,var(--color-status-success-text)_8%,transparent)] rounded-md"
+              class="flex items-baseline gap-2 p-[12px_14px] border border-[color-mix(in_srgb,var(--color-status-success-text)_35%,transparent)] bg-[color-mix(in_srgb,var(--color-status-success-text)_8%,transparent)] rounded-default"
             >
               <span class="text-lg font-bold text-status-success-text">{{ thresholdSign }}</span>
               <span class="font-[ui-monospace,SFMono-Regular,Menlo,monospace] font-bold text-sm text-text-body">{{ healthyLabel }}</span>
@@ -116,7 +116,7 @@
           <p class="m-0 text-xs leading-normal text-text-secondary">{{ t("onlineEvals.scoreConfig.detail.versionsIntro") }}</p>
           <ul class="list-none m-0 p-0 flex flex-col gap-2">
             <li
-              class="p-[12px_14px] bg-card-bg border border-[color-mix(in_srgb,var(--color-primary-600,#3F7994)_30%,transparent)] bg-[color-mix(in_srgb,var(--color-primary-600,#3F7994)_5%,var(--color-card-bg))]! rounded-md"
+              class="p-[12px_14px] bg-card-bg border border-[color-mix(in_srgb,var(--color-primary-600,#3F7994)_30%,transparent)] bg-[color-mix(in_srgb,var(--color-primary-600,#3F7994)_5%,var(--color-card-bg))]! rounded-default"
             >
               <div class="flex items-center gap-2">
                 <span class="font-[ui-monospace,SFMono-Regular,Menlo,monospace] [font-variant-numeric:tabular-nums] font-bold text-compact text-text-body">v{{ row.version }}</span>
@@ -135,7 +135,7 @@
           <p class="m-0 text-xs leading-normal text-text-secondary">{{ t("onlineEvals.scoreConfig.detail.usedByIntro") }}</p>
           <div
             v-if="usedByScorers.length === 0"
-            class="inline-flex items-center gap-1.5 p-[8px_10px] bg-[color-mix(in_srgb,var(--color-text-secondary)_6%,transparent)] rounded-md text-xs text-text-secondary"
+            class="inline-flex items-center gap-1.5 p-[8px_10px] bg-[color-mix(in_srgb,var(--color-text-secondary)_6%,transparent)] rounded-default text-xs text-text-secondary"
           >
             <OIcon name="info" size="xs" />
             <span>{{ t("onlineEvals.scoreConfig.detail.usedByEmpty") }}</span>
@@ -144,7 +144,7 @@
             <li v-for="scorer in usedByScorers" :key="scorer.id">
               <OButton
                 variant="ghost"
-                class="scd-used-card w-full bg-card-bg! border! border-[color-mix(in_srgb,var(--color-text-secondary)_16%,transparent)]! rounded-md! transition-[border-color,background] duration-150"
+                class="scd-used-card w-full bg-card-bg! border! border-[color-mix(in_srgb,var(--color-text-secondary)_16%,transparent)]! rounded-default! transition-[border-color,background] duration-150"
                 :data-test="`score-config-detail-used-by-item-${scorer.name}`"
                 @click="emit('view-scorer', scorer)"
               >

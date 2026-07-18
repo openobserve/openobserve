@@ -59,34 +59,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template v-if="runsLoading || !runsHasLoadedOnce">
               <div class="px-2">
                 <div
-                  class="card-container rounded-lg flex flex-col bg-surface-base border border-border-default overflow-hidden"
+                  class="card-container rounded-default flex flex-col bg-surface-base border border-border-default overflow-hidden"
                 >
                   <div
                     class="flex items-center gap-2 px-[0.875rem] pt-[0.625rem] pb-[0.5rem]"
                   >
-                    <SkeletonBox width="100px" height="14px" rounded-sm />
+                    <SkeletonBox width="100px" height="14px" rounded-default />
                     <span class="flex-1" />
-                    <SkeletonBox width="45px" height="12px" rounded-sm />
-                    <SkeletonBox width="50px" height="12px" rounded-sm />
-                    <SkeletonBox width="45px" height="12px" rounded-sm />
+                    <SkeletonBox width="45px" height="12px" rounded-default />
+                    <SkeletonBox width="50px" height="12px" rounded-default />
+                    <SkeletonBox width="45px" height="12px" rounded-default />
                   </div>
                   <div class="border-t border-border-default" />
                   <div class="flex flex-col gap-1 py-2 px-[0.875rem]">
                     <div class="flex items-center gap-1">
                       <div class="w-5 h-5 shrink-0" />
-                      <div class="flex-1 h-6.5 rounded-sm flex gap-0.5 items-stretch">
+                      <div class="flex-1 h-6.5 rounded-default flex gap-0.5 items-stretch">
                         <div
                           v-for="n in 26"
                           :key="n"
-                          class="flex-1 h-full rounded-sm bg-border-default opacity-40"
+                          class="flex-1 h-full rounded-default bg-border-default opacity-40"
                         />
                       </div>
                       <div class="w-5 h-5 shrink-0" />
                     </div>
                     <div class="flex justify-between">
-                      <SkeletonBox width="60px" height="10px" rounded-sm />
-                      <SkeletonBox width="80px" height="10px" rounded-sm />
-                      <SkeletonBox width="60px" height="10px" rounded-sm />
+                      <SkeletonBox width="60px" height="10px" rounded-default />
+                      <SkeletonBox width="80px" height="10px" rounded-default />
+                      <SkeletonBox width="60px" height="10px" rounded-default />
                     </div>
                   </div>
                 </div>
@@ -96,7 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template v-else-if="runsError">
               <div class="px-2">
                 <div
-                  class="card-container rounded-lg flex flex-col bg-surface-base border border-border-default overflow-hidden"
+                  class="card-container rounded-default flex flex-col bg-surface-base border border-border-default overflow-hidden"
                 >
                   <div
                     class="flex items-center gap-2 px-[0.875rem] pt-[0.625rem] pb-[0.5rem]"
@@ -133,10 +133,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div
                     v-for="n in 5"
                     :key="n"
-                    class="card-container rounded-lg flex flex-col px-[0.875rem] pt-[0.625rem] pb-[0.625rem] gap-2 bg-surface-base border border-border-default"
+                    class="card-container rounded-default flex flex-col px-[0.875rem] pt-[0.625rem] pb-[0.625rem] gap-2 bg-surface-base border border-border-default"
                   >
-                    <SkeletonBox width="60%" height="11px" rounded-sm />
-                    <SkeletonBox width="55%" height="22px" rounded-sm />
+                    <SkeletonBox width="60%" height="11px" rounded-default />
+                    <SkeletonBox width="55%" height="22px" rounded-default />
                   </div>
                 </div>
               </div>
@@ -147,7 +147,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div
                   v-for="card in kpiCards"
                   :key="card.key"
-                  class="card-container rounded-lg flex flex-col px-2 pt-[0.625rem] pb-[0.625rem] gap-[0.25rem] bg-surface-base border border-border-default transition-shadow duration-200 hover:shadow-[0_1px_6px_rgba(0,0,0,0.08)]"
+                  class="card-container rounded-default flex flex-col px-2 pt-[0.625rem] pb-[0.625rem] gap-[0.25rem] bg-surface-base border border-border-default transition-shadow duration-200 hover:shadow-[0_1px_6px_rgba(0,0,0,0.08)]"
                   :data-test="`monitor-runs-kpi-${card.key}`"
                 >
                   <div class="flex flex-col gap-[0.25rem]">
@@ -185,33 +185,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="px-2">
               <div class="grid grid-cols-2 gap-2">
                 <div
-                  class="card-container rounded-lg flex flex-col bg-surface-base border border-border-default overflow-hidden"
+                  class="card-container rounded-default flex flex-col bg-surface-base border border-border-default overflow-hidden"
                 >
                   <div
                     class="flex items-center gap-2 px-2 pt-[0.625rem] pb-[0.5rem]"
                   >
-                    <SkeletonBox width="110px" height="14px" rounded-sm />
+                    <SkeletonBox width="110px" height="14px" rounded-default />
                     <span class="flex-1" />
-                    <SkeletonBox width="80px" height="20px" rounded-sm />
+                    <SkeletonBox width="80px" height="20px" rounded-default />
                   </div>
                   <div class="border-t border-border-default" />
                   <div class="p-4">
-                    <SkeletonBox width="100%" height="160px" rounded-sm />
+                    <SkeletonBox width="100%" height="160px" rounded-default />
                   </div>
                 </div>
                 <div
-                  class="card-container rounded-lg flex flex-col bg-surface-base border border-border-default overflow-hidden"
+                  class="card-container rounded-default flex flex-col bg-surface-base border border-border-default overflow-hidden"
                 >
                   <div
                     class="flex items-center gap-2 px-2 pt-[0.625rem] pb-[0.5rem]"
                   >
-                    <SkeletonBox width="120px" height="14px" rounded-sm />
+                    <SkeletonBox width="120px" height="14px" rounded-default />
                     <span class="flex-1" />
-                    <SkeletonBox width="90px" height="20px" rounded-sm />
+                    <SkeletonBox width="90px" height="20px" rounded-default />
                   </div>
                   <div class="border-t border-border-default" />
                   <div class="p-4">
-                    <SkeletonBox width="100%" height="160px" rounded-sm />
+                    <SkeletonBox width="100%" height="160px" rounded-default />
                   </div>
                 </div>
               </div>
@@ -221,7 +221,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="px-2">
               <div class="grid grid-cols-2 gap-2">
                 <div
-                  class="card-container rounded-lg flex flex-col bg-surface-base border border-border-default overflow-hidden"
+                  class="card-container rounded-default flex flex-col bg-surface-base border border-border-default overflow-hidden"
                 >
                   <div
                     class="flex items-center gap-2 px-2 pt-[0.625rem] pb-[0.5rem]"
@@ -255,7 +255,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </div>
                 <div
-                  class="card-container rounded-lg flex flex-col bg-surface-base border border-border-default overflow-hidden"
+                  class="card-container rounded-default flex flex-col bg-surface-base border border-border-default overflow-hidden"
                 >
                   <div
                     class="flex items-center gap-2 px-2 pt-[0.625rem] pb-[0.5rem]"
@@ -299,7 +299,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div
                   v-for="n in 3"
                   :key="n"
-                  class="card-container rounded-lg flex flex-col bg-surface-base border border-border-default overflow-hidden"
+                  class="card-container rounded-default flex flex-col bg-surface-base border border-border-default overflow-hidden"
                 >
                   <div
                     class="flex items-center gap-2 px-2 pt-[0.625rem] pb-[0.5rem]"
@@ -309,7 +309,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       height="16px"
                       :custom-radius="'4px'"
                     />
-                    <SkeletonBox width="110px" height="14px" rounded-sm />
+                    <SkeletonBox width="110px" height="14px" rounded-default />
                   </div>
                   <div class="border-t border-border-default" />
                   <div class="px-2 py-[0.5rem] flex flex-col">
@@ -323,11 +323,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         height="16px"
                         :custom-radius="'4px'"
                       />
-                      <SkeletonBox width="70px" height="12px" rounded-sm />
+                      <SkeletonBox width="70px" height="12px" rounded-default />
                       <div
                         class="flex-1 h-1.5 rounded-full bg-border-default opacity-30"
                       />
-                      <SkeletonBox width="36px" height="12px" rounded-sm />
+                      <SkeletonBox width="36px" height="12px" rounded-default />
                     </div>
                   </div>
                 </div>
@@ -341,7 +341,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div
                   v-for="dim in ['Browser','Location','Device']"
                   :key="dim"
-                  class="card-container rounded-lg flex flex-col bg-surface-base border border-border-default overflow-hidden"
+                  class="card-container rounded-default flex flex-col bg-surface-base border border-border-default overflow-hidden"
                 >
                   <div
                     class="flex items-center gap-2 px-2 pt-[0.625rem] pb-[0.5rem]"
@@ -365,7 +365,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="px-2">
               <div class="grid grid-cols-3 gap-2">
                 <div
-                  class="card-container rounded-lg flex flex-col bg-surface-base border border-border-default overflow-hidden"
+                  class="card-container rounded-default flex flex-col bg-surface-base border border-border-default overflow-hidden"
                 >
                   <div
                     class="flex items-center gap-2 px-2 pt-[0.625rem] pb-[0.5rem]"
@@ -411,7 +411,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </div>
                 <div
-                  class="card-container rounded-lg flex flex-col bg-surface-base border border-border-default overflow-hidden"
+                  class="card-container rounded-default flex flex-col bg-surface-base border border-border-default overflow-hidden"
                 >
                   <div
                     class="flex items-center gap-2 px-2 pt-[0.625rem] pb-[0.5rem]"
@@ -460,7 +460,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </div>
                 <div
-                  class="card-container rounded-lg flex flex-col bg-surface-base border border-border-default overflow-hidden"
+                  class="card-container rounded-default flex flex-col bg-surface-base border border-border-default overflow-hidden"
                 >
                   <div
                     class="flex items-center gap-2 px-2 pt-[0.625rem] pb-[0.5rem]"
@@ -776,22 +776,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Loading skeleton -->
             <template v-if="stepsLoading || !stepsHasLoadedOnce">
               <div class="grid grid-cols-2 gap-2">
-                <div class="card-container rounded-lg flex flex-col bg-surface-base border border-border-default overflow-hidden">
+                <div class="card-container rounded-default flex flex-col bg-surface-base border border-border-default overflow-hidden">
                   <div class="flex items-center gap-2 px-2 pt-[0.625rem] pb-[0.5rem]">
-                    <SkeletonBox width="100px" height="14px" rounded-sm />
+                    <SkeletonBox width="100px" height="14px" rounded-default />
                   </div>
                   <div class="border-t border-border-default" />
-                  <div class="p-4"><SkeletonBox width="100%" height="160px" rounded-sm /></div>
+                  <div class="p-4"><SkeletonBox width="100%" height="160px" rounded-default /></div>
                 </div>
-                <div class="card-container rounded-lg flex flex-col bg-surface-base border border-border-default overflow-hidden">
+                <div class="card-container rounded-default flex flex-col bg-surface-base border border-border-default overflow-hidden">
                   <div class="flex items-center gap-2 px-2 pt-[0.625rem] pb-[0.5rem]">
-                    <SkeletonBox width="100px" height="14px" rounded-sm />
+                    <SkeletonBox width="100px" height="14px" rounded-default />
                   </div>
                   <div class="border-t border-border-default" />
-                  <div class="p-4"><SkeletonBox width="100%" height="160px" rounded-sm /></div>
+                  <div class="p-4"><SkeletonBox width="100%" height="160px" rounded-default /></div>
                 </div>
               </div>
-              <div v-for="n in 5" :key="n" class="card-container rounded-lg overflow-hidden">
+              <div v-for="n in 5" :key="n" class="card-container rounded-default overflow-hidden">
                 <div class="h-10 bg-[var(--color-border-default)] opacity-20" />
               </div>
             </template>

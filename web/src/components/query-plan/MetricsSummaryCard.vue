@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OCardSection role="body">
       <div class="text-sm font-medium font-bold mb-3">{{ t("search.executionSummary") }}</div>
       <div class="grid [grid-template-columns:repeat(auto-fit,minmax(11.25rem,1fr))] gap-4">
-        <div data-test="metrics-summary-card-item" class="flex items-center gap-3 p-[0.875rem_1rem] rounded-lg bg-card-glass-bg border border-solid border-card-glass-border transition-[border-color,box-shadow] duration-200 hover:border-accent hover:shadow-[0_0.0625rem_0.1875rem_rgba(0,0,0,0.05)]">
+        <div data-test="metrics-summary-card-item" class="flex items-center gap-3 p-[0.875rem_1rem] rounded-default bg-card-glass-bg border border-solid border-card-glass-border transition-[border-color,box-shadow] duration-200 hover:border-accent hover:shadow-[0_0.0625rem_0.1875rem_rgba(0,0,0,0.05)]">
           <div data-test="metrics-summary-card-icon" class="shrink-0 text-text-secondary">
             <OIcon name="schedule" size="md" />
           </div>
@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
 
-        <div data-test="metrics-summary-card-item" class="flex items-center gap-3 p-[0.875rem_1rem] rounded-lg bg-card-glass-bg border border-solid border-card-glass-border transition-[border-color,box-shadow] duration-200 hover:border-accent hover:shadow-[0_0.0625rem_0.1875rem_rgba(0,0,0,0.05)]">
+        <div data-test="metrics-summary-card-item" class="flex items-center gap-3 p-[0.875rem_1rem] rounded-default bg-card-glass-bg border border-solid border-card-glass-border transition-[border-color,box-shadow] duration-200 hover:border-accent hover:shadow-[0_0.0625rem_0.1875rem_rgba(0,0,0,0.05)]">
           <div data-test="metrics-summary-card-icon" class="shrink-0 text-text-secondary">
             <OIcon name="format-list-numbered" size="md" />
           </div>
@@ -42,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
 
-        <div data-test="metrics-summary-card-item" class="flex items-center gap-3 p-[0.875rem_1rem] rounded-lg bg-card-glass-bg border border-solid border-card-glass-border transition-[border-color,box-shadow] duration-200 hover:border-accent hover:shadow-[0_0.0625rem_0.1875rem_rgba(0,0,0,0.05)]">
+        <div data-test="metrics-summary-card-item" class="flex items-center gap-3 p-[0.875rem_1rem] rounded-default bg-card-glass-bg border border-solid border-card-glass-border transition-[border-color,box-shadow] duration-200 hover:border-accent hover:shadow-[0_0.0625rem_0.1875rem_rgba(0,0,0,0.05)]">
           <div data-test="metrics-summary-card-icon" class="shrink-0 text-text-secondary">
             <OIcon name="memory" size="md" />
           </div>

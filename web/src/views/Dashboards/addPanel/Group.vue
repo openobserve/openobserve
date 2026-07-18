@@ -2,7 +2,7 @@
   <div
     data-test="dashboard-group"
     :style="`--group-index: ${groupNestedIndex};`"
-    class="flex p-0 rounded-md bg-[color-mix(in_srgb,var(--color-brand-indigo)_calc(12%*var(--group-index)),transparent)]"
+    class="flex p-0 rounded-default bg-[color-mix(in_srgb,var(--color-brand-indigo)_calc(12%*var(--group-index)),transparent)]"
     :class="groupNestedIndex > 0 ? 'pl-1.25' : 'pl-0'"
   >
     <div class="flex flex-row flex-wrap items-center" data-test="dashboard-group-conditions">

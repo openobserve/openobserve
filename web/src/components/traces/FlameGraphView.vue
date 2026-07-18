@@ -69,7 +69,7 @@
             :style="{ left: cursorX + 'px' }"
           >
             <div
-              class="text-3xs text-white px-1.5 py-0.5 rounded-sm whitespace-nowrap font-medium"
+              class="text-3xs text-white px-1.5 py-0.5 rounded-default whitespace-nowrap font-medium"
               style="background: rgba(30, 30, 30, 0.9); line-height: 1.4"
             >
               {{ cursorTimeLabel }}

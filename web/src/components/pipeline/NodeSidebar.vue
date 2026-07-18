@@ -34,8 +34,8 @@ export default {
 </script>
 
 <template>
-  <div class="nodes bg-surface-panel backdrop-blur-[12px] rounded-xl border border-border-default shadow-[0_4px_16px_rgba(0,0,0,0.08)] py-3 px-2 m-[4px_2px] transition-all duration-300 ease-in-out hover:shadow-[0_6px_20px_rgba(0,0,0,0.12)] dark:hover:shadow-[0_8px_32px_rgba(0,0,0,0.5)]">
-    <div v-for="node in node_types" :key="node.io_type" class="o2vf_node transition-all rounded-lg mb-3 last:mb-0">
+  <div class="nodes bg-surface-panel backdrop-blur-[12px] rounded-default border border-border-default shadow-[0_4px_16px_rgba(0,0,0,0.08)] py-3 px-2 m-[4px_2px] transition-all duration-300 ease-in-out hover:shadow-[0_6px_20px_rgba(0,0,0,0.12)] dark:hover:shadow-[0_8px_32px_rgba(0,0,0,0.5)]">
+    <div v-for="node in node_types" :key="node.io_type" class="o2vf_node transition-all rounded-default mb-3 last:mb-0">
       <OButton
         variant="ghost"
         size="md"

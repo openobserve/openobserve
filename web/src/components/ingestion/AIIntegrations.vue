@@ -82,14 +82,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           v-if="(integration.logo || integration.logoDark) && !failedLogos.has(integration.slug)"
                           :src="(isDark && integration.logoDark) || integration.logo"
                           :alt="`${integration.name} logo`"
-                          class="w-4.5 h-4.5 rounded-sm flex-none object-contain"
+                          class="w-4.5 h-4.5 rounded-default flex-none object-contain"
                           loading="lazy"
                           referrerpolicy="no-referrer"
                           @error="onLogoError(integration.slug)"
                         />
                         <span
                           v-else
-                          class="w-4.5 h-4.5 rounded-sm flex-none grid place-items-center bg-theme-accent text-text-inverse text-3xs font-bold leading-none"
+                          class="w-4.5 h-4.5 rounded-default flex-none grid place-items-center bg-theme-accent text-text-inverse text-3xs font-bold leading-none"
                           aria-hidden="true"
                         >{{
                           integration.name.charAt(0)

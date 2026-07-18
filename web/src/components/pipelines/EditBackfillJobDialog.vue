@@ -100,7 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
                 <div
                   v-if="deleteBeforeBackfill"
-                  class="mt-2 p-3 rounded-md border bg-banner-warning-bg border-banner-warning-border"
+                  class="mt-2 p-3 rounded-default border bg-banner-warning-bg border-banner-warning-border"
                 >
                   <div class="flex items-start">
                     <OIcon name="warning" size="sm" class="mr-2 mt-0.5" />

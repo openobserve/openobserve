@@ -102,7 +102,7 @@
         size="icon-toolbar"
         :disabled="props.disableAi"
         @click="nlpMode = true"
-        class="group absolute! top-0.75 z-100 bg-[image:var(--color-gradient-ai-subtle)]! text-text-inverse! [transition:background_0.3s_ease,box-shadow_0.3s_ease]! w-7.5! h-7.5! min-w-7.5! min-h-7.5! rounded-md hover:bg-[image:var(--color-gradient-ai)]! hover:shadow-[0_0.25rem_0.75rem_0_rgba(139,92,246,0.35)]!"
+        class="group absolute! top-0.75 z-100 bg-[image:var(--color-gradient-ai-subtle)]! text-text-inverse! [transition:background_0.3s_ease,box-shadow_0.3s_ease]! w-7.5! h-7.5! min-w-7.5! min-h-7.5! rounded-default hover:bg-[image:var(--color-gradient-ai)]! hover:shadow-[0_0.25rem_0.75rem_0_rgba(139,92,246,0.35)]!"
         :style="props.hasExpandButton ? { right: '2.375rem' } : { right: '0.25rem' }"
       >
         <img :src="nlpIcon" alt="AI Mode" class="w-4.5 h-4.5 transition-transform duration-[600ms] ease-[ease] group-hover:rotate-180 group-hover:brightness-0 group-hover:invert" />

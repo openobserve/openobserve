@@ -451,7 +451,7 @@ size="sm">
                 activeTab !== 'map' &&
                 activeTab !== 'thread'
               "
-              class="unified-search-group mr-1! gap-1 flex items-stretch w-fit rounded-md transition-colors duration-200"
+              class="unified-search-group mr-1! gap-1 flex items-stretch w-fit rounded-default transition-colors duration-200"
             >
               <div class="log-stream-search-input">
                 <OSearchInput
@@ -465,7 +465,7 @@ size="sm">
                 />
               </div>
               <!-- Search Results Navigation -->
-              <div class="inline-flex items-center bg-transparent px-[0.125rem] [transition:all_0.2s_ease] rounded-md border border-input-border dark:hover:border-theme-accent h-8.2! py-0!">
+              <div class="inline-flex items-center bg-transparent px-[0.125rem] [transition:all_0.2s_ease] rounded-default border border-input-border dark:hover:border-theme-accent h-8.2! py-0!">
                 <div
                   class="flex items-center text-xs font-medium px-1 gap-[0.0625rem] select-none"
                   data-test="trace-details-search-results"
@@ -711,7 +711,7 @@ size="sm">
                 class="dag-resizer group w-2 cursor-col-resize flex items-center justify-center shrink-0 relative z-10"
                 @mousedown="startDagResize"
               >
-                <div class="dag-resizer-line w-0.75 h-full bg-border-default group-hover:bg-accent rounded-sm transition-colors duration-200"></div>
+                <div class="dag-resizer-line w-0.75 h-full bg-border-default group-hover:bg-accent rounded-default transition-colors duration-200"></div>
               </div>
               <div
                 v-if="isSidebarOpen && (selectedSpanId || showTraceDetails)"
@@ -921,7 +921,7 @@ size="sm">
       @click:secondary="showFilterPopover = false"
       @click:primary="applyAndViewTraces"
     >
-      <div class="flex-1 border border-border-default rounded-sm">
+      <div class="flex-1 border border-border-default rounded-default">
         <CodeQueryEditor
           v-model:query="localEditorValue"
           language="sql"

@@ -43,29 +43,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                      a query that does not run. -->
                 <li>
                   {{ t("metrics.syntaxGuide.instantVector") }}
-                  <span class="bg-highlight-bg px-1.25 rounded-sm"
+                  <span class="bg-highlight-bg px-1.25 rounded-default"
                     >metric_name{label1="value1", label2="value2"}</span
                   >
                 </li>
                 <li>
                   {{ t("metrics.syntaxGuide.rangeVector") }}
-                  <span class="bg-highlight-bg px-1.25 rounded-sm"
+                  <span class="bg-highlight-bg px-1.25 rounded-default"
                     >metric_name[5m]</span
                   >
                 </li>
                 <li>
                   {{ t("metrics.syntaxGuide.aggregate") }}
-                  <span class="bg-highlight-bg px-1.25 rounded-sm"
+                  <span class="bg-highlight-bg px-1.25 rounded-default"
                     >sum by (label)(metric_name)</span
                   >
                   {{ t("metrics.syntaxGuide.or") }}
-                  <span class="bg-highlight-bg px-1.25 rounded-sm"
+                  <span class="bg-highlight-bg px-1.25 rounded-default"
                     >avg by (label)(metric_name)</span
                   >
                 </li>
                 <li>
                   {{ t("metrics.syntaxGuide.rate") }}
-                  <span class="bg-highlight-bg px-1.25 rounded-sm"
+                  <span class="bg-highlight-bg px-1.25 rounded-default"
                     >rate(metric_name[5m])</span
                   >
                 </li>
@@ -88,26 +88,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <!-- As above: prose translated, SQL samples left literal. -->
                 <li>
                   {{ t("metrics.syntaxGuide.sqlFullText") }}
-                  <span class="bg-highlight-bg px-1.25 rounded-sm"
+                  <span class="bg-highlight-bg px-1.25 rounded-default"
                     >SELECT * FROM <b>stream</b> WHERE match_all('error')</span
                   >
                 </li>
                 <li>
                   {{ t("metrics.syntaxGuide.sqlColumn") }}
-                  <span class="bg-highlight-bg px-1.25 rounded-sm"
+                  <span class="bg-highlight-bg px-1.25 rounded-default"
                     >SELECT * FROM <b>stream</b> WHERE
                     str_match(<b>fieldname</b>, 'error')</span
                   >
                 </li>
                 <li>
                   {{ t("metrics.syntaxGuide.sqlCode") }}
-                  <span class="bg-highlight-bg px-1.25 rounded-sm"
+                  <span class="bg-highlight-bg px-1.25 rounded-default"
                     >SELECT * FROM <b>stream</b> WHERE code=200</span
                   >
                 </li>
                 <li>
                   {{ t("metrics.syntaxGuide.sqlStream") }}
-                  <span class="bg-highlight-bg px-1.25 rounded-sm"
+                  <span class="bg-highlight-bg px-1.25 rounded-default"
                     >SELECT * FROM <b>stream</b> WHERE stream='stderr'</span
                   >
                 </li>
@@ -117,7 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   {{
                     t("metrics.syntaxGuide.sqlFunction", { fn: "extract_ip" })
                   }}
-                  <span class="bg-highlight-bg px-1.25 rounded-sm"
+                  <span class="bg-highlight-bg px-1.25 rounded-default"
                     >SELECT extract_ip(log) FROM <b>stream</b> WHERE
                     code=200</span
                   >

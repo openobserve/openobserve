@@ -143,7 +143,7 @@ const titleClasses = computed<string>(() => {
 const triggerClasses = computed<string>(() => {
   const base = [
     'flex items-center gap-3 w-full text-start',
-    'rounded-md px-1.5 py-1.5 outline-none select-none',
+    'rounded-default px-1.5 py-1.5 outline-none select-none',
     'transition-colors duration-150',
   ].join(' ')
   if (canClick.value) {

@@ -14,7 +14,7 @@
         <div class="flex items-center gap-3">
           <div class="flex items-center gap-2.5 shrink-0">
             <div
-              class="flex items-center justify-center w-8 h-8 rounded-lg shrink-0 bg-[color-mix(in_srgb,var(--color-accent)_12%,transparent)]"
+              class="flex items-center justify-center w-8 h-8 rounded-default shrink-0 bg-[color-mix(in_srgb,var(--color-accent)_12%,transparent)]"
             >
               <OIcon
                 name="key"
@@ -94,7 +94,7 @@
             :key="m.title"
             :ref="(el) => registerModuleRef(m.title, el)"
             :data-module="m.title"
-            class="px-1 pb-2 rounded-md bg-transparent transition-colors"
+            class="px-1 pb-2 rounded-default bg-transparent transition-colors"
           >
             <!-- Module header (partition line above the title) -->
             <div
@@ -126,7 +126,7 @@
                 <li
                   v-for="entry in sec.entries"
                   :key="entry.id"
-                  class="flex justify-between items-center py-1.5 px-2 rounded-md transition-colors duration-100 hover:bg-surface-base"
+                  class="flex justify-between items-center py-1.5 px-2 rounded-default transition-colors duration-100 hover:bg-surface-base"
                   :data-test="`shortcut-cheatsheet-row-${entry.id}`"
                 >
                   <span
@@ -147,7 +147,7 @@
                       >
                       <kbd
                         v-else
-                        class="inline-flex items-center justify-center min-w-[1.5rem] h-6 px-1.5 bg-surface-base border border-border-default rounded-sm font-mono text-2xs font-medium text-text-secondary whitespace-nowrap shadow-[0_1px_0_0_var(--color-border-default)]"
+                        class="inline-flex items-center justify-center min-w-[1.5rem] h-6 px-1.5 bg-surface-base border border-border-default rounded-default font-mono text-2xs font-medium text-text-secondary whitespace-nowrap shadow-[0_1px_0_0_var(--color-border-default)]"
                         >{{ part }}</kbd
                       >
                     </template>
@@ -167,7 +167,7 @@
             :key="m.title"
             :ref="(el) => registerModuleRef(m.title, el)"
             :data-module="m.title"
-            class="px-1 pb-2 rounded-md bg-transparent transition-colors"
+            class="px-1 pb-2 rounded-default bg-transparent transition-colors"
           >
             <!-- Module header (partition line above the title) -->
             <div
@@ -199,7 +199,7 @@
                 <li
                   v-for="entry in sec.entries"
                   :key="entry.id"
-                  class="flex justify-between items-center py-1.5 px-2 rounded-md transition-colors duration-100 hover:bg-surface-base"
+                  class="flex justify-between items-center py-1.5 px-2 rounded-default transition-colors duration-100 hover:bg-surface-base"
                   :data-test="`shortcut-cheatsheet-row-${entry.id}`"
                 >
                   <span
@@ -220,7 +220,7 @@
                       >
                       <kbd
                         v-else
-                        class="inline-flex items-center justify-center min-w-[1.5rem] h-6 px-1.5 bg-surface-base border border-border-default rounded-sm font-mono text-2xs font-medium text-text-secondary whitespace-nowrap shadow-[0_1px_0_0_var(--color-border-default)]"
+                        class="inline-flex items-center justify-center min-w-[1.5rem] h-6 px-1.5 bg-surface-base border border-border-default rounded-default font-mono text-2xs font-medium text-text-secondary whitespace-nowrap shadow-[0_1px_0_0_var(--color-border-default)]"
                         >{{ part }}</kbd
                       >
                     </template>
@@ -240,13 +240,13 @@
       >
         <div class="flex items-center gap-1.5 flex-wrap">
           <kbd
-            class="inline-flex items-center justify-center h-5 px-1.5 bg-surface-base border border-border-default rounded-sm font-mono text-2xs shadow-[0_1px_0_0_var(--color-border-default)]"
+            class="inline-flex items-center justify-center h-5 px-1.5 bg-surface-base border border-border-default rounded-default font-mono text-2xs shadow-[0_1px_0_0_var(--color-border-default)]"
             >Esc</kbd
           >
           <span>{{ t("shortcuts.footerClose") }}</span>
           <span class="opacity-40">·</span>
           <kbd
-            class="inline-flex items-center justify-center h-5 px-1.5 bg-surface-base border border-border-default rounded-sm font-mono text-2xs shadow-[0_1px_0_0_var(--color-border-default)]"
+            class="inline-flex items-center justify-center h-5 px-1.5 bg-surface-base border border-border-default rounded-default font-mono text-2xs shadow-[0_1px_0_0_var(--color-border-default)]"
             >?</kbd
           >
           <span>{{ t("shortcuts.footerReopen") }}</span>

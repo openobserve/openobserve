@@ -516,7 +516,7 @@ function getIcon(data, ioType) {
       <OSeparator vertical class="mr-2" />
 
       <!-- Label -->
-      <div class="o2-scroll-container overflow-auto rounded-lg">
+      <div class="o2-scroll-container overflow-auto rounded-default">
         <div
           class="flex text-sm! font-bold! leading-[1.4]! text-left text-wrap w-auto text-ellipsis"
           align="left"
@@ -568,7 +568,7 @@ function getIcon(data, ioType) {
           variant="ghost"
           size="icon"
           @click.stop="deleteNode(id)"
-          class="min-w-5! w-5! h-5! p-0! rounded-sm! bg-[color-mix(in_srgb,var(--color-white)_95%,transparent)]! border! border-(--node-color)! text-(--node-color)! transition-all! duration-200! hover:bg-error-500! hover:border-error-500! hover:text-white! hover:scale-110! hover:shadow-[0_0.125rem_0.5rem_color-mix(in_srgb,var(--color-error-500)_30%,transparent)]!"
+          class="min-w-5! w-5! h-5! p-0! rounded-default! bg-[color-mix(in_srgb,var(--color-white)_95%,transparent)]! border! border-(--node-color)! text-(--node-color)! transition-all! duration-200! hover:bg-error-500! hover:border-error-500! hover:text-white! hover:scale-110! hover:shadow-[0_0.125rem_0.5rem_color-mix(in_srgb,var(--color-error-500)_30%,transparent)]!"
           :data-test="`pipeline-node-${io_type}-delete-btn`"
           @mouseenter="handleDeleteTooltipEnter"
           @mouseleave="handleDeleteTooltipLeave"
@@ -577,7 +577,7 @@ function getIcon(data, ioType) {
         </OButton>
         <div
           v-if="showDeleteTooltip"
-          class="fixed left-3.75 bg-status-negative text-button-destructive-foreground py-1.5 px-2.5 rounded-md text-2xs z-[1000] shadow-[0_0.25rem_0.75rem_color-mix(in_srgb,var(--color-black)_30%,transparent)] pointer-events-none whitespace-nowrap"
+          class="fixed left-3.75 bg-status-negative text-button-destructive-foreground py-1.5 px-2.5 rounded-default text-2xs z-[1000] shadow-[0_0.25rem_0.75rem_color-mix(in_srgb,var(--color-black)_30%,transparent)] pointer-events-none whitespace-nowrap"
         >
           Delete Node
           <div class="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0 border-l-[5px] border-l-transparent border-r-[5px] border-r-transparent border-t-[5px] border-t-status-negative"></div>
@@ -607,7 +607,7 @@ function getIcon(data, ioType) {
       <OSeparator vertical class="mr-2" />
 
       <!-- Label -->
-      <div class="o2-scroll-container overflow-auto rounded-lg">
+      <div class="o2-scroll-container overflow-auto rounded-default">
         <div
           v-if="data.stream_name && data.stream_name.hasOwnProperty('label')"
           class="flex text-sm! font-bold! leading-[1.4]! text-left text-wrap w-auto text-ellipsis"
@@ -633,7 +633,7 @@ function getIcon(data, ioType) {
           variant="ghost"
           size="icon"
           @click.stop="deleteNode(id)"
-          class="min-w-5! w-5! h-5! p-0! rounded-sm! bg-[color-mix(in_srgb,var(--color-white)_95%,transparent)]! border! border-(--node-color)! text-(--node-color)! transition-all! duration-200! hover:bg-error-500! hover:border-error-500! hover:text-white! hover:scale-110! hover:shadow-[0_0.125rem_0.5rem_color-mix(in_srgb,var(--color-error-500)_30%,transparent)]!"
+          class="min-w-5! w-5! h-5! p-0! rounded-default! bg-[color-mix(in_srgb,var(--color-white)_95%,transparent)]! border! border-(--node-color)! text-(--node-color)! transition-all! duration-200! hover:bg-error-500! hover:border-error-500! hover:text-white! hover:scale-110! hover:shadow-[0_0.125rem_0.5rem_color-mix(in_srgb,var(--color-error-500)_30%,transparent)]!"
           :data-test="`pipeline-node-${io_type}-delete-btn`"
           @mouseenter="handleDeleteTooltipEnter"
           @mouseleave="handleDeleteTooltipLeave"
@@ -642,7 +642,7 @@ function getIcon(data, ioType) {
         </OButton>
         <div
           v-if="showDeleteTooltip"
-          class="fixed left-3.75 bg-status-negative text-button-destructive-foreground py-1.5 px-2.5 rounded-md text-2xs z-[1000] shadow-[0_0.25rem_0.75rem_color-mix(in_srgb,var(--color-black)_30%,transparent)] pointer-events-none whitespace-nowrap"
+          class="fixed left-3.75 bg-status-negative text-button-destructive-foreground py-1.5 px-2.5 rounded-default text-2xs z-[1000] shadow-[0_0.25rem_0.75rem_color-mix(in_srgb,var(--color-black)_30%,transparent)] pointer-events-none whitespace-nowrap"
         >
           Delete Node
           <div class="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0 border-l-[5px] border-l-transparent border-r-[5px] border-r-transparent border-t-[5px] border-t-status-negative"></div>
@@ -671,7 +671,7 @@ function getIcon(data, ioType) {
       <OSeparator vertical class="mr-2" />
 
       <!-- Label -->
-      <div class="o2-scroll-container overflow-auto rounded-lg">
+      <div class="o2-scroll-container overflow-auto rounded-default">
         <div
           class="flex text-sm! font-bold! leading-[1.4]! text-left text-wrap w-auto text-ellipsis"
         >
@@ -690,7 +690,7 @@ function getIcon(data, ioType) {
           variant="ghost"
           size="icon"
           @click.stop="deleteNode(id)"
-          class="min-w-5! w-5! h-5! p-0! rounded-sm! bg-[color-mix(in_srgb,var(--color-white)_95%,transparent)]! border! border-(--node-color)! text-(--node-color)! transition-all! duration-200! hover:bg-error-500! hover:border-error-500! hover:text-white! hover:scale-110! hover:shadow-[0_0.125rem_0.5rem_color-mix(in_srgb,var(--color-error-500)_30%,transparent)]!"
+          class="min-w-5! w-5! h-5! p-0! rounded-default! bg-[color-mix(in_srgb,var(--color-white)_95%,transparent)]! border! border-(--node-color)! text-(--node-color)! transition-all! duration-200! hover:bg-error-500! hover:border-error-500! hover:text-white! hover:scale-110! hover:shadow-[0_0.125rem_0.5rem_color-mix(in_srgb,var(--color-error-500)_30%,transparent)]!"
           :data-test="`pipeline-node-${io_type}-delete-btn`"
           @mouseenter="handleDeleteTooltipEnter"
           @mouseleave="handleDeleteTooltipLeave"
@@ -699,7 +699,7 @@ function getIcon(data, ioType) {
         </OButton>
         <div
           v-if="showDeleteTooltip"
-          class="fixed left-3.75 bg-status-negative text-button-destructive-foreground py-1.5 px-2.5 rounded-md text-2xs z-[1000] shadow-[0_0.25rem_0.75rem_color-mix(in_srgb,var(--color-black)_30%,transparent)] pointer-events-none whitespace-nowrap"
+          class="fixed left-3.75 bg-status-negative text-button-destructive-foreground py-1.5 px-2.5 rounded-default text-2xs z-[1000] shadow-[0_0.25rem_0.75rem_color-mix(in_srgb,var(--color-black)_30%,transparent)] pointer-events-none whitespace-nowrap"
         >
           Delete Node
           <div class="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0 border-l-[5px] border-l-transparent border-r-[5px] border-r-transparent border-t-[5px] border-t-status-negative"></div>
@@ -729,7 +729,7 @@ function getIcon(data, ioType) {
       <OSeparator vertical class="mr-2" />
 
       <!-- Label -->
-      <div class="o2-scroll-container overflow-auto rounded-lg">
+      <div class="o2-scroll-container overflow-auto rounded-default">
         <div
           class="flex text-sm! font-bold! leading-[1.4]! text-left text-wrap w-auto text-ellipsis"
         >
@@ -749,7 +749,7 @@ function getIcon(data, ioType) {
           variant="ghost"
           size="icon"
           @click.stop="deleteNode(id)"
-          class="min-w-5! w-5! h-5! p-0! rounded-sm! bg-[color-mix(in_srgb,var(--color-white)_95%,transparent)]! border! border-(--node-color)! text-(--node-color)! transition-all! duration-200! hover:bg-error-500! hover:border-error-500! hover:text-white! hover:scale-110! hover:shadow-[0_0.125rem_0.5rem_color-mix(in_srgb,var(--color-error-500)_30%,transparent)]!"
+          class="min-w-5! w-5! h-5! p-0! rounded-default! bg-[color-mix(in_srgb,var(--color-white)_95%,transparent)]! border! border-(--node-color)! text-(--node-color)! transition-all! duration-200! hover:bg-error-500! hover:border-error-500! hover:text-white! hover:scale-110! hover:shadow-[0_0.125rem_0.5rem_color-mix(in_srgb,var(--color-error-500)_30%,transparent)]!"
           :data-test="`pipeline-node-${io_type}-delete-btn`"
           @mouseenter="handleDeleteTooltipEnter"
           @mouseleave="handleDeleteTooltipLeave"
@@ -758,7 +758,7 @@ function getIcon(data, ioType) {
         </OButton>
         <div
           v-if="showDeleteTooltip"
-          class="fixed left-3.75 bg-status-negative text-button-destructive-foreground py-1.5 px-2.5 rounded-md text-2xs z-[1000] shadow-[0_0.25rem_0.75rem_color-mix(in_srgb,var(--color-black)_30%,transparent)] pointer-events-none whitespace-nowrap"
+          class="fixed left-3.75 bg-status-negative text-button-destructive-foreground py-1.5 px-2.5 rounded-default text-2xs z-[1000] shadow-[0_0.25rem_0.75rem_color-mix(in_srgb,var(--color-black)_30%,transparent)] pointer-events-none whitespace-nowrap"
         >
           Delete Node
           <div class="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0 border-l-[5px] border-l-transparent border-r-[5px] border-r-transparent border-t-[5px] border-t-status-negative"></div>
@@ -788,7 +788,7 @@ function getIcon(data, ioType) {
       <OSeparator vertical class="mr-2" />
 
       <!-- Label -->
-      <div class="o2-scroll-container overflow-auto rounded-lg">
+      <div class="o2-scroll-container overflow-auto rounded-default">
         <div
           class="text-sm! font-bold! leading-[1.4]! text-left text-wrap w-auto text-ellipsis"
         >
@@ -808,7 +808,7 @@ function getIcon(data, ioType) {
           variant="ghost"
           size="icon"
           @click.stop="deleteNode(id)"
-          class="min-w-5! w-5! h-5! p-0! rounded-sm! bg-[color-mix(in_srgb,var(--color-white)_95%,transparent)]! border! border-(--node-color)! text-(--node-color)! transition-all! duration-200! hover:bg-error-500! hover:border-error-500! hover:text-white! hover:scale-110! hover:shadow-[0_0.125rem_0.5rem_color-mix(in_srgb,var(--color-error-500)_30%,transparent)]!"
+          class="min-w-5! w-5! h-5! p-0! rounded-default! bg-[color-mix(in_srgb,var(--color-white)_95%,transparent)]! border! border-(--node-color)! text-(--node-color)! transition-all! duration-200! hover:bg-error-500! hover:border-error-500! hover:text-white! hover:scale-110! hover:shadow-[0_0.125rem_0.5rem_color-mix(in_srgb,var(--color-error-500)_30%,transparent)]!"
           :data-test="`pipeline-node-${io_type}-delete-btn`"
           @mouseenter="handleDeleteTooltipEnter"
           @mouseleave="handleDeleteTooltipLeave"
@@ -817,7 +817,7 @@ function getIcon(data, ioType) {
         </OButton>
         <div
           v-if="showDeleteTooltip"
-          class="fixed left-3.75 bg-status-negative text-button-destructive-foreground py-1.5 px-2.5 rounded-md text-2xs z-[1000] shadow-[0_0.25rem_0.75rem_color-mix(in_srgb,var(--color-black)_30%,transparent)] pointer-events-none whitespace-nowrap"
+          class="fixed left-3.75 bg-status-negative text-button-destructive-foreground py-1.5 px-2.5 rounded-default text-2xs z-[1000] shadow-[0_0.25rem_0.75rem_color-mix(in_srgb,var(--color-black)_30%,transparent)] pointer-events-none whitespace-nowrap"
         >
           Delete Node
           <div class="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0 border-l-[5px] border-l-transparent border-r-[5px] border-r-transparent border-t-[5px] border-t-status-negative"></div>
@@ -848,7 +848,7 @@ function getIcon(data, ioType) {
       <OSeparator vertical class="mr-2" />
 
       <!-- Label -->
-      <div class="o2-scroll-container overflow-auto rounded-lg">
+      <div class="o2-scroll-container overflow-auto rounded-default">
         <div
           class="text-sm! font-bold! leading-[1.4]! text-left text-wrap w-auto text-ellipsis"
         >
@@ -904,7 +904,7 @@ function getIcon(data, ioType) {
           variant="ghost"
           size="icon"
           @click.stop="deleteNode(id)"
-          class="min-w-5! w-5! h-5! p-0! rounded-sm! bg-[color-mix(in_srgb,var(--color-white)_95%,transparent)]! border! border-(--node-color)! text-(--node-color)! transition-all! duration-200! hover:bg-error-500! hover:border-error-500! hover:text-white! hover:scale-110! hover:shadow-[0_0.125rem_0.5rem_color-mix(in_srgb,var(--color-error-500)_30%,transparent)]!"
+          class="min-w-5! w-5! h-5! p-0! rounded-default! bg-[color-mix(in_srgb,var(--color-white)_95%,transparent)]! border! border-(--node-color)! text-(--node-color)! transition-all! duration-200! hover:bg-error-500! hover:border-error-500! hover:text-white! hover:scale-110! hover:shadow-[0_0.125rem_0.5rem_color-mix(in_srgb,var(--color-error-500)_30%,transparent)]!"
           :data-test="`pipeline-node-${io_type}-delete-btn`"
           @mouseenter="handleDeleteTooltipEnter"
           @mouseleave="handleDeleteTooltipLeave"
@@ -913,7 +913,7 @@ function getIcon(data, ioType) {
         </OButton>
         <div
           v-if="showDeleteTooltip"
-          class="fixed left-3.75 bg-status-negative text-button-destructive-foreground py-1.5 px-2.5 rounded-md text-2xs z-[1000] shadow-[0_0.25rem_0.75rem_color-mix(in_srgb,var(--color-black)_30%,transparent)] pointer-events-none whitespace-nowrap"
+          class="fixed left-3.75 bg-status-negative text-button-destructive-foreground py-1.5 px-2.5 rounded-default text-2xs z-[1000] shadow-[0_0.25rem_0.75rem_color-mix(in_srgb,var(--color-black)_30%,transparent)] pointer-events-none whitespace-nowrap"
         >
           Delete Node
           <div class="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0 border-l-[5px] border-l-transparent border-r-[5px] border-r-transparent border-t-[5px] border-t-status-negative"></div>

@@ -61,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <div
               v-if="!isEditMode"
-              class="flex items-start gap-2.5 px-3 py-2.5 mb-3 rounded-lg border bg-banner-warning-bg border-banner-warning-border"
+              class="flex items-start gap-2.5 px-3 py-2.5 mb-3 rounded-default border bg-banner-warning-bg border-banner-warning-border"
             >
               <OIcon name="warning" size="sm" class="flex-shrink-0 mt-px" />
               <div class="text-compact leading-[1.55] text-text-body">
@@ -70,7 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <div
               v-if="!isEditMode"
-              class="flex items-start gap-2.5 px-3 py-2.5 mb-3 rounded-lg border bg-banner-info-bg border-banner-info-border"
+              class="flex items-start gap-2.5 px-3 py-2.5 mb-3 rounded-default border bg-banner-info-bg border-banner-info-border"
             >
               <OIcon name="info" size="sm" class="flex-shrink-0 mt-px" />
               <div class="text-compact leading-[1.55] text-text-body">
@@ -85,7 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-for="provider in availableProviders"
                 :key="provider.value"
                 :data-test="`storage-settings-provider-card-${provider.value}`"
-                class="group/card relative flex flex-col items-center justify-center py-5 px-3 border-2 rounded-xl cursor-pointer transition-all duration-300 min-h-30 hover:-translate-y-0.5 hover:shadow-md"
+                class="group/card relative flex flex-col items-center justify-center py-5 px-3 border-2 rounded-default cursor-pointer transition-all duration-300 min-h-30 hover:-translate-y-0.5 hover:shadow-md"
                 :class="
                   selectedProvider === provider.value
                     ? 'selected bg-table-row-selected-bg border-accent shadow-md'
@@ -251,7 +251,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- AwsRoleArn Fields -->
               <template v-if="selectedProvider === 'AwsRoleArn'">
                 <div
-                  class="flex items-start gap-2.5 px-3 py-2.5 mb-3 rounded-lg border bg-banner-info-bg border-banner-info-border"
+                  class="flex items-start gap-2.5 px-3 py-2.5 mb-3 rounded-default border bg-banner-info-bg border-banner-info-border"
                 >
                   <OIcon name="info" size="sm" class="flex-shrink-0 mt-px" />
                   <div class="text-compact leading-[1.55] text-text-body">

@@ -2,7 +2,7 @@
 <template>
   <div class="p-1 kubernetes-config-section pb-lg">
     <!-- Quick Install Section -->
-    <div class="mb-6 p-4 rounded-lg" :class="quickInstallBgClass">
+    <div class="mb-6 p-4 rounded-default" :class="quickInstallBgClass">
       <div class="flex items-start gap-3">
         <OIcon name="rocket-launch" size="xl" class="text-[var(--color-theme-accent)]" />
         <div class="flex-1">

@@ -33,7 +33,7 @@ const sessionReplay = computed({
 </script>
 
 <template>
-  <div class="rounded-lg border border-border-default bg-surface-base p-6 mb-4">
+  <div class="rounded-default border border-border-default bg-surface-base p-6 mb-4">
     <h3 class="text-base font-semibold text-text-heading pb-4">{{ t('synthetics.rum.title') }}</h3>
     <div class="flex flex-col gap-4">
       <div>

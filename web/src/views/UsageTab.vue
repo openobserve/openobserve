@@ -35,13 +35,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Streams overview section -->
       <div
-        class="rounded-sm p-4 bg-card-glass-bg border border-card-glass-border"
+        class="rounded-default p-4 bg-card-glass-bg border border-card-glass-border"
         role="region"
         aria-label="Streams overview section"
       >
         <div class="flex justify-between items-center mb-3">
           <div class="flex items-center gap-2">
-            <div class="inline-flex items-center justify-center shrink-0 w-10 h-10 rounded-lg bg-(--color-indigo-50) text-(--color-indigo-600) dark:bg-(--color-indigo-900) dark:text-(--color-indigo-300)" aria-hidden="true">
+            <div class="inline-flex items-center justify-center shrink-0 w-10 h-10 rounded-default bg-(--color-indigo-50) text-(--color-indigo-600) dark:bg-(--color-indigo-900) dark:text-(--color-indigo-300)" aria-hidden="true">
               <OIcon name="window" size="md" />
             </div>
             <div class="text-(length:--text-lg) font-semibold [line-height:1.4]">{{ t("home.streams") }}</div>
@@ -75,14 +75,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="grid [grid-template-columns:repeat(auto-fit,minmax(15rem,1fr))] gap-3">
           <div class="[border-radius:0.325rem] border border-card-glass-border">
             <div
-              class="rounded-lg text-center flex flex-col justify-between h-full p-3 gap-1 [transition:all_0.3s_cubic-bezier(0.4,0,0.2,1)] [contain:layout_style_paint]"
+              class="rounded-default text-center flex flex-col justify-between h-full p-3 gap-1 [transition:all_0.3s_cubic-bezier(0.4,0,0.2,1)] [contain:layout_style_paint]"
               role="article"
               aria-label="Streams count statistics"
             >
               <div class="flex flex-col justify-between">
                 <div class="flex justify-between">
                   <div class="text-(length:--text-base) font-medium [line-height:1.4] [letter-spacing:0%]">{{ t("home.streams") }}</div>
-                  <div class="inline-flex items-center justify-center shrink-0 w-10 h-10 rounded-lg bg-(--color-indigo-50) text-(--color-indigo-600) dark:bg-(--color-indigo-900) dark:text-(--color-indigo-300)" aria-hidden="true">
+                  <div class="inline-flex items-center justify-center shrink-0 w-10 h-10 rounded-default bg-(--color-indigo-50) text-(--color-indigo-600) dark:bg-(--color-indigo-900) dark:text-(--color-indigo-300)" aria-hidden="true">
                     <OIcon name="code" size="md" />
                   </div>
                 </div>
@@ -106,14 +106,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <div class="[border-radius:0.325rem] border border-card-glass-border">
             <div
-              class="rounded-lg text-center flex flex-col justify-between h-full p-3 gap-1 [transition:all_0.3s_cubic-bezier(0.4,0,0.2,1)] [contain:layout_style_paint]"
+              class="rounded-default text-center flex flex-col justify-between h-full p-3 gap-1 [transition:all_0.3s_cubic-bezier(0.4,0,0.2,1)] [contain:layout_style_paint]"
               role="article"
               aria-label="Events count statistics"
             >
               <div class="flex flex-col justify-between">
                 <div class="flex justify-between">
                   <div class="text-(length:--text-base) font-medium [line-height:1.4] [letter-spacing:0%]">{{ t("home.docsCountLbl") }}</div>
-                  <div class="inline-flex items-center justify-center shrink-0 w-10 h-10 rounded-lg bg-(--color-indigo-100) text-(--color-indigo-900) dark:bg-(--color-indigo-900) dark:text-(--color-indigo-200)" aria-hidden="true">
+                  <div class="inline-flex items-center justify-center shrink-0 w-10 h-10 rounded-default bg-(--color-indigo-100) text-(--color-indigo-900) dark:bg-(--color-indigo-900) dark:text-(--color-indigo-200)" aria-hidden="true">
                     <OIcon name="bar-chart" size="md" />
                   </div>
                 </div>
@@ -137,7 +137,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <div class="[border-radius:0.325rem] border border-card-glass-border">
             <div
-              class="rounded-lg text-center flex flex-col justify-between h-full p-3 gap-1 [transition:all_0.3s_cubic-bezier(0.4,0,0.2,1)] [contain:layout_style_paint]"
+              class="rounded-default text-center flex flex-col justify-between h-full p-3 gap-1 [transition:all_0.3s_cubic-bezier(0.4,0,0.2,1)] [contain:layout_style_paint]"
               role="article"
               aria-label="Ingested data size statistics"
             >
@@ -146,7 +146,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div class="text-(length:--text-base) font-medium [line-height:1.4] [letter-spacing:0%]">
                     {{ t("home.totalDataIngested") }}
                   </div>
-                  <div class="inline-flex items-center justify-center shrink-0 w-10 h-10 rounded-lg bg-(--color-orange-50) text-(--color-warning-900) dark:bg-(--color-orange-900) dark:text-(--color-orange-300)" aria-hidden="true">
+                  <div class="inline-flex items-center justify-center shrink-0 w-10 h-10 rounded-default bg-(--color-orange-50) text-(--color-warning-900) dark:bg-(--color-orange-900) dark:text-(--color-orange-300)" aria-hidden="true">
                     <OIcon name="download" size="md" />
                   </div>
                 </div>
@@ -170,7 +170,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <div class="[border-radius:0.325rem] border border-card-glass-border" v-if="config.isCloud == 'false'">
             <div
-              class="rounded-lg text-center flex flex-col justify-between h-full p-3 gap-1 [transition:all_0.3s_cubic-bezier(0.4,0,0.2,1)] [contain:layout_style_paint]"
+              class="rounded-default text-center flex flex-col justify-between h-full p-3 gap-1 [transition:all_0.3s_cubic-bezier(0.4,0,0.2,1)] [contain:layout_style_paint]"
               role="article"
               aria-label="Compressed data size statistics"
             >
@@ -179,7 +179,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div class="text-(length:--text-base) font-medium [line-height:1.4] [letter-spacing:0%]">
                     {{ t("home.totalDataCompressed") }}
                   </div>
-                  <div class="inline-flex items-center justify-center shrink-0 w-10 h-10 rounded-lg bg-(--color-cyan-50) text-(--color-cyan-700) dark:bg-(--color-cyan-900) dark:text-(--color-cyan-300)" aria-hidden="true">
+                  <div class="inline-flex items-center justify-center shrink-0 w-10 h-10 rounded-default bg-(--color-cyan-50) text-(--color-cyan-700) dark:bg-(--color-cyan-900) dark:text-(--color-cyan-300)" aria-hidden="true">
                     <OIcon name="compress" size="md" />
                   </div>
                 </div>
@@ -203,14 +203,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <div class="[border-radius:0.325rem] border border-card-glass-border" v-if="config.isCloud == 'false'">
             <div
-              class="rounded-lg text-center flex flex-col justify-between h-full p-3 gap-1 [transition:all_0.3s_cubic-bezier(0.4,0,0.2,1)] [contain:layout_style_paint]"
+              class="rounded-default text-center flex flex-col justify-between h-full p-3 gap-1 [transition:all_0.3s_cubic-bezier(0.4,0,0.2,1)] [contain:layout_style_paint]"
               role="article"
               aria-label="Index size statistics"
             >
               <div class="flex flex-col justify-between">
                 <div class="flex justify-between">
                   <div class="text-(length:--text-base) font-medium [line-height:1.4] [letter-spacing:0%]">{{ t("home.indexSizeLbl") }}</div>
-                  <div class="inline-flex items-center justify-center shrink-0 w-10 h-10 rounded-lg bg-warning-50 text-warning-700 dark:bg-(--color-warning-900) dark:text-(--color-warning-300)" aria-hidden="true">
+                  <div class="inline-flex items-center justify-center shrink-0 w-10 h-10 rounded-default bg-warning-50 text-warning-700 dark:bg-(--color-warning-900) dark:text-(--color-warning-300)" aria-hidden="true">
                     <OIcon name="save" size="md" />
                   </div>
                 </div>
@@ -240,7 +240,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="flex flex-col gap-4 w-full">
           <div class="flex-1 flex min-w-0 w-full">
             <div
-              class="rounded-sm p-4 w-full bg-card-glass-bg border border-card-glass-border text-center flex flex-col justify-between"
+              class="rounded-default p-4 w-full bg-card-glass-bg border border-card-glass-border text-center flex flex-col justify-between"
               role="article"
               aria-label="Functions count statistics"
             >
@@ -249,7 +249,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="flex items-center gap-2 flex-nowrap w-full"
                 >
                   <div
-                    class="inline-flex items-center justify-center shrink-0 w-10 h-10 rounded-lg bg-(--color-blue-50) text-(--color-blue-500) dark:bg-(--color-blue-900) dark:text-(--color-blue-300)"
+                    class="inline-flex items-center justify-center shrink-0 w-10 h-10 rounded-default bg-(--color-blue-50) text-(--color-blue-500) dark:bg-(--color-blue-900) dark:text-(--color-blue-300)"
                     aria-hidden="true"
                   >
                     <OIcon name="function" size="md" />
@@ -296,7 +296,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <div class="flex-1 flex min-w-0 w-full">
             <div
-              class="rounded-sm p-4 w-full bg-card-glass-bg border border-card-glass-border text-center flex flex-col justify-between"
+              class="rounded-default p-4 w-full bg-card-glass-bg border border-card-glass-border text-center flex flex-col justify-between"
               role="article"
               aria-label="Dashboards count statistics"
             >
@@ -305,7 +305,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="flex items-center gap-2 flex-nowrap w-full"
                 >
                   <div
-                    class="inline-flex items-center justify-center shrink-0 w-10 h-10 rounded-lg bg-(--color-orange-50) text-(--color-orange-600) dark:bg-(--color-orange-900) dark:text-(--color-orange-300)"
+                    class="inline-flex items-center justify-center shrink-0 w-10 h-10 rounded-default bg-(--color-orange-50) text-(--color-orange-600) dark:bg-(--color-orange-900) dark:text-(--color-orange-300)"
                     aria-hidden="true"
                   >
                     <OIcon name="dashboard" size="md" />
@@ -353,14 +353,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Alerts chart -->
         <div
-          class="rounded-sm p-4 bg-card-glass-bg border border-card-glass-border flex flex-col min-h-0"
+          class="rounded-default p-4 bg-card-glass-bg border border-card-glass-border flex flex-col min-h-0"
           role="region"
           aria-label="Alerts overview section"
         >
           <div class="gap-2 mb-3">
             <div class="flex justify-between items-center">
               <span class="text-(length:--text-base) font-medium [line-height:1.4] [letter-spacing:0%] flex items-center gap-2">
-                <div class="inline-flex items-center justify-center shrink-0 w-10 h-10 rounded-lg bg-warning-50 text-warning-700 dark:bg-(--color-warning-900) dark:text-(--color-warning-300)" aria-hidden="true">
+                <div class="inline-flex items-center justify-center shrink-0 w-10 h-10 rounded-default bg-warning-50 text-warning-700 dark:bg-(--color-warning-900) dark:text-(--color-warning-300)" aria-hidden="true">
                   <OIcon name="shield-alert-outline" size="md" />
                 </div>
                 {{ t("home.alertTitle") }}
@@ -428,14 +428,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Pipelines chart -->
         <div
-          class="rounded-sm p-4 bg-card-glass-bg border border-card-glass-border flex flex-col min-h-0"
+          class="rounded-default p-4 bg-card-glass-bg border border-card-glass-border flex flex-col min-h-0"
           role="region"
           aria-label="Pipelines overview section"
         >
           <div class="gap-2 mb-3">
             <div class="flex justify-between items-center">
               <span class="text-(length:--text-base) font-medium [line-height:1.4] [letter-spacing:0%] flex items-center gap-2">
-                <div class="inline-flex items-center justify-center shrink-0 w-10 h-10 rounded-lg bg-(--color-purple-50) text-(--color-purple-600) dark:bg-(--color-purple-900) dark:text-(--color-purple-400)" aria-hidden="true">
+                <div class="inline-flex items-center justify-center shrink-0 w-10 h-10 rounded-default bg-(--color-purple-50) text-(--color-purple-600) dark:bg-(--color-purple-900) dark:text-(--color-purple-400)" aria-hidden="true">
                   <OIcon name="lan" size="md" />
                 </div>
                 {{ t("home.pipelineTitle") }}

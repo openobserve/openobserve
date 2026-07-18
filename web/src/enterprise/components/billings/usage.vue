@@ -31,8 +31,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- tab-info-section -->
       <!-- this will be unlocked when we get the actionscripts , rum sessions , error tracking from BE -->
         <div v-if="false" class="grid grid-cols-3 gap-4 w-full">
-            <div class="bg-card-glass-bg border border-card-glass-border rounded-lg p-4 min-h-32 flex flex-col justify-between transition-shadow duration-200 ease-in-out">
-              <div class="flex flex-col justify-between rounded-md h-full gap-4 ">
+            <div class="bg-card-glass-bg border border-card-glass-border rounded-default p-4 min-h-32 flex flex-col justify-between transition-shadow duration-200 ease-in-out">
+              <div class="flex flex-col justify-between rounded-default h-full gap-4 ">
               <!-- Top Section (60%) -->
               <div class="flex flex-col justify-between">
                 <!-- Title row -->
@@ -50,8 +50,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             </div>
             </div>
-            <div class="bg-card-glass-bg border border-card-glass-border rounded-lg p-4 min-h-32 flex flex-col justify-between transition-shadow duration-200 ease-in-out">
-              <div class="flex flex-col justify-between rounded-md h-full gap-4 ">
+            <div class="bg-card-glass-bg border border-card-glass-border rounded-default p-4 min-h-32 flex flex-col justify-between transition-shadow duration-200 ease-in-out">
+              <div class="flex flex-col justify-between rounded-default h-full gap-4 ">
               <!-- Top Section (60%) -->
               <div class="flex flex-col justify-between">
                 <!-- Title row -->
@@ -69,8 +69,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             </div>
             </div>
-            <div class="bg-card-glass-bg border border-card-glass-border rounded-lg p-4 min-h-32 flex flex-col justify-between transition-shadow duration-200 ease-in-out">
-              <div class="flex flex-col justify-between rounded-md h-full gap-4 ">
+            <div class="bg-card-glass-bg border border-card-glass-border rounded-default p-4 min-h-32 flex flex-col justify-between transition-shadow duration-200 ease-in-out">
+              <div class="flex flex-col justify-between rounded-default h-full gap-4 ">
               <!-- Top Section (60%) -->
               <div class="flex flex-col justify-between">
                 <!-- Title row -->
@@ -101,7 +101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-for="tile in usageTiles"
             :key="tile.key"
             data-test="billings-usage-tile"
-            class="usage-tile bg-card-glass-bg border border-card-glass-border rounded-lg px-3 py-3 flex flex-col gap-2 transition-shadow duration-200 ease-in-out"
+            class="usage-tile bg-card-glass-bg border border-card-glass-border rounded-default px-3 py-3 flex flex-col gap-2 transition-shadow duration-200 ease-in-out"
           >
             <div class="flex items-center justify-between gap-2">
               <div
@@ -111,7 +111,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 {{ tile.label }}
               </div>
-              <div class="h-7 w-7 bg-bg-gray shrink-0 flex items-center justify-center rounded-lg">
+              <div class="h-7 w-7 bg-bg-gray shrink-0 flex items-center justify-center rounded-default">
                 <img :src="tile.icon" class="h-4 w-4" />
               </div>
             </div>
@@ -145,7 +145,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         v-if="usageStreamEnabled"
         data-test="usage-daily-chart"
-        class="bg-card-glass-bg border border-card-glass-border rounded-lg p-4 mt-4"
+        class="bg-card-glass-bg border border-card-glass-border rounded-default p-4 mt-4"
       >
         <div class="text-(length:--text-sm) font-semibold text-text-heading mb-2">
           {{ t("billing.usageTrends.dailyUsage") }}
@@ -188,7 +188,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OEmptyState
         v-else
         data-test="usage-enable-cta"
-        class="mt-4 border border-card-glass-border rounded-lg bg-card-glass-bg"
+        class="mt-4 border border-card-glass-border rounded-default bg-card-glass-bg"
         size="block"
         illustration="wave-bars"
         :title="t('billing.usageTrends.enableTitle')"

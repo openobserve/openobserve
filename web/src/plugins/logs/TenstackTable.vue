@@ -234,7 +234,7 @@ class="mr-1" />
           <!-- No columns loaded yet (first page load) — full-width shimmer bar -->
           <td v-if="!headers?.length" class="w-full px-4 overflow-hidden">
             <span
-              class="logs-skel-pill inline-block h-3 rounded-md"
+              class="logs-skel-pill inline-block h-3 rounded-default"
               :style="{ width: `${skelCellWidth(r - 1, 0)}%` }"
               aria-hidden="true"
             />
@@ -249,7 +249,7 @@ class="mr-1" />
               :style="skelTdStyle(header, c)"
             >
               <span
-                class="logs-skel-pill inline-block h-3 rounded-md"
+                class="logs-skel-pill inline-block h-3 rounded-default"
                 :style="{ width: c === 0 ? `${SKEL_TIMESTAMP_PX}px` : `${skelCellWidth(r - 1, c)}%` }"
                 aria-hidden="true"
               />

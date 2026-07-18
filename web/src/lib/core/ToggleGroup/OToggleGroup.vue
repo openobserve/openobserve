@@ -61,7 +61,7 @@ const wrapperClasses = computed(() => {
       :class="[
         'inline-flex items-stretch',
         orientation === 'vertical' ? 'flex-col' : 'flex-row',
-        'bg-toggle-track-bg rounded-lg p-0.5',
+        'bg-toggle-track-bg rounded-default p-0.5',
       ]"
       @update:model-value="
         (v) => {
@@ -84,7 +84,7 @@ const wrapperClasses = computed(() => {
     :class="[
       'inline-flex items-stretch',
       orientation === 'vertical' ? 'flex-col' : 'flex-row',
-      'bg-toggle-track-bg rounded-lg p-0.5',
+      'bg-toggle-track-bg rounded-default p-0.5',
       'border border-toggle-border',
     ]"
     @update:model-value="

@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="rounded-md p-0" data-test="incident-detail-page">
+  <div class="rounded-default p-0" data-test="incident-detail-page">
     <div class="w-full h-full flex flex-col">
     <!-- Header — shared AppPageHeader: back button in the icon-tile spot, the
          incident name as the title (with its status badges trailing), and the
@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model="editableTitle"
           ref="titleInputRef"
           :class="[
-            'font-bold px-2 py-1 rounded-md outline-none border-2',
+            'font-bold px-2 py-1 rounded-default outline-none border-2',
             'text-text-link bg-status-info-bg border-text-link'
           ]"
         />
@@ -207,14 +207,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="flex gap-3 mb-3 h-25">
             <!-- 1. Total Alerts Card -->
             <div
-              class="flex-1 flex flex-col justify-between border border-card-glass-border rounded-md bg-card-glass-bg transition-all duration-200 cursor-pointer p-3"
+              class="flex-1 flex flex-col justify-between border border-card-glass-border rounded-default bg-card-glass-bg transition-all duration-200 cursor-pointer p-3"
             >
               <!-- Top: Title and Icon -->
               <div class="flex justify-between items-start">
                 <div :class="'text-text-secondary'" class="text-sm font-medium">
                   Total Alerts
                 </div>
-                <div class="w-8 h-8 rounded-lg flex items-center justify-center bg-badge-amber-soft-bg">
+                <div class="w-8 h-8 rounded-default flex items-center justify-center bg-badge-amber-soft-bg">
                   <OIcon name="bolt" size="sm" class="text-badge-amber-soft-text" />
                 </div>
               </div>
@@ -227,14 +227,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- 2. Unique Alerts Card -->
             <div
-              class="flex-1 flex flex-col justify-between border border-card-glass-border rounded-md bg-card-glass-bg transition-all duration-200 cursor-pointer p-3"
+              class="flex-1 flex flex-col justify-between border border-card-glass-border rounded-default bg-card-glass-bg transition-all duration-200 cursor-pointer p-3"
             >
               <!-- Top: Title and Icon -->
               <div class="flex justify-between items-start">
                 <div :class="'text-text-secondary'" class="text-sm font-medium">
                   {{ t('alerts.incidents.uniqueAlerts') }}
                 </div>
-                <div class="w-8 h-8 rounded-lg flex items-center justify-center bg-badge-blue-soft-bg">
+                <div class="w-8 h-8 rounded-default flex items-center justify-center bg-badge-blue-soft-bg">
                   <OIcon name="notifications-active" size="sm" class="text-badge-blue-soft-text" />
                 </div>
               </div>
@@ -247,14 +247,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- 3. Affected Services Card -->
             <div
-              class="flex-1 flex flex-col justify-between border border-card-glass-border rounded-md bg-card-glass-bg transition-all duration-200 cursor-pointer p-3"
+              class="flex-1 flex flex-col justify-between border border-card-glass-border rounded-default bg-card-glass-bg transition-all duration-200 cursor-pointer p-3"
             >
               <!-- Top: Title and Icon -->
               <div class="flex justify-between items-start">
                 <div :class="'text-text-secondary'" class="text-sm font-medium">
                   Affected Services
                 </div>
-                <div class="w-8 h-8 rounded-lg flex items-center justify-center bg-badge-purple-soft-bg">
+                <div class="w-8 h-8 rounded-default flex items-center justify-center bg-badge-purple-soft-bg">
                   <OIcon name="dns" size="sm" class="text-badge-purple-soft-text" />
                 </div>
               </div>
@@ -267,14 +267,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- 4. Active Duration Card -->
             <div
-              class="flex-1 flex flex-col justify-between border border-card-glass-border rounded-md bg-card-glass-bg transition-all duration-200 cursor-pointer p-3"
+              class="flex-1 flex flex-col justify-between border border-card-glass-border rounded-default bg-card-glass-bg transition-all duration-200 cursor-pointer p-3"
             >
               <!-- Top: Title and Icon -->
               <div class="flex justify-between items-start">
                 <div :class="'text-text-secondary'" class="text-sm font-medium">
                   Active Duration
                 </div>
-                <div class="w-8 h-8 rounded-lg flex items-center justify-center bg-badge-success-soft-bg">
+                <div class="w-8 h-8 rounded-default flex items-center justify-center bg-badge-success-soft-bg">
                   <OIcon name="schedule" size="sm" class="text-badge-success-soft-text" />
                 </div>
               </div>
@@ -289,14 +289,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- 5. Alert Frequency Card -->
             <div
-              class="flex-1 flex flex-col justify-between border border-card-glass-border rounded-md bg-card-glass-bg transition-all duration-200 cursor-pointer p-3"
+              class="flex-1 flex flex-col justify-between border border-card-glass-border rounded-default bg-card-glass-bg transition-all duration-200 cursor-pointer p-3"
             >
               <!-- Top: Title and Icon -->
               <div class="flex justify-between items-start">
                 <div :class="'text-text-secondary'" class="text-sm font-medium">
                   Alert Frequency
                 </div>
-                <div class="w-8 h-8 rounded-lg flex items-center justify-center bg-badge-error-soft-bg">
+                <div class="w-8 h-8 rounded-default flex items-center justify-center bg-badge-error-soft-bg">
                   <OIcon name="show-chart" size="sm" class="text-badge-error-soft-text" />
                 </div>
               </div>
@@ -316,7 +316,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="flex gap-3 h-1/2">
                                <!-- Incident Timeline (33.33% width) -->
                 <div
-                  class="border border-card-glass-border rounded-md bg-card-glass-bg flex flex-col overflow-hidden w-1/3"
+                  class="border border-card-glass-border rounded-default bg-card-glass-bg flex flex-col overflow-hidden w-1/3"
                 >
                   <!-- Header -->
                   <div class="flex items-center justify-between px-4 py-3">
@@ -324,7 +324,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       {{ t('alerts.incidents.incidentTimeline') }}
                     </div>
                     <div
-                      class="px-2 py-0.5 rounded-sm text-xs font-medium bg-surface-panel text-text-secondary"
+                      class="px-2 py-0.5 rounded-default text-xs font-medium bg-surface-panel text-text-secondary"
                     >
                       UTC
                     </div>
@@ -402,7 +402,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <!-- Incident Details (66.67% width) -->
                 <div
-                  class="border border-card-glass-border rounded-md bg-card-glass-bg flex flex-col overflow-hidden w-2/3"
+                  class="border border-card-glass-border rounded-default bg-card-glass-bg flex flex-col overflow-hidden w-2/3"
                 >
                   <!-- Header -->
                   <div class="px-4 pt-2 pb-1">
@@ -419,7 +419,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         {{ t('alerts.incidents.incidentId') }}
                       </div>
                       <div
-                        class="flex items-center gap-2 px-2.5 py-1 rounded-sm border text-xs font-mono min-w-0 bg-surface-panel border-border-default text-text-body"
+                        class="flex items-center gap-2 px-2.5 py-1 rounded-default border text-xs font-mono min-w-0 bg-surface-panel border-border-default text-text-body"
                       >
                         <span class="truncate flex-1 min-w-0">{{ incidentDetails?.id || 'N/A' }}</span>
                         <OIcon
@@ -437,7 +437,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         {{ t('alerts.incidents.incidentName') }}
                       </div>
                       <div
-                        class="flex items-center gap-2 px-2.5 py-1 rounded-sm border text-xs min-w-0 bg-surface-panel border-border-default text-text-body"
+                        class="flex items-center gap-2 px-2.5 py-1 rounded-default border text-xs min-w-0 bg-surface-panel border-border-default text-text-body"
                       >
                         <span class="truncate flex-1 min-w-0">{{ incidentDetails?.title || 'N/A' }}</span>
                         <OIcon
@@ -455,7 +455,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         Correlated By
                       </div>
                       <div
-                        class="flex items-center gap-2 px-2.5 py-1 rounded-sm border text-xs min-w-0 bg-surface-panel border-border-default text-text-body"
+                        class="flex items-center gap-2 px-2.5 py-1 rounded-default border text-xs min-w-0 bg-surface-panel border-border-default text-text-body"
                       >
                         <span class="truncate flex-1 min-w-0">{{ getCorrelationMethodLabel(incidentDetails?.key_type) }}</span>
                         <OIcon
@@ -492,7 +492,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <!-- alert activity -->
                <!-- 2.1B: Alert Activity Chart (50% height, full width) -->
               <div
-                class="border border-card-glass-border rounded-md bg-card-glass-bg flex flex-col overflow-hidden h-1/2"
+                class="border border-card-glass-border rounded-default bg-card-glass-bg flex flex-col overflow-hidden h-1/2"
               >
                 <!-- Header -->
                 <div class="px-4 pt-2 pb-1">
@@ -520,7 +520,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="flex flex-col gap-2 w-1/3 h-full">
               <!-- 2.2A: Manage Panel (40% of available height after gaps) -->
               <div
-                class="border border-card-glass-border rounded-md bg-card-glass-bg flex flex-col overflow-hidden h-[calc(35%-0.4rem)]"
+                class="border border-card-glass-border rounded-default bg-card-glass-bg flex flex-col overflow-hidden h-[calc(35%-0.4rem)]"
               >
                 <!-- Header -->
                 <div class="px-4 pt-2 pb-1">
@@ -593,7 +593,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <!-- 2.2B: Dimensions Panel (35% when Alert Flow present, 60% when absent, or when no triggers) -->
               <div
-                class="border border-card-glass-border rounded-md bg-card-glass-bg flex flex-col overflow-hidden min-h-0 shrink-0"
+                class="border border-card-glass-border rounded-default bg-card-glass-bg flex flex-col overflow-hidden min-h-0 shrink-0"
                 :class="(sortedAlertsByTriggerCount?.length) ? 'h-[calc(35%-0.35rem)]' : 'h-[calc(65%-0.125rem)]'"
               >
                 <!-- Header -->
@@ -645,7 +645,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- 2.2C: Alert Flow Panel (25% of available height after gaps) - Conditional -->
               <div
                 v-if="sortedAlertsByTriggerCount?.length"
-                class="border border-card-glass-border rounded-md bg-card-glass-bg flex flex-col overflow-hidden h-[calc(30%-0.25rem)]"
+                class="border border-card-glass-border rounded-default bg-card-glass-bg flex flex-col overflow-hidden h-[calc(30%-0.25rem)]"
               >
                 <!-- Header -->
                 <div class="px-4 pt-2 pb-1">
@@ -733,7 +733,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="flex-1 flex flex-col overflow-hidden pr-2 pt-4">
             <div
               :class="[
-                'border border-card-glass-border rounded-md overflow-hidden flex flex-col flex-1'
+                'border border-card-glass-border rounded-default overflow-hidden flex flex-col flex-1'
               ]"
             >
               <IncidentAlertTriggersTable
@@ -748,7 +748,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="w-100 flex-shrink-0 flex flex-col pt-4">
             <div
               :class="[
-                'border border-card-glass-border rounded-md overflow-hidden flex flex-col flex-1'
+                'border border-card-glass-border rounded-default overflow-hidden flex flex-col flex-1'
               ]"
             >
               <!-- Header -->
@@ -853,7 +853,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
 
                   <!-- Alert Conditions Section -->
-                  <div :class="['rounded-sm border flex flex-col border-card-glass-border rounded-md',]" class="overflow-hidden h-98">
+                  <div :class="['rounded-default border flex flex-col border-card-glass-border rounded-default',]" class="overflow-hidden h-98">
                     <div :class="['!bg-[var(--color-theme-table-header-bg)] px-2.5 py-1.5 border-b flex items-center justify-between flex-shrink-0', 'border-border-default']">
                       <span :class="'text-text-secondary'" class="text-2xs font-semibold uppercase tracking-wide">
                         {{ alerts[selectedAlertIndex]?.query_condition?.type === 'sql' ? 'SQL Query' : alerts[selectedAlertIndex]?.query_condition?.type === 'promql' ? 'PromQL Query' : 'Conditions' }}
@@ -2575,18 +2575,18 @@ export default defineComponent({
             const classes = [
               'rca-h1 font-bold text-lg text-center mb-4 pb-2 border-b-2',
               // TODO: Discuss with team - h2 section separators with background and left border
-              // Remove 'rca-section-bg px-4 py-3 rounded-sm border-l-4' if not approved
-              'rca-h2 font-bold text-lg mt-5 mb-3 rca-section-bg px-4 py-3 rounded-sm border-l-4',
+              // Remove 'rca-section-bg px-4 py-3 rounded-default border-l-4' if not approved
+              'rca-h2 font-bold text-lg mt-5 mb-3 rca-section-bg px-4 py-3 rounded-default border-l-4',
               'rca-h3 font-semibold text-base mt-4 mb-2',
               'rca-h4 font-semibold text-sm mt-3 mb-2',
             ];
             return `<div id="${id}" class="${classes[depth - 1] || ''}">${parsedText}</div>`;
           },
           code({ text }: any) {
-            return `<div class="rca-code-block border rounded-sm p-3 my-3 overflow-x-auto"><pre class="text-sm font-mono whitespace-pre m-0"><code>${text}</code></pre></div>`;
+            return `<div class="rca-code-block border rounded-default p-3 my-3 overflow-x-auto"><pre class="text-sm font-mono whitespace-pre m-0"><code>${text}</code></pre></div>`;
           },
           codespan({ text }: any) {
-            return `<code class="rca-inline-code px-1.5 py-0.5 rounded-sm text-sm font-mono">${text}</code>`;
+            return `<code class="rca-inline-code px-1.5 py-0.5 rounded-default text-sm font-mono">${text}</code>`;
           },
           list(token: any) {
             const body = token.items.map((item: any) => this.listitem(item)).join('');
@@ -2620,7 +2620,7 @@ export default defineComponent({
               body += '</tr>';
             }
 
-            return `<div class="rca-table-wrapper my-4 overflow-x-auto"><table class="rca-table w-full border border-table-header-border rounded-sm"><thead class="bg-table-header-bg">${header}</thead><tbody>${body}</tbody></table></div>`;
+            return `<div class="rca-table-wrapper my-4 overflow-x-auto"><table class="rca-table w-full border border-table-header-border rounded-default"><thead class="bg-table-header-bg">${header}</thead><tbody>${body}</tbody></table></div>`;
           },
           blockquote({ tokens }: any) {
             const text = this.parser.parse(tokens);

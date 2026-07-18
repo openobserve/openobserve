@@ -91,8 +91,8 @@
               class="flex flex-col gap-3"
               data-test="test-match-no-result"
             >
-              <div class="flex items-center gap-3 py-3 px-3.5 rounded-lg border bg-banner-error-soft-bg border-banner-error-soft-border">
-                <div class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-status-error-bg text-status-error-text">
+              <div class="flex items-center gap-3 py-3 px-3.5 rounded-default border bg-banner-error-soft-bg border-banner-error-soft-border">
+                <div class="w-8 h-8 rounded-default flex items-center justify-center shrink-0 bg-status-error-bg text-status-error-text">
                   <OIcon name="error-outline" size="md" />
                 </div>
                 <div>
@@ -108,7 +108,7 @@
                   </div>
                 </div>
               </div>
-              <div class="py-3 px-3.5 rounded-lg bg-surface-panel border border-card-glass-border">
+              <div class="py-3 px-3.5 rounded-default bg-surface-panel border border-card-glass-border">
                 <div class="text-2xs font-semibold opacity-55 mb-1.5">
                   {{ t("modelPricing.troubleshootingTitle") }}
                 </div>
@@ -128,8 +128,8 @@
               data-test="test-match-result"
             >
               <!-- Match status -->
-              <div class="flex items-center gap-3 py-3 px-3.5 rounded-lg border bg-banner-success-bg border-banner-success-border">
-                <div class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-status-success-bg text-status-success-text">
+              <div class="flex items-center gap-3 py-3 px-3.5 rounded-default border bg-banner-success-bg border-banner-success-border">
+                <div class="w-8 h-8 rounded-default flex items-center justify-center shrink-0 bg-status-success-bg text-status-success-text">
                   <OIcon name="check-circle" size="md" />
                 </div>
                 <div class="flex-1 min-w-0">
@@ -137,7 +137,7 @@
                     {{ t("modelPricing.matchFound") }}
                   </div>
                   <div class="text-xs mt-0.5 opacity-70 truncate">
-                    <code class="inline py-px px-1.5 rounded-sm text-xs font-semibold font-mono bg-banner-success-bg border border-banner-success-border text-inherit">{{
+                    <code class="inline py-px px-1.5 rounded-default text-xs font-semibold font-mono bg-banner-success-bg border border-banner-success-border text-inherit">{{
                       testResult.matched.name
                     }}</code>
                   </div>
@@ -152,7 +152,7 @@
               </div>
 
               <!-- Priority flow -->
-              <div class="py-3 px-3.5 border border-card-glass-border rounded-lg bg-surface-panel">
+              <div class="py-3 px-3.5 border border-card-glass-border rounded-default bg-surface-panel">
                 <div class="text-3xs font-semibold opacity-40 mb-2">
                   {{ t("modelPricing.matchPriority") }}
                 </div>
@@ -165,7 +165,7 @@
                       <OIcon name="arrow-forward" size="xs" />
                     </div>
                     <div
-                      class="flex items-center gap-1.25 py-1.25 px-2.5 rounded-md border border-card-glass-border text-2xs font-medium bg-transparent"
+                      class="flex items-center gap-1.25 py-1.25 px-2.5 rounded-default border border-card-glass-border text-2xs font-medium bg-transparent"
                       :class="{
                         'border-status-positive bg-banner-success-bg font-bold': step.key === winnerSource,
                         'opacity-40': step.key !== winnerSource,
@@ -189,7 +189,7 @@
               </div>
 
               <!-- Tier + cost card -->
-              <div class="border border-card-glass-border rounded-lg overflow-hidden">
+              <div class="border border-card-glass-border rounded-default overflow-hidden">
                 <div class="py-3 px-3.5 bg-surface-panel border-b border-card-glass-border">
                   <div>
                     <div class="text-compact font-bold">
@@ -200,7 +200,7 @@
                       v-if="matchedTierDef?.condition"
                     >
                       Condition:
-                      <code class="tmm-cost-tier-desc-code py-px px-1 rounded-sm bg-surface-subtle text-2xs"
+                      <code class="tmm-cost-tier-desc-code py-px px-1 rounded-default bg-surface-subtle text-2xs"
                         >{{ matchedTierDef.condition.usage_key }}
                         {{ operatorSymbol(matchedTierDef.condition.operator) }}
                         {{ matchedTierDef.condition.value }}</code

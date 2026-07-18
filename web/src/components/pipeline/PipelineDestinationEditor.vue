@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
     </AppPageHeader>
 
-    <div class="rounded-lg py-2 px-3 overflow-auto">
+    <div class="rounded-default py-2 px-3 overflow-auto">
       <div class="w-full">
         <CreateDestinationForm
           :destination="destination"

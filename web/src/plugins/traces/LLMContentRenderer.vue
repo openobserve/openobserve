@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :show-auto-complete="false"
           :show-line-numbers="false"
           :sticky-scroll="false"
-          class="min-h-25 w-full rounded-sm overflow-hidden max-h-full! h-full!"
+          class="min-h-25 w-full rounded-default overflow-hidden max-h-full! h-full!"
         />
       </div>
     </div>
@@ -102,7 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :show-auto-complete="false"
                   :show-line-numbers="false"
                   :sticky-scroll="false"
-                  class="min-h-25 w-full rounded-sm overflow-hidden max-h-full! h-full!"
+                  class="min-h-25 w-full rounded-default overflow-hidden max-h-full! h-full!"
                 />
               </div>
               <div
@@ -113,7 +113,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
           <div v-else-if="isPlainText" class="text-content">
-            <pre class="plain-text-content m-0 p-2 whitespace-pre-wrap wrap-break-word font-mono text-compact leading-normal bg-code-bg rounded-sm overflow-x-auto">{{ contentStats.previewText }}</pre>
+            <pre class="plain-text-content m-0 p-2 whitespace-pre-wrap wrap-break-word font-mono text-compact leading-normal bg-code-bg rounded-default overflow-x-auto">{{ contentStats.previewText }}</pre>
           </div>
           <div v-else class="json-content">
             <CodeQueryEditor
@@ -124,7 +124,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :show-auto-complete="false"
               :show-line-numbers="false"
               :sticky-scroll="false"
-              class="min-h-25 w-full rounded-sm overflow-hidden max-h-full! h-full!"
+              class="min-h-25 w-full rounded-default overflow-hidden max-h-full! h-full!"
             />
           </div>
         </div>
@@ -139,7 +139,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :show-auto-complete="false"
             :show-line-numbers="false"
             :sticky-scroll="false"
-            class="min-h-25 w-full rounded-sm overflow-hidden max-h-full! h-full!"
+            class="min-h-25 w-full rounded-default overflow-hidden max-h-full! h-full!"
           />
         </div>
 
@@ -201,7 +201,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :show-auto-complete="false"
                   :show-line-numbers="false"
                   :sticky-scroll="false"
-                  class="min-h-25 w-full rounded-sm overflow-hidden max-h-full! h-full!"
+                  class="min-h-25 w-full rounded-default overflow-hidden max-h-full! h-full!"
                 />
               </div>
               <div
@@ -212,7 +212,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
           <div v-else-if="isPlainText" class="text-content">
-            <pre class="plain-text-content m-0 p-2 whitespace-pre-wrap wrap-break-word font-mono text-compact leading-normal bg-code-bg rounded-sm overflow-x-auto">{{ fullText }}</pre>
+            <pre class="plain-text-content m-0 p-2 whitespace-pre-wrap wrap-break-word font-mono text-compact leading-normal bg-code-bg rounded-default overflow-x-auto">{{ fullText }}</pre>
           </div>
           <div v-else class="json-content h-full">
             <CodeQueryEditor
@@ -223,7 +223,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :show-auto-complete="false"
               :show-line-numbers="false"
               :sticky-scroll="false"
-              class="min-h-25 w-full rounded-sm overflow-hidden max-h-full! h-full"
+              class="min-h-25 w-full rounded-default overflow-hidden max-h-full! h-full"
             />
           </div>
         </div>
@@ -238,7 +238,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :show-auto-complete="false"
             :show-line-numbers="false"
             :sticky-scroll="false"
-            class="h-full max-h-full min-h-25 w-full rounded-sm overflow-hidden"
+            class="h-full max-h-full min-h-25 w-full rounded-default overflow-hidden"
           />
         </div>
 

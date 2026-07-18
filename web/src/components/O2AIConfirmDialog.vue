@@ -1,7 +1,7 @@
 <template>
   <div v-if="visible" class="confirmation-overlay w-full mb-2">
     <div
-      class="confirmation-dialog w-full pt-4 px-4 pb-3.5 rounded-xl flex flex-col gap-3.5 bg-surface-base border-2 border-border-default shadow-[0_2px_8px_rgba(0,0,0,0.1)] dark:shadow-[0_2px_8px_rgba(0,0,0,0.3)]"
+      class="confirmation-dialog w-full pt-4 px-4 pb-3.5 rounded-default flex flex-col gap-3.5 bg-surface-base border-2 border-border-default shadow-[0_2px_8px_rgba(0,0,0,0.1)] dark:shadow-[0_2px_8px_rgba(0,0,0,0.3)]"
       @keydown="handleDialogKeydown"
       @click="handleDialogClick"
     >
@@ -17,7 +17,7 @@
             ref="yesButtonRef"
             variant="outline"
             :block="true"
-            class="confirmation-btn w-full text-sm font-semibold rounded-md normal-case tracking-normal transition-all duration-200 text-theme-accent border-2 border-border-default bg-surface-base hover:bg-button-ghost-primary-hover-bg hover:border-theme-accent"
+            class="confirmation-btn w-full text-sm font-semibold rounded-default normal-case tracking-normal transition-all duration-200 text-theme-accent border-2 border-border-default bg-surface-base hover:bg-button-ghost-primary-hover-bg hover:border-theme-accent"
             :class="isFocusedYes ? 'text-white! bg-theme-accent! border-theme-accent! ring-3 ring-theme-accent/40' : ''"
             tabindex="0"
             @click="handleConfirm"
@@ -28,7 +28,7 @@
             ref="alwaysButtonRef"
             variant="outline"
             :block="true"
-            class="confirmation-btn w-full text-sm font-semibold rounded-md normal-case tracking-normal transition-all duration-200 text-status-positive border-2 border-border-default bg-surface-base hover:bg-button-ghost-success-hover-bg hover:border-status-positive"
+            class="confirmation-btn w-full text-sm font-semibold rounded-default normal-case tracking-normal transition-all duration-200 text-status-positive border-2 border-border-default bg-surface-base hover:bg-button-ghost-success-hover-bg hover:border-status-positive"
             :class="isFocusedAlways ? 'text-white! bg-status-positive! border-status-positive! ring-3 ring-status-positive/40' : ''"
             tabindex="1"
             @click="handleAlwaysConfirm"
@@ -39,7 +39,7 @@
             ref="noButtonRef"
             variant="outline"
             :block="true"
-            class="confirmation-btn w-full text-sm font-semibold rounded-md normal-case tracking-normal transition-all duration-200 text-text-body border-2 border-border-default bg-surface-base hover:bg-button-ghost-destructive-hover-bg hover:border-status-negative"
+            class="confirmation-btn w-full text-sm font-semibold rounded-default normal-case tracking-normal transition-all duration-200 text-text-body border-2 border-border-default bg-surface-base hover:bg-button-ghost-destructive-hover-bg hover:border-status-negative"
             :class="isFocusedNo ? 'text-white! bg-status-negative! border-status-negative! ring-3 ring-status-negative/40' : ''"
             tabindex="2"
             @click="handleCancel"
@@ -54,7 +54,7 @@
             ref="yesButtonRef"
             variant="outline"
             :block="true"
-            class="confirmation-btn w-full text-sm font-semibold rounded-md normal-case tracking-normal transition-all duration-200 text-theme-accent border-2 border-border-default bg-surface-base hover:bg-button-ghost-primary-hover-bg hover:border-theme-accent"
+            class="confirmation-btn w-full text-sm font-semibold rounded-default normal-case tracking-normal transition-all duration-200 text-theme-accent border-2 border-border-default bg-surface-base hover:bg-button-ghost-primary-hover-bg hover:border-theme-accent"
             :class="isFocusedYes ? 'text-white! bg-theme-accent! border-theme-accent! ring-3 ring-theme-accent/40' : ''"
             tabindex="0"
             @click="handleConfirm"
@@ -65,7 +65,7 @@
             ref="noButtonRef"
             variant="outline"
             :block="true"
-            class="confirmation-btn w-full text-sm font-semibold rounded-md normal-case tracking-normal transition-all duration-200 text-text-body border-2 border-border-default bg-surface-base hover:bg-button-ghost-destructive-hover-bg hover:border-status-negative"
+            class="confirmation-btn w-full text-sm font-semibold rounded-default normal-case tracking-normal transition-all duration-200 text-text-body border-2 border-border-default bg-surface-base hover:bg-button-ghost-destructive-hover-bg hover:border-status-negative"
             :class="isFocusedNo ? 'text-white! bg-status-negative! border-status-negative! ring-3 ring-status-negative/40' : ''"
             tabindex="1"
             @click="handleCancel"

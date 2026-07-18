@@ -47,7 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       v-else
       data-test="associate-function-routing-container"
-      class="rounded-lg w-full pt-3 pb-3 flex flex-col gap-4 flex-1 min-h-0"
+      class="rounded-default w-full pt-3 pb-3 flex flex-col gap-4 flex-1 min-h-0"
     >
       <div class="flex items-center gap-3 px-(--spacing-dialog-header-px)">
         <OSwitch
@@ -92,7 +92,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="associate-function-definition-section"
             class="mt-4 mb-4"
           >
-            <OCard class="function-definition-card border border-border-default rounded-lg shadow-[0_2px_4px_rgba(0,0,0,0.05)] dark:shadow-[0_4px_12px_rgba(0,0,0,0.4)] overflow-hidden bg-surface-base">
+            <OCard class="function-definition-card border border-border-default rounded-default shadow-[0_2px_4px_rgba(0,0,0,0.05)] dark:shadow-[0_4px_12px_rgba(0,0,0,0.4)] overflow-hidden bg-surface-base">
               <OCardSection role="header" class="function-definition-header bg-[linear-gradient(135deg,#f8fafc_0%,#f1f5f9_100%)] dark:bg-[linear-gradient(135deg,#2d3748_0%,#1a202c_100%)] border-b border-b-border-default">
                 <div class="text-base font-semibold text-text-heading">
                   {{ t("function.function_definition") }}
@@ -118,7 +118,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
 
             <!-- Info note explaining RAF/RBF -->
-            <div class="bg-banner-warning-bg text-banner-warning-text w-full rounded-md p-3 flex flex-col gap-2">
+            <div class="bg-banner-warning-bg text-banner-warning-text w-full rounded-default p-3 flex flex-col gap-2">
               <div class="text-sm text-banner-warning-text">
                 Function Execution Guidelines:
               </div>

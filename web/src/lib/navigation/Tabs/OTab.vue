@@ -79,7 +79,7 @@ const baseClasses = computed<string>(() => [
     ? 'flex justify-start'
     : 'inline-flex justify-center',
   'px-2 font-normal text-sm whitespace-nowrap',
-  isVertical.value ? 'rounded-lg' : 'rounded-t-md',
+  isVertical.value ? 'rounded-default' : 'rounded-t-default',
   'outline-none transition-[color,background-color,border-color,text-decoration-color,fill,stroke,box-shadow] duration-150',
   'select-none',
   'ring-offset-1 ring-offset-surface-base',

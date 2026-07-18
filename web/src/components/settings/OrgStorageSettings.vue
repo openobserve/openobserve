@@ -86,9 +86,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             v-for="feature in features"
             :key="feature.title"
-            class="feature-card flex items-start rounded-xl border border-border-default bg-surface-base shadow-md transition-all duration-200 gap-4 py-5 px-5.5 hover:shadow-lg hover:-translate-y-px"
+            class="feature-card flex items-start rounded-default border border-border-default bg-surface-base shadow-md transition-all duration-200 gap-4 py-5 px-5.5 hover:shadow-lg hover:-translate-y-px"
           >
-            <div class="feature-card__icon-box w-10 h-10 rounded-lg bg-[color-mix(in_srgb,var(--color-theme-accent)_8%,transparent)] flex items-center justify-center shrink-0">
+            <div class="feature-card__icon-box w-10 h-10 rounded-default bg-[color-mix(in_srgb,var(--color-theme-accent)_8%,transparent)] flex items-center justify-center shrink-0">
               <OIcon :name="feature.icon" size="md" class="feature-card__icon text-theme-accent opacity-85" />
             </div>
             <div class="feature-card__content pt-0.5 flex-1">
@@ -151,7 +151,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <div class="p-3">
       <OCard
-        class="storage-card rounded-xl bg-surface-base max-w-170"
+        class="storage-card rounded-default bg-surface-base max-w-170"
       >
         <!-- Card header: logo + name + badge | update button -->
         <OCardSection role="header">

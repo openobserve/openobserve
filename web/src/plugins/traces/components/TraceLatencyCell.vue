@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     data-test="trace-row-latency-bar"
-    class="flex flex-nowrap h-[0.85rem] rounded-sm overflow-hidden w-full bg-card-glass-border"
+    class="flex flex-nowrap h-[0.85rem] rounded-default overflow-hidden w-full bg-card-glass-border"
   >
     <div
       v-for="[service, svc] in serviceEntries"

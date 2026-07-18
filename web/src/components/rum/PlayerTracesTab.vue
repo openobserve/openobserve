@@ -76,14 +76,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="flex items-center gap-1.5 flex-shrink-0">
           <span
             v-if="selectedTrace.metadata?.errorCount > 0"
-            class="font-bold inline-flex items-center gap-1 px-1.5 py-0.5 rounded-sm text-2xs bg-status-error-bg! text-status-error-text!"
+            class="font-bold inline-flex items-center gap-1 px-1.5 py-0.5 rounded-default text-2xs bg-status-error-bg! text-status-error-text!"
           >
             <OIcon name="error" size="xs" />
             {{ selectedTrace.metadata.errorCount }} {{ selectedTrace.metadata.errorCount === 1 ? t("rum.error") : t("rum.errors") }}
           </span>
           <button
             v-if="selectedTrace.metadata?.start_time && props.startTime > 0"
-            class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-sm text-2xs bg-surface-accent text-text-body whitespace-nowrap cursor-pointer hover:bg-card-glass-border"
+            class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-default text-2xs bg-surface-accent text-text-body whitespace-nowrap cursor-pointer hover:bg-card-glass-border"
             :title="t('rum.seekToMoment')"
             data-test="rum-player-traces-tab-seek-btn"
             @click="seekToTrace(selectedTrace)"
@@ -93,14 +93,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </button>
           <span
             v-if="selectedTrace.metadata?.e2eDuration"
-            class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-sm text-2xs bg-surface-accent text-text-body whitespace-nowrap"
+            class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-default text-2xs bg-surface-accent text-text-body whitespace-nowrap"
           >
             <OIcon name="timer" size="xs" class="text-text-secondary" />
             {{ formatTimeWithSuffix(selectedTrace.metadata.e2eDuration * 1000) }}
           </span>
           <span
             v-if="selectedTrace.metadata?.spanCount"
-            class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-sm text-2xs bg-surface-accent text-text-body whitespace-nowrap"
+            class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-default text-2xs bg-surface-accent text-text-body whitespace-nowrap"
           >
             <OIcon name="lan" size="xs" class="text-text-secondary" />
             {{ selectedTrace.metadata.spanCount }} {{ selectedTrace.metadata.spanCount === 1 ? t("rum.span") : t("rum.spans") }}
@@ -160,7 +160,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- Traces table -->
-      <div class="flex-1 min-h-0 overflow-hidden rounded-sm">
+      <div class="flex-1 min-h-0 overflow-hidden rounded-default">
         <TenstackTable
           :rows="correlatedViews"
           :columns="traceColumns"

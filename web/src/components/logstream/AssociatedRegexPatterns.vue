@@ -133,7 +133,7 @@
           >
             <!-- Pattern Info Card -->
             <div
-              class="section-card p-3 rounded-lg border bg-surface-subtle border-border-default"
+              class="section-card p-3 rounded-default border bg-surface-subtle border-border-default"
             >
               <div class="flex flex-col gap-2">
                 <div class="flex flex-col gap-1">
@@ -170,7 +170,7 @@
 
             <!-- Configuration Card -->
             <div
-              class="section-card p-3 rounded-lg border bg-surface-subtle border-border-default"
+              class="section-card p-3 rounded-default border bg-surface-subtle border-border-default"
             >
               <div class="flex gap-4">
                 <!-- when value matches -->
@@ -242,7 +242,7 @@
 
             <!-- Test Pattern Card -->
             <div
-              class="section-card p-3 rounded-lg border bg-surface-subtle border-border-default"
+              class="section-card p-3 rounded-default border bg-surface-subtle border-border-default"
             >
               <div class="flex flex-col gap-2.5">
                 <div class="flex items-center justify-between">
@@ -268,7 +268,7 @@
                     {{ t('regex_patterns.regex_pattern_label') }}
                   </span>
                   <div
-                    class="p-2 rounded-sm font-mono text-2xs break-all bg-surface-base"
+                    class="p-2 rounded-default font-mono text-2xs break-all bg-surface-base"
                   >
                     <span
                       class="regex-pattern-text text-xs font-normal leading-6 break-all whitespace-pre-wrap overflow-wrap-anywhere text-text-secondary"
@@ -894,8 +894,8 @@ export default defineComponent({
 /* keep(lib-override:o2-input): squares the top corners of the textarea's own
    border box (OInput's internal wrapper div, only reachable via :deep()) so each
    field reads as one unit under its flat full-width section-header strip. */
-.regex-pattern-input :deep(.rounded-md.border),
-.regex-test-string-input :deep(.rounded-md.border) {
+.regex-pattern-input :deep(.rounded-default.border),
+.regex-test-string-input :deep(.rounded-default.border) {
   border-top-left-radius: 0 !important;
   border-top-right-radius: 0 !important;
 }

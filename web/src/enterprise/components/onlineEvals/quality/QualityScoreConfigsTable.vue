@@ -1,6 +1,6 @@
 <template>
   <section class="flex flex-col gap-2.5 min-h-0 flex-1" data-test="quality-score-configs-overview">
-    <div v-if="isLoading && rows.length === 0" class="flex flex-col items-center gap-2 py-8 px-3 border border-dashed border-dialog-header-border rounded-md text-center text-text-secondary">
+    <div v-if="isLoading && rows.length === 0" class="flex flex-col items-center gap-2 py-8 px-3 border border-dashed border-dialog-header-border rounded-default text-center text-text-secondary">
       <OSpinner size="sm" />
       <span>{{ t("onlineEvals.quality.loading") }}</span>
     </div>

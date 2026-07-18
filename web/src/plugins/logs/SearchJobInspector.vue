@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #actions>
         <div
           v-if="profileData && !hasNoData"
-          class="flex items-center gap-1.5 px-2 py-1 rounded-md border bg-surface-panel border-border-default"
+          class="flex items-center gap-1.5 px-2 py-1 rounded-default border bg-surface-panel border-border-default"
         >
           <svg class="w-3.5 h-3.5 opacity-70 text-icon-color" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
             <rect x="3" y="6" width="18" height="14" rx="2" stroke="currentColor" stroke-width="2"/>
@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </svg>
           <div class="flex items-center gap-1.5">
             <span
-              class="text-3xs font-small px-1.5 py-0.5 rounded-sm text-text-secondary bg-surface-subtle"
+              class="text-3xs font-small px-1.5 py-0.5 rounded-default text-text-secondary bg-surface-subtle"
             >
               {{ store.state.timezone || 'UTC' }}
             </span>
@@ -55,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Results Returned -->
           <div class="stat-tile">
             <div
-              class="rounded-lg p-3 border h-28 flex flex-col justify-between bg-surface-base border-border-default"
+              class="rounded-default p-3 border h-28 flex flex-col justify-between bg-surface-base border-border-default"
             >
               <div class="flex justify-between items-start">
                 <div
@@ -64,7 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   Results
                 </div>
                 <div
-                  class="w-10 h-10 rounded-lg flex items-center justify-center border"
+                  class="w-10 h-10 rounded-default flex items-center justify-center border"
                   style="background: rgba(57, 126, 246, 0.2); border-color: rgba(57, 126, 246, 0.35);"
                 >
                   <img src="@/assets/images/home/records.svg" alt="Results Icon" class="h-6 w-6" />
@@ -88,7 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Events Scanned -->
           <div class="stat-tile">
             <div
-              class="rounded-lg p-3 border h-28 flex flex-col justify-between bg-surface-base border-border-default"
+              class="rounded-default p-3 border h-28 flex flex-col justify-between bg-surface-base border-border-default"
             >
               <div class="flex justify-between items-start">
                 <div
@@ -97,7 +97,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   Scanned Events
                 </div>
                 <div
-                  class="w-10 h-10 rounded-lg flex items-center justify-center border"
+                  class="w-10 h-10 rounded-default flex items-center justify-center border"
                   style="background: rgba(57, 126, 246, 0.2); border-color: rgba(57, 126, 246, 0.35);"
                 >
                   <img src="@/assets/images/home/streams.svg" alt="Events Icon" class="h-6 w-6" />
@@ -121,7 +121,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Time Taken -->
           <div class="stat-tile">
             <div
-              class="rounded-lg p-3 border h-28 flex flex-col justify-between bg-surface-base border-border-default"
+              class="rounded-default p-3 border h-28 flex flex-col justify-between bg-surface-base border-border-default"
             >
               <div class="flex justify-between items-start">
                 <div
@@ -130,7 +130,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   Time Taken
                 </div>
                 <div
-                  class="w-10 h-10 rounded-lg flex items-center justify-center border"
+                  class="w-10 h-10 rounded-default flex items-center justify-center border"
                   style="background: rgba(34, 197, 94, 0.2); border-color: rgba(34, 197, 94, 0.35);"
                 >
                   <svg class="h-6 w-6 text-status-positive" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -158,7 +158,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Trace ID -->
           <div class="stat-tile">
             <div
-              class="rounded-lg p-3 border h-28 flex flex-col justify-between bg-surface-base border-border-default"
+              class="rounded-default p-3 border h-28 flex flex-col justify-between bg-surface-base border-border-default"
             >
               <div class="flex justify-between items-start">
                 <div
@@ -167,7 +167,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   Trace ID
                 </div>
                 <div
-                  class="w-10 h-10 rounded-lg flex items-center justify-center border"
+                  class="w-10 h-10 rounded-default flex items-center justify-center border"
                   style="background: rgba(242, 220, 245, 0.25); border-color: rgba(242, 220, 245, 0.45);"
                 >
                   <svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -191,12 +191,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- View Query -->
           <div class="stat-tile">
             <div
-              class="rounded-lg p-3 border h-28 flex flex-col items-center justify-center transition-all bg-surface-base border-border-default"
+              class="rounded-default p-3 border h-28 flex flex-col items-center justify-center transition-all bg-surface-base border-border-default"
               :class="hasNoData ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:border-primary hover:shadow-lg'"
               @click="!hasNoData && (showSqlDialog = true)"
             >
               <div
-                class="w-12 h-12 rounded-lg flex items-center justify-center border mb-2"
+                class="w-12 h-12 rounded-default flex items-center justify-center border mb-2"
                 style="background: rgba(245, 235, 147, 0.25); border-color: rgba(245, 235, 147, 0.45);"
               >
                 <svg class="h-7 w-7 text-status-warning-text" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -250,7 +250,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #cell-duration="{ row }">
               <div class="flex items-center gap-2 min-w-37.5">
                 <div
-                  class="h-5 rounded-sm min-w-1 transition-[width] duration-300 ease-in-out"
+                  class="h-5 rounded-default min-w-1 transition-[width] duration-300 ease-in-out"
                   :style="{
                     width: calculateBarWidth(row.duration) + '%',
                     backgroundColor: getDurationColor(row.duration),
@@ -296,7 +296,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
       </template>
       <div
-        class="rounded-sm p-4 max-h-[calc(100vh-150px)] overflow-auto bg-surface-subtle"
+        class="rounded-default p-4 max-h-[calc(100vh-150px)] overflow-auto bg-surface-subtle"
       >
         <pre
           class="font-mono text-compact leading-[1.6] m-0 whitespace-pre-wrap break-words"
@@ -308,7 +308,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Trace ID Dialog -->
     <ODialog data-test="search-job-inspector-trace-id-dialog" v-model:open="showTraceIdDialog" size="sm" title="Full Trace ID">
       <div class="flex items-center gap-3">
-        <div class="flex-1 font-mono text-sm break-all p-3 rounded-sm border bg-surface-panel border-border-default text-text-link">
+        <div class="flex-1 font-mono text-sm break-all p-3 rounded-default border bg-surface-panel border-border-default text-text-link">
           {{ traceId }}
         </div>
         <OButton

@@ -35,9 +35,9 @@
     <div class="job-form__body flex-1 min-h-0 overflow-hidden flex gap-2 max-[68.75rem]:flex-col">
       <div class="job-form__main flex-[6.5] min-w-0 min-h-0 overflow-auto flex flex-col gap-2 p-2 max-[68.75rem]:flex-auto">
         <!-- Target -->
-        <section class="bg-card-glass-bg border border-(--color-dialog-header-border,var(--color-border-default)) rounded-md overflow-hidden shrink-0">
+        <section class="bg-card-glass-bg border border-(--color-dialog-header-border,var(--color-border-default)) rounded-default overflow-hidden shrink-0">
           <div class="flex items-center py-2.5 px-3 border-b border-(--color-border-default,var(--color-border-default))">
-            <div class="w-0.75 h-4 rounded-sm mr-2 shrink-0 bg-theme-accent" />
+            <div class="w-0.75 h-4 rounded-default mr-2 shrink-0 bg-theme-accent" />
             <span class="text-compact font-semibold tracking-[0.01em] text-(--color-text-heading,currentColor)">{{ t("onlineEvals.job.targetSection") }}</span>
           </div>
           <div class="flex flex-col gap-3 py-3.5 px-4">
@@ -86,9 +86,9 @@
         </section>
 
         <!-- Scorers + Filter + Mapping -->
-        <section class="bg-card-glass-bg border border-(--color-dialog-header-border,var(--color-border-default)) rounded-md overflow-hidden shrink-0">
+        <section class="bg-card-glass-bg border border-(--color-dialog-header-border,var(--color-border-default)) rounded-default overflow-hidden shrink-0">
           <div class="flex items-center py-2.5 px-3 border-b border-(--color-border-default,var(--color-border-default))">
-            <div class="w-0.75 h-4 rounded-sm mr-2 shrink-0 bg-theme-accent" />
+            <div class="w-0.75 h-4 rounded-default mr-2 shrink-0 bg-theme-accent" />
             <span class="text-compact font-semibold tracking-[0.01em] text-(--color-text-heading,currentColor)">{{ t("onlineEvals.job.scorersSection") }}</span>
           </div>
           <div class="flex flex-col gap-3 py-3.5 px-4">
@@ -112,9 +112,9 @@
         </section>
 
         <!-- Sampling -->
-        <section class="bg-card-glass-bg border border-(--color-dialog-header-border,var(--color-border-default)) rounded-md overflow-hidden shrink-0">
+        <section class="bg-card-glass-bg border border-(--color-dialog-header-border,var(--color-border-default)) rounded-default overflow-hidden shrink-0">
           <div class="flex items-center py-2.5 px-3 border-b border-(--color-border-default,var(--color-border-default))">
-            <div class="w-0.75 h-4 rounded-sm mr-2 shrink-0 bg-theme-accent" />
+            <div class="w-0.75 h-4 rounded-default mr-2 shrink-0 bg-theme-accent" />
             <span class="text-compact font-semibold tracking-[0.01em] text-(--color-text-heading,currentColor)">{{ t("onlineEvals.job.stepper.sampling") }}</span>
           </div>
           <div class="flex flex-col gap-3 py-3.5 px-4">
@@ -162,7 +162,7 @@
       />
     </div>
 
-    <footer class="sticky bottom-0 flex items-center justify-end gap-2 px-5.5 py-3 bg-surface-base rounded-md shadow-[0_0_0.313rem_0.063rem_var(--color-hover-shadow)] shrink-0 z-1">
+    <footer class="sticky bottom-0 flex items-center justify-end gap-2 px-5.5 py-3 bg-surface-base rounded-default shadow-[0_0_0.313rem_0.063rem_var(--color-hover-shadow)] shrink-0 z-1">
       <OButton
         data-test="job-form-cancel-btn"
         type="button"

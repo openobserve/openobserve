@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-for="card in cards"
       :key="card.key"
       type="button"
-      class="metric-card flex flex-col items-start gap-0.5 text-left rounded-lg border p-3 transition-colors bg-card-glass-bg enabled:cursor-pointer enabled:hover:border-accent disabled:cursor-default"
+      class="metric-card flex flex-col items-start gap-0.5 text-left rounded-default border p-3 transition-colors bg-card-glass-bg enabled:cursor-pointer enabled:hover:border-accent disabled:cursor-default"
       :class="
         card.key === activeCard
           ? 'border-accent'

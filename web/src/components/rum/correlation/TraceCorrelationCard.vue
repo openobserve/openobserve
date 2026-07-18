@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="mt-3 border border-solid border-card-glass-border rounded-sm">
+  <div class="mt-3 border border-solid border-card-glass-border rounded-default">
     <div class="text-base text-text-heading font-bold ml-1 mb-2">Distributed Trace</div>
 
     <template v-if="isLoading">
@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="w-3/4 flex items-center flex-nowrap">
             <code
               data-test="trace-correlation-card-trace-id-text"
-              class="font-mono text-sm py-1 px-2 bg-surface-accent rounded-sm text-text-body"
+              class="font-mono text-sm py-1 px-2 bg-surface-accent rounded-default text-text-body"
             >{{ formatTraceId(traceId) }}</code>
             <OButton
               icon-left="content-copy"
@@ -59,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="w-3/4">
             <code
               data-test="trace-correlation-card-span-id-text"
-              class="font-mono text-sm py-1 px-2 bg-surface-accent rounded-sm text-text-body"
+              class="font-mono text-sm py-1 px-2 bg-surface-accent rounded-default text-text-body"
             >{{ formatSpanId(spanId) }}</code>
           </div>
         </div>
@@ -96,7 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Performance Breakdown -->
         <div v-if="performanceData" class="mb-3">
           <div class="text-text-label mb-1">Performance Breakdown:</div>
-          <div class="p-2 bg-surface-accent rounded-sm text-sm">
+          <div class="p-2 bg-surface-accent rounded-default text-sm">
             <div class="flex items-center mb-1">
               <div class="w-5/12 text-text-label">Total Duration:</div>
               <div class="w-7/12 font-bold">
@@ -184,7 +184,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Missing trace notice -->
         <div
           v-if="!hasBackendTrace && traceId"
-          class="mt-3 p-2 bg-surface-accent rounded-sm"
+          class="mt-3 p-2 bg-surface-accent rounded-default"
         >
           <div class="flex items-center">
             <OIcon name="info" size="sm" class="mr-2" />

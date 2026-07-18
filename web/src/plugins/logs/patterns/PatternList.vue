@@ -101,10 +101,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="min-h-8 flex items-center border-b border-card-glass-border bg-theme-table-header-bg min-w-full"
       >
         <div class="flex-1 min-w-0 px-2">
-          <span class="pattern-skel-pill inline-block h-3 w-16 rounded-sm" aria-hidden="true" />
+          <span class="pattern-skel-pill inline-block h-3 w-16 rounded-default" aria-hidden="true" />
         </div>
         <div class="w-24 flex-shrink-0 px-2 flex justify-end">
-          <span class="pattern-skel-pill inline-block h-3 w-14 rounded-sm" aria-hidden="true" />
+          <span class="pattern-skel-pill inline-block h-3 w-14 rounded-default" aria-hidden="true" />
         </div>
         <div class="w-20 flex-shrink-0 px-2" />
       </div>
@@ -120,12 +120,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span class="absolute left-0 inset-y-0 w-1 pattern-skel-pill" aria-hidden="true" />
         <!-- Pattern column -->
         <div class="flex-1 min-w-0 px-2 pl-3">
-          <span class="pattern-skel-pill inline-block h-3 rounded-sm" :class="skeletonWidth" aria-hidden="true" />
+          <span class="pattern-skel-pill inline-block h-3 rounded-default" :class="skeletonWidth" aria-hidden="true" />
         </div>
         <!-- Count column -->
         <div class="w-24 flex-shrink-0 px-2 flex flex-col items-end gap-1">
-          <span class="pattern-skel-pill inline-block h-3 w-12 rounded-sm" aria-hidden="true" />
-          <span class="pattern-skel-pill inline-block h-2 w-10 rounded-sm" aria-hidden="true" />
+          <span class="pattern-skel-pill inline-block h-3 w-12 rounded-default" aria-hidden="true" />
+          <span class="pattern-skel-pill inline-block h-2 w-10 rounded-default" aria-hidden="true" />
         </div>
         <!-- Actions column — 3 icon-sized circles -->
         <div class="w-20 flex-shrink-0 px-2 flex items-center justify-center gap-1">

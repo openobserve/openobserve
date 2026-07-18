@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div
     v-show="visible && !!anchorEl"
     ref="popoverRef"
-    class="wcp w-72 bg-card-glass-solid border border-border-default rounded-lg overflow-hidden shadow-[0_0.5rem_1.5rem_rgba(0,0,0,0.14),0_0.125rem_0.375rem_rgba(0,0,0,0.06)]"
+    class="wcp w-72 bg-card-glass-solid border border-border-default rounded-default overflow-hidden shadow-[0_0.5rem_1.5rem_rgba(0,0,0,0.14),0_0.125rem_0.375rem_rgba(0,0,0,0.06)]"
     :class="{ 'wcp--flip-up': flipUpward }"
     :style="popoverStyle"
     data-test="wildcard-value-popover"

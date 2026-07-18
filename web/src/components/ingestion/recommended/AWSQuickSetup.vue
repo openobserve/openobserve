@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div>
     <div class="setup-card max-w-225 mx-auto">
       <!-- Header -->
-      <div class="mb-6 p-4 rounded-lg" :class="quickInstallBgClass">
+      <div class="mb-6 p-4 rounded-default" :class="quickInstallBgClass">
         <div class="flex items-start gap-3">
           <OIcon
             name="rocket-launch"
@@ -65,7 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Step: Services -->
       <div class="mb-6">
         <div
-          class="flex items-center justify-between cursor-pointer py-2 px-3 rounded-sm"
+          class="flex items-center justify-between cursor-pointer py-2 px-3 rounded-default"
           :class="collapsibleHeaderClass"
           @click="showServices = !showServices"
         >
@@ -147,7 +147,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <div class="mb-6">
           <div
-            class="flex items-center justify-between cursor-pointer py-2 px-3 rounded-sm"
+            class="flex items-center justify-between cursor-pointer py-2 px-3 rounded-default"
           :class="collapsibleHeaderClass"
             @click="showTargetRegions = !showTargetRegions"
           >
@@ -294,7 +294,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="overflow-hidden min-h-0">
         <div>
           <OSeparator class="mb-4" />
-          <div class="rounded-lg p-4" :class="paramHelperClass">
+          <div class="rounded-default p-4" :class="paramHelperClass">
             <div class="flex items-center justify-between mb-3">
               <div class="font-semibold text-sm" :class="stepLabelClass">
                 Parameters to enter in the AWS wizard
@@ -315,7 +315,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div
                 v-for="param in stackSetParams"
                 :key="param.key"
-                class="flex items-center gap-3 py-1.5 px-2.5 rounded-sm text-compact font-mono"
+                class="flex items-center gap-3 py-1.5 px-2.5 rounded-default text-compact font-mono"
                 :class="paramRowClass"
               >
                 <div class="min-w-60 font-semibold shrink-0" :class="paramKeyClass">{{ param.key }}</div>

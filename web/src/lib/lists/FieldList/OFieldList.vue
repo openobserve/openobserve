@@ -66,7 +66,7 @@
         <!-- Field row -->
         <div
           v-else
-          class="o-field-list__row group mt-1 flex items-center w-full min-h-6 p-0 relative cursor-pointer rounded-sm text-xs leading-[0.8rem]"
+          class="o-field-list__row group mt-1 flex items-center w-full min-h-6 p-0 relative cursor-pointer rounded-default text-xs leading-[0.8rem]"
           :class="{ 'o-field-list__row--draggable': draggable }"
           :data-test="`o-field-list-row-${row.name}`"
           :draggable="draggable && isDragEnabled(row, row._index ?? 0)"
@@ -101,7 +101,7 @@
               </OFieldRow>
             </slot>
           </div>
-          <div v-if="$slots['field-actions']" class="o-field-list__actions flex items-stretch shrink-0 invisible opacity-0 group-hover:visible group-hover:opacity-100 transition-[opacity,visibility] duration-[120ms] ease-[ease] absolute right-1 top-1/2 -translate-y-1/2 border border-field-list-actions-border rounded-sm overflow-hidden bg-field-list-actions-bg">
+          <div v-if="$slots['field-actions']" class="o-field-list__actions flex items-stretch shrink-0 invisible opacity-0 group-hover:visible group-hover:opacity-100 transition-[opacity,visibility] duration-[120ms] ease-[ease] absolute right-1 top-1/2 -translate-y-1/2 border border-field-list-actions-border rounded-default overflow-hidden bg-field-list-actions-bg">
             <slot name="field-actions" :row="row" :index="row._index" />
           </div>
         </div>
@@ -109,7 +109,7 @@
         <!-- Expanded content -->
         <div
           v-if="isExpanded(row) && $slots.expansion"
-          class="w-full pt-1 pb-1.5 border border-field-list-expansion-border border-t-0 rounded-b-sm mb-1.5 relative z-[1] box-border"
+          class="w-full pt-1 pb-1.5 border border-field-list-expansion-border border-t-0 rounded-b-default mb-1.5 relative z-[1] box-border"
         >
           <slot name="expansion" :row="row" />
         </div>
@@ -406,7 +406,7 @@ defineExpose({ scrollToTop });
   margin-top: 0.5rem;
 }
 
-/* Make each chip flush (no individual border, no rounded-sm corners),
+/* Make each chip flush (no individual border, no rounded-default corners),
    and put a vertical separator between adjacent chips. */
 .o-field-list__actions > :deep(*) {
   border: 0 !important;

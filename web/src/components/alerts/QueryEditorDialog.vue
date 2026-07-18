@@ -39,13 +39,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Stream Type + Stream Name -->
           <div class="flex items-center gap-2">
-            <div v-if="streamType" class="inline-flex flex-row items-center gap-1.25 py-0.75 px-2.5 rounded-md bg-[color-mix(in_srgb,var(--color-info)_10%,transparent)] border border-[color-mix(in_srgb,var(--color-info)_28%,transparent)]">
+            <div v-if="streamType" class="inline-flex flex-row items-center gap-1.25 py-0.75 px-2.5 rounded-default bg-[color-mix(in_srgb,var(--color-info)_10%,transparent)] border border-[color-mix(in_srgb,var(--color-info)_28%,transparent)]">
               <span class="text-2xs font-semibold text-text-label">{{ t("alerts.streamType") }}</span>
               <span class="text-2xs opacity-30 text-text-label">:</span>
               <span class="text-xs font-bold text-text-link">{{ streamType }}</span>
             </div>
             <span v-if="streamType && streamName" class="opacity-20 select-none">|</span>
-            <div class="inline-flex flex-row items-center gap-1.25 py-0.75 px-2.5 rounded-md bg-[color-mix(in_srgb,var(--color-sql-accent)_10%,transparent)] border border-[color-mix(in_srgb,var(--color-sql-accent)_28%,transparent)]">
+            <div class="inline-flex flex-row items-center gap-1.25 py-0.75 px-2.5 rounded-default bg-[color-mix(in_srgb,var(--color-sql-accent)_10%,transparent)] border border-[color-mix(in_srgb,var(--color-sql-accent)_28%,transparent)]">
               <span class="text-2xs font-semibold text-text-label">{{ t("alerts.stream_name") }}</span>
               <span class="text-2xs opacity-30 text-text-label">:</span>
               <span v-if="streamName" class="text-xs font-bold text-sql-accent">{{ streamName }}</span>
@@ -84,7 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- Left Section (25%) — Field Browser -->
             <div
-              class="h-full rounded-lg overflow-hidden p-2.5 border border-border-default bg-surface-base"
+              class="h-full rounded-default overflow-hidden p-2.5 border border-border-default bg-surface-base"
             >
               <SearchFieldList
                 :fields="fieldListItems"
@@ -104,14 +104,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="flex-[3] w-full flex flex-col overflow-visible min-h-55">
                   <!-- Editor Pane (no overflow:hidden bottom clip issue for status bar) -->
                   <div
-                    class="flex-1 w-full flex flex-col overflow-hidden rounded-lg border border-border-default border-b-0 rounded-b-none"
+                    class="flex-1 w-full flex flex-col overflow-hidden rounded-default border border-border-default border-b-0 rounded-b-none"
                   >
                     <!-- Pane Header -->
                     <div
                       class="flex items-center justify-between py-2 px-3 min-h-12 shrink-0 bg-surface-subtle border-b border-border-default"
                     >
                       <div class="flex items-center gap-2">
-                        <div class="w-0.75 h-3.5 rounded-sm shrink-0 bg-theme-accent" />
+                        <div class="w-0.75 h-3.5 rounded-default shrink-0 bg-theme-accent" />
                         <span class="text-xs font-semibold">{{ localTab === 'sql' ? t('alerts.sqlEditor') : t('alerts.promqlEditor') }}</span>
                       </div>
                       <div class="flex items-center gap-2">
@@ -127,7 +127,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           data-test="alert-run-query-btn"
                           variant="primary"
                           size="sm"
-                          class="h-7 text-xs rounded-md px-3!"
+                          class="h-7 text-xs rounded-default px-3!"
                           :disabled="localTab == 'sql' ? localSqlQuery == '' : localPromqlQuery == ''"
                           @click="localTab === 'sql' ? runSqlQuery() : runPromqlQuery()"
                         >
@@ -170,7 +170,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="relative h-5.5 shrink-0 text-compact font-medium cursor-default"
                     :class="[
                       sqlStatusBarClasses,
-                      'border-l border-r border-b border-border-default rounded-bl-lg rounded-br-lg'
+                      'border-l border-r border-b border-border-default rounded-bl-default rounded-br-default'
                     ]"
                   >
                     <div class="absolute inset-0 flex items-center gap-1.25 px-2.5 overflow-hidden">
@@ -211,7 +211,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <!-- VRL Editor Pane -->
                 <div
                   v-if="localTab !== 'promql'"
-                  class="w-full flex flex-col overflow-hidden rounded-lg"
+                  class="w-full flex flex-col overflow-hidden rounded-default"
                   :class="[
                     'border border-border-default',
                     sqlEditorMaximized ? 'flex-none' : 'flex-[2] min-h-40'
@@ -222,7 +222,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="flex items-center justify-between py-2 px-3 min-h-12 shrink-0 bg-surface-subtle border-b border-border-default"
                   >
                     <div class="flex items-center gap-2">
-                      <div class="w-0.75 h-3.5 rounded-sm shrink-0 bg-section-accent-secondary" />
+                      <div class="w-0.75 h-3.5 rounded-default shrink-0 bg-section-accent-secondary" />
                       <span class="text-xs font-semibold">{{ t('alerts.vrlEditor') }}</span>
                     </div>
                     <div v-if="!sqlEditorMaximized" class="flex gap-2 items-center">
@@ -250,7 +250,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         data-test="alert-apply-vrl-btn"
                         variant="primary"
                         size="sm"
-                        class="h-7 text-xs rounded-md px-3!"
+                        class="h-7 text-xs rounded-default px-3!"
                         :disabled="vrlFunctionContent == ''"
                         @click="runTestFunction"
                       >
@@ -300,18 +300,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <!-- Query Result Pane -->
               <div
-                class="flex-1 flex flex-col overflow-hidden rounded-lg border border-border-default min-h-55"
+                class="flex-1 flex flex-col overflow-hidden rounded-default border border-border-default min-h-55"
               >
                 <!-- Pane Header -->
                 <div
                   class="flex items-center justify-between py-2 px-3 min-h-12 shrink-0 bg-surface-subtle border-b border-border-default"
                 >
                   <div class="flex items-center gap-2">
-                    <div class="w-0.75 h-3.5 rounded-sm shrink-0 bg-theme-accent" />
+                    <div class="w-0.75 h-3.5 rounded-default shrink-0 bg-theme-accent" />
                     <span class="text-xs font-semibold">{{ t('alerts.queryEditor.queryResult') }}</span>
                     <span
                       v-if="multiTimeRange && multiTimeRange.length > 0"
-                      class="text-3xs font-bold py-px px-1.75 rounded-sm tracking-[0.04em] bg-status-info-bg border border-banner-info-border text-text-link"
+                      class="text-3xs font-bold py-px px-1.75 rounded-default tracking-[0.04em] bg-status-info-bg border border-banner-info-border text-text-link"
                     >{{ t('alerts.queryEditor.resultsAcrossWindows') }}</span>
                   </div>
                 </div>
@@ -353,17 +353,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Combined Output Pane (SQL + VRL only) -->
               <div
                 v-if="localTab !== 'promql'"
-                class="flex-1 flex flex-col overflow-hidden rounded-lg border border-border-default min-h-50"
+                class="flex-1 flex flex-col overflow-hidden rounded-default border border-border-default min-h-50"
               >
                 <!-- Pane Header -->
                 <div
                   class="flex items-center justify-between py-2 px-3 min-h-12 shrink-0 bg-surface-subtle border-b border-border-default"
                 >
                   <div class="flex items-center gap-2">
-                    <div class="w-0.75 h-3.5 rounded-sm shrink-0 bg-section-accent-secondary" />
+                    <div class="w-0.75 h-3.5 rounded-default shrink-0 bg-section-accent-secondary" />
                     <span class="text-xs font-semibold">{{ t('alerts.queryEditor.combinedOutput') }}</span>
                     <span
-                      class="text-3xs font-bold py-px px-1.75 rounded-sm tracking-[0.04em] bg-badge-purple-soft-bg border border-badge-purple-ol-border text-badge-purple-ol-text"
+                      class="text-3xs font-bold py-px px-1.75 rounded-default tracking-[0.04em] bg-badge-purple-soft-bg border border-badge-purple-ol-border text-badge-purple-ol-text"
                     >SQL + VRL</span>
                   </div>
                   <!-- Running indicator -->

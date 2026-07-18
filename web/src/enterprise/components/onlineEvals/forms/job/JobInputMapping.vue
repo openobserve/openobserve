@@ -6,7 +6,7 @@
     </div>
     <div
       v-if="selectedScorers.length === 0"
-      class="py-2.5 px-3 border border-dashed border-dialog-header-border rounded-md text-text-secondary text-xs text-center"
+      class="py-2.5 px-3 border border-dashed border-dialog-header-border rounded-default text-text-secondary text-xs text-center"
     >
       {{ t("onlineEvals.job.inputMapping.selectScorers") }}
     </div>
@@ -14,7 +14,7 @@
       <article
         v-for="scorer in selectedScorers"
         :key="entityId(scorer)"
-        class="border border-dialog-header-border rounded-md bg-card-bg overflow-hidden"
+        class="border border-dialog-header-border rounded-default bg-card-bg overflow-hidden"
       >
         <div class="flex items-center justify-between gap-3 py-2.5 px-3 border-b border-dialog-header-border">
           <div class="flex flex-col gap-px min-w-0">
@@ -36,9 +36,9 @@
             :key="`${entityId(scorer)}-${variable}`"
             class="grid grid-cols-[minmax(130px,0.35fr)_minmax(0,1fr)] items-center gap-2.5"
           >
-            <code class="overflow-hidden py-1.25 px-2 rounded-sm bg-[color-mix(in_srgb,var(--color-text-secondary)_10%,transparent)] text-text-label font-semibold text-2xs font-mono truncate">{{ formatTemplateVariable(variable) }}</code>
+            <code class="overflow-hidden py-1.25 px-2 rounded-default bg-[color-mix(in_srgb,var(--color-text-secondary)_10%,transparent)] text-text-label font-semibold text-2xs font-mono truncate">{{ formatTemplateVariable(variable) }}</code>
             <input
-              class="w-full h-7 py-0 px-2.5 border border-input-border rounded-sm bg-input-bg text-input-text font-normal text-xs font-mono outline-none transition-colors duration-120 focus:border-primary-600"
+              class="w-full h-7 py-0 px-2.5 border border-input-border rounded-default bg-input-bg text-input-text font-normal text-xs font-mono outline-none transition-colors duration-120 focus:border-primary-600"
               :value="inputMappings[entityId(scorer)]?.[variable] || ''"
               :placeholder="defaultJobMappingValue(variable)"
               @input="updateMapping(entityId(scorer), variable, ($event.target as HTMLInputElement).value)"
@@ -47,7 +47,7 @@
         </div>
         <div
           v-else
-          class="py-2.5 px-3 border border-dashed border-dialog-header-border rounded-md text-text-secondary text-xs text-center"
+          class="py-2.5 px-3 border border-dashed border-dialog-header-border rounded-default text-text-secondary text-xs text-center"
         >
           {{ t("onlineEvals.job.inputMapping.noVariables") }}
         </div>

@@ -34,7 +34,7 @@ const variantClasses: Record<
     :text-value="textValue"
     :class="[
       'relative flex items-center gap-2',
-      'w-full px-3 py-1.5 rounded-md',
+      'w-full px-3 py-1.5 rounded-default',
       'cursor-pointer select-none outline-none',
       'transition-colors duration-150',
       variantClasses[variant],

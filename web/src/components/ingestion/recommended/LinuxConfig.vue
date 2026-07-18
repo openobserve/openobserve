@@ -5,7 +5,7 @@
       <div
         v-for="opt in options"
         :key="opt.value"
-        class="rounded-lg border p-4 cursor-pointer transition-all flex gap-3 items-start"
+        class="rounded-default border p-4 cursor-pointer transition-all flex gap-3 items-start"
         :class="selected === opt.value ? selectedCardClass : unselectedCardClass"
         @click="selected = opt.value"
       >
@@ -20,7 +20,7 @@
     <!-- EC2 IAM prerequisite note -->
     <div
       v-if="selected === 'ec2'"
-      class="flex gap-2 items-start rounded-lg p-3 mb-4 text-sm bg-banner-warning-bg border border-banner-warning-border"
+      class="flex gap-2 items-start rounded-default p-3 mb-4 text-sm bg-banner-warning-bg border border-banner-warning-border"
     >
       <OIcon name="info" size="sm" class="text-banner-warning-text shrink-0 mt-0.5" />
       <div class="text-banner-warning-text">

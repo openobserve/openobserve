@@ -20,7 +20,7 @@
           :options="agentOptions || []"
           labelKey="label"
           valueKey="value"
-          class="rounded-sm"
+          class="rounded-default"
           data-test="quality-agent-filter"
         />
       </div>

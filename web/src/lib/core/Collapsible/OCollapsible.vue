@@ -101,7 +101,7 @@ watch(
         'focus-visible:ring-2 focus-visible:ring-collapsible-trigger-focus-ring focus-visible:ring-offset-1',
         variant === 'sidebar'
           ? 'px-3 py-0 min-h-9 rounded-none'
-          : 'px-2 py-2 rounded-md',
+          : 'px-2 py-2 rounded-default',
         triggerClass,
       ]"
     >

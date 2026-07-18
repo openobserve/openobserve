@@ -251,7 +251,7 @@ function handleClick() {
         <button
           v-if="treeMeta?.hasChildren"
           type="button"
-          class="inline-flex items-center justify-center w-4.5 h-4.5 p-0 bg-transparent border-0 rounded-sm cursor-pointer text-text-secondary hover:bg-table-row-hover-bg hover:text-text-body"
+          class="inline-flex items-center justify-center w-4.5 h-4.5 p-0 bg-transparent border-0 rounded-default cursor-pointer text-text-secondary hover:bg-table-row-hover-bg hover:text-text-body"
           :data-test="`o2-table-tree-toggle-${cell.column.id}`"
           :aria-expanded="treeMeta?.isExpanded ? 'true' : 'false'"
           @click="onTreeToggle"
@@ -263,7 +263,7 @@ function handleClick() {
         </button>
         <span
           v-else
-          class="size-1.75 bg-theme-accent opacity-75 rounded-sm ring-2 ring-table-cell-bg z-3 relative"
+          class="size-1.75 bg-theme-accent opacity-75 rounded-default ring-2 ring-table-cell-bg z-3 relative"
           aria-hidden="true"
         />
       </span>
@@ -317,7 +317,7 @@ function handleClick() {
       v-if="enableCellCopy && !$slots.default"
       type="button"
       :data-test="`o2-table-cell-copy-${cell.column.id}`"
-      class="absolute right-1 opacity-0 group-hover:opacity-100 bg-surface-base border border-border-default rounded-sm cursor-pointer p-0.5 text-text-muted hover:text-text-body leading-none transition-opacity"
+      class="absolute right-1 opacity-0 group-hover:opacity-100 bg-surface-base border border-border-default rounded-default cursor-pointer p-0.5 text-text-muted hover:text-text-body leading-none transition-opacity"
       :title="copied ? 'Copied!' : 'Copy'"
       @click="handleCopy"
     >

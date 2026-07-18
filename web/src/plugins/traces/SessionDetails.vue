@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #title-trail>
         <span
           v-if="detail"
-          class="font-semibold px-2 py-1 rounded-md inline-flex items-center gap-1.5 flex-shrink-0 text-status-info-text bg-status-info-bg"
+          class="font-semibold px-2 py-1 rounded-default inline-flex items-center gap-1.5 flex-shrink-0 text-status-info-text bg-status-info-bg"
           data-test="session-detail-title"
         >
           <span class="font-mono text-sm">{{ detail.sessionId }}</span>
@@ -69,16 +69,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="grid grid-cols-2 gap-[0.625rem] mb-[0.625rem] flex-shrink-0">
         <div class="grid grid-cols-3 gap-[0.625rem]">
           <div v-for="n in 6" :key="n" :class="kpiCardClass()">
-            <OSkeleton type="rect" animation="wave" class="rounded-sm w-[3rem] h-[0.7rem]" />
-            <OSkeleton type="rect" animation="wave" class="rounded-sm w-[4.5rem] h-[1.3rem] mt-[0.3rem]" />
-            <OSkeleton type="rect" animation="wave" class="rounded-sm w-[6.5rem] h-[0.6rem] mt-[0.4rem]" />
+            <OSkeleton type="rect" animation="wave" class="rounded-default w-[3rem] h-[0.7rem]" />
+            <OSkeleton type="rect" animation="wave" class="rounded-default w-[4.5rem] h-[1.3rem] mt-[0.3rem]" />
+            <OSkeleton type="rect" animation="wave" class="rounded-default w-[6.5rem] h-[0.6rem] mt-[0.4rem]" />
           </div>
         </div>
-        <div class="bg-card-glass-bg rounded-lg border border-border-default pt-[1rem] px-[1rem] pb-[0.625rem] flex flex-col">
-          <OSkeleton type="rect" animation="wave" class="rounded-sm w-[8rem] h-[0.85rem] flex-shrink-0" />
+        <div class="bg-card-glass-bg rounded-default border border-border-default pt-[1rem] px-[1rem] pb-[0.625rem] flex flex-col">
+          <OSkeleton type="rect" animation="wave" class="rounded-default w-[8rem] h-[0.85rem] flex-shrink-0" />
           <!-- Fill the panel height (it stretches to the 6-tile block on the left)
                so the skeleton matches the real ribbon and leaves no gap below. -->
-          <OSkeleton type="rect" animation="wave" class="rounded-sm w-full flex-1 min-h-0 mt-[0.75rem]" />
+          <OSkeleton type="rect" animation="wave" class="rounded-default w-full flex-1 min-h-0 mt-[0.75rem]" />
         </div>
       </div>
 
@@ -87,15 +87,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Conversation column: toolbar + panel -->
         <div class="flex flex-col min-w-0 min-h-0">
           <div class="flex items-center gap-[0.5rem] mb-[0.625rem] flex-shrink-0">
-            <OSkeleton type="rect" animation="wave" class="rounded-sm flex-1 h-9" />
-            <OSkeleton v-for="n in 3" :key="n" type="rect" animation="wave" class="rounded-sm w-[8rem] h-9" />
+            <OSkeleton type="rect" animation="wave" class="rounded-default flex-1 h-9" />
+            <OSkeleton v-for="n in 3" :key="n" type="rect" animation="wave" class="rounded-default w-[8rem] h-9" />
           </div>
-          <div class="bg-card-glass-bg rounded-lg border border-border-default flex flex-col overflow-hidden">
+          <div class="bg-card-glass-bg rounded-default border border-border-default flex flex-col overflow-hidden">
             <div class="flex items-center gap-[0.625rem] px-[1rem] py-[0.75rem] border-b border-border-default flex-shrink-0">
-              <OSkeleton type="rect" animation="wave" class="rounded-sm w-[7rem] h-[1rem]" />
+              <OSkeleton type="rect" animation="wave" class="rounded-default w-[7rem] h-[1rem]" />
             </div>
             <div class="flex flex-col gap-[0.5rem] p-[0.5rem] flex-1 min-h-0 overflow-hidden">
-              <OSkeleton v-for="n in 14" :key="n" type="rect" animation="wave" class="rounded-sm w-full h-[3rem] flex-shrink-0" />
+              <OSkeleton v-for="n in 14" :key="n" type="rect" animation="wave" class="rounded-default w-full h-[3rem] flex-shrink-0" />
             </div>
           </div>
         </div>
@@ -105,13 +105,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             v-for="c in 3"
             :key="c"
-            class="bg-card-glass-bg rounded-lg border border-border-default flex flex-col overflow-hidden"
+            class="bg-card-glass-bg rounded-default border border-border-default flex flex-col overflow-hidden"
           >
             <div class="px-[0.75rem] py-[0.5rem] border-b border-border-default flex-shrink-0">
-              <OSkeleton type="rect" animation="wave" class="rounded-sm w-[6rem] h-[0.8rem]" />
+              <OSkeleton type="rect" animation="wave" class="rounded-default w-[6rem] h-[0.8rem]" />
             </div>
             <div class="flex flex-col gap-[0.4rem] p-[0.5rem] flex-1 min-h-0 overflow-hidden">
-              <OSkeleton v-for="r in 8" :key="r" type="rect" animation="wave" class="rounded-sm w-full h-[1.25rem] flex-shrink-0" />
+              <OSkeleton v-for="r in 8" :key="r" type="rect" animation="wave" class="rounded-default w-full h-[1.25rem] flex-shrink-0" />
             </div>
           </div>
         </div>
@@ -177,7 +177,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :class="kpiCardClass(card.variant)"
           :data-test="`session-detail-kpi-${card.key}`"
         >
-          <!-- Title row: label on the left, a metric icon in a soft rounded-sm
+          <!-- Title row: label on the left, a metric icon in a soft rounded-default
                tile on the right (KPI-card convention). The tile gives the icon
                room to render crisply and anchors each metric without crowding
                the label/value text. -->
@@ -186,7 +186,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ card.label }}
             </div>
             <span
-              class="inline-flex items-center justify-center shrink-0 w-6 h-6 rounded-md bg-surface-subtle text-text-secondary"
+              class="inline-flex items-center justify-center shrink-0 w-6 h-6 rounded-default bg-surface-subtle text-text-secondary"
             >
               <OIcon :name="card.icon" size="sm" />
             </span>
@@ -245,7 +245,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :cache-pct="cacheRatio"
               >
                 <span
-                  class="inline-flex items-center justify-center min-w-[1rem] h-[1.05rem] px-[0.3rem] rounded-md border border-border-default bg-surface-base text-text-body text-2xs font-bold leading-none cursor-pointer transition-colors hover:bg-[color-mix(in_srgb,var(--color-text-heading)_8%,var(--color-surface-base))] hover:border-[color-mix(in_srgb,var(--color-text-heading)_25%,var(--color-border-default))]"
+                  class="inline-flex items-center justify-center min-w-[1rem] h-[1.05rem] px-[0.3rem] rounded-default border border-border-default bg-surface-base text-text-body text-2xs font-bold leading-none cursor-pointer transition-colors hover:bg-[color-mix(in_srgb,var(--color-text-heading)_8%,var(--color-surface-base))] hover:border-[color-mix(in_srgb,var(--color-text-heading)_25%,var(--color-border-default))]"
                   @click="jumpToTurn(chip.n)"
                 >{{ chip.label }}</span>
               </TurnPreviewCard>
@@ -317,7 +317,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Conversation panel -->
       <div
-        class="bg-card-glass-bg rounded-lg border border-border-default mb-[0.625rem] flex flex-col overflow-hidden"
+        class="bg-card-glass-bg rounded-default border border-border-default mb-[0.625rem] flex flex-col overflow-hidden"
         data-test="session-conversation-panel"
       >
         <!-- panel header: title + count chip + jump buttons -->
@@ -447,15 +447,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <!-- loading skeleton -->
               <div v-if="sessionSpansLoading" class="flex flex-col gap-[0.4rem]">
-                <OSkeleton type="rect" animation="wave" class="rounded-sm w-[40%] h-[0.7rem]" />
-                <OSkeleton type="rect" animation="wave" class="rounded-sm w-[90%] h-[0.65rem]" />
-                <OSkeleton type="rect" animation="wave" class="rounded-sm w-[80%] h-[0.65rem]" />
-                <OSkeleton type="rect" animation="wave" class="rounded-sm w-[60%] h-[0.65rem]" />
+                <OSkeleton type="rect" animation="wave" class="rounded-default w-[40%] h-[0.7rem]" />
+                <OSkeleton type="rect" animation="wave" class="rounded-default w-[90%] h-[0.65rem]" />
+                <OSkeleton type="rect" animation="wave" class="rounded-default w-[80%] h-[0.65rem]" />
+                <OSkeleton type="rect" animation="wave" class="rounded-default w-[60%] h-[0.65rem]" />
               </div>
 
               <div v-else class="flex flex-col gap-[0.625rem]">
                 <!-- user block -->
-                <div class="rounded-lg border border-border-default bg-surface-base overflow-hidden">
+                <div class="rounded-default border border-border-default bg-surface-base overflow-hidden">
                   <div class="flex items-center justify-between px-[0.625rem] py-[0.375rem] border-b border-border-default">
                     <span class="text-xs font-bold text-text-heading">
                       {{ t('traces.sessionDetail.roles.user') }}
@@ -481,7 +481,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
 
                 <!-- assistant block -->
-                <div class="rounded-lg border border-border-default bg-surface-base overflow-hidden">
+                <div class="rounded-default border border-border-default bg-surface-base overflow-hidden">
                   <div class="flex items-center justify-between px-[0.625rem] py-[0.375rem] border-b border-border-default">
                     <span class="flex items-center gap-[0.375rem] text-xs font-bold text-text-heading">
                       {{ t('traces.sessionDetail.roles.assistant') }}
@@ -551,9 +551,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="flex flex-col gap-[0.5rem] p-[0.75rem]"
             data-test="session-pretty-skeleton"
           >
-            <OSkeleton type="rect" animation="wave" class="rounded-sm w-[30%] h-[1.5rem]" />
-            <OSkeleton type="rect" animation="wave" class="rounded-sm w-[70%] h-[3rem] mt-[0.5rem]" />
-            <OSkeleton type="rect" animation="wave" class="rounded-sm w-[85%] h-[4rem]" />
+            <OSkeleton type="rect" animation="wave" class="rounded-default w-[30%] h-[1.5rem]" />
+            <OSkeleton type="rect" animation="wave" class="rounded-default w-[70%] h-[3rem] mt-[0.5rem]" />
+            <OSkeleton type="rect" animation="wave" class="rounded-default w-[85%] h-[4rem]" />
           </div>
           <ThreadView
             v-else
@@ -579,7 +579,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="session-rail"
       >
         <!-- Tool Hotspots (by time + calls; cost pending backend attribution) -->
-        <div class="bg-card-glass-bg rounded-lg border border-border-default flex flex-col overflow-hidden">
+        <div class="bg-card-glass-bg rounded-default border border-border-default flex flex-col overflow-hidden">
           <div class="flex items-center gap-[0.4rem] px-[0.75rem] py-[0.5rem] border-b border-border-default flex-shrink-0">
             <OIcon name="build" size="xs" class="text-text-muted" />
             <span class="text-xs font-semibold text-text-heading">
@@ -590,7 +590,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="sessionSpansLoading"
             class="flex flex-col gap-[0.4rem] p-[0.625rem]"
           >
-            <OSkeleton v-for="n in 3" :key="n" type="rect" animation="wave" class="rounded-sm w-full h-[1.1rem]" />
+            <OSkeleton v-for="n in 3" :key="n" type="rect" animation="wave" class="rounded-default w-full h-[1.1rem]" />
           </div>
           <div
             v-else-if="toolHotspots.length"
@@ -602,10 +602,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="contents"
             >
               <button
-                class="flex items-center gap-[0.5rem] w-full px-[0.4rem] py-[0.35rem] rounded-md text-left cursor-pointer hover:bg-[color-mix(in_srgb,var(--color-text-heading)_4%,transparent)]"
+                class="flex items-center gap-[0.5rem] w-full px-[0.4rem] py-[0.35rem] rounded-default text-left cursor-pointer hover:bg-[color-mix(in_srgb,var(--color-text-heading)_4%,transparent)]"
                 @click="jumpToTurn(originalTurnIndex(row.topTraceId) + 1)"
               >
-                <span class="w-[1.25rem] h-[1.25rem] rounded-md grid place-items-center text-3xs font-bold tabular-nums flex-shrink-0 bg-[color-mix(in_srgb,var(--color-text-heading)_8%,transparent)] text-text-secondary">
+                <span class="w-[1.25rem] h-[1.25rem] rounded-default grid place-items-center text-3xs font-bold tabular-nums flex-shrink-0 bg-[color-mix(in_srgb,var(--color-text-heading)_8%,transparent)] text-text-secondary">
                   {{ i + 1 }}
                 </span>
                 <span class="text-xs font-semibold text-text-heading flex-1 min-w-0 truncate" :title="row.name">
@@ -638,7 +638,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <span
                         v-for="tn in row.turns"
                         :key="tn"
-                        class="inline-flex items-center px-[0.35rem] h-[1.05rem] rounded-md border border-border-default bg-surface-base text-3xs font-semibold tabular-nums"
+                        class="inline-flex items-center px-[0.35rem] h-[1.05rem] rounded-default border border-border-default bg-surface-base text-3xs font-semibold tabular-nums"
                       >{{ t('traces.sessionDetail.turnLabel') }} {{ tn }}</span>
                     </div>
                   </div>
@@ -652,7 +652,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Cost Hotspots -->
-        <div class="bg-card-glass-bg rounded-lg border border-border-default flex flex-col overflow-hidden">
+        <div class="bg-card-glass-bg rounded-default border border-border-default flex flex-col overflow-hidden">
           <div class="flex items-center gap-[0.4rem] px-[0.75rem] py-[0.5rem] border-b border-border-default flex-shrink-0">
             <OIcon name="trending-up" size="xs" class="text-text-muted" />
             <span class="text-xs font-semibold text-text-heading">
@@ -669,10 +669,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               side="right"
             >
               <button
-                class="flex items-center gap-[0.5rem] w-full px-[0.4rem] py-[0.35rem] rounded-md text-left cursor-pointer hover:bg-[color-mix(in_srgb,var(--color-text-heading)_4%,transparent)]"
+                class="flex items-center gap-[0.5rem] w-full px-[0.4rem] py-[0.35rem] rounded-default text-left cursor-pointer hover:bg-[color-mix(in_srgb,var(--color-text-heading)_4%,transparent)]"
                 @click="jumpToTurn(row.n)"
               >
-                <span class="w-[1.25rem] h-[1.25rem] rounded-md grid place-items-center text-3xs font-bold tabular-nums flex-shrink-0 bg-[color-mix(in_srgb,var(--color-text-heading)_8%,transparent)] text-text-secondary">
+                <span class="w-[1.25rem] h-[1.25rem] rounded-default grid place-items-center text-3xs font-bold tabular-nums flex-shrink-0 bg-[color-mix(in_srgb,var(--color-text-heading)_8%,transparent)] text-text-secondary">
                   {{ i + 1 }}
                 </span>
                 <span class="text-xs font-semibold text-text-heading w-[2.75rem] flex-shrink-0">
@@ -696,7 +696,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Slowest Turns -->
-        <div class="bg-card-glass-bg rounded-lg border border-border-default flex flex-col overflow-hidden">
+        <div class="bg-card-glass-bg rounded-default border border-border-default flex flex-col overflow-hidden">
           <div class="flex items-center gap-[0.4rem] px-[0.75rem] py-[0.5rem] border-b border-border-default flex-shrink-0">
             <OIcon name="schedule" size="xs" class="text-text-muted" />
             <span class="text-xs font-semibold text-text-heading">
@@ -713,10 +713,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               side="right"
             >
               <button
-                class="flex items-center gap-[0.5rem] w-full px-[0.4rem] py-[0.35rem] rounded-md text-left cursor-pointer hover:bg-[color-mix(in_srgb,var(--color-text-heading)_4%,transparent)]"
+                class="flex items-center gap-[0.5rem] w-full px-[0.4rem] py-[0.35rem] rounded-default text-left cursor-pointer hover:bg-[color-mix(in_srgb,var(--color-text-heading)_4%,transparent)]"
                 @click="jumpToTurn(row.n)"
               >
-                <span class="w-[1.25rem] h-[1.25rem] rounded-md grid place-items-center text-3xs font-bold tabular-nums flex-shrink-0 bg-[color-mix(in_srgb,var(--color-text-heading)_8%,transparent)] text-text-secondary">
+                <span class="w-[1.25rem] h-[1.25rem] rounded-default grid place-items-center text-3xs font-bold tabular-nums flex-shrink-0 bg-[color-mix(in_srgb,var(--color-text-heading)_8%,transparent)] text-text-secondary">
                   {{ i + 1 }}
                 </span>
                 <span class="text-xs font-semibold text-text-heading w-[2.75rem] flex-shrink-0">
@@ -877,7 +877,7 @@ function cacheInputDenominator(d: SessionDetail): number {
 // Errors uses a variant (red when > 50% error rate); every other tile is neutral.
 function kpiCardClass(variant?: "danger"): string {
   const base =
-    "flex flex-col justify-center gap-1 px-3.5 py-2.5 rounded-lg border transition-shadow hover:shadow-[0_1px_6px_rgba(0,0,0,0.08)]";
+    "flex flex-col justify-center gap-1 px-3.5 py-2.5 rounded-default border transition-shadow hover:shadow-[0_1px_6px_rgba(0,0,0,0.08)]";
   if (variant === "danger")
     return `${base} bg-[color-mix(in_srgb,var(--color-error-500)_5%,var(--color-surface-base))] border-[color-mix(in_srgb,var(--color-error-500)_35%,var(--color-border-default))]`;
   return `${base} bg-surface-base border-border-default`;
@@ -1489,7 +1489,7 @@ function turnRowClass(trace: SessionTraceRow): string {
       : "bg-surface-base";
   const flash =
     flashTurn.value === n ? " ring-2 ring-primary-500" : "";
-  return `rounded-lg border border-border-default ${surface} overflow-hidden${flash}`;
+  return `rounded-default border border-border-default ${surface} overflow-hidden${flash}`;
 }
 
 async function load() {

@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <div
-    class="bg-card-glass-bg rounded-lg border border-border-default pt-[1rem] px-[1rem] pb-[0.625rem] flex flex-col"
+    class="bg-card-glass-bg rounded-default border border-border-default pt-[1rem] px-[1rem] pb-[0.625rem] flex flex-col"
     data-test="session-ribbon"
   >
     <!-- Header: title + subtitle (left) · metric toggle (right) -->
@@ -78,7 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :delay="40"
           >
             <div
-              class="relative flex-1 min-w-0 rounded-t-xs cursor-pointer transition-[height] duration-300 ease-out hover:brightness-110"
+              class="relative flex-1 min-w-0 rounded-t-default cursor-pointer transition-[height] duration-300 ease-out hover:brightness-110"
               :style="{ height: bar.pct + '%', background: bar.color }"
               @click="emit('jump', bar.index + 1)"
             />
@@ -134,7 +134,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           v-for="bar in bars"
           :key="bar.index"
-          class="flex-1 min-w-0 rounded-t-sm transition-opacity"
+          class="flex-1 min-w-0 rounded-t-default transition-opacity"
           :style="{
             height: Math.max(2, bar.pct) + '%',
             background: bar.color,
@@ -143,7 +143,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <!-- selected window: drag the body to pan, or either edge to resize -->
         <div
-          class="absolute top-0 bottom-0 rounded-sm border border-[color-mix(in_srgb,var(--color-text-heading)_45%,transparent)] bg-[color-mix(in_srgb,var(--color-text-heading)_8%,transparent)]"
+          class="absolute top-0 bottom-0 rounded-default border border-[color-mix(in_srgb,var(--color-text-heading)_45%,transparent)] bg-[color-mix(in_srgb,var(--color-text-heading)_8%,transparent)]"
           :class="dragging ? 'cursor-grabbing' : 'cursor-grab'"
           :style="{ left: brushLeftPct + '%', width: brushWidthPct + '%' }"
           @pointerdown.stop="(e) => beginDrag('pan', e)"
@@ -153,14 +153,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="absolute top-0 bottom-0 -left-1 w-2.25 cursor-ew-resize flex items-center justify-center"
             @pointerdown.stop="(e) => beginDrag('resize-left', e)"
           >
-            <div class="w-0.5 h-[55%] rounded-sm bg-[color-mix(in_srgb,var(--color-text-heading)_60%,transparent)]" />
+            <div class="w-0.5 h-[55%] rounded-default bg-[color-mix(in_srgb,var(--color-text-heading)_60%,transparent)]" />
           </div>
           <!-- right resize handle -->
           <div
             class="absolute top-0 bottom-0 -right-1 w-2.25 cursor-ew-resize flex items-center justify-center"
             @pointerdown.stop="(e) => beginDrag('resize-right', e)"
           >
-            <div class="w-0.5 h-[55%] rounded-sm bg-[color-mix(in_srgb,var(--color-text-heading)_60%,transparent)]" />
+            <div class="w-0.5 h-[55%] rounded-default bg-[color-mix(in_srgb,var(--color-text-heading)_60%,transparent)]" />
           </div>
         </div>
       </div>

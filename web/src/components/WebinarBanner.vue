@@ -57,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <!-- Home variant: larger banner -->
   <div
     v-else-if="webinarData && !isExpired && variant === 'home'"
-    class="webinar-home-banner mb-3 relative overflow-hidden rounded-lg border border-[color-mix(in_srgb,var(--color-promo-webinar-accent)_35%,transparent)] bg-[linear-gradient(120deg,color-mix(in_srgb,var(--color-promo-webinar-accent)_14%,var(--color-surface-base))_0%,var(--color-surface-base)_55%,color-mix(in_srgb,var(--color-promo-webinar-accent)_7%,var(--color-surface-base))_100%)]"
+    class="webinar-home-banner mb-3 relative overflow-hidden rounded-default border border-[color-mix(in_srgb,var(--color-promo-webinar-accent)_35%,transparent)] bg-[linear-gradient(120deg,color-mix(in_srgb,var(--color-promo-webinar-accent)_14%,var(--color-surface-base))_0%,var(--color-surface-base)_55%,color-mix(in_srgb,var(--color-promo-webinar-accent)_7%,var(--color-surface-base))_100%)]"
     data-test="webinar-home-banner"
   >
     <!-- Decorative blobs -->

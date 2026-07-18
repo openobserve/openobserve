@@ -98,7 +98,7 @@ function fmtDuration(ms: number) {
                 v-if="execution.traceKey"
                 :href="artifactUrlFn(execution.traceKey)"
                 target="_blank"
-                class="inline-flex items-center gap-1 text-xs font-medium text-text-link border border-current rounded-sm px-2 py-1 hover:opacity-80"
+                class="inline-flex items-center gap-1 text-xs font-medium text-text-link border border-current rounded-default px-2 py-1 hover:opacity-80"
               >
                 <OIcon name="download" size="xs" />
                 trace.zip
@@ -116,7 +116,7 @@ function fmtDuration(ms: number) {
           <!-- Error banner (probe crash) -->
           <div
             v-if="execution.error && !execution.steps.length"
-            class="mx-5 mt-4 rounded-sm border border-[var(--color-warning-500)]/30 bg-[var(--color-warning-500)]/10 px-4 py-3 shrink-0"
+            class="mx-5 mt-4 rounded-default border border-[var(--color-warning-500)]/30 bg-[var(--color-warning-500)]/10 px-4 py-3 shrink-0"
           >
             <p class="text-xs font-semibold text-[var(--color-warning-600)] mb-1">{{ t('synthetics.executionDetail.probeError') }}</p>
             <p class="text-xs text-[var(--color-warning-600)] font-mono whitespace-pre-wrap leading-relaxed">{{ execution.error }}</p>
@@ -132,7 +132,7 @@ function fmtDuration(ms: number) {
               <div
                 v-for="(step, i) in mergedSteps"
                 :key="step.stepId"
-                class="rounded-lg border overflow-hidden"
+                class="rounded-default border overflow-hidden"
                 :class="step.status === 'fail' ? 'border-[var(--color-error-500)]/40' : 'border-border-default'"
               >
                 <!-- Step header -->

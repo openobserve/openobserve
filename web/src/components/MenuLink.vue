@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div class="nav-menu-item-avatar flex flex-col items-center gap-0.5 w-full">
       <div
-        class="icon-wrapper relative inline-flex items-center justify-center rounded-lg p-0.5 transition-colors duration-250"
+        class="icon-wrapper relative inline-flex items-center justify-center rounded-default p-0.5 transition-colors duration-250"
         :class="isActive
           ? activeIconClass
           : 'text-tabs-inactive-text group-hover:text-primary-600'"
@@ -256,7 +256,7 @@ export default defineComponent({
 
     const rootClass = computed(() => [
       "nav-menu-item",
-      "group relative block [text-decoration:none]! text-inherit shrink-0 mx-1 px-0 py-1 min-h-0 rounded-lg transition-colors duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-1",
+      "group relative block [text-decoration:none]! text-inherit shrink-0 mx-1 px-0 py-1 min-h-0 rounded-default transition-colors duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-1",
       isActive.value
         ? activePillClass.value
         : "text-tabs-inactive-text border-l-2 border-transparent bg-transparent hover:bg-tabs-hover-bg",

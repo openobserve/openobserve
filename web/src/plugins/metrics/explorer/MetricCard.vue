@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     ref="root"
-    class="group relative flex flex-col h-full overflow-hidden border border-border-default rounded-md hover:border-primary focus-within:border-primary"
+    class="group relative flex flex-col h-full overflow-hidden border border-border-default rounded-default hover:border-primary focus-within:border-primary"
     role="group"
     :aria-label="
       t('metrics.explorer.card.ariaLabel', {

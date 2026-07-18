@@ -5,12 +5,12 @@
     aria-modal="true"
     @click.self="$emit('close')"
   >
-    <div class="scorer-type-panel w-[min(820px,calc(100vw-48px))] bg-card-bg border border-dialog-header-border rounded-lg shadow-(--shadow-lg,0_8px_24px_rgba(0,0,0,0.12),0_2px_6px_rgba(0,0,0,0.08)) px-5.5 pt-5 pb-6">
+    <div class="scorer-type-panel w-[min(820px,calc(100vw-48px))] bg-card-bg border border-dialog-header-border rounded-default shadow-(--shadow-lg,0_8px_24px_rgba(0,0,0,0.12),0_2px_6px_rgba(0,0,0,0.08)) px-5.5 pt-5 pb-6">
       <header class="flex items-center gap-3 pb-3 border-b border-dialog-header-border mb-4">
         <h2 class="flex-1 m-0 text-base font-semibold text-text-heading">{{ t("onlineEvals.scorerTypeDialog.title") }}</h2>
         <button
           type="button"
-          class="inline-flex items-center justify-center w-7 h-7 p-0 text-(--color-text-secondary,var(--color-text-secondary)) bg-transparent border-0 rounded-md cursor-pointer transition-[background,color] duration-150 hover:bg-[color-mix(in_srgb,var(--color-text-heading)_6%,transparent)] hover:text-(--color-primary-600,#3F7994)"
+          class="inline-flex items-center justify-center w-7 h-7 p-0 text-(--color-text-secondary,var(--color-text-secondary)) bg-transparent border-0 rounded-default cursor-pointer transition-[background,color] duration-150 hover:bg-[color-mix(in_srgb,var(--color-text-heading)_6%,transparent)] hover:text-(--color-primary-600,#3F7994)"
           :aria-label="t('onlineEvals.buttons.cancel')"
           data-test="scorer-type-close-btn"
           @click="$emit('close')"
@@ -37,11 +37,11 @@
       <div class="grid grid-cols-3 max-[720px]:grid-cols-1 gap-3">
         <button
           type="button"
-          class="relative flex flex-col items-start gap-2.5 min-h-45 py-4 px-4 pb-3.5 border border-(--color-dialog-header-border,var(--color-border-default)) rounded-lg bg-card-bg text-(--color-text-heading,currentColor) text-left cursor-pointer transition-[border-color,background,box-shadow] duration-[120ms] hover:border-(--color-primary-600,#3F7994) hover:bg-[color-mix(in_srgb,var(--color-primary-600)_4%,var(--color-card-bg))] hover:shadow-[0_0_0_3px_color-mix(in_srgb,var(--color-primary-600)_12%,transparent)]"
+          class="relative flex flex-col items-start gap-2.5 min-h-45 py-4 px-4 pb-3.5 border border-(--color-dialog-header-border,var(--color-border-default)) rounded-default bg-card-bg text-(--color-text-heading,currentColor) text-left cursor-pointer transition-[border-color,background,box-shadow] duration-[120ms] hover:border-(--color-primary-600,#3F7994) hover:bg-[color-mix(in_srgb,var(--color-primary-600)_4%,var(--color-card-bg))] hover:shadow-[0_0_0_3px_color-mix(in_srgb,var(--color-primary-600)_12%,transparent)]"
           data-test="scorer-type-llm-judge"
           @click="$emit('select', 'llm_judge')"
         >
-          <div class="inline-flex items-center justify-center w-9 h-9 rounded-lg bg-[color-mix(in_srgb,var(--color-primary-600)_10%,transparent)] text-(--color-primary-600,#3F7994)">
+          <div class="inline-flex items-center justify-center w-9 h-9 rounded-default bg-[color-mix(in_srgb,var(--color-primary-600)_10%,transparent)] text-(--color-primary-600,#3F7994)">
             <OIcon name="smart-toy" size="md" />
           </div>
           <div class="text-sm font-semibold text-(--color-text-heading,currentColor)">
@@ -58,11 +58,11 @@
 
         <button
           type="button"
-          class="relative flex flex-col items-start gap-2.5 min-h-45 py-4 px-4 pb-3.5 border border-(--color-dialog-header-border,var(--color-border-default)) rounded-lg bg-card-bg text-(--color-text-heading,currentColor) text-left cursor-pointer transition-[border-color,background,box-shadow] duration-[120ms] hover:border-(--color-primary-600,#3F7994) hover:bg-[color-mix(in_srgb,var(--color-primary-600)_4%,var(--color-card-bg))] hover:shadow-[0_0_0_3px_color-mix(in_srgb,var(--color-primary-600)_12%,transparent)]"
+          class="relative flex flex-col items-start gap-2.5 min-h-45 py-4 px-4 pb-3.5 border border-(--color-dialog-header-border,var(--color-border-default)) rounded-default bg-card-bg text-(--color-text-heading,currentColor) text-left cursor-pointer transition-[border-color,background,box-shadow] duration-[120ms] hover:border-(--color-primary-600,#3F7994) hover:bg-[color-mix(in_srgb,var(--color-primary-600)_4%,var(--color-card-bg))] hover:shadow-[0_0_0_3px_color-mix(in_srgb,var(--color-primary-600)_12%,transparent)]"
           data-test="scorer-type-remote"
           @click="$emit('select', 'remote')"
         >
-          <div class="inline-flex items-center justify-center w-9 h-9 rounded-lg bg-[color-mix(in_srgb,var(--color-primary-600)_10%,transparent)] text-(--color-primary-600,#3F7994)">
+          <div class="inline-flex items-center justify-center w-9 h-9 rounded-default bg-[color-mix(in_srgb,var(--color-primary-600)_10%,transparent)] text-(--color-primary-600,#3F7994)">
             <OIcon name="cloud" size="md" />
           </div>
           <div class="text-sm font-semibold text-(--color-text-heading,currentColor)">
@@ -79,14 +79,14 @@
 
         <button
           type="button"
-          class="relative flex flex-col items-start gap-2.5 min-h-45 py-4 px-4 pb-3.5 border border-(--color-dialog-header-border,var(--color-border-default)) rounded-lg bg-card-bg text-(--color-text-heading,currentColor) text-left cursor-not-allowed opacity-60 transition-[border-color,background,box-shadow] duration-[120ms]"
+          class="relative flex flex-col items-start gap-2.5 min-h-45 py-4 px-4 pb-3.5 border border-(--color-dialog-header-border,var(--color-border-default)) rounded-default bg-card-bg text-(--color-text-heading,currentColor) text-left cursor-not-allowed opacity-60 transition-[border-color,background,box-shadow] duration-[120ms]"
           data-test="scorer-type-code"
           disabled
         >
-          <span class="absolute top-3 right-3 py-0.5 px-2 rounded-sm text-2xs font-semibold leading-normal bg-[color-mix(in_srgb,var(--color-status-warning-text)_14%,transparent)] text-status-warning-text">
+          <span class="absolute top-3 right-3 py-0.5 px-2 rounded-default text-2xs font-semibold leading-normal bg-[color-mix(in_srgb,var(--color-status-warning-text)_14%,transparent)] text-status-warning-text">
             {{ t("onlineEvals.scorerTypeDialog.comingSoonBadge") }}
           </span>
-          <div class="inline-flex items-center justify-center w-9 h-9 rounded-lg bg-[color-mix(in_srgb,var(--color-primary-600)_10%,transparent)] text-(--color-primary-600,#3F7994)">
+          <div class="inline-flex items-center justify-center w-9 h-9 rounded-default bg-[color-mix(in_srgb,var(--color-primary-600)_10%,transparent)] text-(--color-primary-600,#3F7994)">
             <OIcon name="code" size="md" />
           </div>
           <div class="text-sm font-semibold text-(--color-text-heading,currentColor)">

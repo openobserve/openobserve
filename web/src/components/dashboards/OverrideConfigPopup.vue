@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <button
               type="button"
               data-test="dashboard-addpanel-config-add-column"
-              class="flex items-center justify-center gap-1.5 w-full shrink-0 p-2.25 rounded-lg border border-dashed border-[color-mix(in_srgb,var(--color-primary-600)_50%,transparent)] bg-transparent cursor-pointer text-sm font-medium text-primary-600 transition-colors hover:bg-[color-mix(in_srgb,var(--color-primary-600)_5%,transparent)] hover:border-primary-600"
+              class="flex items-center justify-center gap-1.5 w-full shrink-0 p-2.25 rounded-default border border-dashed border-[color-mix(in_srgb,var(--color-primary-600)_50%,transparent)] bg-transparent cursor-pointer text-sm font-medium text-primary-600 transition-colors hover:bg-[color-mix(in_srgb,var(--color-primary-600)_5%,transparent)] hover:border-primary-600"
             >
               <OIcon name="add" size="sm" />
               {{ t("dashboard.columnFormattingAddField") }}
@@ -54,7 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @select="addField(opt.value)"
             >
               <span class="flex items-center gap-2">
-                <span class="shrink-0 text-3xs font-bold tracking-[0.05em] uppercase py-0.5 px-1.25 rounded-sm" :class="badgeClass(opt.isNumeric)">
+                <span class="shrink-0 text-3xs font-bold tracking-[0.05em] uppercase py-0.5 px-1.25 rounded-default" :class="badgeClass(opt.isNumeric)">
                   {{ opt.isNumeric ? t("dashboard.typeNumeric") : t("dashboard.typeText") }}
                 </span>
                 <span>{{ opt.label }}</span>
@@ -79,7 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             role="button"
             tabindex="0"
             :data-test="`override-config-row-${idx}`"
-            class="group relative flex items-center gap-2 w-full py-2 pl-2.25 pr-1.5 rounded-lg border-l-[0.1875rem] border-transparent cursor-pointer outline-none transition-colors hover:bg-[color-mix(in_srgb,var(--color-grey-500)_5%,transparent)]"
+            class="group relative flex items-center gap-2 w-full py-2 pl-2.25 pr-1.5 rounded-default border-l-[0.1875rem] border-transparent cursor-pointer outline-none transition-colors hover:bg-[color-mix(in_srgb,var(--color-grey-500)_5%,transparent)]"
             :class="
               idx === selectedIdx
                 ? 'bg-[color-mix(in_srgb,var(--color-primary-600)_6%,transparent)] border-l-primary-600!'
@@ -89,7 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @keydown.enter.prevent="selectedIdx = idx"
             @keydown.space.prevent="selectedIdx = idx"
           >
-            <span class="shrink-0 text-3xs font-bold tracking-[0.05em] uppercase py-0.5 px-1.25 rounded-sm" :class="badgeClass(isNumericColumn(col))">
+            <span class="shrink-0 text-3xs font-bold tracking-[0.05em] uppercase py-0.5 px-1.25 rounded-default" :class="badgeClass(isNumericColumn(col))">
               {{ isNumericColumn(col) ? t("dashboard.typeNumeric") : t("dashboard.typeText") }}
             </span>
             <span
@@ -144,7 +144,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span>{{ t("dashboard.inlinePreview") }}</span>
           </div>
           <div
-            class="border border-[color-mix(in_srgb,var(--color-grey-500)_18%,transparent)] rounded-md overflow-hidden [&_[data-test=dashboard-table-cell-copy-btn]]:hidden!"
+            class="border border-[color-mix(in_srgb,var(--color-grey-500)_18%,transparent)] rounded-default overflow-hidden [&_[data-test=dashboard-table-cell-copy-btn]]:hidden!"
           >
             <TableRenderer
               v-if="selectedPreview"
@@ -172,7 +172,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <template #illustration>
             <div
-              class="w-18 h-18 rounded-lg bg-[color-mix(in_srgb,var(--color-grey-500)_8%,transparent)] flex items-center justify-center text-text-secondary"
+              class="w-18 h-18 rounded-default bg-[color-mix(in_srgb,var(--color-grey-500)_8%,transparent)] flex items-center justify-center text-text-secondary"
             >
               <OIcon name="tune" size="xl" />
             </div>
@@ -200,7 +200,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @select="addField(opt.value)"
                 >
                   <span class="flex items-center gap-2">
-                    <span class="shrink-0 text-3xs font-bold tracking-[0.05em] uppercase py-0.5 px-1.25 rounded-sm" :class="badgeClass(opt.isNumeric)">
+                    <span class="shrink-0 text-3xs font-bold tracking-[0.05em] uppercase py-0.5 px-1.25 rounded-default" :class="badgeClass(opt.isNumeric)">
                       {{ opt.isNumeric ? t("dashboard.typeNumeric") : t("dashboard.typeText") }}
                     </span>
                     <span>{{ opt.label }}</span>

@@ -43,7 +43,7 @@
             </span>
             <code class="text-2xs text-text-disabled">preset="{{ p.preset }}"</code>
           </div>
-          <div class="rounded-xl border border-border-default h-110 overflow-hidden">
+          <div class="rounded-default border border-border-default h-110 overflow-hidden">
             <OEmptyState
               :preset="p.preset"
               size="hero"
@@ -64,7 +64,7 @@
           character (e.g. a prominent first-run hero) while everything else stays
           object-only. Same component, <code class="text-text-body">illustration="explorer"</code>.
         </p>
-        <div class="rounded-xl border border-border-default h-110 overflow-hidden">
+        <div class="rounded-default border border-border-default h-110 overflow-hidden">
           <OEmptyState
             size="hero"
             variant="create"
@@ -87,7 +87,7 @@
             <span class="text-xs font-semibold uppercase tracking-wider text-text-secondary">
               size="block" (inside a card / dashboard panel)
             </span>
-            <div class="rounded-xl border border-border-default overflow-hidden">
+            <div class="rounded-default border border-border-default overflow-hidden">
               <OEmptyState preset="no-search-results" size="block" @action="onAction('block')" />
             </div>
           </section>
@@ -95,7 +95,7 @@
             <span class="text-xs font-semibold uppercase tracking-wider text-text-secondary">
               size="inline" (table body / dropdown)
             </span>
-            <div class="rounded-xl border border-border-default overflow-hidden">
+            <div class="rounded-default border border-border-default overflow-hidden">
               <OEmptyState preset="no-search-results" size="inline" @action="onAction('inline')" />
             </div>
           </section>

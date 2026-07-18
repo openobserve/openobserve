@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template #header-right>
       <div
         v-if="indexData.name"
-        class="flex items-center gap-1.5 px-2 py-1 rounded-md border bg-surface-panel border-border-default"
+        class="flex items-center gap-1.5 px-2 py-1 rounded-default border bg-surface-panel border-border-default"
       >
         <img
           :src="getTimelineIcon"
@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <div class="flex items-center gap-1.5">
           <span
-            class="text-3xs font-medium px-1.5 py-0.5 rounded-sm text-text-secondary bg-surface-subtle"
+            class="text-3xs font-medium px-1.5 py-0.5 rounded-default text-text-secondary bg-surface-subtle"
           >
             UTC
           </span>
@@ -80,7 +80,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="docs-count-tile"
               >
                 <div
-                  class="tile-content rounded-lg p-3 text-center border h-20 flex flex-col justify-between bg-surface-base border-border-default"
+                  class="tile-content rounded-default p-3 text-center border h-20 flex flex-col justify-between bg-surface-base border-border-default"
                 >
                   <div
                     class="tile-header flex justify-between items-start"
@@ -110,7 +110,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Storage Size Tile -->
               <div class="tile" data-test="storage-size-tile">
                 <div
-                  class="tile-content rounded-lg p-3 text-center border h-20 flex flex-col justify-between bg-surface-base border-border-default"
+                  class="tile-content rounded-default p-3 text-center border h-20 flex flex-col justify-between bg-surface-base border-border-default"
                 >
                   <div
                     class="tile-header flex justify-between items-start"
@@ -142,7 +142,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="compressed-size-tile"
               >
                 <div
-                  class="tile-content rounded-lg p-3 text-center border h-20 flex flex-col justify-between bg-surface-base border-border-default"
+                  class="tile-content rounded-default p-3 text-center border h-20 flex flex-col justify-between bg-surface-base border-border-default"
                 >
                   <div
                     class="tile-header flex justify-between items-start"
@@ -174,7 +174,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="index-size-tile"
               >
                 <div
-                  class="tile-content rounded-lg p-3 text-center border h-20 flex flex-col justify-between bg-surface-base border-border-default"
+                  class="tile-content rounded-default p-3 text-center border h-20 flex flex-col justify-between bg-surface-base border-border-default"
                 >
                   <div
                     class="tile-header flex justify-between items-start"
@@ -203,7 +203,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="w-full flex flex-1 min-h-0 gap-2">
               <!--  left section(includes tabs and schema settings) -->
               <div
-                class="w-[100%] h-full min-h-0 rounded-lg border p-2 flex flex-col overflow-hidden bg-surface-base border-border-default"
+                class="w-[100%] h-full min-h-0 rounded-default border p-2 flex flex-col overflow-hidden bg-surface-base border-border-default"
               >
                 <div>
                   <div class="flex justify-start">
@@ -262,7 +262,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       <label
                         style="font-weight: 600"
-                        class="bg-banner-warning-bg py-1 px-4 rounded-sm border border-banner-warning-border text-banner-warning-text"
+                        class="bg-banner-warning-bg py-1 px-4 rounded-default border border-banner-warning-border text-banner-warning-text"
                       >
                         {{ t("logStream.mapping") }} Default FTS keys used (no
                         custom keys set).</label
@@ -498,7 +498,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div v-if="activeMainTab == 'configuration'">
                   <div class="w-full h-full overflow-y-auto p-4 flex flex-col gap-4">
                     <!-- Configuration Settings Card -->
-                    <div class="rounded-lg border border-card-glass-border divide-y divide-card-glass-border">
+                    <div class="rounded-default border border-card-glass-border divide-y divide-card-glass-border">
 
                       <!-- Data Retention -->
                       <div v-if="showDataRetention" class="flex flex-col gap-1 p-3">
@@ -590,7 +590,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="flex flex-col h-full min-h-0 overflow-hidden"
                 >
                   <div
-                    class="bg-banner-warning-bg py-1 px-4 rounded-sm border border-banner-warning-border text-banner-warning-text mt-2"
+                    class="bg-banner-warning-bg py-1 px-4 rounded-default border border-banner-warning-border text-banner-warning-text mt-2"
                     style="width: fit-content"
                   >
                     <span style="font-weight: 600">

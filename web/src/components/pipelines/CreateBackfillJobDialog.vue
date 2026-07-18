@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <template #header-left>
       <span
-        class="font-semibold px-2 py-1 rounded-md inline-block text-badge-blue-soft-text bg-badge-blue-soft-bg"
+        class="font-semibold px-2 py-1 rounded-default inline-block text-badge-blue-soft-text bg-badge-blue-soft-bg"
       >
         {{ pipelineName }}
         <OTooltip v-if="pipelineName && pipelineName.length > 25" :content="pipelineName" />
@@ -65,9 +65,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Advanced Options -->
-          <div class="collapsible-section flex flex-col transition-all overflow-hidden bg-card-glass-bg rounded-md shadow-[0_0_5px_1px_var(--color-hover-shadow)] border border-card-glass-border" data-test="advanced-options-section">
+          <div class="collapsible-section flex flex-col transition-all overflow-hidden bg-card-glass-bg rounded-default shadow-[0_0_5px_1px_var(--color-hover-shadow)] border border-card-glass-border" data-test="advanced-options-section">
             <div
-              class="section-header flex items-center justify-between px-4 py-3 cursor-pointer shrink-0 border-b border-border-default transition-all rounded-t-md select-none hover:bg-interactive-hover-bg active:bg-interactive-hover-bg"
+              class="section-header flex items-center justify-between px-4 py-3 cursor-pointer shrink-0 border-b border-border-default transition-all rounded-t-default select-none hover:bg-interactive-hover-bg active:bg-interactive-hover-bg"
               @click="showAdvanced = !showAdvanced"
             >
               <div class="flex items-center gap-2">
@@ -145,7 +145,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
                 <div
                   v-if="deleteBeforeBackfill"
-                  class="mt-3 p-4 rounded-lg border bg-banner-warning-bg border-banner-warning-border"
+                  class="mt-3 p-4 rounded-default border bg-banner-warning-bg border-banner-warning-border"
                 >
                   <div class="flex items-start gap-3">
                     <OIcon name="warning" size="md" class="mt-0.5 text-banner-warning-text" />
@@ -170,7 +170,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Estimated Info -->
           <div
             v-if="estimatedInfo"
-            class="p-3 rounded-lg border bg-banner-info-bg border-banner-info-border"
+            class="p-3 rounded-default border bg-banner-info-bg border-banner-info-border"
           >
             <div class="text-banner-info-text">
               <div class="flex items-center gap-2 font-medium mb-1">

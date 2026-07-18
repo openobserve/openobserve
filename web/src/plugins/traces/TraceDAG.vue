@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="mt-3 text-text-muted">No DAG data available</div>
     </div>
 
-    <div v-else data-test="traces-trace-dag-wrapper" class="w-full h-full min-h-150 border border-border-default rounded-sm relative">
+    <div v-else data-test="traces-trace-dag-wrapper" class="w-full h-full min-h-150 border border-border-default rounded-default relative">
       <VueFlow
         :nodes="nodes"
         :edges="edges"
@@ -48,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <Handle v-if="data.hasIncoming" type="target" :position="Position.Top"
             class="w-2 h-2 bg-info border-2 border-surface-base rounded-full shadow-[0_1px_3px_rgba(0,0,0,0.15)]" />
           <div
-            class="p-[6px_12px] rounded-md bg-surface-base border-2 border-info min-w-20 max-w-45 min-h-7 shadow-[0_2px_6px_rgba(0,0,0,0.1)] transition-all duration-200 cursor-pointer text-center flex flex-col items-center justify-center hover:shadow-[0_4px_12px_rgba(0,0,0,0.15)] hover:[transform:translateY(-2px)]"
+            class="p-[6px_12px] rounded-default bg-surface-base border-2 border-info min-w-20 max-w-45 min-h-7 shadow-[0_2px_6px_rgba(0,0,0,0.1)] transition-all duration-200 cursor-pointer text-center flex flex-col items-center justify-center hover:shadow-[0_4px_12px_rgba(0,0,0,0.15)] hover:[transform:translateY(-2px)]"
             :class="[
               {
                 'border-status-negative! bg-status-error-bg!': data.span_status === 'ERROR',

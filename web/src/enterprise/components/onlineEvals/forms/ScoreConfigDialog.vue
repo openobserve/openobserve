@@ -24,7 +24,7 @@
     <OForm id="score-config-form" class="py-3.5 px-5.5" :form="form">
       <div
         v-if="mode === 'edit'"
-        class="flex gap-2.5 items-start px-3 py-2.5 bg-[color-mix(in_srgb,var(--color-status-info-text)_14%,transparent)] border border-[color-mix(in_srgb,var(--color-status-info-text)_20%,transparent)] rounded-md text-xs leading-normal text-text-body mb-4"
+        class="flex gap-2.5 items-start px-3 py-2.5 bg-[color-mix(in_srgb,var(--color-status-info-text)_14%,transparent)] border border-[color-mix(in_srgb,var(--color-status-info-text)_20%,transparent)] rounded-default text-xs leading-normal text-text-body mb-4"
       >
         <OIcon name="info" size="xs" class="shrink-0 mt-px text-status-info-text" />
         <div class="flex flex-col gap-0.5 min-w-0">
@@ -93,7 +93,7 @@
           <div
             v-for="type in DATA_TYPES"
             :key="type"
-            class="sc-dtype-radio flex-1 min-w-0 border rounded-md transition-[border-color,background] duration-120"
+            class="sc-dtype-radio flex-1 min-w-0 border rounded-default transition-[border-color,background] duration-120"
             :class="[
               formValues.dataType === type
                 ? 'border-primary-600 bg-[color-mix(in_srgb,var(--color-primary-600)_5%,var(--color-card-bg))]'
@@ -161,7 +161,7 @@
       <!-- Boolean info banner -->
       <div
         v-if="formValues.dataType === 'boolean'"
-        class="flex gap-2.5 items-start px-3 py-2.5 bg-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] border border-dialog-header-border rounded-md text-xs leading-normal text-text-body mb-4"
+        class="flex gap-2.5 items-start px-3 py-2.5 bg-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] border border-dialog-header-border rounded-default text-xs leading-normal text-text-body mb-4"
       >
         <OIcon name="info" size="xs" class="shrink-0 mt-px text-text-secondary" />
         <span>
@@ -171,7 +171,7 @@
 
       <!-- Healthy threshold -->
       <div
-        class="mt-1 pt-3 px-3.5 pb-2.5 border border-dialog-header-border rounded-md bg-[color-mix(in_srgb,var(--color-primary-600)_2.5%,var(--color-card-bg))]"
+        class="mt-1 pt-3 px-3.5 pb-2.5 border border-dialog-header-border rounded-default bg-[color-mix(in_srgb,var(--color-primary-600)_2.5%,var(--color-card-bg))]"
       >
         <div class="flex items-center gap-2.5 mb-3">
           <span class="inline-flex items-center gap-1">
@@ -192,7 +192,7 @@
           <!-- Narrow drawers (<51.25rem): stack so the label + input don't crush. -->
           <div class="flex flex-col gap-2.5 min-[51.25rem]:flex-row">
             <label
-              class="flex-1 min-w-0 grid grid-cols-[1.125rem_1.25rem_minmax(0,1fr)_5rem] items-center gap-2 px-3 py-1.5 border rounded-sm cursor-pointer transition-[border-color,background] duration-120 hover:border-[color-mix(in_srgb,var(--color-primary-600)_40%,var(--color-dialog-header-border))]"
+              class="flex-1 min-w-0 grid grid-cols-[1.125rem_1.25rem_minmax(0,1fr)_5rem] items-center gap-2 px-3 py-1.5 border rounded-default cursor-pointer transition-[border-color,background] duration-120 hover:border-[color-mix(in_srgb,var(--color-primary-600)_40%,var(--color-dialog-header-border))]"
               :class="
                 formValues.healthyDirection === 'gte'
                   ? 'border-primary-600 bg-[color-mix(in_srgb,var(--color-primary-600)_4%,var(--color-card-bg))]'
@@ -219,7 +219,7 @@
               />
             </label>
             <label
-              class="flex-1 min-w-0 grid grid-cols-[1.125rem_1.25rem_minmax(0,1fr)_5rem] items-center gap-2 px-3 py-1.5 border rounded-sm cursor-pointer transition-[border-color,background] duration-120 hover:border-[color-mix(in_srgb,var(--color-primary-600)_40%,var(--color-dialog-header-border))]"
+              class="flex-1 min-w-0 grid grid-cols-[1.125rem_1.25rem_minmax(0,1fr)_5rem] items-center gap-2 px-3 py-1.5 border rounded-default cursor-pointer transition-[border-color,background] duration-120 hover:border-[color-mix(in_srgb,var(--color-primary-600)_40%,var(--color-dialog-header-border))]"
               :class="
                 formValues.healthyDirection === 'lte'
                   ? 'border-primary-600 bg-[color-mix(in_srgb,var(--color-primary-600)_4%,var(--color-card-bg))]'
@@ -251,14 +251,14 @@
         <!-- Categorical threshold -->
         <template v-else-if="formValues.dataType === 'categorical'">
           <div class="text-xs font-medium text-text-secondary mb-2">{{ t("onlineEvals.scoreConfig.healthyCategories") }}</div>
-          <div v-if="formValues.categories.length === 0" class="text-2xs italic text-text-secondary px-3 py-2.5 border border-dashed border-dialog-header-border rounded-sm bg-card-bg">
+          <div v-if="formValues.categories.length === 0" class="text-2xs italic text-text-secondary px-3 py-2.5 border border-dashed border-dialog-header-border rounded-default bg-card-bg">
             {{ t("onlineEvals.scoreConfig.addCategoryPlaceholder") }}…
           </div>
-          <div v-else class="flex flex-col gap-0.5 border border-dialog-header-border rounded-sm bg-card-bg p-1">
+          <div v-else class="flex flex-col gap-0.5 border border-dialog-header-border rounded-default bg-card-bg p-1">
             <label
               v-for="cat in formValues.categories"
               :key="cat"
-              class="flex items-center gap-2.5 px-2.5 py-1.75 rounded-sm cursor-pointer transition-[background] duration-120 hover:bg-[color-mix(in_srgb,var(--color-text-heading)_6%,transparent)]"
+              class="flex items-center gap-2.5 px-2.5 py-1.75 rounded-default cursor-pointer transition-[background] duration-120 hover:bg-[color-mix(in_srgb,var(--color-text-heading)_6%,transparent)]"
               :class="
                 formValues.healthyCategories.includes(cat)
                   ? 'bg-[color-mix(in_srgb,color-mix(in_srgb,var(--color-status-success-text)_14%,transparent)_35%,transparent)]'
@@ -286,7 +286,7 @@
           <!-- Narrow drawers (<51.25rem): stack so the label + hint don't crush. -->
           <div class="flex flex-col gap-2.5 min-[51.25rem]:flex-row">
             <label
-              class="flex-1 min-w-0 grid grid-cols-[1rem_1fr] items-start gap-2.5 px-3 py-1.75 border rounded-sm cursor-pointer transition-[border-color,background] duration-120 hover:border-[color-mix(in_srgb,var(--color-primary-600)_40%,var(--color-dialog-header-border))]"
+              class="flex-1 min-w-0 grid grid-cols-[1rem_1fr] items-start gap-2.5 px-3 py-1.75 border rounded-default cursor-pointer transition-[border-color,background] duration-120 hover:border-[color-mix(in_srgb,var(--color-primary-600)_40%,var(--color-dialog-header-border))]"
               :class="
                 formValues.healthyBool === true
                   ? 'border-primary-600 bg-[color-mix(in_srgb,var(--color-primary-600)_4%,var(--color-card-bg))]'
@@ -306,7 +306,7 @@
               </div>
             </label>
             <label
-              class="flex-1 min-w-0 grid grid-cols-[1rem_1fr] items-start gap-2.5 px-3 py-1.75 border rounded-sm cursor-pointer transition-[border-color,background] duration-120 hover:border-[color-mix(in_srgb,var(--color-primary-600)_40%,var(--color-dialog-header-border))]"
+              class="flex-1 min-w-0 grid grid-cols-[1rem_1fr] items-start gap-2.5 px-3 py-1.75 border rounded-default cursor-pointer transition-[border-color,background] duration-120 hover:border-[color-mix(in_srgb,var(--color-primary-600)_40%,var(--color-dialog-header-border))]"
               :class="
                 formValues.healthyBool === false
                   ? 'border-primary-600 bg-[color-mix(in_srgb,var(--color-primary-600)_4%,var(--color-card-bg))]'

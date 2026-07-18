@@ -134,7 +134,7 @@
     <template #cell-locations="{ row }">
       <div class="flex items-center gap-1 cursor-default" @mouseenter="showLoc($event, (row as any).locations)" @mouseleave="hideLoc">
         <span class="text-xs truncate max-w-[4.375rem]">{{ (row as any).locations[0] }}</span>
-        <span v-if="(row as any).locations.length > 1" class="text-xs font-bold px-1 py-0.5 rounded-sm bg-[var(--color-surface-subtle)] whitespace-nowrap shrink-0">+{{ (row as any).locations.length - 1 }}</span>
+        <span v-if="(row as any).locations.length > 1" class="text-xs font-bold px-1 py-0.5 rounded-default bg-[var(--color-surface-subtle)] whitespace-nowrap shrink-0">+{{ (row as any).locations.length - 1 }}</span>
       </div>
     </template>
 

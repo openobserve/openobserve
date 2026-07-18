@@ -289,7 +289,7 @@ const rowStateClass = (row: { org: OrgOption; index: number }) => {
               :key="row.key"
               data-test="organization-menu-item-label-item-label"
               :data-test-org-identifier="row.org.identifier"
-              class="group absolute left-0 right-0 top-0 box-border flex items-center gap-2 px-3 rounded-md cursor-pointer transition-colors"
+              class="group absolute left-0 right-0 top-0 box-border flex items-center gap-2 px-3 rounded-default cursor-pointer transition-colors"
               :class="rowStateClass(row)"
               :style="{
                 transform: `translateY(${row.start}px)`,
@@ -324,7 +324,7 @@ const rowStateClass = (row: { org: OrgOption; index: number }) => {
                 type="button"
                 data-test="organization-menu-item-copy-id"
                 :aria-label="`Copy organization ID ${row.org.identifier}`"
-                class="shrink-0 inline-flex items-center justify-center size-6 rounded-md transition hover:bg-primary-200 hover:text-select-item-selected-text"
+                class="shrink-0 inline-flex items-center justify-center size-6 rounded-default transition hover:bg-primary-200 hover:text-select-item-selected-text"
                 :class="
                   copiedId === row.org.identifier
                     ? 'opacity-100 text-primary-600'

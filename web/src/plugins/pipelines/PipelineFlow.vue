@@ -17,13 +17,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- src/components/PipelineFlow.vue -->
 <template>
   <div data-test="pipeline-flow-container" class="flex items-center justify-between">
-     <div data-test="pipeline-flow-unsaved-changes-warning-text" v-show="pipelineObj.dirtyFlag" class="text-status-warning-text border border-status-warning-text rounded-sm flex items-center px-2 mr-3">
+     <div data-test="pipeline-flow-unsaved-changes-warning-text" v-show="pipelineObj.dirtyFlag" class="text-status-warning-text border border-status-warning-text rounded-default flex items-center px-2 mr-3">
       <OIcon name="info" class="mr-1 " size="sm" />
      Unsaved changes detected. Click "Save" to preserve your updates.
    </div>
 
    <!-- Edge deletion help notification -->
-   <div v-if="showEdgeHelpNotification" class="edge-help-notification absolute top-5 left-1/2 -translate-x-1/2 z-[1000] bg-surface-base text-text-body py-2.5 px-4 rounded-lg text-sm shadow-[0_4px_20px_rgba(0,0,0,0.15)] border border-border-default flex items-center dark:shadow-[0_4px_20px_rgba(0,0,0,0.4)]">
+   <div v-if="showEdgeHelpNotification" class="edge-help-notification absolute top-5 left-1/2 -translate-x-1/2 z-[1000] bg-surface-base text-text-body py-2.5 px-4 rounded-default text-sm shadow-[0_4px_20px_rgba(0,0,0,0.15)] border border-border-default flex items-center dark:shadow-[0_4px_20px_rgba(0,0,0,0.4)]">
      <OIcon name="info" class="mr-1" size="sm" />
      Press Backspace/Delete to remove the edge
    </div>

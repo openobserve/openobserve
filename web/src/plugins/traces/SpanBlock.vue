@@ -51,7 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="span-marker"
         >
           <div
-            class="w-[calc(100%-0.375rem)] h-full rounded-sm"
+            class="w-[calc(100%-0.375rem)] h-full rounded-default"
             :style="{
               backgroundColor: span.style?.color || DEFAULT_SPAN_COLOR,
             }"

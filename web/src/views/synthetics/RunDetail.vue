@@ -158,7 +158,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div
                   v-for="i in 5"
                   :key="i"
-                  class="card-container rounded-lg flex flex-row items-center px-[0.875rem] py-[0.625rem] gap-1.5 bg-surface-base border border-border-default"
+                  class="card-container rounded-default flex flex-row items-center px-[0.875rem] py-[0.625rem] gap-1.5 bg-surface-base border border-border-default"
                 >
                   <OSkeleton type="circle" class="h-4 w-4 shrink-0" />
                   <OSkeleton type="text" class="h-4 w-20" />
@@ -174,7 +174,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div
                   v-for="chip in infoChips"
                   :key="chip.label"
-                  class="card-container rounded-lg flex flex-row items-center px-[0.875rem] py-[0.625rem] gap-1.5 bg-surface-base border border-border-default"
+                  class="card-container rounded-default flex flex-row items-center px-[0.875rem] py-[0.625rem] gap-1.5 bg-surface-base border border-border-default"
                 >
                   <OIcon
                     v-if="chip.icon"
@@ -204,9 +204,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div
                     v-for="i in 4"
                     :key="i"
-                    class="flex items-center gap-2 rounded-sm border border-border-default p-2"
+                    class="flex items-center gap-2 rounded-default border border-border-default p-2"
                   >
-                    <OSkeleton type="rect" class="h-12 w-18 shrink-0 rounded-sm" />
+                    <OSkeleton type="rect" class="h-12 w-18 shrink-0 rounded-default" />
                     <OSkeleton type="circle" class="h-6 w-6 shrink-0" />
                     <OSkeleton type="text" class="h-4 flex-1" />
                     <OSkeleton type="text" class="h-4 w-16 shrink-0" />
@@ -217,7 +217,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Lambda execution error (no steps) -->
             <div
               v-else-if="isErrorRun"
-              class="bg-[var(--color-badge-error-soft-bg)] border border-badge-error-ol-border/30 rounded-lg overflow-hidden m-2"
+              class="bg-[var(--color-badge-error-soft-bg)] border border-badge-error-ol-border/30 rounded-default overflow-hidden m-2"
               role="alert"
               data-test="synthetics-run-detail-steps-error-banner"
             >
@@ -255,7 +255,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </OButton>
                   <pre
                     v-if="stackOpen && currentRun.errorStack"
-                    class="mt-2 text-2xs leading-[1.6] text-text-body bg-code-bg rounded-md p-[10px_12px] overflow-auto whitespace-pre-wrap font-mono"
+                    class="mt-2 text-2xs leading-[1.6] text-text-body bg-code-bg rounded-default p-[10px_12px] overflow-auto whitespace-pre-wrap font-mono"
                     data-test="synthetics-run-detail-error-stack"
                   >{{ currentRun.errorStack }}</pre>
                 </div>
@@ -337,7 +337,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <template #expansion="{ row }">
                       <div class="flex gap-4 p-3">
                         <div class="w-[40%] shrink-0">
-                          <div class="rounded-sm border border-border-default overflow-hidden">
+                          <div class="rounded-default border border-border-default overflow-hidden">
                             <div
                               class="aspect-[16/10] flex items-center justify-center overflow-hidden"
                               :class="row.status === 'fail' ? 'bg-status-error-bg' : 'bg-surface-subtle'"
@@ -360,7 +360,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                   />
                                 </OButton>
                                 <div
-                                  class="absolute top-2 right-2 flex items-center justify-center w-7 h-7 rounded-md bg-surface-base/80 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"
+                                  class="absolute top-2 right-2 flex items-center justify-center w-7 h-7 rounded-default bg-surface-base/80 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"
                                   aria-hidden="true"
                                 >
                                   <OIcon name="fullscreen" size="sm" class="text-text-body" />
@@ -390,7 +390,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                           <div
                             v-if="row.status === 'fail' && row.error"
-                            class="rounded-lg border border-badge-error-ol-border/30 overflow-hidden"
+                            class="rounded-default border border-badge-error-ol-border/30 overflow-hidden"
                             :data-test="`synthetics-run-detail-step-error-card-${row.id}`"
                           >
                             <div class="flex items-center gap-2 px-3 py-2 bg-[var(--color-badge-error-soft-bg)]">
@@ -527,7 +527,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="errorStep"
       class="flex flex-col h-full overflow-y-auto p-6"
     >
-      <div class="rounded-lg border border-badge-error-ol-border/30 overflow-hidden">
+      <div class="rounded-default border border-badge-error-ol-border/30 overflow-hidden">
         <div
           class="flex items-center gap-2 px-4 py-2.5 bg-[var(--color-badge-error-soft-bg)]"
         >

@@ -191,6 +191,9 @@
   --color-warning-700: var(--color-warning-700);
 
   /* Radius / Shadow (re-exports from base.css) */
+  /* --radius-default is the app knob; sm/md/lg/xl are legacy aliases (same 4px
+     value) kept only for library internals + scoped var() refs (A5). */
+  --radius-default: var(--radius-default);
   --radius-sm:   var(--radius-sm);
   --radius-md:   var(--radius-md);
   --radius-lg:   var(--radius-lg);

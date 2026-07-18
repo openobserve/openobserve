@@ -116,7 +116,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 diffData.additions.length
               }})
             </div>
-            <ul class="flex flex-col divide-y divide-border border rounded-md">
+            <ul class="flex flex-col divide-y divide-border border rounded-default">
               <li
                 v-for="group in diffData.additions"
                 :key="group.id"
@@ -159,7 +159,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 diffData.modifications.length
               }})
             </div>
-            <ul class="flex flex-col divide-y divide-border border rounded-md">
+            <ul class="flex flex-col divide-y divide-border border rounded-default">
               <li
                 v-for="mod in diffData.modifications"
                 :key="mod.proposed.id"
@@ -204,7 +204,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :label="`Unchanged (${diffData.unchanged.length})`"
               icon="check-circle"
             >
-              <ul class="flex flex-col divide-y divide-border border rounded-md">
+              <ul class="flex flex-col divide-y divide-border border rounded-default">
                 <li
                   v-for="group in diffData.unchanged"
                   :key="group.id"
@@ -277,7 +277,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="text-xs mb-1">
           {{ selectedModification?.current.fields.length }} fields
         </div>
-        <div class="max-h-62.5 overflow-y-auto p-2 bg-surface-subtle rounded-sm">
+        <div class="max-h-62.5 overflow-y-auto p-2 bg-surface-subtle rounded-default">
           <OTag
             v-for="field in selectedModification?.current.fields"
             :key="`current-${field}`"
@@ -294,7 +294,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="text-xs mb-1">
           {{ selectedModification?.proposed.fields.length }} fields
         </div>
-        <div class="max-h-62.5 overflow-y-auto p-2 bg-surface-subtle rounded-sm">
+        <div class="max-h-62.5 overflow-y-auto p-2 bg-surface-subtle rounded-default">
           <OTag
             v-for="field in selectedModification?.proposed.fields"
             :key="`proposed-${field}`"

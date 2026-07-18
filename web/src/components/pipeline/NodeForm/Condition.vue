@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="o-drawer-close-btn"
         @mousedown.prevent
         @click="openCancelDialog"
-        class="shrink-0 flex items-center justify-center h-7 w-7 rounded-md text-dialog-close-text hover:bg-dialog-close-hover-bg active:bg-dialog-close-active-bg transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-dialog-focus-ring cursor-pointer"
+        class="shrink-0 flex items-center justify-center h-7 w-7 rounded-default text-dialog-close-text hover:bg-dialog-close-hover-bg active:bg-dialog-close-active-bg transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-dialog-focus-ring cursor-pointer"
       >
         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <line x1="18" y1="6" x2="6" y2="18" />
@@ -55,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
     <OForm id="condition-form" :form="form">
-    <div class="w-full rounded-lg px-3 stream-routing-container">
+    <div class="w-full rounded-default px-3 stream-routing-container">
       <div>
         <div
           class="showLabelOnTop font-bold text-h7"
@@ -93,7 +93,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ conditionsError }}
           </div>
           <div
-            class="note-container bg-banner-warning-bg text-banner-warning-text w-full rounded-md p-3 my-3 flex flex-col gap-2"
+            class="note-container bg-banner-warning-bg text-banner-warning-text w-full rounded-default p-3 my-3 flex flex-col gap-2"
             data-test="add-condition-note-container"
           >
             <div
@@ -111,7 +111,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <span>
                   To check for an empty value, use
                   <span class="highlight font-bold text-text-link">""</span>. Example:
-                  <span class="code font-mono py-px px-1 rounded-sm bg-code-bg text-code-text">app_name != ""</span>
+                  <span class="code font-mono py-px px-1 rounded-default bg-code-bg text-code-text">app_name != ""</span>
                 </span>
               </div>
               <div class="flex items-start gap-2">
@@ -119,7 +119,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <span>
                   To check for an Null value, use
                   <span class="highlight font-bold text-text-link">null</span>. Example:
-                  <span class="code font-mono py-px px-1 rounded-sm bg-code-bg text-code-text">app_name != null</span>
+                  <span class="code font-mono py-px px-1 rounded-default bg-code-bg text-code-text">app_name != null</span>
                 </span>
               </div>
               <div class="flex items-start gap-2">

@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- ── Header ──────────────────────────────────────────────────────── -->
     <div class="flex items-start gap-3 mb-2">
-      <div data-test="feature-comparison-table-icon-wrapper" class="w-12 h-12 rounded-lg flex items-center justify-center shrink-0 bg-[color-mix(in_srgb,var(--color-accent)_12%,var(--color-card-glass-bg))] text-accent">
+      <div data-test="feature-comparison-table-icon-wrapper" class="w-12 h-12 rounded-default flex items-center justify-center shrink-0 bg-[color-mix(in_srgb,var(--color-accent)_12%,var(--color-card-glass-bg))] text-accent">
         <OIcon name="compare-arrows" size="md" />
       </div>
       <div>
@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :key="ed.id"
         data-test="feature-comparison-table-edition-card"
         :data-test-active="buildType === ed.id ? 'true' : undefined"
-        class="relative flex flex-col bg-card-glass-bg rounded-xl p-6 max-[1024px]:p-4 border border-card-glass-border"
+        class="relative flex flex-col bg-card-glass-bg rounded-default p-6 max-[1024px]:p-4 border border-card-glass-border"
         :class="{ 'border-2 border-accent pt-7 max-[1024px]:pt-5': buildType === ed.id }"
       >
         <!-- Your Plan badge (floats above the card top border) -->
@@ -58,14 +58,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- All Five Pillars chips ────────────────────────────────────── -->
-        <div class="bg-[color-mix(in_srgb,var(--color-accent)_5%,var(--color-card-glass-bg))] border border-[color-mix(in_srgb,var(--color-accent)_15%,transparent)] rounded-lg p-3 mb-4">
+        <div class="bg-[color-mix(in_srgb,var(--color-accent)_5%,var(--color-card-glass-bg))] border border-[color-mix(in_srgb,var(--color-accent)_15%,transparent)] rounded-default p-3 mb-4">
           <div class="text-3xs font-bold uppercase tracking-[0.12em] text-text-label m-0 mb-2">ALL FIVE PILLARS</div>
           <div class="flex flex-wrap gap-1.5 mb-1.5">
-            <span v-for="pillarId in PILLAR_IDS" :key="pillarId" data-test="feature-comparison-table-pillar-chip" class="inline-flex items-center py-[0.1875rem] px-2 rounded-sm text-2xs font-medium bg-[color-mix(in_srgb,var(--color-accent)_10%,var(--color-card-glass-bg))] text-accent border border-[color-mix(in_srgb,var(--color-accent)_20%,transparent)] mr-[0.375rem] mb-[0.375rem]">
+            <span v-for="pillarId in PILLAR_IDS" :key="pillarId" data-test="feature-comparison-table-pillar-chip" class="inline-flex items-center py-[0.1875rem] px-2 rounded-default text-2xs font-medium bg-[color-mix(in_srgb,var(--color-accent)_10%,var(--color-card-glass-bg))] text-accent border border-[color-mix(in_srgb,var(--color-accent)_20%,transparent)] mr-[0.375rem] mb-[0.375rem]">
               {{ t(`about.feature_${pillarId}`) }}
             </span>
           </div>
-          <span class="inline-flex items-center py-[0.1875rem] px-2 rounded-sm text-2xs font-medium bg-[color-mix(in_srgb,var(--color-accent)_10%,var(--color-card-glass-bg))] text-accent border border-[color-mix(in_srgb,var(--color-accent)_20%,transparent)] mr-[0.375rem] mb-[0.375rem]">{{ t('about.feature_dashboards') }}</span>
+          <span class="inline-flex items-center py-[0.1875rem] px-2 rounded-default text-2xs font-medium bg-[color-mix(in_srgb,var(--color-accent)_10%,var(--color-card-glass-bg))] text-accent border border-[color-mix(in_srgb,var(--color-accent)_20%,transparent)] mr-[0.375rem] mb-[0.375rem]">{{ t('about.feature_dashboards') }}</span>
         </div>
 
         <!-- Feature list ───────────────────────────────────────────────── -->
@@ -125,11 +125,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             target="_blank"
             data-test="feature-comparison-table-cta-btn"
             data-test-cta="action"
-            class="block w-full py-2 px-4 rounded-md text-sm font-semibold text-center no-underline cursor-pointer transition-all duration-200 border-[1.5px] border-solid bg-[color-mix(in_srgb,var(--color-accent)_10%,var(--color-card-glass-bg))] text-accent border-[color-mix(in_srgb,var(--color-accent)_30%,transparent)] hover:bg-[color-mix(in_srgb,var(--color-accent)_18%,var(--color-card-glass-bg))] hover:border-accent"
+            class="block w-full py-2 px-4 rounded-default text-sm font-semibold text-center no-underline cursor-pointer transition-all duration-200 border-[1.5px] border-solid bg-[color-mix(in_srgb,var(--color-accent)_10%,var(--color-card-glass-bg))] text-accent border-[color-mix(in_srgb,var(--color-accent)_30%,transparent)] hover:bg-[color-mix(in_srgb,var(--color-accent)_18%,var(--color-card-glass-bg))] hover:border-accent"
           >
             {{ ed.ctaLabel }}
           </a>
-          <button v-else data-test="feature-comparison-table-cta-btn" data-test-cta="current" class="block w-full py-2 px-4 rounded-md text-sm font-semibold text-center no-underline cursor-default transition-all duration-200 border-[1.5px] border-solid bg-transparent text-text-muted border-card-glass-border" disabled>
+          <button v-else data-test="feature-comparison-table-cta-btn" data-test-cta="current" class="block w-full py-2 px-4 rounded-default text-sm font-semibold text-center no-underline cursor-default transition-all duration-200 border-[1.5px] border-solid bg-transparent text-text-muted border-card-glass-border" disabled>
             {{ ed.ctaLabel }}
           </button>
         </div>

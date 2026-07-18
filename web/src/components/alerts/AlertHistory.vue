@@ -364,7 +364,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                   Error Details
                 </div>
-                <div class="rounded-sm border border-solid border-negative/30 p-2 mt-2 bg-status-error-bg">
+                <div class="rounded-default border border-solid border-negative/30 p-2 mt-2 bg-status-error-bg">
                   <pre
                     class="text-sm"
                     style="
@@ -392,7 +392,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                   Response
                 </div>
-                <div class="rounded-sm border border-solid border-positive/30 p-2 mt-2 bg-status-success-bg">
+                <div class="rounded-default border border-solid border-positive/30 p-2 mt-2 bg-status-success-bg">
                   <pre
                     class="text-sm"
                     style="
@@ -431,7 +431,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <div class="mb-4">
         <div class="text-sm font-semibold tracking-[0.02em] opacity-80 mb-2">Error Summary</div>
-        <div class="p-4 rounded-lg font-mono text-compact leading-[1.6] whitespace-pre-wrap wrap-break-word bg-status-error-bg border border-solid border-status-negative text-status-error-text">
+        <div class="p-4 rounded-default font-mono text-compact leading-[1.6] whitespace-pre-wrap wrap-break-word bg-status-error-bg border border-solid border-status-negative text-status-error-text">
           {{ errorMessage.error }}
         </div>
       </div>

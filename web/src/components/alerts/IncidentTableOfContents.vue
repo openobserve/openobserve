@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div data-test="toc-container" class="px-2 pt-4 pb-2 flex flex-col h-full overflow-hidden">
     <div
       data-test="toc-section-container"
-      class="overflow-hidden flex flex-col flex-1 border border-card-glass-border rounded-md"
+      class="overflow-hidden flex flex-col flex-1 border border-card-glass-border rounded-default"
     >
       <!-- Header -->
       <div
@@ -44,7 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Level 1 Item -->
               <div
                 :data-test="`toc-level1-content-${item.id}`"
-                class="flex items-center gap-2 px-2 py-1.5 rounded-sm transition-colors text-text-heading"
+                class="flex items-center gap-2 px-2 py-1.5 rounded-default transition-colors text-text-heading"
               >
                 <!-- Icon on the left -->
                 <OIcon
@@ -80,7 +80,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <!-- Level 2 Item -->
                     <div
                       :data-test="`toc-level2-content-${child.id}`"
-                      class="flex items-center gap-2 px-2 py-1 rounded-sm transition-colors text-text-body"
+                      class="flex items-center gap-2 px-2 py-1 rounded-default transition-colors text-text-body"
                     >
                       <!-- Icon on the left -->
                       <OIcon
@@ -116,7 +116,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :key="grandchild.id"
                         :data-test="`toc-level3-item-${grandchild.id}`"
                         @click="$emit('scroll-to-section', grandchild.id)"
-                        class="flex items-center gap-2 px-2 py-1 rounded-sm cursor-pointer transition-colors text-text-secondary hover:bg-surface-subtle-hover"
+                        class="flex items-center gap-2 px-2 py-1 rounded-default cursor-pointer transition-colors text-text-secondary hover:bg-surface-subtle-hover"
                       >
                         <OIcon :data-test="`toc-level3-icon-${grandchild.id}`" name="fiber-manual-record" size="xs" class="opacity-60" />
                         <span :data-test="`toc-level3-text-${grandchild.id}`" class="text-2xs truncate">{{ grandchild.text }}</span>

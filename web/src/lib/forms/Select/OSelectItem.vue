@@ -46,7 +46,7 @@ onUnmounted(() => {
     :class="[
       'relative flex items-center w-full',
       'ps-3 pe-3 py-1.5 text-sm',
-      'text-select-item-text rounded-sm',
+      'text-select-item-text rounded-default',
       'cursor-pointer select-none outline-none',
       'transition-colors duration-100',
       'data-highlighted:bg-select-item-hover-bg',

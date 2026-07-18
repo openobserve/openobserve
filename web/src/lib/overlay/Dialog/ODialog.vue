@@ -429,7 +429,7 @@ watch(internalOpen, (open) => {
           !isFullSize && 'max-h-[90vh]',
           // Surface
           'bg-dialog-bg border border-dialog-border',
-          !isFullSize && 'rounded-xl',
+          !isFullSize && 'rounded-default',
           'shadow-dialog',
           // Typography
           'text-dialog-content-text',
@@ -470,7 +470,7 @@ watch(internalOpen, (open) => {
             'px-dialog-header-px py-dialog-header-py',
             'bg-dialog-header-bg text-dialog-header-text',
             'border-b border-dialog-header-border',
-            !isFullSize && 'rounded-t-xl',
+            !isFullSize && 'rounded-t-default',
           ]"
         >
           <!-- CASE 1: Full override — backward compat, sub-slots are ignored -->
@@ -519,7 +519,7 @@ watch(internalOpen, (open) => {
               @mousedown.prevent
               :class="[
                 'shrink-0 flex items-center justify-center',
-                'h-7 w-7 rounded-md',
+                'h-7 w-7 rounded-default',
                 'text-dialog-close-text',
                 'hover:bg-dialog-close-hover-bg',
                 'active:bg-dialog-close-active-bg',
@@ -576,7 +576,7 @@ watch(internalOpen, (open) => {
             'px-dialog-footer-px py-dialog-footer-py',
             'bg-dialog-footer-bg',
             'border-t border-dialog-footer-border',
-            !isFullSize && 'rounded-b-xl',
+            !isFullSize && 'rounded-b-default',
           ]"
         >
           <!-- ── Built-in footer buttons ──────────────────────────────────────── -->

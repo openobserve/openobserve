@@ -385,7 +385,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="section-label mb-2 text-compact font-semibold tracking-[0.02em] opacity-80">
           {{ t("pipeline_list.error_summary") }}
         </div>
-        <div class="error-summary-box p-4 rounded-lg font-mono text-compact leading-[1.6] whitespace-pre-wrap wrap-break-word bg-banner-error-soft-bg border border-banner-error-soft-border text-banner-error-soft-text">
+        <div class="error-summary-box p-4 rounded-default font-mono text-compact leading-[1.6] whitespace-pre-wrap wrap-break-word bg-banner-error-soft-bg border border-banner-error-soft-border text-banner-error-soft-text">
           {{ errorDialog.data.last_error.error_summary }}
         </div>
       </div>
@@ -405,11 +405,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-for="(nodeError, nodeId) in errorDialog.data.last_error
               .node_errors"
             :key="nodeId"
-            class="node-error-item p-4 rounded-lg bg-surface-subtle border border-border-default transition-all hover:bg-interactive-hover-bg"
+            class="node-error-item p-4 rounded-default bg-surface-subtle border border-border-default transition-all hover:bg-interactive-hover-bg"
           >
             <div class="node-error-header flex items-center justify-between mb-2.5">
               <span class="node-name font-semibold text-sm">{{ nodeError.node_name || nodeId }}</span>
-              <span class="node-type text-xs px-2.5 py-1 rounded-xl bg-badge-indigo-soft-bg text-badge-indigo-soft-text font-medium">{{ nodeError.node_type }}</span>
+              <span class="node-type text-xs px-2.5 py-1 rounded-default bg-badge-indigo-soft-bg text-badge-indigo-soft-text font-medium">{{ nodeError.node_type }}</span>
             </div>
             <div
               v-if="
@@ -420,7 +420,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div
                 v-for="(msg, idx) in nodeError.error_messages"
                 :key="idx"
-                class="error-message p-3 rounded-md bg-banner-error-soft-bg border-l-[3px] border-l-status-negative font-mono text-xs leading-[1.5] whitespace-pre-wrap wrap-break-word text-banner-error-soft-text"
+                class="error-message p-3 rounded-default bg-banner-error-soft-bg border-l-[3px] border-l-status-negative font-mono text-xs leading-[1.5] whitespace-pre-wrap wrap-break-word text-banner-error-soft-text"
               >
                 {{ msg }}
               </div>

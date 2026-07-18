@@ -1,5 +1,5 @@
 <template>
-    <div v-if="showLicenseExpiryWarning && config.isEnterprise == 'true' && config.isCloud === 'false'" data-test="license-period-container" class="w-full p-3 border border-border-default rounded-md [background:var(--color-usage-banner-success-bg)]">
+    <div v-if="showLicenseExpiryWarning && config.isEnterprise == 'true' && config.isCloud === 'false'" data-test="license-period-container" class="w-full p-3 border border-border-default rounded-default [background:var(--color-usage-banner-success-bg)]">
         <div class="flex" >
         <div class="flex flex-col">
         <span data-test="license-period-message" class="text-lg font-semibold leading-8">{{ getLicenseExpiryMessage() }}</span>

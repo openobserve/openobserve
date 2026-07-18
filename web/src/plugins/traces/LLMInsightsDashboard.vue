@@ -58,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :options="availableStreams.map((s) => ({ label: s, value: s }))"
           labelKey="label"
           valueKey="value"
-          class="w-full rounded-sm"
+          class="w-full rounded-default"
           @update:model-value="onStreamChange"
         />
       </div>
@@ -79,7 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :options="agentSelectOptions"
           labelKey="label"
           valueKey="value"
-          class="w-full rounded-sm"
+          class="w-full rounded-default"
           @update:model-value="onAgentChange"
         />
       </div>
@@ -167,7 +167,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           v-for="card in kpiCards"
           :key="card.label"
-          class="bg-card-glass-bg rounded-lg flex flex-col px-3.5 pt-2.5 pb-2.5 gap-1 border border-border-default transition-shadow duration-200 hover:shadow-[0_1px_6px_rgba(0,0,0,0.08)]"
+          class="bg-card-glass-bg rounded-default flex flex-col px-3.5 pt-2.5 pb-2.5 gap-1 border border-border-default transition-shadow duration-200 hover:shadow-[0_1px_6px_rgba(0,0,0,0.08)]"
         >
           <!-- P95 rides its own (slower) query — skeleton the WHOLE card while
                it loads, matching the initial strip skeleton tile (see
@@ -189,7 +189,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   {{ card.label }}
                 </div>
                 <span
-                  class="inline-flex items-center justify-center shrink-0 w-6 h-6 rounded-md bg-surface-subtle text-text-secondary"
+                  class="inline-flex items-center justify-center shrink-0 w-6 h-6 rounded-default bg-surface-subtle text-text-secondary"
                 >
                   <OIcon :name="card.icon" size="sm" />
                 </span>

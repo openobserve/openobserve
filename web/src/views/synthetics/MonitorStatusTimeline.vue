@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <div
-    class="card-container rounded-lg flex flex-col bg-surface-base border border-border-default overflow-hidden"
+    class="card-container rounded-default flex flex-col bg-surface-base border border-border-default overflow-hidden"
     data-test="monitor-status-timeline"
   >
     <div
@@ -70,7 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
         <div
           ref="scrollRef"
-          class="flex-1 overflow-hidden flex rounded-sm h-6.5 gap-0.5"
+          class="flex-1 overflow-hidden flex rounded-default h-6.5 gap-0.5"
           @scroll="onScroll"
         >
           <div

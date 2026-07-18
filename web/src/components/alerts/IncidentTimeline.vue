@@ -106,7 +106,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </span>
                       <span
                         v-if="event.type !== 'SeverityUpgrade' && event.type !== 'SeverityOverride'"
-                        class="inline-flex items-center px-2 py-0.5 rounded-sm text-xs font-semibold"
+                        class="inline-flex items-center px-2 py-0.5 rounded-default text-xs font-semibold"
                         :style="badgeStyle(getEventBadgeColor(event))"
                       >
                         {{ getEventBadgeText(event) }}
@@ -121,7 +121,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <!-- AI events: "AI SRE" badge first, then message text -->
                       <template v-if="event.type === 'ai_analysis_begin' || event.type === 'ai_analysis_complete' || event.type === 'ai_analysis_failed'">
                         <span
-                          class="inline-flex items-center px-2 py-0.5 rounded-sm text-xs font-semibold"
+                          class="inline-flex items-center px-2 py-0.5 rounded-default text-xs font-semibold"
                           :style="badgeStyle(getEventBadgeColor(event))"
                         >
                           AI SRE
@@ -135,7 +135,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <!-- For Alert events, show badge first -->
                       <template v-else-if="event.type === 'Alert'">
                         <span
-                          class="inline-flex items-center px-2 py-0.5 rounded-sm text-xs font-semibold"
+                          class="inline-flex items-center px-2 py-0.5 rounded-default text-xs font-semibold"
                           :style="badgeStyle(getEventBadgeColor(event))"
                         >
                           {{ getEventBadgeText(event) }}
@@ -153,7 +153,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         ></span>
                         <span
                           v-if="event.type !== 'SeverityUpgrade' && event.type !== 'SeverityOverride'"
-                          class="inline-flex items-center px-2 py-0.5 rounded-sm text-xs font-semibold"
+                          class="inline-flex items-center px-2 py-0.5 rounded-default text-xs font-semibold"
                           :style="badgeStyle(getEventBadgeColor(event))"
                         >
                           {{ getEventBadgeText(event) }}
@@ -190,7 +190,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="flex-1 min-w-0">
                   <!-- Comment Box -->
                   <div
-                    class="rounded-lg overflow-hidden hover:shadow-md transition-shadow bg-surface-base border border-border-default"
+                    class="rounded-default overflow-hidden hover:shadow-md transition-shadow bg-surface-base border border-border-default"
                   >
                     <!-- Header -->
                     <div

@@ -86,7 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :key="bodyLanguage"
               data-test="template-body-editor"
               editor-id="template-body-editor"
-              class="w-full min-h-77.5! rounded-md border border-card-glass-border resize-y overflow-auto mb-3"
+              class="w-full min-h-77.5! rounded-default border border-card-glass-border resize-y overflow-auto mb-3"
               :language="bodyLanguage"
               :query="body"
               @update:query="onBodyChange"
@@ -158,7 +158,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div
                 data-test="add-template-sample-template-text"
-                class="bg-black/[0.07] px-2 rounded-sm"
+                class="bg-black/[0.07] px-2 rounded-default"
               >
                 <pre class="text-3xs my-0">
                     {{ template.body }}

@@ -69,7 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <button
         v-else-if="node.item.to || node.item.onClick"
         type="button"
-        class="text-text-secondary max-w-48 truncate px-1.5 py-0.5 rounded-md outline-none transition-colors hover:text-text-body hover:bg-surface-subtle focus-visible:ring-4 focus-visible:ring-primary-500/25 focus-visible:ring-inset shrink-0"
+        class="text-text-secondary max-w-48 truncate px-1.5 py-0.5 rounded-default outline-none transition-colors hover:text-text-body hover:bg-surface-subtle focus-visible:ring-4 focus-visible:ring-primary-500/25 focus-visible:ring-inset shrink-0"
         :title="node.item.title ?? node.item.label"
         :data-test="node.item.dataTest"
         @click="onCrumbClick(node.item)"

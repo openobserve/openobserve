@@ -53,7 +53,7 @@
           v-for="card in kpiCards"
           v-else
           :key="card.label"
-          class="rounded-lg flex flex-col px-3.5 pt-2.5 pb-2.5 gap-1 bg-surface-base border border-border-default transition-shadow duration-200 hover:shadow-md"
+          class="rounded-default flex flex-col px-3.5 pt-2.5 pb-2.5 gap-1 bg-surface-base border border-border-default transition-shadow duration-200 hover:shadow-md"
         >
           <div
             class="kpi-label text-2xs leading-normal font-semibold mb-1 text-text-secondary"
@@ -121,7 +121,7 @@
               :options="agentOptions"
               labelKey="label"
               valueKey="value"
-              class="w-full rounded-sm"
+              class="w-full rounded-default"
               data-test="scorer-detail-runs-agent-filter"
             />
           </div>

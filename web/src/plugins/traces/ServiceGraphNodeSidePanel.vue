@@ -70,7 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div
               v-for="chip in filterChips"
               :key="chip.key"
-              class="inline-flex items-center gap-1 rounded-sm border border-border-default px-2 py-[0.325rem] text-2xs leading-none text-text-body"
+              class="inline-flex items-center gap-1 rounded-default border border-border-default px-2 py-[0.325rem] text-2xs leading-none text-text-body"
               :data-test="`service-graph-filter-chip-${chip.key}`"
               :class="
                 chip.type === 'duration'
@@ -249,7 +249,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div
                   v-else-if="recentOperations.length > 0 || loadingOperations"
-                  class="overflow-hidden rounded-sm"
+                  class="overflow-hidden rounded-default"
                   data-test="service-graph-side-panel-operations-table"
                 >
                   <TenstackTable
@@ -354,7 +354,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div
                 v-else-if="resourceTabData[cfg.id]?.length > 0 || resourceTabLoading[cfg.id]"
-                class="overflow-hidden rounded-sm"
+                class="overflow-hidden rounded-default"
                 :data-test="`service-graph-side-panel-${cfg.id}-table`"
               >
                 <TenstackTable

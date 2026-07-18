@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :options="availableStreams.map((s) => ({ label: s, value: s }))"
           labelKey="label"
           valueKey="value"
-          class="w-full rounded-sm"
+          class="w-full rounded-default"
           :disabled="availableStreams.length === 0"
           @update:model-value="onStreamFilterChange"
         />
@@ -69,7 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <template v-if="statusCounts.critical > 0">
           <div
-            class="inline-flex items-center gap-[0.375rem] px-[0.625rem] py-[0.25rem] rounded-sm text-xs font-medium bg-[color-mix(in_srgb,var(--color-service-health-critical)_12%,transparent)] text-service-health-critical"
+            class="inline-flex items-center gap-[0.375rem] px-[0.625rem] py-[0.25rem] rounded-default text-xs font-medium bg-[color-mix(in_srgb,var(--color-service-health-critical)_12%,transparent)] text-service-health-critical"
             data-test="services-catalog-pill-critical"
           >
             <span>{{ statusCounts.critical }}</span>
@@ -84,7 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
         <template v-if="statusCounts.warning > 0">
           <div
-            class="inline-flex items-center gap-[0.375rem] px-[0.625rem] py-[0.25rem] rounded-sm text-xs font-medium bg-[color-mix(in_srgb,var(--color-service-health-warning)_12%,transparent)] text-service-health-warning"
+            class="inline-flex items-center gap-[0.375rem] px-[0.625rem] py-[0.25rem] rounded-default text-xs font-medium bg-[color-mix(in_srgb,var(--color-service-health-warning)_12%,transparent)] text-service-health-warning"
             data-test="services-catalog-pill-warning"
           >
             <span>{{ statusCounts.warning }}</span>
@@ -99,7 +99,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
         <template v-if="statusCounts.degraded > 0">
           <div
-            class="inline-flex items-center gap-[0.375rem] px-[0.625rem] py-[0.25rem] rounded-sm text-xs font-medium bg-[color-mix(in_srgb,var(--color-service-health-degraded)_12%,transparent)] text-service-health-degraded"
+            class="inline-flex items-center gap-[0.375rem] px-[0.625rem] py-[0.25rem] rounded-default text-xs font-medium bg-[color-mix(in_srgb,var(--color-service-health-degraded)_12%,transparent)] text-service-health-degraded"
             data-test="services-catalog-pill-degraded"
           >
             <span>{{ statusCounts.degraded }}</span>
@@ -116,7 +116,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <!-- Status legend -->
       <!-- <div
-        class="ml-auto flex items-center gap-3 px-[0.625rem] py-[0.325rem] rounded-sm border border-card-glass-border"
+        class="ml-auto flex items-center gap-3 px-[0.625rem] py-[0.325rem] rounded-default border border-card-glass-border"
         data-test="services-catalog-status-legend"
       >
         <span

@@ -226,43 +226,43 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
 };
 
 const sizeClasses: Record<NonNullable<ButtonProps["size"]>, string> = {
-  xs: "h-7 ps-2.5 pe-2.5 text-xs gap-1.5 rounded-sm",
+  xs: "h-7 ps-2.5 pe-2.5 text-xs gap-1.5 rounded-default",
   // 34px control height per HANDOFF §11 — the workhorse compact button that
-  // pairs with 34px inputs in toolbars/headers. (radius 8 = rounded-lg per §11.)
-  sm: "h-[2.125rem] ps-3 pe-3 text-sm gap-2 rounded-lg",
+  // pairs with 34px inputs in toolbars/headers. (radius 8 = rounded-default per §11.)
+  sm: "h-[2.125rem] ps-3 pe-3 text-sm gap-2 rounded-default",
   // 30px labeled — matches icon-toolbar height for labeled outline buttons in toolbars
   "sm-toolbar":
-    "h-[1.875rem] ps-2 pe-2 text-xs gap-1.5 rounded-md",
+    "h-[1.875rem] ps-2 pe-2 text-xs gap-1.5 rounded-default",
   // Compact labeled size for inline field chips (axis items) — ~28px, matches the dense button size
   // Extra-compact chip size — 24px height for axis field chips in query builder
-  chip: "h-6 ps-2 pe-1.5 text-xs gap-1 rounded-sm leading-none",
+  chip: "h-6 ps-2 pe-1.5 text-xs gap-1 rounded-default leading-none",
   // Same as chip but with fixed 12px font — for dashboard query builder axis field chips
   // (needed because the html font-size is 14px, making text-xs = 10.5px instead of 12px)
-  "chip-12": "h-6 ps-2 pe-1.5 !text-xs gap-1 rounded-sm leading-none",
+  "chip-12": "h-6 ps-2 pe-1.5 !text-xs gap-1 rounded-default leading-none",
   "sm-action":
-    "h-[2.125rem] ps-3 pe-3 min-w-20 text-sm gap-2 rounded-lg",
-  md: "h-10 ps-4 pe-4 text-sm gap-2 rounded-lg",
-  lg: "h-12 ps-6 pe-6 text-base gap-3 rounded-lg",
-  icon: "size-6 p-0 rounded-md gap-x-0",
-  "icon-xs": "h-7.5 px-2 text-lg rounded-md gap-x-0",
+    "h-[2.125rem] ps-3 pe-3 min-w-20 text-sm gap-2 rounded-default",
+  md: "h-10 ps-4 pe-4 text-sm gap-2 rounded-default",
+  lg: "h-12 ps-6 pe-6 text-base gap-3 rounded-default",
+  icon: "size-6 p-0 rounded-default gap-x-0",
+  "icon-xs": "h-7.5 px-2 text-lg rounded-default gap-x-0",
   // 24px round circle — for small inline add/action icon buttons (e.g. + Joins, + Filters)
   "icon-xs-circle": "size-6 p-0 rounded-full gap-x-0",
   // 28px square — matches xs chip height for paired close/remove buttons
-  "icon-xs-sq": "h-7 w-7 p-0 rounded-md gap-x-0",
+  "icon-xs-sq": "h-7 w-7 p-0 rounded-default gap-x-0",
   // 24px square — matches chip size for paired close/remove buttons
-  "icon-chip": "h-6 w-6 p-0 rounded-sm gap-x-0",
-  "icon-sm": "h-8 w-8 p-0 rounded-md gap-x-0",
-  "icon-md": "h-10 w-10 p-0 rounded-lg gap-x-0",
-  "icon-lg": "h-12 w-12 p-0 rounded-lg gap-x-0",
+  "icon-chip": "h-6 w-6 p-0 rounded-default gap-x-0",
+  "icon-sm": "h-8 w-8 p-0 rounded-default gap-x-0",
+  "icon-md": "h-10 w-10 p-0 rounded-default gap-x-0",
+  "icon-lg": "h-12 w-12 p-0 rounded-default gap-x-0",
   "icon-circle": "size-8 p-0 rounded-full gap-x-0",
   "icon-circle-sm": "size-7 p-0 rounded-full gap-x-0",
   // 30×30px square — for toolbar icon buttons (auto-refresh, share, hamburger)
-  "icon-toolbar": "size-[1.875rem] p-0 rounded-md gap-x-0",
-  // 26px rounded-lg — compact modern icon button for panel header collapse/expand
-  "icon-panel": "size-[1.625rem] p-0 rounded-lg gap-x-0",
+  "icon-toolbar": "size-[1.875rem] p-0 rounded-default gap-x-0",
+  // 26px rounded-default — compact modern icon button for panel header collapse/expand
+  "icon-panel": "size-[1.625rem] p-0 rounded-default gap-x-0",
   // Tall narrow vertical rectangle — 32px × 20px for splitter collapse/expand buttons
   "sidebar-button":
-    "h-8 w-3 p-0 rounded-sm overflow-hidden gap-x-0",
+    "h-8 w-3 p-0 rounded-default overflow-hidden gap-x-0",
 };
 
 const activeClasses = [

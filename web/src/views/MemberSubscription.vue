@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="rounded-md">
+  <div class="rounded-default">
     <div
       style="text-align: center; width: 100%; font-size: 30px; margin: 40px 0px"
     >

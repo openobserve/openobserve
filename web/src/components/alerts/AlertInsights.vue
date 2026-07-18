@@ -109,7 +109,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             v-for="[panelId, filter] in rangeFilters"
             :key="panelId"
-            class="inline-flex items-center rounded-sm py-1 px-3 text-sm cursor-default bg-status-info-bg text-status-info-text"
+            class="inline-flex items-center rounded-default py-1 px-3 text-sm cursor-default bg-status-info-bg text-status-info-text"
             data-test="range-filter-chip"
           >
             <span class="chip-label">

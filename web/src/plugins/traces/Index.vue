@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <div class="rounded-md tracePage h-full min-h-full! max-h-full! overflow-hidden!"
+  <div class="rounded-default tracePage h-full min-h-full! max-h-full! overflow-hidden!"
     id="tracePage"
     style="min-height: auto"
   >

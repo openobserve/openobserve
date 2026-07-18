@@ -67,7 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <div class="max-w-100 mx-auto">
           <!-- Create New Org -->
-          <OCard class="rounded-lg transition-all duration-200 hover:shadow-[0_4px_12px_rgba(0,0,0,0.1)] mb-4">
+          <OCard class="rounded-default transition-all duration-200 hover:shadow-[0_4px_12px_rgba(0,0,0,0.1)] mb-4">
             <OCardSection role="body">
               <div class="text-xl font-semibold">Create New Organization</div>
               <p class="text-text-secondary">
@@ -102,7 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Link to Existing Org (only show orgs without billing) -->
           <OCard
             v-if="eligibleOrganizations.length > 0"
-            class="rounded-lg transition-all duration-200 hover:shadow-[0_4px_12px_rgba(0,0,0,0.1)]"
+            class="rounded-default transition-all duration-200 hover:shadow-[0_4px_12px_rgba(0,0,0,0.1)]"
           >
             <OCardSection role="body">
               <div class="text-xl font-semibold">Link to Existing Organization</div>

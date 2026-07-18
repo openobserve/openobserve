@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="flex items-center w-full"
               >
                 <div
-                  class="px-1.5 py-0.5 rounded-sm text-3xs font-semibold uppercase mr-1.5"
+                  class="px-1.5 py-0.5 rounded-default text-3xs font-semibold uppercase mr-1.5"
                   :class="getEventTypeClass(event.type)"
                 >
                   {{ event.type }}
@@ -172,7 +172,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <div class="flex-1 break-words">
                   <span
-                    class="px-1 py-0.5 rounded-sm text-3xs"
+                    class="px-1 py-0.5 rounded-default text-3xs"
                     :class="
                       rawEvent.error_handling === 'unhandled'
                         ? 'text-status-error-text border border-solid border-status-negative'
@@ -194,7 +194,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <div class="flex-1 break-words">
                   <code
-                    class="font-mono text-3xs px-1 py-0.5 bg-surface-accent rounded-sm"
+                    class="font-mono text-3xs px-1 py-0.5 bg-surface-accent rounded-default"
                   >
                     {{ formatId(rawEvent.error_id) }}
                   </code>
@@ -251,7 +251,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <div class="flex-1 break-words">
                   <code
-                    class="font-mono text-3xs px-1 py-0.5 bg-surface-accent rounded-sm"
+                    class="font-mono text-3xs px-1 py-0.5 bg-surface-accent rounded-default"
                   >
                     {{ formatId(rawEvent.view_id) }}
                   </code>
@@ -287,14 +287,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div
                   v-for="item in relatedResources"
                   :key="item[`${item.type}_id`] || item.id"
-                  class="p-1.5 mb-1 bg-surface-accent rounded-sm cursor-pointer hover:bg-interactive-hover-bg transition-colors"
+                  class="p-1.5 mb-1 bg-surface-accent rounded-default cursor-pointer hover:bg-interactive-hover-bg transition-colors"
                   data-test="related-resource-item"
                   @click="viewResourceDetails(item)"
                 >
                   <!-- Event Type Badge -->
                   <div class="flex items-center mb-0.5">
                     <div
-                      class="px-1 py-0.5 rounded-sm text-3xs font-semibold uppercase mr-1.5"
+                      class="px-1 py-0.5 rounded-default text-3xs font-semibold uppercase mr-1.5"
                       :class="getEventTypeClass(item.type)"
                     >
                       {{ item.type }}
@@ -407,12 +407,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div
               v-for="resource in networkResources"
               :key="resource.resource_id"
-              class="p-2 mb-2 bg-surface-accent rounded-sm"
+              class="p-2 mb-2 bg-surface-accent rounded-default"
               data-test="network-resource-item"
             >
               <div class="flex items-center mb-1">
                 <span
-                  class="px-1.5 py-0.5 rounded-sm text-3xs font-bold mr-2 bg-badge-blue-soft-bg text-badge-blue-soft-text"
+                  class="px-1.5 py-0.5 rounded-default text-3xs font-bold mr-2 bg-badge-blue-soft-bg text-badge-blue-soft-text"
                 >
                   {{ resource.resource_method || "GET" }}
                 </span>
@@ -484,7 +484,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
         </div>
         <div
-          class="p-2 rounded-sm overflow-x-auto font-mono text-3xs"
+          class="p-2 rounded-default overflow-x-auto font-mono text-3xs"
           data-test="raw-event-json"
         >
           <div>

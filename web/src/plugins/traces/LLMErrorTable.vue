@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     ref="rootEl"
-    class="bg-card-glass-bg llm-trend-panel rounded-lg flex flex-col overflow-hidden border border-border-default"
+    class="bg-card-glass-bg llm-trend-panel rounded-default flex flex-col overflow-hidden border border-border-default"
   >
     <!-- Padding lives on the header only, so the table spans edge-to-edge
          (no left/right/bottom inset) and sits flush within the card. -->

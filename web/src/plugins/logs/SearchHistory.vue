@@ -11,7 +11,7 @@
             data-test="search-history-wrap-content-btn"
             variant="ghost"
             size="icon"
-            class="h-6! min-h-6! w-[1.45rem]! p-0! m-0 border-[0.0626rem]! border-solid! border-card-glass-border! rounded-sm! [transition:all_0.2s_ease] backdrop-blur-[0.625rem]! flex! items-center! justify-center!"
+            class="h-6! min-h-6! w-[1.45rem]! p-0! m-0 border-[0.0626rem]! border-solid! border-card-glass-border! rounded-default! [transition:all_0.2s_ease] backdrop-blur-[0.625rem]! flex! items-center! justify-center!"
             :class="
               wrapText
                 ? 'bg-theme-accent! text-white hover:opacity-85'
@@ -23,7 +23,7 @@
             <OTooltip :content="t('search.messageWrapContent')" />
           </OButton>
           <div
-            class="text-status-warning-text border border-status-warning-text flex items-center px-2 h-9 rounded-md"
+            class="text-status-warning-text border border-status-warning-text flex items-center px-2 h-9 rounded-default"
           >
             <OIcon name="info" class="mr-1" size="sm" />
             <div>

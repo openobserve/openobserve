@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <!-- Error Summary: HTTP / gRPC status code -->
   <div
     v-if="hasSpanError && (spanStatusCode || spanGrpcStatusCode)"
-    class="error-summary rounded-sm p-[0.5rem] mb-[0.5rem] border border-solid bg-status-error-bg border-status-error-text"
+    class="error-summary rounded-default p-[0.5rem] mb-[0.5rem] border border-solid bg-status-error-bg border-status-error-text"
     data-test="trace-details-sidebar-error-summary"
   >
     <div class="flex-col items-center gap-1">
@@ -54,7 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <!-- DB Response Status Code -->
   <div
     v-if="hasSpanError && spanDbResponseStatusCode"
-    class="error-summary rounded-sm p-[0.5rem] mb-[0.5rem] border border-solid bg-status-error-bg border-status-error-text"
+    class="error-summary rounded-default p-[0.5rem] mb-[0.5rem] border border-solid bg-status-error-bg border-status-error-text"
     data-test="trace-details-sidebar-db-response-status-code"
   >
     <div class="flex-col items-center gap-1">
@@ -77,7 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <!-- Process Exit Code -->
   <div
     v-if="hasSpanError && spanProcessExitCode"
-    class="error-summary rounded-sm p-[0.5rem] mb-[0.5rem] border border-solid bg-status-error-bg border-status-error-text"
+    class="error-summary rounded-default p-[0.5rem] mb-[0.5rem] border border-solid bg-status-error-bg border-status-error-text"
     data-test="trace-details-sidebar-process-exit-code"
   >
     <div class="flex-col items-center gap-1">
@@ -102,7 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     v-if="
       hasSpanError && (errorBannerTitle || errorBannerMessage || spanErrorType)
     "
-    class="error-summary rounded-sm p-[0.5rem] mb-[0.5rem] border border-solid bg-status-error-bg border-status-error-text"
+    class="error-summary rounded-default p-[0.5rem] mb-[0.5rem] border border-solid bg-status-error-bg border-status-error-text"
     data-test="trace-details-sidebar-error-summary"
   >
     <div class="flex items-center gap-2 mb-[0.25rem]">
@@ -158,18 +158,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <template #expansion="{ row }">
-        <div class="px-4 py-3 bg-surface-base rounded-sm">
+        <div class="px-4 py-3 bg-surface-base rounded-default">
           <div class="space-y-3">
             <!-- Exception Type -->
             <div class="space-y-1">
               <span class="block font-semibold text-text-secondary text-sm mb-1">{{ t("traces.typeLabel") }}</span>
-              <span class="text-status-error-text font-semibold bg-status-error-bg py-1 px-2 rounded-sm inline-block text-sm">{{ row["exception.type"] }}</span>
+              <span class="text-status-error-text font-semibold bg-status-error-bg py-1 px-2 rounded-default inline-block text-sm">{{ row["exception.type"] }}</span>
             </div>
 
             <!-- Exception Message -->
             <div class="space-y-1">
               <span class="block font-semibold text-text-secondary text-sm mb-1">{{ t("traces.messageLabel") }}</span>
-              <div class="text-text-secondary bg-code-bg p-2 rounded-sm border-l-[3px] border-l-status-warning-text whitespace-pre-wrap break-words leading-normal text-sm">
+              <div class="text-text-secondary bg-code-bg p-2 rounded-default border-l-[3px] border-l-status-warning-text whitespace-pre-wrap break-words leading-normal text-sm">
                 {{ formatExceptionMessage(row["exception.message"]) }}
               </div>
             </div>
@@ -198,12 +198,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div
                 v-if="row['exception.stacktrace'] && row['exception.stacktrace'].trim()"
-                class="bg-code-bg rounded-sm border border-border-default p-3 overflow-x-auto max-h-150 overflow-y-auto"
+                class="bg-code-bg rounded-default border border-border-default p-3 overflow-x-auto max-h-150 overflow-y-auto"
                 data-test="exception-stacktrace-container"
               >
                 <div class="stacktrace-content m-0 p-0 text-2xs leading-[1.6] text-code-text font-[Monaco,Menlo,'Ubuntu_Mono',Consolas,'source-code-pro',monospace] whitespace-pre-wrap break-words" v-html="formatStackTrace(row['exception.stacktrace'])" />
               </div>
-              <div v-else class="flex items-center justify-center bg-code-bg text-text-muted text-xs italic py-4 px-3 border border-dashed border-border-default rounded-sm" data-test="exception-stacktrace-empty">
+              <div v-else class="flex items-center justify-center bg-code-bg text-text-muted text-xs italic py-4 px-3 border border-dashed border-border-default rounded-default" data-test="exception-stacktrace-empty">
                 <OIcon name="info" size="sm" class="mr-1" />
                 <span>{{ t("traces.noStacktraceAvailable") }}</span>
               </div>

@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     v-if="isMetaOrg"
-    class="rounded-md p-0 flex flex-col h-full"
+    class="rounded-default p-0 flex flex-col h-full"
   >
     <div class="flex-none">
       <div class="bg-card-glass-bg">

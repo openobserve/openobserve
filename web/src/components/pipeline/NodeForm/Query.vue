@@ -89,7 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          The schema (makeQuerySchema) replaces ScheduledPipeline.validateInputs();
          the SQL editor stays bare so validateSqlQuery() remains a pre-submit
          guard inside saveQueryData (the form's onSubmit). -->
-    <OForm :form="form" class="w-full h-full rounded-lg stream-routing-container">
+    <OForm :form="form" class="w-full h-full rounded-default stream-routing-container">
       <scheduled-pipeline
         ref="scheduledPipelineRef"
         :columns="filteredColumns"

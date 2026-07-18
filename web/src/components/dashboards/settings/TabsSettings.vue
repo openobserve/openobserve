@@ -63,7 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div v-else class="flex items-center gap-1">
             <input
               v-model="editTabObj.data.name"
-              class="flex-1 border border-theme-accent rounded-sm p-1 outline-none min-w-0 focus:border-section-accent-secondary bg-input-bg"
+              class="flex-1 border border-theme-accent rounded-default p-1 outline-none min-w-0 focus:border-section-accent-secondary bg-input-bg"
               data-test="dashboard-tab-settings-tab-name-edit"
             />
             <OButton

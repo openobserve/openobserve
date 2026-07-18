@@ -90,7 +90,7 @@ const onCopy = () => {
 
 <template>
   <div
-    class="o2-code-block my-3 overflow-hidden rounded-lg border border-border-default"
+    class="o2-code-block my-3 overflow-hidden rounded-default border border-border-default"
     :class="chrome ? `o2-chrome-${chrome}` : ''"
     :data-test="dataTest"
   >

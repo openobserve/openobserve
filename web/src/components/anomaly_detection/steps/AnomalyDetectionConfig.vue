@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="step-anomaly-config h-full"
   >
     <div
-      class="step-content px-3 py-4 rounded-lg h-full overflow-y-auto overflow-x-hidden bg-surface-overlay border border-border-default"
+      class="step-content px-3 py-4 rounded-default h-full overflow-y-auto overflow-x-hidden bg-surface-overlay border border-border-default"
     >
       <OForm :form="form">
         <!-- Query Mode Tabs -->
@@ -141,7 +141,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div style="width: calc(100% - 190px)">
             <div
-              class="custom-sql-editor-wrapper h-35 rounded-sm overflow-hidden border"
+              class="custom-sql-editor-wrapper h-35 rounded-default overflow-hidden border"
               :class="hasSqlError ? 'border-input-border-error' : 'border-border-default'"
             >
               <!-- Bare Monaco (sanctioned): value bridged into the form from
@@ -614,7 +614,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="min-h-45 relative flex-1">
                   <div
                     v-if="!previewActive"
-                    class="w-full h-45 flex flex-col items-center justify-center rounded-sm border border-dashed border-border-default"
+                    class="w-full h-45 flex flex-col items-center justify-center rounded-default border border-dashed border-border-default"
                     :class="
                       'text-text-secondary'
                     "

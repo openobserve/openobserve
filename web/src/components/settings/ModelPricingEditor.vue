@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="rounded-md p-0 flex flex-col min-h-0 h-full overflow-hidden"
+    class="rounded-default p-0 flex flex-col min-h-0 h-full overflow-hidden"
   >
     <!-- Header -->
     <AppPageHeader
@@ -44,8 +44,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <div class="max-w-190 flex flex-col gap-6">
         <!-- ── Model Details Card ── -->
-        <div class="border border-card-glass-border rounded-lg shadow-md">
-          <div class="flex flex-row items-center justify-between gap-3 py-2.5 px-4 bg-surface-panel border-b border-card-glass-border rounded-t-lg">
+        <div class="border border-card-glass-border rounded-default shadow-md">
+          <div class="flex flex-row items-center justify-between gap-3 py-2.5 px-4 bg-surface-panel border-b border-card-glass-border rounded-t-default">
             <div>
               <div class="form-card-title text-compact font-semibold">
                 {{ t("modelPricing.modelDetails") }}
@@ -134,7 +134,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :title="t('modelPricing.patternExamplesTitle')"
           :sub-title="t('modelPricing.patternExamplesDesc')"
         >
-          <div class="examples-table border border-card-glass-border rounded-lg overflow-hidden">
+          <div class="examples-table border border-card-glass-border rounded-default overflow-hidden">
             <div class="grid grid-cols-[11.25rem_1fr_auto] gap-3 py-1.5 px-3 bg-surface-subtle border-b border-card-glass-border text-3xs font-bold uppercase tracking-[0.06em] opacity-45">
               <span>{{ t("modelPricing.patternExamplesModelCol") }}</span>
               <span>{{ t("modelPricing.patternExamplesPatternCol") }}</span>
@@ -145,7 +145,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="grid grid-cols-[11.25rem_1fr_auto] gap-3 items-center py-2 px-3 border-b border-card-glass-border text-xs last:border-b-0"
             >
               <span class="examples-model-name font-medium">{{ ex.name }}</span>
-              <code class="font-mono text-2xs bg-surface-subtle py-px px-1.5 rounded-sm break-all">{{ ex.match_pattern }}</code>
+              <code class="font-mono text-2xs bg-surface-subtle py-px px-1.5 rounded-default break-all">{{ ex.match_pattern }}</code>
               <OButton
                 variant="ghost"
                 size="icon-xs-sq"
@@ -180,8 +180,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </ODialog>
 
         <!-- ── Pricing Tiers ── -->
-        <div class="border border-card-glass-border rounded-lg shadow-md">
-          <div class="flex flex-row items-center justify-between gap-3 py-2.5 px-4 bg-surface-panel border-b border-card-glass-border rounded-t-lg">
+        <div class="border border-card-glass-border rounded-default shadow-md">
+          <div class="flex flex-row items-center justify-between gap-3 py-2.5 px-4 bg-surface-panel border-b border-card-glass-border rounded-t-default">
             <div>
               <div class="form-card-title text-compact font-semibold">
                 {{ t("modelPricing.pricingTiers") }}
@@ -196,7 +196,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div
               v-for="(tier, idx) in formTiers"
               :key="idx"
-              class="border border-card-glass-border rounded-lg overflow-hidden shadow-md"
+              class="border border-card-glass-border rounded-default overflow-hidden shadow-md"
             >
               <!-- Tier Header -->
               <div class="flex items-center justify-between gap-2 py-2 px-4 bg-surface-panel border-b border-card-glass-border">
@@ -229,7 +229,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <!-- Condition row (non-default tiers only) -->
                 <div
                   v-if="idx > 0 && tier.condition"
-                  class="py-3 px-3.5 rounded-lg bg-surface-panel border border-card-glass-border"
+                  class="py-3 px-3.5 rounded-default bg-surface-panel border border-card-glass-border"
                 >
                   <div class="sub-label mb-2 text-2xs font-semibold tracking-[0.06em] opacity-65">
                     {{ t("modelPricing.applyTierWhen") }}
@@ -415,7 +415,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <!-- Price Preview Table -->
                   <div
                     v-if="previewEntries(tier).length"
-                    class="mt-5 border rounded-sm bg-surface-panel border-card-glass-border"
+                    class="mt-5 border rounded-default bg-surface-panel border-card-glass-border"
                   >
                     <div
                       class="px-4 py-2 text-xs text-text-secondary font-semibold border-b border-card-glass-border"

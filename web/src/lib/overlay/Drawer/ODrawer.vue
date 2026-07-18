@@ -442,7 +442,7 @@ watch(internalOpen, (open) => {
               @mousedown.prevent
               :class="[
                 'shrink-0 flex items-center justify-center',
-                'h-7 w-7 rounded-md',
+                'h-7 w-7 rounded-default',
                 'text-dialog-close-text',
                 'hover:bg-dialog-close-hover-bg',
                 'active:bg-dialog-close-active-bg',

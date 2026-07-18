@@ -62,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Collapsed group header (e.g. the per-stream delete steps) -->
           <div
             v-if="row.type === 'group'"
-            class="flex flex-col rounded-sm"
+            class="flex flex-col rounded-default"
             :class="rowAccentClass(row.status)"
           >
             <!-- Clickable summary line -->
@@ -114,7 +114,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div
                 v-for="child in row.children"
                 :key="child.id"
-                class="flex flex-col gap-1 pl-6 pr-2 py-1.5 rounded-sm"
+                class="flex flex-col gap-1 pl-6 pr-2 py-1.5 rounded-default"
                 :class="rowAccentClass(child.status)"
               >
                 <div class="flex items-center gap-3">
@@ -144,7 +144,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <div
                   v-if="child.last_error"
-                  class="ml-6 text-xs text-error bg-surface-secondary rounded-sm px-2 py-1 break-words whitespace-pre-wrap"
+                  class="ml-6 text-xs text-error bg-surface-secondary rounded-default px-2 py-1 break-words whitespace-pre-wrap"
                 >
                   {{ child.last_error }}
                 </div>
@@ -155,7 +155,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Regular single-step row -->
           <div
             v-else
-            class="flex flex-col gap-1 px-3 py-2 rounded-sm"
+            class="flex flex-col gap-1 px-3 py-2 rounded-default"
             :class="rowAccentClass(row.task.status)"
           >
             <div class="flex items-center gap-3">
@@ -194,7 +194,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Error message — full, wrapping, contained (no cut-off) -->
             <div
               v-if="row.task.last_error"
-              class="ml-8 text-xs text-error bg-surface-secondary rounded-sm px-2 py-1 break-words whitespace-pre-wrap"
+              class="ml-8 text-xs text-error bg-surface-secondary rounded-default px-2 py-1 break-words whitespace-pre-wrap"
             >
               {{ row.task.last_error }}
             </div>

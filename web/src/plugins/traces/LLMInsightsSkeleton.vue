@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         v-for="n in 5"
         :key="n"
-        class="bg-(--tile-bg) border border-(--tile-border) text-(--text-primary) rounded-lg py-[0.625rem] px-[0.875rem] flex flex-col gap-2 h-32.5 tile-content"
+        class="bg-(--tile-bg) border border-(--tile-border) text-(--text-primary) rounded-default py-[0.625rem] px-[0.875rem] flex flex-col gap-2 h-32.5 tile-content"
       >
         <OSkeleton type="text" class="w-[60%] h-3" />
         <OSkeleton type="text" class="w-[55%] h-5.5" />
@@ -51,7 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         v-for="n in 4"
         :key="n"
-        class="bg-(--tile-bg) border border-(--tile-border) text-(--text-primary) rounded-lg p-4 flex flex-col gap-[0.4rem] tile-content"
+        class="bg-(--tile-bg) border border-(--tile-border) text-(--text-primary) rounded-default p-4 flex flex-col gap-[0.4rem] tile-content"
       >
         <OSkeleton type="text" class="w-30 h-4" />
         <OSkeleton type="text" class="w-40 h-2.5" />
@@ -79,7 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Row 4: w-full recent errors table -->
     <div
       v-if="!kpiOnly"
-      class="bg-(--tile-bg) border border-(--tile-border) text-(--text-primary) rounded-lg p-4 flex flex-col gap-[0.4rem] tile-content"
+      class="bg-(--tile-bg) border border-(--tile-border) text-(--text-primary) rounded-default p-4 flex flex-col gap-[0.4rem] tile-content"
     >
       <OSkeleton type="text" class="w-30 h-4" />
       <OSkeleton type="text" class="w-40 h-2.5" />

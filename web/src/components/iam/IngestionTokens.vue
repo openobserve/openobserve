@@ -176,7 +176,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ t('ingestion.authHeaderLabel') }}
       </div>
       <div
-        class="p-2.5 border border-dashed rounded-sm border-border-default mb-1 bg-surface-subtle"
+        class="p-2.5 border border-dashed rounded-default border-border-default mb-1 bg-surface-subtle"
       >
         <code
           class="break-all font-mono text-sm"

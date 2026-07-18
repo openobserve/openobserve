@@ -110,7 +110,7 @@ function onTickChange(newVal: CheckboxModelValue) {
   >
     <!-- Node row ────────────────────────────────────────────────────── -->
     <div
-      class="flex items-center gap-1 min-h-7 px-1 rounded-sm select-none transition-colors duration-100"
+      class="flex items-center gap-1 min-h-7 px-1 rounded-default select-none transition-colors duration-100"
       :class="
         !isLeaf
           ? 'cursor-pointer hover:bg-tree-node-hover-bg'
@@ -162,7 +162,7 @@ function onTickChange(newVal: CheckboxModelValue) {
              silently compiles to NOTHING. Subtracting a negative is the only form
              that survives extraction. Verified against the compiled stylesheet. -->
         <span
-          class="absolute top-0 left-[calc(-0.75rem_-_0.75px)] w-[calc(1.75rem_-_-0.75px)] h-[calc(50%_-_-0.75px)] border-l-[1.5px] border-b-[1.5px] rounded-bl-sm"
+          class="absolute top-0 left-[calc(-0.75rem_-_0.75px)] w-[calc(1.75rem_-_-0.75px)] h-[calc(50%_-_-0.75px)] border-l-[1.5px] border-b-[1.5px] rounded-bl-default"
         />
       </span>
 

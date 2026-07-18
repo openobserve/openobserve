@@ -77,12 +77,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :width="40"
       >
         <div class="p-4 text-sm">
-          <div class="mb-4 p-4 rounded-sm bg-surface-subtle">
+          <div class="mb-4 p-4 rounded-default bg-surface-subtle">
             <div class="font-medium mb-2">{{ t("settings.claimParserFunctionInputTitle") }}</div>
             <div>{{ t("settings.claimParserFunctionInputDescription") }}</div>
           </div>
 
-          <div class="mb-4 p-4 rounded-sm bg-surface-subtle">
+          <div class="mb-4 p-4 rounded-default bg-surface-subtle">
             <div class="font-medium mb-2">{{ t("settings.claimParserFunctionOutputTitle") }}</div>
             <div class="mb-2">{{ t("settings.claimParserFunctionOutputDescription") }}</div>
             <div class="ml-4">
@@ -92,7 +92,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Recent Errors Section -->
-          <div v-if="claimParserFunction" class="p-4 rounded-sm border-l-[3px] bg-surface-subtle border-l-status-negative">
+          <div v-if="claimParserFunction" class="p-4 rounded-default border-l-[3px] bg-surface-subtle border-l-status-negative">
             <div class="flex items-center mb-2">
               <div class="flex-1 font-medium">{{ t("settings.claimParserRecentErrors") }}</div>
               <div>
@@ -120,7 +120,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div
                 v-for="(error, index) in recentErrors.slice(0, 3)"
                 :key="index"
-                class="p-2 mb-1 rounded-sm border-l-2 bg-status-error-bg border-l-status-negative"
+                class="p-2 mb-1 rounded-default border-l-2 bg-status-error-bg border-l-status-negative"
               >
                 <div class="flex items-start mb-1">
                   <OIcon name="error" size="xs" class="mr-1 mt-1" />
@@ -207,9 +207,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template v-for="(domain, index) in domains" :key="domain?.name || `domain-${index}`">
         <div
           v-if="domain && domain.name"
-          class="mb-1 border border-border-default rounded-lg bg-surface-base"
+          class="mb-1 border border-border-default rounded-default bg-surface-base"
         >
-          <div class="flex items-center justify-between px-3 py-2 border-b border-b-border-default rounded-t-lg bg-surface-subtle">
+          <div class="flex items-center justify-between px-3 py-2 border-b border-b-border-default rounded-t-default bg-surface-subtle">
           <div
             :data-test="`domain-management-domain-name-${domain.name}`"
             class="text-base font-bold"
@@ -259,7 +259,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Info message for all users -->
           <div
             v-if="domain.policy === 'allow_all'"
-            class="p-2 rounded-sm mb-3 bg-status-info-bg text-status-info-text"
+            class="p-2 rounded-default mb-3 bg-status-info-bg text-status-info-text"
           >
             {{ t("settings.allUsersAllowedMessage", { domain: '@'+domain.name }) }}
           </div>
@@ -267,7 +267,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Info message for whole-domain block -->
           <div
             v-if="domain.policy === 'block_all'"
-            class="p-2 rounded-sm mb-3 bg-status-error-bg text-status-error-text"
+            class="p-2 rounded-default mb-3 bg-status-error-bg text-status-error-text"
           >
             {{ t("settings.allUsersBlockedMessage", { domain: '@'+domain.name }) }}
           </div>
@@ -307,7 +307,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div
                 v-for="(email, emailIndex) in domain.allowedEmails"
                 :key="email"
-                class="flex items-center justify-between p-2 mb-1 rounded-sm border border-border-default bg-surface-subtle"
+                class="flex items-center justify-between p-2 mb-1 rounded-default border border-border-default bg-surface-subtle"
               >
                 <div class="text-sm">{{ email }}</div>
                 <OButton
@@ -354,7 +354,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div
                 v-for="(email, emailIndex) in domain.blockedEmails"
                 :key="email"
-                class="flex items-center justify-between p-2 mb-1 rounded-sm border bg-banner-error-soft-bg border-banner-error-soft-border"
+                class="flex items-center justify-between p-2 mb-1 rounded-default border bg-banner-error-soft-bg border-banner-error-soft-border"
               >
                 <div class="text-sm">{{ email }}</div>
                 <OButton
@@ -382,7 +382,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       v-else
       data-test="domain-management-no-domain-message"
-      class="text-xl font-semibold text-text-muted mt-3 mb-4 w-full text-center p-4 border border-border-default rounded-lg bg-surface-base"
+      class="text-xl font-semibold text-text-muted mt-3 mb-4 w-full text-center p-4 border border-border-default rounded-default bg-surface-base"
     >
       {{ t("settings.noDomainMessage") }}
     </div>

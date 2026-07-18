@@ -69,7 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   {{ t("alert_destinations.destination_type") }}
                 </div>
                 <div
-                  class="flex items-center p-2 border border-card-glass-border rounded-md"
+                  class="flex items-center p-2 border border-card-glass-border rounded-default"
                   data-test="destination-type-readonly"
                 >
                   <OIcon

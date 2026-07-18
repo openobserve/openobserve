@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span
           v-for="(value, index) in displayBuckets"
           :key="index"
-          class="trend-bar rounded-sm w-1.5"
+          class="trend-bar rounded-default w-1.5"
           :class="
             value > 0
               ? isUnhandled
@@ -62,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <span
         v-for="index in 12"
         :key="index"
-        class="trend-bar rounded-sm bg-card-glass-border opacity-60 w-1.5"
+        class="trend-bar rounded-default bg-card-glass-border opacity-60 w-1.5"
         :style="{ height: `${20 + ((index * 11) % 60)}%` }"
       />
     </div>

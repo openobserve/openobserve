@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <OCollapsible
     :model-value="isExpanded"
     @update:model-value="handleToggle"
-    class="field-expansion-item w-full rounded-sm overflow-hidden"
+    class="field-expansion-item w-full rounded-default overflow-hidden"
     trigger-class="px-0! py-0!"
   >
     <template #trigger>

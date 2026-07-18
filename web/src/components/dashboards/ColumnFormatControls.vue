@@ -103,7 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <button
         type="button"
-        class="inline-flex items-center gap-2 py-1.5 px-2.5 mt-3 rounded-md border cursor-pointer text-left transition-colors hover:border-primary-600"
+        class="inline-flex items-center gap-2 py-1.5 px-2.5 mt-3 rounded-default border cursor-pointer text-left transition-colors hover:border-primary-600"
         :class="
           col.autoColor
             ? 'border-primary-600 bg-[color-mix(in_srgb,var(--color-primary-600)_7%,transparent)]'
@@ -133,7 +133,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         v-for="(rule, ruleIdx) in col.conditions"
         :key="ruleIdx"
-        class="flex flex-col gap-2 py-2 px-2.5 mb-1.5 rounded-md bg-[color-mix(in_srgb,var(--color-grey-500)_4%,transparent)] border border-[color-mix(in_srgb,var(--color-grey-500)_10%,transparent)]"
+        class="flex flex-col gap-2 py-2 px-2.5 mb-1.5 rounded-default bg-[color-mix(in_srgb,var(--color-grey-500)_4%,transparent)] border border-[color-mix(in_srgb,var(--color-grey-500)_10%,transparent)]"
       >
         <div class="flex items-center gap-2 flex-wrap">
           <span class="o-input-label text-compact font-medium leading-tight text-input-label-text shrink-0 w-28">{{ t("dashboard.conditionIfValue") }}</span>

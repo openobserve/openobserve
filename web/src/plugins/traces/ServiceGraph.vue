@@ -12,7 +12,7 @@
           :options="availableStreams.map((s) => ({ label: s, value: s }))"
           labelKey="label"
           valueKey="value"
-          class="w-auto flex-shrink-0 rounded-sm"
+          class="w-auto flex-shrink-0 rounded-default"
           :disabled="availableStreams.length === 0"
           @update:model-value="onStreamFilterChange"
         />
@@ -34,7 +34,7 @@
       <!-- Legends (horizontal) -->
       <div
         data-test="service-graph-legends"
-        class="flex flex-row items-center gap-3 p-[0.325rem] rounded-sm border border-card-glass-border!"
+        class="flex flex-row items-center gap-3 p-[0.325rem] rounded-default border border-card-glass-border!"
       >
         <div
           data-test="sg-legend"
@@ -226,11 +226,11 @@
       class="flex-1 min-h-0 relative overflow-hidden service-graph-container bg-surface-base!"
     >
       <!-- Graph Visualization -->
-      <OCard class="rounded-lg h-full">
+      <OCard class="rounded-default h-full">
         <OCardSection class="p-0 h-full" style="height: 100%">
           <div
             data-test="service-graph-container"
-            class="graph-container h-full w-full rounded-sm overflow-hidden bg-surface-base"
+            class="graph-container h-full w-full rounded-default overflow-hidden bg-surface-base"
             style="position: relative"
           >
             <div v-if="loading" class="flex items-center justify-center h-full">
@@ -290,7 +290,7 @@
                    these explicit buttons drive zoom + fit-to-screen. Floated
                    bottom-right like a map control. -->
               <div
-                class="absolute bottom-3 right-3 z-10 flex flex-col rounded-md border border-border-default bg-surface-panel overflow-hidden"
+                class="absolute bottom-3 right-3 z-10 flex flex-col rounded-default border border-border-default bg-surface-panel overflow-hidden"
                 data-test="service-graph-zoom-controls"
               >
                 <OButton

@@ -57,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <div class="flex items-center flex-nowrap w-full">
               <div
-                class="w-5 h-3 rounded-sm mr-2.5 shrink-0"
+                class="w-5 h-3 rounded-default mr-2.5 shrink-0"
                 :style="{ backgroundColor: legend.color || DEFAULT_LEGEND_COLOR }"
               ></div>
               <div class="break-all overflow-wrap-anywhere whitespace-normal leading-[1.4] text-xs" data-test="dashboard-legend-item-text">

@@ -121,7 +121,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 Source Map Files ({{ row.files.length }})
               </div>
               <ul
-                class="flex flex-col divide-y divide-border border rounded-md"
+                class="flex flex-col divide-y divide-border border rounded-default"
                 style="max-height: 400px; overflow-y: auto;"
               >
                 <li

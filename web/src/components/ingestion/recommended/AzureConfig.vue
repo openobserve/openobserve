@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Step 1 -->
     <div
-      class="mb-4 p-4 rounded-sm border-l-[3px] border-l-solid bg-surface-panel border-l-border-default"
+      class="mb-4 p-4 rounded-default border-l-[3px] border-l-solid bg-surface-panel border-l-border-default"
     >
       <div
         style="
@@ -73,7 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Step 2 -->
     <div
-      class="mb-4 p-4 rounded-sm border-l-[3px] border-l-solid bg-surface-panel border-l-border-default"
+      class="mb-4 p-4 rounded-default border-l-[3px] border-l-solid bg-surface-panel border-l-border-default"
     >
       <div
         style="

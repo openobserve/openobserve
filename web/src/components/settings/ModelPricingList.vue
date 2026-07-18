@@ -196,7 +196,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #cell-match_pattern="{ row }">
           <div class="flex items-center gap-1 min-w-0">
             <code
-              class="text-xs block max-w-full bg-surface-subtle border border-card-glass-border py-0.5 px-1.5 rounded-sm text-inherit"
+              class="text-xs block max-w-full bg-surface-subtle border border-card-glass-border py-0.5 px-1.5 rounded-default text-inherit"
               :class="{ 'opacity-50 [text-decoration:line-through] [text-decoration-color:currentColor]': isChildRow(row) }"
               >{{ row.match_pattern }}</code
             >
@@ -432,7 +432,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="text-xs font-semibold mb-1.5 text-text-secondary">
               {{ t("modelPricing.colPattern") }}
             </div>
-            <code class="text-xs block bg-surface-subtle border border-card-glass-border py-0.5 px-1.5 rounded-sm text-inherit text-compact px-2.5 py-1.5 whitespace-pre-wrap break-all max-h-75 overflow-y-auto">{{
+            <code class="text-xs block bg-surface-subtle border border-card-glass-border py-0.5 px-1.5 rounded-default text-inherit text-compact px-2.5 py-1.5 whitespace-pre-wrap break-all max-h-75 overflow-y-auto">{{
               pricingDialogRow.match_pattern
             }}</code>
           </div>
@@ -448,7 +448,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   getDefaultTier(pricingDialogRow)?.prices || {},
                 ).length
               "
-              class="mt-2 border border-card-glass-border rounded-lg overflow-hidden"
+              class="mt-2 border border-card-glass-border rounded-default overflow-hidden"
             >
               <table class="w-full border-collapse">
                 <thead>

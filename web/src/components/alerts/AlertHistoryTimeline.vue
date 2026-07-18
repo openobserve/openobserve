@@ -24,19 +24,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <div class="flex items-center gap-3">
         <span v-if="firingCount > 0" class="flex items-center gap-1 text-2xs">
-          <span class="inline-block w-2 h-2 rounded-sm bg-badge-error-solid-bg" />
+          <span class="inline-block w-2 h-2 rounded-default bg-badge-error-solid-bg" />
           <span class="font-medium text-badge-error-soft-text">{{ firingCount }} Firing</span>
         </span>
         <span class="flex items-center gap-1 text-2xs text-text-secondary">
-          <span class="inline-block w-2 h-2 rounded-sm bg-badge-success-solid-bg" />
+          <span class="inline-block w-2 h-2 rounded-default bg-badge-success-solid-bg" />
           {{ okCount }} Ok
         </span>
         <span v-if="skippedCount > 0" class="flex items-center gap-1 text-2xs text-text-muted">
-          <span class="inline-block w-2 h-2 rounded-sm bg-border-default" />
+          <span class="inline-block w-2 h-2 rounded-default bg-border-default" />
           {{ skippedCount }} Skipped
         </span>
         <span v-if="hasFlappingZone" class="flex items-center gap-1 text-2xs font-semibold text-badge-purple-ol-text brightness-90">
-          <span class="inline-block w-2 h-2 rounded-sm o2-flap-swatch" />
+          <span class="inline-block w-2 h-2 rounded-default o2-flap-swatch" />
           Flapping
         </span>
       </div>
@@ -71,7 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             v-for="(cell, c) in seg.cells"
             :key="c"
-            class="flex-1 rounded-sm min-w-1.5 o2-flap-cell"
+            class="flex-1 rounded-default min-w-1.5 o2-flap-cell"
             :style="{ backgroundColor: blockColor(cell.status) }"
           />
         </div>
@@ -79,18 +79,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Normal block -->
         <div
           v-else
-          class="flex-1 rounded-sm min-w-1 cursor-default relative transition-opacity duration-100 hover:opacity-75"
+          class="flex-1 rounded-default min-w-1 cursor-default relative transition-opacity duration-100 hover:opacity-75"
           :style="{ flex: seg.weight, background: blockColor(seg.status) }"
           @mouseenter="hoveredIndex = i"
           @mouseleave="hoveredIndex = null"
         >
           <div
             v-if="hoveredIndex === i"
-            class="absolute top-full mt-1.5 left-1/2 -translate-x-1/2 z-50 whitespace-nowrap rounded-md px-2.5 py-1.5 text-2xs leading-[1.4] pointer-events-none shadow-md bg-surface-overlay border border-border-default text-text-body"
+            class="absolute top-full mt-1.5 left-1/2 -translate-x-1/2 z-50 whitespace-nowrap rounded-default px-2.5 py-1.5 text-2xs leading-[1.4] pointer-events-none shadow-md bg-surface-overlay border border-border-default text-text-body"
           >
             <div class="font-semibold capitalize flex items-center gap-1.5">
               <span
-                class="inline-block w-2 h-2 rounded-sm shrink-0"
+                class="inline-block w-2 h-2 rounded-default shrink-0"
                 :style="{ background: blockColor(seg.status) }"
               />
               {{ normalizeStatus(seg.status) }}

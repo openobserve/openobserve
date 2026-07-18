@@ -18,22 +18,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="w-full service-identity-setup mt-2">
     <!-- Loading skeleton while fetching recommendations -->
     <div v-if="loading" class="flex flex-col gap-4 py-4">
-      <OSkeleton class="rounded-lg h-14 w-full" />
-      <OSkeleton class="rounded-lg h-14 w-full" />
-      <OSkeleton class="rounded-lg h-10 w-40" />
+      <OSkeleton class="rounded-default h-14 w-full" />
+      <OSkeleton class="rounded-default h-14 w-full" />
+      <OSkeleton class="rounded-default h-10 w-40" />
     </div>
 
     <div v-else>
       <!-- Section 1: Service Configuration -->
       <div
-        class="mb-3 rounded-lg overflow-hidden border border-card-glass-border"
+        class="mb-3 rounded-default overflow-hidden border border-card-glass-border"
        
       >
         <div class="p-3 flex flex-col gap-3">
           <!-- Service name source banner -->
           <div
             v-if="!serviceOptional"
-            class="rounded-lg border overflow-hidden transition-all"
+            class="rounded-default border overflow-hidden transition-all"
             :class="
               serviceNameDetected
                 ? 'bg-banner-info-bg border-banner-info-border'
@@ -91,7 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <!-- Inner card -->
               <div
-                class="rounded-lg p-2.5"
+                class="rounded-default p-2.5"
                 :class="
                   'bg-surface-subtle'
                 "
@@ -111,7 +111,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div
                     v-for="field in detectedServiceFields"
                     :key="field.name"
-                    class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md font-mono text-xs font-medium border border-card-glass-border"
+                    class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-default font-mono text-xs font-medium border border-card-glass-border"
                    
                     :class="
                       'bg-surface-base text-text-secondary'
@@ -137,7 +137,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div
                     v-for="field in unseenServiceFields"
                     :key="field"
-                    class="inline-flex items-center px-2.5 py-1 rounded-md border-dashed font-mono text-xs border border-dashed border-card-glass-border"
+                    class="inline-flex items-center px-2.5 py-1 rounded-default border-dashed font-mono text-xs border border-dashed border-card-glass-border"
                    
                     :class="
                       'text-text-secondary'
@@ -193,7 +193,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                   <!-- Customize link -->
                   <a
-                    class="config-link-btn cursor-pointer inline-flex items-center gap-1 px-2 py-0.5 rounded-sm text-xs font-semibold no-underline border border-text-link text-text-link bg-badge-blue-soft-bg transition-[background] hover:bg-[color-mix(in_srgb,var(--color-badge-blue-ol-border)_18%,transparent)]"
+                    class="config-link-btn cursor-pointer inline-flex items-center gap-1 px-2 py-0.5 rounded-default text-xs font-semibold no-underline border border-text-link text-text-link bg-badge-blue-soft-bg transition-[background] hover:bg-[color-mix(in_srgb,var(--color-badge-blue-ol-border)_18%,transparent)]"
                     @click.prevent="emit('navigate-to-aliases', 'service')"
                   >
                     {{ t("settings.correlation.customizeFieldMappings") }}
@@ -262,7 +262,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Empty state: nothing configured anywhere -->
             <div
               v-if="allConfiguredEnvs.length === 0 && !addingToEnv"
-              class="flex flex-col items-center gap-2 py-3 px-4 rounded-md border border-dashed"
+              class="flex flex-col items-center gap-2 py-3 px-4 rounded-default border border-dashed"
               :class="
                 'border-border-default bg-surface-subtle'
               "
@@ -293,7 +293,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Auto-suggested banner (only when fields came from suggestion, not saved config) -->
               <div
                 v-if="isAutoSuggested"
-                class="flex items-start gap-2 px-3 py-2 rounded-md text-xs"
+                class="flex items-start gap-2 px-3 py-2 rounded-default text-xs"
                 :class="
                   'bg-status-info-bg text-status-info-text'
                 "
@@ -334,7 +334,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       Boolean,
                     )"
                     :key="fieldId"
-                    class="flex items-center gap-1 pl-3 pr-1 py-1 rounded-md text-xs font-medium transition-colors border border-card-glass-border"
+                    class="flex items-center gap-1 pl-3 pr-1 py-1 rounded-default text-xs font-medium transition-colors border border-card-glass-border"
                    
                     :class="
                       'bg-surface-base text-text-secondary'
@@ -520,7 +520,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Section 3: Workload Detection -->
       <div
         v-if="workloadDetectedGroups.length > 0"
-        class="mb-3 rounded-lg overflow-hidden border border-card-glass-border"
+        class="mb-3 rounded-default overflow-hidden border border-card-glass-border"
        
       >
         <!-- Section header -->
@@ -534,7 +534,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Collapsible: Workload detected using fields (N) -->
         <div
-          class="mx-3 mt-3 rounded-lg border overflow-hidden transition-all"
+          class="mx-3 mt-3 rounded-default border overflow-hidden transition-all"
           :class="
             'bg-banner-info-bg border-banner-info-border'
           "
@@ -569,7 +569,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
           >
             <div
-              class="rounded-lg p-2.5"
+              class="rounded-default p-2.5"
               :class="
                 'bg-surface-subtle'
               "
@@ -584,7 +584,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 and recommendations. Fields not in this list will not influence
                 service discovery results. Cannot be empty.
                 <a
-                  class="config-link-btn cursor-pointer inline-block mx-1 px-2 py-0.5 rounded-sm text-xs font-semibold no-underline align-middle border border-text-link text-text-link bg-badge-blue-soft-bg transition-[background] hover:bg-[color-mix(in_srgb,var(--color-badge-blue-ol-border)_18%,transparent)]"
+                  class="config-link-btn cursor-pointer inline-block mx-1 px-2 py-0.5 rounded-default text-xs font-semibold no-underline align-middle border border-text-link text-text-link bg-badge-blue-soft-bg transition-[background] hover:bg-[color-mix(in_srgb,var(--color-badge-blue-ol-border)_18%,transparent)]"
                   @click.prevent="emit('navigate-to-aliases', 'service')"
                   >Go to Field Aliases</a
                 >
@@ -595,7 +595,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div
                   v-for="alias in resolvedTrackedAliases"
                   :key="alias.id"
-                  class="flex items-center gap-1 pl-3 pr-1 py-1 rounded-md text-xs font-medium transition-colors border border-card-glass-border"
+                  class="flex items-center gap-1 pl-3 pr-1 py-1 rounded-default text-xs font-medium transition-colors border border-card-glass-border"
                  
                   :class="
                     'bg-surface-base text-text-secondary'
@@ -703,7 +703,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             We discovered these deployment patterns in your streams. Use them to
             configure service correlation.
             <a
-              class="config-link-btn cursor-pointer inline-block mx-1 px-2 py-0.5 rounded-sm text-xs font-semibold no-underline align-middle border border-text-link text-text-link bg-badge-blue-soft-bg transition-[background] hover:bg-[color-mix(in_srgb,var(--color-badge-blue-ol-border)_18%,transparent)]"
+              class="config-link-btn cursor-pointer inline-block mx-1 px-2 py-0.5 rounded-default text-xs font-semibold no-underline align-middle border border-text-link text-text-link bg-badge-blue-soft-bg transition-[background] hover:bg-[color-mix(in_srgb,var(--color-badge-blue-ol-border)_18%,transparent)]"
               @click.prevent="emit('navigate-to-services')"
               >Go to Services</a
             >
@@ -719,7 +719,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             v-for="env in detectedEnvironments"
             :key="env.key"
-            class="relative px-4 py-2 cursor-pointer transition-all text-xs font-medium min-w-17.5 text-center rounded-t-lg border border-b-0"
+            class="relative px-4 py-2 cursor-pointer transition-all text-xs font-medium min-w-17.5 text-center rounded-t-default border border-b-0"
             :class="
               activeEnvironment === env.key
                 ? 'text-text-body'
@@ -758,7 +758,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <!-- Dim card -->
               <div
-                class="dim-stat-card flex-1 min-w-0 rounded-lg p-3 flex flex-col"
+                class="dim-stat-card flex-1 min-w-0 rounded-default p-3 flex flex-col"
                 :style="card.theme.border"
               >
                 <div class="flex items-center gap-2 mb-2">
@@ -963,7 +963,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ insightData.subtitle }}
                 <span
                   :class="[
-                    'font-semibold px-2 py-0.5 rounded-md ml-2 inline-block',
+                    'font-semibold px-2 py-0.5 rounded-default ml-2 inline-block',
                     'text-status-info-text bg-status-info-bg',
                   ]"
                 >
@@ -1115,7 +1115,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <!-- Explanation -->
             <div
-              class="flex items-center gap-1.5 text-2xs mb-2 shrink-0 py-1.5 px-2.5 rounded-md"
+              class="flex items-center gap-1.5 text-2xs mb-2 shrink-0 py-1.5 px-2.5 rounded-default"
               :class="
                 'bg-status-info-bg text-text-secondary'
               "
@@ -1163,7 +1163,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <span
                     v-for="dVal in dim.values"
                     :key="dVal"
-                    class="text-compact py-1 px-2.5 rounded-md border truncate shrink-0"
+                    class="text-compact py-1 px-2.5 rounded-default border truncate shrink-0"
                     :class="{
                       'bg-badge-teal-soft-bg border-badge-teal-ol-border text-badge-teal-soft-text': dim.color === 'teal',
                       'bg-badge-purple-soft-bg border-badge-purple-ol-border text-badge-purple-soft-text': dim.color === 'purple',
@@ -1351,7 +1351,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div
                     v-for="val in getPopupColumnValues(colIdx)"
                     :key="val"
-                    class="px-3 py-2 rounded-sm border transition-colors cursor-pointer font-mono truncate"
+                    class="px-3 py-2 rounded-default border transition-colors cursor-pointer font-mono truncate"
                     :class="
                       popupColumnSelections[colIdx] === val
                         ? 'bg-primary/15 border-primary/40 text-primary ring-1 ring-primary/30'

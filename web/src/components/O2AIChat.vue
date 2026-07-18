@@ -1,6 +1,6 @@
 ﻿<template>
   <div
-    class="chat-container w-full h-full flex flex-col overflow-hidden rounded-md text-text-body bg-card-glass-solid [box-shadow:0_0_5px_1px_var(--color-hover-shadow)]"
+    class="chat-container w-full h-full flex flex-col overflow-hidden rounded-default text-text-body bg-card-glass-solid [box-shadow:0_0_5px_1px_var(--color-hover-shadow)]"
     :class="[
       { 'chat-open': isOpen },    ]"
   >
@@ -25,7 +25,7 @@
                 <OButton
                   variant="ghost"
                   size="sm"
-                  class="chat-title-dropdown flex items-center overflow-hidden max-w-52.5 h-8 min-h-8 px-3 py-1.5 rounded-sm transition-colors duration-200 hover:bg-interactive-hover-bg"
+                  class="chat-title-dropdown flex items-center overflow-hidden max-w-52.5 h-8 min-h-8 px-3 py-1.5 rounded-default transition-colors duration-200 hover:bg-interactive-hover-bg"
                 >
                   <div class="flex items-center gap-2 max-w-55">
                     <span
@@ -245,7 +245,7 @@
         >
           <div
             v-if="chatMessages.length === 0"
-            class="welcome-section flex flex-1 items-center justify-center rounded-lg"
+            class="welcome-section flex flex-1 items-center justify-center rounded-default"
             :class="
               centeredStart
                 ? 'p-0 mb-0 bg-transparent'
@@ -269,7 +269,7 @@
                     class="text-sm font-[600] ml-7.5 text-center"
                     >O2 Assistant</span
                   >
-                  <span class="o2-ai-beta-text ml-2 relative text-[var(--color-theme-accent)] text-3xs px-1 rounded-lg text-center border border-[var(--color-theme-accent)] uppercase font-semibold [letter-spacing:0.5px] w-8.5">BETA</span>
+                  <span class="o2-ai-beta-text ml-2 relative text-[var(--color-theme-accent)] text-3xs px-1 rounded-default text-center border border-[var(--color-theme-accent)] uppercase font-semibold [letter-spacing:0.5px] w-8.5">BETA</span>
                 </div>
               </div>
             </div>
@@ -277,7 +277,7 @@
           <div
             v-for="(message, index) in processedMessages"
             :key="index"
-            class="message p-3 rounded-xl border border-border-default [box-shadow:0_1px_2px_color-mix(in_srgb,var(--color-text-heading)_10%,transparent)]"
+            class="message p-3 rounded-default border border-border-default [box-shadow:0_1px_2px_color-mix(in_srgb,var(--color-text-heading)_10%,transparent)]"
             :class="[
               message.role,
               message.role === 'user'
@@ -313,7 +313,7 @@
                   <!-- Tool call block - expandable -->
                   <div
                     v-if="block.type === 'tool_call'"
-                    class="tool-call-item flex flex-col px-3 py-2 rounded-md text-compact mb-2"
+                    class="tool-call-item flex flex-col px-3 py-2 rounded-default text-compact mb-2"
                     :class="[
                       { 'has-details': hasToolCallDetails(block) },
                       {
@@ -495,7 +495,7 @@
                             <OTooltip content="Copy query" />
                           </OButton>
                         </div>
-                        <code class="detail-value query-value text-xs select-text font-mono p-2 rounded-sm whitespace-pre-wrap break-all cursor-text [background:color-mix(in_srgb,var(--color-text-heading)_5%,transparent)]">{{
+                        <code class="detail-value query-value text-xs select-text font-mono p-2 rounded-default whitespace-pre-wrap break-all cursor-text [background:color-mix(in_srgb,var(--color-text-heading)_5%,transparent)]">{{
                           getToolCallDisplayData(block.context)?.query
                         }}</code>
                       </div>
@@ -592,7 +592,7 @@
                             <OTooltip content="Copy VRL" />
                           </OButton>
                         </div>
-                        <code class="detail-value query-value text-xs select-text font-mono p-2 rounded-sm whitespace-pre-wrap break-all cursor-text [background:color-mix(in_srgb,var(--color-text-heading)_5%,transparent)]">{{
+                        <code class="detail-value query-value text-xs select-text font-mono p-2 rounded-default whitespace-pre-wrap break-all cursor-text [background:color-mix(in_srgb,var(--color-text-heading)_5%,transparent)]">{{
                           getToolCallDisplayData(block.context)?.vrl
                         }}</code>
                       </div>
@@ -616,7 +616,7 @@
                             <OTooltip content="Copy command" />
                           </OButton>
                         </div>
-                        <code class="detail-value query-value text-xs select-text font-mono p-2 rounded-sm whitespace-pre-wrap break-all cursor-text [background:color-mix(in_srgb,var(--color-text-heading)_5%,transparent)]">{{
+                        <code class="detail-value query-value text-xs select-text font-mono p-2 rounded-default whitespace-pre-wrap break-all cursor-text [background:color-mix(in_srgb,var(--color-text-heading)_5%,transparent)]">{{
                           getToolCallDisplayData(block.context)?.command
                         }}</code>
                       </div>
@@ -639,7 +639,7 @@
                               <OTooltip content="Copy results" />
                             </OButton>
                           </div>
-                          <div class="tool-response-hits flex flex-col gap-1 text-xs font-mono px-2 py-1.5 rounded-sm max-h-50 overflow-y-auto [background:color-mix(in_srgb,var(--color-text-heading)_5%,transparent)]">
+                          <div class="tool-response-hits flex flex-col gap-1 text-xs font-mono px-2 py-1.5 rounded-default max-h-50 overflow-y-auto [background:color-mix(in_srgb,var(--color-text-heading)_5%,transparent)]">
                             <div
                               v-for="(hit, hIdx) in block.response.hits"
                               :key="hIdx"
@@ -684,7 +684,7 @@
                       >
                         <div v-if="block.response.input" class="detail-item flex flex-col gap-1">
                           <span class="detail-label text-2xs font-semibold uppercase opacity-60">Input Events</span>
-                          <div class="tool-response-hits flex flex-col gap-1 text-xs font-mono px-2 py-1.5 rounded-sm max-h-50 overflow-y-auto [background:color-mix(in_srgb,var(--color-text-heading)_5%,transparent)]">
+                          <div class="tool-response-hits flex flex-col gap-1 text-xs font-mono px-2 py-1.5 rounded-default max-h-50 overflow-y-auto [background:color-mix(in_srgb,var(--color-text-heading)_5%,transparent)]">
                             <div
                               v-for="(evt, eIdx) in block.response.input"
                               :key="eIdx"
@@ -707,7 +707,7 @@
                         </div>
                         <div v-if="block.response.output" class="detail-item flex flex-col gap-1">
                           <span class="detail-label text-2xs font-semibold uppercase opacity-60">Output</span>
-                          <div class="tool-response-hits flex flex-col gap-1 text-xs font-mono px-2 py-1.5 rounded-sm max-h-50 overflow-y-auto [background:color-mix(in_srgb,var(--color-text-heading)_5%,transparent)]">
+                          <div class="tool-response-hits flex flex-col gap-1 text-xs font-mono px-2 py-1.5 rounded-default max-h-50 overflow-y-auto [background:color-mix(in_srgb,var(--color-text-heading)_5%,transparent)]">
                             <div
                               v-for="(res, rIdx) in block.response.output"
                               :key="rIdx"
@@ -766,7 +766,7 @@
                               <OTooltip content="Copy items" />
                             </OButton>
                           </div>
-                          <div class="tool-response-hits flex flex-col gap-1 text-xs font-mono px-2 py-1.5 rounded-sm max-h-50 overflow-y-auto [background:color-mix(in_srgb,var(--color-text-heading)_5%,transparent)]">
+                          <div class="tool-response-hits flex flex-col gap-1 text-xs font-mono px-2 py-1.5 rounded-default max-h-50 overflow-y-auto [background:color-mix(in_srgb,var(--color-text-heading)_5%,transparent)]">
                             <div
                               v-for="(item, iIdx) in block.response.items"
                               :key="iIdx"
@@ -808,7 +808,7 @@
                             <OTooltip content="Copy response" />
                           </OButton>
                         </div>
-                        <code class="detail-value query-value text-xs select-text font-mono p-2 rounded-sm whitespace-pre-wrap break-all cursor-text [background:color-mix(in_srgb,var(--color-text-heading)_5%,transparent)]">{{
+                        <code class="detail-value query-value text-xs select-text font-mono p-2 rounded-default whitespace-pre-wrap break-all cursor-text [background:color-mix(in_srgb,var(--color-text-heading)_5%,transparent)]">{{
                           typeof block.response === "string"
                             ? block.response
                             : JSON.stringify(block.response, null, 2)
@@ -819,7 +819,7 @@
                   <!-- Log Entry block - expandable -->
                   <div
                     v-else-if="block.type === 'log_entry'"
-                    class="log-entry-item flex flex-col px-2.5 py-1.5 rounded-md text-xs mb-1 cursor-pointer text-text-secondary [background:color-mix(in_srgb,var(--color-info)_8%,transparent)] hover:[background:color-mix(in_srgb,var(--color-info)_12%,transparent)] dark:bg-surface-panel dark:border dark:border-border-default dark:hover:bg-surface-panel dark:hover:border-text-secondary"
+                    class="log-entry-item flex flex-col px-2.5 py-1.5 rounded-default text-xs mb-1 cursor-pointer text-text-secondary [background:color-mix(in_srgb,var(--color-info)_8%,transparent)] hover:[background:color-mix(in_srgb,var(--color-info)_12%,transparent)] dark:bg-surface-panel dark:border dark:border-border-default dark:hover:bg-surface-panel dark:hover:border-text-secondary"
                     @click="toggleLogEntryExpanded(index, blockIndex)"
                   >
                     <div class="log-entry-header flex items-center gap-1.5">
@@ -846,12 +846,12 @@
                       @click.stop
                     >
                       <div
-                        class="log-entry-content relative rounded-md border overflow-hidden bg-surface-base border-border-default [box-shadow:0_2px_8px_color-mix(in_srgb,var(--color-black)_8%,transparent)] dark:bg-surface-panel dark:[box-shadow:0_2px_8px_color-mix(in_srgb,var(--color-black)_20%,transparent)]"
+                        class="log-entry-content relative rounded-default border overflow-hidden bg-surface-base border-border-default [box-shadow:0_2px_8px_color-mix(in_srgb,var(--color-black)_8%,transparent)] dark:bg-surface-panel dark:[box-shadow:0_2px_8px_color-mix(in_srgb,var(--color-black)_20%,transparent)]"
                       >
                         <OButton
                           variant="ghost"
                           size="icon-xs-circle"
-                          class="copy-btn opacity-60 hover:opacity-100 absolute top-2 right-2 z-1 rounded-sm px-2 py-1 [background:color-mix(in_srgb,var(--color-text-heading)_10%,transparent)] hover:[background:color-mix(in_srgb,var(--color-text-heading)_8%,transparent)] dark:hover:[background:color-mix(in_srgb,var(--color-text-heading)_15%,transparent)]"
+                          class="copy-btn opacity-60 hover:opacity-100 absolute top-2 right-2 z-1 rounded-default px-2 py-1 [background:color-mix(in_srgb,var(--color-text-heading)_10%,transparent)] hover:[background:color-mix(in_srgb,var(--color-text-heading)_8%,transparent)] dark:hover:[background:color-mix(in_srgb,var(--color-text-heading)_15%,transparent)]"
                           @click.stop="copyToClipboard(block.content)"
                         >
                           <OIcon name="content-copy" size="sm" />
@@ -867,7 +867,7 @@
                   <!-- Stream-level error block -->
                   <div
                     v-else-if="block.type === 'error'"
-                    class="stream-error-block flex flex-col px-3 py-2.5 rounded-md border-l-3 border-border-default mb-2 text-compact text-text-secondary [background:color-mix(in_srgb,var(--color-status-negative)_6%,transparent)] dark:[background:color-mix(in_srgb,var(--color-status-negative)_10%,transparent)]"
+                    class="stream-error-block flex flex-col px-3 py-2.5 rounded-default border-l-3 border-border-default mb-2 text-compact text-text-secondary [background:color-mix(in_srgb,var(--color-status-negative)_6%,transparent)] dark:[background:color-mix(in_srgb,var(--color-status-negative)_10%,transparent)]"
                   >
                     <div class="stream-error-header flex items-center gap-2">
                       <OIcon name="warning" size="sm" />
@@ -917,14 +917,14 @@
                     >
                       <div
                         v-if="textBlock.type === 'code'"
-                        class="code-block rounded-sm m-0 overflow-hidden"
+                        class="code-block rounded-default m-0 overflow-hidden"
                       >
                         <div
                           class="code-block-header flex items-center justify-between px-2 py-1 bg-surface-subtle"
                         >
                           <span
                             v-if="textBlock.language"
-                            class="code-type-label text-xs font-semibold px-1.5 py-0.5 rounded-sm text-theme-accent dark:text-text-secondary [background:color-mix(in_srgb,var(--color-theme-accent)_10%,transparent)]"
+                            class="code-type-label text-xs font-semibold px-1.5 py-0.5 rounded-default text-theme-accent dark:text-text-secondary [background:color-mix(in_srgb,var(--color-theme-accent)_10%,transparent)]"
                           >
                             {{ getLanguageDisplay(textBlock.language) }}
                           </span>
@@ -989,7 +989,7 @@
                       <img
                         :src="'data:' + img.mimeType + ';base64,' + img.data"
                         :alt="img.filename"
-                        class="max-w-50 max-h-37.5 object-contain rounded-lg border border-border-default cursor-pointer [transition:transform_0.2s_ease,box-shadow_0.2s_ease] hover:scale-102 hover:shadow-[0_4px_12px_color-mix(in_srgb,var(--color-black)_15%,transparent)]"
+                        class="max-w-50 max-h-37.5 object-contain rounded-default border border-border-default cursor-pointer [transition:transform_0.2s_ease,box-shadow_0.2s_ease] hover:scale-102 hover:shadow-[0_4px_12px_color-mix(in_srgb,var(--color-black)_15%,transparent)]"
                         @click="openImagePreview(img)"
                       />
                       <OTooltip :content="img.filename" />
@@ -1001,14 +1001,14 @@
                   >
                     <div
                       v-if="block.type === 'code'"
-                      class="code-block rounded-sm m-0 overflow-hidden"
+                      class="code-block rounded-default m-0 overflow-hidden"
                     >
                       <div
                         class="code-block-header flex items-center justify-between px-2 py-1 bg-surface-subtle"
                       >
                         <span
                           v-if="block.language"
-                          class="code-type-label text-xs font-semibold px-1.5 py-0.5 rounded-sm text-theme-accent dark:text-text-secondary [background:color-mix(in_srgb,var(--color-theme-accent)_10%,transparent)]"
+                          class="code-type-label text-xs font-semibold px-1.5 py-0.5 rounded-default text-theme-accent dark:text-text-secondary [background:color-mix(in_srgb,var(--color-theme-accent)_10%,transparent)]"
                         >
                           {{ getLanguageDisplay(block.language) }}
                         </span>
@@ -1087,7 +1087,7 @@
             v-for="(block, pIdx) in pendingToolCalls"
             v-show="block.type === 'tool_call'"
             :key="'pending-tc-' + pIdx"
-            class="tool-call-indicator flex items-center rounded-xl border border-border-default [background:var(--color-chat-bubble-user)] px-4 py-2 my-1"
+            class="tool-call-indicator flex items-center rounded-default border border-border-default [background:var(--color-chat-bubble-user)] px-4 py-2 my-1"
           >
             <div class="tool-call-content flex items-center gap-3 w-full">
               <OIcon
@@ -1105,7 +1105,7 @@
           <!-- Tool call indicator - shows outside message box -->
           <div
             v-if="activeToolCall"
-            class="tool-call-indicator flex items-center rounded-xl border border-border-default [background:var(--color-chat-bubble-user)] px-4 py-3 my-2"
+            class="tool-call-indicator flex items-center rounded-default border border-border-default [background:var(--color-chat-bubble-user)] px-4 py-3 my-2"
           >
             <div class="tool-call-content flex items-center gap-3 w-full">
               <OSpinner variant="dots" size="xs" />
@@ -1122,7 +1122,7 @@
                     class="context-item w-full"
                   >
                     <code
-                      class="context-query block font-mono text-xs px-3 py-2 rounded-md whitespace-pre-wrap break-all max-w-full overflow-hidden bg-surface-base border border-border-default text-text-body dark:text-text-secondary"
+                      class="context-query block font-mono text-xs px-3 py-2 rounded-default whitespace-pre-wrap break-all max-w-full overflow-hidden bg-surface-base border border-border-default text-text-body dark:text-text-secondary"
                       >{{
                         truncateQuery(
                           getToolCallDisplayData(activeToolCall.context)?.query,
@@ -1138,7 +1138,7 @@
                     class="context-item w-full"
                   >
                     <code
-                      class="context-query block font-mono text-xs px-3 py-2 rounded-md whitespace-pre-wrap break-all max-w-full overflow-hidden bg-surface-base border border-border-default text-text-body dark:text-text-secondary"
+                      class="context-query block font-mono text-xs px-3 py-2 rounded-default whitespace-pre-wrap break-all max-w-full overflow-hidden bg-surface-base border border-border-default text-text-body dark:text-text-secondary"
                       >{{
                         truncateQuery(
                           getToolCallDisplayData(activeToolCall.context)?.vrl,
@@ -1150,7 +1150,7 @@
                     v-if="
                       getToolCallDisplayData(activeToolCall.context)?.stream
                     "
-                    class="context-tag inline-flex items-center text-2xs px-2 py-1 rounded-sm font-medium text-ai-accent dark:text-text-secondary [background:color-mix(in_srgb,var(--color-ai-accent)_10%,transparent)] dark:[background:color-mix(in_srgb,var(--color-ai-accent)_20%,transparent)]"
+                    class="context-tag inline-flex items-center text-2xs px-2 py-1 rounded-default font-medium text-ai-accent dark:text-text-secondary [background:color-mix(in_srgb,var(--color-ai-accent)_10%,transparent)] dark:[background:color-mix(in_srgb,var(--color-ai-accent)_20%,transparent)]"
                   >
                     Stream:
                     {{ getToolCallDisplayData(activeToolCall.context)?.stream }}
@@ -1159,7 +1159,7 @@
                     v-if="
                       getToolCallDisplayData(activeToolCall.context)?.query_type
                     "
-                    class="context-tag inline-flex items-center text-2xs px-2 py-1 rounded-sm font-medium text-ai-accent dark:text-text-secondary [background:color-mix(in_srgb,var(--color-ai-accent)_10%,transparent)] dark:[background:color-mix(in_srgb,var(--color-ai-accent)_20%,transparent)]"
+                    class="context-tag inline-flex items-center text-2xs px-2 py-1 rounded-default font-medium text-ai-accent dark:text-text-secondary [background:color-mix(in_srgb,var(--color-ai-accent)_10%,transparent)] dark:[background:color-mix(in_srgb,var(--color-ai-accent)_20%,transparent)]"
                   >
                     Type:
                     {{
@@ -1173,7 +1173,7 @@
           <!-- Standalone loading indicator - only shown when loading with no tool calls -->
           <div
             v-if="isLoading && !activeToolCall"
-            class="tool-call-indicator flex items-center rounded-xl border border-border-default [background:var(--color-chat-bubble-user)] px-4 py-3 my-2"
+            class="tool-call-indicator flex items-center rounded-default border border-border-default [background:var(--color-chat-bubble-user)] px-4 py-3 my-2"
           >
             <div class="tool-call-content flex items-center gap-3 w-full">
               <OSpinner variant="dots" size="xs" />
@@ -1201,7 +1201,7 @@
       <!-- Fixed loading indicator above input - only shown when scrolled up -->
       <div
         v-if="(isLoading || activeToolCall) && showScrollToBottom"
-        class="fixed-analyzing-indicator flex items-center justify-center px-4 py-3 mx-4 mb-2 rounded-xl border border-border-default [background:var(--color-chat-bubble-user)] [box-shadow:0_2px_8px_color-mix(in_srgb,var(--color-black)_8%,transparent)]"
+        class="fixed-analyzing-indicator flex items-center justify-center px-4 py-3 mx-4 mb-2 rounded-default border border-border-default [background:var(--color-chat-bubble-user)] [box-shadow:0_2px_8px_color-mix(in_srgb,var(--color-black)_8%,transparent)]"
       >
         <!-- Show tool call if active -->
         <div
@@ -1247,7 +1247,7 @@
 
         <div
           v-if="!pendingConfirmation"
-          class="unified-input-box flex flex-col gap-3 px-2 py-1 rounded-xl transition-all duration-200 bg-surface-base border border-border-default focus-within:border-transparent focus-within:[box-shadow:0_0_0_2px_var(--color-accent)]"
+          class="unified-input-box flex flex-col gap-3 px-2 py-1 rounded-default transition-all duration-200 bg-surface-base border border-border-default focus-within:border-transparent focus-within:[box-shadow:0_0_0_2px_var(--color-accent)]"
           @dragover="handleDragOver"
           @drop="handleDrop"
           @paste="handlePaste"
@@ -1262,7 +1262,7 @@
               <img
                 :src="'data:' + img.mimeType + ';base64,' + img.data"
                 :alt="img.filename"
-                class="preview-image w-16 h-16 object-cover rounded-lg border border-border-default [transition:transform_0.2s_ease] hover:scale-105"
+                class="preview-image w-16 h-16 object-cover rounded-default border border-border-default [transition:transform_0.2s_ease] hover:scale-105"
               />
               <OButton
                 variant="ghost"
@@ -1317,7 +1317,7 @@
                 @click.stop="isAutoNavigationEnabled = !isAutoNavigationEnabled"
                 variant="ghost"
                 size="sm"
-                class="auto-nav-toggle-btn flex items-center gap-1.5 px-2 py-1 rounded-md transition-all duration-200 hover:bg-surface-subtle"
+                class="auto-nav-toggle-btn flex items-center gap-1.5 px-2 py-1 rounded-default transition-all duration-200 hover:bg-surface-subtle"
               >
                 <OIcon
                   :name="

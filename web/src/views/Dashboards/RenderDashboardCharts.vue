@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div
     :class="[
       'bg-surface-base',
-      frame ? 'border border-border-default rounded-xl' : '',
+      frame ? 'border border-border-default rounded-default' : '',
       store.state.printMode ? '' : 'h-full overflow-y-auto',
     ]"
   >
@@ -152,7 +152,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :gs-h="getPanelLayout(item, 'h')"
             :gs-min-w="getMinimumWidth(item.type)"
             :gs-min-h="getMinimumHeight(item.type)"
-            class="grid-stack-item gridBackground bg-transparent! rounded-lg border-border-default!"
+            class="grid-stack-item gridBackground bg-transparent! rounded-default border-border-default!"
           >
             <div class="grid-stack-item-content">
               <!-- Panel with Panel-Level Variables -->

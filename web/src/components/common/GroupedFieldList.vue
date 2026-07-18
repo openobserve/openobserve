@@ -20,7 +20,7 @@
     <template #group-header="{ row, groupName }">
       <slot name="group-header" :row="row" :group-name="groupName">
         <div
-          class="h-full w-full flex justify-between items-center rounded-sm font-semibold text-xs px-[0.325rem] cursor-pointer bg-surface-subtle text-field-list-group-text"
+          class="h-full w-full flex justify-between items-center rounded-default font-semibold text-xs px-[0.325rem] cursor-pointer bg-surface-subtle text-field-list-group-text"
           @click="toggleGroup(row.group)"
         >
           <div class="flex-1 min-w-0">

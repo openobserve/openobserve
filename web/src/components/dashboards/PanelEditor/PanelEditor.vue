@@ -159,7 +159,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="p-2"
                   >
                     <div
-                      class="border border-banner-warning-border bg-banner-warning-bg p-[1%] rounded-sm"
+                      class="border border-banner-warning-border bg-banner-warning-bg p-[1%] rounded-default"
                      
                     >
                       <div class="font-bold">

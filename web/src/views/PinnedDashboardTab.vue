@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             v-for="i in 4"
             :key="i"
-            class="flex flex-col gap-3 rounded-lg border border-border-default p-4 min-h-[10rem]"
+            class="flex flex-col gap-3 rounded-default border border-border-default p-4 min-h-[10rem]"
           >
             <div class="flex items-center justify-between">
               <div class="w-[10rem]"><OSkeleton class="h-4" /></div>

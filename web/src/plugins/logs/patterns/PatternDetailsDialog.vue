@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="flex items-center gap-2 min-w-0">
           <span
             v-if="patternLevelInfo"
-            class="shrink-0 inline-flex items-center px-1.5 py-0.5 rounded-sm text-xs font-semibold uppercase tracking-wide text-white"
+            class="shrink-0 inline-flex items-center px-1.5 py-0.5 rounded-default text-xs font-semibold uppercase tracking-wide text-white"
             :style="{ backgroundColor: patternLevelInfo.color }"
           >
             {{ patternLevelInfo.level }}
@@ -109,7 +109,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="mt-3"
           >
             <div
-              class="rounded-sm border border-solid border-status-error-text px-3 py-2 flex gap-3 items-start bg-surface-base"
+              class="rounded-default border border-solid border-status-error-text px-3 py-2 flex gap-3 items-start bg-surface-base"
             >
               <OIcon name="warning" size="sm" class="mt-0.5 shrink-0" />
               <div>
@@ -137,7 +137,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("search.patternVariablesHeader") }}
           </div>
           <div
-            class="px-2.5 py-1.5 rounded-sm border-l-4 border-solid border-l-accent bg-surface-subtle"
+            class="px-2.5 py-1.5 rounded-default border-l-4 border-solid border-l-accent bg-surface-subtle"
           >
             {{
               selectedPattern.pattern.examples?.[0]?.variables
@@ -153,7 +153,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("search.patternTemplate") }}
           </div>
           <div
-            class="px-2.5 py-1.5 font-mono text-compact leading-[1.6] rounded-sm border-l-4 border-solid border-l-accent break-all flex flex-wrap items-baseline gap-x-[2px] gap-y-[2px] bg-surface-subtle"
+            class="px-2.5 py-1.5 font-mono text-compact leading-[1.6] rounded-default border-l-4 border-solid border-l-accent break-all flex flex-wrap items-baseline gap-x-[2px] gap-y-[2px] bg-surface-subtle"
           >
             <template v-for="(tok, i) in selectedTemplateTokens" :key="i">
               <span v-if="tok.kind === 'text'" class="whitespace-pre">{{ tok.value }}</span>
@@ -227,7 +227,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             v-for="(example, exIdx) in selectedPattern.pattern.examples"
             :key="exIdx"
-            class="px-[0.625rem] py-[0.375rem] mb-[0.375rem] font-mono text-xs leading-[1.6] rounded-sm break-all whitespace-pre-wrap border-l-[0.1875rem] border-solid bg-surface-panel border-l-border-default"
+            class="px-[0.625rem] py-[0.375rem] mb-[0.375rem] font-mono text-xs leading-[1.6] rounded-default break-all whitespace-pre-wrap border-l-[0.1875rem] border-solid bg-surface-panel border-l-border-default"
           >
             <LogsHighLighting
               :data="example.log_message"

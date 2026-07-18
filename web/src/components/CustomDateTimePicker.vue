@@ -8,7 +8,7 @@
         }"
         data-test="date-time-btn"
         variant="outline"
-        class="h-full rounded-sm py-0 px-1.25 text-xs min-w-auto bg-[rgba(89,96,178,0.2)]!"
+        class="h-full rounded-default py-0 px-1.25 text-xs min-w-auto bg-[rgba(89,96,178,0.2)]!"
         :class="changeStyle ? computedClass : 'h-8!'"
         :disabled="isFirstEntry"
       >

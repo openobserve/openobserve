@@ -1,7 +1,7 @@
 ﻿<template>
     <!-- Preview Section (only for root level) -->
     <div v-if="depth === 0 && showSqlPreview && previewString"
-         class="mb-2 p-2 rounded-sm border w-full max-h-[3.2em] overflow-y-auto bg-surface-panel border-border-default">
+         class="mb-2 p-2 rounded-default border w-full max-h-[3.2em] overflow-y-auto bg-surface-panel border-border-default">
       <div class="flex items-start gap-1 min-w-0">
         <span class="font-medium text-xs flex-shrink-0 leading-[1.3] text-text-body">
           {{ t('alerts.filters.previewLabel') }}
@@ -12,7 +12,7 @@
       </div>
     </div>
 
-    <div :class="[`  px-2 mb-2 filter-group-box border border-card-glass-border rounded-md `,
+    <div :class="[`  px-2 mb-2 filter-group-box border border-card-glass-border rounded-default `,
         'mt-4',
         store.state.isAiChatEnabled ? 'w-full' : 'xl:w-fit'
     ]"

@@ -299,7 +299,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       v-if="
                         getHttpStatusVars((spans as any[])[virtualRow.index])
                       "
-                      class="text-xs font-semibold leading-none py-[0.4rem] px-1 mr-[0.25rem] rounded-sm whitespace-nowrap"
+                      class="text-xs font-semibold leading-none py-[0.4rem] px-1 mr-[0.25rem] rounded-default whitespace-nowrap"
                       :style="{
                         backgroundColor: getHttpStatusVars(
                           (spans as any[])[virtualRow.index],

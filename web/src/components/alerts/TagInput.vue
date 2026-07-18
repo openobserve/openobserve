@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div data-test="tag-input-container" class="w-full h-full">
     <div
       data-test="tag-input-wrapper"
-      class="group relative flex flex-col px-1.25 py-0 border border-card-glass-border rounded-sm bg-card-glass-bg min-h-14 h-full w-full max-w-full cursor-text transition-colors duration-300 overflow-hidden focus-within:border-theme-accent"
+      class="group relative flex flex-col px-1.25 py-0 border border-card-glass-border rounded-default bg-card-glass-bg min-h-14 h-full w-full max-w-full cursor-text transition-colors duration-300 overflow-hidden focus-within:border-theme-accent"
     >
       <label
         v-if="label"

@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <pre
         data-test="error-event-description-navigation"
-        class="bg-surface-subtle rounded-sm p-2"
+        class="bg-surface-subtle rounded-default p-2"
       >
 {
   <span class="text-primary">from</span> : {{ column.view_referrer }},

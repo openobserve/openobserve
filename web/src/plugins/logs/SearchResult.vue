@@ -45,7 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </OButton>
         <div
-          class="flex-1 min-w-0 text-left pl-2 bg-warning text-text-inverse rounded-sm"
+          class="flex-1 min-w-0 text-left pl-2 bg-warning text-text-inverse rounded-default"
           v-if="searchObj.data.countErrorMsg != ''"
         >
           <SanitizedHtmlRenderer
@@ -171,7 +171,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- INLINE BUTTONS (wider container) -->
           <template v-else>
             <!-- Refresh in bordered wrapper -->
-            <div class="inline-flex items-center border border-card-glass-border rounded-md px-1 h-6 overflow-hidden">
+            <div class="inline-flex items-center border border-card-glass-border rounded-default px-1 h-6 overflow-hidden">
               <ORefreshButton
                 :last-run-at="searchObj.meta.lastRunAt"
                 :loading="searchObj.loading || searchObj.loadingHistogram"
@@ -565,7 +565,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :correlation-loading="correlationLoading"
           :correlation-error="correlationError"
           :initial-tab="detailTableInitialTab"
-          class="rounded-lg"
+          class="rounded-default"
           :currentIndex="searchObj.meta.resultGrid.navigation.currentRowIndex"
           :totalLength="parseInt(searchObj.data.queryResults.hits.length)"
           :highlight-query="searchObj.data.highlightQuery"

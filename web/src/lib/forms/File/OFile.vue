@@ -184,7 +184,7 @@ function formatSize(bytes: number) {
 }
 
 const wrapperClasses = computed(() => [
-  "relative flex items-center gap-2 w-full rounded-md border px-3 py-1 transition-[color,background-color,border-color,box-shadow] duration-150",
+  "relative flex items-center gap-2 w-full rounded-default border px-3 py-1 transition-[color,background-color,border-color,box-shadow] duration-150",
   "ring-offset-1 ring-offset-surface-base",
   heightClasses[props.size ?? "md"],
   isDragging.value
@@ -274,7 +274,7 @@ const wrapperClasses = computed(() => [
         <span
           v-for="(file, i) in files"
           :key="`${file.name}-${i}`"
-          class="inline-flex items-center gap-1 rounded-md bg-file-chip-bg text-file-chip-text px-2 py-0.5 text-xs max-w-48 shrink-0"
+          class="inline-flex items-center gap-1 rounded-default bg-file-chip-bg text-file-chip-text px-2 py-0.5 text-xs max-w-48 shrink-0"
           :data-test="`o-file-chip-${i}`"
         >
           <span class="truncate" :title="`${file.name} (${formatSize(file.size)})`">

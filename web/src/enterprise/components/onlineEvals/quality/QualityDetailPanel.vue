@@ -4,7 +4,7 @@
          ODrawer header (QualityPage) so the panel content starts straight
          from the KPI tiles without a duplicated identification block. -->
 
-    <div v-if="isLoading && !hasScores" class="flex flex-col items-center gap-2 py-7 px-3 border border-dashed border-dialog-header-border rounded-md text-center text-text-secondary text-xs">
+    <div v-if="isLoading && !hasScores" class="flex flex-col items-center gap-2 py-7 px-3 border border-dashed border-dialog-header-border rounded-default text-center text-text-secondary text-xs">
       <OSpinner size="sm" />
       <span>{{ t("onlineEvals.quality.detail.loading") }}</span>
     </div>
@@ -30,7 +30,7 @@
         <div
           v-for="kpi in kpis"
           :key="kpi.id"
-          class="rounded-lg flex flex-col px-[0.875rem] pt-[0.625rem] pb-[0.625rem] gap-[0.25rem] bg-surface-base border border-border-default transition-shadow duration-200 hover:shadow-[0_0.0625rem_0.375rem_rgba(0,0,0,0.08)]"
+          class="rounded-default flex flex-col px-[0.875rem] pt-[0.625rem] pb-[0.625rem] gap-[0.25rem] bg-surface-base border border-border-default transition-shadow duration-200 hover:shadow-[0_0.0625rem_0.375rem_rgba(0,0,0,0.08)]"
           :data-test="`quality-detail-kpi-${kpi.id}`"
         >
           <div class="text-2xs font-semibold text-text-secondary">
@@ -44,7 +44,7 @@
         </div>
       </div>
 
-      <section v-if="dataType === 'numeric'" class="bg-card-glass-bg py-3 px-3.5 pb-3.5 border border-border-default rounded-md">
+      <section v-if="dataType === 'numeric'" class="bg-card-glass-bg py-3 px-3.5 pb-3.5 border border-border-default rounded-default">
         <header class="mb-1.5">
           <h4 class="m-0 text-compact font-semibold text-text-heading">
             {{ t("onlineEvals.quality.detail.trendTitle") }}
@@ -66,7 +66,7 @@
         </div>
       </section>
 
-      <section v-if="dataType === 'numeric'" class="bg-card-glass-bg py-3 px-3.5 pb-3.5 border border-border-default rounded-md">
+      <section v-if="dataType === 'numeric'" class="bg-card-glass-bg py-3 px-3.5 pb-3.5 border border-border-default rounded-default">
         <header class="mb-1.5">
           <h4 class="m-0 text-compact font-semibold text-text-heading">{{ t("onlineEvals.quality.detail.distributionTitle") }}</h4>
         </header>
@@ -82,7 +82,7 @@
         </div>
       </section>
 
-      <section v-if="dataType === 'boolean'" class="bg-card-glass-bg py-3 px-3.5 pb-3.5 border border-border-default rounded-md">
+      <section v-if="dataType === 'boolean'" class="bg-card-glass-bg py-3 px-3.5 pb-3.5 border border-border-default rounded-default">
         <header class="mb-1.5">
           <h4 class="m-0 text-compact font-semibold text-text-heading">
             {{ t("onlineEvals.quality.detail.passRateTitle") }}
@@ -100,7 +100,7 @@
         </div>
       </section>
 
-      <section v-if="dataType === 'boolean'" class="bg-card-glass-bg py-3 px-3.5 pb-3.5 border border-border-default rounded-md">
+      <section v-if="dataType === 'boolean'" class="bg-card-glass-bg py-3 px-3.5 pb-3.5 border border-border-default rounded-default">
         <header class="mb-1.5">
           <h4 class="m-0 text-compact font-semibold text-text-heading">{{ t("onlineEvals.quality.detail.trueFalseTitle") }}</h4>
         </header>
@@ -116,7 +116,7 @@
         </div>
       </section>
 
-      <section v-if="dataType === 'categorical'" class="bg-card-glass-bg py-3 px-3.5 pb-3.5 border border-border-default rounded-md">
+      <section v-if="dataType === 'categorical'" class="bg-card-glass-bg py-3 px-3.5 pb-3.5 border border-border-default rounded-default">
         <header class="mb-1.5">
           <h4 class="m-0 text-compact font-semibold text-text-heading">{{ t("onlineEvals.quality.detail.categoryDistributionTitle") }}</h4>
         </header>

@@ -67,7 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <ul
-            class="flex flex-col rounded-sm list-none p-0 m-0 max-h-[calc(100dvh-12.5rem)] overflow-y-auto"
+            class="flex flex-col rounded-default list-none p-0 m-0 max-h-[calc(100dvh-12.5rem)] overflow-y-auto"
             :class="filteredDashboards.length > 0 ? 'border border-border-default' : ''"
           >
             <li

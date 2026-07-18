@@ -193,7 +193,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <div
-        class="absolute z-9999999 min-w-50 py-1 px-0 hidden whitespace-nowrap top-0 left-0 rounded-sm border border-dropdown-border bg-dropdown-bg shadow-[0_2px_8px_color-mix(in_srgb,var(--color-black)_15%,transparent)] dark:shadow-[0_2px_8px_color-mix(in_srgb,var(--color-black)_40%,transparent)]"
+        class="absolute z-9999999 min-w-50 py-1 px-0 hidden whitespace-nowrap top-0 left-0 rounded-default border border-dropdown-border bg-dropdown-bg shadow-[0_2px_8px_color-mix(in_srgb,var(--color-black)_15%,transparent)] dark:shadow-[0_2px_8px_color-mix(in_srgb,var(--color-black)_40%,transparent)]"
         data-test="drilldown-menu"
         ref="drilldownPopUpRef"
         @mouseleave="hidePopupsAndOverlays"
@@ -224,7 +224,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </div>
       <div
-        class="border border-border-default rounded-sm p-0.75 absolute top-0 left-0 hidden max-w-50 whitespace-normal [word-wrap:break-word] [overflow-wrap:break-word] z-9999999 bg-surface-base"
+        class="border border-border-default rounded-default p-0.75 absolute top-0 left-0 hidden max-w-50 whitespace-normal [word-wrap:break-word] [overflow-wrap:break-word] z-9999999 bg-surface-base"
         ref="annotationPopupRef"
       >
         <div

@@ -25,7 +25,7 @@
       <div
         v-for="(link, idx) in links"
         :key="link.name"
-        class="cross-link-item border border-card-glass-border rounded-md mb-1 p-2"
+        class="cross-link-item border border-card-glass-border rounded-default mb-1 p-2"
         :data-test="`cross-link-item-${idx}`"
       >
         <div class="flex justify-between items-start">

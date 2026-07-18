@@ -56,7 +56,7 @@
                   style="min-height: 200px"
                 />
                 <div v-if="isLicenseKeyAutoFilled" class="mt-2 mb-3">
-                  <div class="flex items-center py-3 px-4 bg-banner-success-bg border border-solid border-banner-success-border rounded-lg backdrop-blur-md transition-all duration-200 dark:shadow-md">
+                  <div class="flex items-center py-3 px-4 bg-banner-success-bg border border-solid border-banner-success-border rounded-default backdrop-blur-md transition-all duration-200 dark:shadow-md">
                     <OIcon
                       name="check-circle"
                       class="text-status-positive mr-2"
@@ -219,7 +219,7 @@
                   style="min-height: 150px"
                 />
                 <div v-if="isLicenseKeyAutoFilled" class="mt-2 mb-3">
-                  <div class="flex items-center py-3 px-4 bg-banner-success-bg border border-solid border-banner-success-border rounded-lg backdrop-blur-md transition-all duration-200 dark:shadow-md">
+                  <div class="flex items-center py-3 px-4 bg-banner-success-bg border border-solid border-banner-success-border rounded-default backdrop-blur-md transition-all duration-200 dark:shadow-md">
                     <OIcon
                       name="check-circle"
                       class="text-status-positive mr-2"
@@ -272,7 +272,7 @@
 
             <div class="flex flex-col gap-2 mt-3">
               <!-- Summary Message -->
-              <div class="ingestion-summary-compact border border-solid rounded-lg py-3 px-3.5 [backdrop-filter:blur(10px)] relative overflow-hidden border-[rgba(99,102,241,0.2)] dark:bg-[linear-gradient(135deg,rgba(99,102,241,0.1)_0%,rgba(168,85,247,0.1)_100%)] dark:border-[rgba(99,102,241,0.3)]">
+              <div class="ingestion-summary-compact border border-solid rounded-default py-3 px-3.5 [backdrop-filter:blur(10px)] relative overflow-hidden border-[rgba(99,102,241,0.2)] dark:bg-[linear-gradient(135deg,rgba(99,102,241,0.1)_0%,rgba(168,85,247,0.1)_100%)] dark:border-[rgba(99,102,241,0.3)]">
                 <div class="summary-text-compact text-sm leading-[1.6] text-inherit text-compact">
                   <!-- Line 1: License Info -->
                   <div class="flex items-center gap-2 mb-2">

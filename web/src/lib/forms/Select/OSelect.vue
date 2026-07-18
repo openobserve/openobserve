@@ -1064,7 +1064,7 @@ const fieldWidthClass = computed(() => {
             "
             :data-test-selected-label="triggerDisplayLabel"
             :class="[
-              'relative flex w-full rounded-md border',
+              'relative flex w-full rounded-default border',
               // In inside-label mode padding is handled per-row; in normal mode it goes on the trigger
               labelPosition === 'inside' && label ? '' : ($slots['icon-left'] ? 'ps-2' : 'ps-3'),
               'bg-select-bg',
@@ -1117,14 +1117,14 @@ const fieldWidthClass = computed(() => {
                     >
                       <span
                         :key="`${idx}-${String(labelText ?? '')}`"
-                        class="inline-flex items-center rounded-sm px-2 py-0.5 text-xs leading-none bg-select-item-selected-bg text-select-item-selected-text max-w-40 truncate shrink-0"
+                        class="inline-flex items-center rounded-default px-2 py-0.5 text-xs leading-none bg-select-item-selected-bg text-select-item-selected-text max-w-40 truncate shrink-0"
                       >
                         {{ labelText }}
                       </span>
                     </slot>
                     <span
                       v-if="overflowSelectedCount > 0"
-                      class="inline-flex items-center rounded-sm px-2 py-0.5 text-xs bg-select-item-hover-bg text-select-text shrink-0"
+                      class="inline-flex items-center rounded-default px-2 py-0.5 text-xs bg-select-item-hover-bg text-select-text shrink-0"
                       data-test="o-select-overflow-chip"
                     >
                       +{{ overflowSelectedCount }} more
@@ -1228,7 +1228,7 @@ const fieldWidthClass = computed(() => {
             :class="[
               'z-[10001] min-w-(--reka-popover-trigger-width)',
               'overflow-hidden flex flex-col',
-              'rounded-md shadow-lg',
+              'rounded-default shadow-lg',
               'bg-select-content-bg',
             ]"
             :style="[dropdownStyle, { maxHeight: 'min(18rem, var(--reka-popover-content-available-height, 18rem))' }]"
@@ -1244,7 +1244,7 @@ const fieldWidthClass = computed(() => {
               <!-- Single bordered container wrapping search + list -->
               <div
                 :class="[
-                  'rounded-md border border-input-border overflow-hidden',
+                  'rounded-default border border-input-border overflow-hidden',
                   'bg-select-content-bg flex flex-col flex-1 min-h-0',
                 ]"
               >
@@ -1283,7 +1283,7 @@ const fieldWidthClass = computed(() => {
                   :class="[
                     'relative flex items-center w-full gap-2 shrink-0',
                     'ps-3 pe-3 py-1.5 text-sm',
-                    'text-select-item-text rounded-sm',
+                    'text-select-item-text rounded-default',
                     'cursor-pointer select-none outline-none',
                     'hover:bg-select-item-hover-bg',
                     'focus-visible:bg-select-item-hover-bg',
@@ -1298,7 +1298,7 @@ const fieldWidthClass = computed(() => {
                   <span
                     :class="[
                       'flex items-center justify-center shrink-0',
-                      'size-3.5 rounded-sm border transition-colors',
+                      'size-3.5 rounded-default border transition-colors',
                       allSelected
                         ? 'bg-checkbox-checked-bg border-checkbox-checked-border'
                         : 'bg-checkbox-bg border-checkbox-border',
@@ -1398,7 +1398,7 @@ const fieldWidthClass = computed(() => {
                         :class="[
                           'relative flex w-full h-full gap-2',
                           'ps-3 pe-3 text-sm',
-                          'text-select-item-text rounded-sm',
+                          'text-select-item-text rounded-default',
                           'cursor-pointer select-none outline-none',
                           'transition-colors duration-100',
                           // Use flex-col for stacked rich items; flex-row for inline subLabel or simple items
@@ -1422,7 +1422,7 @@ const fieldWidthClass = computed(() => {
                           <span
                             :class="[
                               'flex items-center justify-center shrink-0',
-                              'size-3.5 rounded-sm border transition-colors',
+                              'size-3.5 rounded-default border transition-colors',
                               selectedValues.includes(
                                 filteredOptions[vRow.index].value,
                               )
@@ -1480,7 +1480,7 @@ const fieldWidthClass = computed(() => {
                               <span class="truncate font-medium" :title="optionTooltip ? filteredOptions[vRow.index].label : undefined">{{ filteredOptions[vRow.index].label }}</span>
                               <span
                                 v-if="filteredOptions[vRow.index].badge"
-                                class="shrink-0 rounded-sm border border-solid"
+                                class="shrink-0 rounded-default border border-solid"
                                 :class="[
                                   filteredOptions[vRow.index].badgeTitle ? 'cursor-help' : undefined,
                                   filteredOptions[vRow.index].badgeStyle
@@ -1502,7 +1502,7 @@ const fieldWidthClass = computed(() => {
                             >{{ filteredOptions[vRow.index].subLabel }}</span>
                             <div
                               v-if="filteredOptions[vRow.index].colorPalette?.length"
-                              class="h-1.5 w-full rounded-sm"
+                              class="h-1.5 w-full rounded-default"
                               :style="{
                                 background: getPaletteGradient(
                                   filteredOptions[vRow.index].colorPalette!,
@@ -1553,7 +1553,7 @@ const fieldWidthClass = computed(() => {
                 <!-- Checkbox zone hint -->
                 <span class="flex items-center gap-1.5 text-2xs text-select-placeholder shrink-0">
                   <span
-                    class="inline-flex items-center justify-center size-3.5 rounded-sm border border-select-placeholder shrink-0"
+                    class="inline-flex items-center justify-center size-3.5 rounded-default border border-select-placeholder shrink-0"
                     aria-hidden="true"
                   >
                     <svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-2.5 p-px">
@@ -1607,7 +1607,7 @@ const fieldWidthClass = computed(() => {
             parentDataTest ? `${parentDataTest}-trigger` : undefined
           "
           :class="[
-            'relative flex w-full rounded-md border',
+            'relative flex w-full rounded-default border',
             // In inside-label mode padding is handled per-row
             labelPosition === 'inside' && label ? '' : 'ps-3',
             'bg-select-bg',
@@ -1724,7 +1724,7 @@ const fieldWidthClass = computed(() => {
           :class="[
             'z-[10001] min-w-(--reka-select-trigger-width)',
             'overflow-hidden',
-            'rounded-md border shadow-md',
+            'rounded-default border shadow-md',
             'bg-select-content-bg border-select-content-border',
             // Clip-path reveal: unveiled at full size from its trigger edge (no
             // scale/squish). Wipes down by default; top-placed wipes up. Soft

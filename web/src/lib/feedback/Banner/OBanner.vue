@@ -53,7 +53,7 @@ const variantClass = computed(() => {
     :role="ariaRole"
     :data-test="dataTest"
     :class="[
-      'flex rounded-md',
+      'flex rounded-default',
       inlineActions ? 'flex-row items-center gap-3' : 'flex-col gap-2',
       dense ? 'p-2' : 'p-4',
       variantClass,

@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         Full Text Search ({{ fieldsByType.fts.length }})
       </div>
       <div
-        class="p-2 max-h-50 overflow-y-auto border rounded-sm border-border-default bg-surface-subtle"
+        class="p-2 max-h-50 overflow-y-auto border rounded-default border-border-default bg-surface-subtle"
       >
         <OTag
           v-for="field in fieldsByType.fts"
@@ -55,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         Secondary Index ({{ fieldsByType.secondaryIndex.length }})
       </div>
       <div
-        class="p-2 max-h-50 overflow-y-auto border rounded-sm border-border-default bg-surface-subtle"
+        class="p-2 max-h-50 overflow-y-auto border rounded-default border-border-default bg-surface-subtle"
       >
         <OTag
           v-for="field in fieldsByType.secondaryIndex"

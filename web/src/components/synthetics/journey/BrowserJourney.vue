@@ -554,7 +554,7 @@ function openChromeExtensions() {
     <!-- Incognito blocked warning card (pre-flight failure) -->
     <div
       v-if="blockedReason === 'incognito'"
-      class="flex flex-col gap-3 px-3 py-3 mb-3 rounded-lg border border-[var(--color-warning-300)] bg-warning-50"
+      class="flex flex-col gap-3 px-3 py-3 mb-3 rounded-default border border-[var(--color-warning-300)] bg-warning-50"
       role="alert"
       data-test="synthetics-journey-incognito-warning"
     >
@@ -604,7 +604,7 @@ function openChromeExtensions() {
     <!-- Replay running banner -->
     <div
       v-if="replayPhase === 'running'"
-      class="flex items-center gap-2 mx-2 px-3 py-2 mb-3 rounded-sm bg-[var(--color-badge-primary-soft-bg)] border border-border-default"
+      class="flex items-center gap-2 mx-2 px-3 py-2 mb-3 rounded-default bg-[var(--color-badge-primary-soft-bg)] border border-border-default"
       role="status"
       data-test="synthetics-journey-replay-banner"
     >
@@ -623,7 +623,7 @@ function openChromeExtensions() {
     <!-- Replay passed banner -->
     <div
       v-else-if="replayPhase === 'passed'"
-      class="flex items-center gap-2 mx-2 px-3 py-2 mb-3 rounded-sm bg-[var(--color-badge-success-soft-bg)] border border-badge-success-ol-border/50"
+      class="flex items-center gap-2 mx-2 px-3 py-2 mb-3 rounded-default bg-[var(--color-badge-success-soft-bg)] border border-badge-success-ol-border/50"
       role="status"
       data-test="synthetics-journey-passed-banner"
     >
@@ -638,7 +638,7 @@ function openChromeExtensions() {
     <!-- Replay failed banner -->
     <div
       v-else-if="replayPhase === 'failed'"
-      class="flex items-start gap-2 px-3 py-2 mb-3 rounded-sm bg-[var(--color-badge-error-soft-bg)] border border-badge-error-ol-border/30"
+      class="flex items-start gap-2 px-3 py-2 mb-3 rounded-default bg-[var(--color-badge-error-soft-bg)] border border-badge-error-ol-border/30"
       role="alert"
       data-test="synthetics-journey-failed-banner"
     >
@@ -655,7 +655,7 @@ function openChromeExtensions() {
     <!-- Replay stopped banner -->
     <div
       v-else-if="replayPhase === 'stopped'"
-      class="flex items-center gap-2 px-3 py-2 mb-3 rounded-sm bg-surface-subtle border border-border-default"
+      class="flex items-center gap-2 px-3 py-2 mb-3 rounded-default bg-surface-subtle border border-border-default"
       role="status"
       data-test="synthetics-journey-stopped-banner"
     >
@@ -673,7 +673,7 @@ function openChromeExtensions() {
     <!-- Recorder error (extension missing / failed to start) -->
     <div
       v-if="recordingError && !isRecording"
-      class="flex items-center gap-2 px-3 py-2 mb-3 rounded-sm bg-status-error-bg text-status-error-text text-sm"
+      class="flex items-center gap-2 px-3 py-2 mb-3 rounded-default bg-status-error-bg text-status-error-text text-sm"
       role="alert"
       data-test="synthetics-journey-record-error"
     >
@@ -684,7 +684,7 @@ function openChromeExtensions() {
     <!-- Live capture area (shown while recording) -->
     <template v-if="isRecording">
       <!-- Recording banner with current URL + controls -->
-      <div class="flex items-center gap-3 px-3 py-2 mb-3 rounded-sm bg-status-error-bg border border-border-default">
+      <div class="flex items-center gap-3 px-3 py-2 mb-3 rounded-default bg-status-error-bg border border-border-default">
         <span class="flex items-center gap-1.5">
           <span class="relative inline-flex items-center justify-center w-[0.7rem] h-[0.7rem]" aria-hidden="true">
             <span class="absolute w-[0.7rem] h-[0.7rem] rounded-full bg-status-error-text z-1" />

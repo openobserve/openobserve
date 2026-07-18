@@ -223,7 +223,7 @@ const textSizeClasses: Record<NonNullable<InputProps["size"]>, string> = {
 };
 
 const wrapperClasses = computed(() => [
-  "flex items-stretch w-full rounded-md border transition-[color,background-color,border-color,box-shadow] duration-150",
+  "flex items-stretch w-full rounded-default border transition-[color,background-color,border-color,box-shadow] duration-150",
   "bg-input-bg",
   !isTextarea.value ? heightClasses[props.size ?? "md"] : "",
   /* Focus affordance = soft glow: a 4px translucent halo hugging the border

@@ -18,7 +18,7 @@
     />
     <div
       v-if="!scorers.length"
-      class="mt-2 py-3 px-3.5 border border-dashed border-dialog-header-border rounded-md text-center text-text-secondary text-xs"
+      class="mt-2 py-3 px-3.5 border border-dashed border-dialog-header-border rounded-default text-center text-text-secondary text-xs"
     >
       {{ t("onlineEvals.job.scorerPicker.empty") }}
     </div>

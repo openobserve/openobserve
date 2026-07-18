@@ -95,7 +95,7 @@ const charCount = computed(() => {
 });
 
 const wrapperClasses = computed(() => [
-  "flex items-stretch w-full rounded-md border transition-[color,background-color,border-color,box-shadow] duration-150",
+  "flex items-stretch w-full rounded-default border transition-[color,background-color,border-color,box-shadow] duration-150",
   "ring-offset-1 ring-offset-surface-base",
   "bg-input-bg",
   /* Keep the red error border on focus (don't let the focus color override it);

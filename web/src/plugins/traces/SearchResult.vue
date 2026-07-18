@@ -65,7 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="traces-error-count-badge"
           variant="error"
           :clickable="true"
-          class="text-xs rounded-sm! py-[0.4rem]! px-[0.625rem]! text-xs!"
+          class="text-xs rounded-default! py-[0.4rem]! px-[0.625rem]! text-xs!"
           :class="showErrorOnly
             ? 'bg-badge-error-solid-bg! text-badge-error-solid-text!'
             : 'bg-error-tag-bg! text-error-tag-text!'"
@@ -84,7 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="flex-1" />
 
         <!-- Right: Refresh → Insights → rows per page → pagination (same sequence as logs) -->
-        <div class="inline-flex items-center border border-card-glass-border rounded-md px-1 h-6 mr-1 overflow-hidden">
+        <div class="inline-flex items-center border border-card-glass-border rounded-default px-1 h-6 mr-1 overflow-hidden">
           <ORefreshButton
             :last-run-at="searchObj.meta.lastRunAt"
             :loading="searchObj.loading"

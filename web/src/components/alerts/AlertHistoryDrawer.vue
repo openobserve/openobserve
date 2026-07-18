@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div
               v-if="alertDetails"
               :class="[
-                'flex items-center gap-1 px-2 py-1 rounded-md border shrink-0',
+                'flex items-center gap-1 px-2 py-1 rounded-default border shrink-0',
                 'bg-surface-subtle border-border-default',
               ]"
             >
@@ -153,7 +153,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
 
               <div
-                class="rounded-lg overflow-hidden border flex flex-col flex-1"
+                class="rounded-default overflow-hidden border flex flex-col flex-1"
                 :class="
                   'border-border-default bg-surface-panel'
                 "
@@ -265,7 +265,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Anomaly detection condition view — mirrors the alert SQL code block -->
             <template v-if="isAnomaly">
               <div
-                class="rounded-lg overflow-hidden border flex flex-col flex-1"
+                class="rounded-default overflow-hidden border flex flex-col flex-1"
                 :class="
                   'border-border-default bg-surface-panel'
                 "
@@ -307,7 +307,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Regular alert condition view -->
             <template v-else>
               <div
-                class="rounded-lg overflow-hidden border flex flex-col flex-1"
+                class="rounded-default overflow-hidden border flex flex-col flex-1"
                 :class="
                   'border-border-default bg-surface-panel'
                 "
@@ -391,7 +391,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ t("common.description") }}
               </div>
               <div
-                class="text-compact px-3 py-2 rounded-sm leading-relaxed"
+                class="text-compact px-3 py-2 rounded-default leading-relaxed"
                 :class="
                   'bg-surface-panel text-text-body'
                 "

@@ -98,7 +98,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="text-text-label font-bold text-compact">
                 Existing URLs ({{ formData.urlJobs.length }})
               </div>
-              <div class="rounded-md border border-card-glass-border bg-surface-panel p-2 flex flex-col gap-1">
+              <div class="rounded-default border border-card-glass-border bg-surface-panel p-2 flex flex-col gap-1">
                 <div v-for="(job, index) in formData.urlJobs" :key="job.id">
                   <div class="flex items-center gap-2">
                     <span class="font-medium text-text-secondary text-xs">{{ Number(index) + 1 }}.</span>
@@ -125,7 +125,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Mode explanation (always show for URL-based tables in edit mode) -->
             <div
               v-if="isUpdating && formData.source === 'url'"
-              class="text-sm text-text-secondary p-3 rounded-lg"
+              class="text-sm text-text-secondary p-3 rounded-default"
               :class="{
                 'bg-status-info-bg': formData.updateMode === 'reload',
                 'bg-status-success-bg': formData.updateMode === 'append',

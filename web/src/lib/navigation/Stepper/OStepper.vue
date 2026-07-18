@@ -98,7 +98,7 @@ function titleClasses(step: StepRegistration): string {
 function triggerClasses(step: StepRegistration): string {
   const base = [
     'flex flex-row items-center gap-2 px-2 py-1.5',
-    'rounded-md outline-none select-none',
+    'rounded-default outline-none select-none',
     'transition-colors duration-150',
   ].join(' ')
   if (canNavigateTo(step)) {

@@ -141,7 +141,7 @@
       />
 
       <div style="max-height: 400px; overflow-y: auto">
-        <div class="border border-border rounded-md divide-y divide-border">
+        <div class="border border-border rounded-default divide-y divide-border">
           <div
             v-for="category in categories"
             :key="category"

@@ -1,6 +1,6 @@
 <template>
   <div
-    class="rich-text-input-wrapper py-1 px-2 pb-2 rounded-xl transition-all duration-200 ease-in-out min-h-15 cursor-text bg-surface-base border border-border-default focus-within:border-transparent focus-within:shadow-[0_0_0_2px_var(--color-accent)]"
+    class="rich-text-input-wrapper py-1 px-2 pb-2 rounded-default transition-all duration-200 ease-in-out min-h-15 cursor-text bg-surface-base border border-border-default focus-within:border-transparent focus-within:shadow-[0_0_0_2px_var(--color-accent)]"
     :class="[
       disabled ? ['is-disabled', 'opacity-60', 'cursor-not-allowed'] : [],
       borderless ? ['borderless', 'p-0', 'border-0!', 'bg-transparent!', 'shadow-none!', 'rounded-none'] : []
@@ -23,7 +23,7 @@
     <!-- Detail Card -->
     <div
       v-if="showDetailCard"
-      class="chip-detail-card fixed max-w-75 max-h-75 border rounded-lg shadow-lg z-[100000] flex flex-col overflow-hidden bg-surface-base border-border-default"
+      class="chip-detail-card fixed max-w-75 max-h-75 border rounded-default shadow-lg z-[100000] flex flex-col overflow-hidden bg-surface-base border-border-default"
       :style="{
         top: cardPosition.top + 'px',
         left: cardPosition.left + 'px',

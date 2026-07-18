@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <!-- Baseline Chip -->
         <div
-          class="time-range-chip baseline-chip flex items-center gap-1 px-2 py-[0.375rem] rounded-sm text-sm"
+          class="time-range-chip baseline-chip flex items-center gap-1 px-2 py-[0.375rem] rounded-default text-sm"
           :style="{ '--chip-color': chipColors.baseline }"
         >
           <span class="uppercase tracking-wide opacity-70"
@@ -53,7 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Selected Chip -->
         <div
           v-if="hasSelectedTimeRange"
-          class="time-range-chip selected-chip flex items-center gap-1 px-2 py-[0.375rem] rounded-sm text-sm"
+          class="time-range-chip selected-chip flex items-center gap-1 px-2 py-[0.375rem] rounded-default text-sm"
           :style="{ '--chip-color': chipColors.selected }"
         >
           <span class="uppercase tracking-wide opacity-70"

@@ -57,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
       </div>
       <div
-        class="filter-mode-toggle flex border border-card-glass-border rounded-sm overflow-hidden"
+        class="filter-mode-toggle flex border border-card-glass-border rounded-default overflow-hidden"
         data-test="field-values-panel-filter-mode-toggle"
       >
         <OButton
@@ -186,7 +186,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="w-full flex justify-center border-t border-card-glass-border pt-1 px-1"
     >
       <button
-        class="inline-flex items-center gap-1 bg-transparent border-0 text-accent text-2xs font-[inherit] py-0.5 px-1 cursor-pointer rounded-sm transition-opacity duration-150 hover:opacity-80 hover:bg-interactive-hover-bg disabled:opacity-50 disabled:cursor-default"
+        class="inline-flex items-center gap-1 bg-transparent border-0 text-accent text-2xs font-[inherit] py-0.5 px-1 cursor-pointer rounded-default transition-opacity duration-150 hover:opacity-80 hover:bg-interactive-hover-bg disabled:opacity-50 disabled:cursor-default"
         :disabled="isLoadingMore"
         @click="handleLoadMoreClick"
         :data-test="`log-search-subfield-load-more-${fieldName}`"

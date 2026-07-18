@@ -96,7 +96,7 @@
       >
         Performing
         <span
-          class="inline-flex items-center rounded-sm px-1.5 py-0.5 text-xs font-semibold bg-[color-mix(in_srgb,var(--color-accent)_15%,transparent)] text-accent"
+          class="inline-flex items-center rounded-default px-1.5 py-0.5 text-xs font-semibold bg-[color-mix(in_srgb,var(--color-accent)_15%,transparent)] text-accent"
         >{{ joinTypeLabel }} Join</span> between
         <span class="font-semibold">{{ mainStream }}</span> and
         <span class="font-semibold">{{ modelValue.stream }}</span>
@@ -120,7 +120,7 @@
       <div
         v-for="(arg, argIndex) in modelValue.conditions"
         :key="argIndex + JSON.stringify(arg)"
-        class="mb-2.5 p-2.5 border border-border-default rounded-sm"
+        class="mb-2.5 p-2.5 border border-border-default rounded-default"
       >
         <div class="mb-2 font-medium">Clause {{ argIndex + 1 }}</div>
         <div class="flex items-center gap-2.5">

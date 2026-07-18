@@ -17,14 +17,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <div class="rounded-md relative-position">
+  <div class="rounded-default relative-position">
     <div
       class="performance-dashboard"
       :class="isLoading.length ? 'invisible' : 'visible'"
     >
       <div
         data-test="learn-web-vitals-link"
-        class="font-bold ml-3 px-2 rounded-sm mt-2 py-1 text-sm w-fit flex items-center bg-badge-indigo-soft-bg"
+        class="font-bold ml-3 px-2 rounded-default mt-2 py-1 text-sm w-fit flex items-center bg-badge-indigo-soft-bg"
       >
         <OIcon
           name="info"

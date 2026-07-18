@@ -46,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- INCIDENTS: joined rows inside one bordered container -->
     <div
       v-if="section === 'incidents'"
-      class="flex flex-col border border-[0.0625em] border-border-default rounded-md overflow-hidden"
+      class="flex flex-col border border-[0.0625em] border-border-default rounded-default overflow-hidden"
     >
       <div
         v-for="i in 2"
@@ -62,12 +62,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- SERVICES: scroll chevron + fixed-width cards -->
     <div v-else-if="section === 'services'" class="flex items-stretch gap-2">
-      <OSkeleton class="w-6 shrink-0 rounded-lg" />
+      <OSkeleton class="w-6 shrink-0 rounded-default" />
       <div class="flex flex-row gap-2 flex-1 overflow-hidden">
         <div
           v-for="i in 4"
           :key="i"
-          class="py-3 px-[0.875rem] rounded-md border border-[0.0625em] border-border-default bg-surface-base basis-40 grow-0 shrink-0 min-w-40 max-w-40 flex flex-col gap-2"
+          class="py-3 px-[0.875rem] rounded-default border border-[0.0625em] border-border-default bg-surface-base basis-40 grow-0 shrink-0 min-w-40 max-w-40 flex flex-col gap-2"
         >
           <OSkeleton class="h-4 max-w-[7em]" />
           <OSkeleton class="h-3 max-w-[4.5em]" />
@@ -80,7 +80,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         v-for="i in 2"
         :key="i"
-        class="flex items-center gap-3 py-[0.625rem] px-[0.875rem] rounded-md border border-[0.0625em] border-border-default bg-surface-base"
+        class="flex items-center gap-3 py-[0.625rem] px-[0.875rem] rounded-default border border-[0.0625em] border-border-default bg-surface-base"
       >
         <OSkeleton type="circle" class="w-4 shrink-0" />
         <OSkeleton class="h-4 max-w-[24em]" />
@@ -90,7 +90,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- RECENT EVENTS: joined compact rows -->
     <div
       v-else
-      class="flex flex-col gap-0 border border-[0.0625em] border-border-default rounded-md overflow-hidden bg-surface-base"
+      class="flex flex-col gap-0 border border-[0.0625em] border-border-default rounded-default overflow-hidden bg-surface-base"
     >
       <div
         v-for="i in 3"

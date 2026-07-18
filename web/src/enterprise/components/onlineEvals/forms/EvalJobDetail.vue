@@ -53,7 +53,7 @@
           v-for="card in kpiCards"
           v-else
           :key="card.label"
-          class="rounded-lg flex flex-col px-[0.875rem] pt-[0.625rem] pb-[0.625rem] gap-[0.25rem] bg-surface-base border border-border-default transition-shadow duration-200 hover:shadow-[0_0.0625rem_0.375rem_color-mix(in_srgb,var(--color-black)_8%,transparent)]"
+          class="rounded-default flex flex-col px-[0.875rem] pt-[0.625rem] pb-[0.625rem] gap-[0.25rem] bg-surface-base border border-border-default transition-shadow duration-200 hover:shadow-[0_0.0625rem_0.375rem_color-mix(in_srgb,var(--color-black)_8%,transparent)]"
         >
           <div
             class="kpi-label text-2xs leading-normal font-semibold mb-[0.25rem] text-text-secondary"
@@ -116,7 +116,7 @@
               :options="agentOptions"
               labelKey="label"
               valueKey="value"
-              class="w-full rounded-sm"
+              class="w-full rounded-default"
               data-test="eval-job-detail-runs-agent-filter"
             />
           </div>
@@ -142,7 +142,7 @@
             <!-- Filter rendered as a code block with a header bar + copy action,
                  matching the Alert History condition view. -->
             <div
-              class="border border-dialog-header-border rounded-lg overflow-hidden bg-[color-mix(in_srgb,var(--color-text-secondary)_4%,var(--color-card-bg))]"
+              class="border border-dialog-header-border rounded-default overflow-hidden bg-[color-mix(in_srgb,var(--color-text-secondary)_4%,var(--color-card-bg))]"
               data-test="eval-job-detail-filter"
             >
               <div
@@ -203,13 +203,13 @@
                      must not light up on hover. -->
                 <button
                   type="button"
-                  class="group w-full flex items-center gap-3.5 px-4 py-3.5 bg-card-bg border border-[color-mix(in_srgb,var(--color-text-secondary)_16%,transparent)] rounded-lg text-left cursor-pointer transition-[border-color,background,box-shadow,transform] duration-150 enabled:hover:border-[color-mix(in_srgb,var(--color-primary-600)_45%,transparent)] enabled:hover:bg-[color-mix(in_srgb,var(--color-primary-600)_4%,var(--color-card-bg))] enabled:hover:shadow-[0_0.0625rem_0.1875rem_color-mix(in_srgb,var(--color-primary-600)_12%,transparent)] enabled:hover:-translate-y-px disabled:opacity-55 disabled:cursor-not-allowed"
+                  class="group w-full flex items-center gap-3.5 px-4 py-3.5 bg-card-bg border border-[color-mix(in_srgb,var(--color-text-secondary)_16%,transparent)] rounded-default text-left cursor-pointer transition-[border-color,background,box-shadow,transform] duration-150 enabled:hover:border-[color-mix(in_srgb,var(--color-primary-600)_45%,transparent)] enabled:hover:bg-[color-mix(in_srgb,var(--color-primary-600)_4%,var(--color-card-bg))] enabled:hover:shadow-[0_0.0625rem_0.1875rem_color-mix(in_srgb,var(--color-primary-600)_12%,transparent)] enabled:hover:-translate-y-px disabled:opacity-55 disabled:cursor-not-allowed"
                   :data-test="`eval-job-detail-scorer-item-${item.name}`"
                   :disabled="!findScorerById(item.id)"
                   @click="onScorerClick(item.id)"
                 >
                   <span
-                    class="shrink-0 inline-flex items-center justify-center size-8.5 rounded-lg"
+                    class="shrink-0 inline-flex items-center justify-center size-8.5 rounded-default"
                     :class="{
                       'bg-badge-indigo-soft-bg text-badge-indigo-soft-text': item.scorerType === 'llm_judge',
                       'bg-badge-orange-soft-bg text-badge-orange-soft-text': item.scorerType === 'remote',

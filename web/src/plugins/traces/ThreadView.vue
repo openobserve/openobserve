@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div v-if="props.showSummary" class="thread-summary flex flex-wrap items-center gap-[0.4rem] py-2 px-4 bg-surface-base border-b border-border-default">
       <OTag
         type="metricChip"
-        class="thread-chip thread-chip--steps h-6.5! px-[0.625rem]! py-0! bg-surface-base! border border-border-default rounded-sm! text-xs! text-text-body! border-l-[3px]! border-l-[color-mix(in_srgb,var(--color-orange-700)_75%,var(--color-grey-300))]!"
+        class="thread-chip thread-chip--steps h-6.5! px-[0.625rem]! py-0! bg-surface-base! border border-border-default rounded-default! text-xs! text-text-body! border-l-[3px]! border-l-[color-mix(in_srgb,var(--color-orange-700)_75%,var(--color-grey-300))]!"
         :title="`${summary.turnCount} LLM step${summary.turnCount === 1 ? '' : 's'}`"
       >
         <template #icon><OIcon name="auto-awesome" size="xs" /></template>
@@ -42,13 +42,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span class="thread-chip__value text-text-body font-semibold text-xs">{{ summary.turnCount }}</span>
       </OTag>
 
-      <OTag type="metricChip" class="thread-chip thread-chip--tools h-6.5! px-[0.625rem]! py-0! bg-surface-base! border border-border-default rounded-sm! text-xs! text-text-body! border-l-[3px]! border-l-[color-mix(in_srgb,var(--color-cyan-500)_55%,var(--color-blue-500))]!">
+      <OTag type="metricChip" class="thread-chip thread-chip--tools h-6.5! px-[0.625rem]! py-0! bg-surface-base! border border-border-default rounded-default! text-xs! text-text-body! border-l-[3px]! border-l-[color-mix(in_srgb,var(--color-cyan-500)_55%,var(--color-blue-500))]!">
         <template #icon><OIcon name="build" size="xs" /></template>
         <span class="thread-chip__label text-text-secondary font-medium mr-[0.3125rem] tracking-normal text-2xs">Tools</span>
         <span class="thread-chip__value text-text-body font-semibold text-xs">{{ summary.toolCallCount }}</span>
       </OTag>
 
-      <OTag type="metricChip" class="thread-chip thread-chip--duration h-6.5! px-[0.625rem]! py-0! bg-surface-base! border border-border-default rounded-sm! text-xs! text-text-body! border-l-[3px]! border-l-[color-mix(in_srgb,var(--color-grey-500)_80%,var(--color-blue-800))]!">
+      <OTag type="metricChip" class="thread-chip thread-chip--duration h-6.5! px-[0.625rem]! py-0! bg-surface-base! border border-border-default rounded-default! text-xs! text-text-body! border-l-[3px]! border-l-[color-mix(in_srgb,var(--color-grey-500)_80%,var(--color-blue-800))]!">
         <template #icon><OIcon name="schedule" size="xs" /></template>
         <span class="thread-chip__label text-text-secondary font-medium mr-[0.3125rem] tracking-normal text-2xs">Duration</span>
         <span class="thread-chip__value text-text-body font-semibold text-xs">
@@ -56,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </span>
       </OTag>
 
-      <OTag type="metricChip" class="thread-chip thread-chip--cost h-6.5! px-[0.625rem]! py-0! bg-surface-base! border border-border-default rounded-sm! text-xs! text-text-body! border-l-[3px]! border-l-success-600!">
+      <OTag type="metricChip" class="thread-chip thread-chip--cost h-6.5! px-[0.625rem]! py-0! bg-surface-base! border border-border-default rounded-default! text-xs! text-text-body! border-l-[3px]! border-l-success-600!">
         <template #icon><OIcon name="payments" size="xs" /></template>
         <span class="thread-chip__label text-text-secondary font-medium mr-[0.3125rem] tracking-normal text-2xs">Cost</span>
         <span class="thread-chip__value text-text-body font-semibold text-xs">
@@ -67,7 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OTag
         v-if="summary.dominantModel"
         type="metricChip"
-        class="thread-chip thread-chip--model h-6.5! px-[0.625rem]! py-0! bg-surface-base! border border-border-default rounded-sm! text-xs! text-text-body! border-l-[3px]! border-l-ai-accent! dark:border-l-(--color-purple-400)!"
+        class="thread-chip thread-chip--model h-6.5! px-[0.625rem]! py-0! bg-surface-base! border border-border-default rounded-default! text-xs! text-text-body! border-l-[3px]! border-l-ai-accent! dark:border-l-(--color-purple-400)!"
         :title="summary.dominantModel"
       >
         <template #icon><OIcon name="bolt" size="xs" /></template>
@@ -78,7 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OTag
         v-if="summary.errorCount > 0"
         type="metricChip"
-        class="thread-chip thread-chip--error h-6.5! px-[0.625rem]! py-0! bg-surface-base! border border-border-default rounded-sm! text-xs! text-text-body! border-l-[3px]! border-l-error-600!"
+        class="thread-chip thread-chip--error h-6.5! px-[0.625rem]! py-0! bg-surface-base! border border-border-default rounded-default! text-xs! text-text-body! border-l-[3px]! border-l-error-600!"
       >
         <template #icon><OIcon name="error-outline" size="xs" /></template>
         <span class="thread-chip__label text-text-secondary font-medium mr-[0.3125rem] tracking-normal text-2xs">Errors</span>
@@ -105,13 +105,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- System prompt (global — identical across traces in a session). -->
       <div
         v-if="head.systemPrompt"
-        class="thread-system mb-4 border border-border-default border-l-[3px] border-l-ai-accent dark:border-l-(--color-purple-400) rounded-md bg-surface-base overflow-hidden"
+        class="thread-system mb-4 border border-border-default border-l-[3px] border-l-ai-accent dark:border-l-(--color-purple-400) rounded-default bg-surface-base overflow-hidden"
       >
         <div
           class="thread-system__head flex items-center gap-[0.625rem] py-2 px-3 cursor-pointer transition-all duration-120 hover:bg-[color-mix(in_srgb,var(--color-ai-accent)_4%,transparent)] dark:hover:bg-[color-mix(in_srgb,var(--color-ai-accent)_8%,transparent)]"
           @click="showSystemFull = !showSystemFull"
         >
-          <span class="thread-system__badge inline-flex items-center py-[0.15rem] px-2 bg-[color-mix(in_srgb,var(--color-ai-accent)_10%,transparent)] dark:bg-[color-mix(in_srgb,var(--color-ai-accent)_18%,transparent)] text-ai-accent dark:text-(--color-purple-400) rounded-sm text-2xs font-semibold tracking-[0.02rem] shrink-0">
+          <span class="thread-system__badge inline-flex items-center py-[0.15rem] px-2 bg-[color-mix(in_srgb,var(--color-ai-accent)_10%,transparent)] dark:bg-[color-mix(in_srgb,var(--color-ai-accent)_18%,transparent)] text-ai-accent dark:text-(--color-purple-400) rounded-default text-2xs font-semibold tracking-[0.02rem] shrink-0">
             <OIcon name="settings" size="xs" class="mr-1" />
             System
           </span>
@@ -142,7 +142,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              same session — these are answered in earlier traces. -->
         <div
           v-if="group.historicalUserCount > 0"
-          class="thread-prior flex items-center gap-[0.5rem] px-[0.75rem] py-[0.4rem] mb-[0.5rem] rounded-sm border border-dashed border-border-default text-xs text-text-muted"
+          class="thread-prior flex items-center gap-[0.5rem] px-[0.75rem] py-[0.4rem] mb-[0.5rem] rounded-default border border-dashed border-border-default text-xs text-text-muted"
         >
           <span>↶</span>
           <span>
@@ -155,7 +155,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- This group's user query. -->
         <div
           v-if="group.userQuery"
-          class="thread-bubble thread-bubble--user thread-user-row flex items-start gap-[0.625rem] mb-4 ml-auto max-w-[40%] w-fit py-[0.625rem] px-[0.875rem] rounded-lg text-sm leading-normal whitespace-pre-wrap break-words bg-[image:var(--color-chat-bubble-user)] border border-(--color-indigo-100) dark:border-[color-mix(in_srgb,var(--color-indigo-900)_55%,var(--color-grey-700))] text-text-body shadow-[0_0.0625rem_0.125rem_color-mix(in_srgb,var(--color-black)_6%,transparent)] dark:shadow-[0_0.0625rem_0.125rem_color-mix(in_srgb,var(--color-white)_8%,transparent)]"
+          class="thread-bubble thread-bubble--user thread-user-row flex items-start gap-[0.625rem] mb-4 ml-auto max-w-[40%] w-fit py-[0.625rem] px-[0.875rem] rounded-default text-sm leading-normal whitespace-pre-wrap break-words bg-[image:var(--color-chat-bubble-user)] border border-(--color-indigo-100) dark:border-[color-mix(in_srgb,var(--color-indigo-900)_55%,var(--color-grey-700))] text-text-body shadow-[0_0.0625rem_0.125rem_color-mix(in_srgb,var(--color-black)_6%,transparent)] dark:shadow-[0_0.0625rem_0.125rem_color-mix(in_srgb,var(--color-white)_8%,transparent)]"
         >
           <div
             class="thread-user-avatar w-6 h-6 rounded-full bg-[image:var(--color-gradient-ai)] dark:bg-[image:linear-gradient(135deg,var(--color-indigo-600)_0%,var(--color-indigo-500)_100%)] text-white inline-flex items-center justify-content-center text-2xs font-bold shrink-0 cursor-default"
@@ -188,7 +188,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             v-for="(u, uIdx) in turn.followupUsers"
             :key="`u-${uIdx}`"
-            class="thread-bubble thread-bubble--user thread-bubble--user-followup py-[0.625rem] px-[0.875rem] rounded-lg text-sm leading-normal whitespace-pre-wrap break-words max-w-[min(40rem,75%)] bg-[image:var(--color-chat-bubble-user)] border border-(--color-indigo-100) dark:border-[color-mix(in_srgb,var(--color-indigo-900)_55%,var(--color-grey-700))] text-text-body shadow-[0_0.0625rem_0.125rem_color-mix(in_srgb,var(--color-black)_6%,transparent)] dark:shadow-[0_0.0625rem_0.125rem_color-mix(in_srgb,var(--color-white)_8%,transparent)]"
+            class="thread-bubble thread-bubble--user thread-bubble--user-followup py-[0.625rem] px-[0.875rem] rounded-default text-sm leading-normal whitespace-pre-wrap break-words max-w-[min(40rem,75%)] bg-[image:var(--color-chat-bubble-user)] border border-(--color-indigo-100) dark:border-[color-mix(in_srgb,var(--color-indigo-900)_55%,var(--color-grey-700))] text-text-body shadow-[0_0.0625rem_0.125rem_color-mix(in_srgb,var(--color-black)_6%,transparent)] dark:shadow-[0_0.0625rem_0.125rem_color-mix(in_srgb,var(--color-white)_8%,transparent)]"
           >
             {{ u.content }}
           </div>
@@ -207,42 +207,42 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             v-for="(msg, mIdx) in turn.assistant"
             :key="`a-${mIdx}`"
-            class="thread-bubble thread-bubble--assistant markdown-body self-start bg-surface-base border border-border-default text-text-body max-w-full shadow-[0_0.0625rem_0.125rem_color-mix(in_srgb,var(--color-black)_6%,transparent)] dark:shadow-[0_0.0625rem_0.125rem_color-mix(in_srgb,var(--color-white)_8%,transparent)] py-[0.625rem] px-[0.875rem] rounded-lg text-sm leading-normal break-words whitespace-normal"
+            class="thread-bubble thread-bubble--assistant markdown-body self-start bg-surface-base border border-border-default text-text-body max-w-full shadow-[0_0.0625rem_0.125rem_color-mix(in_srgb,var(--color-black)_6%,transparent)] dark:shadow-[0_0.0625rem_0.125rem_color-mix(in_srgb,var(--color-white)_8%,transparent)] py-[0.625rem] px-[0.875rem] rounded-default text-sm leading-normal break-words whitespace-normal"
             v-html="renderMarkdown(msg.content)"
           />
 
 
           <!-- Footer. -->
           <div class="thread-turn__footer flex items-center flex-wrap gap-[0.35rem] mt-2 pt-2 border-t border-dashed border-border-default text-xs text-text-secondary">
-            <span class="thread-metric inline-flex items-center gap-1 py-[0.18rem] px-2 rounded-md bg-surface-subtle border border-border-default text-text-secondary text-2xs leading-none whitespace-nowrap shrink-0" :title="`Started at ${formatTime(turn.span.start_time)}`">
+            <span class="thread-metric inline-flex items-center gap-1 py-[0.18rem] px-2 rounded-default bg-surface-subtle border border-border-default text-text-secondary text-2xs leading-none whitespace-nowrap shrink-0" :title="`Started at ${formatTime(turn.span.start_time)}`">
               <OIcon name="schedule" size="xs" />
               {{ formatTime(turn.span.start_time) }}
             </span>
-            <span class="thread-metric thread-metric--model inline-flex items-center gap-1 py-[0.18rem] px-2 rounded-md text-ai-accent dark:text-(--color-purple-400) bg-[color-mix(in_srgb,var(--color-ai-accent)_6%,transparent)] dark:bg-[color-mix(in_srgb,var(--color-ai-accent)_12%,transparent)] border border-[color-mix(in_srgb,var(--color-ai-accent)_20%,transparent)] dark:border-[color-mix(in_srgb,var(--color-ai-accent)_30%,transparent)] font-medium max-w-50 overflow-hidden text-ellipsis text-2xs leading-none whitespace-nowrap shrink-0" :title="getModel(turn.span)">
+            <span class="thread-metric thread-metric--model inline-flex items-center gap-1 py-[0.18rem] px-2 rounded-default text-ai-accent dark:text-(--color-purple-400) bg-[color-mix(in_srgb,var(--color-ai-accent)_6%,transparent)] dark:bg-[color-mix(in_srgb,var(--color-ai-accent)_12%,transparent)] border border-[color-mix(in_srgb,var(--color-ai-accent)_20%,transparent)] dark:border-[color-mix(in_srgb,var(--color-ai-accent)_30%,transparent)] font-medium max-w-50 overflow-hidden text-ellipsis text-2xs leading-none whitespace-nowrap shrink-0" :title="getModel(turn.span)">
               <OIcon name="bolt" size="xs" />
               {{ getModel(turn.span) || "unknown" }}
             </span>
-            <span class="thread-metric inline-flex items-center gap-1 py-[0.18rem] px-2 rounded-md bg-surface-subtle border border-border-default text-text-secondary text-2xs leading-none whitespace-nowrap shrink-0" title="Duration">
+            <span class="thread-metric inline-flex items-center gap-1 py-[0.18rem] px-2 rounded-default bg-surface-subtle border border-border-default text-text-secondary text-2xs leading-none whitespace-nowrap shrink-0" title="Duration">
               <OIcon name="timer" size="xs" />
               {{ formatDuration(turn.span.duration) }}
             </span>
-            <span class="thread-metric inline-flex items-center gap-1 py-[0.18rem] px-2 rounded-md bg-surface-subtle border border-border-default text-text-secondary text-2xs leading-none whitespace-nowrap shrink-0" title="Tokens">
+            <span class="thread-metric inline-flex items-center gap-1 py-[0.18rem] px-2 rounded-default bg-surface-subtle border border-border-default text-text-secondary text-2xs leading-none whitespace-nowrap shrink-0" title="Tokens">
               <OIcon name="data-usage" size="xs" />
               {{ formatNumber(getTokens(turn.span)) }} tokens
             </span>
-            <span class="thread-metric inline-flex items-center gap-1 py-[0.18rem] px-2 rounded-md bg-surface-subtle border border-border-default text-text-secondary text-2xs leading-none whitespace-nowrap shrink-0" title="Cost">
+            <span class="thread-metric inline-flex items-center gap-1 py-[0.18rem] px-2 rounded-default bg-surface-subtle border border-border-default text-text-secondary text-2xs leading-none whitespace-nowrap shrink-0" title="Cost">
               <OIcon name="payments" size="xs" />
               {{ formatCost(getCost(turn.span)) }}
             </span>
             <span
               v-if="turn.span.span_status === 'ERROR'"
-              class="thread-metric thread-metric--error inline-flex items-center gap-1 py-[0.18rem] px-2 rounded-md text-error-600 dark:text-error-400 bg-[color-mix(in_srgb,var(--color-error-600)_8%,transparent)] dark:bg-[color-mix(in_srgb,var(--color-error-400)_12%,transparent)] border border-[color-mix(in_srgb,var(--color-error-600)_25%,transparent)] dark:border-[color-mix(in_srgb,var(--color-error-400)_30%,transparent)] font-medium text-2xs leading-none whitespace-nowrap shrink-0"
+              class="thread-metric thread-metric--error inline-flex items-center gap-1 py-[0.18rem] px-2 rounded-default text-error-600 dark:text-error-400 bg-[color-mix(in_srgb,var(--color-error-600)_8%,transparent)] dark:bg-[color-mix(in_srgb,var(--color-error-400)_12%,transparent)] border border-[color-mix(in_srgb,var(--color-error-600)_25%,transparent)] dark:border-[color-mix(in_srgb,var(--color-error-400)_30%,transparent)] font-medium text-2xs leading-none whitespace-nowrap shrink-0"
             >
               <OIcon name="error-outline" size="xs" />
               Error
             </span>
             <button
-              class="thread-turn__view-span ml-auto inline-flex items-center gap-[0.2rem] py-[0.2rem] px-[0.55rem] rounded-md text-theme-accent text-xs font-medium bg-transparent border border-transparent cursor-pointer transition-all duration-120 shrink-0 hover:bg-[color-mix(in_srgb,var(--color-blue-500)_8%,transparent)] hover:border-[color-mix(in_srgb,var(--color-blue-500)_25%,transparent)] dark:hover:bg-[color-mix(in_srgb,var(--color-blue-400)_12%,transparent)] dark:hover:border-[color-mix(in_srgb,var(--color-blue-400)_30%,transparent)]"
+              class="thread-turn__view-span ml-auto inline-flex items-center gap-[0.2rem] py-[0.2rem] px-[0.55rem] rounded-default text-theme-accent text-xs font-medium bg-transparent border border-transparent cursor-pointer transition-all duration-120 shrink-0 hover:bg-[color-mix(in_srgb,var(--color-blue-500)_8%,transparent)] hover:border-[color-mix(in_srgb,var(--color-blue-500)_25%,transparent)] dark:hover:bg-[color-mix(in_srgb,var(--color-blue-400)_12%,transparent)] dark:hover:border-[color-mix(in_srgb,var(--color-blue-400)_30%,transparent)]"
               @click="emit('span-selected', turn.span.span_id)"
             >
               View span

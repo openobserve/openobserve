@@ -373,7 +373,7 @@ class="h-full overflow-y-auto">
                     </OButton>
                   </div>
                 </div>
-                <div class="llm-content-box flex-1 h-full max-h-[calc(100%-1.625rem)] border border-solid border-card-glass-border rounded-sm p-3 overflow-y-auto overflow-x-hidden bg-code-bg">
+                <div class="llm-content-box flex-1 h-full max-h-[calc(100%-1.625rem)] border border-solid border-card-glass-border rounded-default p-3 overflow-y-auto overflow-x-hidden bg-code-bg">
                   <!-- System Instructions (when available) -->
                   <div v-if="parsedSystemInstructions" class="mb-3">
                     <OCollapsible
@@ -440,7 +440,7 @@ class="h-full overflow-y-auto">
                     </OButton>
                   </div>
                 </div>
-                <div class="llm-content-box flex-1 h-full max-h-[calc(100%-1.625rem)] border border-solid border-card-glass-border rounded-sm p-3 overflow-y-auto overflow-x-hidden bg-code-bg">
+                <div class="llm-content-box flex-1 h-full max-h-[calc(100%-1.625rem)] border border-solid border-card-glass-border rounded-default p-3 overflow-y-auto overflow-x-hidden bg-code-bg">
                   <div
                     v-if="!hasContent(span.gen_ai_output_messages)"
                     class="text-text-secondary italic text-center p-8 text-sm"
@@ -467,7 +467,7 @@ class="h-full overflow-y-auto">
               label="Model Parameters"
               class="mt-3"
             >
-              <pre class="bg-code-bg p-4 rounded-sm overflow-x-auto font-mono text-xs m-0">{{
+              <pre class="bg-code-bg p-4 rounded-default overflow-x-auto font-mono text-xs m-0">{{
                 formatModelParams(span.llm_request_parameters)
               }}</pre>
             </OCollapsible>
@@ -480,7 +480,7 @@ class="h-full overflow-y-auto">
         >
           <!-- View mode toggle toolbar -->
           <div class="flex items-center justify-start pb-1.5! h-fit!">
-            <OToggleGroup v-model="attributesViewMode" class="rounded-sm!">
+            <OToggleGroup v-model="attributesViewMode" class="rounded-default!">
               <OToggleGroupItem value="json"
 size="xs"
 class="h-5! text-xs!">
@@ -618,7 +618,7 @@ class="h-5! text-xs!">
             </div>
             <!-- TenstackTable for events -->
             <div
-              class="flex-1 traces-events-table-container overflow-hidden tab-content-dynamic-height border-1 border-solid border-card-glass-border rounded-sm"
+              class="flex-1 traces-events-table-container overflow-hidden tab-content-dynamic-height border-1 border-solid border-card-glass-border rounded-default"
               :class="
                 isLLMSpan && llmMetrics && span.gen_ai_response_model
                   ? '[height:calc(100vh-312px)]'

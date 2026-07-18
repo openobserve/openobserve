@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="rounded-md px-4 pt-3" style="min-height: inherit; overflow: auto">
+  <div class="rounded-default px-4 pt-3" style="min-height: inherit; overflow: auto">
     <!-- Page title is supplied by the parent Billing.vue AppPageHeader; no local title here. -->
     <!-- Managed billing empty state for child orgs -->
     <div
@@ -72,8 +72,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <trial-period class="mb-3" currentPage="billing"></trial-period>
     <!-- AI Credits card -->
     <div v-if="aiUsage" class="grid grid-cols-1 gap-4 w-full mb-4">
-      <div class="bg-card-glass-bg border border-card-glass-border rounded-lg p-4 shadow-none transition-shadow duration-200 hover:shadow-[0_1px_3px_rgba(0,0,0,0.1)] dark:bg-surface-base dark:border-border-default">
-        <div class="min-h-full rounded-lg transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] text-center flex flex-col justify-between">
+      <div class="bg-card-glass-bg border border-card-glass-border rounded-default p-4 shadow-none transition-shadow duration-200 hover:shadow-[0_1px_3px_rgba(0,0,0,0.1)] dark:bg-surface-base dark:border-border-default">
+        <div class="min-h-full rounded-default transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] text-center flex flex-col justify-between">
           <div class="flex flex-col justify-between">
             <div class="flex justify-between items-center">
               <div class="text-base font-medium leading-5 text-text-heading text-left">{{ t("billing.aiCredits") }}</div>

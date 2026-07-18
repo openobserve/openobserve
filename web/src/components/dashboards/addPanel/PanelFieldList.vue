@@ -71,7 +71,7 @@
       <!-- Group header -->
       <template #group-header="{ row }">
         <div
-          class="h-7! w-full flex justify-between items-center rounded-sm font-semibold pl-2 pr-1 text-xs cursor-default select-none bg-section-header-bg text-text-secondary"
+          class="h-7! w-full flex justify-between items-center rounded-default font-semibold pl-2 pr-1 text-xs cursor-default select-none bg-section-header-bg text-text-secondary"
           :title="row.groupName"
         >
           <div class="flex-1 min-w-0">{{ row.groupName }}</div>
@@ -362,7 +362,7 @@
           >
             <OSkeleton
               type="rect"
-              class="w-[0.875rem] h-[0.875rem] rounded-sm flex-shrink-0"
+              class="w-[0.875rem] h-[0.875rem] rounded-default flex-shrink-0"
             />
             <OSkeleton type="text" class="flex-1" />
           </div>

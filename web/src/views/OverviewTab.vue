@@ -51,7 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <button class="text-xs font-medium text-primary-600 bg-none border-none p-0 cursor-pointer whitespace-nowrap transition-opacity duration-150 opacity-80 hover:opacity-100 hover:underline" @click="goToIncidentList">{{ t('overview.viewAll') }} →</button>
       </div>
-      <div class="flex flex-col border border-[0.0625em] border-border-default rounded-md overflow-hidden">
+      <div class="flex flex-col border border-[0.0625em] border-border-default rounded-default overflow-hidden">
         <div
           v-for="inc in incidents"
           :key="inc.id"
@@ -117,7 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div class="flex items-stretch gap-2">
         <button
-          class="shrink-0 w-6 flex items-center justify-center cursor-pointer border border-[0.0625em] border-border-default rounded-lg bg-surface-base text-text-secondary shadow-[0_1px_3px_rgba(0,0,0,0.06)] transition-all duration-150 hover:not-disabled:bg-table-row-hover-bg hover:not-disabled:text-text-body hover:not-disabled:shadow-[0_2px_6px_rgba(0,0,0,0.12)] hover:not-disabled:-translate-y-px active:not-disabled:translate-y-0 active:not-disabled:shadow-[0_1px_2px_rgba(0,0,0,0.08)] disabled:opacity-25 disabled:cursor-not-allowed disabled:shadow-none"
+          class="shrink-0 w-6 flex items-center justify-center cursor-pointer border border-[0.0625em] border-border-default rounded-default bg-surface-base text-text-secondary shadow-[0_1px_3px_rgba(0,0,0,0.06)] transition-all duration-150 hover:not-disabled:bg-table-row-hover-bg hover:not-disabled:text-text-body hover:not-disabled:shadow-[0_2px_6px_rgba(0,0,0,0.12)] hover:not-disabled:-translate-y-px active:not-disabled:translate-y-0 active:not-disabled:shadow-[0_1px_2px_rgba(0,0,0,0.08)] disabled:opacity-25 disabled:cursor-not-allowed disabled:shadow-none"
           :disabled="!svcScrollCanLeft"
           @click="scrollServices(-1)"
         >
@@ -129,7 +129,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           v-for="svc in services"
           :key="svc.id"
-          class="py-3 px-[0.875rem] rounded-md border border-[0.0625em] border-border-default bg-surface-base transition-[background] duration-150 basis-40 grow-0 shrink-0 min-w-40 max-w-40 cursor-pointer hover:bg-table-row-hover-bg"
+          class="py-3 px-[0.875rem] rounded-default border border-[0.0625em] border-border-default bg-surface-base transition-[background] duration-150 basis-40 grow-0 shrink-0 min-w-40 max-w-40 cursor-pointer hover:bg-table-row-hover-bg"
           :class="[serviceCardClass(svc), { 'bg-table-row-hover-bg outline outline-[0.125em] outline-primary-600 [outline-offset:-0.0625em]': selectedService?.id === svc.id && servicePanelVisible }]"
           @click="openServicePanel(svc)"
         >
@@ -170,7 +170,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         </div>
         <button
-          class="shrink-0 w-6 flex items-center justify-center cursor-pointer border border-[0.0625em] border-border-default rounded-lg bg-surface-base text-text-secondary shadow-[0_1px_3px_rgba(0,0,0,0.06)] transition-all duration-150 hover:not-disabled:bg-table-row-hover-bg hover:not-disabled:text-text-body hover:not-disabled:shadow-[0_2px_6px_rgba(0,0,0,0.12)] hover:not-disabled:-translate-y-px active:not-disabled:translate-y-0 active:not-disabled:shadow-[0_1px_2px_rgba(0,0,0,0.08)] disabled:opacity-25 disabled:cursor-not-allowed disabled:shadow-none"
+          class="shrink-0 w-6 flex items-center justify-center cursor-pointer border border-[0.0625em] border-border-default rounded-default bg-surface-base text-text-secondary shadow-[0_1px_3px_rgba(0,0,0,0.06)] transition-all duration-150 hover:not-disabled:bg-table-row-hover-bg hover:not-disabled:text-text-body hover:not-disabled:shadow-[0_2px_6px_rgba(0,0,0,0.12)] hover:not-disabled:-translate-y-px active:not-disabled:translate-y-0 active:not-disabled:shadow-[0_1px_2px_rgba(0,0,0,0.08)] disabled:opacity-25 disabled:cursor-not-allowed disabled:shadow-none"
           :disabled="!svcScrollCanRight"
           @click="scrollServices(1)"
         >
@@ -217,7 +217,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           v-for="item in anomalies"
           :key="item.id"
-          class="group flex items-center gap-3 py-[0.625rem] px-[0.875rem] rounded-md border border-[0.0625em] border-border-default bg-surface-base transition-[background] duration-150 hover:bg-table-row-hover-bg"
+          class="group flex items-center gap-3 py-[0.625rem] px-[0.875rem] rounded-default border border-[0.0625em] border-border-default bg-surface-base transition-[background] duration-150 hover:bg-table-row-hover-bg"
           :class="severityRowClass(item.severity)"
         >
           <span class="shrink-0 flex items-center" :class="severityIconClass(item.severity)">
@@ -259,7 +259,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <button class="text-xs font-medium text-primary-600 bg-none border-none p-0 cursor-pointer whitespace-nowrap transition-opacity duration-150 opacity-80 hover:opacity-100 hover:underline" @click="goToAlertList">{{ t('overview.viewAll') }} →</button>
       </div>
-      <div class="flex flex-col gap-0 border border-[0.0625em] border-border-default rounded-md overflow-hidden bg-surface-base">
+      <div class="flex flex-col gap-0 border border-[0.0625em] border-border-default rounded-default overflow-hidden bg-surface-base">
         <div
           v-for="ev in recentEvents"
           :key="ev.id"
@@ -293,8 +293,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #description>{{ t('overview.allClearDesc') }}</template>
       <template #actions>
         <!-- View alerts -->
-        <button v-if="showAlertsCard" type="button" class="focus-visible:shadow-[0_0_0_0.125rem_color-mix(in_srgb,var(--color-primary-500)_40%,transparent)] group relative flex items-center gap-3 flex-1 basis-56 min-w-0 max-w-72 min-h-16 py-[0.625rem] pr-[0.875rem] pl-3 rounded-xl border border-border-default bg-surface-base text-left cursor-pointer transition-[color,background-color,border-color,box-shadow] duration-150 outline-none hover:shadow-md hover:border-primary-400 hover:bg-tabs-hover-bg" data-test="overview-empty-alerts-card" @click="goToAlertList">
-          <span class="inline-flex items-center justify-center shrink-0 w-10 h-10 rounded-lg transition-[background-color,color] duration-150 bg-warning-50 text-warning-700 group-hover:bg-primary-600 group-hover:text-text-inverse">
+        <button v-if="showAlertsCard" type="button" class="focus-visible:shadow-[0_0_0_0.125rem_color-mix(in_srgb,var(--color-primary-500)_40%,transparent)] group relative flex items-center gap-3 flex-1 basis-56 min-w-0 max-w-72 min-h-16 py-[0.625rem] pr-[0.875rem] pl-3 rounded-default border border-border-default bg-surface-base text-left cursor-pointer transition-[color,background-color,border-color,box-shadow] duration-150 outline-none hover:shadow-md hover:border-primary-400 hover:bg-tabs-hover-bg" data-test="overview-empty-alerts-card" @click="goToAlertList">
+          <span class="inline-flex items-center justify-center shrink-0 w-10 h-10 rounded-default transition-[background-color,color] duration-150 bg-warning-50 text-warning-700 group-hover:bg-primary-600 group-hover:text-text-inverse">
             <OIcon name="notifications" size="md" />
           </span>
           <span class="flex-1 min-w-0 flex flex-col gap-[0.125rem]">
@@ -304,8 +304,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OIcon name="chevron-right" size="sm" class="shrink-0 text-text-disabled transition-[transform,color] duration-150 group-hover:translate-x-[0.125rem] group-hover:text-primary-600" />
         </button>
         <!-- Explore logs -->
-        <button v-if="showLogsCard" type="button" class="focus-visible:shadow-[0_0_0_0.125rem_color-mix(in_srgb,var(--color-primary-500)_40%,transparent)] group relative flex items-center gap-3 flex-1 basis-56 min-w-0 max-w-72 min-h-16 py-[0.625rem] pr-[0.875rem] pl-3 rounded-xl border border-border-default bg-surface-base text-left cursor-pointer transition-[color,background-color,border-color,box-shadow] duration-150 outline-none hover:shadow-md hover:border-primary-400 hover:bg-tabs-hover-bg" data-test="overview-empty-logs-card" @click="goToLogs">
-          <span class="inline-flex items-center justify-center shrink-0 w-10 h-10 rounded-lg transition-[background-color,color] duration-150 bg-status-info-bg text-status-info-text group-hover:bg-primary-600 group-hover:text-text-inverse">
+        <button v-if="showLogsCard" type="button" class="focus-visible:shadow-[0_0_0_0.125rem_color-mix(in_srgb,var(--color-primary-500)_40%,transparent)] group relative flex items-center gap-3 flex-1 basis-56 min-w-0 max-w-72 min-h-16 py-[0.625rem] pr-[0.875rem] pl-3 rounded-default border border-border-default bg-surface-base text-left cursor-pointer transition-[color,background-color,border-color,box-shadow] duration-150 outline-none hover:shadow-md hover:border-primary-400 hover:bg-tabs-hover-bg" data-test="overview-empty-logs-card" @click="goToLogs">
+          <span class="inline-flex items-center justify-center shrink-0 w-10 h-10 rounded-default transition-[background-color,color] duration-150 bg-status-info-bg text-status-info-text group-hover:bg-primary-600 group-hover:text-text-inverse">
             <OIcon name="search" size="md" />
           </span>
           <span class="flex-1 min-w-0 flex flex-col gap-[0.125rem]">
@@ -315,8 +315,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OIcon name="chevron-right" size="sm" class="shrink-0 text-text-disabled transition-[transform,color] duration-150 group-hover:translate-x-[0.125rem] group-hover:text-primary-600" />
         </button>
         <!-- Explore traces -->
-        <button v-if="showTracesCard" type="button" class="focus-visible:shadow-[0_0_0_0.125rem_color-mix(in_srgb,var(--color-primary-500)_40%,transparent)] group relative flex items-center gap-3 flex-1 basis-56 min-w-0 max-w-72 min-h-16 py-[0.625rem] pr-[0.875rem] pl-3 rounded-xl border border-border-default bg-surface-base text-left cursor-pointer transition-[color,background-color,border-color,box-shadow] duration-150 outline-none hover:shadow-md hover:border-primary-400 hover:bg-tabs-hover-bg" data-test="overview-empty-traces-card" @click="goToTraces">
-          <span class="inline-flex items-center justify-center shrink-0 w-10 h-10 rounded-lg transition-[background-color,color] duration-150 bg-status-info-bg text-status-info-text group-hover:bg-primary-600 group-hover:text-text-inverse">
+        <button v-if="showTracesCard" type="button" class="focus-visible:shadow-[0_0_0_0.125rem_color-mix(in_srgb,var(--color-primary-500)_40%,transparent)] group relative flex items-center gap-3 flex-1 basis-56 min-w-0 max-w-72 min-h-16 py-[0.625rem] pr-[0.875rem] pl-3 rounded-default border border-border-default bg-surface-base text-left cursor-pointer transition-[color,background-color,border-color,box-shadow] duration-150 outline-none hover:shadow-md hover:border-primary-400 hover:bg-tabs-hover-bg" data-test="overview-empty-traces-card" @click="goToTraces">
+          <span class="inline-flex items-center justify-center shrink-0 w-10 h-10 rounded-default transition-[background-color,color] duration-150 bg-status-info-bg text-status-info-text group-hover:bg-primary-600 group-hover:text-text-inverse">
             <OIcon name="account-tree" size="md" />
           </span>
           <span class="flex-1 min-w-0 flex flex-col gap-[0.125rem]">

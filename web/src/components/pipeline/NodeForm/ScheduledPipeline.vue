@@ -607,7 +607,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                suppresses its inline message; we surface the schema
                                error in the full-width sibling below (R3-timed). -->
                           <div
-                            class="flex items-stretch border border-card-glass-border rounded-md w-fit overflow-hidden"
+                            class="flex items-stretch border border-card-glass-border rounded-default w-fit overflow-hidden"
                           >
                             <OFormInput
                               data-test="scheduled-pipeline-frequency-input-field"
@@ -691,7 +691,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                              below the bordered control instead of inside the
                              7.5rem field, where it would wrap. -->
                         <div
-                          class="flex items-stretch border border-card-glass-border rounded-md w-fit overflow-hidden"
+                          class="flex items-stretch border border-card-glass-border rounded-default w-fit overflow-hidden"
                         >
                           <OFormInput
                             data-test="scheduled-pipeline-period-input"
@@ -755,7 +755,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </OIcon>
                       </div>
                       <div
-                        class="flex items-stretch border border-card-glass-border rounded-md w-fit overflow-hidden"
+                        class="flex items-stretch border border-card-glass-border rounded-default w-fit overflow-hidden"
                       >
                         <OFormInput
                           data-test="scheduled-pipeline-delay-input"

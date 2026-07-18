@@ -404,7 +404,7 @@ function onChildMouseenter(event: MouseEvent) {
         :data-test="`nav-group-flyout-${groupKey}`"
         role="menu"
         :aria-label="title"
-        class="nav-group-flyout min-w-52 p-1 rounded-lg border border-dropdown-border bg-dropdown-bg shadow-md"
+        class="nav-group-flyout min-w-52 p-1 rounded-default border border-dropdown-border bg-dropdown-bg shadow-md"
         :style="flyoutStyle"
         @mouseenter="clearTimers"
         @mouseleave="scheduleClose"
@@ -429,7 +429,7 @@ function onChildMouseenter(event: MouseEvent) {
             :data-test="`nav-group-item-${row.child.name}`"
             role="menuitem"
             :to="childTo(row.child)"
-            class="nav-group-item flex items-center gap-2.5 px-3 py-1.5 rounded-md text-sm [text-decoration:none]! cursor-pointer select-none outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-primary-500"
+            class="nav-group-item flex items-center gap-2.5 px-3 py-1.5 rounded-default text-sm [text-decoration:none]! cursor-pointer select-none outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-primary-500"
             :class="[
               flyoutTextClass,
               isChildActive(row.child)

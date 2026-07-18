@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="rounded-md flex items-center justify-center min-h-[inherit] bg-surface-base">
+  <div class="rounded-default flex items-center justify-center min-h-[inherit] bg-surface-base">
     <div class="flex flex-col items-center text-center max-w-md p-8">
       <div class="mb-8">
         <svg

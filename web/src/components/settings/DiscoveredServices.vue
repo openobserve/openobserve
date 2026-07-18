@@ -68,7 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div v-else class="flex flex-col flex-1 min-h-0 pt-3">
       <!-- Info banner -->
       <div
-        class="info-banner shrink-0 mb-3 mx-4 rounded-lg flex items-center gap-3 py-3 px-4 bg-banner-info-bg border border-banner-info-border"
+        class="info-banner shrink-0 mb-3 mx-4 rounded-default flex items-center gap-3 py-3 px-4 bg-banner-info-bg border border-banner-info-border"
       >
         <OIcon
           name="info"
@@ -80,7 +80,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           {{ t("settings.correlation.discoveredServicesDescription") }}
           <a
-            class="cursor-pointer inline-block mx-1 px-2 py-0.5 rounded-sm text-xs font-semibold no-underline align-middle border border-text-link text-text-link bg-badge-blue-soft-bg transition-[background] duration-150 hover:bg-[color-mix(in_srgb,var(--color-badge-blue-ol-border)_18%,transparent)]"
+            class="cursor-pointer inline-block mx-1 px-2 py-0.5 rounded-default text-xs font-semibold no-underline align-middle border border-text-link text-text-link bg-badge-blue-soft-bg transition-[background] duration-150 hover:bg-[color-mix(in_srgb,var(--color-badge-blue-ol-border)_18%,transparent)]"
             @click.prevent="$emit('navigate-to-configuration')"
             >{{ t("settings.correlation.goToConfiguration") }}</a
           >
@@ -211,7 +211,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </OTag>
               </div>
               <div v-else class="flex items-center gap-2 flex-wrap">
-                <span class="set-id-badge inline-flex items-center py-[0.0625rem] px-2 rounded-lg text-2xs font-semibold border whitespace-nowrap shrink-0 bg-badge-purple-soft-bg text-badge-purple-soft-text border-badge-purple-ol-border">{{ row.set_id }}</span>
+                <span class="set-id-badge inline-flex items-center py-[0.0625rem] px-2 rounded-default text-2xs font-semibold border whitespace-nowrap shrink-0 bg-badge-purple-soft-bg text-badge-purple-soft-text border-badge-purple-ol-border">{{ row.set_id }}</span>
                 <ODimensionChip
                   v-for="[key, value] in Object.entries(
                     row.disambiguation,
@@ -354,7 +354,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="service-side-panel"
     >
       <template #header-right>
-        <span class="set-id-badge inline-flex items-center py-[0.0625rem] px-2 rounded-lg text-2xs font-semibold border whitespace-nowrap shrink-0 bg-badge-purple-soft-bg text-badge-purple-soft-text border-badge-purple-ol-border">{{ selectedService?.set_id }}</span>
+        <span class="set-id-badge inline-flex items-center py-[0.0625rem] px-2 rounded-default text-2xs font-semibold border whitespace-nowrap shrink-0 bg-badge-purple-soft-bg text-badge-purple-soft-text border-badge-purple-ol-border">{{ selectedService?.set_id }}</span>
       </template>
 
       <!-- Default set warning banner -->
@@ -421,7 +421,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <span
                     v-for="stream in selectedService.logs_streams"
                     :key="stream"
-                    class="stream-name-badge inline-flex items-center py-[0.0625rem] px-[0.4375rem] rounded-sm text-2xs font-mono border whitespace-nowrap bg-surface-subtle text-text-body border-border-default"
+                    class="stream-name-badge inline-flex items-center py-[0.0625rem] px-[0.4375rem] rounded-default text-2xs font-mono border whitespace-nowrap bg-surface-subtle text-text-body border-border-default"
                     >{{ stream }}</span
                   >
                 </div>
@@ -444,7 +444,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <span
                     v-for="stream in selectedService.traces_streams"
                     :key="stream"
-                    class="stream-name-badge inline-flex items-center py-[0.0625rem] px-[0.4375rem] rounded-sm text-2xs font-mono border whitespace-nowrap bg-surface-subtle text-text-body border-border-default"
+                    class="stream-name-badge inline-flex items-center py-[0.0625rem] px-[0.4375rem] rounded-default text-2xs font-mono border whitespace-nowrap bg-surface-subtle text-text-body border-border-default"
                     >{{ stream }}</span
                   >
                 </div>
@@ -467,7 +467,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <span
                     v-for="stream in selectedService.metrics_streams"
                     :key="stream"
-                    class="stream-name-badge inline-flex items-center py-[0.0625rem] px-[0.4375rem] rounded-sm text-2xs font-mono border whitespace-nowrap bg-surface-subtle text-text-body border-border-default"
+                    class="stream-name-badge inline-flex items-center py-[0.0625rem] px-[0.4375rem] rounded-default text-2xs font-mono border whitespace-nowrap bg-surface-subtle text-text-body border-border-default"
                     >{{ stream }}</span
                   >
                 </div>
@@ -494,13 +494,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               ).sort(([a], [b]) => a.localeCompare(b))"
               :key="raw"
             >
-              <span class="mapping-key font-mono text-2xs py-[0.0625rem] px-[0.375rem] rounded-sm border whitespace-nowrap bg-surface-subtle text-text-body border-border-default">{{ raw }}</span>
+              <span class="mapping-key font-mono text-2xs py-[0.0625rem] px-[0.375rem] rounded-default border whitespace-nowrap bg-surface-subtle text-text-body border-border-default">{{ raw }}</span>
               <OIcon
                 name="arrow-forward"
                 size="xs"
                 class="text-text-muted justify-self-center"
               />
-              <span class="mapping-val font-mono text-2xs py-[0.0625rem] px-[0.375rem] rounded-sm border whitespace-nowrap bg-badge-success-soft-bg text-badge-success-soft-text border-badge-success-ol-border">{{ mapped }}</span>
+              <span class="mapping-val font-mono text-2xs py-[0.0625rem] px-[0.375rem] rounded-default border whitespace-nowrap bg-badge-success-soft-bg text-badge-success-soft-text border-badge-success-ol-border">{{ mapped }}</span>
             </template>
           </div>
         </div>

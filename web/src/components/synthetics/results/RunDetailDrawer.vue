@@ -142,15 +142,15 @@ function toggleSteps(executionId: string) {
       <!-- ── Loading skeleton ── -->
       <div v-if="loading" class="flex flex-col gap-3 p-5">
         <div class="flex gap-6 mb-2">
-          <div class="bg-[var(--color-border-default)] animate-pulse h-10 w-28 rounded-sm" />
-          <div class="bg-[var(--color-border-default)] animate-pulse h-10 w-20 rounded-sm" />
-          <div class="bg-[var(--color-border-default)] animate-pulse h-10 w-40 rounded-sm" />
+          <div class="bg-[var(--color-border-default)] animate-pulse h-10 w-28 rounded-default" />
+          <div class="bg-[var(--color-border-default)] animate-pulse h-10 w-20 rounded-default" />
+          <div class="bg-[var(--color-border-default)] animate-pulse h-10 w-40 rounded-default" />
         </div>
-        <div v-for="i in 2" :key="i" class="rounded-lg border border-border-default overflow-hidden">
+        <div v-for="i in 2" :key="i" class="rounded-default border border-border-default overflow-hidden">
           <div class="bg-[var(--color-border-default)] animate-pulse h-11 w-full" />
           <div class="p-4 flex flex-col gap-2">
-            <div class="bg-[var(--color-border-default)] animate-pulse h-4 w-2/3 rounded-sm" />
-            <div class="bg-[var(--color-border-default)] animate-pulse h-4 w-1/2 rounded-sm" />
+            <div class="bg-[var(--color-border-default)] animate-pulse h-4 w-2/3 rounded-default" />
+            <div class="bg-[var(--color-border-default)] animate-pulse h-4 w-1/2 rounded-default" />
           </div>
         </div>
       </div>
@@ -200,7 +200,7 @@ function toggleSteps(executionId: string) {
           <div
             v-for="loc in locations"
             :key="loc.executionId"
-            class="bg-surface-base rounded-lg border border-border-default overflow-hidden"
+            class="bg-surface-base rounded-default border border-border-default overflow-hidden"
           >
             <!-- Card header -->
             <div
@@ -225,7 +225,7 @@ function toggleSteps(executionId: string) {
                   <OIcon name="cancel" size="xs" />
                   {{ t('synthetics.results.error') }}
                 </p>
-                <pre class="whitespace-pre-wrap font-mono text-xs text-text-secondary leading-relaxed bg-status-error-bg rounded-sm px-3 py-2 border border-[var(--color-status-error-text)]">{{ loc.error }}</pre>
+                <pre class="whitespace-pre-wrap font-mono text-xs text-text-secondary leading-relaxed bg-status-error-bg rounded-default px-3 py-2 border border-[var(--color-status-error-text)]">{{ loc.error }}</pre>
               </div>
 
               <!-- Steps -->
@@ -272,7 +272,7 @@ function toggleSteps(executionId: string) {
                   <div
                     v-for="step in loc.steps.filter(s => s.screenshotKey)"
                     :key="step.stepId"
-                    class="rounded-sm border border-border-default overflow-hidden bg-surface-panel"
+                    class="rounded-default border border-border-default overflow-hidden bg-surface-panel"
                   >
                     <div class="flex items-center gap-1.5 px-2 py-1 border-b border-border-default">
                       <span
@@ -298,7 +298,7 @@ function toggleSteps(executionId: string) {
                 <a
                   :href="artifactUrl(loc.traceKey)"
                   target="_blank"
-                  class="inline-flex items-center gap-2 text-xs font-medium text-text-link hover:text-text-link-hover bg-surface-panel border border-border-default rounded-sm px-3 py-1.5 transition-colors"
+                  class="inline-flex items-center gap-2 text-xs font-medium text-text-link hover:text-text-link-hover bg-surface-panel border border-border-default rounded-default px-3 py-1.5 transition-colors"
                 >
                   <OIcon name="download" size="xs" />
                   {{ t('synthetics.runDetail.downloadTrace', { filename: 'trace.zip' }) }}

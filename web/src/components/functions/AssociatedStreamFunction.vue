@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <div class="rounded-md p-0" style="min-height: inherit">
+  <div class="rounded-default p-0" style="min-height: inherit">
     <OTable
       data-test="log-stream-table"
       :data="filteredStreamData"

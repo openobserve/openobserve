@@ -8,7 +8,7 @@
     <!-- 1st section - Streams container -->
     <div
       data-test="home-view-skeleton-streams-container"
-      class="feature-card bg-surface-base border border-card-glass-border rounded-lg p-4"
+      class="feature-card bg-surface-base border border-card-glass-border rounded-default p-4"
     >
       <!-- Header -->
       <div data-test="home-view-skeleton-streams-header" class="flex justify-between items-center mb-4">
@@ -21,9 +21,9 @@
 
       <!-- Tiles using same grid as HomeView -->
       <div class="tiles-grid grid gap-4 grid-cols-[repeat(auto-fit,minmax(15rem,1fr))]">
-        <div v-for="n in 5" :key="n" data-test="home-view-skeleton-tile" class="rounded-md border border-card-glass-border">
+        <div v-for="n in 5" :key="n" data-test="home-view-skeleton-tile" class="rounded-default border border-card-glass-border">
           <div
-            class="tile-content h-full p-4 gap-2 rounded-sm text-center flex flex-col justify-between bg-surface-base border border-border-default text-text-body"
+            class="tile-content h-full p-4 gap-2 rounded-default text-center flex flex-col justify-between bg-surface-base border border-border-default text-text-body"
           >
             <!-- Top Section (60%) -->
             <div class="flex flex-col justify-between">
@@ -50,7 +50,7 @@
         <!-- Functions tile -->
         <div class="tile-wrapper flex-1 flex min-w-0 w-full">
           <div
-            class="feature-card bg-surface-base border border-border-default p-4 w-full rounded-sm text-center flex flex-col justify-between text-text-body"
+            class="feature-card bg-surface-base border border-border-default p-4 w-full rounded-default text-center flex flex-col justify-between text-text-body"
           >
             <div class="flex flex-col justify-between">
               <div
@@ -70,7 +70,7 @@
         <!-- Dashboards tile -->
         <div class="tile-wrapper flex-1 flex min-w-0 w-full">
           <div
-            class="feature-card bg-surface-base border border-border-default p-4 w-full rounded-sm text-center flex flex-col justify-between text-text-body"
+            class="feature-card bg-surface-base border border-border-default p-4 w-full rounded-default text-center flex flex-col justify-between text-text-body"
           >
             <div class="flex flex-col justify-between">
               <div
@@ -90,7 +90,7 @@
 
       <!-- Alerts Chart -->
       <div
-        class="feature-card first-chart-container bg-surface-base border border-border-default rounded-sm p-4"
+        class="feature-card first-chart-container bg-surface-base border border-border-default rounded-default p-4"
       >
         <div class="details-container flex flex-col gap-3 mb-4">
           <!-- Header -->
@@ -119,8 +119,8 @@
           class="custom-first-chart my-auto xl:min-h-50 h-[calc(100vh-500px)] md:h-[calc(100vh-500px)] lg:h-[calc(100vh-550px)] xl:h-[calc(100vh-645px)] w-full"
         >
           <!-- custom-radius, not the boolean radius prop, is what actually lands
-               lg corners here: OSkeleton type="text" base `rounded-sm` beats
-               `rounded-lg` on Tailwind's alphabetical emit order, while this
+               lg corners here: OSkeleton type="text" base `rounded-default` beats
+               `rounded-default` on Tailwind's alphabetical emit order, while this
                inline binding beats both. -->
           <OSkeleton type="text" custom-radius="var(--radius-lg)" class="w-full h-full" />
         </div>
@@ -128,7 +128,7 @@
 
       <!-- Pipelines Chart -->
       <div
-        class="feature-card second-chart-container bg-surface-base border border-border-default rounded-sm p-4"
+        class="feature-card second-chart-container bg-surface-base border border-border-default rounded-default p-4"
       >
         <div class="details-container flex flex-col gap-3 mb-4">
           <!-- Header -->
@@ -157,8 +157,8 @@
           class="custom-second-chart my-auto xl:min-h-50 h-[calc(100vh-500px)] md:h-[calc(100vh-500px)] lg:h-[calc(100vh-550px)] xl:h-[calc(100vh-645px)]"
         >
           <!-- custom-radius, not the boolean radius prop, is what actually lands
-               lg corners here: OSkeleton type="text" base `rounded-sm` beats
-               `rounded-lg` on Tailwind's alphabetical emit order, while this
+               lg corners here: OSkeleton type="text" base `rounded-default` beats
+               `rounded-default` on Tailwind's alphabetical emit order, while this
                inline binding beats both. -->
           <OSkeleton type="text" custom-radius="var(--radius-lg)" class="w-full h-full" />
         </div>

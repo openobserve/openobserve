@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/attribute-hyphenation -->
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <template>
-  <div class="rounded-md h-full min-h-full! max-h-full! overflow-hidden! logPage" id="logPage" data-test="logs-page-container">
+  <div class="rounded-default h-full min-h-full! max-h-full! overflow-hidden! logPage" id="logPage" data-test="logs-page-container">
     <div
       v-show="!showSearchHistory && !showSearchScheduler"
       id="secondLevel"
@@ -298,10 +298,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
       <div
         v-else-if="showSearchHistory && !store.state.zoConfig.usage_enabled"
-        class="h-50 rounded-lg"
+        class="h-50 rounded-default"
       >
         <div
-          class="h-[80vh] rounded-lg text-center p-3 flex items-center justify-center"
+          class="h-[80vh] rounded-default text-center p-3 flex items-center justify-center"
         >
           <div>
             <div>

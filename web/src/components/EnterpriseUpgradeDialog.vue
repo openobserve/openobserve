@@ -33,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div v-if="!dialogConfig.isCloudLayout" class="hero-panel [flex:0_0_35%] bg-[linear-gradient(135deg,var(--color-theme-accent)_0%,color-mix(in_srgb,var(--color-theme-accent)_85%,black_15%)_100%)] p-10 flex flex-col relative text-white overflow-y-auto min-h-0 max-[56.25rem]:flex-none max-[56.25rem]:min-h-100">
 
           <div class="flex-1 flex flex-col justify-center items-center max-w-100 w-full m-auto">
-            <div class="w-20 h-20 bg-[rgba(255,255,255,0.15)] rounded-xl flex items-center justify-center mb-6 backdrop-blur-[10px]">
+            <div class="w-20 h-20 bg-[rgba(255,255,255,0.15)] rounded-default flex items-center justify-center mb-6 backdrop-blur-[10px]">
               <OIcon name="workspace-premium" size="xl" />
             </div>
 
@@ -52,7 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="enterprise-upgrade-usage-indicator-skeleton"
                 />
                 <OSkeleton
-                  class="shrink-0 rounded-lg"
+                  class="shrink-0 rounded-default"
                   style="width: 200px; height: 44px;"
                   data-test="enterprise-upgrade-offer-badge-skeleton"
                 />
@@ -60,7 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <!-- Loaded State: Show actual data -->
               <template v-else>
-                <div data-test="enterprise-upgrade-offer-badge" class="inline-flex items-center bg-[linear-gradient(135deg,#22c55e_0%,#4ade80_100%)] py-2.5 px-5 rounded-xl font-bold text-sm backdrop-blur-[10px] text-white shadow-[0_4px_16px_rgba(34,197,94,0.4)]" :class="{ 'bg-[rgba(255,255,255,0.2)]! shadow-[0_4px_12px_rgba(0,0,0,0.15)]!': dialogConfig.isLicensed }">
+                <div data-test="enterprise-upgrade-offer-badge" class="inline-flex items-center bg-[linear-gradient(135deg,#22c55e_0%,#4ade80_100%)] py-2.5 px-5 rounded-default font-bold text-sm backdrop-blur-[10px] text-white shadow-[0_4px_16px_rgba(34,197,94,0.4)]" :class="{ 'bg-[rgba(255,255,255,0.2)]! shadow-[0_4px_12px_rgba(0,0,0,0.15)]!': dialogConfig.isLicensed }">
                   <OIcon v-if="!dialogConfig.showUsageIndicator" :name="dialogConfig.badgeIcon" size="md" class="mr-1" />
                   <span>{{ dialogConfig.badgeText }}</span>
                 </div>
@@ -68,11 +68,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <!-- Usage Chart (only for Enterprise with license) -->
-            <div v-if="dialogConfig.isLicensed" class="w-full mb-6 bg-[rgba(255,255,255,0.1)] rounded-xl p-4 backdrop-blur-[10px] border border-[rgba(255,255,255,0.2)]">
+            <div v-if="dialogConfig.isLicensed" class="w-full mb-6 bg-[rgba(255,255,255,0.1)] rounded-default p-4 backdrop-blur-[10px] border border-[rgba(255,255,255,0.2)]">
               <!-- Loading skeleton -->
               <template v-if="isLoadingLicense">
                 <OSkeleton
-                  class="chart-skeleton rounded-lg"
+                  class="chart-skeleton rounded-default"
                   style="height: 150px;"
                   data-test="enterprise-upgrade-chart-skeleton"
                 />
@@ -100,7 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 size="lg"
                 @click="handlePrimaryButtonClick"
                 data-test="enterprise-upgrade-download-btn"
-                class="bg-white! text-[var(--color-theme-accent)]! font-bold! py-2.5 px-8 text-sm rounded-lg! shadow-[0_4px_16px_rgba(0,0,0,0.15)] transition-all duration-300 [transition-timing-function:cubic-bezier(0.4,0,0.2,1)] [letter-spacing:0.3px] hover:[transform:translateY(-3px)_scale(1.02)] hover:shadow-[0_8px_24px_rgba(0,0,0,0.25)] active:[transform:translateY(-1px)_scale(0.98)]"
+                class="bg-white! text-[var(--color-theme-accent)]! font-bold! py-2.5 px-8 text-sm rounded-default! shadow-[0_4px_16px_rgba(0,0,0,0.15)] transition-all duration-300 [transition-timing-function:cubic-bezier(0.4,0,0.2,1)] [letter-spacing:0.3px] hover:[transform:translateY(-3px)_scale(1.02)] hover:shadow-[0_8px_24px_rgba(0,0,0,0.25)] active:[transform:translateY(-1px)_scale(0.98)]"
               >
                 {{ dialogConfig.primaryButtonText }}
                 <template v-if="dialogConfig.primaryButtonIcon" #icon-right>
@@ -112,7 +112,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 variant="on-dark-ghost"
                 size="lg"
                 @click="contactSales"
-                class="font-semibold! py-2.5 px-6 text-sm rounded-lg! border-2 border-[rgba(255,255,255,0.3)] transition-all duration-300 bg-transparent [letter-spacing:0.2px] hover:bg-[rgba(255,255,255,0.15)] hover:border-[rgba(255,255,255,0.5)] hover:[transform:translateX(4px)] active:[transform:scale(0.96)]"
+                class="font-semibold! py-2.5 px-6 text-sm rounded-default! border-2 border-[rgba(255,255,255,0.3)] transition-all duration-300 bg-transparent [letter-spacing:0.2px] hover:bg-[rgba(255,255,255,0.15)] hover:border-[rgba(255,255,255,0.5)] hover:[transform:translateX(4px)] active:[transform:scale(0.96)]"
               >
                 {{ t('about.enterprise_offer.buttons.contact_sales') }}
               </OButton>
@@ -122,7 +122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 size="lg"
                 @click="openDocsLink"
                 data-test="enterprise-upgrade-learn-more-btn"
-                class="font-semibold! py-2.5 px-6 text-sm rounded-lg! border-2 border-[rgba(255,255,255,0.3)] transition-all duration-300 bg-transparent [letter-spacing:0.2px] hover:bg-[rgba(255,255,255,0.15)] hover:border-[rgba(255,255,255,0.5)] hover:[transform:translateX(4px)] active:[transform:scale(0.96)]"
+                class="font-semibold! py-2.5 px-6 text-sm rounded-default! border-2 border-[rgba(255,255,255,0.3)] transition-all duration-300 bg-transparent [letter-spacing:0.2px] hover:bg-[rgba(255,255,255,0.15)] hover:border-[rgba(255,255,255,0.5)] hover:[transform:translateX(4px)] active:[transform:scale(0.96)]"
               >
                 {{ t('about.enterprise_offer.buttons.learn_more') }}
               </OButton>
@@ -144,7 +144,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-for="feature in coreFeatures"
               :key="feature.name"
               data-test="enterprise-upgrade-feature-item"
-              class="flex gap-2.5 p-[8px_12px] rounded-md border transition-all duration-200"
+              class="flex gap-2.5 p-[8px_12px] rounded-default border transition-all duration-200"
               :class="[
                 'border-border-default',
                 feature.link
@@ -157,7 +157,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               ]"
               @click="feature.link && openFeatureLink(feature.link)"
             >
-              <div class="shrink-0 w-7.5 h-7.5 rounded-lg flex items-center justify-center text-[var(--color-theme-accent)] bg-[color-mix(in_srgb,var(--color-theme-accent)_10%,transparent)] dark:bg-[color-mix(in_srgb,var(--color-theme-accent)_15%,transparent)]">
+              <div class="shrink-0 w-7.5 h-7.5 rounded-default flex items-center justify-center text-[var(--color-theme-accent)] bg-[color-mix(in_srgb,var(--color-theme-accent)_10%,transparent)] dark:bg-[color-mix(in_srgb,var(--color-theme-accent)_15%,transparent)]">
                 <OIcon :name="feature.icon" size="sm" />
               </div>
               <div class="flex-1 min-w-0">
@@ -175,7 +175,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-show="!feature.cloudHidden"
               :key="feature.name"
               data-test="enterprise-upgrade-feature-item"
-              class="flex gap-2.5 p-[8px_12px] rounded-md border transition-all duration-200"
+              class="flex gap-2.5 p-[8px_12px] rounded-default border transition-all duration-200"
               :class="[
                 'border-border-default',
                 feature.link
@@ -188,7 +188,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               ]"
               @click="feature.link && openFeatureLink(feature.link)"
             >
-              <div class="shrink-0 w-7.5 h-7.5 rounded-lg flex items-center justify-center text-[var(--color-theme-accent)] bg-[color-mix(in_srgb,var(--color-theme-accent)_10%,transparent)] dark:bg-[color-mix(in_srgb,var(--color-theme-accent)_15%,transparent)]">
+              <div class="shrink-0 w-7.5 h-7.5 rounded-default flex items-center justify-center text-[var(--color-theme-accent)] bg-[color-mix(in_srgb,var(--color-theme-accent)_10%,transparent)] dark:bg-[color-mix(in_srgb,var(--color-theme-accent)_15%,transparent)]">
                 <OIcon :name="feature.icon" size="sm" />
               </div>
               <div class="flex-1 min-w-0">
@@ -209,7 +209,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-show="!feature.cloudOnly"
               :key="feature.name"
               data-test="enterprise-upgrade-feature-item"
-              class="flex gap-2.5 p-[8px_12px] rounded-md border transition-all duration-200"
+              class="flex gap-2.5 p-[8px_12px] rounded-default border transition-all duration-200"
               :class="[
                 'border-border-default',
                 feature.link
@@ -222,7 +222,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               ]"
               @click="feature.link && openFeatureLink(feature.link)"
             >
-              <div class="shrink-0 w-7.5 h-7.5 rounded-lg flex items-center justify-center text-[var(--color-theme-accent)] bg-[color-mix(in_srgb,var(--color-theme-accent)_10%,transparent)] dark:bg-[color-mix(in_srgb,var(--color-theme-accent)_15%,transparent)]">
+              <div class="shrink-0 w-7.5 h-7.5 rounded-default flex items-center justify-center text-[var(--color-theme-accent)] bg-[color-mix(in_srgb,var(--color-theme-accent)_10%,transparent)] dark:bg-[color-mix(in_srgb,var(--color-theme-accent)_15%,transparent)]">
                 <OIcon :name="feature.icon" size="sm" />
               </div>
               <div class="flex-1 min-w-0">

@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="flex justify-start items-center bg-[color-mix(in_srgb,currentColor_5%,transparent)] h-7.5 top-0 z-1999 sticky rounded-t-lg"
+    class="flex justify-start items-center bg-[color-mix(in_srgb,currentColor_5%,transparent)] h-7.5 top-0 z-1999 sticky rounded-t-default"
     data-test="trace-header"
     :style="
       isSidebarOpen && {

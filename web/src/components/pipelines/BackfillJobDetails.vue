@@ -47,7 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Job Information -->
           <section class="flex flex-col gap-3">
             <h3 class="text-base font-semibold">Job Information</h3>
-            <div class="grid grid-cols-2 gap-x-6 gap-y-3 rounded-md border border-card-border bg-card-bg p-4">
+            <div class="grid grid-cols-2 gap-x-6 gap-y-3 rounded-default border border-card-border bg-card-bg p-4">
               <div>
                 <div class="text-xs text-text-label mb-1">Job ID</div>
                 <div class="font-mono text-sm break-all">{{ job.job_id }}</div>
@@ -70,7 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Progress -->
           <section class="flex flex-col gap-3">
             <h3 class="text-base font-semibold">Progress</h3>
-            <div class="rounded-md border border-card-border bg-card-bg p-4 flex flex-col gap-4">
+            <div class="rounded-default border border-card-border bg-card-bg p-4 flex flex-col gap-4">
               <div>
                 <div class="flex items-center justify-between mb-2">
                   <div class="text-sm font-medium">Overall Progress</div>
@@ -107,7 +107,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Deletion Details (if applicable) -->
           <section v-if="job.delete_before_backfill || job.deletion_status" class="flex flex-col gap-3">
             <h3 class="text-base font-semibold">Deletion Details</h3>
-            <div class="rounded-md border border-card-border bg-card-bg p-4 flex flex-col gap-3">
+            <div class="rounded-default border border-card-border bg-card-bg p-4 flex flex-col gap-3">
               <div class="grid grid-cols-2 gap-x-6 gap-y-3">
                 <div>
                   <div class="text-xs text-text-label mb-1">Status</div>
@@ -134,7 +134,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Error Details (if present) -->
           <section v-if="job.error" class="flex flex-col gap-3">
             <h3 class="text-base font-semibold">Error Details</h3>
-            <div class="rounded-md border border-banner-error-soft-border bg-banner-error-soft-bg p-4 flex items-start gap-3">
+            <div class="rounded-default border border-banner-error-soft-border bg-banner-error-soft-bg p-4 flex items-start gap-3">
               <OIcon name="error" size="md" class="text-status-error-text mt-0.5 shrink-0" />
               <div class="flex-1 min-w-0">
                 <div class="text-xs text-text-label mb-1">Error Message</div>

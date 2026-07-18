@@ -16,7 +16,7 @@ const emit = defineEmits<{ (e: "select", prompt: string): void }>();
       :key="card.id"
       role="button"
       tabindex="0"
-      class="capability-card group/card relative py-4 px-4 pb-[1.125rem] border border-border-default rounded-xl cursor-pointer bg-card-bg transition-[border-color,box-shadow,translate,background] duration-200 ease-[ease] isolate overflow-hidden min-h-33 [--accent:123,97,255] [--card-tint:linear-gradient(155deg,rgba(var(--accent),0.1)_0%,rgba(var(--accent),0.02)_40%,transparent_70%)] hover:border-[rgba(var(--accent),0.5)] hover:-translate-y-[3px] hover:shadow-[0_1px_2px_rgba(0,0,0,0.04),0_12px_28px_-10px_rgba(var(--accent),0.35)] focus-visible:outline-none focus-visible:border-[rgba(var(--accent),0.7)] focus-visible:shadow-[0_0_0_2px_rgba(var(--accent),0.45)]"
+      class="capability-card group/card relative py-4 px-4 pb-[1.125rem] border border-border-default rounded-default cursor-pointer bg-card-bg transition-[border-color,box-shadow,translate,background] duration-200 ease-[ease] isolate overflow-hidden min-h-33 [--accent:123,97,255] [--card-tint:linear-gradient(155deg,rgba(var(--accent),0.1)_0%,rgba(var(--accent),0.02)_40%,transparent_70%)] hover:border-[rgba(var(--accent),0.5)] hover:-translate-y-[3px] hover:shadow-[0_1px_2px_rgba(0,0,0,0.04),0_12px_28px_-10px_rgba(var(--accent),0.35)] focus-visible:outline-none focus-visible:border-[rgba(var(--accent),0.7)] focus-visible:shadow-[0_0_0_2px_rgba(var(--accent),0.45)]"
       :class="{
         '[--accent:123,97,255]': card.id === 'query',
         '[--accent:245,158,11]': card.id === 'incident',
@@ -28,11 +28,11 @@ const emit = defineEmits<{ (e: "select", prompt: string): void }>();
       @keydown.space.prevent="emit('select', t(`aiAssistant.capabilities.${card.id}.prompt`))"
     >
       <span
-        class="capability-card__glow absolute [-inset-px] rounded-xl bg-[linear-gradient(135deg,rgba(var(--accent),0.45),rgba(var(--accent),0.05)_60%)] opacity-0 transition-opacity duration-[250ms] ease-[ease] pointer-events-none z-[-1] blur-[8px] group-hover/card:opacity-100"
+        class="capability-card__glow absolute [-inset-px] rounded-default bg-[linear-gradient(135deg,rgba(var(--accent),0.45),rgba(var(--accent),0.05)_60%)] opacity-0 transition-opacity duration-[250ms] ease-[ease] pointer-events-none z-[-1] blur-[8px] group-hover/card:opacity-100"
         aria-hidden="true"
       ></span>
       <div
-        class="capability-card__icon relative z-[1] inline-flex items-center justify-center w-9.5 h-9.5 rounded-lg mb-[0.625rem] shadow-[inset_0_0_0_1px_rgba(var(--accent),0.18)]"
+        class="capability-card__icon relative z-[1] inline-flex items-center justify-center w-9.5 h-9.5 rounded-default mb-[0.625rem] shadow-[inset_0_0_0_1px_rgba(var(--accent),0.18)]"
         :class="card.iconBgClass"
       >
         <OIcon :name="card.icon" size="md" :class="card.iconColorClass" />

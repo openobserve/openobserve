@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Whole-page last-refresh + refresh control (logs-style): relative
              time + freshness dot, ticking on its own. -->
         <div
-          class="inline-flex items-center border border-border-default rounded-md px-1 h-[2rem] overflow-hidden"
+          class="inline-flex items-center border border-border-default rounded-default px-1 h-[2rem] overflow-hidden"
         >
           <ORefreshButton
             :last-run-at="dashboardLastRunAt"

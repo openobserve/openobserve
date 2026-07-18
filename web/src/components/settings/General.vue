@@ -375,7 +375,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       id="dangerZone"
       v-if="canDeleteOrg"
       data-test="general-settings-danger-zone"
-      class="mt-8 overflow-hidden rounded-lg border border-banner-error-soft-border"
+      class="mt-8 overflow-hidden rounded-default border border-banner-error-soft-border"
     >
       <!-- Red-accented header signals this section is destructive. -->
       <div
@@ -509,7 +509,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Irreversible-action warning callout -->
       <div
-        class="flex items-start gap-2 rounded-sm border border-banner-error-soft-border bg-banner-error-soft-bg px-3 py-2"
+        class="flex items-start gap-2 rounded-default border border-banner-error-soft-border bg-banner-error-soft-bg px-3 py-2"
       >
         <OIcon
           name="warning"

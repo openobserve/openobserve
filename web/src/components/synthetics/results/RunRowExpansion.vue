@@ -168,11 +168,11 @@ function failedAtStep(steps: StepResult[]): string {
     <!-- Loading skeleton -->
     <div v-if="loading" class="flex flex-col gap-2 p-4">
       <div class="flex gap-3 items-center py-2">
-        <div class="bg-[var(--color-border-default)] animate-pulse h-4 w-24 rounded-sm" />
-        <div class="bg-[var(--color-border-default)] animate-pulse h-4 w-16 rounded-sm" />
-        <div class="bg-[var(--color-border-default)] animate-pulse h-4 w-40 rounded-sm" />
+        <div class="bg-[var(--color-border-default)] animate-pulse h-4 w-24 rounded-default" />
+        <div class="bg-[var(--color-border-default)] animate-pulse h-4 w-16 rounded-default" />
+        <div class="bg-[var(--color-border-default)] animate-pulse h-4 w-40 rounded-default" />
       </div>
-      <div class="bg-[var(--color-border-default)] animate-pulse h-24 w-full rounded-sm" />
+      <div class="bg-[var(--color-border-default)] animate-pulse h-24 w-full rounded-default" />
     </div>
 
     <!-- Query error -->
@@ -235,7 +235,7 @@ function failedAtStep(steps: StepResult[]): string {
           <div v-if="expandedLocations.has(group.location)" class="px-4 pb-3">
 
             <!-- Execution summary table -->
-            <div class="rounded-sm border border-border-default overflow-hidden mb-3">
+            <div class="rounded-default border border-border-default overflow-hidden mb-3">
               <table class="w-full text-xs">
                 <thead>
                   <tr class="bg-surface-panel border-b border-border-default">

@@ -66,7 +66,7 @@ const pageSizeSelectOptions = computed(() =>
       <!-- Loading: always skeleton, regardless of slot/count -->
       <span
         v-if="loading"
-        class="o2-pag-skel inline-block h-3 w-24 rounded-md [background:linear-gradient(90deg,var(--color-skeleton-base)_0%,var(--color-skeleton-highlight)_50%,var(--color-skeleton-base)_100%)] [background-size:200%_100%] [animation:o2-skel-shimmer_1.5s_ease-in-out_infinite]"
+        class="o2-pag-skel inline-block h-3 w-24 rounded-default [background:linear-gradient(90deg,var(--color-skeleton-base)_0%,var(--color-skeleton-highlight)_50%,var(--color-skeleton-base)_100%)] [background-size:200%_100%] [animation:o2-skel-shimmer_1.5s_ease-in-out_infinite]"
         aria-hidden="true"
         data-test="o2-table-pagination-count-skel"
       />
@@ -80,7 +80,7 @@ const pageSizeSelectOptions = computed(() =>
     <div class="flex items-center gap-3">
       <span
         v-if="loading"
-        class="o2-pag-skel inline-block h-3 w-36 rounded-md [background:linear-gradient(90deg,var(--color-skeleton-base)_0%,var(--color-skeleton-highlight)_50%,var(--color-skeleton-base)_100%)] [background-size:200%_100%] [animation:o2-skel-shimmer_1.5s_ease-in-out_infinite]"
+        class="o2-pag-skel inline-block h-3 w-36 rounded-default [background:linear-gradient(90deg,var(--color-skeleton-base)_0%,var(--color-skeleton-highlight)_50%,var(--color-skeleton-base)_100%)] [background-size:200%_100%] [animation:o2-skel-shimmer_1.5s_ease-in-out_infinite]"
         aria-hidden="true"
         data-test="o2-table-pagination-info-skel"
       />

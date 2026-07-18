@@ -145,7 +145,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         type="warning"
         icon="cloud"
-        class="inline bg-status-warning-bg p-1.25 rounded-sm"
+        class="inline bg-status-warning-bg p-1.25 rounded-default"
       >
         <OIcon name="warning"
 size="xs" class="text-warning" />{{
@@ -348,7 +348,7 @@ size="xs" class="text-warning" />{{
                 v-if="selectedLanguage.icon && selectedLanguage.icon.startsWith('img:')"
                 :src="selectedLanguage.icon.slice(4)"
                 :alt="selectedLanguage.label"
-                class="w-4 h-3 object-cover rounded-sm inline-block shrink-0"
+                class="w-4 h-3 object-cover rounded-default inline-block shrink-0"
               />
               <OIcon
                 v-else-if="selectedLanguage.icon"
@@ -363,7 +363,7 @@ size="xs" class="text-warning" />{{
             <!-- Submenu — absolutely positioned to the left of parent dropdown -->
             <div
               v-if="showLanguageSubmenu"
-              class="absolute right-full top-0 mr-1 min-w-50 border rounded-md py-1 z-9999 bg-dropdown-bg border-dropdown-border shadow-[0_8px_24px_rgba(0,0,0,0.15)] dark:shadow-[0_8px_24px_rgba(0,0,0,0.5)]"
+              class="absolute right-full top-0 mr-1 min-w-50 border rounded-default py-1 z-9999 bg-dropdown-bg border-dropdown-border shadow-[0_8px_24px_rgba(0,0,0,0.15)] dark:shadow-[0_8px_24px_rgba(0,0,0,0.5)]"
               data-test="language-dropdown-item"
               @click.stop
             >
@@ -383,7 +383,7 @@ size="xs" class="text-warning" />{{
                   v-if="lang.icon && lang.icon.startsWith('img:')"
                   :src="lang.icon.slice(4)"
                   :alt="lang.label"
-                  class="w-4 h-3 object-cover rounded-sm inline-block shrink-0"
+                  class="w-4 h-3 object-cover rounded-default inline-block shrink-0"
                 />
                 <OIcon v-else-if="lang.icon" size="xs" :name="lang.icon" />
                 <span class="flex-1">{{ lang.label }}</span>

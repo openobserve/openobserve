@@ -48,7 +48,7 @@ const iconSize: Record<NonNullable<ToggleGroupItemProps["size"]>, "xs" | "sm"> =
         sizeClasses[props.size],
         // Base state - inactive (transparent on track)
         'bg-toggle-item-bg text-toggle-item-text font-medium whitespace-nowrap',
-        'rounded-md',
+        'rounded-default',
         'transition-all duration-150',
         'outline-none cursor-pointer',
         // Hover (inactive only)

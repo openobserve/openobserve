@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="step-anomaly-alerting h-full"
   >
     <div
-      class="step-content px-3 py-4 rounded-lg h-full overflow-y-auto border bg-surface-overlay border-border-default"
+      class="step-content px-3 py-4 rounded-default h-full overflow-y-auto border bg-surface-overlay border-border-default"
     >
       <!-- Enable Notifications toggle -->
       <div class="flex items-start mb-6!  pb-0!">

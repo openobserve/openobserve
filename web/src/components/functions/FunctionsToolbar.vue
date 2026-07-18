@@ -58,7 +58,7 @@
         size="icon-sm"
         @click="emit('open:chat',!store.state.isAiChatEnabled)"
         data-test="menu-link-ai-item"
-        class="![background:var(--color-gradient-ai-subtle)] transition-[background,box-shadow] duration-300 ease-in-out hover:![background:var(--color-gradient-ai)] hover:shadow-[0_0.25rem_0.75rem_0_rgba(139,92,246,0.35)] rounded-md"
+        class="![background:var(--color-gradient-ai-subtle)] transition-[background,box-shadow] duration-300 ease-in-out hover:![background:var(--color-gradient-ai)] hover:shadow-[0_0.25rem_0.75rem_0_rgba(139,92,246,0.35)] rounded-default"
         :class="store.state.isAiChatEnabled ? 'ai-btn-active' : ''"
         :disabled="isSubmitting"
         @mouseenter="isHovered = true"

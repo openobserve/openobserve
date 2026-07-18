@@ -56,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       valueKey="value"
     />
     <fieldset
-      class="p-3 w-full border border-[lightgray] rounded-sm relative"
+      class="p-3 w-full border border-[lightgray] rounded-default relative"
       v-if="authType != ''"
     >
       <legend class="px-2 text-xs text-text-heading ml-2 py-0 px-1">
@@ -132,7 +132,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       valueKey="value"
     />
     <fieldset
-      class="p-3 w-full border border-[lightgray] rounded-sm relative"
+      class="p-3 w-full border border-[lightgray] rounded-default relative"
       v-if="secretType != ''"
     >
       <legend class="px-2 text-xs text-text-heading ml-2 py-0 px-1">

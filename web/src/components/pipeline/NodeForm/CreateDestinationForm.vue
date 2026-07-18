@@ -49,7 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-for="destType in destinationTypes"
               :key="destType.value"
               :data-test="`destination-type-card-${destType.value}`"
-              class="destination-type-card group relative flex flex-col items-center justify-center py-5 px-3 border-2 rounded-xl cursor-pointer [transition:all_0.3s_ease] min-h-30 hover:-translate-y-0.5 hover:border-card-glass-border hover:shadow-[0_0.25rem_0.75rem_color-mix(in_srgb,var(--color-status-info-text)_15%,transparent)]"
+              class="destination-type-card group relative flex flex-col items-center justify-center py-5 px-3 border-2 rounded-default cursor-pointer [transition:all_0.3s_ease] min-h-30 hover:-translate-y-0.5 hover:border-card-glass-border hover:shadow-[0_0.25rem_0.75rem_color-mix(in_srgb,var(--color-status-info-text)_15%,transparent)]"
               :class="destinationType === destType.value
                 ? 'selected border-card-glass-border bg-status-info-bg shadow-[0_0.25rem_1rem_color-mix(in_srgb,var(--color-status-info-text)_20%,transparent)]'
                 : 'border-border-default bg-surface-base'"
@@ -339,7 +339,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Connection Notes Card -->
           <OCard
-            class="connection-notes-card rounded-lg border border-banner-info-border mb-6 mt-4 bg-banner-info-bg!"
+            class="connection-notes-card rounded-default border border-banner-info-border mb-6 mt-4 bg-banner-info-bg!"
           >
             <OCardSection role="body">
               <div class="flex items-center mb-2">
@@ -364,7 +364,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </ol>
                 <div
                   v-if="connectionNotes.example"
-                  class="mt-2 p-2 rounded-md text-compact bg-surface-base"
+                  class="mt-2 p-2 rounded-default text-compact bg-surface-base"
                 >
                   <strong>Example:</strong>
                   <code class="ml-1 bg-transparent p-0 font-[Monaco,Menlo,'Ubuntu_Mono',monospace] text-text-link">{{ connectionNotes.example }}</code>

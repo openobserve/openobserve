@@ -121,7 +121,7 @@ function formatTime(ts: string): string {
 
     <!-- Search -->
     <div class="px-2 pb-[0.375em] shrink-0">
-      <div class="flex items-center gap-[0.375em] bg-input-bg rounded-md px-[0.375em]">
+      <div class="flex items-center gap-[0.375em] bg-input-bg rounded-default px-[0.375em]">
         <svg
           class="opacity-50 shrink-0"
           width="0.875em"
@@ -169,7 +169,7 @@ function formatTime(ts: string): string {
       <div
         v-for="chat in filtered"
         :key="chat.id"
-        class="group flex items-center gap-1 py-[0.4375em] px-2 rounded-md cursor-pointer transition-[background] duration-[120ms] hover:bg-interactive-hover-bg"
+        class="group flex items-center gap-1 py-[0.4375em] px-2 rounded-default cursor-pointer transition-[background] duration-[120ms] hover:bg-interactive-hover-bg"
         :class="{
           'bg-primary-100!': activeChatId === chat.id,
         }"

@@ -99,7 +99,7 @@ const metadataRows = computed(() =>
             v-for="row in metadataRows"
             :key="row.key"
             :data-test="`traces-db-span-details-tag-${row.key}`"
-            class="inline-flex items-center gap-1 rounded-md px-2 py-1 text-sm"
+            class="inline-flex items-center gap-1 rounded-default px-2 py-1 text-sm"
             style="
               background: var(--color-surface-base);
               border: 1px solid var(--color-border-default);

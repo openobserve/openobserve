@@ -31,19 +31,19 @@
         <div
           v-for="(query, index) in queryData"
           :key="query?.originalQuery + index"
-          class="bg-card-glass-bg rounded-xl border border-card-glass-border overflow-hidden"
+          class="bg-card-glass-bg rounded-default border border-card-glass-border overflow-hidden"
         >
           <!-- Query Header -->
           <div
             class="p-2 gap-3 bg-theme-body-bg-primary border-b border-card-glass-border flex items-start justify-start"
           >
-            <span class="text-sm font-bold rounded-md"
+            <span class="text-sm font-bold rounded-default"
                 :data-test="`query-inspector-query-name-${index}`"
             >
               {{ query.tabName || ('Query ' + (index + 1)) }}
             </span>
             <span
-              class="bg-theme-body-bg-primary border border-card-glass-border text-text-secondary text-3xs font-bold px-2 py-0.5 rounded-md"
+              class="bg-theme-body-bg-primary border border-card-glass-border text-text-secondary text-3xs font-bold px-2 py-0.5 rounded-default"
             >
               {{ getQueryTypeDisplay(query.queryType) }}
             </span>
@@ -67,7 +67,7 @@
               </div>
               <div class="relative group mt-1">
                 <div
-                  class="p-2 rounded-lg bg-theme-body-bg-primary border border-card-glass-border font-mono text-sm max-h-40 overflow-y-auto whitespace-pre-wrap break-all [scrollbar-width:thin] [scrollbar-color:color-mix(in_srgb,var(--color-grey-500)_20%,transparent)_transparent] inspector-query-editor"
+                  class="p-2 rounded-default bg-theme-body-bg-primary border border-card-glass-border font-mono text-sm max-h-40 overflow-y-auto whitespace-pre-wrap break-all [scrollbar-width:thin] [scrollbar-color:color-mix(in_srgb,var(--color-grey-500)_20%,transparent)_transparent] inspector-query-editor"
                   :data-test="`query-inspector-original-query-${index}`"
                   v-html="
                     highlightSearch(
@@ -96,7 +96,7 @@
               </div>
               <div class="relative group mt-1">
                 <div
-                  class="p-2 rounded-lg bg-theme-body-bg-primary border border-card-glass-border font-mono text-sm max-h-40 overflow-y-auto whitespace-pre-wrap break-all [scrollbar-width:thin] [scrollbar-color:color-mix(in_srgb,var(--color-grey-500)_20%,transparent)_transparent] inspector-query-editor"
+                  class="p-2 rounded-default bg-theme-body-bg-primary border border-card-glass-border font-mono text-sm max-h-40 overflow-y-auto whitespace-pre-wrap break-all [scrollbar-width:thin] [scrollbar-color:color-mix(in_srgb,var(--color-grey-500)_20%,transparent)_transparent] inspector-query-editor"
                   :data-test="`query-inspector-executed-query-${index}`"
                   v-html="
                     highlightSearch(
@@ -159,7 +159,7 @@
                     <div
                       v-for="v in getVariablesByType(query, 'variable')"
                       :key="v.name"
-                      class="flex items-center gap-2 p-1 rounded-md border border-card-glass-border bg-card-glass-bg text-xs"
+                      class="flex items-center gap-2 p-1 rounded-default border border-card-glass-border bg-card-glass-bg text-xs"
                     >
                       <span
                         class="font-bold text-text-label"
@@ -186,7 +186,7 @@
                     <div
                       v-for="v in getVariablesByType(query, 'fixed')"
                       :key="v.name"
-                      class="flex items-center gap-2 p-1 rounded-md border border-card-glass-border bg-card-glass-bg text-xs"
+                      class="flex items-center gap-2 p-1 rounded-default border border-card-glass-border bg-card-glass-bg text-xs"
                     >
                       <span
                         class="font-bold text-text-label"
@@ -215,7 +215,7 @@
                     <div
                       v-for="v in getVariablesByType(query, 'dynamicVariable')"
                       :key="v.name"
-                      class="flex items-center gap-2 p-1 rounded-md border border-card-glass-border bg-card-glass-bg text-xs"
+                      class="flex items-center gap-2 p-1 rounded-default border border-card-glass-border bg-card-glass-bg text-xs"
                     >
                       <span
                         class="font-bold text-text-label"
@@ -345,7 +345,7 @@ export default defineComponent({
         return safeHtml.replace(
           regex,
           (match) =>
-            `<mark class="rounded-sm">${match}</mark>`,
+            `<mark class="rounded-default">${match}</mark>`,
         );
       } catch (e) {
         return safeHtml;

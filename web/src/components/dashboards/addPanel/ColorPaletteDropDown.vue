@@ -90,7 +90,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="flex items-center gap-1.5 w-full min-w-0">
               <span
                 v-if="opt.colorPalette?.length"
-                class="block w-10 h-2 rounded-sm flex-shrink-0"
+                class="block w-10 h-2 rounded-default flex-shrink-0"
                 aria-hidden="true"
                 :style="{ background: `linear-gradient(to right, ${opt.colorPalette.join(', ')})` }"
               />

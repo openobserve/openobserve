@@ -66,7 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         v-for="facet in visibleFacets"
         :key="facet.id"
-        class="flex items-center justify-between gap-2 px-2 py-1 rounded-sm hover:bg-surface-subtle"
+        class="flex items-center justify-between gap-2 px-2 py-1 rounded-default hover:bg-surface-subtle"
         :class="{ 'bg-surface-subtle': selected.has(facet.id) }"
       >
         <OCheckbox

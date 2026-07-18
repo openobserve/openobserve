@@ -761,10 +761,17 @@
   --spacing-10:  2.5rem;    /* 40px */
 
   /* --- Radius scale --- */
-  --radius-sm:   0.25rem;   /* 4px  */
-  --radius-md:   0.375rem;  /* 6px  */
-  --radius-lg:   0.5rem;    /* 8px  */
-  --radius-xl:   0.75rem;   /* 12px */
+  /* ONE app corner radius (A5). Standardised to a single value (the max-used
+     4px) so every surface rounds identically; change --radius-default to retune
+     every corner at once. The legacy sm/md/lg/xl are kept as ALIASES of it —
+     app templates use `rounded-default`, but these remain so scoped-block
+     `var(--radius-*)` refs and the OTag/OSkeleton `shape` API keep resolving
+     (all to the one value). `full` stays for pills/avatars/circles. */
+  --radius-default: 0.25rem;   /* 4px — the one app corner radius */
+  --radius-sm:   var(--radius-default);
+  --radius-md:   var(--radius-default);
+  --radius-lg:   var(--radius-default);
+  --radius-xl:   var(--radius-default);
   --radius-full: 9999px;
 
   /* --- Shadow scale — hairline-border philosophy ---

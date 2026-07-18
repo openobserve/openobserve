@@ -553,7 +553,7 @@ describe("TrialPeriod.vue", () => {
       const container = wrapper.find('[data-test="trial-period-container"]');
       expect(container.exists()).toBe(true);
       expect(container.classes()).toContain('w-full');
-      expect(container.classes()).toContain('rounded-md');
+      expect(container.classes()).toContain('rounded-default');
     });
 
     it("should display correct subtitle text", () => {

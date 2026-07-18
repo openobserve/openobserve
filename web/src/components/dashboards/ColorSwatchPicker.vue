@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- None — checkerboard tint with a diagonal strike -->
     <button
       type="button"
-      class="relative inline-flex h-5 w-5 cursor-pointer items-center justify-center rounded-sm border border-border-default p-0 transition-[transform,box-shadow,border-color] duration-100 hover:scale-[1.12] bg-[repeating-linear-gradient(45deg,color-mix(in_srgb,var(--color-grey-500)_12%,transparent),color-mix(in_srgb,var(--color-grey-500)_12%,transparent)_2px,transparent_2px,transparent_6px)]"
+      class="relative inline-flex h-5 w-5 cursor-pointer items-center justify-center rounded-default border border-border-default p-0 transition-[transform,box-shadow,border-color] duration-100 hover:scale-[1.12] bg-[repeating-linear-gradient(45deg,color-mix(in_srgb,var(--color-grey-500)_12%,transparent),color-mix(in_srgb,var(--color-grey-500)_12%,transparent)_2px,transparent_2px,transparent_6px)]"
       :class="!modelValue ? 'border-primary-600 ring-2 ring-focus-ring' : ''"
       :title="t('dashboard.colorNone')"
       :aria-label="t('dashboard.colorNone')"
@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-for="c in swatches"
       :key="c"
       type="button"
-      class="relative inline-flex h-5 w-5 cursor-pointer items-center justify-center rounded-sm border border-border-default p-0 transition-[transform,box-shadow,border-color] duration-100 hover:scale-[1.12]"
+      class="relative inline-flex h-5 w-5 cursor-pointer items-center justify-center rounded-default border border-border-default p-0 transition-[transform,box-shadow,border-color] duration-100 hover:scale-[1.12]"
       :class="isActive(c) ? 'border-primary-600 ring-2 ring-focus-ring' : ''"
       :style="{ background: c }"
       :title="c"
@@ -55,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Custom (native color input) — rainbow wheel until a colour is chosen -->
     <label
-      class="relative inline-flex h-5 w-5 cursor-pointer items-center justify-center rounded-sm border border-border-default p-0 transition-[transform,box-shadow,border-color] duration-100 hover:scale-[1.12] bg-[conic-gradient(from_0deg,var(--color-error-500),var(--color-warning-400),var(--color-success-500),var(--color-blue-500),var(--color-purple-500),var(--color-error-500))]"
+      class="relative inline-flex h-5 w-5 cursor-pointer items-center justify-center rounded-default border border-border-default p-0 transition-[transform,box-shadow,border-color] duration-100 hover:scale-[1.12] bg-[conic-gradient(from_0deg,var(--color-error-500),var(--color-warning-400),var(--color-success-500),var(--color-blue-500),var(--color-purple-500),var(--color-error-500))]"
       :class="isCustomActive ? 'border-primary-600 ring-2 ring-focus-ring' : ''"
       :style="isCustomActive ? { background: modelValue } : {}"
       :title="t('dashboard.customColor')"

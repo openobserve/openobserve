@@ -89,7 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           id="pipelineChartContainer"
           ref="chartContainerRef"
-          class="relative-position pipeline-chart-container o2vf_node h-[82.6vh] rounded-xl w-[calc(100%-200px)] bg-surface-subtle dark:bg-transparent"
+          class="relative-position pipeline-chart-container o2vf_node h-[82.6vh] rounded-default w-[calc(100%-200px)] bg-surface-subtle dark:bg-transparent"
           v-show="!pipelineObj.dialog.show || pipelineObj.dialog.name != 'query'"
         >
           <PipelineFlow />

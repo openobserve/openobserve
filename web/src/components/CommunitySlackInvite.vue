@@ -153,7 +153,7 @@ const joinSlack = () => {
       <!-- Header: Slack badge, title to its right, close button on the far right -->
       <div class="flex items-start gap-3">
         <div
-          class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary-50"
+          class="flex h-12 w-12 shrink-0 items-center justify-center rounded-default bg-primary-50"
           aria-hidden="true"
         >
           <svg
@@ -235,7 +235,7 @@ const joinSlack = () => {
       <!-- Social proof — generic avatar stack, no fabricated counts -->
       <div
         data-test="community-slack-invite-members"
-        class="flex items-center gap-3 rounded-lg bg-surface-panel px-3 py-2.5"
+        class="flex items-center gap-3 rounded-default bg-surface-panel px-3 py-2.5"
       >
         <div class="flex items-center" aria-hidden="true">
           <span

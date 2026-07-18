@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       ref="parentRef"
       :class="[
-        'o2-scroll-container overflow-auto rounded-lg',
+        'o2-scroll-container overflow-auto rounded-default',
         'table-container',
         'flex-1',
         'min-h-0',
@@ -350,7 +350,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <li
                           v-for="rawVal in getFilteredUniqueValues(header.column.id)"
                           :key="String(rawVal)"
-                          class="flex items-center gap-2 px-3 py-1.5 cursor-pointer rounded-sm hover:bg-surface-panel transition-colors"
+                          class="flex items-center gap-2 px-3 py-1.5 cursor-pointer rounded-default hover:bg-surface-panel transition-colors"
                           @click.stop="toggleColFilterValue(header.column.id, rawVal)"
                         >
                           <OCheckbox
@@ -496,7 +496,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="w-full px-4 overflow-hidden"
             >
               <span
-                class="o2-skel-pill inline-block h-3 rounded-md"
+                class="o2-skel-pill inline-block h-3 rounded-default"
                 :style="{ width: `${skelCellWidth(r - 1, 0)}%` }"
                 aria-hidden="true"
               />
@@ -511,7 +511,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :style="skelTdStyle(header, c)"
               >
                 <span
-                  class="o2-skel-pill inline-block h-3 rounded-md"
+                  class="o2-skel-pill inline-block h-3 rounded-default"
                   :style="{
                     width:
                       c === 0

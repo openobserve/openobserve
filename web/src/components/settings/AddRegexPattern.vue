@@ -103,7 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ t("regex_patterns.unsupported_lookaround_note") }}
                 {{ t("regex_patterns.unsupported_lookaround_example") }}
                 <code
-                  class="font-mono text-xs px-1 py-px rounded-sm bg-banner-info-border"
+                  class="font-mono text-xs px-1 py-px rounded-default bg-banner-info-border"
                   >(?=openobserve)\w+</code
                 >
                 <OIcon
@@ -112,7 +112,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="inline-block align-middle mx-1"
                 />
                 <code
-                  class="font-mono text-xs px-1 py-px rounded-sm bg-banner-info-border"
+                  class="font-mono text-xs px-1 py-px rounded-default bg-banner-info-border"
                   >openobserve\w*</code
                 >
               </div>
@@ -226,7 +226,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
                 <div
                   v-else
-                  class="flex flex-col items-center justify-center h-27.75 rounded-md border border-input-border bg-input-bg"
+                  class="flex flex-col items-center justify-center h-27.75 rounded-default border border-input-border bg-input-bg"
                 >
                   <div v-if="!testLoading && outputStringValue.length === 0">
                     <OIcon
@@ -587,8 +587,8 @@ export default defineComponent({
 /* keep(lib-override:o2-textarea): squares the top corners of the textarea's own
    border box (OTextarea's internal wrapper div, only reachable via :deep()) so
    each field reads as one unit under its flat full-width section-header strip. */
-.regex-pattern-input :deep(.rounded-md.border),
-.regex-test-string-input :deep(.rounded-md.border) {
+.regex-pattern-input :deep(.rounded-default.border),
+.regex-test-string-input :deep(.rounded-default.border) {
   border-top-left-radius: 0 !important;
   border-top-right-radius: 0 !important;
 }

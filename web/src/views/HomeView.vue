@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <div
-    class="rounded-md overflow-hidden min-h-0 h-full flex flex-col"
+    class="rounded-default overflow-hidden min-h-0 h-full flex flex-col"
     data-test="home-page"
   >
     <!-- No card-container here: the page already renders inside MainLayout's
@@ -63,7 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <button
                 v-if="tab.id.startsWith('dash:')"
                 type="button"
-                class="ml-1 inline-flex items-center justify-center w-4 h-4 leading-none border-none bg-transparent rounded-sm cursor-pointer opacity-60 text-sm text-text-secondary transition-all duration-200 ease-[ease] hover:opacity-100 hover:bg-surface-subtle-hover hover:text-text-body"
+                class="ml-1 inline-flex items-center justify-center w-4 h-4 leading-none border-none bg-transparent rounded-default cursor-pointer opacity-60 text-sm text-text-secondary transition-all duration-200 ease-[ease] hover:opacity-100 hover:bg-surface-subtle-hover hover:text-text-body"
                 :data-test="`home-tab-close-${tab.id}`"
                 :aria-label="t('home.removeHomeDashboard')"
                 @mousedown.stop.prevent

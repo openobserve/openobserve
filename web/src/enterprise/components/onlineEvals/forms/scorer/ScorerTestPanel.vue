@@ -1,6 +1,6 @@
 <template>
   <aside class="eval-form-page__side eval-form-page__side--test p-0 max-[60rem]:border-l-0 max-[60rem]:border-t max-[60rem]:border-border-default">
-    <section class="eval-test-panel min-h-full p-5 bg-surface-base rounded-md shadow-[0_0_0.313rem_0.063rem_var(--color-hover-shadow)]">
+    <section class="eval-test-panel min-h-full p-5 bg-surface-base rounded-default shadow-[0_0_0.313rem_0.063rem_var(--color-hover-shadow)]">
       <!-- Header -->
       <div class="flex flex-col gap-1">
         <h3 class="m-0 text-text-heading text-sm font-bold">{{ t("onlineEvals.scorer.testPanel.title") }}</h3>
@@ -20,14 +20,14 @@
               })
             "
             :data-test="`scorer-test-input-${variable}`"
-            class="w-full box-border border border-border-default rounded-sm bg-surface-base text-text-body font-normal text-xs font-sans leading-normal py-2 px-2.25 [resize:vertical] max-h-40 overflow-y-auto placeholder:text-text-muted focus:outline-none focus:border-primary-600"
+            class="w-full box-border border border-border-default rounded-default bg-surface-base text-text-body font-normal text-xs font-sans leading-normal py-2 px-2.25 [resize:vertical] max-h-40 overflow-y-auto placeholder:text-text-muted focus:outline-none focus:border-primary-600"
             @input="
               updateInput(variable, ($event.target as HTMLTextAreaElement).value)
             "
           />
         </div>
       </div>
-      <div v-else class="eval-test-panel__empty text-text-secondary text-xs py-2.5 px-3 border border-border-default rounded-md bg-surface-base [&_code]:font-mono [&_code]:font-semibold [&_code]:text-text-body">
+      <div v-else class="eval-test-panel__empty text-text-secondary text-xs py-2.5 px-3 border border-border-default rounded-default bg-surface-base [&_code]:font-mono [&_code]:font-semibold [&_code]:text-text-body">
         {{ t("onlineEvals.scorer.testPanel.emptyPrefix") }}<code v-text="'{{ input }}'" />{{ t("onlineEvals.scorer.testPanel.emptySuffix") }}
       </div>
 
@@ -56,7 +56,7 @@
       <!-- Result — only shown once a test has run (no idle placeholder box). -->
       <div
         v-if="state !== 'idle'"
-        class="flex flex-col gap-2 mt-4 p-3 border border-border-default rounded-md bg-surface-base text-text-secondary text-xs"
+        class="flex flex-col gap-2 mt-4 p-3 border border-border-default rounded-default bg-surface-base text-text-secondary text-xs"
         :class="{ 'border-[color-mix(in_srgb,var(--color-status-success-text)_35%,var(--color-border-default))]': state === 'success', 'border-[color-mix(in_srgb,var(--color-status-error-text)_35%,var(--color-border-default))] text-status-error-text': state === 'error' }"
         data-test="scorer-test-result"
       >

@@ -70,7 +70,7 @@ the Free Software Foundation, either version 3 of the License, or
             <span class="font-medium text-text-secondary">({{ group.entries.length }})</span>
           </div>
           <ul
-            class="flex flex-col rounded-sm border border-border-default"
+            class="flex flex-col rounded-default border border-border-default"
           >
             <li
               v-for="entry in group.entries"

@@ -91,7 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
 
           <div
-            class="py-1 px-[0.375rem] flex items-center justify-center border border-button-outline-border rounded-md transition-all duration-200 cursor-pointer hover:bg-button-outline-hover-bg"
+            class="py-1 px-[0.375rem] flex items-center justify-center border border-button-outline-border rounded-default transition-all duration-200 cursor-pointer hover:bg-button-outline-hover-bg"
           >
             <OSwitch
               data-test="traces-search-bar-show-metrics-toggle-btn"
@@ -179,7 +179,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :class="
                 store.state.zoConfig.auto_query_enabled
                   ? '![border-radius:0.375rem_0_0_0.375rem]'
-                  : 'rounded-md'
+                  : 'rounded-default'
               "
               @click="searchData"
               :loading="isLoading"

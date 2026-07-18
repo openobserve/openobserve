@@ -21,7 +21,7 @@
         <!-- Group header (only rendered for grouped/label rows) -->
         <template #group-header="{ row, groupName }">
           <div
-            class="field-group-header h-full w-full flex justify-between items-center rounded-lg font-semibold text-xs leading-7 px-[0.325rem] cursor-pointer bg-surface-subtle text-field-list-group-text"
+            class="field-group-header h-full w-full flex justify-between items-center rounded-default font-semibold text-xs leading-7 px-[0.325rem] cursor-pointer bg-surface-subtle text-field-list-group-text"
             :data-test="`search-field-list-group-${row.group}-header`"
             @click="toggleGroup(row.group)"
           >
@@ -104,52 +104,52 @@
           >
             <!-- Group 1 header -->
             <div class="h-7 flex items-center justify-between px-2">
-              <OSkeleton type="rect" class="h-3 w-24 rounded-sm" />
-              <OSkeleton type="rect" class="h-3 w-3 rounded-sm" />
+              <OSkeleton type="rect" class="h-3 w-24 rounded-default" />
+              <OSkeleton type="rect" class="h-3 w-3 rounded-default" />
             </div>
             <!-- Group 1 fields -->
             <div class="flex items-center gap-2 px-3 py-[0.375rem]">
-              <OSkeleton type="rect" class="w-[0.875rem] h-[0.875rem] rounded-sm shrink-0" />
+              <OSkeleton type="rect" class="w-[0.875rem] h-[0.875rem] rounded-default shrink-0" />
               <OSkeleton type="text" class="flex-1" />
             </div>
             <div class="flex items-center gap-2 px-3 py-[0.375rem]">
-              <OSkeleton type="rect" class="w-[0.875rem] h-[0.875rem] rounded-sm shrink-0" />
+              <OSkeleton type="rect" class="w-[0.875rem] h-[0.875rem] rounded-default shrink-0" />
               <OSkeleton type="text" class="w-3/4" />
             </div>
             <div class="flex items-center gap-2 px-3 py-[0.375rem]">
-              <OSkeleton type="rect" class="w-[0.875rem] h-[0.875rem] rounded-sm shrink-0" />
+              <OSkeleton type="rect" class="w-[0.875rem] h-[0.875rem] rounded-default shrink-0" />
               <OSkeleton type="text" class="flex-1" />
             </div>
             <!-- Group 2 header -->
             <div class="h-7 flex items-center justify-between px-2 mt-2">
-              <OSkeleton type="rect" class="h-3 w-16 rounded-sm" />
-              <OSkeleton type="rect" class="h-3 w-3 rounded-sm" />
+              <OSkeleton type="rect" class="h-3 w-16 rounded-default" />
+              <OSkeleton type="rect" class="h-3 w-3 rounded-default" />
             </div>
             <!-- Group 2 fields -->
             <div class="flex items-center gap-2 px-3 py-[0.375rem]">
-              <OSkeleton type="rect" class="w-[0.875rem] h-[0.875rem] rounded-sm shrink-0" />
+              <OSkeleton type="rect" class="w-[0.875rem] h-[0.875rem] rounded-default shrink-0" />
               <OSkeleton type="text" class="w-4/5" />
             </div>
             <div class="flex items-center gap-2 px-3 py-[0.375rem]">
-              <OSkeleton type="rect" class="w-[0.875rem] h-[0.875rem] rounded-sm shrink-0" />
+              <OSkeleton type="rect" class="w-[0.875rem] h-[0.875rem] rounded-default shrink-0" />
               <OSkeleton type="text" class="w-2/3" />
             </div>
             <!-- Group 3 header -->
             <div class="h-7 flex items-center justify-between px-2 mt-2">
-              <OSkeleton type="rect" class="h-3 w-32 rounded-sm" />
-              <OSkeleton type="rect" class="h-3 w-3 rounded-sm" />
+              <OSkeleton type="rect" class="h-3 w-32 rounded-default" />
+              <OSkeleton type="rect" class="h-3 w-3 rounded-default" />
             </div>
             <!-- Group 3 fields -->
             <div class="flex items-center gap-2 px-3 py-[0.375rem]">
-              <OSkeleton type="rect" class="w-[0.875rem] h-[0.875rem] rounded-sm shrink-0" />
+              <OSkeleton type="rect" class="w-[0.875rem] h-[0.875rem] rounded-default shrink-0" />
               <OSkeleton type="text" class="flex-1" />
             </div>
             <div class="flex items-center gap-2 px-3 py-[0.375rem]">
-              <OSkeleton type="rect" class="w-[0.875rem] h-[0.875rem] rounded-sm shrink-0" />
+              <OSkeleton type="rect" class="w-[0.875rem] h-[0.875rem] rounded-default shrink-0" />
               <OSkeleton type="text" class="w-3/4" />
             </div>
             <div class="flex items-center gap-2 px-3 py-[0.375rem]">
-              <OSkeleton type="rect" class="w-[0.875rem] h-[0.875rem] rounded-sm shrink-0" />
+              <OSkeleton type="rect" class="w-[0.875rem] h-[0.875rem] rounded-default shrink-0" />
               <OSkeleton type="text" class="flex-1" />
             </div>
           </div>
@@ -169,7 +169,7 @@
               size="icon-panel"
               :disabled="bottomProps.isFirstPage"
               @click="bottomProps.firstPage"
-              class="py-1.5 px-1! m-0! min-w-6! w-6! min-h-5.5! h-5.5! rounded-sm! overflow-visible!"
+              class="py-1.5 px-1! m-0! min-w-6! w-6! min-h-5.5! h-5.5! rounded-default! overflow-visible!"
             >
               <OIcon name="fast-rewind" size="sm" />
             </OButton>
@@ -182,7 +182,7 @@
                   bottomProps.currentPage === page ? 'primary' : 'ghost'
                 "
                 size="icon-panel"
-                class="py-1.5 px-1! m-0! min-w-6! w-6! min-h-5.5! h-5.5! text-xs! font-medium leading-none text-text-body! rounded-sm! overflow-visible!"
+                class="py-1.5 px-1! m-0! min-w-6! w-6! min-h-5.5! h-5.5! text-xs! font-medium leading-none text-text-body! rounded-default! overflow-visible!"
                 @click="setPage(page)"
                 >{{ page }}</OButton
               >
@@ -192,7 +192,7 @@
               size="icon-panel"
               :disabled="bottomProps.isLastPage"
               @click="bottomProps.lastPage"
-              class="py-1.5 px-1! m-0! min-w-6! w-6! min-h-5.5! h-5.5! rounded-sm! overflow-visible!"
+              class="py-1.5 px-1! m-0! min-w-6! w-6! min-h-5.5! h-5.5! rounded-default! overflow-visible!"
             >
               <OIcon name="fast-forward" size="sm" />
             </OButton>

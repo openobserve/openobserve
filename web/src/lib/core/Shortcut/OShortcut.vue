@@ -89,7 +89,7 @@ const sizeClasses: Record<NonNullable<ShortcutProps["size"]>, string> = {
       :key="i"
       :class="[
         'inline-flex items-center justify-center',
-        'rounded-sm border border-kbd-border bg-kbd-bg text-kbd-text',
+        'rounded-default border border-kbd-border bg-kbd-bg text-kbd-text',
         'font-medium leading-none whitespace-nowrap shadow-md',
         sizeClasses[size],
       ]"
