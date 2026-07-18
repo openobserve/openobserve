@@ -640,7 +640,7 @@
     "logs": "Logs",
     "traces": "Traces",
     "enrichmentTables": "Enrichment Tables",
-    "switchToLogs": "click to switch back to Logs",
+    "switchToLogs": "Switch back to Logs",
     "savedViewsLabel": "Saved View",
     "savedViewsNotFound": "Saved view not found!",
     "savedViewAction": "Create/Update Saved View",
