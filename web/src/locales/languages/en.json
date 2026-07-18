@@ -2177,7 +2177,11 @@
         "vscode": "VS Code",
         "claudeDesktop": "Claude Desktop",
         "windsurf": "Windsurf",
-        "chatgpt": "ChatGPT"
+        "chatgpt": "ChatGPT",
+        "antigravity": "Antigravity",
+        "opencode": "opencode",
+        "openclaw": "OpenClaw",
+        "hermes": "Hermes"
       },
       "desc": {
         "claudeCode": "Run this once — it registers the server in Claude Code.",
@@ -2185,7 +2189,11 @@
         "vscode": "Add to .vscode/mcp.json in your workspace, then reload VS Code.",
         "claudeDesktop": "Add to claude_desktop_config.json, then restart Claude Desktop.",
         "windsurf": "Add to ~/.codeium/windsurf/mcp_config.json, then reload Windsurf.",
-        "chatgpt": "Add a custom connector in ChatGPT settings with these values."
+        "chatgpt": "Add a custom connector in ChatGPT settings with these values.",
+        "antigravity": "Settings → Customizations → Open MCP Config (~/.gemini/config/mcp_config.json). Antigravity uses serverUrl, not url.",
+        "opencode": "Add to opencode.json (project root or ~/.config/opencode/), then restart opencode.",
+        "openclaw": "Add to ~/.openclaw/openclaw.json (run `openclaw mcp status` to locate it).",
+        "hermes": "Add to ~/.hermes/config.yaml (YAML), then run /reload-mcp."
       }
     },
     "manageTokensBtnLabel": "Manage Tokens",

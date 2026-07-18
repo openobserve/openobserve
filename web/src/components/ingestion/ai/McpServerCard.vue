@@ -112,6 +112,69 @@ const clients = computed(() => [
     config: `Server URL: ${endpoint.value}
 Authorization: Basic [BASIC_PASSCODE]`,
   },
+  {
+    // Antigravity uses `serverUrl` (not `url`) for remote HTTP servers.
+    id: "antigravity",
+    label: t("ingestion.mcp.clients.antigravity"),
+    desc: t("ingestion.mcp.desc.antigravity"),
+    config: `{
+  "mcpServers": {
+    "openobserve": {
+      "serverUrl": "${endpoint.value}",
+      "headers": {
+        "Authorization": "Basic [BASIC_PASSCODE]"
+      }
+    }
+  }
+}`,
+  },
+  {
+    id: "opencode",
+    label: t("ingestion.mcp.clients.opencode"),
+    desc: t("ingestion.mcp.desc.opencode"),
+    config: `{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "openobserve": {
+      "type": "remote",
+      "url": "${endpoint.value}",
+      "enabled": true,
+      "headers": {
+        "Authorization": "Basic [BASIC_PASSCODE]"
+      }
+    }
+  }
+}`,
+  },
+  {
+    id: "openclaw",
+    label: t("ingestion.mcp.clients.openclaw"),
+    desc: t("ingestion.mcp.desc.openclaw"),
+    config: `{
+  "mcp": {
+    "servers": {
+      "openobserve": {
+        "url": "${endpoint.value}",
+        "transport": "streamable-http",
+        "headers": {
+          "Authorization": "Basic [BASIC_PASSCODE]"
+        }
+      }
+    }
+  }
+}`,
+  },
+  {
+    // Hermes config is YAML (~/.hermes/config.yaml).
+    id: "hermes",
+    label: t("ingestion.mcp.clients.hermes"),
+    desc: t("ingestion.mcp.desc.hermes"),
+    config: `mcp_servers:
+  openobserve:
+    url: "${endpoint.value}"
+    headers:
+      Authorization: "Basic [BASIC_PASSCODE]"`,
+  },
 ]);
 
 const selectedClient = ref("claudeCode");
