@@ -1,0 +1,23 @@
+[package]
+name = "ingestion-service"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+async-trait.workspace = true
+axum.workspace = true
+bytes.workspace = true
+chrono.workspace = true
+common.workspace = true
+config.workspace = true
+infra.workspace = true
+ingester.workspace = true
+log.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+utoipa.workspace = true
+
+[dev-dependencies]
+tokio.workspace = true

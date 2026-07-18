@@ -40,6 +40,7 @@ vortex = [
 [dependencies]
 common.workspace = true
 catalog.workspace = true
+ingestion.workspace = true
 telemetry.workspace = true
 transform.workspace = true
 promql.workspace = true

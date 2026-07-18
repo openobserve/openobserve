@@ -249,6 +249,7 @@ members = [
     "src/jobs",
     "src/config",
     "src/infra",
+    "src/ingestion",
     "src/ingester",
     "src/wal",
     "src/proto",
@@ -267,6 +268,7 @@ license = "AGPL-3.0"
 [workspace.dependencies]
 config = { path = "src/config" }
 infra = { path = "src/infra" }
+ingestion = { package = "ingestion-service", path = "src/ingestion" }
 ingester = { path = "src/ingester" }
 wal = { path = "src/wal" }
 proto = { path = "src/proto" }

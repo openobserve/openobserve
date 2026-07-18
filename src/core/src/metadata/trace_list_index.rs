@@ -92,7 +92,7 @@ impl Metadata for TraceListIndex {
             let data = data.as_object_mut().unwrap();
             let hour_key = ingestion::get_write_partition_key(
                 timestamp,
-                &vec![],
+                &[],
                 get_partition_time_level(StreamType::Metadata),
                 data,
                 Some(&schema_key),
@@ -281,7 +281,7 @@ mod tests {
         );
         let hour_key = ingestion::get_write_partition_key(
             timestamp,
-            &vec![],
+            &[],
             get_partition_time_level(StreamType::Metadata),
             data,
             Some(schema_key),

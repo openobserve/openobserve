@@ -16,23 +16,20 @@
 use std::{
     collections::{HashMap, HashSet},
     io::Write,
-    sync::{
-        Arc,
-        atomic::{AtomicUsize, Ordering},
-    },
+    sync::atomic::Ordering,
 };
 
-use chrono::{Duration, TimeZone, Utc};
+use chrono::{Duration, Utc};
 use config::{
-    SIZE_IN_MB, TIMESTAMP_COL_NAME,
+    TIMESTAMP_COL_NAME,
     cluster::{LOCAL_NODE, LOCAL_NODE_ID},
     ider::SnowflakeIdGenerator,
     meta::{
         alerts::alert::Alert,
-        self_reporting::usage::{RequestStats, TriggerData, TriggerDataStatus, TriggerDataType},
-        stream::{PartitionTimeLevel, StreamParams, StreamPartition, StreamType},
+        self_reporting::usage::{TriggerData, TriggerDataStatus, TriggerDataType},
+        stream::{StreamParams, StreamType},
     },
-    utils::{flatten, json::*, schema::format_partition_key},
+    utils::{flatten, json::*},
 };
 use infra::{
     errors::{Error, Result},
@@ -48,7 +45,7 @@ use crate::{
     alerts::alert::AlertExt,
     common::{
         infra::config::{REALTIME_ALERT_TRIGGERS, STREAM_ALERTS},
-        meta::{ingestion::IngestionRequest, stream::SchemaRecords},
+        meta::ingestion::IngestionRequest,
     },
     db::{self, alerts::alert::scheduler_key},
     telemetry::report_trigger,
@@ -57,39 +54,15 @@ use crate::{
 pub mod grpc;
 pub mod ingestion_service;
 
+pub use ::ingestion::{
+    get_stream_partition_keys, get_thread_id, get_write_partition_key, write_file,
+};
 pub use transform::{
     apply_vrl_fn, compile_vrl_function, init_vrl_runtime as init_functions_runtime,
     js::{JSRuntimeConfig, apply_js_fn, compile_js_function},
 };
 
 pub type TriggerAlertData = Vec<(Alert, Vec<Map<String, Value>>)>;
-
-/// Global atomic counter for round-robin distribution of requests across memory table buckets.
-/// This ensures even distribution of ingestion load across multiple buckets in axum.
-static REQUEST_COUNTER: AtomicUsize = AtomicUsize::new(0);
-
-/// Get the next thread_id using round-robin distribution.
-/// This replaces the thread-local approach from actix-web with a request-level distribution.
-///
-/// The counter will wrap around safely when it reaches usize::MAX:
-/// - On 64-bit systems: ~5.8 million years at 100k req/s
-/// - On 32-bit systems: wraps after ~12 hours at 100k req/s, but continues working correctly
-pub fn get_thread_id() -> usize {
-    let cfg = config::get_config();
-    // Use wrapping modulo to ensure even distribution across worker threads/buckets
-    REQUEST_COUNTER.fetch_add(1, Ordering::Relaxed) % cfg.limit.http_worker_num
-}
-
-pub async fn get_stream_partition_keys(
-    org_id: &str,
-    stream_type: &StreamType,
-    stream_name: &str,
-) -> Vec<StreamPartition> {
-    let stream_settings = infra::schema::get_settings(org_id, stream_name, *stream_type)
-        .await
-        .unwrap_or_default();
-    stream_settings.partition_keys
-}
 
 #[inline(always)]
 pub async fn get_stream_executable_pipelines(stream: &StreamParams) -> Vec<ExecutablePipeline> {
@@ -234,91 +207,6 @@ pub async fn evaluate_trigger(triggers: TriggerAlertData) {
     for trigger_data_stream in trigger_usage_reports {
         report_trigger(trigger_data_stream);
     }
-}
-
-pub fn get_write_partition_key(
-    timestamp: i64,
-    partition_keys: &Vec<StreamPartition>,
-    time_level: PartitionTimeLevel,
-    local_val: &Map<String, Value>,
-    suffix: Option<&str>,
-) -> String {
-    // get time file name
-    let mut time_key = match time_level {
-        PartitionTimeLevel::Unset | PartitionTimeLevel::Hourly => Utc
-            .timestamp_nanos(timestamp * 1000)
-            .format("%Y/%m/%d/%H")
-            .to_string(),
-        PartitionTimeLevel::Daily => Utc
-            .timestamp_nanos(timestamp * 1000)
-            .format("%Y/%m/%d/00")
-            .to_string(),
-    };
-    if let Some(s) = suffix {
-        time_key.push_str(&format!("/{s}"));
-    } else {
-        time_key.push_str("/default");
-    }
-    for key in partition_keys {
-        if key.disabled {
-            continue;
-        }
-        let val = match local_val.get(&key.field) {
-            Some(v) => get_string_value(v),
-            None => "null".to_string(),
-        };
-        let val = key.get_partition_key(&val);
-        time_key.push_str(&format!("/{}", format_partition_key(&val)));
-    }
-    time_key
-}
-
-pub async fn write_file(
-    writer: &Arc<ingester::Writer>,
-    org_id: &str,
-    stream_name: &str,
-    buf: HashMap<String, SchemaRecords>,
-    fsync: bool,
-) -> Result<RequestStats> {
-    let mut req_stats = RequestStats::default();
-    let entries = buf
-        .into_iter()
-        .filter_map(|(hour_key, entry)| {
-            if entry.records.is_empty() {
-                None
-            } else {
-                Some(ingester::Entry {
-                    org_id: Arc::from(org_id),
-                    stream: Arc::from(stream_name),
-                    schema: Some(entry.schema),
-                    schema_key: Arc::from(entry.schema_key.as_str()),
-                    partition_key: Arc::from(hour_key.as_str()),
-                    data: entry.records,
-                    data_size: entry.records_size,
-                    batch: None,
-                })
-            }
-        })
-        .collect::<Vec<_>>();
-    let (entries_records, entries_size) = entries
-        .iter()
-        .map(|entry| (entry.data.len(), entry.data_size))
-        .fold((0, 0), |(acc_records, acc_size), (records, size)| {
-            (acc_records + records, acc_size + size)
-        });
-    if let Err(e) = writer.write_batch(entries, fsync).await {
-        log::error!(
-            "ingestion write file for stream {}/{} error: {}",
-            writer.get_key_str(),
-            stream_name,
-            e
-        );
-        return Err(Error::IngestionError(e.to_string()));
-    }
-
-    req_stats.size += entries_size as f64 / SIZE_IN_MB;
-    req_stats.records += entries_records as i64;
-    Ok(req_stats)
 }
 
 pub async fn check_ingestion_allowed(
@@ -544,6 +432,10 @@ pub fn refactor_map(
 
 #[cfg(test)]
 mod tests {
+    use config::{
+        meta::stream::{PartitionTimeLevel, StreamPartition},
+        utils::schema::format_partition_key,
+    };
     use infra::schema::{STREAM_SETTINGS, unwrap_stream_settings};
 
     use super::*;
@@ -561,7 +453,7 @@ mod tests {
         assert_eq!(
             get_write_partition_key(
                 1620000000,
-                &vec![
+                &[
                     StreamPartition::new("country"),
                     StreamPartition::new("sport")
                 ],
@@ -581,7 +473,7 @@ mod tests {
         assert_eq!(
             get_write_partition_key(
                 1620000000,
-                &vec![],
+                &[],
                 PartitionTimeLevel::Hourly,
                 &local_val,
                 None
@@ -595,7 +487,7 @@ mod tests {
         assert_eq!(
             get_write_partition_key(
                 1620000000,
-                &vec![],
+                &[],
                 PartitionTimeLevel::Hourly,
                 &Map::new(),
                 None

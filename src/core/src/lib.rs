@@ -42,7 +42,6 @@ pub mod grpc;
 pub mod http;
 pub mod ingestion;
 pub mod ingestion_tokens;
-pub mod ingestion_types;
 pub mod kv;
 #[cfg(feature = "enterprise")]
 pub mod llm_evaluations;
@@ -92,8 +91,7 @@ pub mod users;
 pub mod common {
     pub mod meta {
         pub use ::common::meta::*;
-
-        pub use crate::ingestion_types as ingestion;
+        pub use ::ingestion::types as ingestion;
 
         /// Lives here rather than in the `common` crate so that `common` does not
         /// depend on the `search` crate.

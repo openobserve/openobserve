@@ -5109,6 +5109,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "ingestion-service"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "axum",
+ "bytes",
+ "chrono",
+ "common",
+ "config",
+ "infra",
+ "ingester",
+ "log",
+ "serde",
+ "serde_json",
+ "tokio",
+ "utoipa",
+]
+
+[[package]]
 name = "inherent"
 version = "1.0.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6744,6 +6763,7 @@ dependencies = [
  "openobserve-core",
  "promql-parser",
  "proto",
+ "query-service",
  "serde",
  "serde_json",
  "tokio",
@@ -6793,6 +6813,7 @@ dependencies = [
  "http-body-util",
  "infra",
  "ingester",
+ "ingestion-service",
  "itertools 0.14.0",
  "jsonwebtoken",
  "lettre",

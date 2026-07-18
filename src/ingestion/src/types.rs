@@ -18,8 +18,8 @@ use std::{
     io::{BufReader, Cursor, Lines},
 };
 
-use ::common::meta::stream::SchemaRecords;
 use axum::body::Bytes;
+use common::meta::stream::SchemaRecords;
 use config::utils::json;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
@@ -447,6 +447,34 @@ pub enum IngestionDataIter {
         std::vec::IntoIter<json::Value>,
         Option<KinesisFHIngestionResponse>,
     ),
+}
+
+impl Iterator for IngestionDataIter {
+    type Item = Result<json::Value, IngestionError>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            IngestionDataIter::JSONIter(iter) => iter.next().map(Ok),
+            IngestionDataIter::MultiIter(iter) => loop {
+                match iter.next() {
+                    Some(Ok(line)) if line.trim().is_empty() => continue,
+                    Some(Ok(line)) => {
+                        return Some(json::from_str(&line).map_err(IngestionError::from));
+                    }
+                    Some(Err(error)) => return Some(Err(IngestionError::from(error))),
+                    None => return None,
+                }
+            },
+            IngestionDataIter::GCP(iter, error) => match error {
+                Some(error) => Some(Err(IngestionError::GCPError(error.clone()))),
+                None => iter.next().map(Ok),
+            },
+            IngestionDataIter::KinesisFH(iter, error) => match error {
+                Some(error) => Some(Err(IngestionError::AWSError(error.clone()))),
+                None => iter.next().map(Ok),
+            },
+        }
+    }
 }
 
 pub enum HecStatus {
