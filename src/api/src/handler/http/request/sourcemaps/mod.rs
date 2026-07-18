@@ -22,16 +22,14 @@ use axum::{
     response::Response,
 };
 use infra::table::source_maps::FileType;
+use resources::{
+    sourcemap_service::{self as sv_sourcemaps, TranslatedStack},
+    sourcemaps as db_sourcemaps,
+};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-use crate::{
-    common::meta::http::HttpResponse as MetaHttpResponse,
-    service::{
-        db::sourcemaps as db_sourcemaps,
-        sourcemaps::{self as sv_sourcemaps, TranslatedStack},
-    },
-};
+use crate::common::meta::http::HttpResponse as MetaHttpResponse;
 
 #[derive(Serialize)]
 struct SourceMapRepr {

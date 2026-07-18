@@ -22,7 +22,14 @@ infra.workspace = true
 log.workspace = true
 o2_enterprise = { workspace = true, optional = true, default-features = false }
 parquet.workspace = true
+proto.workspace = true
 regex.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+sourcemap.workspace = true
 tokio.workspace = true
+tonic.workspace = true
+zip.workspace = true
+
+[dev-dependencies]
+sea-orm.workspace = true

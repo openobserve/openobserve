@@ -67,7 +67,6 @@ pub mod search;
 #[cfg(feature = "enterprise")]
 pub mod search_jobs;
 pub mod self_reporting;
-pub mod sourcemaps;
 pub mod stream;
 pub mod stream_utils;
 pub mod synthetics;

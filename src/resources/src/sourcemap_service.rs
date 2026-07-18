@@ -18,7 +18,7 @@ use {
     },
 };
 
-use super::db::sourcemaps;
+use crate::sourcemaps;
 
 const UNKNOWN_STR: &str = "<unknown>";
 // half-window size for returning source. Basically for trace at line l, it will return l-this -> l+
@@ -534,7 +534,8 @@ mod tests {
 
     use std::collections::HashSet;
 
-    use super::{super::db::sourcemaps::*, *};
+    use super::*;
+    use crate::sourcemaps::*;
 
     // Unit tests run without `init-db` (which creates the sqlite db dir and runs
     // migrations from the workspace root); create the db dir and the one table
@@ -585,7 +586,7 @@ mod tests {
     // tests extraction and processing of zip works fine
     #[tokio::test]
     async fn test_zip_processing() {
-        upload_zip("svc1", "env1", "v1").await;
+        upload_zip("svc-zip", "env-zip", "v-zip").await;
     }
 
     #[tokio::test]
@@ -597,12 +598,12 @@ mod tests {
             "startRecording-DDLxttnr.js.map".to_string(),
         ]);
 
-        upload_zip("svc1", "env1", "v1").await;
+        upload_zip("svc-list", "env-list", "v-list").await;
         let res = list_files(
             "default",
-            Some("svc1".into()),
-            Some("env1".into()),
-            Some("v1".into()),
+            Some("svc-list".into()),
+            Some("env-list".into()),
+            Some("v-list".into()),
         )
         .await
         .unwrap();
@@ -615,17 +616,22 @@ mod tests {
 
         let res = list_files(
             "org2",
-            Some("svc1".into()),
-            Some("env1".into()),
-            Some("v1".into()),
+            Some("svc-list".into()),
+            Some("env-list".into()),
+            Some("v-list".into()),
         )
         .await
         .unwrap();
         assert!(res.is_empty());
 
-        let res = list_files("default", Some("svc1".into()), None, Some("v1".into()))
-            .await
-            .unwrap();
+        let res = list_files(
+            "default",
+            Some("svc-list".into()),
+            None,
+            Some("v-list".into()),
+        )
+        .await
+        .unwrap();
         assert_eq!(res.len(), 4);
 
         let t: HashSet<_> = res
@@ -634,9 +640,14 @@ mod tests {
             .collect();
         assert_eq!(t, expected);
 
-        let res = list_files("default", None, Some("env1".into()), Some("v1".into()))
-            .await
-            .unwrap();
+        let res = list_files(
+            "default",
+            None,
+            Some("env-list".into()),
+            Some("v-list".into()),
+        )
+        .await
+        .unwrap();
         assert_eq!(res.len(), 4);
         let t: HashSet<_> = res
             .iter()
@@ -644,9 +655,14 @@ mod tests {
             .collect();
         assert_eq!(t, expected);
 
-        let res = list_files("default", Some("svc1".into()), Some("env1".into()), None)
-            .await
-            .unwrap();
+        let res = list_files(
+            "default",
+            Some("svc-list".into()),
+            Some("env-list".into()),
+            None,
+        )
+        .await
+        .unwrap();
         assert_eq!(res.len(), 4);
         let t: HashSet<_> = res
             .iter()
@@ -663,16 +679,26 @@ mod tests {
             "profiler-Dq395iFC.js.map".to_string(),
             "startRecording-DDLxttnr.js.map".to_string(),
         ]);
-        upload_zip("svc1", "env1", "v1").await;
+        upload_zip("svc-delete", "env-delete", "v-delete").await;
         // for deletion the filters much match exactly, so nothing should be deleted here
-        delete_group("default", None, Some("env1".into()), Some("v1".into()))
-            .await
-            .unwrap();
+        delete_group(
+            "default",
+            None,
+            Some("env-delete".into()),
+            Some("v-delete".into()),
+        )
+        .await
+        .unwrap();
 
         // list matches filter approximately, so we should still get list here
-        let res = list_files("default", None, Some("env1".into()), Some("v1".into()))
-            .await
-            .unwrap();
+        let res = list_files(
+            "default",
+            None,
+            Some("env-delete".into()),
+            Some("v-delete".into()),
+        )
+        .await
+        .unwrap();
         assert_eq!(res.len(), 4);
         let t: HashSet<_> = res
             .iter()
@@ -682,15 +708,20 @@ mod tests {
 
         delete_group(
             "default",
-            Some("svc1".into()),
-            Some("env1".into()),
-            Some("v1".into()),
+            Some("svc-delete".into()),
+            Some("env-delete".into()),
+            Some("v-delete".into()),
         )
         .await
         .unwrap();
-        let res = list_files("default", None, Some("env1".into()), Some("v1".into()))
-            .await
-            .unwrap();
+        let res = list_files(
+            "default",
+            None,
+            Some("env-delete".into()),
+            Some("v-delete".into()),
+        )
+        .await
+        .unwrap();
         assert!(res.is_empty());
     }
 
@@ -698,14 +729,14 @@ mod tests {
     async fn test_translate() {
         let stack1 = "TypeError: can't access property \"nonExistent\", e is undefined\n  at setup/b/< @ http://localhost:4173/assets/AboutView-RC3okFHd.js:1:338\n  at setup/b/< @ http://localhost:4173/assets/AboutView-RC3okFHd.js:1:538\n  at b @ http://localhost:4173/assets/AboutView-RC3okFHd.js:1:542\n  at i @ http://localhost:4173/assets/AboutView-RC3okFHd.js:1:210\n  at Oe @ http://localhost:4173/assets/index-BO6PqLMi.js:2:18838\n  at Ie @ http://localhost:4173/assets/index-BO6PqLMi.js:2:18910\n  at n @ http://localhost:4173/assets/index-BO6PqLMi.js:2:56810";
 
-        upload_zip("svc1", "env1", "v1").await;
+        upload_zip("svc-translate", "env-translate", "v-translate").await;
 
         // valid stack and smap
         let res = translate_stacktrace(
             "default",
-            Some("svc1".into()),
-            Some("env1".into()),
-            Some("v1".into()),
+            Some("svc-translate".into()),
+            Some("env-translate".into()),
+            Some("v-translate".into()),
             stack1.into(),
         )
         .await

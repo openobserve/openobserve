@@ -9,5 +9,6 @@ pub mod kv;
 pub mod model_pricing;
 pub mod saved_view;
 pub mod short_url;
+pub mod sourcemap_service;
 pub mod sourcemaps;
 mod store;

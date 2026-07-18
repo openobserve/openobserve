@@ -6598,6 +6598,7 @@ dependencies = [
  "regex-syntax",
  "report_server",
  "reqwest 0.13.2",
+ "resources",
  "rquickjs",
  "rust-embed-for-web",
  "rustls",
@@ -8791,10 +8792,15 @@ dependencies = [
  "log",
  "o2_enterprise",
  "parquet",
+ "proto",
  "regex",
+ "sea-orm",
  "serde",
  "serde_json",
+ "sourcemap",
  "tokio",
+ "tonic",
+ "zip 8.2.0",
 ]
 
 [[package]]
