@@ -19,27 +19,50 @@ use std::collections::HashMap;
 
 use config::utils::json;
 
-use crate::service::traces::otel::attributes::{GenAiAttributes, LangfuseAttributes};
+use crate::service::traces::otel::attributes::{
+    FrameworkAttributes, GenAiAttributes, LangfuseAttributes, OpenInferenceAttributes,
+};
+
+/// Read a non-empty trimmed string attribute, else None.
+fn str_attr(attributes: &HashMap<String, json::Value>, key: &str) -> Option<String> {
+    let s = attributes.get(key)?.as_str()?.trim();
+    if s.is_empty() {
+        None
+    } else {
+        Some(s.to_string())
+    }
+}
 
 pub struct ToolExtractor;
 
 impl ToolExtractor {
-    /// Extract tool name
+    /// Extract tool name.
+    ///
+    /// Reads across the tracing conventions OpenObserve documents so tool nodes
+    /// render regardless of which framework produced the span:
+    ///  - Gen-AI semconv:  `gen_ai.tool.name`
+    ///  - OpenInference:   `tool.name`, `tool_call.function.name` (Arize/Phoenix, OpenAI Agents,
+    ///    Google ADK)
+    ///  - LangChain:       `langchain.tool.name`
+    ///  - CrewAI:          `crewai.task.tools`
+    ///  - Langfuse:        `langfuse.observation.metadata.tool.name`
     pub fn extract_tool_name(&self, attributes: &HashMap<String, json::Value>) -> Option<String> {
-        // Check Gen-AI attributes first
-        if let Some(value) = attributes.get(GenAiAttributes::TOOL_NAME)
-            && let Some(s) = value.as_str()
-        {
-            return Some(s.to_string());
+        // Gen-AI semconv wins.
+        if let Some(s) = str_attr(attributes, GenAiAttributes::TOOL_NAME) {
+            return Some(s);
         }
-
-        // Check Langfuse attributes
-        if let Some(value) = attributes.get(LangfuseAttributes::METADATA_TOOL_NAME)
-            && let Some(s) = value.as_str()
-        {
-            return Some(s.to_string());
+        // Framework conventions, in the order they appear across the docs.
+        for key in [
+            OpenInferenceAttributes::TOOL_NAME,
+            OpenInferenceAttributes::TOOL_CALL_FUNCTION_NAME,
+            FrameworkAttributes::LANGCHAIN_TOOL_NAME,
+            FrameworkAttributes::CREWAI_TASK_TOOLS,
+            LangfuseAttributes::METADATA_TOOL_NAME,
+        ] {
+            if let Some(s) = str_attr(attributes, key) {
+                return Some(s);
+            }
         }
-
         None
     }
 
@@ -105,6 +128,54 @@ mod tests {
 
         let result = extractor.extract_tool_name(&attrs);
         assert_eq!(result, None);
+    }
+
+    #[test]
+    fn test_extract_tool_name_openinference() {
+        // Arize/Phoenix, OpenAI Agents, Google ADK: tool.name on a TOOL span.
+        let extractor = ToolExtractor;
+        let mut attrs = HashMap::new();
+        attrs.insert("tool.name".to_string(), json::json!("file_search"));
+        assert_eq!(
+            extractor.extract_tool_name(&attrs),
+            Some("file_search".to_string())
+        );
+    }
+
+    #[test]
+    fn test_extract_tool_name_openinference_function_call() {
+        let extractor = ToolExtractor;
+        let mut attrs = HashMap::new();
+        attrs.insert(
+            "tool_call.function.name".to_string(),
+            json::json!("run_query"),
+        );
+        assert_eq!(
+            extractor.extract_tool_name(&attrs),
+            Some("run_query".to_string())
+        );
+    }
+
+    #[test]
+    fn test_extract_tool_name_langchain() {
+        let extractor = ToolExtractor;
+        let mut attrs = HashMap::new();
+        attrs.insert("langchain.tool.name".to_string(), json::json!("calculator"));
+        assert_eq!(
+            extractor.extract_tool_name(&attrs),
+            Some("calculator".to_string())
+        );
+    }
+
+    #[test]
+    fn test_extract_tool_name_crewai() {
+        let extractor = ToolExtractor;
+        let mut attrs = HashMap::new();
+        attrs.insert("crewai.task.tools".to_string(), json::json!("web_scraper"));
+        assert_eq!(
+            extractor.extract_tool_name(&attrs),
+            Some("web_scraper".to_string())
+        );
     }
 
     #[test]

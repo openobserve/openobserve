@@ -217,6 +217,13 @@ impl OpenInferenceAttributes {
     pub const LLM_TOKEN_COUNT_PROMPT: &'static str = "llm.token_count.prompt";
     pub const LLM_TOKEN_COUNT_COMPLETION: &'static str = "llm.token_count.completion";
     pub const LLM_INVOCATION_PARAMETERS: &'static str = "llm.invocation_parameters";
+    // Tool name on a TOOL-kind span (Arize/Phoenix, OpenAI Agents, Google ADK).
+    pub const TOOL_NAME: &'static str = "tool.name";
+    pub const TOOL_CALL_FUNCTION_NAME: &'static str = "tool_call.function.name";
+    // Agent name (OpenInference AGENT span).
+    pub const AGENT_NAME: &'static str = "agent.name";
+    // Graph-framework node identity (LangGraph via OpenInference).
+    pub const GRAPH_NODE_ID: &'static str = "graph.node.id";
 }
 
 /// Langfuse Attributes
@@ -276,10 +283,18 @@ pub struct FrameworkAttributes;
 
 impl FrameworkAttributes {
     // Google Vertex AI Agent
+    pub const GCP_VERTEX_AGENT_NAME: &'static str = "gcp.vertex.agent.name";
     pub const GCP_VERTEX_AGENT_LLM_REQUEST: &'static str = "gcp.vertex.agent.llm_request";
     pub const GCP_VERTEX_AGENT_LLM_RESPONSE: &'static str = "gcp.vertex.agent.llm_response";
     pub const GCP_VERTEX_AGENT_TOOL_CALL_ARGS: &'static str = "gcp.vertex.agent.tool_call_args";
     pub const GCP_VERTEX_AGENT_TOOL_RESPONSE: &'static str = "gcp.vertex.agent.tool_response";
+
+    // CrewAI (traceloop-based)
+    pub const CREWAI_TASK_AGENT: &'static str = "crewai.task.agent";
+    pub const CREWAI_TASK_TOOLS: &'static str = "crewai.task.tools";
+
+    // LangChain / LangGraph
+    pub const LANGCHAIN_TOOL_NAME: &'static str = "langchain.tool.name";
 
     // Logfire
     pub const LOGFIRE_PROMPT: &'static str = "prompt";
