@@ -1610,16 +1610,16 @@ onMounted(load);
     line-height: 1.3;
   }
   :deep(h1) {
-    font-size: 1.05rem;
+    font-size: var(--text-base);
   }
   :deep(h2) {
-    font-size: 0.95rem;
+    font-size: var(--text-base);
   }
   :deep(h3) {
-    font-size: 0.875rem;
+    font-size: var(--text-sm);
   }
   :deep(h4) {
-    font-size: 0.8rem;
+    font-size: var(--text-compact);
   }
   :deep(ul),
   :deep(ol) {
@@ -1639,7 +1639,7 @@ onMounted(load);
   }
   :deep(code) {
     font-family: var(--font-mono);
-    font-size: 0.72rem;
+    font-size: var(--text-xs);
     background: color-mix(in srgb, var(--color-text-heading) 8%, transparent);
     padding: 0.1rem 0.3rem;
     border-radius: 0.1875rem;
@@ -1666,7 +1666,7 @@ onMounted(load);
     border-collapse: collapse;
     width: 100%;
     margin: 0.5rem 0;
-    font-size: 0.72rem;
+    font-size: var(--text-xs);
   }
   :deep(th),
   :deep(td) {

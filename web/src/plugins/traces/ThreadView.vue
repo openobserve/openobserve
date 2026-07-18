@@ -522,16 +522,16 @@ function formatTime(ns: number): string {
     line-height: 1.3;
   }
   :deep(h1) {
-    font-size: 1.05rem;
+    font-size: var(--text-base);
   }
   :deep(h2) {
-    font-size: 0.95rem;
+    font-size: var(--text-base);
   }
   :deep(h3) {
-    font-size: 0.9rem;
+    font-size: var(--text-sm);
   }
   :deep(h4) {
-    font-size: 0.85rem;
+    font-size: var(--text-sm);
   }
   :deep(ul),
   :deep(ol) {
@@ -551,7 +551,7 @@ function formatTime(ns: number): string {
   }
   :deep(code) {
     font-family: var(--font-mono);
-    font-size: 0.78rem;
+    font-size: var(--text-xs);
     background: color-mix(in srgb, var(--color-text-body) 8%, transparent);
     padding: 0.1rem 0.3rem;
     border-radius: 0.1875rem;
@@ -578,7 +578,7 @@ function formatTime(ns: number): string {
     border-collapse: collapse;
     width: 100%;
     margin: 0.5rem 0;
-    font-size: 0.78rem;
+    font-size: var(--text-xs);
   }
   :deep(th),
   :deep(td) {

@@ -411,7 +411,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   style="
                     word-break: break-word;
                     font-family: var(--font-mono);
-                    font-size: 12px;
+                    font-size: var(--text-xs);
                   "
                   >{{ selectedRow.error }}</pre
                 >
@@ -435,7 +435,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   style="
                     word-break: break-word;
                     font-family: var(--font-mono);
-                    font-size: 12px;
+                    font-size: var(--text-xs);
                   "
                   >{{ selectedRow.success_response }}</pre
                 >

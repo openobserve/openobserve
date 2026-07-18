@@ -513,8 +513,8 @@ export default defineComponent({
               const firstTime = new Date(originalNode.first_fired_at / 1000).toLocaleString();
               const lastTime = originalNode.alert_count > 1 ? new Date(originalNode.last_fired_at / 1000).toLocaleString() : null;
 
-              let html = `<div style="padding: 0.5rem; font-size: 0.75rem;">`;
-              html += `<strong style="font-size: 0.875rem;">${originalNode.alert_name}</strong><br/>`;
+              let html = `<div style="padding: 0.5rem; font-size: var(--text-xs);">`;
+              html += `<strong style="font-size: var(--text-sm);">${originalNode.alert_name}</strong><br/>`;
               html += `Service: <strong>${originalNode.service_name}</strong><br/><br/>`;
               html += `Alert Count: <strong>${originalNode.alert_count}</strong><br/>`;
               html += `First Fired: ${firstTime}<br/>`;
@@ -553,7 +553,7 @@ export default defineComponent({
           },
           tooltip: {
             formatter: () => {
-              let html = `<div style="padding: 0.5rem; font-size: 0.75rem; text-align: center;">`;
+              let html = `<div style="padding: 0.5rem; font-size: var(--text-xs); text-align: center;">`;
               html += `<strong>${sourceNode.alert_name}</strong> <span style="color: var(--color-badge-purple-ol-text);">→</span> <strong>${targetNode.alert_name}</strong><br/><br/>`;
 
               if (edge.edge_type === "temporal") {

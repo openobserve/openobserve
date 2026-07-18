@@ -307,7 +307,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div>
               <OIcon
                 name="history"
-                class="w-25 h-25 [font-size:6.25rem] opacity-10" />
+                class="w-25 h-25 [font-size: var(--text-4xl)] opacity-10" />
             </div>
             <div class="text-3xl font-semibold opacity-80">
               Search history is not enabled.
@@ -3645,7 +3645,7 @@ export default defineComponent({
    FieldRow child components, so this reaches it with :deep() rather than a
    template utility. Mirrors the identical rule in plugins/traces/Index.vue. */
 .logPage :deep(.index-menu .field_list .field_overlay .field_label) {
-  font-size: 0.75rem !important;
+  font-size: var(--text-xs) !important;
 }
 </style>
 

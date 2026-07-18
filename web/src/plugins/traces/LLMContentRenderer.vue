@@ -689,7 +689,7 @@ const renderMarkdown = (content: string): string => {
    .message-content, which never receives the scope attribute — reached with
    :deep(). Tailwind cannot target these runtime-generated nodes. */
 .messages-view .message-item .message-content {
-  font-size: 0.8125rem;
+  font-size: var(--text-compact);
   line-height: 1.6;
 }
 
@@ -720,7 +720,7 @@ const renderMarkdown = (content: string): string => {
 
 .messages-view .message-item .message-content :deep(code) {
   font-family: var(--font-mono);
-  font-size: 0.75rem;
+  font-size: var(--text-xs);
   background-color: color-mix(in srgb, var(--color-black) 5%, transparent);
   padding: 0.125rem 0.25rem;
   border-radius: 0.1875rem;
@@ -784,18 +784,18 @@ const renderMarkdown = (content: string): string => {
 }
 
 .messages-view .message-item .message-content :deep(h1) {
-  font-size: 1.15rem;
+  font-size: var(--text-lg);
 }
 
 .messages-view .message-item .message-content :deep(h2) {
-  font-size: 1.05rem;
+  font-size: var(--text-base);
 }
 
 .messages-view .message-item .message-content :deep(h3) {
-  font-size: 0.95rem;
+  font-size: var(--text-base);
 }
 
 .messages-view .message-item .message-content :deep(h4) {
-  font-size: 0.875rem;
+  font-size: var(--text-sm);
 }
 </style>

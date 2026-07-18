@@ -236,7 +236,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       data-test="add-report-format-section"
                     >
                       <div
-                        style="font-size: 14px"
+                        style="font-size: var(--text-sm)"
                         class="font-bold text-text-secondary mb-2"
                       >
                         {{ t("reports.reportFormat") }}
@@ -298,7 +298,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       >
                         <div
                           class="flex items-center cursor-pointer"
-                          style="font-size: 14px; color: inherit"
+                          style="font-size: var(--text-sm); color: inherit"
                           @click="showCustomDimensions = !showCustomDimensions"
                         >
                           <OIcon
@@ -386,7 +386,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <div class="my-2 px-2">
                   <div
-                    style="font-size: 14px"
+                    style="font-size: var(--text-sm)"
                     class="font-bold text-text-secondary mb-2"
                   >
                     Frequency
@@ -423,7 +423,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             class="ml-1 cursor-pointer text-text-muted"
                           >
                             <OTooltip side="right" align="center">
-                              <template #content><span style="font-size: 14px">
+                              <template #content><span style="font-size: var(--text-sm)">
                                 Pattern: * * * * * * means every second.
                                 <br />
                                 Format: [Second (optional) 0-59] [Minute 0-59]
@@ -637,7 +637,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     />
                   </div>
                   <div data-test="add-report-share-message-section" class="pt-3">
-                    <div style="font-size: 14px" class="font-bold text-text-secondary">
+                    <div style="font-size: var(--text-sm)" class="font-bold text-text-secondary">
                       Message
                     </div>
 

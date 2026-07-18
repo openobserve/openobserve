@@ -177,7 +177,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   <div class="my-2 px-2">
                     <div
-                      style="font-size: 14px"
+                      style="font-size: var(--text-sm)"
                       class="font-bold text-text-secondary mb-2"
                       data-test="add-action-script-frequency-title"
                     >
@@ -206,7 +206,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       data-test="add-action-script-frequency-info"
                     >
                       <OIcon name="event" size="sm" class="mr-2" />
-                      <div style="font-size: 14px">
+                      <div style="font-size: var(--text-sm)">
                         The script will be triggered immediately after it is saved
                       </div>
                     </div>
@@ -231,7 +231,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             >
                               <OTooltip side="right" align="center">
                                 <template #content>
-                                  <span style="font-size: 14px">
+                                  <span style="font-size: var(--text-sm)">
                                     Pattern: * * * * * means every minute .
                                     <br />
                                     Format: [Minute 0-59] [Hour 0-23] [Day of Month
@@ -314,7 +314,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         >
                           <OTooltip side="right" align="center">
                             <template #content>
-                              <span style="font-size: 14px">
+                              <span style="font-size: var(--text-sm)">
                                 Make sure service account has permissions to access
                                 Actions.
                               </span>

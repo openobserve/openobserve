@@ -363,7 +363,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         >
                           <OTooltip side="right" max-width="300px">
                             <template #content>
-                              <span style="font-size: 14px"
+                              <span style="font-size: var(--text-sm)"
                                 >The threshold above/below which the alert will
                                 trigger. <br />
                                 e.g. if the threshold is >100 and the query
@@ -439,7 +439,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 .length
                             "
                             class="text-status-error-text pt-1 absolute"
-                            style="font-size: 11px; line-height: 12px"
+                            style="font-size: var(--text-2xs); line-height: 12px"
                           >
                             {{ t("pipeline.fieldRequired") }}
                           </div>
@@ -497,7 +497,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               !Number(triggerData.threshold)
                             "
                             class="text-status-error-text pt-1 absolute"
-                            style="font-size: 11px; line-height: 12px"
+                            style="font-size: var(--text-2xs); line-height: 12px"
                           >
                             {{ t("pipeline.fieldRequired") }}
                           </div>

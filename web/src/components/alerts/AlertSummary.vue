@@ -139,7 +139,7 @@ onMounted(async () => {
 .summary-text :deep(strong) {
   display: inline;
   font-weight: 700;
-  font-size: 0.875rem;
+  font-size: var(--text-sm);
 }
 
 .summary-text :deep(.summary-clickable) {
@@ -192,7 +192,7 @@ onMounted(async () => {
     color-mix(in srgb, var(--color-theme-accent) 8%, transparent)
   );
   border-left: 0.1875rem solid var(--color-theme-accent);
-  font-size: 0.875rem;
+  font-size: var(--text-sm);
   line-height: 1.7;
   font-style: italic;
   opacity: 0.95;

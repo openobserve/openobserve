@@ -659,7 +659,7 @@ export default defineComponent({
   padding: 0.25rem 0.5rem;
   margin: 0.25rem 0.125rem;
   border-radius: 0.375rem;
-  font-size: 0.75rem;
+  font-size: var(--text-xs);
   cursor: pointer;
   user-select: none;
   vertical-align: middle;
@@ -680,7 +680,7 @@ export default defineComponent({
 }
 
 .rich-text-input :deep(.reference-chip .chip-meta) {
-  font-size: 0.625rem;
+  font-size: var(--text-3xs);
   white-space: nowrap;
   color: var(--color-text-secondary);
 }
@@ -696,7 +696,7 @@ export default defineComponent({
   border: none;
   background: transparent;
   cursor: pointer;
-  font-size: 1rem;
+  font-size: var(--text-base);
   line-height: 1;
   border-radius: 0.1875rem;
   transition: all 0.15s ease;

@@ -2686,7 +2686,7 @@ export default defineComponent({
 }
 
 .indexDetailsContainer :deep(.o2-schema-table tbody tr td) {
-  font-size: 0.875rem;
+  font-size: var(--text-sm);
   height: 1.5625rem;
   padding: 0 0.3125rem;
 }

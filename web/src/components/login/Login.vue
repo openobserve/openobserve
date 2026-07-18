@@ -85,7 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <div v-else>
-        <div style="font-size: 22px" class="w-full text-center pb-3">
+        <div style="font-size: var(--text-xl)" class="w-full text-center pb-3">
           Login
         </div>
 

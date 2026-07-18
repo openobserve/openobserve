@@ -212,7 +212,7 @@ export default defineComponent({
       top: 50%;
       transform: translateY(-50%);
       color: var(--rca-icon-color);
-      font-size: 1.25rem;
+      font-size: var(--text-xl);
       line-height: 1;
     }
   }

@@ -838,11 +838,11 @@ size="sm">
                  />
                 <div
                   class="font-semibold mb-2"
-                  style="font-size: 16px"
+                  style="font-size: var(--text-base)"
                 >
                   {{ t("traces.spansTableView") }}
                 </div>
-                <div style="font-size: 14px">{{ t("traces.comingSoon") }}</div>
+                <div style="font-size: var(--text-sm)">{{ t("traces.comingSoon") }}</div>
               </div>
             </div>
 

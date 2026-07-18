@@ -79,7 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <span
                   data-test="edit-role-permissions-show-text"
-                  style="font-size: 14px"
+                  style="font-size: var(--text-sm)"
                 >
                   Show
                 </span>
@@ -204,7 +204,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <div v-if="isHelpOpen" style="width: 350px" class="p-2">
                   <div class="flex justify-between items-center px-2">
-                    <div style="font-size: 16px">Quick Reference</div>
+                    <div style="font-size: var(--text-base)">Quick Reference</div>
                     <OIcon
                       class="cursor-pointer"
                       name="close"
@@ -219,7 +219,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       Configure access with JSON objects specifying "object"
                       (resource) and "permission" (access level).
                     </div>
-                    <pre style="font-size: 12px">
+                    <pre style="font-size: var(--text-xs)">
 {
   "object": "MainResource:ChildResource",
   "permission": "AccessType"

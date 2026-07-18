@@ -802,7 +802,7 @@ function relativeTime(timestampMs: number): string {
 
 .sd__tab-intro {
   margin: 0;
-  font-size: 0.75rem;
+  font-size: var(--text-xs);
   line-height: 1.5;
   color: var(--color-text-secondary, var(--color-text-secondary));
 }
@@ -826,14 +826,14 @@ function relativeTime(timestampMs: number): string {
 }
 
 .sd-kv dt {
-  font-size: 0.75rem;
+  font-size: var(--text-xs);
   font-weight: 600;
   color: var(--color-text-secondary, var(--color-text-secondary));
 }
 
 .sd-kv dd {
   margin: 0;
-  font-size: 0.8125rem;
+  font-size: var(--text-compact);
   color: var(--color-text-heading, currentColor);
 }
 
@@ -841,7 +841,7 @@ function relativeTime(timestampMs: number): string {
   display: inline-flex;
   padding: 0.0625rem 0.375rem;
   border-radius: 0.1875rem;
-  font-size: 0.6875rem;
+  font-size: var(--text-2xs);
   font-weight: 600;
   background: var(--color-badge-indigo-soft-bg);
   color: var(--color-badge-indigo-soft-text);
@@ -857,7 +857,7 @@ function relativeTime(timestampMs: number): string {
   margin-left: 0.375rem;
   padding: 0.0625rem 0.375rem;
   border-radius: 0.1875rem;
-  font-size: 0.6875rem;
+  font-size: var(--text-2xs);
   font-weight: 600;
   background: color-mix(in srgb, var(--color-text-secondary) 10%, transparent);
   color: var(--color-text-secondary, var(--color-text-secondary));
@@ -876,7 +876,7 @@ function relativeTime(timestampMs: number): string {
   border: 0.0625rem solid
     color-mix(in srgb, var(--color-primary-600) 30%, transparent);
   border-radius: 0.3125rem;
-  font-size: 0.75rem;
+  font-size: var(--text-xs);
   color: var(--color-text-heading, currentColor);
 }
 
@@ -888,7 +888,7 @@ function relativeTime(timestampMs: number): string {
 .sd-produces__sep,
 .sd-produces__type {
   color: var(--color-text-secondary, var(--color-text-secondary));
-  font-size: 0.6875rem;
+  font-size: var(--text-2xs);
 }
 
 
@@ -900,7 +900,7 @@ function relativeTime(timestampMs: number): string {
     color-mix(in srgb, var(--color-text-secondary) 14%, transparent);
   border-radius: 0.375rem;
   font-family: var(--font-mono);
-  font-size: 0.75rem;
+  font-size: var(--text-xs);
   line-height: 1.55;
   color: var(--color-text-heading, currentColor);
   white-space: pre-wrap;
@@ -952,7 +952,7 @@ function relativeTime(timestampMs: number): string {
 
 .sd-versions__label {
   font-weight: 700;
-  font-size: 0.8125rem;
+  font-size: var(--text-compact);
   color: var(--color-text-heading, currentColor);
 }
 
@@ -960,7 +960,7 @@ function relativeTime(timestampMs: number): string {
   display: inline-flex;
   padding: 0.0625rem 0.4375rem;
   border-radius: 0.1875rem;
-  font-size: 0.625rem;
+  font-size: var(--text-3xs);
   font-weight: 600;
   background: color-mix(
     in srgb,
@@ -972,7 +972,7 @@ function relativeTime(timestampMs: number): string {
 
 .sd-versions__meta {
   margin-top: 0.375rem;
-  font-size: 0.71875rem;
+  font-size: var(--text-2xs);
   color: var(--color-text-secondary, var(--color-text-secondary));
 }
 
@@ -1052,14 +1052,14 @@ function relativeTime(timestampMs: number): string {
   height: auto !important;
   padding: 0.5rem 0.625rem !important;
   gap: 0.5rem;
-  font-size: 0.75rem;
+  font-size: var(--text-xs);
   justify-content: flex-start;
   text-align: left;
 }
 
 .sd-used-list__meta {
   margin-left: auto;
-  font-size: 0.625rem;
+  font-size: var(--text-3xs);
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: var(--color-text-secondary, var(--color-text-secondary));

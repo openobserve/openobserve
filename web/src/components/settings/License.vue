@@ -416,7 +416,7 @@
                   <div
                     v-if="isIngestionUnlimited"
                     class="text-xs text-text-secondary mt-1 text-center"
-                    style="font-size: 10px"
+                    style="font-size: var(--text-3xs)"
                   >
                     {{ t("about.usage_shows_zero_unlimited") }}
                   </div>
@@ -448,7 +448,7 @@
         v-model="licenseData.key"
         readonly
         :rows="8"
-        style="font-family: var(--font-mono); font-size: 12px"
+        style="font-family: var(--font-mono); font-size: var(--text-xs)"
       />
     </ODialog>
   </div>

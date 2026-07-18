@@ -628,7 +628,7 @@ defineExpose({ applyTemplate, previewTemplate });
   flex-direction: column;
   gap: 1.5rem;
   padding: 1.25rem;
-  font-size: 0.875rem;
+  font-size: var(--text-sm);
   color: var(--color-text-body);
 }
 
@@ -643,7 +643,7 @@ defineExpose({ applyTemplate, previewTemplate });
   padding: 0.75rem;
   border-radius: var(--radius-md);
   background: var(--color-surface-subtle);
-  font-size: 0.75rem;
+  font-size: var(--text-xs);
   color: var(--color-text-secondary);
 
   &__title {
@@ -670,7 +670,7 @@ defineExpose({ applyTemplate, previewTemplate });
     padding: 0.0625rem 0.375rem;
     border-radius: var(--radius-sm);
     font-family: var(--font-mono);
-    font-size: 0.6875rem;
+    font-size: var(--text-2xs);
     line-height: 1.4;
     text-align: center;
   }
@@ -699,7 +699,7 @@ defineExpose({ applyTemplate, previewTemplate });
   flex-direction: column;
 
   &__title {
-    font-size: 0.9375rem;
+    font-size: var(--text-sm);
     font-weight: 600;
     color: var(--color-text-heading);
     margin: 0 0 0.5rem;
@@ -717,7 +717,7 @@ defineExpose({ applyTemplate, previewTemplate });
 
   &__hint {
     color: var(--color-text-secondary);
-    font-size: 0.75rem;
+    font-size: var(--text-xs);
     margin: 0.5rem 0 0;
 
     &--top {
@@ -736,7 +736,7 @@ defineExpose({ applyTemplate, previewTemplate });
   background: transparent;
   border: none;
   cursor: pointer;
-  font-size: 0.9375rem;
+  font-size: var(--text-sm);
   font-weight: 600;
   color: var(--color-text-heading);
 
@@ -750,7 +750,7 @@ defineExpose({ applyTemplate, previewTemplate });
 .help-result-label {
   display: block;
   margin: 0.625rem 0 0.25rem;
-  font-size: 0.6875rem;
+  font-size: var(--text-2xs);
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.03em;
@@ -769,7 +769,7 @@ defineExpose({ applyTemplate, previewTemplate });
   margin: 0;
 
   &--sm {
-    font-size: 0.75rem;
+    font-size: var(--text-xs);
   }
 }
 
@@ -786,7 +786,7 @@ defineExpose({ applyTemplate, previewTemplate });
   align-items: center;
   gap: 0.5rem;
   margin: 0.5rem 0 0;
-  font-size: 0.8125rem;
+  font-size: var(--text-compact);
   color: var(--color-text-secondary);
 }
 
@@ -797,7 +797,7 @@ defineExpose({ applyTemplate, previewTemplate });
   gap: 0.375rem;
 
   &__label {
-    font-size: 0.6875rem;
+    font-size: var(--text-2xs);
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.03em;
@@ -829,7 +829,7 @@ defineExpose({ applyTemplate, previewTemplate });
   }
 
   &__label {
-    font-size: 0.6875rem;
+    font-size: var(--text-2xs);
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.03em;
@@ -837,7 +837,7 @@ defineExpose({ applyTemplate, previewTemplate });
   }
   &__desc {
     margin: 0;
-    font-size: 0.8125rem;
+    font-size: var(--text-compact);
     color: var(--color-text-secondary);
     line-height: 1.45;
   }
@@ -882,7 +882,7 @@ defineExpose({ applyTemplate, previewTemplate });
     color: var(--color-text-heading);
   }
   &__tpl {
-    font-size: 0.75rem;
+    font-size: var(--text-xs);
     color: var(--color-text-muted);
   }
 }
@@ -900,7 +900,7 @@ defineExpose({ applyTemplate, previewTemplate });
   border-radius: var(--radius-md);
   background: transparent;
   font-family: var(--font-mono);
-  font-size: 0.75rem;
+  font-size: var(--text-xs);
   color: var(--color-text-code);
   cursor: pointer;
   transition: background 0.2s ease;
@@ -930,7 +930,7 @@ defineExpose({ applyTemplate, previewTemplate });
 
   &__key {
     font-family: var(--font-mono);
-    font-size: 0.75rem;
+    font-size: var(--text-xs);
     color: var(--color-text-code);
   }
   &__val {
@@ -943,7 +943,7 @@ defineExpose({ applyTemplate, previewTemplate });
   white-space: pre-wrap;
   word-break: break-word;
   font-family: var(--font-mono);
-  font-size: 0.75rem;
+  font-size: var(--text-xs);
   line-height: 1.6;
   margin: 0;
   padding: 0.75rem;

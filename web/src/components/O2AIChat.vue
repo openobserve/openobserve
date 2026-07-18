@@ -4644,12 +4644,12 @@ export default defineComponent({
             imageRefSpan.contentEditable = "false";
             imageRefSpan.className = "image-reference";
             imageRefSpan.style.cssText =
-              `display: inline-flex; align-items: center; gap: 4px; padding: 2px 6px; margin: 0 2px; background: ${chartColor("--color-status-success-bg")}; border: 1px solid ${chartColor("--color-success-200")}; border-radius: 4px; font-size: 13px; color: ${chartColor("--color-status-success-text")}; user-select: none;`;
+              `display: inline-flex; align-items: center; gap: 4px; padding: 2px 6px; margin: 0 2px; background: ${chartColor("--color-status-success-bg")}; border: 1px solid ${chartColor("--color-success-200")}; border-radius: 4px; font-size: var(--text-compact); color: ${chartColor("--color-status-success-text")}; user-select: none;`;
 
             // Add image icon
             const imageIcon = document.createElement("span");
             imageIcon.textContent = "🖼️";
-            imageIcon.style.cssText = "font-size: 12px;";
+            imageIcon.style.cssText = "font-size: var(--text-xs);";
 
             // Add filename text
             const filenameText = document.createElement("span");
@@ -4659,7 +4659,7 @@ export default defineComponent({
             const removeBtn = document.createElement("button");
             removeBtn.textContent = "×";
             removeBtn.style.cssText =
-              `display: flex; align-items: center; justify-content: center; width: 14px; height: 14px; padding: 0; margin-left: 2px; background: transparent; border: none; border-radius: 3px; font-size: 16px; line-height: 1; cursor: pointer; color: ${chartColor("--color-status-success-text")}; transition: all 0.15s ease;`;
+              `display: flex; align-items: center; justify-content: center; width: 14px; height: 14px; padding: 0; margin-left: 2px; background: transparent; border: none; border-radius: 3px; font-size: var(--text-base); line-height: 1; cursor: pointer; color: ${chartColor("--color-status-success-text")}; transition: all 0.15s ease;`;
             removeBtn.onmouseover = () => {
               removeBtn.style.background = chartColor("--color-status-negative");
               removeBtn.style.color = chartColor("--color-white");
@@ -5976,37 +5976,37 @@ export default defineComponent({
    `!important` retained: these fight the global base-elements typography layer.
    ============================================================ */
 .text-block :deep(h1) {
-  font-size: 1.5rem !important;
+  font-size: var(--text-2xl) !important;
   font-weight: 600 !important;
   margin: 1rem 0 0.5rem 0 !important;
   line-height: 1.3 !important;
 }
 .text-block :deep(h2) {
-  font-size: 1.25rem !important;
+  font-size: var(--text-xl) !important;
   font-weight: 600 !important;
   margin: 0.875rem 0 0.4375rem 0 !important;
   line-height: 1.3 !important;
 }
 .text-block :deep(h3) {
-  font-size: 1.125rem !important;
+  font-size: var(--text-lg) !important;
   font-weight: 600 !important;
   margin: 0.75rem 0 0.375rem 0 !important;
   line-height: 1.3 !important;
 }
 .text-block :deep(h4) {
-  font-size: 1rem !important;
+  font-size: var(--text-base) !important;
   font-weight: 600 !important;
   margin: 0.625rem 0 0.3125rem 0 !important;
   line-height: 1.3 !important;
 }
 .text-block :deep(h5) {
-  font-size: 0.875rem !important;
+  font-size: var(--text-sm) !important;
   font-weight: 600 !important;
   margin: 0.5rem 0 0.25rem 0 !important;
   line-height: 1.3 !important;
 }
 .text-block :deep(h6) {
-  font-size: 0.75rem !important;
+  font-size: var(--text-xs) !important;
   font-weight: 600 !important;
   margin: 0.5rem 0 0.25rem 0 !important;
   line-height: 1.3 !important;

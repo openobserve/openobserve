@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <span
             data-test="iam-roles-selection-show-text"
-            style="font-size: 14px"
+            style="font-size: var(--text-sm)"
           >
             Show
           </span>

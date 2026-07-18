@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="edit-role-permissions-table-no-permissions-title"
         v-if="!level && !rows.length && !loading"
         class="w-full text-center mt-4 font-bold text-text-secondary"
-        style="margin-top: 64px; font-size: 18px"
+        style="margin-top: 64px; font-size: var(--text-lg)"
       >
         <span> No Permissions Selected </span>
       </div>

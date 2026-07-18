@@ -1352,7 +1352,7 @@ async function save(value: ScorerForm) {
 .scorer-form__main label:not(.o-input-label) {
   color: var(--color-text-heading, currentColor);
   font-weight: 600;
-  font-size: 0.75rem;
+  font-size: var(--text-xs);
 }
 
 /* keep(lib-override:o2-forms): native <textarea>/<select>/<input> rendered inside

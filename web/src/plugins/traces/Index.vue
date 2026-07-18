@@ -2437,6 +2437,6 @@ useShortcuts([
 }
 
 .tracePage :deep(.index-menu .field_list .field_overlay .field_label) {
-  font-size: 0.75rem !important;
+  font-size: var(--text-xs) !important;
 }
 </style>

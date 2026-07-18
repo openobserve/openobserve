@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div>
       <div class="flex justify-between items-center px-3 py-2">
-        <div data-test="add-pipeline-section-title" style="font-size: 18px">
+        <div data-test="add-pipeline-section-title" style="font-size: var(--text-lg)">
           {{ t("pipeline.addPipeline") }}
         </div>
         <OIcon

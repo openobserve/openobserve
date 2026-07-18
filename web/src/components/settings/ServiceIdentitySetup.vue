@@ -2359,7 +2359,7 @@ const insightChartData = computed(() => {
           const list = names
             .map(
               (n) =>
-                `<div style="padding:1px 0;padding-left:14px;font-size:11px;">${n}</div>`,
+                `<div style="padding:1px 0;padding-left:14px;font-size: var(--text-2xs);">${n}</div>`,
             )
             .join("");
           return header + '<div style="margin-top:4px;">' + list + "</div>";

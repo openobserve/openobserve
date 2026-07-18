@@ -111,7 +111,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         v-if="expandState.functionError"
                         class="px-2 pb-2 border-l-4 border-status-negative bg-surface-subtle"
                       >
-                        <pre class="my-0 text-status-error-text whitespace-pre-wrap" style="font-family: var(--font-mono); font-size: 13px;">{{
+                        <pre class="my-0 text-status-error-text whitespace-pre-wrap" style="font-family: var(--font-mono); font-size: var(--text-compact);">{{
                           vrlFunctionError
                         }}</pre>
                       </div>

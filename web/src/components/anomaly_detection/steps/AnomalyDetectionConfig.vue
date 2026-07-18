@@ -492,7 +492,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OTooltip side="right" align="center" max-width="300px">
                   <!-- Kept as a #content slot (not :content) so the 14px span
                        survives; only the text moves to i18n. -->
-                  <template #content><span style="font-size: 14px">{{
+                  <template #content><span style="font-size: var(--text-sm)">{{
                     t("alerts.anomaly.trainingWindowTooltip")
                   }}</span></template>
                 </OTooltip>

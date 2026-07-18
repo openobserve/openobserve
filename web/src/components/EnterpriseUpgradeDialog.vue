@@ -85,7 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :data="chartData"
                     />
                   </div>
-                  <div v-if="isIngestionUnlimited" class="text-xs text-center mt-1" style="color: rgba(255, 255, 255, 0.7); font-size: 10px;">
+                  <div v-if="isIngestionUnlimited" class="text-xs text-center mt-1" style="color: rgba(255, 255, 255, 0.7); font-size: var(--text-3xs);">
                     {{ t('about.usage_shows_zero_unlimited') }}
                   </div>
                 </div>

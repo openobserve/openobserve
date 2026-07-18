@@ -1352,7 +1352,7 @@ export default defineComponent({
 /* keep(lib-override): compact role chip styling (child OTag DOM) */
 :deep(.o2-role-chip) {
   padding: 0.125rem 0.5rem;
-  font-size: 0.6875rem;
+  font-size: var(--text-2xs);
   font-weight: 600;
   border-radius: 0.375rem;
   line-height: 1.4;

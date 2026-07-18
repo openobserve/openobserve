@@ -98,10 +98,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="text-2xl font-semibold leading-7 text-text-body text-left flex items-end">
             {{ aiUsage.credits_used }} / {{ aiUsage.credits_limit }} credits used
           </div>
-          <div v-if="aiUsage.mode === 'exhausted'" class="text-status-error-text mt-2" style="font-size: 13px;">
+          <div v-if="aiUsage.mode === 'exhausted'" class="text-status-error-text mt-2" style="font-size: var(--text-compact);">
             {{ t("billing.aiExhaustedMessage") }}
           </div>
-          <div v-else-if="aiUsage.mode === 'pay_as_you_go'" class="text-info mt-2" style="font-size: 13px;">
+          <div v-else-if="aiUsage.mode === 'pay_as_you_go'" class="text-info mt-2" style="font-size: var(--text-compact);">
             {{ t("billing.aiPaygMessage") }}
           </div>
         </div>

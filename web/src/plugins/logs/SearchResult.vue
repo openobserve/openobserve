@@ -2207,7 +2207,7 @@ export default defineComponent({
     height: 1.5rem !important;
     min-height: 1.5rem !important;
     min-width: 1.5rem !important;
-    font-size: 0.75rem !important;
+    font-size: var(--text-xs) !important;
     border-radius: 0.25rem !important;
     line-height: 1rem !important;
 
@@ -2227,7 +2227,7 @@ export default defineComponent({
   :deep(button) {
     height: 1.5rem !important;
     min-height: 1.5rem !important;
-    font-size: 0.75rem !important;
+    font-size: var(--text-xs) !important;
     padding-inline: 0.5rem !important;
   }
 }

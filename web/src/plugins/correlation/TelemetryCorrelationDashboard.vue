@@ -3457,7 +3457,7 @@ watch(
 .metric-group-tabs :deep(.o-tab) {
   min-height: 2rem;
   padding: 0 0.75rem;
-  font-size: 0.8125rem;
+  font-size: var(--text-compact);
 }
 .metric-group-tabs :deep(.o-tab__indicator) {
   height: 0.125rem;

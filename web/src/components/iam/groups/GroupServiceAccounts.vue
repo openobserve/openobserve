@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="flex items-center">
             <span
               data-test="iam-service-accounts-selection-show-text"
-              style="font-size: 14px"
+              style="font-size: var(--text-sm)"
             >
               Show
             </span>

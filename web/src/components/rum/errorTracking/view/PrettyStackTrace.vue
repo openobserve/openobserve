@@ -24,10 +24,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :style="{ 'background-color': backgroundColor, 'border': `1px solid ${borderColor}` }"
     >
       <OSpinner variant="dots" size="lg" />
-      <div class="mt-3 text-text-secondary font-medium" style="font-size: 14px;">
+      <div class="mt-3 text-text-secondary font-medium" style="font-size: var(--text-sm);">
         Translating stack trace with source maps...
       </div>
-      <div class="mt-1 text-text-secondary" style="font-size: 12px;">
+      <div class="mt-1 text-text-secondary" style="font-size: var(--text-xs);">
         This may take a few moments
       </div>
     </div>
@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="text-base font-medium text-text-secondary mb-1">
         Source Maps Not Available
       </div>
-      <div class="text-sm text-text-secondary" style="max-width: 500px; margin: 0 auto; font-size: 13px;">
+      <div class="text-sm text-text-secondary" style="max-width: 500px; margin: 0 auto; font-size: var(--text-compact);">
         To view detailed stack traces with original source code and line numbers, please upload source maps for this application.
       </div>
       <div v-if="props.error.service || props.error.version" class="flex items-center justify-center gap-2 mt-2 mb-2">

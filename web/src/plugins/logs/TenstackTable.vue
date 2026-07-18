@@ -1292,7 +1292,7 @@ defineExpose({
 .logs-table {
   border-collapse: separate;
   border-spacing: 0;
-  font-size: 0.75rem !important;
+  font-size: var(--text-xs) !important;
 }
 
 .logs-table,
@@ -1303,7 +1303,7 @@ defineExpose({
 
 .logs-table thead {
   font-family: var(--font-sans);
-  font-size: 0.875rem !important;
+  font-size: var(--text-sm) !important;
 }
 
 .logs-table th {

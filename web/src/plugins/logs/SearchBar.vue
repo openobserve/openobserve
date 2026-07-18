@@ -5707,7 +5707,7 @@ export default defineComponent({
 .logs-search-bar-component .region-dropdown-btn {
   text-transform: capitalize;
   font-weight: 600;
-  font-size: 0.75rem;
+  font-size: var(--text-xs);
   padding-left: 0.5rem;
   height: 1.875rem;
   padding-top: 0.1875rem;

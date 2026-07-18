@@ -653,13 +653,13 @@ export default defineComponent({
 
 .index-menu :deep(.field_list.field-group-header) {
   font-weight: 600;
-  font-size: 0.75rem;
+  font-size: var(--text-xs);
   padding: 0.25rem 0.325rem;
 }
 
 .index-menu :deep(.field_list .field_label) {
   pointer-events: none;
-  font-size: 0.825rem;
+  font-size: var(--text-compact);
   position: relative;
   display: inline;
   z-index: 2;

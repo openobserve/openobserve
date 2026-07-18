@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="flex items-center">
           <span
             data-test="iam-users-selection-show-text"
-            style="font-size: 14px"
+            style="font-size: var(--text-sm)"
           >
             Show
           </span>
@@ -116,7 +116,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :data-test="`iam-external-user-warning-icon-${row.email}`"
               />
               <template #content>
-                <div style="font-size: 12px; line-height: 1.5;">
+                <div style="font-size: var(--text-xs); line-height: 1.5;">
                   <strong>{{ t("iam.externalUserWarningTitle") }}</strong>
                   <div class="mt-1">{{ t("iam.externalUserWarningMessage") }}</div>
                 </div>

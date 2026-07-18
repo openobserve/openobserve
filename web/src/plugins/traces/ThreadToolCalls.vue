@@ -223,14 +223,14 @@ function formatDuration(ns: number): string {
   }
 
   .tt-count {
-    font-size: 0.72rem;
+    font-size: var(--text-xs);
     color: var(--color-text-secondary);
     font-weight: 600;
     white-space: nowrap;
   }
 
   .tt-link {
-    font-size: 0.78rem;
+    font-size: var(--text-xs);
     color: var(--color-primary-500);
     font-weight: 650;
   }
@@ -271,7 +271,7 @@ function formatDuration(ns: number): string {
   align-items: center;
   gap: 0.5rem;
   padding: 0.45rem 0.5rem 0.45rem 0.75rem;
-  font-size: 0.78rem;
+  font-size: var(--text-xs);
   cursor: pointer;
   color: var(--color-text-secondary);
   transition: background 120ms ease;
@@ -282,7 +282,7 @@ function formatDuration(ns: number): string {
 
   &__caret {
     color: var(--color-text-secondary);
-    font-size: 0.7rem;
+    font-size: var(--text-2xs);
     width: 0.75rem;
     text-align: center;
   }
@@ -293,7 +293,7 @@ function formatDuration(ns: number): string {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    font-size: 0.95rem;
+    font-size: var(--text-base);
   }
 
   &__name {
@@ -330,7 +330,7 @@ function formatDuration(ns: number): string {
   gap: 0.25rem;
   padding: 0.1rem 0.5rem;
   border-radius: var(--radius-full);
-  font-size: 0.65rem;
+  font-size: var(--text-3xs);
   font-weight: 600;
   letter-spacing: 0.03rem;
   font-family: var(--font-mono);
@@ -364,7 +364,7 @@ function formatDuration(ns: number): string {
   }
 
   &__label {
-    font-size: 0.62rem;
+    font-size: var(--text-3xs);
     font-weight: 700;
     letter-spacing: 0.06rem;
     color: var(--color-text-secondary);
@@ -377,7 +377,7 @@ function formatDuration(ns: number): string {
     border: 1px solid var(--color-border-default);
     border-radius: 0.25rem;
     font-family: var(--font-mono);
-    font-size: 0.72rem;
+    font-size: var(--text-xs);
     color: var(--color-text-body);
     line-height: 1.45;
     white-space: pre-wrap;

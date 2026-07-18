@@ -1130,7 +1130,7 @@ watch(
  * (COMPARISON_COLORS baseline/selected palette) via color-mix — a dynamic brand
  * color Tailwind can't express; the text mix flips through --color-text-heading. */
 .time-range-chip {
-  font-size: 0.7rem;
+  font-size: var(--text-2xs);
   line-height: 1.2;
   transition: all 0.2s ease;
 }

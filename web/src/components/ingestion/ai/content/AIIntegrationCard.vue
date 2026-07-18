@@ -155,7 +155,7 @@ const renderedSections = computed(() =>
 }
 
 .o2-section-title {
-  font-size: 0.95rem;
+  font-size: var(--text-base);
   font-weight: 600;
   margin: 0 0 0.5rem;
   letter-spacing: 0.01em;
@@ -185,6 +185,6 @@ const renderedSections = computed(() =>
   display: block;
   width: 100%;
   overflow-x: auto;
-  font-size: 0.8125rem;
+  font-size: var(--text-compact);
 }
 </style>

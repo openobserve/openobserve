@@ -2733,6 +2733,6 @@ export default defineComponent({
 
 .panel-time-picker-btn :deep(.date-time-button .date-time-arrow) {
   flex-shrink: 0;
-  font-size: 1.125rem !important;
+  font-size: var(--text-lg) !important;
 }
 </style>

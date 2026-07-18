@@ -419,7 +419,7 @@ const chartOptions = computed(() => {
         return `
           <div style="padding: 4px 0;">
             <div style="font-weight: bold; margin-bottom: 6px;">${escapeHtml(span.operationName)}</div>
-            <div style="font-size: 11px; line-height: 1.6;">
+            <div style="font-size: var(--text-2xs); line-height: 1.6;">
               <div style="display: flex; justify-content: space-between; gap: 16px;">
                 <span style="color: var(--color-flame-tooltip-label);">Service:</span>
                 <span>${escapeHtml(span.serviceName)}</span>

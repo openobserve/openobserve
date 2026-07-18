@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="rounded-default">
     <div
       class="text-center w-full"
-      style="font-size: 30px; margin: 40px 0px"
+      style="font-size: var(--text-3xl); margin: 40px 0px"
     >
       Member Subscription
     </div>
