@@ -41,8 +41,8 @@ impl ToolExtractor {
     /// Reads across the tracing conventions OpenObserve documents so tool nodes
     /// render regardless of which framework produced the span:
     ///  - Gen-AI semconv:  `gen_ai.tool.name`
-    ///  - OpenInference:   `tool.name`, `tool_call.function.name`
-    ///                     (Arize/Phoenix, OpenAI Agents, Google ADK)
+    ///  - OpenInference:   `tool.name`, `tool_call.function.name` (Arize/Phoenix, OpenAI Agents,
+    ///    Google ADK)
     ///  - LangChain:       `langchain.tool.name`
     ///  - CrewAI:          `crewai.task.tools`
     ///  - Langfuse:        `langfuse.observation.metadata.tool.name`

@@ -466,8 +466,7 @@ async fn compute_stream_edges(
             // will be false-ish and the query still runs (schema-safe).
             (false, false) => "CAST(NULL AS STRING)",
         };
-        let model_predicate =
-            format!("{model_expr} IS NOT NULL AND {model_expr} != ''");
+        let model_predicate = format!("{model_expr} IS NOT NULL AND {model_expr} != ''");
 
         // Metric aggregates shared by every edge query (aliased to child `c`
         // where a join is present, so it works in both flat and joined forms).
@@ -711,15 +710,21 @@ mod test {
     fn test_ancestor_joins_chain_parent_links() {
         let joins = super::build_ancestor_joins("mystream", 3);
         // p1 joins the child c; p2 joins p1; p3 joins p2 — a true chain.
-        assert!(joins.contains(
-            "LEFT JOIN \"mystream\" AS p1 ON c.reference_parent_span_id = p1.span_id"
-        ));
-        assert!(joins.contains(
-            "LEFT JOIN \"mystream\" AS p2 ON p1.reference_parent_span_id = p2.span_id"
-        ));
-        assert!(joins.contains(
-            "LEFT JOIN \"mystream\" AS p3 ON p2.reference_parent_span_id = p3.span_id"
-        ));
+        assert!(
+            joins.contains(
+                "LEFT JOIN \"mystream\" AS p1 ON c.reference_parent_span_id = p1.span_id"
+            )
+        );
+        assert!(
+            joins.contains(
+                "LEFT JOIN \"mystream\" AS p2 ON p1.reference_parent_span_id = p2.span_id"
+            )
+        );
+        assert!(
+            joins.contains(
+                "LEFT JOIN \"mystream\" AS p3 ON p2.reference_parent_span_id = p3.span_id"
+            )
+        );
         // trace_id is part of every join key (no cross-trace leakage).
         assert_eq!(joins.matches("trace_id = p").count(), 3);
         // exactly `depth` joins.
