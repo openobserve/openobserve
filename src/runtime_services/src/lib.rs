@@ -12,4 +12,5 @@ pub mod cluster_info;
 pub mod grpc;
 pub mod node;
 pub mod runtime_metrics;
+pub mod tls;
 pub mod trace_utils;

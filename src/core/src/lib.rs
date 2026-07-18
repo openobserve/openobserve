@@ -64,7 +64,6 @@ pub mod stream;
 pub mod stream_utils;
 pub mod synthetics;
 pub mod telemetry;
-pub mod tls;
 pub mod traces;
 #[cfg(feature = "cloud")]
 pub mod trial_quota;

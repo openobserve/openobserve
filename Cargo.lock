@@ -8970,15 +8970,22 @@ dependencies = [
  "config",
  "infra",
  "ingester",
+ "itertools 0.14.0",
  "log",
  "maintenance",
  "opentelemetry",
  "prometheus",
  "proto",
+ "rcgen",
+ "reqwest 0.13.2",
+ "rustls",
+ "rustls-native-certs",
  "tokio",
  "tonic",
  "tracing",
  "tracing-opentelemetry",
+ "webpki-roots 1.0.6",
+ "x509-parser",
 ]
 
 [[package]]

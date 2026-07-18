@@ -14,12 +14,21 @@ common.workspace = true
 config.workspace = true
 infra.workspace = true
 ingester.workspace = true
+itertools.workspace = true
 log.workspace = true
 maintenance.workspace = true
 opentelemetry.workspace = true
 prometheus.workspace = true
 proto.workspace = true
+reqwest.workspace = true
+rustls.workspace = true
+rustls-native-certs.workspace = true
 tokio.workspace = true
 tonic.workspace = true
 tracing.workspace = true
 tracing-opentelemetry.workspace = true
+webpki-roots.workspace = true
+x509-parser.workspace = true
+
+[dev-dependencies]
+rcgen.workspace = true
