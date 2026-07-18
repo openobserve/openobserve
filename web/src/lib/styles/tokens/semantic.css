@@ -78,6 +78,12 @@
      Use `text-accent` / `bg-accent` / `border-accent`. Rebrand = change the one
      line below. Keep it a single colour — do not introduce a second accent hue. */
   --color-accent: var(--color-primary-600);
+
+  /* Favorite (filled heart) — a rose/pink-leaning red, deliberately warmer
+     than the destructive error red so "loved" and "danger" never read as the
+     same hue on a row that carries both. Only the FILLED heart uses this;
+     unfavorited outlines stay neutral. */
+  --color-favorite: #F43F5E;
 }
 
 /* â”€â”€ Register ALL semantic tokens for Tailwind utilities â”€â”€ */
@@ -153,6 +159,10 @@
   --color-grey-850: var(--color-grey-850);
   --color-grey-900: var(--color-grey-900);
   --color-grey-950: var(--color-grey-950);
+
+  /* Favorite (self-reference so `text-favorite` utility exists + dark override
+     applies) */
+  --color-favorite: var(--color-favorite);
 
   /* Brand / Primary (re-exports from base.css) */
   --color-primary-50:  var(--color-primary-50);

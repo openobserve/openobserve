@@ -194,6 +194,26 @@ export default defineComponent({
       },
     ];
 
+    // MCP is an AI feature (endpoint requires O2_AI_ENABLED); available on
+    // enterprise and cloud, and only when ai_enabled is on at runtime.
+    if (
+      (config.isEnterprise == "true" || config.isCloud == "true") &&
+      store.state.zoConfig.ai_enabled
+    ) {
+      recommendedTabs.push({
+        name: "recommendedMcp",
+        to: {
+          name: "recommendedMcp",
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        },
+        icon: "mcp",
+        label: t("ingestion.mcp.shortName"),
+        contentClass: "tab_content",
+      });
+    }
+
     return {
       t,
       store,

@@ -53,6 +53,7 @@ const editorRunQuery = vi.hoisted(() => vi.fn());
 vi.mock("@/components/dashboards/PanelEditor", () => ({
   PanelEditor: {
     name: "PanelEditor",
+    props: ["allowedChartTypes"],
     emits: ["add-to-dashboard", "chart-api-error"],
     setup: (_: any, { expose }: any) => {
       expose({ runQuery: editorRunQuery });
@@ -119,6 +120,19 @@ describe("MetricsVisualize", () => {
       "metrics",
     );
     expect(panelData.current.layout.showQueryBar).toBe(true);
+  });
+
+  it("offers area-stacked among the allowed chart types", async () => {
+    // Dashboards have supported stacked area on PromQL for years; the metrics
+    // visualize pane narrowed the list and silently dropped it.
+    const wrapper = mountVisualize();
+    await flushPromises();
+
+    const allowed = wrapper
+      .findComponent({ name: "PanelEditor" })
+      .props("allowedChartTypes");
+    expect(allowed).toContain("area");
+    expect(allowed).toContain("area-stacked");
   });
 
   it("opens the add-to-dashboard dialog only when the panel validates", async () => {

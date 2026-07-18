@@ -123,7 +123,7 @@ const CARD = { name: "http_requests_total", unsupported: false, cardKind: "count
  *  visualize mode instead of sweeping the Explore grid. */
 const visualizeRunQuery = vi.fn();
 
-const mountExplorer = () =>
+const mountExplorer = (stubOverrides: Record<string, any> = {}) =>
   mount(MetricsExplorer, {
     global: {
       stubs: {
@@ -173,6 +173,7 @@ const mountExplorer = () =>
           template:
             '<div data-test="metrics-explorer-visualize">visualize</div>',
         },
+        ...stubOverrides,
       },
     },
   });
@@ -269,6 +270,26 @@ describe("MetricsExplorer wiring", () => {
       (wrapper.vm as any).onDataScope(undefined);
 
       expect(grid.hideEmptyPanels.value).toBe(true);
+    });
+  });
+
+  describe("the toolbar refresh control", () => {
+    it("is a labeled 'Refresh' button, not an icon-only control", () => {
+      // Icon-only refresh was easy to miss next to the date picker; the control
+      // now carries its label like the other toolbar actions.
+      const wrapper = mountExplorer({
+        OButton: {
+          template: '<button v-bind="$attrs"><slot /></button>',
+        },
+      });
+
+      const btn = wrapper.find('[data-test="metrics-explorer-refresh"]');
+      expect(btn.exists()).toBe(true);
+      // t() is mocked to echo the key — the label must come from i18n.
+      expect(btn.text()).toContain("metrics.explorer.refresh");
+      expect(btn.attributes("size")).toBe("sm-toolbar");
+      // Same treatment as the logs/traces Run Query button.
+      expect(btn.attributes("variant")).toBe("primary");
     });
   });
 

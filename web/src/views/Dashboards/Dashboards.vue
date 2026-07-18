@@ -69,7 +69,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <div class="flex flex-col">
               <span>{{ t('dashboard.importCustom') }}</span>
-              <span class="text-xs text-dropdown-item-text opacity-60">{{ t('dashboard.importCustomDesc') }}</span
+              <span class="text-xs text-dropdown-item-text opacity-60"
+                >{{ t('dashboard.importCustomDesc') }}</span
               >
             </div>
           </ODropdownItem>
@@ -79,7 +80,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <div class="flex flex-col">
               <span>{{ t('dashboard.importTemplates') }}</span>
-              <span class="text-xs text-dropdown-item-text opacity-60">{{ t('dashboard.importTemplatesDesc') }}</span
+              <span class="text-xs text-dropdown-item-text opacity-60"
+                >{{ t('dashboard.importTemplatesDesc') }}</span
               >
             </div>
           </ODropdownItem>
@@ -105,6 +107,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="h-full">
           <FolderList
             type="dashboards"
+            show-favorites
             @update:activeFolderId="updateActiveFolderId"
           />
         </div>
@@ -194,11 +197,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
             <template #cell-name="{ row, value }">
               <span class="inline-flex items-center gap-1">
+                <!-- One-click favorite toggle — filled rose heart when
+                     favorited, neutral outline otherwise. -->
+                <OButton
+                  variant="ghost"
+                  size="icon-xs-sq"
+                  :icon-left="
+                    isFavorite(row.id) ? 'favorite' : 'favorite-border'
+                  "
+                  :class="
+                    isFavorite(row.id)
+                      ? 'text-favorite shrink-0'
+                      : 'text-text-secondary shrink-0'
+                  "
+                  :title="
+                    isFavorite(row.id)
+                      ? t('dashboard.removeFromFavorites')
+                      : t('dashboard.addToFavorites')
+                  "
+                  :data-test="`dashboard-favorite-toggle-${value}`"
+                  @click.stop="toggleFavorite(row)"
+                />
                 <span
                   class="text-text-body"
                   :data-test="`dashboard-name-cell-${value}`"
                   :title="value"
-                >{{ value }}</span
+                  >{{ value }}</span
                 >
                 <!-- At-a-glance indicator: shows which dashboard is the org
                      home dashboard without an interactive icon on every row. -->
@@ -220,14 +244,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span
                 class="font-mono text-xs text-text-body"
                 :title="value"
-              >{{ value }}</span
+                >{{ value }}</span
               >
             </template>
             <template #cell-description="{ value }">
               <span
                 class="text-text-body"
                 :title="value"
-              >{{ value || "—" }}</span
+                >{{ value || "—" }}</span
               >
             </template>
             <template #cell-owner="{ value }">
@@ -319,6 +343,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OEmptyState
                 size="hero"
                 :preset="activeFolderId !== 'default' ? 'no-dashboards-in-folder' : 'no-dashboards'"
+                :title="
+                  showFavoritesOnly && !filterQuery
+                    ? t('dashboard.noFavoritesTitle')
+                    : undefined
+                "
+                :description="
+                  showFavoritesOnly && !filterQuery
+                    ? t('dashboard.noFavoritesMessage')
+                    : undefined
+                "
                 :filtered="!!filterQuery"
                 @action="
                   (id) =>
@@ -347,7 +381,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   <span
                     class="text-sm text-text-body mr-1"
-                  >{{ selectedIds.length }} selected</span
+                    >{{ selectedIds.length }} selected</span
                   >
                   <OButton
                     variant="outline"
@@ -535,6 +569,10 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 import { useHomeDashboard } from "@/composables/useHomeDashboard";
+import {
+  useFavoriteDashboards,
+  FAVORITES_FOLDER_ID,
+} from "@/composables/useFavoriteDashboards";
 
 const MoveDashboardToAnotherFolder = defineAsyncComponent(() => {
   return import("@/components/dashboards/MoveDashboardToAnotherFolder.vue");
@@ -590,6 +628,9 @@ export default defineComponent({
     const confirmDeleteDialog = ref<boolean>(false);
     const selectedDelete = ref(null);
     const activeFolderId = ref(null);
+    // Set once the onMounted landing decision has run; folder-selection events
+    // arriving earlier are child-initialization noise, not user intent.
+    let landingDecided = false;
     const isFolderEditMode = ref(false);
     const selectedFolderDelete = ref(null);
     const selectedFolderToEdit = ref(null);
@@ -610,6 +651,37 @@ export default defineComponent({
 
     const { isHome, setHomeDashboard, clearHomeDashboard, homeDashboard } =
       useHomeDashboard();
+
+    // Per-user favorites — heart toggle on each row + a folder-independent
+    // favorites view.
+    const {
+      favorites,
+      isFavorite,
+      toggleFavorite: toggleFavoriteSetting,
+      load: loadFavorites,
+    } = useFavoriteDashboards();
+    // The favorites view is a rail location, not a toolbar filter: it is
+    // active exactly when the Favorites pseudo-folder is selected.
+    const showFavoritesOnly = computed(
+      () => activeFolderId.value === FAVORITES_FOLDER_ID,
+    );
+    const toggleFavorite = (row: any) => {
+      const org = store.state.selectedOrganization?.identifier;
+      const userId = store.state.userInfo?.email;
+      // row.folder_id is populated in the cross-folder surfaces (search
+      // results, the favorites view); in the normal folder view it is
+      // undefined, so fall back to the active folder (default). Never store
+      // the Favorites pseudo-folder as a real folder id.
+      const folderId =
+        row.folder_id ||
+        (showFavoritesOnly.value ? "default" : activeFolderId.value) ||
+        "default";
+      toggleFavoriteSetting(org, userId, {
+        dashboardId: row.id,
+        folderId,
+        label: row.name,
+      });
+    };
     const openHomeDashboard = async () => {
       if (!homeDashboard.value) return;
       const org = store.state.selectedOrganization?.identifier;
@@ -689,6 +761,8 @@ export default defineComponent({
       // on another system since this tab last loaded.
       const org = store.state.selectedOrganization?.identifier;
       if (org) useHomeDashboard().load(org);
+      // Favorites are loaded by the landing-view onMounted below, before the
+      // favorites-first landing decision needs them.
     });
     onUnmounted(() => {
       offDashboardEvent(handleAiDashboardEvent);
@@ -765,7 +839,10 @@ export default defineComponent({
         },
       ];
 
-      if (searchAcrossFolders.value && searchQuery.value != "") {
+      if (
+        (searchAcrossFolders.value && searchQuery.value != "") ||
+        showFavoritesOnly.value
+      ) {
         baseColumns.splice(2, 0, {
           id: "folder",
           header: t("dashboard.folder"),
@@ -786,21 +863,35 @@ export default defineComponent({
       //get folders list
       await getFoldersList(store);
 
-      //initial activeFolderId will be null
-      //if route has query and we have a folder in folder list then set activeFolderId to that folder
-      // else default as a folder
+      // Load favorites BEFORE picking the landing view — the favorites-first
+      // landing below depends on knowing whether any exist.
+      const org = store.state.selectedOrganization?.identifier;
+      const userId = store.state.userInfo?.email;
+      if (org && userId) await loadFavorites(org, userId);
 
+      // Landing rules: an explicit deep link (?folder=...) wins — including
+      // the Favorites pseudo-folder. `folder=default` is NOT treated as
+      // explicit: the folder watcher stamps it into the URL on every ordinary
+      // visit, so honoring it would defeat the favorites-first landing on
+      // every reload. With no (effective) deep link, land on Favorites when
+      // the user has any, else on the default folder exactly as before.
       activeFolderId.value = null;
-      if (
+      if (route.query.folder === FAVORITES_FOLDER_ID) {
+        activeFolderId.value = FAVORITES_FOLDER_ID;
+      } else if (
         route.query.folder &&
+        route.query.folder !== "default" &&
         store.state.organizationData.folders.find(
           (it: any) => it.folderId === route.query.folder,
         )
       ) {
         activeFolderId.value = route.query.folder;
+      } else if (favorites.value.length > 0) {
+        activeFolderId.value = FAVORITES_FOLDER_ID;
       } else {
         activeFolderId.value = "default";
       }
+      landingDecided = true;
     });
 
     watch(
@@ -809,6 +900,30 @@ export default defineComponent({
         //resetting the selected dashboards if any so that when shifting to another folder and reswitching to same folder
         //the selected dashboards are not shown
         selectedIds.value = [];
+        // The Favorites pseudo-folder has no backend list. Rows render
+        // immediately from the stored favorites; fetch the involved folders'
+        // lists in the background purely to enrich them (owner/created/fresh
+        // titles) — cached folders resolve instantly.
+        if (activeFolderId.value === FAVORITES_FOLDER_ID) {
+          loading.value = false;
+          const favFolders = [
+            ...new Set(favorites.value.map((f: any) => f.folderId)),
+          ];
+          Promise.all(
+            favFolders.map((fid) =>
+              getAllDashboardsByFolderId(store, fid).catch(() => null),
+            ),
+          );
+          searchAcrossFolders.value = false;
+          router.push({
+            path: "/dashboards",
+            query: {
+              org_identifier: store.state.selectedOrganization.identifier,
+              folder: activeFolderId.value,
+            },
+          });
+          return;
+        }
         // skip the skeleton for already-cached folders so we don't flash it
         loading.value =
           !store.state.organizationData.allDashboardList[activeFolderId.value];
@@ -1012,9 +1127,7 @@ export default defineComponent({
         query: {
           org_identifier: store.state.selectedOrganization.identifier,
           dashboard: row.id,
-          folder: searchAcrossFolders.value
-            ? row.folder_id
-            : activeFolderId.value || "default",
+          folder: row.folder_id || activeFolderId.value || "default",
           // tab: selectedTabId,
         },
       });
@@ -1031,11 +1144,27 @@ export default defineComponent({
 });
       loading.value = true;
       try {
-        const response = await getAllDashboards(
-          store,
-          activeFolderId.value ?? "default",
-        );
-        dashboardList.value = response;
+        if (showFavoritesOnly.value) {
+          // Refresh in the favorites view: re-read the favorites setting and
+          // force-refetch each involved folder so titles/owners are current.
+          const org = store.state.selectedOrganization?.identifier;
+          const userId = store.state.userInfo?.email;
+          if (org && userId) await loadFavorites(org, userId);
+          const favFolders = [
+            ...new Set(favorites.value.map((f: any) => f.folderId)),
+          ];
+          await Promise.all(
+            favFolders.map((fid) =>
+              getAllDashboards(store, fid).catch(() => null),
+            ),
+          );
+        } else {
+          const response = await getAllDashboards(
+            store,
+            activeFolderId.value ?? "default",
+          );
+          dashboardList.value = response;
+        }
       } catch (err) {
         showErrorNotification(err?.message || "Failed to load dashboards.");
       } finally {
@@ -1069,6 +1198,39 @@ export default defineComponent({
 
     const dashboards = computed(function () {
       selectedIds.value = [];
+      // The favorites view is folder-independent: rows come from the stored
+      // favorites themselves (each carries its folderId), enriched from any
+      // folder list already cached in the store. A favorite whose folder
+      // hasn't been visited yet still shows via its stored label.
+      if (showFavoritesOnly.value) {
+        const folderNames = new Map(
+          (store.state.organizationData?.folders ?? []).map((f: any) => [
+            f.folderId,
+            f.name,
+          ]),
+        );
+        const allLists = store.state.organizationData?.allDashboardList ?? {};
+        return favorites.value.map((fav: any, index: number) => {
+          const cached = (allLists[fav.folderId] ?? []).find(
+            (board: any) => board.dashboardId === fav.dashboardId,
+          );
+          return {
+            "#": index < 9 ? `0${index + 1}` : index + 1,
+            id: fav.dashboardId,
+            folder: folderNames.get(fav.folderId) ?? fav.folderId,
+            folder_id: fav.folderId,
+            name: cached?.title ?? fav.label,
+            identifier: fav.dashboardId,
+            description: cached?.description ?? "",
+            owner: cached?.owner ?? "",
+            created_raw: cached?.created ?? "",
+            created: cached?.created
+              ? formatDate(cached.created, "YYYY-MM-DDTHH:mm:ss")
+              : "",
+            actions: "true",
+          };
+        });
+      }
       if (!searchAcrossFolders.value || searchQuery.value == "") {
         const dashboardList = toRaw(
           store.state.organizationData?.allDashboardList[
@@ -1089,13 +1251,9 @@ export default defineComponent({
     });
 
     const resultTotal = computed(function () {
-      if (!searchAcrossFolders.value || searchQuery.value == "") {
-        return store.state.organizationData?.allDashboardList[
-          activeFolderId.value
-        ]?.length;
-      } else {
-        return filteredResults.value.length;
-      }
+      // Derived from the rendered rows so the footer count matches what the
+      // favorites filter / cross-folder search actually shows.
+      return dashboards.value.length;
     });
 
     const deleteDashboard = async () => {
@@ -1272,6 +1430,11 @@ export default defineComponent({
     });
 
     const updateActiveFolderId = (folderId: any) => {
+      // FolderList emits its own initialization value asynchronously; before
+      // the landing decision in onMounted has run, that emission is rail
+      // presentation state, not a user action — letting it through would
+      // clobber the favorites-first landing with "default".
+      if (!landingDecided) return;
       activeFolderId.value = folderId;
       filterQuery.value = "";
       searchQuery.value = "";
@@ -1511,6 +1674,9 @@ export default defineComponent({
       toggleHome,
       homeDashboard,
       openHomeDashboard,
+      isFavorite,
+      toggleFavorite,
+      showFavoritesOnly,
     };
   },
   methods: {

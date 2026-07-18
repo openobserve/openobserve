@@ -640,7 +640,7 @@
     "logs": "Logs",
     "traces": "Traces",
     "enrichmentTables": "Enrichment Tables",
-    "switchToLogs": "click to switch back to Logs",
+    "switchToLogs": "Switch back to Logs",
     "savedViewsLabel": "Saved View",
     "savedViewsNotFound": "Saved view not found!",
     "savedViewAction": "Create/Update Saved View",
@@ -648,6 +648,8 @@
     "savedViewName": "View Name",
     "createSavedView": "Create Saved View",
     "listSavedViews": "List Saved Views",
+    "manageSavedViews": "Manage Saved Views",
+    "updateSavedViewWithCurrent": "Update this view with the current search",
     "pinToToolbar": "Pin to toolbar",
     "unpinFromToolbar": "Unpin from toolbar",
     "shareLink": "Share Link",
@@ -1435,7 +1437,9 @@
   },
   "serviceAccounts": {
     "header": "Service Accounts",
-    "emailInvalid": "Please enter a valid email address",
+    "nameInvalid": "Use lowercase letters, numbers and hyphens (up to {max} characters)",
+    "createFailed": "Failed to create the service account. Please try again.",
+    "updateFailed": "Failed to update the service account. Please try again.",
     "headerSubtitle": "Programmatic access tokens for APIs",
     "search": "Search Service Account",
     "refresh": "Refresh Service Token",
@@ -1470,17 +1474,29 @@
       "addToGroup": "Add to a user group",
       "addToRole": "Assign a role",
       "step1Title": "Copy your token",
-      "step2Title": "Grant permissions",
       "copyHint": "Copy this token now — you won't be able to see it again.",
-      "next": "Next: grant permissions",
-      "back": "Back",
-      "done": "Done"
+      "done": "Done",
+      "applying": "Applying access grants…",
+      "grantedRoles": "Roles assigned: {roles}",
+      "grantedGroups": "Added to user groups: {groups}",
+      "failedRoles": "Could not assign roles: {roles}",
+      "failedGroups": "Could not add to user groups: {groups}",
+      "failedHint": "You can grant these later from the Roles and User Groups pages."
     },
     "form": {
-      "identifier": {
-        "label": "Identifier",
-        "placeholder": "Enter email address",
-        "help": "Email address used as the service account identifier"
+      "name": {
+        "label": "Service account name",
+        "placeholder": "e.g. ingest-bot",
+        "help": "Lowercase letters, numbers and hyphens. Saved as name{suffix}"
+      },
+      "roles": {
+        "label": "Assign roles",
+        "create": "New role",
+        "readonlySeeded": "Read-only permissions applied to role \"{role}\".",
+        "readonlySeedFailed": "Role \"{role}\" was created, but read-only permissions could not be applied. Grant them from the Roles page."
+      },
+      "groups": {
+        "label": "Add to user groups"
       }
     },
     "list": {
@@ -1512,6 +1528,10 @@
     "usersDesc": "People with access to this organization",
     "serviceAccountsDesc": "Programmatic access tokens for APIs",
     "ingestionTokensDesc": "Tokens for ingesting data into this organization",
+    "mcpServerLabel": "MCP Server",
+    "mcpServerDesc": "Connect AI clients over the Model Context Protocol",
+    "mcpServerHeader": "MCP Server",
+    "mcpServerHeaderSubtitle": "Connect Claude, Cursor, VS Code and other AI clients to this organization.",
     "invitationsDesc": "Pending and sent member invitations",
     "groupsDesc": "Group users together to assign roles",
     "rolesDesc": "Define permissions and access policies",
@@ -2151,6 +2171,62 @@
     "iis": "IIS",
     "pubsub": "Pub/Sub Logs",
     "aiLabel": "AI Integrations",
+    "mcp": {
+      "name": "OpenObserve MCP Server",
+      "shortName": "MCP Server",
+      "crossLinkTitle": "Connect AI clients via MCP",
+      "crossLinkBody": "OpenObserve exposes a Model Context Protocol (MCP) endpoint so AI clients like Claude, Cursor and VS Code can query and act on this organization. Setup and credentials live in IAM.",
+      "crossLinkCta": "Open MCP setup",
+      "tagline": "Connect Claude, Cursor, VS Code and other AI clients to this organization over the Model Context Protocol (MCP).",
+      "enterpriseNote": "MCP server is an Enterprise feature.",
+      "endpointLabel": "MCP endpoint",
+      "authLabel": "1. Authentication",
+      "clientLabel": "2. Choose your client",
+      "configLabel": "3. Add the configuration",
+      "auth": {
+        "oauth": "OAuth — sign in (recommended)",
+        "token": "Access token",
+        "oauthNote": "No credential to manage: your MCP client opens a browser to sign in, and access is scoped by your existing permissions. Use it whenever your client supports OAuth."
+      },
+      "credential": {
+        "quickStartTitle": "Quick start — your account",
+        "quickStartBody": "Snippets use your own credentials, which carry your full permissions. For production, generate a dedicated read-only credential instead.",
+        "generate": "Generate read-only credential",
+        "created": "Read-only credential created",
+        "shownOnce": "For {email}. Copy it now — the token is shown only once and the snippets below now use it.",
+        "download": "Download",
+        "manage": "Manage / revoke",
+        "readonlyWarn": "The account was created but the read-only role couldn't be applied automatically — review its permissions in Service Accounts.",
+        "error": "Couldn't create the credential. Try again, or create a service account manually in IAM."
+      },
+      "securityTitle": "Use a dedicated, least-privilege credential",
+      "securityBody": "The token defaults to your own account credentials. For production, generate a read-only credential above (or create a scoped service account) and never commit tokens to source control.",
+      "docsCta": "Read the full MCP documentation",
+      "clients": {
+        "claudeCode": "Claude Code",
+        "cursor": "Cursor",
+        "vscode": "VS Code",
+        "claudeDesktop": "Claude Desktop",
+        "windsurf": "Windsurf",
+        "chatgpt": "ChatGPT",
+        "antigravity": "Antigravity",
+        "opencode": "opencode",
+        "openclaw": "OpenClaw",
+        "hermes": "Hermes"
+      },
+      "desc": {
+        "claudeCode": "Run this once — it registers the server in Claude Code.",
+        "cursor": "Add to ~/.cursor/mcp.json, then reload Cursor.",
+        "vscode": "Add to .vscode/mcp.json in your workspace, then reload VS Code.",
+        "claudeDesktop": "Add to claude_desktop_config.json, then restart Claude Desktop.",
+        "windsurf": "Add to ~/.codeium/windsurf/mcp_config.json, then reload Windsurf.",
+        "chatgpt": "Add a custom connector in ChatGPT settings with these values.",
+        "antigravity": "Settings → Customizations → Open MCP Config (~/.gemini/config/mcp_config.json). Antigravity uses serverUrl, not url.",
+        "opencode": "Add to opencode.json (project root or ~/.config/opencode/), then restart opencode.",
+        "openclaw": "Add to ~/.openclaw/openclaw.json (run `openclaw mcp status` to locate it).",
+        "hermes": "Add to ~/.hermes/config.yaml (YAML), then run /reload-mcp."
+      }
+    },
     "manageTokensBtnLabel": "Manage Tokens",
     "orgLevelExplanation": "These are organization-level ingestion tokens. They are not tied to individual users and will continue working even if the user who created them leaves the organization. Tokens can only be used on ingestion endpoints.",
     "orgLevelSummary": "Organization-level tokens for ingestion endpoints.",
@@ -2214,6 +2290,11 @@
     "homePinNotFound": "This dashboard no longer exists and was removed from Home.",
     "homePinUnavailable": "This dashboard is no longer available and was removed from Home.",
     "setAsHomeDesc": "Show this dashboard on the home page for everyone in the org",
+    "favorites": "Favorites",
+    "addToFavorites": "Add to favorites",
+    "removeFromFavorites": "Remove from favorites",
+    "noFavoritesTitle": "No favorite dashboards yet",
+    "noFavoritesMessage": "Click the heart icon on any dashboard to see it here, across all folders.",
     "moreActions": "More actions",
     "save": "Save",
     "cancel": "Cancel",
