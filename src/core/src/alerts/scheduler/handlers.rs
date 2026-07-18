@@ -15,6 +15,7 @@
 
 use std::{collections::HashMap, str::FromStr, time::Instant};
 
+use automation::backfill as backfill_store;
 use chrono::{DateTime, Duration, FixedOffset, Utc};
 use config::{
     cluster::LOCAL_NODE,
@@ -3499,7 +3500,7 @@ async fn handle_backfill_triggers(
         .await?;
 
         // Disable the job since it's completed
-        let _ = db::backfill::update_enabled(&org, &job_id, false).await;
+        let _ = backfill_store::update_enabled(&org, &job_id, false).await;
 
         // Determine trigger status based on data availability and ingestion success
         let trigger_status = if ingestion_error.is_some() {

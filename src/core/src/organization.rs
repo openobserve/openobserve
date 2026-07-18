@@ -28,7 +28,7 @@ use config::{
 use infra::table::{self, org_users::UserOrgExpandedRecord};
 #[cfg(feature = "enterprise")]
 use o2_openfga::config::get_config as get_openfga_config;
-use organization_domain::ingestion_tokens;
+use organization_domain::{ingestion_tokens, org_ingestion_tokens as ingestion_token_store};
 #[cfg(feature = "cloud")]
 use {
     crate::common::meta::organization::{
@@ -228,7 +228,7 @@ async fn get_passcode_inner(
     // org ingestion passcode — never for a service account, which must return
     // its own per-account token.
     if !is_service_account {
-        let default_org_token = db::org_ingestion_tokens::get_by_name(lookup_org_id, "default")
+        let default_org_token = ingestion_token_store::get_by_name(lookup_org_id, "default")
             .await
             .ok()
             .flatten();
@@ -370,12 +370,11 @@ async fn update_passcode_inner(
         // OWN per-account token — never the org ingestion token, which is
         // org-wide and `o2oi_`-prefixed. Diverting a service-account rotation to
         // the org token is wrong (scope) and a security issue.
-        let default_org_token_exists =
-            db::org_ingestion_tokens::get_by_name(local_org_id, "default")
-                .await
-                .is_ok_and(|r| r.is_some());
+        let default_org_token_exists = ingestion_token_store::get_by_name(local_org_id, "default")
+            .await
+            .is_ok_and(|r| r.is_some());
         if should_use_org_ingestion_token(is_service_account, default_org_token_exists) {
-            let new_token = db::org_ingestion_tokens::rotate_token(local_org_id, "default").await?;
+            let new_token = ingestion_token_store::rotate_token(local_org_id, "default").await?;
             return Ok(IngestionTokensContainer::Passcode(IngestionPasscode {
                 user: db_user.email,
                 passcode: new_token,

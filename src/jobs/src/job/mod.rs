@@ -16,7 +16,9 @@
 use config::{cluster::LOCAL_NODE, spawn_pausable_job};
 #[cfg(any(feature = "enterprise", feature = "cloud"))]
 use openobserve_core::telemetry;
+use organization_domain::org_ingestion_tokens;
 use regex::Regex;
+use resources::short_url;
 #[cfg(feature = "enterprise")]
 use {
     o2_enterprise::enterprise::{common::config::get_config as get_o2_config, search::admission},
@@ -350,7 +352,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
         .await
         .expect("organizations cache failed");
     db::org_users::cache().await.expect("org user cache failed");
-    db::org_ingestion_tokens::cache()
+    org_ingestion_tokens::cache()
         .await
         .expect("org ingestion tokens cache failed");
 
@@ -361,7 +363,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     // watch org users
     tokio::task::spawn(db::user::watch());
     tokio::task::spawn(db::org_users::watch());
-    tokio::task::spawn(db::org_ingestion_tokens::watch());
+    tokio::task::spawn(org_ingestion_tokens::watch());
     tokio::task::spawn(db::organization::watch());
     tokio::task::spawn(db::org_status::watch());
     if let Err(e) = db::org_status::load_from_db().await {
@@ -456,10 +458,8 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(self_reporting::run());
 
     // cache short_urls
-    tokio::task::spawn(db::short_url::watch());
-    db::short_url::cache()
-        .await
-        .expect("short url cache failed");
+    tokio::task::spawn(short_url::watch());
+    short_url::cache().await.expect("short url cache failed");
 
     // initialize metadata watcher
     tokio::task::spawn(catalog::schema::watch(
@@ -837,7 +837,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(alert_manager::run());
     #[cfg(feature = "enterprise")]
     tokio::task::spawn(alert_grouping::process_expired_batches());
-    tokio::task::spawn(openobserve_core::file_downloader::run());
+    tokio::task::spawn(infra::cache::file_downloader::run());
     // Note: Service discovery extraction runs automatically during parquet file processing
     // See src/jobs/src/job/files/parquet.rs:queue_services_from_data_file for
     // implementation

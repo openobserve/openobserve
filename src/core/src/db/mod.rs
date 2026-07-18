@@ -31,11 +31,11 @@ pub mod keys;
 pub mod license;
 pub mod metas;
 pub mod metrics;
-pub use ::resources::{kv, model_pricing, saved_view, short_url, sourcemaps};
+pub use ::resources::{model_pricing, saved_view};
 pub mod model_pricing_sync;
 #[cfg(feature = "enterprise")]
 pub mod ofga;
-pub use ::organization_domain::{org_ingestion_tokens, org_status, session};
+pub use ::organization_domain::{org_status, session};
 #[cfg(feature = "enterprise")]
 pub mod org_storage_providers;
 pub mod org_users;
@@ -43,7 +43,7 @@ pub mod organization;
 pub mod pipeline;
 #[cfg(feature = "vectorscan")]
 pub mod re_pattern;
-pub use ::automation::{backfill, pipeline_errors, scheduler};
+pub use ::automation::{pipeline_errors, scheduler};
 #[cfg(feature = "enterprise")]
 pub mod service_graph;
 pub mod system_settings;

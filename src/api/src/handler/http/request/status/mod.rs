@@ -46,6 +46,8 @@ use infra::{
         STREAM_STATS_EXISTS,
     },
 };
+use organization_domain::org_ingestion_tokens;
+use resources::short_url;
 use serde::Serialize;
 use time;
 use utoipa::ToSchema;
@@ -1613,10 +1615,10 @@ async fn reload_module_cache(module: &str) -> Result<(), anyhow::Error> {
         "alerts" => db::alerts::alert::cache().await,
         "destinations" => db::alerts::destinations::cache().await,
         "templates" => db::alerts::templates::cache().await,
-        "short_url" => db::short_url::cache().await,
+        "short_url" => short_url::cache().await,
         "realtime_triggers" => db::alerts::realtime_triggers::cache().await,
         "org_users" => db::org_users::cache().await,
-        "org_ingestion_tokens" => db::org_ingestion_tokens::cache().await,
+        "org_ingestion_tokens" => org_ingestion_tokens::cache().await,
         "compact_retention" => db::compact::retention::cache().await,
         _ => Err(anyhow::anyhow!("unsupported module")),
     }

@@ -6580,6 +6580,7 @@ dependencies = [
  "opentelemetry-otlp",
  "opentelemetry-proto",
  "opentelemetry_sdk",
+ "organization-domain",
  "parking_lot 0.12.5",
  "parquet",
  "pin-project-lite",
