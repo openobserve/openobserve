@@ -1,6 +1,26 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { applyThemeColors } from './theme';
+import { applyThemeColors, cssToken } from './theme';
 import type { SemanticColors } from './theme';
+
+describe('cssToken', () => {
+  beforeEach(() => {
+    document.documentElement.removeAttribute('style');
+  });
+
+  it('returns the resolved token value when the custom property is set', () => {
+    document.documentElement.style.setProperty('--color-indigo-500', '#6366f1');
+    expect(cssToken('--color-indigo-500', '#000000')).toBe('#6366f1');
+  });
+
+  it('accepts a token name without the leading --', () => {
+    document.documentElement.style.setProperty('--color-indigo-300', '#a5b4fc');
+    expect(cssToken('color-indigo-300', '#000000')).toBe('#a5b4fc');
+  });
+
+  it('returns the fallback when the token is unset', () => {
+    expect(cssToken('--color-does-not-exist', '#deadbe')).toBe('#deadbe');
+  });
+});
 
 const SEMANTIC: SemanticColors = {
   error: '#F45B49',
