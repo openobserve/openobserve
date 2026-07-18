@@ -15,6 +15,7 @@
 
 use std::sync::Arc;
 
+use catalog::enrichment as enrichment_table;
 use config::{
     cluster::LOCAL_NODE,
     datafusion::request::{FlightSearchRequest, Request},
@@ -37,24 +38,21 @@ use infra::{
 };
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
-use crate::{
-    db::enrichment_table,
-    search::{
-        SEARCH_SERVER,
-        cluster::flight::{get_online_querier_nodes, partition_file_list},
-        datafusion::{
-            distributed_plan::{
-                NewEmptyExecVisitor,
-                codec::get_physical_extension_codec,
-                node::{RemoteScanNode, SearchInfos},
-                remote_scan_exec::RemoteScanExec,
-            },
-            exec::{DataFusionContextBuilder, register_udf},
-            optimizer::physical_optimizer::remote_scan::wrap_partial_reduce_for_aggregate,
+use crate::search::{
+    SEARCH_SERVER,
+    cluster::flight::{get_online_querier_nodes, partition_file_list},
+    datafusion::{
+        distributed_plan::{
+            NewEmptyExecVisitor,
+            codec::get_physical_extension_codec,
+            node::{RemoteScanNode, SearchInfos},
+            remote_scan_exec::RemoteScanExec,
         },
-        inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
-        work_group::DeferredLock,
+        exec::{DataFusionContextBuilder, register_udf},
+        optimizer::physical_optimizer::remote_scan::wrap_partial_reduce_for_aggregate,
     },
+    inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
+    work_group::DeferredLock,
 };
 
 /// in cluster search function only single stream take part in

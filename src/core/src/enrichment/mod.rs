@@ -15,10 +15,10 @@
 
 use std::sync::Arc;
 
+use catalog::enrichment as enrichment_table;
 use config::utils::time::now_micros;
 
-use crate::db::enrichment_table;
-
+mod query;
 pub mod storage;
 
 pub use search::enrichment::StreamTable;
@@ -66,7 +66,7 @@ pub async fn get_enrichment_table_inner(
         } else {
             db_stats.end_time + 1 // search query end time is not inclusive
         };
-        enrichment_table::get_enrichment_table_data(
+        query::get_enrichment_table_data(
             org_id,
             table_name,
             apply_primary_region_if_specified,
@@ -134,7 +134,7 @@ mod tests {
             }),
         ]
         .into_iter()
-        .map(|v| crate::db::enrichment_table::convert_to_vrl(&v))
+        .map(|v| catalog::enrichment::convert_to_vrl(&v))
         .collect()
     }
 

@@ -17,6 +17,7 @@ use std::sync::{Arc, atomic::Ordering};
 
 use arrow::array::RecordBatch;
 use async_recursion::async_recursion;
+use catalog::enrichment as enrichment_table;
 use config::{
     cluster::LOCAL_NODE,
     datafusion::request::Request,
@@ -49,24 +50,19 @@ use {
     o2_enterprise::enterprise::search::{WorkGroup, admission},
 };
 
-use crate::{
-    db::enrichment_table,
-    search::{
-        SearchResult,
-        datafusion::{
-            context::{SearchContextBuilder, register_table},
-            optimizer::{
-                context::{
-                    PhysicalOptimizerContext, RemoteScanContext, StreamingAggregationContext,
-                },
-                create_physical_plan,
-            },
-            plan_metrics::get_peak_memory_from_ctx,
+use crate::search::{
+    SearchResult,
+    datafusion::{
+        context::{SearchContextBuilder, register_table},
+        optimizer::{
+            context::{PhysicalOptimizerContext, RemoteScanContext, StreamingAggregationContext},
+            create_physical_plan,
         },
-        inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
-        sql::Sql,
-        utils::{ScanStatsVisitor, check_query_default_limit_exceeded},
+        plan_metrics::get_peak_memory_from_ctx,
     },
+    inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
+    sql::Sql,
+    utils::{ScanStatsVisitor, check_query_default_limit_exceeded},
 };
 
 #[async_recursion]

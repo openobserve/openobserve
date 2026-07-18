@@ -134,9 +134,13 @@ pub async fn remote_write(
             json::to_string(&metadata).unwrap(),
         );
         log::info!("Metadata for stream {org_id}/metrics/{metric_name} needs to be updated");
-        if let Err(e) =
-            db::schema::update_setting(org_id, &metric_name, StreamType::Metrics, extra_metadata)
-                .await
+        if let Err(e) = catalog::schema::update_setting(
+            org_id,
+            &metric_name,
+            StreamType::Metrics,
+            extra_metadata,
+        )
+        .await
         {
             log::error!("Error updating metadata for stream: {metric_name}, err: {e}");
         }
@@ -763,7 +767,7 @@ pub async fn get_metadata(org_id: &str, req: RequestMetadata) -> Result<Response
     if let Some(metric_name) = req.metric {
         let schema = infra::schema::get(org_id, &metric_name, stream_type)
             .await
-            // `db::schema::get` never fails, so it's safe to unwrap
+            // `catalog::schema::get` never fails, so it's safe to unwrap
             .unwrap();
         let mut resp = hashbrown::HashMap::new();
         if schema != Schema::empty() {
@@ -775,7 +779,7 @@ pub async fn get_metadata(org_id: &str, req: RequestMetadata) -> Result<Response
         return Ok(resp);
     }
 
-    match db::schema::list(org_id, Some(stream_type), true).await {
+    match catalog::schema::list(org_id, Some(stream_type), true).await {
         Err(error) => {
             tracing::error!(%stream_type, ?error, "failed to get metrics' stream schemas");
             Err(Error::Message(format!(
@@ -849,7 +853,7 @@ pub async fn get_series(
 
     let schema = infra::schema::get(org_id, &metric_name, StreamType::Metrics)
         .await
-        // `db::schema::get` never fails, so it's safe to unwrap
+        // `catalog::schema::get` never fails, so it's safe to unwrap
         .unwrap();
 
     // Comma-separated list of label names
@@ -940,7 +944,8 @@ pub async fn get_labels(
     end: i64,
 ) -> Result<Vec<String>> {
     let opt_metric_name = selector.as_ref().and_then(try_into_metric_name);
-    let stream_schemas = match db::schema::list(org_id, Some(StreamType::Metrics), true).await {
+    let stream_schemas = match catalog::schema::list(org_id, Some(StreamType::Metrics), true).await
+    {
         Err(_) => return Ok(vec![]),
         Ok(schemas) => schemas,
     };
@@ -1024,7 +1029,7 @@ pub async fn get_label_values(
         // This special case doesn't require any SQL to be executed. All we have
         // to do is to collect stream names that satisfy selection criteria
         // (i.e., `selector` and `start`/`end`) and return them.
-        let stream_schemas = db::schema::list(org_id, Some(stream_type), true)
+        let stream_schemas = catalog::schema::list(org_id, Some(stream_type), true)
             .await
             .unwrap_or_default();
         let mut label_values = Vec::with_capacity(stream_schemas.len());
@@ -1061,7 +1066,7 @@ pub async fn get_label_values(
 
     let schema = infra::schema::get(org_id, &metric_name, stream_type)
         .await
-        // `db::schema::get` never fails, so it's safe to unwrap
+        // `catalog::schema::get` never fails, so it's safe to unwrap
         .unwrap();
     if schema.fields().is_empty() {
         return Ok(vec![]);

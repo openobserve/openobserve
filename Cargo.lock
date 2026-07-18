@@ -1714,6 +1714,31 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "37b2a672a2cb129a2e41c10b1224bb368f9f37a2b16b612598138befd7b37eb5"
 
 [[package]]
+name = "catalog"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "arrow",
+ "arrow-schema",
+ "bytes",
+ "chrono",
+ "common",
+ "config",
+ "dashmap",
+ "hashbrown 0.16.1",
+ "infra",
+ "itertools 0.14.0",
+ "log",
+ "o2_enterprise",
+ "rayon",
+ "serde_json",
+ "telemetry",
+ "tokio",
+ "transform",
+ "vrl",
+]
+
+[[package]]
 name = "cbc"
 version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6456,6 +6481,7 @@ dependencies = [
  "bitflags 2.11.0",
  "byteorder",
  "bytes",
+ "catalog",
  "chromiumoxide",
  "chrono",
  "clap",
@@ -6584,6 +6610,7 @@ dependencies = [
  "axum-extra",
  "base64 0.22.1",
  "bytes",
+ "catalog",
  "chrono",
  "config",
  "datafusion",
@@ -6665,6 +6692,7 @@ dependencies = [
  "axum",
  "axum-extra",
  "base64 0.22.1",
+ "catalog",
  "chrono",
  "config",
  "cron",
@@ -6700,6 +6728,7 @@ dependencies = [
  "arrow-schema",
  "axum",
  "bytes",
+ "catalog",
  "chrono",
  "config",
  "enrichment",
@@ -6740,6 +6769,7 @@ dependencies = [
  "axum",
  "base64 0.22.1",
  "bytes",
+ "catalog",
  "chromiumoxide",
  "chrono",
  "common",
@@ -6828,6 +6858,7 @@ dependencies = [
  "arrow",
  "arrow-schema",
  "bytes",
+ "catalog",
  "chrono",
  "config",
  "futures",

@@ -14,12 +14,13 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use std::{
+    future::Future,
     sync::{Arc, atomic::Ordering},
-    time::Duration,
 };
 
 use arrow_schema::{DataType, Field, Schema};
 use bytes::Bytes;
+use common::{infra::config::ENRICHMENT_TABLES, meta::stream::StreamSchema};
 use config::{
     cluster::LOCAL_NODE_ID,
     get_config,
@@ -37,21 +38,14 @@ use infra::{
         SchemaCache, unwrap_stream_settings,
     },
 };
+use transform::enrichment::StreamTable;
 #[cfg(feature = "enterprise")]
 use {
     infra::{errors::Error, schema::mk_key},
     o2_enterprise::enterprise::common::config::get_config as get_o2_config,
 };
 
-use crate::{
-    common::{
-        infra::config::{ENRICHMENT_TABLES, ORGANIZATIONS},
-        meta::stream::StreamSchema,
-    },
-    db,
-    enrichment::StreamTable,
-    organization::check_and_create_org,
-};
+use crate::{enrichment, store};
 
 pub async fn merge(
     org_id: &str,
@@ -328,11 +322,10 @@ pub async fn delete(
         // Enrichment table size is not deleted by schema delete
         // Since we are storing the current size of the table in bytes in the meta table,
         // when we delete enrichment table, we need to delete the size from the db as well.
-        if let Err(e) = super::enrichment_table::delete_table_size(org_id, stream_name).await {
+        if let Err(e) = enrichment::delete_table_size(org_id, stream_name).await {
             log::error!("Failed to delete table size: {e}");
         }
-        if let Err(e) = super::enrichment_table::delete_meta_table_stats(org_id, stream_name).await
-        {
+        if let Err(e) = enrichment::delete_meta_table_stats(org_id, stream_name).await {
             log::error!("Failed to delete meta table stats: {e}");
         }
     }
@@ -418,7 +411,7 @@ pub async fn list(
         None => format!("/schema/{org_id}/"),
         Some(stream_type) => format!("/schema/{org_id}/{stream_type}/"),
     };
-    let items = db::list(&db_key).await?;
+    let items = store::list(&db_key).await?;
     let mut schemas: HashMap<(String, StreamType), Vec<(Bytes, i64)>> =
         HashMap::with_capacity(items.len());
     for (key, val) in items {
@@ -475,14 +468,23 @@ pub async fn list(
         .collect())
 }
 
-pub async fn watch() -> Result<(), anyhow::Error> {
+pub async fn watch<EnsureOrg, EnsureOrgFuture, StreamDeleted, StreamDeletedFuture>(
+    ensure_org: EnsureOrg,
+    stream_deleted: StreamDeleted,
+) -> Result<(), anyhow::Error>
+where
+    EnsureOrg: Fn(String) -> EnsureOrgFuture,
+    EnsureOrgFuture: Future<Output = Result<(), anyhow::Error>>,
+    StreamDeleted: Fn(String, StreamType, String) -> StreamDeletedFuture,
+    StreamDeletedFuture: Future<Output = Result<(), anyhow::Error>>,
+{
     #[cfg(feature = "enterprise")]
     let audit_enabled = get_o2_config().common.audit_enabled;
     #[cfg(not(feature = "enterprise"))]
     let audit_enabled = false;
     let cfg = get_config();
     let key = "/schema/";
-    let cluster_coordinator = db::get_coordinator().await;
+    let cluster_coordinator = infra::db::get_coordinator().await;
     let mut events = cluster_coordinator.watch(key).await?;
     let events = Arc::get_mut(&mut events).unwrap();
     log::info!("[Schema:watch] Start watching stream schema");
@@ -496,7 +498,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
         };
         log::debug!("[Schema:watch] Received event: {ev:?}");
         match ev {
-            db::Event::Put(ev) => {
+            infra::db::Event::Put(ev) => {
                 let key_columns = ev.key.split('/').collect::<Vec<&str>>();
                 let (ev_key, mut ev_start_dt) = if key_columns.len() > 5 {
                     (
@@ -534,7 +536,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 };
 
                 let mut schema_versions =
-                    match db::list_values_by_start_dt(&format!("{ev_key}/"), ts_range).await {
+                    match store::list_values_by_start_dt(&format!("{ev_key}/"), ts_range).await {
                         Ok(val) => val,
                         Err(e) => {
                             log::error!("[Schema:watch] Error getting value: {e}");
@@ -616,13 +618,12 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 // if create_org_through_ingestion is enabled, we need to create the org
                 // if it doesn't exist. Hence, we need to check if the org exists in the cache
                 if (cfg.common.create_org_through_ingestion || usage_enabled || audit_enabled)
-                    && !ORGANIZATIONS.read().await.contains_key(org_id)
-                    && let Err(e) = check_and_create_org(org_id).await
+                    && let Err(e) = ensure_org(org_id.to_string()).await
                 {
                     log::error!("Failed to save organization in database: {e}");
                 }
             }
-            db::Event::Delete(ev) => {
+            infra::db::Event::Delete(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
                 let columns = item_key.split('/').collect::<Vec<&str>>();
                 let org_id = columns[0];
@@ -658,7 +659,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 drop(w);
                 cache::stats::remove_stream_stats(org_id, stream_name, stream_type);
                 if let Err(e) =
-                    super::compact::files::del_offset(org_id, stream_type, stream_name).await
+                    stream_deleted(org_id.to_string(), stream_type, stream_name.to_string()).await
                 {
                     log::error!("[Schema:watch] del_offset: {e}");
                 }
@@ -681,24 +682,8 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 {
                     log::error!("[Schema:watch] delete local enrichment file error: {e}");
                 }
-
-                // flush cache for the stream
-                let org_id = org_id.to_string();
-                let stream_name = stream_name.to_string();
-                tokio::task::spawn(async move {
-                    match flush_cache_for_stream(&org_id, stream_type, &stream_name).await {
-                        Ok(()) => {
-                            log::info!(
-                                "[Schema:watch] flushed cache for stream {org_id}/{stream_type}/{stream_name}"
-                            );
-                        }
-                        Err(e) => {
-                            log::error!("[Schema:watch] flush cache for stream error: {e}");
-                        }
-                    }
-                });
             }
-            db::Event::Empty => {}
+            infra::db::Event::Empty => {}
         }
     }
     Ok(())
@@ -706,7 +691,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
 
 pub async fn cache() -> Result<(), anyhow::Error> {
     let db_key = "/schema/";
-    let items = db::list(db_key).await?;
+    let items = store::list(db_key).await?;
     let items_num = items.len();
     let mut schemas: HashMap<String, Vec<(i64, Bytes)>> = HashMap::with_capacity(items_num);
 
@@ -794,85 +779,11 @@ pub async fn cache() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-async fn flush_cache_for_stream(
-    org_id: &str,
-    stream_type: StreamType,
-    stream_name: &str,
-) -> Result<(), anyhow::Error> {
-    let stream_key = format!("{org_id}/{stream_type}/{stream_name}");
-    // flush all memtables and persist to disk also delete parquet files from wal on ingester
-    if config::cluster::LOCAL_NODE.is_ingester() {
-        // get current max memtable id
-        let max_memtable_id = ingester::get_max_writer_seq_id().await;
-        // flush all writers
-        ingester::flush_all().await?;
-        let ttl = get_config().limit.mem_persist_interval;
-        // wait for max memtable id to be updated, skip it after retry 10 times
-        for _ in 0..10 {
-            let new_max_id = ingester::get_max_writer_seq_id().await;
-            if new_max_id > max_memtable_id {
-                break;
-            }
-            tokio::time::sleep(Duration::from_secs(ttl)).await;
-        }
-        // wait for persist done, skip it after retry 10 times
-        for _ in 0..10 {
-            if ingester::check_persist_done(max_memtable_id).await {
-                break;
-            }
-            tokio::time::sleep(Duration::from_secs(ttl)).await;
-        }
-        // delete parquet files from wal
-        let wal_dir = &get_config().common.data_wal_dir;
-        let stream_dir = format!("{wal_dir}files/{stream_key}");
-        if let Err(e) = tokio::fs::remove_dir_all(&stream_dir).await
-            && e.kind() != std::io::ErrorKind::NotFound
-        {
-            return Err(anyhow::anyhow!(
-                "Failed to delete parquet files from wal: {stream_dir}, error: {e}"
-            ));
-        }
-    }
-
-    // remove result cache / agg cache / files cache for the stream on querier
-    // also try to remove the cache from ingester, some test case will query from ingester directly
-    if config::cluster::LOCAL_NODE.is_ingester() || config::cluster::LOCAL_NODE.is_querier() {
-        let cache_dir = &get_config().common.data_cache_dir;
-        // remove result cache
-        let result_cache_dir = format!("{cache_dir}results/{stream_key}");
-        if let Err(e) = tokio::fs::remove_dir_all(&result_cache_dir).await
-            && e.kind() != std::io::ErrorKind::NotFound
-        {
-            return Err(anyhow::anyhow!(
-                "Failed to delete result cache: {result_cache_dir}, error: {e}"
-            ));
-        }
-        // remove agg cache
-        let agg_cache_dir = format!("{cache_dir}aggregations/{stream_key}");
-        if let Err(e) = tokio::fs::remove_dir_all(&agg_cache_dir).await
-            && e.kind() != std::io::ErrorKind::NotFound
-        {
-            return Err(anyhow::anyhow!(
-                "Failed to delete agg cache: {agg_cache_dir}, error: {e}"
-            ));
-        }
-        // remove parquet cache
-        let parquet_cache_dir = format!("{cache_dir}files/{stream_key}");
-        if let Err(e) = tokio::fs::remove_dir_all(&parquet_cache_dir).await
-            && e.kind() != std::io::ErrorKind::NotFound
-        {
-            return Err(anyhow::anyhow!(
-                "Failed to delete parquet cache: {parquet_cache_dir}, error: {e}"
-            ));
-        }
-        // remove metrics cache
-        // !!! we can't remove metrics cache, because metrics cache doesn't persist with stream name
-    }
-
-    Ok(())
-}
-
-pub async fn cache_enrichment_tables() -> Result<(), anyhow::Error> {
+pub async fn cache_enrichment_tables<Load, LoadFuture>(load: Load) -> Result<(), anyhow::Error>
+where
+    Load: Fn(String, String, bool) -> LoadFuture,
+    LoadFuture: Future<Output = Result<Arc<Vec<vrl::value::Value>>, anyhow::Error>>,
+{
     let r = STREAM_SCHEMAS_LATEST.read().await;
     let mut tables = HashMap::new();
     let mut org_tables: HashMap<String, Vec<(String, String)>> = HashMap::new(); // org_id -> [(key, table_name)]
@@ -918,7 +829,7 @@ pub async fn cache_enrichment_tables() -> Result<(), anyhow::Error> {
         HashMap<String, Vec<config::meta::enrichment_table::EnrichmentTableUrlJob>>,
     > = HashMap::new();
     for org_id in org_tables.keys() {
-        match db::enrichment_table::list_url_jobs(org_id).await {
+        match enrichment::list_url_jobs(org_id).await {
             Ok(jobs) => {
                 // Group jobs by table_name since multiple jobs can exist per table
                 let mut jobs_map: HashMap<
@@ -1012,9 +923,7 @@ pub async fn cache_enrichment_tables() -> Result<(), anyhow::Error> {
         let start = std::time::Instant::now();
         // Only use the primary region if specified to fetch enrichment table data assuming only the
         // primary region contains the data.
-        let data =
-            super::super::enrichment::get_enrichment_table(&tbl.org_id, &tbl.stream_name, true)
-                .await?;
+        let data = load(tbl.org_id.clone(), tbl.stream_name.clone(), true).await?;
         let len = data.len();
         ENRICHMENT_TABLES.insert(
             key,

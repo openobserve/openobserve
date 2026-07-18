@@ -40,7 +40,6 @@ use tokio::sync::{RwLock, mpsc};
 
 use crate::{
     common::meta::stream::SchemaRecords,
-    db,
     ingestion::{self, get_thread_id},
     metadata::{Metadata, MetadataItem},
     schema::get_schema_changes,
@@ -217,7 +216,7 @@ impl Metadata for DistinctValues {
             if !db_schema.fields_map().contains_key(TIMESTAMP_COL_NAME) {
                 is_new = true;
                 let schema = default_schema.as_ref().clone();
-                match db::schema::merge(
+                match catalog::schema::merge(
                     &org_id,
                     &distinct_stream_name,
                     StreamType::Metadata,
@@ -270,7 +269,7 @@ impl Metadata for DistinctValues {
                 items.iter().map(|(v, _)| v),
             )?;
             let schema = if is_new || get_schema_changes(&db_schema, &inferred_schema).0 {
-                match db::schema::merge(
+                match catalog::schema::merge(
                     &org_id,
                     &distinct_stream_name,
                     StreamType::Metadata,

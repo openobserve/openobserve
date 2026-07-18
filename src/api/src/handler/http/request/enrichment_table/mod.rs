@@ -79,12 +79,10 @@ pub async fn save_enrichment_table(
     // Reject if a URL enrichment already exists with this name
     // to prevent cross-type silent overwrite
     {
+        use catalog::enrichment::get_url_jobs_for_table;
         use config::meta::stream::StreamType;
 
-        use crate::{
-            common::infra::config::ENRICHMENT_TABLES,
-            service::db::enrichment_table::get_url_jobs_for_table,
-        };
+        use crate::common::infra::config::ENRICHMENT_TABLES;
 
         let key = format!("{org_id}/{}/{}", StreamType::EnrichmentTables, table_name);
         if ENRICHMENT_TABLES.contains_key(&key)
@@ -233,12 +231,10 @@ pub async fn save_enrichment_table_from_url(
     Query(query): Query<HashMap<String, String>>,
     Json(body): Json<EnrichmentTableUrlRequest>,
 ) -> Response {
+    use catalog::enrichment::{delete_url_job, get_url_jobs_for_table, save_url_job};
     use config::meta::enrichment_table::{EnrichmentTableStatus, EnrichmentTableUrlJob};
 
-    use crate::service::{
-        db::enrichment_table::{delete_url_job, get_url_jobs_for_table, save_url_job},
-        enrichment_table::url_processor::trigger_url_job_processing,
-    };
+    use crate::service::enrichment_table::url_processor::trigger_url_job_processing;
 
     let request_body = body;
 
@@ -633,7 +629,7 @@ pub async fn get_all_enrichment_table_statuses(
         crate::common::utils::auth::UserEmail,
     >,
 ) -> Response {
-    use crate::service::db::enrichment_table::list_url_jobs;
+    use catalog::enrichment::list_url_jobs;
 
     // ===== INPUT VALIDATION =====
     if org_id.trim().is_empty() {

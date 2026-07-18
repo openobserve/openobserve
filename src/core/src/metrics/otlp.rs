@@ -294,7 +294,7 @@ pub async fn handle_otlp_request(
                     log::info!(
                         "Metadata for stream {org_id}/metrics/{metric_name} needs to be updated"
                     );
-                    if let Err(e) = db::schema::update_setting(
+                    if let Err(e) = catalog::schema::update_setting(
                         org_id,
                         &metric_name,
                         StreamType::Metrics,

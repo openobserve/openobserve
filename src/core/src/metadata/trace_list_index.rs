@@ -33,7 +33,6 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     common::meta::stream::SchemaRecords,
-    db,
     ingestion::{self, get_thread_id},
     metadata::{Metadata, MetadataItem},
     stream,
@@ -188,7 +187,7 @@ impl TraceListIndex {
             is_new = true;
             let timestamp = now_micros();
             let schema = self.schema.as_ref().clone();
-            if let Err(e) = db::schema::merge(
+            if let Err(e) = catalog::schema::merge(
                 org_id,
                 STREAM_NAME,
                 StreamType::Metadata,

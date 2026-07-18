@@ -49,10 +49,7 @@ use infra::schema::{
 use serde_json::{Map, Value};
 
 use super::logs::bulk::SCHEMA_CONFORMANCE_FAILED;
-use crate::{
-    common::meta::{authz::Authz, ingestion::StreamSchemaChk, stream::SchemaEvolution},
-    db,
-};
+use crate::common::meta::{authz::Authz, ingestion::StreamSchemaChk, stream::SchemaEvolution};
 
 pub(crate) fn get_upto_discard_error() -> anyhow::Error {
     anyhow::anyhow!(
@@ -295,7 +292,7 @@ pub(crate) async fn handle_diff_schema(
         } else {
             inferred_schema
         };
-        match db::schema::merge(
+        match catalog::schema::merge(
             org_id,
             stream_name,
             stream_type,

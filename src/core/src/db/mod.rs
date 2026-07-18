@@ -26,9 +26,7 @@ pub mod backfill;
 pub mod compact;
 pub mod dashboards;
 pub mod distinct_values;
-pub mod enrichment_table;
 pub mod file_list;
-pub mod functions;
 #[cfg(feature = "enterprise")]
 pub mod keys;
 pub mod kv;
@@ -52,7 +50,6 @@ pub mod pipeline_errors;
 pub mod re_pattern;
 pub mod saved_view;
 pub mod scheduler;
-pub mod schema;
 pub mod search_job;
 #[cfg(feature = "enterprise")]
 pub mod service_graph;
@@ -156,15 +153,6 @@ pub(crate) async fn list(prefix: &str) -> Result<HashMap<String, Bytes>> {
 pub(crate) async fn list_values(prefix: &str) -> Result<Vec<Bytes>> {
     let db = infra_db::get_db().await;
     db.list_values(prefix).await
-}
-
-#[inline]
-pub(crate) async fn list_values_by_start_dt(
-    prefix: &str,
-    start_dt: Option<(i64, i64)>,
-) -> Result<Vec<(i64, Bytes)>> {
-    let db = infra_db::get_db().await;
-    db.list_values_by_start_dt(prefix, start_dt).await
 }
 
 #[cfg(test)]

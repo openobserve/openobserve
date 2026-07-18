@@ -111,7 +111,7 @@ pub async fn save_enrichment_data(
     }
 
     let current_size_in_bytes = if append_data {
-        db::enrichment_table::get_table_size(org_id, &stream_name).await
+        catalog::enrichment::get_table_size(org_id, &stream_name).await
     } else {
         // If we are not appending data, we do not need to check the current size
         // we will simply use the payload size to check if it exceeds the max size
@@ -270,7 +270,7 @@ pub async fn save_enrichment_data(
         log::error!("Error writing enrichment table to local cache: {e}");
     }
 
-    let mut enrich_meta_stats = db::enrichment_table::get_meta_table_stats(org_id, &stream_name)
+    let mut enrich_meta_stats = catalog::enrichment::get_meta_table_stats(org_id, &stream_name)
         .await
         .unwrap_or_default();
 
@@ -279,18 +279,18 @@ pub async fn save_enrichment_data(
     }
     if enrich_meta_stats.start_time == 0 {
         enrich_meta_stats.start_time =
-            db::enrichment_table::get_start_time(org_id, &stream_name).await;
+            catalog::enrichment::get_start_time(org_id, &stream_name).await;
     }
     enrich_meta_stats.end_time = timestamp;
     enrich_meta_stats.size = total_expected_size_in_bytes as i64;
     // The stream_stats table takes some time to update, so we need to update the enrichment table
     // size in the meta table to avoid exceeding the `ZO_ENRICHMENT_TABLE_LIMIT`.
-    let _ = db::enrichment_table::update_meta_table_stats(org_id, &stream_name, enrich_meta_stats)
-        .await;
+    let _ =
+        catalog::enrichment::update_meta_table_stats(org_id, &stream_name, enrich_meta_stats).await;
 
     // notify update
     if !schema.fields().is_empty()
-        && let Err(e) = super::db::enrichment_table::notify_update(org_id, &stream_name).await
+        && let Err(e) = catalog::enrichment::notify_update(org_id, &stream_name).await
     {
         log::error!("Error notifying enrichment table {org_id}/{stream_name} update: {e}");
     }
@@ -311,7 +311,7 @@ pub async fn delete_enrichment_table(
 ) {
     log::info!("deleting enrichment table  {stream_name}");
     // delete stream schema
-    if let Err(e) = db::schema::delete(org_id, stream_name, Some(stream_type)).await {
+    if let Err(e) = catalog::schema::delete(org_id, stream_name, Some(stream_type)).await {
         log::error!("Error deleting stream schema: {e}");
     }
 
@@ -347,7 +347,7 @@ pub async fn delete_enrichment_table(
     }
 
     // delete stream key
-    if let Err(e) = db::enrichment_table::delete(org_id, stream_name).await {
+    if let Err(e) = catalog::enrichment::delete(org_id, stream_name).await {
         log::error!("Error deleting enrichment table: {e}");
     }
 
@@ -438,12 +438,12 @@ pub async fn cleanup_enrichment_table_resources(
     }
 
     // delete stream key
-    if let Err(e) = db::enrichment_table::delete(org_id, stream_name).await {
+    if let Err(e) = catalog::enrichment::delete(org_id, stream_name).await {
         log::error!("Error deleting enrichment table: {e}");
     }
 
     // delete URL job record if it exists
-    if let Err(e) = db::enrichment_table::delete_url_job(org_id, stream_name).await {
+    if let Err(e) = catalog::enrichment::delete_url_job(org_id, stream_name).await {
         log::error!("Error deleting enrichment table URL job: {e}");
     }
 

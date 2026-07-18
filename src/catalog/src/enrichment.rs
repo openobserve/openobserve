@@ -13,140 +13,29 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::Arc;
+use std::{future::Future, sync::Arc};
 
 use arrow::{
     array::{RecordBatch, *},
     datatypes::DataType,
 };
+use common::infra::config::ENRICHMENT_TABLES;
 use config::{
-    QUERY_WITH_NO_LIMIT, ider,
     meta::stream::{EnrichmentTableMetaStreamStats, StreamType},
     utils::{json, time::BASE_TIME},
 };
 use infra::{cache::stats, db as infra_db, table::enrichment_table_urls};
-use rayon::prelude::*;
-use vrl::prelude::NotNan;
 #[cfg(feature = "enterprise")]
-use {
-    crate::search::SEARCH_SERVER,
-    o2_enterprise::enterprise::{
-        search::TaskStatus, super_cluster::queue::ENRICHMENT_TABLE_URL_JOB_KEY,
-    },
-};
+use o2_enterprise::enterprise::super_cluster::queue::ENRICHMENT_TABLE_URL_JOB_KEY;
+use rayon::prelude::*;
+use transform::enrichment::StreamTable;
+use vrl::prelude::NotNan;
 
-use crate::{
-    common::infra::config::ENRICHMENT_TABLES,
-    db as db_service,
-    enrichment::{StreamTable, storage::Values},
-    search::cluster::http as search_cluster,
-};
+use crate::store;
 
 /// Will no longer be used as we are using the meta stream stats to store start, end time and size
 pub const ENRICHMENT_TABLE_SIZE_KEY: &str = "/enrichment_table_size";
 pub use infra::table::enrichment_tables::ENRICHMENT_TABLE_META_STREAM_STATS_KEY;
-
-pub async fn get_enrichment_table_data(
-    org_id: &str,
-    name: &str,
-    _apply_primary_region_if_specified: bool,
-    end_time: i64,
-) -> Result<Values, anyhow::Error> {
-    let start_time = get_start_time(org_id, name).await;
-
-    let query = config::meta::search::Query {
-        sql: format!("SELECT * FROM \"{name}\""),
-        start_time,
-        end_time,
-        size: QUERY_WITH_NO_LIMIT, // -1 means no limit, enrichment table should not be limited
-        ..Default::default()
-    };
-
-    #[cfg(feature = "enterprise")]
-    let regions = {
-        use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
-        let config = get_o2_config();
-        let enrichment_table_region = config.super_cluster.enrichment_table_get_region.clone();
-        if _apply_primary_region_if_specified
-            && config.super_cluster.enabled
-            && !enrichment_table_region.is_empty()
-        {
-            vec![enrichment_table_region]
-        } else {
-            vec![]
-        }
-    };
-    #[cfg(not(feature = "enterprise"))]
-    let regions = vec![];
-
-    let search_query: proto::cluster_rpc::SearchQuery = query.clone().into();
-    let trace_id = ider::generate_trace_id();
-    let mut request = config::datafusion::request::Request::new(
-        trace_id.clone(),
-        org_id.to_string(),
-        StreamType::EnrichmentTables,
-        0,    // timeout
-        None, // user_id
-        Some((search_query.start_time, search_query.end_time)),
-        None, // search_type
-        query.histogram_interval,
-        false, // overwrite_cache
-    );
-    // set local mode to true for enrichment table
-    request.set_local_mode(Some(true));
-
-    log::info!("get enrichment table {org_id}/{name} data req start time: {start_time}");
-
-    #[cfg(feature = "enterprise")]
-    {
-        let sql = Some(query.sql.clone());
-        let start_time = Some(query.start_time);
-        let end_time = Some(query.end_time);
-        // set search task
-        SEARCH_SERVER
-            .insert(
-                trace_id.clone(),
-                TaskStatus::new_leader(
-                    vec![],
-                    true,
-                    None,
-                    Some(org_id.to_string()),
-                    Some(request.stream_type.to_string()),
-                    sql,
-                    start_time,
-                    end_time,
-                    None,
-                    None,
-                ),
-            )
-            .await;
-    }
-
-    let result =
-        search_cluster::search_inner(request, search_query, regions, vec![], true, None).await;
-
-    #[cfg(feature = "enterprise")]
-    {
-        let _ = SEARCH_SERVER.remove(&trace_id, false).await;
-    }
-
-    // do search using search_inner which returns RecordBatches
-    match result {
-        Ok((batches, _scan_stats, _took_wait, _is_partial, _partial_err)) => {
-            log::info!(
-                "get enrichment table {org_id}/{name} data success with {} rows",
-                batches.iter().map(|b| b.num_rows()).sum::<usize>()
-            );
-            Ok(Values::RecordBatch(batches))
-        }
-        Err(err) => {
-            log::error!("get enrichment table {org_id}/{name} data error: {err}",);
-            Err(anyhow::anyhow!(
-                "get enrichment table {org_id}/{name} error: {err}"
-            ))
-        }
-    }
-}
 
 pub fn convert_to_vrl(value: &json::Value) -> vrl::value::Value {
     match value {
@@ -390,7 +279,7 @@ pub async fn delete_enrichment_data_from_db(
 
 /// Delete the size of the enrichment table in bytes
 pub async fn delete_table_size(org_id: &str, name: &str) -> Result<(), infra::errors::Error> {
-    db_service::delete(
+    store::delete(
         &format!("{ENRICHMENT_TABLE_SIZE_KEY}/{org_id}/{name}"),
         false,
         false,
@@ -403,7 +292,7 @@ pub async fn delete_table_size(org_id: &str, name: &str) -> Result<(), infra::er
 pub async fn get_table_size(org_id: &str, name: &str) -> f64 {
     match get_meta_table_stats(org_id, name).await {
         Some(meta_stats) if meta_stats.size > 0 => meta_stats.size as f64,
-        _ => match db_service::get(&format!("{ENRICHMENT_TABLE_SIZE_KEY}/{org_id}/{name}")).await {
+        _ => match store::get(&format!("{ENRICHMENT_TABLE_SIZE_KEY}/{org_id}/{name}")).await {
             Ok(size) => {
                 let size = String::from_utf8_lossy(&size);
                 size.parse::<f64>().unwrap_or(0.0)
@@ -442,7 +331,7 @@ pub async fn update_meta_table_stats(
     name: &str,
     stats: EnrichmentTableMetaStreamStats,
 ) -> Result<(), infra::errors::Error> {
-    db_service::put(
+    store::put(
         &format!("{ENRICHMENT_TABLE_META_STREAM_STATS_KEY}/{org_id}/{name}"),
         serde_json::to_string(&stats).unwrap().into(),
         false,
@@ -452,7 +341,7 @@ pub async fn update_meta_table_stats(
 }
 
 pub async fn delete_meta_table_stats(org_id: &str, name: &str) -> Result<(), infra::errors::Error> {
-    db_service::delete(
+    store::delete(
         &format!("{ENRICHMENT_TABLE_META_STREAM_STATS_KEY}/{org_id}/{name}"),
         false,
         false,
@@ -481,7 +370,11 @@ pub async fn delete(org_id: &str, name: &str) -> Result<(), infra::errors::Error
     cluster_coordinator.delete(&key, false, true, None).await
 }
 
-pub async fn watch() -> Result<(), anyhow::Error> {
+pub async fn watch<Load, LoadFuture>(load: Load) -> Result<(), anyhow::Error>
+where
+    Load: Fn(String, String, bool) -> LoadFuture,
+    LoadFuture: Future<Output = Result<Arc<Vec<vrl::value::Value>>, anyhow::Error>>,
+{
     let key = "/enrichment_table/";
     let cluster_coordinator = infra_db::get_coordinator().await;
     let mut events = cluster_coordinator.watch(key).await?;
@@ -502,25 +395,13 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 let org_id = keys[0];
                 let stream_name = keys[2];
 
-                let data = match super::super::enrichment::get_enrichment_table(
-                    org_id,
-                    stream_name,
-                    false,
-                )
-                .await
-                {
+                let data = match load(org_id.to_string(), stream_name.to_string(), false).await {
                     Ok(data) => data,
                     Err(e) => {
                         log::error!(
                             "[ENRICHMENT::TABLE watch] get enrichment table {org_id}/{stream_name} error, trying again: {e}"
                         );
-                        match super::super::enrichment::get_enrichment_table(
-                            org_id,
-                            stream_name,
-                            false,
-                        )
-                        .await
-                        {
+                        match load(org_id.to_string(), stream_name.to_string(), false).await {
                             Ok(data) => data,
                             Err(e) => {
                                 log::error!(
@@ -831,8 +712,6 @@ pub async fn claim_stale_url_jobs(
 // write test for convert_to_vrl
 #[cfg(test)]
 mod tests {
-    use config::utils::time::now_micros;
-
     use super::*;
 
     #[test]
@@ -922,14 +801,6 @@ mod tests {
             }
             _ => panic!("Expected object value"),
         }
-    }
-
-    #[tokio::test]
-    async fn test_get_enrichment_table_data() {
-        // This will fail in test environment due to missing dependencies,
-        // but tests the function structure
-        let result = get_enrichment_table_data("test_org", "test_table", false, now_micros()).await;
-        assert!(result.is_err());
     }
 
     #[tokio::test]

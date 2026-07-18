@@ -184,7 +184,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
             };
 
             // reset all metrics
-            let orgs = crate::service::db::schema::list_organizations_from_cache().await;
+            let orgs = catalog::schema::list_organizations_from_cache().await;
             for org in orgs {
                 for stream_type in ALL_STREAM_TYPES {
                     if metrics::COMPACT_PENDING_JOBS

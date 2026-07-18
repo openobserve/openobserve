@@ -16,6 +16,7 @@
 use std::sync::Arc;
 
 use chrono::Utc;
+use common::infra::config::QUERY_FUNCTIONS;
 use config::{
     meta::{
         function::Transform,
@@ -24,8 +25,9 @@ use config::{
     },
     utils::json,
 };
+use telemetry::ErrorSink;
 
-use crate::{common::infra::config::QUERY_FUNCTIONS, db, telemetry::publish_error};
+use crate::store;
 
 pub async fn set(org_id: &str, name: &str, func_val: &Transform) -> Result<(), anyhow::Error> {
     let key = format!("/function/{org_id}/{name}");
@@ -33,7 +35,7 @@ pub async fn set(org_id: &str, name: &str, func_val: &Transform) -> Result<(), a
     if val.is_empty() {
         return Err(anyhow::anyhow!("Function value is empty"));
     }
-    match db::put(&key, val.into(), db::NEED_WATCH, None).await {
+    match store::put(&key, val.into(), infra::db::NEED_WATCH, None).await {
         Ok(_) => {}
         Err(e) => {
             log::error!("Error saving function: {e}");
@@ -45,13 +47,13 @@ pub async fn set(org_id: &str, name: &str, func_val: &Transform) -> Result<(), a
 }
 
 pub async fn get(org_id: &str, name: &str) -> Result<Transform, anyhow::Error> {
-    let val = db::get(&format!("/function/{org_id}/{name}")).await?;
+    let val = store::get(&format!("/function/{org_id}/{name}")).await?;
     Ok(json::from_slice(&val)?)
 }
 
 pub async fn delete(org_id: &str, name: &str) -> Result<(), anyhow::Error> {
     let key = format!("/function/{org_id}/{name}");
-    match db::delete(&key, false, db::NEED_WATCH, None).await {
+    match store::delete(&key, false, infra::db::NEED_WATCH, None).await {
         Ok(_) => {}
         Err(e) => {
             log::error!("Error deleting function: {e}");
@@ -62,7 +64,7 @@ pub async fn delete(org_id: &str, name: &str) -> Result<(), anyhow::Error> {
 }
 
 pub async fn list(org_id: &str) -> Result<Vec<Transform>, anyhow::Error> {
-    Ok(db::list(&format!("/function/{org_id}/"))
+    Ok(store::list(&format!("/function/{org_id}/"))
         .await?
         .values()
         .filter_map(|val| json::from_slice(val).ok())
@@ -71,7 +73,7 @@ pub async fn list(org_id: &str) -> Result<Vec<Transform>, anyhow::Error> {
 
 pub async fn watch() -> Result<(), anyhow::Error> {
     let key = "/function/";
-    let cluster_coordinator = db::get_coordinator().await;
+    let cluster_coordinator = infra::db::get_coordinator().await;
     let mut events = cluster_coordinator.watch(key).await?;
     let events = Arc::get_mut(&mut events).unwrap();
     log::info!("Start watching function");
@@ -84,9 +86,9 @@ pub async fn watch() -> Result<(), anyhow::Error> {
             }
         };
         match ev {
-            db::Event::Put(ev) => {
+            infra::db::Event::Put(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
-                let item_value: Transform = match db::get(&ev.key).await {
+                let item_value: Transform = match store::get(&ev.key).await {
                     Ok(val) => match json::from_slice(&val) {
                         Ok(val) => val,
                         Err(e) => {
@@ -101,19 +103,19 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 };
                 QUERY_FUNCTIONS.insert(item_key.to_owned(), item_value);
             }
-            db::Event::Delete(ev) => {
+            infra::db::Event::Delete(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
                 QUERY_FUNCTIONS.remove(item_key);
             }
-            db::Event::Empty => {}
+            infra::db::Event::Empty => {}
         }
     }
     Ok(())
 }
 
-pub async fn cache() -> Result<(), anyhow::Error> {
+pub async fn cache(error_sink: &dyn ErrorSink) -> Result<(), anyhow::Error> {
     let key = "/function/";
-    let ret = db::list(key).await?;
+    let ret = store::list(key).await?;
     for (item_key, item_value) in ret {
         let item_key = item_key.strip_prefix(key).unwrap();
         let json_val: Transform = match json::from_slice(&item_value) {
@@ -124,18 +126,19 @@ pub async fn cache() -> Result<(), anyhow::Error> {
                 let mut parts = item_key.splitn(2, '/');
                 let org_id = parts.next().unwrap_or_default();
                 let function_name = parts.next().unwrap_or(item_key);
-                publish_error(ErrorData {
-                    _timestamp: Utc::now().timestamp_micros(),
-                    stream_params: StreamParams {
-                        org_id: org_id.to_string().into(),
-                        ..Default::default()
-                    },
-                    error_source: ErrorSource::Function(FunctionError::new(
-                        function_name.to_string(),
-                        format!("Error deserializing function: {e}"),
-                    )),
-                })
-                .await;
+                error_sink
+                    .emit(ErrorData {
+                        _timestamp: Utc::now().timestamp_micros(),
+                        stream_params: StreamParams {
+                            org_id: org_id.to_string().into(),
+                            ..Default::default()
+                        },
+                        error_source: ErrorSource::Function(FunctionError::new(
+                            function_name.to_string(),
+                            format!("Error deserializing function: {e}"),
+                        )),
+                    })
+                    .await;
                 continue;
             }
         };
@@ -147,8 +150,8 @@ pub async fn cache() -> Result<(), anyhow::Error> {
 
 pub async fn reset() -> Result<(), anyhow::Error> {
     let key = "/function/";
-    db::delete(key, true, db::NO_NEED_WATCH, None).await?;
+    store::delete(key, true, infra::db::NO_NEED_WATCH, None).await?;
     let key = "/transform/";
-    db::delete(key, true, db::NO_NEED_WATCH, None).await?;
+    store::delete(key, true, infra::db::NO_NEED_WATCH, None).await?;
     Ok(())
 }

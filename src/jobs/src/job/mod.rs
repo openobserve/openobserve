@@ -469,8 +469,30 @@ pub async fn init() -> Result<(), anyhow::Error> {
         .expect("short url cache failed");
 
     // initialize metadata watcher
-    tokio::task::spawn(db::schema::watch());
-    tokio::task::spawn(db::functions::watch());
+    tokio::task::spawn(catalog::schema::watch(
+        |org_id| async move {
+            crate::service::organization::check_and_create_org(&org_id)
+                .await
+                .map(|_| ())
+        },
+        |org_id, stream_type, stream_name| async move {
+            crate::service::db::compact::files::del_offset(&org_id, stream_type, &stream_name)
+                .await?;
+            tokio::task::spawn(async move {
+                if let Err(error) = crate::service::catalog_runtime::flush_cache_for_stream(
+                    &org_id,
+                    stream_type,
+                    &stream_name,
+                )
+                .await
+                {
+                    log::error!("[Schema:watch] flush cache for stream error: {error}");
+                }
+            });
+            Ok(())
+        },
+    ));
+    tokio::task::spawn(catalog::functions::watch());
     tokio::task::spawn(db::compact::retention::watch());
     tokio::task::spawn(db::metrics::watch_prom_cluster_leader());
     tokio::task::spawn(db::system_settings::watch());
@@ -510,14 +532,23 @@ pub async fn init() -> Result<(), anyhow::Error> {
         tokio::task::spawn(db::session::watch());
     }
     if LOCAL_NODE.is_ingester() || LOCAL_NODE.is_querier() || LOCAL_NODE.is_alert_manager() {
-        tokio::task::spawn(db::enrichment_table::watch());
+        tokio::task::spawn(catalog::enrichment::watch(
+            |org_id, stream_name, apply_primary_region| async move {
+                crate::service::enrichment::get_enrichment_table(
+                    &org_id,
+                    &stream_name,
+                    apply_primary_region,
+                )
+                .await
+            },
+        ));
     }
 
     tokio::task::yield_now().await;
 
     // cache core metadata
-    db::schema::cache().await.expect("stream cache failed");
-    db::functions::cache()
+    catalog::schema::cache().await.expect("stream cache failed");
+    catalog::functions::cache(crate::service::telemetry::error_sink())
         .await
         .expect("functions cache failed");
     db::compact::retention::cache()
@@ -1011,9 +1042,18 @@ pub async fn init_deferred() -> Result<(), anyhow::Error> {
         .await
         .expect("Failed to clean up old JSON format enrichment tables");
 
-    db::schema::cache_enrichment_tables()
-        .await
-        .expect("EnrichmentTables cache failed");
+    catalog::schema::cache_enrichment_tables(
+        |org_id, stream_name, apply_primary_region| async move {
+            crate::service::enrichment::get_enrichment_table(
+                &org_id,
+                &stream_name,
+                apply_primary_region,
+            )
+            .await
+        },
+    )
+    .await
+    .expect("EnrichmentTables cache failed");
     // pipelines can potentially depend on enrichment tables, so cached afterwards
     db::pipeline::cache().await.expect("Pipeline cache failed");
 

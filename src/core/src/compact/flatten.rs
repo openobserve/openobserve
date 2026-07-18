@@ -48,7 +48,7 @@ static PROCESSING_FILES: Lazy<RwLock<HashSet<String>>> = Lazy::new(|| RwLock::ne
 
 pub async fn run_generate(worker_tx: mpsc::Sender<FileKey>) -> Result<(), anyhow::Error> {
     let semaphore = std::sync::Arc::new(Semaphore::new(get_config().limit.file_merge_thread_num));
-    let orgs = db::schema::list_organizations_from_cache().await;
+    let orgs = catalog::schema::list_organizations_from_cache().await;
     let stream_types = [StreamType::Logs];
     for org_id in orgs {
         // check backlist
@@ -57,7 +57,7 @@ pub async fn run_generate(worker_tx: mpsc::Sender<FileKey>) -> Result<(), anyhow
             continue;
         }
         for stream_type in stream_types {
-            let streams = db::schema::list_streams_from_cache(&org_id, stream_type).await;
+            let streams = catalog::schema::list_streams_from_cache(&org_id, stream_type).await;
             let mut tasks = Vec::with_capacity(streams.len());
             for stream_name in streams {
                 // check if this stream need flatten

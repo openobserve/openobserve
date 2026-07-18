@@ -1060,7 +1060,7 @@ async fn process_custom_claim_parsing(
     let function_loader_fn = |function_name: &str| {
         let function_name = function_name.to_string();
         Box::pin(async move {
-            match db::functions::get("_meta", &function_name).await {
+            match catalog::functions::get("_meta", &function_name).await {
                 Ok(func) => Ok(func), // Return full Transform object with trans_type
                 Err(e) => Err(anyhow::anyhow!(
                     "Failed to load function '{}' from _meta org: {}",

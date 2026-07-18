@@ -68,13 +68,13 @@ pub(crate) async fn generate_jobs() -> Result<(), anyhow::Error> {
     let now = config::utils::time::now();
     let data_lifecycle_end = now - Duration::try_days(cfg.compact.data_retention_days).unwrap();
 
-    let orgs = db::schema::list_organizations_from_cache().await;
+    let orgs = catalog::schema::list_organizations_from_cache().await;
     for org_id in orgs {
         for stream_type in ALL_STREAM_TYPES {
             if stream_type == StreamType::EnrichmentTables || stream_type == StreamType::Filelist {
                 continue; // skip data retention for enrichment tables and filelist
             }
-            let streams = db::schema::list_streams_from_cache(&org_id, stream_type).await;
+            let streams = catalog::schema::list_streams_from_cache(&org_id, stream_type).await;
             for stream_name in streams {
                 let Some(node_name) =
                     get_node_from_consistent_hash(&stream_name, &Role::Compactor, None).await

@@ -138,7 +138,7 @@ pub async fn save_function(org_id: String, mut func: Transform) -> Result<(), Fu
             }
         }
         extract_num_args(&mut func);
-        db::functions::set(&org_id, &func.name, &func)
+        catalog::functions::set(&org_id, &func.name, &func)
             .await
             .map_err(|error| FunctionError::Storage(error.to_string()))?;
         set_ownership(&org_id, "functions", Authz::new(&func.name)).await;
@@ -235,7 +235,7 @@ pub async fn update_function(
         }
     }
     extract_num_args(&mut func);
-    db::functions::set(org_id, &func.name, &func)
+    catalog::functions::set(org_id, &func.name, &func)
         .await
         .map_err(|error| FunctionError::Storage(error.to_string()))?;
 
@@ -258,7 +258,7 @@ pub async fn update_function(
 }
 
 pub async fn list_functions(org_id: String, permitted: Option<Vec<String>>) -> FunctionList {
-    if let Ok(functions) = db::functions::list(&org_id).await {
+    if let Ok(functions) = catalog::functions::list(&org_id).await {
         let mut result = Vec::new();
         for function in functions {
             if permitted.is_none()
@@ -320,7 +320,7 @@ pub async fn delete_function(org_id: &str, fn_name: &str) -> Result<(), Function
             pipeline_data
         )));
     }
-    let result = db::functions::delete(org_id, fn_name).await;
+    let result = catalog::functions::delete(org_id, fn_name).await;
     match result {
         Ok(_) => {
             remove_ownership(org_id, "functions", Authz::new(fn_name)).await;
@@ -369,7 +369,7 @@ fn extract_num_args(func: &mut Transform) {
 }
 
 async fn check_existing_fn(org_id: &str, fn_name: &str) -> Option<Transform> {
-    (db::functions::get(org_id, fn_name).await).ok()
+    (catalog::functions::get(org_id, fn_name).await).ok()
 }
 
 #[cfg(test)]

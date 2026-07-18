@@ -22,6 +22,7 @@ cloud = ["enterprise", "o2_enterprise/cloud", "openobserve-core/cloud"]
 [dependencies]
 openobserve-api-common.workspace = true
 openobserve-core.workspace = true
+catalog.workspace = true
 transform.workspace = true
 anyhow.workspace = true
 axum.workspace = true

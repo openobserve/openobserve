@@ -22,6 +22,7 @@ use axum::{
     http::StatusCode,
     response::{IntoResponse, Response},
 };
+use catalog::enrichment as enrichment_table;
 use chrono::Utc;
 use config::{
     DISTINCT_FIELDS, META_ORG_ID, TIMESTAMP_COL_NAME, get_config,
@@ -65,7 +66,6 @@ use crate::{
     },
     extractors::Headers,
     service::{
-        db::enrichment_table,
         search::{
             self as SearchService, datafusion::plan::projections::get_result_schema,
             sql::visitor::pickup_where::pickup_where, utils::is_permissable_function_error,

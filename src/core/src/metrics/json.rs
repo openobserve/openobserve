@@ -201,7 +201,7 @@ pub async fn ingest(
                     json::to_string(&metadata).unwrap(),
                 );
                 schema = schema.with_metadata(extra_metadata);
-                db::schema::merge(
+                catalog::schema::merge(
                     org_id,
                     &stream_name,
                     StreamType::Metrics,
@@ -446,7 +446,7 @@ pub async fn ingest(
                         json::to_string(&metadata).unwrap(),
                     );
                     schema = inferred_schema.with_metadata(extra_metadata);
-                    db::schema::merge(
+                    catalog::schema::merge(
                         org_id,
                         &stream_name,
                         StreamType::Metrics,

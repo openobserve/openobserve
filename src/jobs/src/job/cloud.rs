@@ -177,7 +177,7 @@ async fn run_ai_quota_check() {
 async fn check_all_orgs_ai_quota() {
     use crate::service::trial_quota;
 
-    let orgs = crate::service::db::schema::list_organizations_from_cache().await;
+    let orgs = catalog::schema::list_organizations_from_cache().await;
 
     // Pre-fetch all notified checkpoints in a single GROUP-BY query to avoid
     // one DB round-trip per org (N+1).

@@ -100,7 +100,7 @@ pub async fn run_retention() -> Result<(), anyhow::Error> {
 
 /// Generate job for compactor
 pub async fn run_generate_job(job_type: CompactionJobType) -> Result<(), anyhow::Error> {
-    let orgs = db::schema::list_organizations_from_cache().await;
+    let orgs = catalog::schema::list_organizations_from_cache().await;
     for org_id in orgs {
         // check backlist
         if !db::file_list::BLOCKED_ORGS.is_empty() && db::file_list::BLOCKED_ORGS.contains(&org_id)
@@ -108,7 +108,7 @@ pub async fn run_generate_job(job_type: CompactionJobType) -> Result<(), anyhow:
             continue;
         }
         for stream_type in ALL_STREAM_TYPES {
-            let streams = db::schema::list_streams_from_cache(&org_id, stream_type).await;
+            let streams = catalog::schema::list_streams_from_cache(&org_id, stream_type).await;
             for stream_name in streams {
                 let Some(node_name) =
                     get_node_from_consistent_hash(&stream_name, &Role::Compactor, None).await
@@ -194,7 +194,7 @@ pub async fn run_generate_job(job_type: CompactionJobType) -> Result<(), anyhow:
 /// Generate downsampling job for Metrics
 #[cfg(feature = "enterprise")]
 pub async fn run_generate_downsampling_job() -> Result<(), anyhow::Error> {
-    let orgs = db::schema::list_organizations_from_cache().await;
+    let orgs = catalog::schema::list_organizations_from_cache().await;
     for org_id in orgs {
         // check backlist
         if !db::file_list::BLOCKED_ORGS.is_empty() && db::file_list::BLOCKED_ORGS.contains(&org_id)
@@ -202,7 +202,7 @@ pub async fn run_generate_downsampling_job() -> Result<(), anyhow::Error> {
             continue;
         }
         let stream_type = StreamType::Metrics;
-        let streams = db::schema::list_streams_from_cache(&org_id, stream_type).await;
+        let streams = catalog::schema::list_streams_from_cache(&org_id, stream_type).await;
         for stream_name in streams {
             let Some(node_name) =
                 get_node_from_consistent_hash(&stream_name, &Role::Compactor, None).await
@@ -417,7 +417,7 @@ pub async fn run_delay_deletion() -> Result<(), anyhow::Error> {
         )
         .unwrap();
     let time_max = time_max.timestamp_micros();
-    let orgs = db::schema::list_organizations_from_cache().await;
+    let orgs = catalog::schema::list_organizations_from_cache().await;
     for org_id in orgs {
         loop {
             match deleted::delete(&org_id, time_max).await {

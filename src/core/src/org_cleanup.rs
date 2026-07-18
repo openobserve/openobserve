@@ -279,7 +279,7 @@ async fn execute_step(org_id: &str, org_name: &str, step: &str) -> Result<(), an
 }
 
 async fn step_delete_streams(org_id: &str, org_name: &str) -> Result<(), anyhow::Error> {
-    let streams = crate::db::schema::list(org_id, None, false).await?;
+    let streams = catalog::schema::list(org_id, None, false).await?;
 
     // Enqueue one sub-task per stream
     let sub_tasks: Vec<org_cleanup_tasks::NewCleanupTask> = streams
@@ -319,7 +319,7 @@ async fn step_delete_stream(org_id: &str, type_and_name: &str) -> Result<(), any
     crate::compact::retention::delete_all(org_id, stream_type, stream_name).await?;
 
     // Delete the schema entry (delete_all removes data, not the stream definition).
-    crate::db::schema::delete(org_id, stream_name, Some(stream_type)).await?;
+    catalog::schema::delete(org_id, stream_name, Some(stream_type)).await?;
 
     Ok(())
 }

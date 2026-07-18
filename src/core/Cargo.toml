@@ -11,6 +11,7 @@ path = "src/lib.rs"
 [features]
 default = []
 enterprise = [
+    "catalog/enterprise",
     "dep:aws-config",
     "dep:aws-credential-types",
     "dep:o2_dex",
@@ -38,6 +39,7 @@ vortex = [
 
 [dependencies]
 common.workspace = true
+catalog.workspace = true
 telemetry.workspace = true
 transform.workspace = true
 promql.workspace = true

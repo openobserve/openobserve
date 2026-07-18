@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use catalog::functions as db_functions;
 use config::meta::{
     pipeline::{
         Pipeline, PipelineKind,
@@ -24,7 +25,6 @@ use config::meta::{
 };
 
 use super::db::{
-    functions as db_functions,
     pipeline::{self, PipelineError},
     scheduler,
 };

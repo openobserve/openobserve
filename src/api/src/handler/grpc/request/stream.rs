@@ -20,8 +20,6 @@ use proto::cluster_rpc::{
 };
 use tonic::{Request, Response, Status};
 
-use crate::service::db;
-
 const BATCH_DELAY_MS: u64 = 100;
 const MAX_CONCURRENT_ORGS: usize = 10;
 
@@ -127,7 +125,7 @@ impl Streams for StreamServiceImpl {
             // Internal-token caller (cluster RPC): may specify an org or list all.
             match req.org_id {
                 Some(org) => vec![org],
-                None => db::schema::list_organizations_from_cache().await,
+                None => catalog::schema::list_organizations_from_cache().await,
             }
         };
 

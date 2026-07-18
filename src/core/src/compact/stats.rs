@@ -75,14 +75,14 @@ pub async fn update_stats_from_file_list() -> Result<(), anyhow::Error> {
 
     let iter = [(new_data_range, true), (old_data_range, false)];
 
-    let orgs = db::schema::list_organizations_from_cache().await;
+    let orgs = catalog::schema::list_organizations_from_cache().await;
     let mut total_streams = 0;
     for org_id in orgs {
         for stream_type in ALL_STREAM_TYPES {
             if stream_type == StreamType::Index || stream_type == StreamType::Filelist {
                 continue;
             }
-            let streams = db::schema::list_streams_from_cache(&org_id, stream_type).await;
+            let streams = catalog::schema::list_streams_from_cache(&org_id, stream_type).await;
             total_streams += streams.len();
             let stream_type_str = stream_type.to_string();
             for stream_name in streams {

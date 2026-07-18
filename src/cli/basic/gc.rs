@@ -34,8 +34,6 @@ use config::{
     utils::time::now,
 };
 
-use crate::service::db;
-
 /// Entry point for the `gc-file-list` command.
 ///
 /// * `account_override` - force this storage account for listing/deleting instead of resolving it
@@ -89,8 +87,8 @@ pub async fn run(
         total_files += files;
     } else {
         // process every stream: load schema cache to enumerate orgs/streams
-        db::schema::cache().await?;
-        let orgs = db::schema::list_organizations_from_cache().await;
+        catalog::schema::cache().await?;
+        let orgs = catalog::schema::list_organizations_from_cache().await;
         for org_id in orgs {
             for stream_type in ALL_STREAM_TYPES {
                 // enrichment tables and file_list streams are not subject to data
@@ -100,7 +98,7 @@ pub async fn run(
                 {
                     continue;
                 }
-                let streams = db::schema::list_streams_from_cache(&org_id, stream_type).await;
+                let streams = catalog::schema::list_streams_from_cache(&org_id, stream_type).await;
                 for stream_name in streams {
                     let (dirs, files) = gc_stream(
                         &org_id,

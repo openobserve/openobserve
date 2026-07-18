@@ -92,7 +92,7 @@ impl Values {
                     .build()?;
                 let json_data = pool.install(|| {
                     data.par_iter()
-                        .map(crate::db::enrichment_table::convert_from_vrl)
+                        .map(catalog::enrichment::convert_from_vrl)
                         .collect()
                 });
                 Ok(Arc::new(json_data))
@@ -130,14 +130,14 @@ impl Values {
                     .build()?;
                 let vrl_data = pool.install(|| {
                     data.par_iter()
-                        .map(crate::db::enrichment_table::convert_to_vrl)
+                        .map(catalog::enrichment::convert_to_vrl)
                         .collect()
                 });
                 Ok(Arc::new(vrl_data))
             }
             Values::RecordBatch(batches) => {
                 // Convert RecordBatch directly to VRL without intermediate JSON
-                let vrl_data = crate::db::enrichment_table::convert_recordbatch_to_vrl(batches)?;
+                let vrl_data = catalog::enrichment::convert_recordbatch_to_vrl(batches)?;
                 Ok(Arc::new(vrl_data))
             }
         }
@@ -242,8 +242,7 @@ pub mod remote {
         // Merge the data from db and convert to parquet format
         // Pass None for end_time to fetch all data (not in search context)
         let (data, min_ts, max_ts) =
-            crate::db::enrichment_table::get_enrichment_data_from_db(org_id, table_name, None)
-                .await?;
+            catalog::enrichment::get_enrichment_data_from_db(org_id, table_name, None).await?;
         if data.is_empty() {
             return Ok(());
         }
@@ -577,7 +576,7 @@ pub mod database {
         created_at: i64,
     ) -> Result<()> {
         // Use existing enrichment table storage
-        crate::db::enrichment_table::save_enrichment_data_to_db(
+        catalog::enrichment::save_enrichment_data_to_db(
             org_id, table_name, data, created_at, // append_data = false for now
         )
         .await
@@ -589,7 +588,7 @@ pub mod database {
 
     pub async fn delete(org_id: &str, table_name: &str) -> Result<()> {
         // Use existing enrichment table deletion
-        crate::db::enrichment_table::delete_enrichment_data_from_db(org_id, table_name)
+        catalog::enrichment::delete_enrichment_data_from_db(org_id, table_name)
             .await
             .map_err(|e| {
                 anyhow::anyhow!("Failed to delete enrichment table {}: {e}", table_name)
@@ -609,7 +608,7 @@ pub mod database {
 
     pub async fn exists(org_id: &str, table_name: &str) -> Result<bool> {
         // Check if table exists by trying to get its metadata
-        match crate::db::enrichment_table::get_meta_table_stats(org_id, table_name).await {
+        match catalog::enrichment::get_meta_table_stats(org_id, table_name).await {
             Some(_) => Ok(true),
             None => Ok(false),
         }

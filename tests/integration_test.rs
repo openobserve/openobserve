@@ -3192,9 +3192,7 @@ mod tests {
         drop(stream_settings);
 
         // Get the meta table stats for enrichment table
-        let meta_table_stats =
-            openobserve::service::db::enrichment_table::get_meta_table_stats(org_id, table_name)
-                .await;
+        let meta_table_stats = catalog::enrichment::get_meta_table_stats(org_id, table_name).await;
         assert!(meta_table_stats.is_some());
         let meta_table_stats = meta_table_stats.unwrap();
         assert_ne!(meta_table_stats.size, 0);
@@ -3314,8 +3312,7 @@ mod tests {
 
         // Get the meta table stats for enrichment table
         let meta_table_stats_first =
-            openobserve::service::db::enrichment_table::get_meta_table_stats(org_id, table_name)
-                .await;
+            catalog::enrichment::get_meta_table_stats(org_id, table_name).await;
         assert!(meta_table_stats_first.is_some());
         let meta_table_stats_first = meta_table_stats_first.unwrap();
         assert_ne!(meta_table_stats_first.size, 0);
@@ -3381,8 +3378,7 @@ mod tests {
 
         // Get the meta table stats for enrichment table
         let meta_table_stats_second =
-            openobserve::service::db::enrichment_table::get_meta_table_stats(org_id, table_name)
-                .await;
+            catalog::enrichment::get_meta_table_stats(org_id, table_name).await;
         assert!(meta_table_stats_second.is_some());
         let meta_table_stats_second = meta_table_stats_second.unwrap();
         assert_ne!(meta_table_stats_second.size, 0);

@@ -114,7 +114,7 @@ pub async fn process_service_graph() -> Result<(), anyhow::Error> {
         match crate::organization::list_all_orgs(None).await {
             Ok(orgs) => {
                 for org in orgs {
-                    for stream_name in crate::db::schema::list_streams_from_cache(
+                    for stream_name in catalog::schema::list_streams_from_cache(
                         &org.identifier,
                         StreamType::Traces,
                     )

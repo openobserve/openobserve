@@ -1945,7 +1945,7 @@ async fn get_transforms(org_id: &str, fn_name: &str) -> Result<Transform> {
         return Ok(trans.value().clone());
     }
     // get from database
-    crate::db::functions::get(org_id, fn_name).await
+    catalog::functions::get(org_id, fn_name).await
 }
 
 fn resolve_stream_name(haystack: &str, record: &Value) -> Result<String> {

@@ -280,6 +280,10 @@ pub async fn publish_error(error: ErrorData) {
     ERROR_SINK.emit(error).await;
 }
 
+pub fn error_sink() -> &'static dyn ErrorSink {
+    &ERROR_SINK
+}
+
 pub async fn write_internal(request: TelemetryWriteRequest) -> Result<(), TelemetryWriteError> {
     TELEMETRY_WRITER.write(request).await
 }

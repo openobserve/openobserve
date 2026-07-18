@@ -13,10 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use catalog::enrichment::{ENRICHMENT_TABLE_META_STREAM_STATS_KEY, notify_update};
 use infra::errors::{Error, Result};
 use o2_enterprise::enterprise::super_cluster::queue::{Message, MessageType};
-
-use crate::service::db::enrichment_table::{ENRICHMENT_TABLE_META_STREAM_STATS_KEY, notify_update};
 
 pub(crate) async fn process(msg: Message) -> Result<()> {
     let db = infra::db::get_db().await;

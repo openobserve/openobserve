@@ -280,7 +280,7 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
                     db::dashboards::reports::reset(conn).await?;
                 }
                 "function" => {
-                    db::functions::reset().await?;
+                    catalog::functions::reset().await?;
                 }
                 "stream-stats" => {
                     // reset stream stats update offset
@@ -288,7 +288,7 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
                     // reset stream stats table data
                     infra_file_list::reset_stream_stats().await?;
                     // load stream list
-                    db::schema::cache().await?;
+                    catalog::schema::cache().await?;
                     // update stats from file list
                     compact::stats::update_stats_from_file_list()
                         .await

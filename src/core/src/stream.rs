@@ -19,6 +19,7 @@ use axum::{
     Json, http,
     response::{IntoResponse, Response as HttpResponse},
 };
+use catalog::enrichment as enrichment_table;
 use chrono::{TimeZone, Timelike, Utc};
 // Reserved self-reporting stream guards are a Cloud-only concern (Cloud manages
 // these streams for billing); OSS / self-hosted must not block user streams.
@@ -53,7 +54,6 @@ use itertools::chain;
 #[cfg(feature = "vectorscan")]
 use o2_enterprise::enterprise::re_patterns::PATTERN_MANAGER;
 
-use super::db::enrichment_table;
 #[cfg(feature = "vectorscan")]
 use crate::db::re_pattern::process_association_changes;
 use crate::{
@@ -99,7 +99,7 @@ pub async fn get_streams(
     fetch_schema: bool,
     permitted_streams: Option<Vec<String>>,
 ) -> Vec<Stream> {
-    let indices = db::schema::list(org_id, stream_type, fetch_schema)
+    let indices = catalog::schema::list(org_id, stream_type, fetch_schema)
         .await
         .unwrap_or_default();
 
@@ -594,7 +594,7 @@ pub async fn save_stream_settings(
     if !metadata.contains_key("created_at") {
         metadata.insert("created_at".to_string(), now_micros().to_string());
     }
-    db::schema::update_setting(org_id, stream_name, stream_type, metadata)
+    catalog::schema::update_setting(org_id, stream_name, stream_type, metadata)
         .await
         .unwrap();
 
@@ -623,7 +623,7 @@ pub async fn save_stream_settings(
                         metadata.insert("created_at".to_string(), now_micros().to_string());
                     }
 
-                    if let Err(e) = db::schema::update_setting(
+                    if let Err(e) = catalog::schema::update_setting(
                         org_id,
                         &distinct_stream,
                         StreamType::Metadata,
@@ -991,10 +991,10 @@ pub async fn delete_stream(
     if schema.is_empty() {
         // If stream schema doesn't exist, check if this is an enrichment table with a URL job
         if stream_type == StreamType::EnrichmentTables
-            && let Ok(Some(_job)) = db::enrichment_table::get_url_job(org_id, stream_name).await
+            && let Ok(Some(_job)) = catalog::enrichment::get_url_job(org_id, stream_name).await
         {
             // URL job exists - delete it and return success
-            if let Err(e) = db::enrichment_table::delete_url_job(org_id, stream_name).await {
+            if let Err(e) = catalog::enrichment::delete_url_job(org_id, stream_name).await {
                 return Ok(MetaHttpResponse::internal_error(format!(
                     "failed to delete URL job: {e}"
                 )));
@@ -1016,7 +1016,7 @@ pub async fn delete_stream(
     }
 
     // delete stream schema
-    if let Err(e) = db::schema::delete(org_id, stream_name, Some(stream_type)).await {
+    if let Err(e) = catalog::schema::delete(org_id, stream_name, Some(stream_type)).await {
         return Ok((
             http::StatusCode::INTERNAL_SERVER_ERROR,
             [(ERROR_HEADER, format!("failed to delete stream schema: {e}"))],
@@ -1271,7 +1271,7 @@ pub async fn delete_fields(
     if fields.is_empty() {
         return Ok(());
     }
-    db::schema::delete_fields(
+    catalog::schema::delete_fields(
         org_id,
         stream_name,
         stream_type.unwrap_or_default(),

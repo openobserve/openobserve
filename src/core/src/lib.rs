@@ -27,6 +27,7 @@ pub mod auth;
 pub mod authz;
 pub mod bootstrap;
 pub mod cache;
+pub mod catalog_runtime;
 pub mod cluster_info;
 pub mod compact;
 pub mod dashboards;

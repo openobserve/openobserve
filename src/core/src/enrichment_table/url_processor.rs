@@ -67,8 +67,6 @@ use futures::StreamExt;
 use reqwest::Client;
 use tokio::sync::mpsc;
 
-use crate::db;
-
 // ============================================================================
 // MPSC Channel and Event
 // ============================================================================
@@ -125,7 +123,7 @@ static URL_JOB_SENDER: Lazy<mpsc::UnboundedSender<EnrichmentUrlJobEvent>> = Lazy
             tokio::time::sleep(tokio::time::Duration::from_secs(check_interval_secs)).await;
 
             // Attempt to claim multiple stale jobs per check (configurable)
-            match db::enrichment_table::claim_stale_url_jobs(stale_threshold_secs, jobs_per_check)
+            match catalog::enrichment::claim_stale_url_jobs(stale_threshold_secs, jobs_per_check)
                 .await
             {
                 Ok(jobs) => {
@@ -323,7 +321,7 @@ async fn process_url_jobs(mut rx: mpsc::UnboundedReceiver<EnrichmentUrlJobEvent>
 /// the status check prevents duplicate processing. Only jobs in Pending or Failed status
 /// will proceed past the initial checks.
 async fn process_single_url_job(org_id: &str, table_name: &str) -> Result<()> {
-    use crate::db::enrichment_table::{get_url_jobs_for_table, notify_update, save_url_job};
+    use catalog::enrichment::{get_url_jobs_for_table, notify_update, save_url_job};
 
     // ===== MULTI-URL SUPPORT: Process all pending jobs sequentially =====
     // Fetch all jobs for this table. We process them one by one in the order they appear.
@@ -435,7 +433,7 @@ async fn process_single_url_job(org_id: &str, table_name: &str) -> Result<()> {
                 // Fetch the latest job state to preserve progress updates made during processing.
                 // The process_enrichment_table_url function updates progress after each batch,
                 // so we need the latest state before marking as completed.
-                let mut job = match crate::db::enrichment_table::get_url_job_by_id(&job_id).await {
+                let mut job = match catalog::enrichment::get_url_job_by_id(&job_id).await {
                     Ok(Some(j)) => j,
                     Ok(None) => {
                         log::warn!(
@@ -495,7 +493,7 @@ async fn process_single_url_job(org_id: &str, table_name: &str) -> Result<()> {
 
                 // Fetch the latest job state to preserve progress updates (last_byte_position,
                 // etc.) made during processing before the failure occurred.
-                let mut job = match crate::db::enrichment_table::get_url_job_by_id(&job_id).await {
+                let mut job = match catalog::enrichment::get_url_job_by_id(&job_id).await {
                     Ok(Some(j)) => j,
                     Ok(None) => {
                         log::warn!(
@@ -1565,12 +1563,12 @@ async fn process_enrichment_table_url(
                         // Calculate absolute byte position (add resume offset if resuming)
                         let absolute_byte_position = resume_from_byte.unwrap_or(0) + bytes_processed_so_far;
 
-                        if let Ok(Some(mut current_job)) = db::enrichment_table::get_url_job_by_id(&job_id_for_save).await {
+                        if let Ok(Some(mut current_job)) = catalog::enrichment::get_url_job_by_id(&job_id_for_save).await {
                             current_job.last_byte_position = absolute_byte_position;
                             current_job.total_bytes_fetched = absolute_byte_position;
                             current_job.total_records_processed += record_count as i64;
 
-                            if let Err(e) = db::enrichment_table::save_url_job(&current_job).await {
+                            if let Err(e) = catalog::enrichment::save_url_job(&current_job).await {
                                 // Log error but don't fail the batch - progress tracking is best-effort
                                 log::warn!(
                                     "[ENRICHMENT::URL] {}/{} (job {}) - Failed to save progress checkpoint: {}",
@@ -1669,14 +1667,14 @@ async fn process_enrichment_table_url(
 
     // Calculate total expected size
     let current_size_in_bytes = if append_data {
-        db::enrichment_table::get_table_size(org_id, &stream_name).await
+        catalog::enrichment::get_table_size(org_id, &stream_name).await
     } else {
         0.0
     };
     let total_expected_size_in_bytes = current_size_in_bytes + final_total_bytes as f64;
 
     // Update meta table stats
-    let mut enrich_meta_stats = db::enrichment_table::get_meta_table_stats(org_id, &stream_name)
+    let mut enrich_meta_stats = catalog::enrichment::get_meta_table_stats(org_id, &stream_name)
         .await
         .unwrap_or_default();
 
@@ -1685,7 +1683,7 @@ async fn process_enrichment_table_url(
     }
     if enrich_meta_stats.start_time == 0 {
         enrich_meta_stats.start_time =
-            db::enrichment_table::get_start_time(org_id, &stream_name).await;
+            catalog::enrichment::get_start_time(org_id, &stream_name).await;
     }
     enrich_meta_stats.end_time = timestamp;
     enrich_meta_stats.size = total_expected_size_in_bytes as i64;
@@ -1693,7 +1691,7 @@ async fn process_enrichment_table_url(
     // The stream_stats table takes some time to update, so we need to update the enrichment table
     // size in the meta table to avoid exceeding the `ZO_ENRICHMENT_TABLE_LIMIT`.
     if let Err(e) =
-        db::enrichment_table::update_meta_table_stats(org_id, &stream_name, enrich_meta_stats).await
+        catalog::enrichment::update_meta_table_stats(org_id, &stream_name, enrich_meta_stats).await
     {
         log::error!(
             "[ENRICHMENT::URL] {}/{} - Error updating meta table stats: {}",
@@ -1705,7 +1703,7 @@ async fn process_enrichment_table_url(
 
     // Notify update
     if !schema.fields().is_empty()
-        && let Err(e) = db::enrichment_table::notify_update(org_id, &stream_name).await
+        && let Err(e) = catalog::enrichment::notify_update(org_id, &stream_name).await
     {
         log::error!(
             "[ENRICHMENT::URL] {}/{} - Error notifying enrichment table update: {}",

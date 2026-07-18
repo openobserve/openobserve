@@ -1599,11 +1599,11 @@ const CACHE_MODULES: &[&str] = &[
 // Helper function to reload cache for a specific module
 async fn reload_module_cache(module: &str) -> Result<(), anyhow::Error> {
     match module {
-        "schema" => db::schema::cache().await,
+        "schema" => catalog::schema::cache().await,
         "organization" => db::organization::cache().await,
         "user" => db::user::cache().await,
         "session" => db::session::cache().await,
-        "functions" => db::functions::cache().await,
+        "functions" => catalog::functions::cache(crate::service::telemetry::error_sink()).await,
         "pipeline" => db::pipeline::cache().await,
         "alerts" => db::alerts::alert::cache().await,
         "destinations" => db::alerts::destinations::cache().await,

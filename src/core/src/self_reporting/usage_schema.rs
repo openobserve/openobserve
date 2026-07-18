@@ -124,7 +124,7 @@ async fn initialize_usage_stream_schema(org_id: &str) -> Result<()> {
         return Ok(());
     }
     // Create the schema using merge (which creates if doesn't exist)
-    match crate::db::schema::merge(
+    match catalog::schema::merge(
         org_id,
         stream_name,
         stream_type,

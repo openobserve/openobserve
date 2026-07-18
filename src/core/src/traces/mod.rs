@@ -391,7 +391,7 @@ pub async fn handle_otlp_request(
     let mut need_mark_llm_stream = false;
     if infra::schema::get_is_llm_stream(org_id, &traces_stream_name, StreamType::Traces).await {
         is_llm_stream = true;
-        if let Err(e) = super::db::schema::ensure_gen_ai_fields_in_schema(
+        if let Err(e) = catalog::schema::ensure_gen_ai_fields_in_schema(
             org_id,
             &traces_stream_name,
             StreamType::Traces,
@@ -894,7 +894,7 @@ pub async fn handle_otlp_request(
 
     // mark llm stream if needed
     if need_mark_llm_stream
-        && let Err(e) = super::db::schema::set_stream_is_llm(
+        && let Err(e) = catalog::schema::set_stream_is_llm(
             org_id,
             &traces_stream_name,
             StreamType::Traces,
@@ -1015,7 +1015,7 @@ pub async fn ingest_json(
     let mut need_mark_llm_stream = false;
     if infra::schema::get_is_llm_stream(org_id, traces_stream_name, StreamType::Traces).await {
         is_llm_stream = true;
-        if let Err(e) = super::db::schema::ensure_gen_ai_fields_in_schema(
+        if let Err(e) = catalog::schema::ensure_gen_ai_fields_in_schema(
             org_id,
             traces_stream_name,
             StreamType::Traces,
@@ -1187,13 +1187,9 @@ pub async fn ingest_json(
 
     // mark llm stream if needed
     if need_mark_llm_stream
-        && let Err(e) = super::db::schema::set_stream_is_llm(
-            org_id,
-            traces_stream_name,
-            StreamType::Traces,
-            true,
-        )
-        .await
+        && let Err(e) =
+            catalog::schema::set_stream_is_llm(org_id, traces_stream_name, StreamType::Traces, true)
+                .await
     {
         log::error!("Error while marking llm stream: {e}");
     }

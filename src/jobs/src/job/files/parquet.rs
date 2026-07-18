@@ -872,8 +872,7 @@ async fn merge_files(
             && valid_stream_type
         {
             // Get stream count for this type (cached, 5-min TTL — counts rarely change).
-            let stream_count =
-                crate::service::db::schema::get_stream_count_cached(&org_id, stream_type).await;
+            let stream_count = catalog::schema::get_stream_count_cached(&org_id, stream_type).await;
 
             // Get coverage deficit: how many known services are missing streams of this type.
             // Derived entirely from the in-memory cache — no DB I/O.

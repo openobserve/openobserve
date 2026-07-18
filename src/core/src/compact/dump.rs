@@ -271,7 +271,7 @@ pub async fn dump(job: &DumpJob) -> Result<(), anyhow::Error> {
         .as_ref()
         .is_none_or(|s| s.fields_map().len() != FILE_LIST_SCHEMA.fields().len())
     {
-        if let Err(e) = super::db::schema::merge(
+        if let Err(e) = catalog::schema::merge(
             &job.org_id,
             &dump_stream_name,
             StreamType::Filelist,
