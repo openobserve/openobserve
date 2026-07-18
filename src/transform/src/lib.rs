@@ -33,6 +33,9 @@ mod runtime;
 use enrichment::ENRICHMENT_TABLES;
 pub use runtime::{TransformError, apply_vrl, apply_vrl_fn};
 
+/// Stable ingestion error code for a document rejected by a transform.
+pub const TRANSFORM_FAILED: &str = "document_failed_transform";
+
 /// Query and ingestion transform definitions, keyed by `org_id/function_name`.
 pub static QUERY_FUNCTIONS: LazyLock<RwHashMap<String, Transform>> =
     LazyLock::new(Default::default);

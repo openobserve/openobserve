@@ -24,13 +24,41 @@ use config::meta::function::{FunctionList, TestVRLRequest, Transform};
 #[cfg(feature = "enterprise")]
 use crate::common::utils::auth::check_permissions;
 use crate::{
-    common::{meta::http::HttpResponse as MetaHttpResponse, utils::auth::UserEmail},
+    common::{
+        meta::http::{ERROR_HEADER, HttpResponse as MetaHttpResponse},
+        utils::auth::UserEmail,
+    },
     handler::http::{
         extractors::Headers,
         request::{BulkDeleteRequest, BulkDeleteResponse},
     },
-    service::functions::FunctionDeleteError,
+    service::functions::{FunctionDeleteError, FunctionError, FunctionUpdateResult},
 };
+
+const FN_SUCCESS: &str = "Function saved successfully";
+
+fn function_error_response(error: FunctionError) -> Response {
+    match &error {
+        FunctionError::NotFound => MetaHttpResponse::not_found(error),
+        FunctionError::AssociatedPipelineUpdate { .. } => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            [(ERROR_HEADER, error.to_string())],
+            Json(MetaHttpResponse::message(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                error,
+            )),
+        )
+            .into_response(),
+        FunctionError::Storage(_) => MetaHttpResponse::bad_request(error),
+        FunctionError::NameEmpty
+        | FunctionError::BodyEmpty
+        | FunctionError::JavaScriptRestricted
+        | FunctionError::AlreadyExists
+        | FunctionError::InvalidTransformType
+        | FunctionError::Compilation(_)
+        | FunctionError::TestRun(_) => MetaHttpResponse::bad_request(error),
+    }
+}
 
 /// CreateFunction
 #[utoipa::path(
@@ -65,8 +93,8 @@ pub async fn save_function(Path(org_id): Path<String>, Json(func): Json<Transfor
     transform.name = transform.name.trim().to_string();
     transform.function = transform.function.trim().to_string();
     match crate::service::functions::save_function(org_id, transform).await {
-        Ok(resp) => resp,
-        Err(e) => MetaHttpResponse::internal_error(e.to_string()),
+        Ok(()) => MetaHttpResponse::ok(FN_SUCCESS),
+        Err(error) => function_error_response(error),
     }
 }
 
@@ -127,10 +155,7 @@ pub async fn list_functions(
         // Get List of allowed objects ends
     }
 
-    match crate::service::functions::list_functions(org_id, _permitted).await {
-        Ok(resp) => resp,
-        Err(e) => MetaHttpResponse::internal_error(e.to_string()),
-    }
+    MetaHttpResponse::json(crate::service::functions::list_functions(org_id, _permitted).await)
 }
 
 /// DeleteFunction
@@ -313,8 +338,9 @@ pub async fn update_function(
     transform.name = transform.name.trim().to_string();
     transform.function = transform.function.trim().to_string();
     match crate::service::functions::update_function(&org_id, name, transform).await {
-        Ok(resp) => resp,
-        Err(e) => MetaHttpResponse::internal_error(e.to_string()),
+        Ok(FunctionUpdateResult::Saved) => MetaHttpResponse::ok(FN_SUCCESS),
+        Ok(FunctionUpdateResult::Unchanged(function)) => MetaHttpResponse::json(function),
+        Err(error) => function_error_response(error),
     }
 }
 
@@ -351,10 +377,9 @@ pub async fn update_function(
 pub async fn list_pipeline_dependencies(
     Path((org_id, fn_name)): Path<(String, String)>,
 ) -> Response {
-    match crate::service::functions::get_pipeline_dependencies(&org_id, &fn_name).await {
-        Ok(resp) => resp,
-        Err(e) => MetaHttpResponse::internal_error(e.to_string()),
-    }
+    MetaHttpResponse::json(
+        crate::service::functions::get_pipeline_dependencies(&org_id, &fn_name).await,
+    )
 }
 
 /// Test a Function
@@ -397,7 +422,7 @@ pub async fn test_function(
     // test_run_function will auto-detect VRL vs JS if trans_type is None
     match crate::service::functions::test_run_function(&org_id, function, events, trans_type).await
     {
-        Ok(result) => result,
-        Err(err) => (StatusCode::BAD_REQUEST, err.to_string()).into_response(),
+        Ok(result) => MetaHttpResponse::json(result),
+        Err(error) => function_error_response(error),
     }
 }

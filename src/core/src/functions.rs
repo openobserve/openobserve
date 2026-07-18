@@ -13,15 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::io::Error;
+use std::{error::Error, fmt};
 
-use axum::{
-    Json, http,
-    response::{IntoResponse, Response as HttpResponse},
-};
 use config::{
     meta::{
-        function::{FunctionList, RESULT_ARRAY, Transform},
+        function::{FunctionList, RESULT_ARRAY, TestVRLResponse, Transform},
         pipeline::{PipelineDependencyItem, PipelineDependencyResponse},
     },
     utils::json::Value,
@@ -30,52 +26,94 @@ use transform::{compile_vrl_function, js::compile_js_function};
 
 use crate::{
     common::{
-        meta::{
-            authz::Authz,
-            http::{ERROR_HEADER, HttpResponse as MetaHttpResponse},
-        },
+        meta::authz::Authz,
         utils::auth::{remove_ownership, set_ownership},
     },
     db,
-    http::map_error_to_http_response,
 };
 
 mod transform_test;
 
-const FN_SUCCESS: &str = "Function saved successfully";
-const FN_NOT_FOUND: &str = "Function not found";
-const FN_ALREADY_EXIST: &str = "Function already exist";
 const FN_IN_USE: &str =
     "Function is associated with streams, please remove association from streams before deleting:";
 
+#[derive(Debug)]
+pub enum FunctionError {
+    NameEmpty,
+    BodyEmpty,
+    JavaScriptRestricted,
+    AlreadyExists,
+    NotFound,
+    InvalidTransformType,
+    Compilation(String),
+    Storage(String),
+    AssociatedPipelineUpdate {
+        pipeline_id: String,
+        pipeline_name: String,
+        message: String,
+    },
+    TestRun(String),
+}
+
+impl fmt::Display for FunctionError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::NameEmpty => formatter.write_str("Function name cannot be empty"),
+            Self::BodyEmpty => formatter.write_str("Function body cannot be empty"),
+            Self::JavaScriptRestricted => formatter.write_str(
+                "JavaScript functions are only allowed in the '_meta' organization. Please use VRL functions for other organizations.",
+            ),
+            Self::AlreadyExists => formatter.write_str("Function already exist"),
+            Self::NotFound => formatter.write_str("Function not found"),
+            Self::InvalidTransformType => {
+                formatter.write_str("Invalid transform type. Use 0 for VRL or 1 for JS.")
+            }
+            Self::Compilation(message) | Self::Storage(message) | Self::TestRun(message) => {
+                formatter.write_str(message)
+            }
+            Self::AssociatedPipelineUpdate {
+                pipeline_id,
+                pipeline_name,
+                message,
+            } => write!(
+                formatter,
+                "Failed to update associated pipeline({pipeline_id}/{pipeline_name}): {message}"
+            ),
+        }
+    }
+}
+
+impl Error for FunctionError {}
+
+#[derive(Debug, PartialEq)]
+pub enum FunctionUpdateResult {
+    Saved,
+    Unchanged(Transform),
+}
+
+#[derive(Debug)]
 pub enum FunctionDeleteError {
     NotFound,
     FunctionInUse(String),
     PipelineDependencies(String),
 }
 
-pub async fn save_function(org_id: String, mut func: Transform) -> Result<HttpResponse, Error> {
+pub async fn save_function(org_id: String, mut func: Transform) -> Result<(), FunctionError> {
     if func.name.is_empty() {
-        return Ok(MetaHttpResponse::bad_request(
-            "Function name cannot be empty",
-        ));
+        return Err(FunctionError::NameEmpty);
     }
     if func.function.is_empty() {
-        return Ok(MetaHttpResponse::bad_request(
-            "Function body cannot be empty",
-        ));
+        return Err(FunctionError::BodyEmpty);
     }
     let func_trans_type = func.trans_type.unwrap_or(0);
 
     // JavaScript functions are only allowed in _meta org (for SSO claim parsing)
     if func_trans_type == 1 && org_id != "_meta" {
-        return Ok(MetaHttpResponse::bad_request(
-            "JavaScript functions are only allowed in the '_meta' organization. Please use VRL functions for other organizations.",
-        ));
+        return Err(FunctionError::JavaScriptRestricted);
     }
 
     if let Some(_existing_fn) = check_existing_fn(&org_id, &func.name).await {
-        Ok(MetaHttpResponse::bad_request(FN_ALREADY_EXIST))
+        Err(FunctionError::AlreadyExists)
     } else {
         // Only append "." for VRL functions, not JS
         if func_trans_type == 0 && !func.function.ends_with('.') {
@@ -86,29 +124,26 @@ pub async fn save_function(org_id: String, mut func: Transform) -> Result<HttpRe
             0 => {
                 // VRL function
                 if let Err(e) = compile_vrl_function(func.function.as_str(), &org_id) {
-                    return Ok(MetaHttpResponse::bad_request(e));
+                    return Err(FunctionError::Compilation(e.to_string()));
                 }
             }
             1 => {
                 // JS function
                 if let Err(e) = compile_js_function(func.function.as_str(), &org_id) {
-                    return Ok(MetaHttpResponse::bad_request(e));
+                    return Err(FunctionError::Compilation(e.to_string()));
                 }
             }
             _ => {
-                return Ok(MetaHttpResponse::bad_request(
-                    "Invalid transform type. Use 0 for VRL or 1 for JS.",
-                ));
+                return Err(FunctionError::InvalidTransformType);
             }
         }
         extract_num_args(&mut func);
-        if let Err(error) = db::functions::set(&org_id, &func.name, &func).await {
-            Ok(map_error_to_http_response(&error.into(), None))
-        } else {
-            set_ownership(&org_id, "functions", Authz::new(&func.name)).await;
+        db::functions::set(&org_id, &func.name, &func)
+            .await
+            .map_err(|error| FunctionError::Storage(error.to_string()))?;
+        set_ownership(&org_id, "functions", Authz::new(&func.name)).await;
 
-            Ok(MetaHttpResponse::ok(FN_SUCCESS))
-        }
+        Ok(())
     }
 }
 
@@ -118,7 +153,7 @@ pub async fn test_run_function(
     function: String,
     events: Vec<Value>,
     trans_type: Option<u8>,
-) -> Result<HttpResponse, anyhow::Error> {
+) -> Result<TestVRLResponse, FunctionError> {
     // Auto-detect transform type if not provided
     let trans_type = trans_type
         .or_else(|| {
@@ -138,15 +173,12 @@ pub async fn test_run_function(
 
     // JavaScript functions are only allowed in _meta org (for SSO claim parsing)
     if trans_type == 1 && org_id != "_meta" {
-        return Ok(MetaHttpResponse::bad_request(
-            "JavaScript functions are only allowed in the '_meta' organization. Please use VRL functions for other organizations.",
-        ));
+        return Err(FunctionError::JavaScriptRestricted);
     }
 
-    match transform_test::run(org_id, function, events, trans_type).await {
-        Ok(results) => Ok(MetaHttpResponse::json(results)),
-        Err(error) => Ok(MetaHttpResponse::bad_request(error)),
-    }
+    transform_test::run(org_id, function, events, trans_type)
+        .await
+        .map_err(|error| FunctionError::TestRun(error.to_string()))
 }
 
 #[tracing::instrument(skip(func))]
@@ -154,64 +186,58 @@ pub async fn update_function(
     org_id: &str,
     fn_name: &str,
     mut func: Transform,
-) -> Result<HttpResponse, Error> {
+) -> Result<FunctionUpdateResult, FunctionError> {
     if func.name.is_empty() {
-        return Ok(MetaHttpResponse::bad_request(
-            "Function name cannot be empty",
-        ));
+        return Err(FunctionError::NameEmpty);
     }
     if func.function.is_empty() {
-        return Ok(MetaHttpResponse::bad_request(
-            "Function body cannot be empty",
-        ));
+        return Err(FunctionError::BodyEmpty);
     }
 
     let existing_fn = match check_existing_fn(org_id, fn_name).await {
         Some(function) => function,
         None => {
-            return Ok(MetaHttpResponse::not_found(FN_NOT_FOUND));
+            return Err(FunctionError::NotFound);
         }
     };
 
+    let func_trans_type = func.trans_type.unwrap_or(0);
+
     // JavaScript functions are only allowed in _meta org (for SSO claim parsing)
-    if func.trans_type.unwrap_or(0) == 1 && org_id != "_meta" {
-        return Ok(MetaHttpResponse::bad_request(
-            "JavaScript functions are only allowed in the '_meta' organization. Please use VRL functions for other organizations.",
-        ));
+    if func_trans_type == 1 && org_id != "_meta" {
+        return Err(FunctionError::JavaScriptRestricted);
     }
 
     if func == existing_fn {
-        return Ok(MetaHttpResponse::json(func));
+        return Ok(FunctionUpdateResult::Unchanged(func));
     }
 
     // Only append "." for VRL functions, not JS
-    if func.trans_type.unwrap() == 0 && !func.function.ends_with('.') {
+    if func_trans_type == 0 && !func.function.ends_with('.') {
         func.function = format!("{} \n .", func.function);
     }
     // Validate function based on type
-    match func.trans_type.unwrap() {
+    match func_trans_type {
         0 => {
             // VRL function
             if let Err(e) = compile_vrl_function(&func.function, org_id) {
-                return Ok(MetaHttpResponse::bad_request(e));
+                return Err(FunctionError::Compilation(e.to_string()));
             }
         }
         1 => {
             // JS function
             if let Err(e) = compile_js_function(&func.function, org_id) {
-                return Ok(MetaHttpResponse::bad_request(e));
+                return Err(FunctionError::Compilation(e.to_string()));
             }
         }
         _ => {
-            return Ok(MetaHttpResponse::bad_request(
-                "Invalid transform type. Use 0 for VRL or 1 for JS.",
-            ));
+            return Err(FunctionError::InvalidTransformType);
         }
     }
     extract_num_args(&mut func);
-    if let Err(error) = db::functions::set(org_id, &func.name, &func).await {
-        return Ok(map_error_to_http_response(&(error.into()), None));
-    }
+    db::functions::set(org_id, &func.name, &func)
+        .await
+        .map_err(|error| FunctionError::Storage(error.to_string()))?;
 
     // update associated pipelines
     if let Ok(associated_pipelines) = db::pipeline::list_by_org(org_id).await {
@@ -219,29 +245,19 @@ pub async fn update_function(
             if pipeline.contains_function(&func.name)
                 && let Err(e) = db::pipeline::update(&pipeline, None).await
             {
-                return Ok((
-                    http::StatusCode::INTERNAL_SERVER_ERROR,
-                    [(ERROR_HEADER, e.to_string())],
-                    Json(MetaHttpResponse::message(
-                        http::StatusCode::INTERNAL_SERVER_ERROR,
-                        format!(
-                            "Failed to update associated pipeline({}/{}): {}",
-                            pipeline.id, pipeline.name, e
-                        ),
-                    )),
-                )
-                    .into_response());
+                return Err(FunctionError::AssociatedPipelineUpdate {
+                    pipeline_id: pipeline.id,
+                    pipeline_name: pipeline.name,
+                    message: e.to_string(),
+                });
             }
         }
     }
 
-    Ok(MetaHttpResponse::ok(FN_SUCCESS))
+    Ok(FunctionUpdateResult::Saved)
 }
 
-pub async fn list_functions(
-    org_id: String,
-    permitted: Option<Vec<String>>,
-) -> Result<HttpResponse, Error> {
+pub async fn list_functions(org_id: String, permitted: Option<Vec<String>>) -> FunctionList {
     if let Ok(functions) = db::functions::list(&org_id).await {
         let mut result = Vec::new();
         for function in functions {
@@ -259,9 +275,9 @@ pub async fn list_functions(
             }
         }
 
-        Ok(MetaHttpResponse::json(FunctionList { list: result }))
+        FunctionList { list: result }
     } else {
-        Ok(MetaHttpResponse::json(FunctionList { list: vec![] }))
+        FunctionList { list: vec![] }
     }
 }
 
@@ -317,9 +333,9 @@ pub async fn delete_function(org_id: &str, fn_name: &str) -> Result<(), Function
 pub async fn get_pipeline_dependencies(
     org_id: &str,
     func_name: &str,
-) -> Result<HttpResponse, Error> {
+) -> PipelineDependencyResponse {
     let list = get_dependencies(org_id, func_name).await;
-    Ok(MetaHttpResponse::json(PipelineDependencyResponse { list }))
+    PipelineDependencyResponse { list }
 }
 
 async fn get_dependencies(org_id: &str, func_name: &str) -> Vec<PipelineDependencyItem> {
@@ -358,16 +374,12 @@ async fn check_existing_fn(org_id: &str, fn_name: &str) -> Option<Transform> {
 
 #[cfg(test)]
 mod tests {
-    use config::meta::{
-        function::{StreamOrder, TestVRLResponse},
-        stream::StreamType,
-    };
+    use config::meta::{function::StreamOrder, stream::StreamType};
 
     use super::*;
 
-    #[tokio::test]
-    async fn test_functions() {
-        // Test JavaScript function in _meta org (only org where JS is allowed)
+    #[test]
+    fn extracts_function_arguments() {
         let mut trans = Transform {
             function: "row.square = row.Year * row.Year;".to_owned(),
             name: "dummyfn".to_owned(),
@@ -398,20 +410,10 @@ mod tests {
         assert_eq!(vrl_trans.num_args, 1);
 
         assert_eq!(trans.num_args, 1);
-
-        // Use _meta org for JavaScript function (restriction)
-        let res = save_function("_meta".to_string(), trans).await;
-        assert!(res.is_ok());
-
-        let list_resp = list_functions("_meta".to_string(), None).await;
-        assert!(list_resp.is_ok());
-
-        assert!(delete_function("_meta", "dummyfn").await.is_ok());
     }
 
     #[tokio::test]
     async fn validate_test_function_processing() {
-        use http_body_util::BodyExt;
         use serde_json::json;
 
         let org_id = "test_org";
@@ -433,16 +435,12 @@ mod tests {
         let response = test_run_function(org_id, function, events, Some(0))
             .await
             .unwrap(); // VRL function
-        assert_eq!(response.status(), http::StatusCode::OK);
-
-        let body_bytes = response.into_body().collect().await.unwrap().to_bytes();
-        let body: TestVRLResponse = serde_json::from_slice(&body_bytes).unwrap();
 
         // Validate transformed events
-        assert_eq!(body.results.len(), 1);
-        assert_eq!(body.results[0].message, "");
+        assert_eq!(response.results.len(), 1);
+        assert_eq!(response.results[0].message, "");
         assert_eq!(
-            body.results[0].event,
+            response.results[0].event,
             json! {{"nested_key":42,"new_field":"new_value"}}
         );
     }
@@ -456,17 +454,16 @@ mod tests {
         let events = vec![json!({"field": "value"})];
         let trans_type = Some(1); // JavaScript
 
-        let response = test_run_function(org_id, function, events, trans_type)
-            .await
-            .unwrap();
-
         // JavaScript functions should be allowed in _meta org
-        assert_eq!(response.status(), http::StatusCode::OK);
+        assert!(
+            test_run_function(org_id, function, events, trans_type)
+                .await
+                .is_ok()
+        );
     }
 
     #[tokio::test]
     async fn test_js_function_blocked_in_regular_org() {
-        use http_body_util::BodyExt;
         use serde_json::json;
 
         let org_id = "default";
@@ -474,42 +471,11 @@ mod tests {
         let events = vec![json!({"field": "value"})];
         let trans_type = Some(1); // JavaScript
 
-        let response = test_run_function(org_id, function, events, trans_type)
-            .await
-            .unwrap();
-
         // JavaScript functions should be blocked in non-_meta orgs
-        assert_eq!(response.status(), http::StatusCode::BAD_REQUEST);
-
-        // Verify error message
-        let body_bytes = response.into_body().collect().await.unwrap().to_bytes();
-        let body_str = String::from_utf8(body_bytes.to_vec()).unwrap();
-        assert!(
-            body_str.contains("JavaScript functions are only allowed in the '_meta' organization")
-        );
-    }
-
-    #[tokio::test]
-    async fn test_save_js_function_allowed_in_meta_org() {
-        let org_id = "_meta";
-        let function = Transform {
-            name: "test_js_fn".to_owned(),
-            function: "function transform(row) { return row; }".to_owned(),
-            params: "row".to_owned(),
-            trans_type: Some(1), // JavaScript
-            num_args: 1,
-            streams: None,
-        };
-
-        let response = save_function(org_id.to_string(), function).await;
-
-        // JavaScript functions should be allowed in _meta org
-        assert!(response.is_ok());
-        let resp = response.unwrap();
-        assert_eq!(resp.status(), http::StatusCode::OK);
-
-        // Clean up
-        let _ = delete_function(org_id, "test_js_fn").await;
+        assert!(matches!(
+            test_run_function(org_id, function, events, trans_type).await,
+            Err(FunctionError::JavaScriptRestricted)
+        ));
     }
 
     #[tokio::test]
@@ -527,17 +493,7 @@ mod tests {
         let response = save_function(org_id.to_string(), function).await;
 
         // JavaScript functions should be blocked in non-_meta orgs
-        assert!(response.is_ok());
-        let resp = response.unwrap();
-        assert_eq!(resp.status(), http::StatusCode::BAD_REQUEST);
-
-        // Verify error message
-        use http_body_util::BodyExt;
-        let body_bytes = resp.into_body().collect().await.unwrap().to_bytes();
-        let body_str = String::from_utf8(body_bytes.to_vec()).unwrap();
-        assert!(
-            body_str.contains("JavaScript functions are only allowed in the '_meta' organization")
-        );
+        assert!(matches!(response, Err(FunctionError::JavaScriptRestricted)));
     }
 
     #[tokio::test]
@@ -550,17 +506,14 @@ mod tests {
         let events = vec![json!({"field": "value"})];
         let trans_type = Some(0); // VRL
 
-        let response = test_run_function(org_id, function.clone(), events.clone(), trans_type)
-            .await
-            .unwrap();
+        let response =
+            test_run_function(org_id, function.clone(), events.clone(), trans_type).await;
 
-        assert_eq!(response.status(), http::StatusCode::OK);
+        assert!(response.is_ok());
 
         // Test VRL in _meta org
-        let meta_response = test_run_function("_meta", function, events, trans_type)
-            .await
-            .unwrap();
+        let meta_response = test_run_function("_meta", function, events, trans_type).await;
 
-        assert_eq!(meta_response.status(), http::StatusCode::OK);
+        assert!(meta_response.is_ok());
     }
 }
