@@ -64,7 +64,14 @@ export function computeTreeLayout(
   // Children adjacency (spanning tree: each node placed once, at first parent).
   const children = new Map<string, string[]>();
   for (const n of graph.nodes) children.set(n.id, []);
-  const hasIncoming = new Set(graph.edges.map((e) => e.to));
+  // A node is a root when it has no *real* parent. The synthetic entry edge
+  // (from == null → the topology's entry service) must NOT count as incoming —
+  // otherwise the entry node looks parented, roots comes back empty, BFS never
+  // runs, and every node collapses to depth 0 (a flat, mis-wired tree). This is
+  // exactly what made an agent's model hang off the wrong parent.
+  const hasIncoming = new Set(
+    graph.edges.filter((e) => e.from != null).map((e) => e.to),
+  );
   const placed = new Set<string>();
   for (const e of graph.edges) {
     if (e.from == null) continue;

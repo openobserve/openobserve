@@ -220,6 +220,28 @@ pub fn is_llm_trace(attributes: &HashMap<String, json::Value>, scope_name: Optio
         return true;
     }
 
+    // 5b. OpenInference span kind. WITHOUT this, only the LLM-kind span (which
+    // carries llm.model_name) passes the gate — the sibling AGENT and TOOL spans
+    // fail it and never get gen_ai processing, so their agent/tool names are lost.
+    // This is what made OpenAI Agents / Google ADK render model-only.
+    if attributes.contains_key(OpenInferenceAttributes::SPAN_KIND) {
+        return true;
+    }
+
+    // 5c. Framework agent/tool identity keys — a span carrying any of these is a
+    // GenAI span even if it lacks a model attribute (CrewAI task span, LangChain
+    // tool span, Google ADK agent span, OpenInference tool/agent span).
+    if attributes.contains_key(OpenInferenceAttributes::AGENT_NAME)
+        || attributes.contains_key(OpenInferenceAttributes::TOOL_NAME)
+        || attributes.contains_key(OpenInferenceAttributes::TOOL_CALL_FUNCTION_NAME)
+        || attributes.contains_key(FrameworkAttributes::GCP_VERTEX_AGENT_NAME)
+        || attributes.contains_key(FrameworkAttributes::CREWAI_TASK_AGENT)
+        || attributes.contains_key(FrameworkAttributes::CREWAI_TASK_TOOLS)
+        || attributes.contains_key(FrameworkAttributes::LANGCHAIN_TOOL_NAME)
+    {
+        return true;
+    }
+
     // 6. Most common model attributes (very common in LLM traces)
     if attributes.contains_key(FrameworkAttributes::GCP_VERTEX_AGENT_LLM_REQUEST)
         || attributes.contains_key(FrameworkAttributes::LOGFIRE_PROMPT)
@@ -709,6 +731,39 @@ mod tests {
     fn test_is_llm_trace_gen_ai_events() {
         let attrs = HashMap::new();
         assert!(!is_llm_trace(&attrs, None));
+    }
+
+    #[test]
+    fn test_is_llm_trace_openinference_tool_and_agent_spans() {
+        // Regression: OpenInference TOOL/AGENT spans carry no model attribute, so
+        // without recognising openinference.span.kind they failed the LLM gate and
+        // their tool/agent names were never extracted (OpenAI Agents / Google ADK
+        // rendered model-only). All three OpenInference span kinds must pass.
+        for kind in ["AGENT", "TOOL", "LLM"] {
+            let attrs = make_attributes(vec![("openinference.span.kind", kind)]);
+            assert!(
+                is_llm_trace(&attrs, None),
+                "openinference.span.kind={kind} must be an LLM span"
+            );
+        }
+    }
+
+    #[test]
+    fn test_is_llm_trace_framework_identity_keys() {
+        // A span carrying a framework agent/tool key is a GenAI span even without
+        // a model attribute (CrewAI task, LangChain tool, Google ADK agent).
+        for key in [
+            "tool.name",
+            "tool_call.function.name",
+            "agent.name",
+            "gcp.vertex.agent.name",
+            "crewai.task.agent",
+            "crewai.task.tools",
+            "langchain.tool.name",
+        ] {
+            let attrs = make_attributes(vec![(key, "x")]);
+            assert!(is_llm_trace(&attrs, None), "{key} must be an LLM span");
+        }
     }
 
     #[test]

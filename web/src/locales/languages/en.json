@@ -4961,7 +4961,10 @@
         "database": "Datastores",
         "queue": "Queues",
         "external": "External",
-        "rpc": "RPC"
+        "rpc": "RPC",
+        "agent": "Agents",
+        "tool": "Tools",
+        "model": "Models"
       }
     },
     "openInFullView": "Open in full view",
@@ -5936,6 +5939,7 @@
     "nav": {
       "llmInsights": "LLM Insights",
       "sessions": "LLM Sessions",
+      "agentGraph": "Agent Graph",
       "quality": "Quality",
       "evalJobs": "Eval Jobs",
       "scorers": "Scorers",
@@ -5944,10 +5948,16 @@
     "subtitle": {
       "llmInsights": "Track latency, errors, tokens, and cost across your LLM traffic",
       "sessions": "Browse and inspect agent sessions turn by turn",
+      "agentGraph": "See what your agents interact with — tools, models, services, and datastores",
       "quality": "Score and track the quality of your LLM responses",
       "evalJobs": "Run and monitor evaluation jobs across your sessions",
       "scorers": "Create and manage the scorers that grade LLM outputs",
       "scoreConfigs": "Configure the scoring rubrics used by your evaluations"
+    },
+    "agentGraph": {
+      "allAgents": "All agents",
+      "stream": "Stream",
+      "agent": "Agent"
     },
     "kpi": {
       "totalCost": "Total Cost",
