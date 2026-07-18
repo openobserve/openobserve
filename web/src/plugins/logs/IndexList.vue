@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :class="store.state.theme == 'dark' ? 'theme-dark' : 'theme-light'"
   >
     <div
-      class="flex items-center gap-1"
+      class="flex items-center gap-2"
       style="max-width: 100%; overflow: hidden"
     >
       <OButton
@@ -28,14 +28,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           searchObj.data.stream.streamType &&
           searchObj.data.stream.streamType !== 'logs'
         "
-        data-test="log-search-index-list-stream-type-badge"
-        variant="ghost"
+        data-test="log-search-index-list-back-to-logs-btn"
+        variant="outline"
         size="icon-sm"
-        class="shrink-0 h-8 w-8 border border-(--o2-border) rounded p-0"
+        class="shrink-0 h-8 w-8 border border-border-default rounded p-0"
         @click="onStreamTypeChange('logs')"
       >
-        <OIcon :name="streamTypeIcon" size="sm" />
-        <OTooltip :content="streamTypeLabel + ' — ' + t('search.switchToLogs')" side="bottom" align="center" />
+        <OIcon name="swap-horiz" size="sm" />
+        <OTooltip :content="t('search.switchToLogs')" side="bottom" align="center" />
       </OButton>
       <div class="flex-1 min-w-0">
         <OSelect
@@ -495,29 +495,6 @@ export default defineComponent({
     const pagination = ref({
       page: 1,
       rowsPerPage: 25,
-    });
-
-    const streamTypes = [
-      { label: t("search.logs"), value: "logs", icon: "search" },
-      { label: t("search.traces"), value: "traces", icon: "account-tree" },
-      { label: t("search.metrics"), value: "metrics", icon: "bar-chart" },
-      {
-        label: t("search.enrichmentTables"),
-        value: "enrichment_tables",
-        icon: "table-view",
-      },
-    ];
-
-    const streamTypeIcon = computed(() => {
-      const current = searchObj.data.stream.streamType;
-      return (
-        streamTypes.find((t) => t.value === current)?.icon ?? "search"
-      );
-    });
-
-    const streamTypeLabel = computed(() => {
-      const current = searchObj.data.stream.streamType;
-      return streamTypes.find((t) => t.value === current)?.label ?? "";
     });
 
     const onStreamTypeChange = async (newType: string) => {
@@ -2037,9 +2014,6 @@ export default defineComponent({
       openFilterCreator,
       addSearchTerm,
       fieldValues,
-      streamTypes,
-      streamTypeIcon,
-      streamTypeLabel,
       onStreamTypeChange,
       "add": "add",
       "visibility-off": "visibility-off",
