@@ -125,7 +125,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                   </template>
                   <div v-else class="pl-3 py-1 text-sm font-medium">
-                    {{ durationPercentileErrMsg || "No values found" }}
+                    {{ durationPercentileErrMsg || t('traces.indexList.noValuesFound') }}
                   </div>
                 </template>
               </FieldExpansion>

@@ -82,7 +82,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="edit-role-permissions-show-text"
                   style="font-size: 14px"
                 >
-                  Show
+                  {{ t('iam.editRole.show') }}
                 </span>
                 <OToggleGroup
                   class="ml-1"
@@ -106,7 +106,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :debounce="500"
                   class="no-border o2-search-input h-[36px] w-[200px]"
                   :class="store.state.theme === 'dark' ? 'o2-search-input-dark' : 'o2-search-input-light'"
-                  :placeholder="`Search Permissions`"
+                  :placeholder="t('iam.editRole.searchPermissions')"
                   @update:model-value="onResourceChange"
                 >
                   <template #icon-left>
@@ -118,7 +118,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OSelect
                   v-model="filter.resource"
                   :options="resourceOptions"
-                  placeholder="Select Resource"
+                  :placeholder="t('iam.editRole.selectResource')"
                   clearable
                   searchable
                   style="width: 200px"
@@ -132,7 +132,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="edit-role-permissions-count"
                 class="font-bold text-[14px]"
               >
-                {{ selectedPermissionsHash.size }} Permissions
+                {{ t('iam.editRole.permissionsCount', { count: selectedPermissionsHash.size }) }}
               </span>
               <OToggleGroup
                 data-test="edit-role-permissions-ui-type-toggle"
@@ -175,7 +175,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div v-show="permissionsUiType === 'json'">
               <div class="flex items-center justify-between">
                 <div class="mb-3 font-bold">
-                  {{ selectedPermissionsHash.size }} Permission
+                  {{ t('iam.editRole.permissionCountSingular', { count: selectedPermissionsHash.size }) }}
                 </div>
                 <div
                   class="flex items-center cursor-pointer"
@@ -183,7 +183,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @click="toggleHelpSection"
                 >
                   <OIcon name="help" size="sm" />
-                  <span class="ml-1"> Help </span>
+                  <span class="ml-1"> {{ t('iam.editRole.help') }} </span>
                 </div>
               </div>
               <div class="flex flex-nowrap">
@@ -206,7 +206,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <div v-if="isHelpOpen" style="width: 350px" class="p-2">
                   <div class="flex justify-between items-center px-2">
-                    <div style="font-size: 16px">Quick Reference</div>
+                    <div style="font-size: 16px">{{ t('iam.editRole.quickReference') }}</div>
                     <OIcon
                       class="cursor-pointer"
                       name="close"
@@ -218,8 +218,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OSeparator class="mt-2 mb-4" />
                   <div class="mt-2 px-2">
                     <div>
-                      Configure access with JSON objects specifying "object"
-                      (resource) and "permission" (access level).
+                      {{ t('iam.editRole.jsonConfigHelp') }}
                     </div>
                     <pre style="font-size: 12px">
 {
@@ -228,10 +227,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 }</pre
                     >
                     <div>
-                      <span class="font-bold">Child Resource:</span> <br />
-                      Specific instance or
-                      <span class="font-bold">organizationID</span> for all
-                      instances within a main resource.
+                      <span class="font-bold">{{ t('iam.editRole.childResource') }}</span> <br />
+                      {{ t('iam.editRole.specificInstanceOr') }}
+                      <span class="font-bold">organizationID</span> {{ t('iam.editRole.forAllInstances') }}
                     </div>
                   </div>
                 </div>
@@ -440,13 +438,13 @@ const tabs = computed(() => {
   const baseTabs = [
     {
       value: "permissions",
-      label: "Permissions",
+      label: t('iam.editRole.permissions'),
       icon: "shield",
       dirty: isPermissionsDirty.value,
     },
     {
       value: "users",
-      label: "Users",
+      label: t('iam.editRole.users'),
       icon: "group",
       dirty: isUsersDirty.value,
     },
@@ -455,7 +453,7 @@ const tabs = computed(() => {
   if (store.state.zoConfig.service_account_enabled) {
     baseTabs.push({
       value: "serviceAccounts",
-      label: "Service Accounts",
+      label: t('iam.editRole.serviceAccounts'),
       icon: "smart-toy",
       dirty: isServiceAccountsDirty.value,
     });
@@ -466,12 +464,12 @@ const tabs = computed(() => {
 
 const permissionDisplayOptions = [
   {
-    label: "All",
+    label: t('iam.editRole.all'),
     value: "all",
     icon: "format-list-bulleted",
   },
   {
-    label: "Selected",
+    label: t('iam.editRole.selected'),
     value: "selected",
     icon: "check-box",
   },
@@ -479,12 +477,12 @@ const permissionDisplayOptions = [
 
 const permissionUiOptions = [
   {
-    label: "Table",
+    label: t('iam.editRole.table'),
     value: "table",
     icon: "table-chart",
   },
   {
-    label: "JSON",
+    label: t('iam.editRole.json'),
     value: "json",
     icon: "data-object",
   },
@@ -555,8 +553,8 @@ const getRoleDetails = () => {
       isFetchingInitialRoles.value = false;
       toast({
         message: error?.response?.status === 404
-          ? "Role not found or has been deleted. Redirecting to roles list."
-          : error?.message || "Failed to load role details. Redirecting to roles list.",
+          ? t('iam.editRole.roleNotFound')
+          : error?.message || t('iam.editRole.loadFailed'),
         variant: "error",
       });
       router.push({
@@ -2501,7 +2499,7 @@ const saveRole = () => {
   ) {
     toast({
       variant: "info",
-      message: `No updates detected.`,
+      message: t('iam.editRole.noUpdatesDetected'),
     });
 
     return;
@@ -2517,7 +2515,7 @@ const saveRole = () => {
 
       toast({
         variant: "success",
-        message: `Updated role successfully!`,
+        message: t('iam.editRole.updateSuccess'),
       });
 
       // Resetting permissions state on save
@@ -2567,7 +2565,7 @@ const saveRole = () => {
       if (err.response.status != 403) {
         toast({
           variant: "error",
-          message: `Error while updating role!`,
+          message: t('iam.editRole.updateError'),
         });
       }
       console.log(err);

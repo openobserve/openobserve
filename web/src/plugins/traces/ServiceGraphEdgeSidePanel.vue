@@ -62,15 +62,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="traffic-row">
               <div class="traffic-pill total" data-test="service-graph-edge-side-panel-total">
                 <OIcon name="swap-horiz" size="xs" />
-                <span class="traffic-label">Total</span>
+                <span class="traffic-label">{{ t('traces.serviceGraphEdgeSidePanel.total') }}</span>
                 <span class="traffic-value">{{ formatNumber(selectedEdge?.total_requests ?? 0) }}</span>
-                <OTooltip content="Total requests flowing through this connection" />
+                <OTooltip :content="t('traces.serviceGraphEdgeSidePanel.totalTooltip')" />
               </div>
               <div class="traffic-pill failed" data-test="service-graph-edge-side-panel-failed">
                 <OIcon name="close" size="xs" />
-                <span class="traffic-label">Failed</span>
+                <span class="traffic-label">{{ t('traces.serviceGraphEdgeSidePanel.failed') }}</span>
                 <span class="traffic-value">{{ formatNumber(selectedEdge?.failed_requests ?? 0) }}</span>
-                <OTooltip content="Number of failed requests on this connection" />
+                <OTooltip :content="t('traces.serviceGraphEdgeSidePanel.failedTooltip')" />
               </div>
               <div
                 class="traffic-pill error-rate"
@@ -78,9 +78,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="service-graph-edge-side-panel-error-rate"
               >
                 <OIcon name="error-outline" size="xs" />
-                <span class="traffic-label">Error Rate</span>
+                <span class="traffic-label">{{ t('traces.serviceGraphEdgeSidePanel.errorRate') }}</span>
                 <span class="traffic-value">{{ errorRateFormatted }}</span>
-                <OTooltip content="Percentage of requests that failed" />
+                <OTooltip :content="t('traces.serviceGraphEdgeSidePanel.errorRateTooltip')" />
               </div>
             </div>
 
@@ -90,9 +90,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="latency-table">
               <div class="latency-header-row">
                 <span class="col-metric"></span>
-                <span class="col-current">Current</span>
-                <span class="col-baseline">Baseline</span>
-                <span class="col-delta">vs Baseline</span>
+                <span class="col-current">{{ t('traces.serviceGraphEdgeSidePanel.current') }}</span>
+                <span class="col-baseline">{{ t('traces.serviceGraphEdgeSidePanel.baseline') }}</span>
+                <span class="col-delta">{{ t('traces.serviceGraphEdgeSidePanel.vsBaseline') }}</span>
               </div>
 
               <!-- P50 -->
@@ -194,7 +194,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <template #icon-left>
                   <OIcon name="refresh" size="xs" />
                 </template>
-                Refresh
+                {{ t('traces.serviceGraphEdgeSidePanel.refresh') }}
               </OButton>
             </span>
           </div>
@@ -202,7 +202,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Loading -->
           <div v-if="trendLoading" class="trend-state">
             <OSpinner size="xs" />
-            <span>Loading data…</span>
+            <span>{{ t('traces.serviceGraphEdgeSidePanel.loadingData') }}</span>
           </div>
 
           <!-- Error -->
@@ -214,7 +214,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Empty -->
           <div v-else-if="!trendData || !trendDataPoints.length" class="trend-state trend-empty">
             <OIcon name="show-chart" size="md" class="trend-empty-icon" />
-            <span>No data available</span>
+            <span>{{ t('traces.serviceGraphEdgeSidePanel.noDataAvailable') }}</span>
           </div>
 
           <!-- Chart — always in DOM when data exists so ref is stable -->
@@ -242,6 +242,7 @@ import {
   type PropType,
 } from 'vue';
 import { useStore } from 'vuex';
+import { useI18n } from "vue-i18n";
 import * as echarts from 'echarts';
 import serviceGraphService from '@/services/service_graph';
 import OButton from '@/lib/core/Button/OButton.vue';
@@ -284,6 +285,7 @@ export default defineComponent({
   emits: ['close'],
   setup(props, { emit }) {
     const store = useStore();
+    const { t } = useI18n();
 
     const trendChartRef = ref<HTMLElement | null>(null);
     const trendLoading = ref(false);
@@ -295,9 +297,9 @@ export default defineComponent({
     // ── RED tab state ────────────────────────────────────────────────────────
 
     const chartTabs: { key: ChartTab; label: string }[] = [
-      { key: 'rate',     label: 'Rate'     },
-      { key: 'errors',   label: 'Errors'   },
-      { key: 'duration', label: 'Duration' },
+      { key: 'rate',     label: t('traces.serviceGraphEdgeSidePanel.rate')     },
+      { key: 'errors',   label: t('traces.serviceGraphEdgeSidePanel.errors')   },
+      { key: 'duration', label: t('traces.serviceGraphEdgeSidePanel.duration') },
     ];
     const activeTab = ref<ChartTab>('rate');
 
@@ -398,9 +400,9 @@ export default defineComponent({
 
     const edgeHealth = computed(() => {
       const rate = props.selectedEdge?.error_rate ?? 0;
-      if (rate > 10) return { status: 'critical', text: 'Critical' };
-      if (rate > 5) return { status: 'degraded', text: 'Degraded' };
-      return { status: 'healthy', text: 'Healthy' };
+      if (rate > 10) return { status: 'critical', text: t('traces.serviceGraphEdgeSidePanel.critical') };
+      if (rate > 5) return { status: 'degraded', text: t('traces.serviceGraphEdgeSidePanel.degraded') };
+      return { status: 'healthy', text: t('traces.serviceGraphEdgeSidePanel.healthy') };
     });
 
     // ── CSS class helpers ───────────────────────────────────────────────────
@@ -707,7 +709,7 @@ export default defineComponent({
         });
         trendData.value = res.data;
       } catch {
-        trendError.value = 'Failed to load trend data.';
+        trendError.value = t('traces.serviceGraphEdgeSidePanel.failedToLoadTrend');
       } finally {
         trendLoading.value = false;
       }
@@ -768,6 +770,7 @@ export default defineComponent({
     const handleClose = () => emit('close');
 
     return {
+      t,
       trendChartRef,
       trendLoading,
       trendError,

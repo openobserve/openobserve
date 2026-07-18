@@ -68,7 +68,7 @@
       <template #icon-left
         ><OIcon name="running-with-errors" size="sm"
       /></template>
-      <OTooltip side="bottom" align="end" hoverable content="The data shown is cached and is different from the selected time range." />
+      <OTooltip side="bottom" align="end" hoverable :content="t('dashboard.panelErrorButtons.cachedDataDiffers')" />
     </OButton>
     <OButton
       v-if="isPartialData && !isPanelLoading"
@@ -79,7 +79,7 @@
       <template #icon-left
         ><OIcon name="clock-loader-20" size="sm"
       /></template>
-      <OTooltip side="bottom" align="end" hoverable content="The data shown is incomplete because the loading was interrupted. Refresh to load complete data." />
+      <OTooltip side="bottom" align="end" hoverable :content="t('dashboard.panelErrorButtons.partialData')" />
     </OButton>
 
     <!-- Universal Last Refreshed Clock Icon and Time -->
@@ -91,12 +91,12 @@
       <span class="lastRefreshedAtIcon text-[smaller] mr-0.5">
         🕑
         <OTooltip side="bottom" align="end">
-          <template #content>Last Refreshed: <RelativeTime :timestamp="lastTriggeredAt" /></template>
+          <template #content>{{ t('dashboard.panelErrorButtons.lastRefreshed') }}<RelativeTime :timestamp="lastTriggeredAt" /></template>
         </OTooltip>
       </span>
       <RelativeTime
         :timestamp="lastTriggeredAt"
-        fullTimePrefix="Last Refreshed At: "
+        :fullTimePrefix="t('dashboard.panelErrorButtons.lastRefreshedAt')"
       />
     </span>
   </div>

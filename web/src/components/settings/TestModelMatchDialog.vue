@@ -30,7 +30,7 @@
             <OInput
               ref="modelInputRef"
               v-model="testModelName"
-              placeholder="e.g. gpt-4-turbo"
+              :placeholder="t('settings.testModelMatchDialog.modelNamePlaceholder')"
               data-test="test-match-model-input"
             >
               <template #icon-left>
@@ -193,13 +193,13 @@
                 <div class="py-3 px-[14px] bg-[rgba(0,0,0,0.02)] dark:bg-[rgba(255,255,255,0.03)] border-b border-(--o2-border-color)">
                   <div>
                     <div class="text-[13px] font-bold">
-                      {{ testResult.tier || "Default" }}
+                      {{ testResult.tier || t("settings.testModelMatchDialog.defaultTier") }}
                     </div>
                     <div
                       class="text-[11px] opacity-50 mt-0.5"
                       v-if="matchedTierDef?.condition"
                     >
-                      Condition:
+                      {{ t("settings.testModelMatchDialog.condition") }}
                       <code class="tmm-cost-tier-desc-code py-px px-1 rounded-[3px] bg-[rgba(0,0,0,0.05)] dark:bg-[rgba(255,255,255,0.08)] text-[11px]"
                         >{{ matchedTierDef.condition.usage_key }}
                         {{ operatorSymbol(matchedTierDef.condition.operator) }}
@@ -341,11 +341,11 @@ function sortedPriceEntries(
 
 const winnerSource = computed(() => testResult.value?.matched?.source || null);
 
-const matchFlowSteps = [
-  { key: "org", label: "your org", icon: "person" },
-  { key: "meta_org", label: "global", icon: "corporate-fare" },
-  { key: "built_in", label: "built-in", icon: "auto-awesome" },
-];
+const matchFlowSteps = computed(() => [
+  { key: "org", label: t("settings.testModelMatchDialog.stepYourOrg"), icon: "person" },
+  { key: "meta_org", label: t("settings.testModelMatchDialog.stepGlobal"), icon: "corporate-fare" },
+  { key: "built_in", label: t("settings.testModelMatchDialog.stepBuiltIn"), icon: "auto-awesome" },
+]);
 
 const matchedTierDef = computed(() => {
   const result = testResult.value;
@@ -380,9 +380,11 @@ function operatorSymbol(op: string) {
 }
 
 function sourceLabel(model: any) {
-  if (!model.source || model.source === "org") return "Your Org";
-  if (model.source === "meta_org") return "Global";
-  return "Built-in";
+  if (!model.source || model.source === "org")
+    return t("settings.testModelMatchDialog.sourceYourOrg");
+  if (model.source === "meta_org")
+    return t("settings.testModelMatchDialog.sourceGlobal");
+  return t("settings.testModelMatchDialog.sourceBuiltIn");
 }
 
 function formatRate(rate: number) {

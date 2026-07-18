@@ -382,7 +382,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   <span
                     class="text-sm text-text-primary mr-1"
-                    >{{ selectedIds.length }} selected</span
+                    >{{ t('dashboard.dashboards.selected', { count: selectedIds.length }) }}</span
                   >
                   <OButton
                     variant="outline"
@@ -939,7 +939,7 @@ export default defineComponent({
           console.error("Error loading dashboards:", error);
           showErrorNotification(
             error?.message ||
-              "Failed to load dashboards for the selected folder.",
+              t("dashboard.dashboards.failedToLoadFolder"),
           );
         } finally {
           loading.value = false;
@@ -1086,7 +1086,7 @@ export default defineComponent({
     ) => {
       const dismiss = toast({
         variant: "loading",
-        message: "Please wait...",
+        message: t("dashboard.dashboards.pleaseWait"),
               timeout: 0,
 });
 
@@ -1102,7 +1102,7 @@ export default defineComponent({
         const data = JSON.parse(JSON.stringify(dashboard));
 
         //change title owner name and created date
-        data.title = `${data.title} - Copy`;
+        data.title = t("dashboard.dashboards.copySuffix", { title: data.title });
         data.owner = store.state.userInfo.name;
         data.created = new Date().toISOString();
 
@@ -1114,9 +1114,9 @@ export default defineComponent({
 
         await getDashboards();
 
-        showPositiveNotification("Dashboard Duplicated Successfully.");
+        showPositiveNotification(t("dashboard.dashboards.duplicatedSuccessfully"));
       } catch (err) {
-        showErrorNotification(err?.message ?? "Dashboard duplication failed");
+        showErrorNotification(err?.message ?? t("dashboard.dashboards.duplicationFailed"));
       }
 
       dismiss();
@@ -1140,7 +1140,7 @@ export default defineComponent({
     const getDashboards = async () => {
       const dismiss = toast({
         variant: "loading",
-        message: "Please wait while loading dashboards...",
+        message: t("dashboard.dashboards.loadingDashboards"),
               timeout: 0,
 });
       loading.value = true;
@@ -1167,7 +1167,7 @@ export default defineComponent({
           dashboardList.value = response;
         }
       } catch (err) {
-        showErrorNotification(err?.message || "Failed to load dashboards.");
+        showErrorNotification(err?.message || t("dashboard.dashboards.failedToLoad"));
       } finally {
         dismiss();
         loading.value = false;
@@ -1284,7 +1284,7 @@ export default defineComponent({
             if (org) useHomeDashboard().load(org);
           }
         } catch (err) {
-          showErrorNotification(err?.message ?? "Dashboard deletion failed", {
+          showErrorNotification(err?.message ?? t("dashboard.dashboards.deletionFailed"), {
           });
         }
       }
@@ -1332,13 +1332,13 @@ export default defineComponent({
           if (activeFolderId.value === selectedFolderDelete.value)
             activeFolderId.value = "default";
 
-          showPositiveNotification("Folder deleted successfully.", {
+          showPositiveNotification(t("dashboard.dashboards.folderDeletedSuccessfully"), {
           });
         } catch (err) {
           showErrorNotification(
             err?.response?.data?.message ||
               err?.message ||
-              "Folder deletion failed",
+              t("dashboard.dashboards.folderDeletionFailed"),
             {
             },
           );
@@ -1395,7 +1395,7 @@ export default defineComponent({
         return migratedDashboards;
       } catch (error) {
         showErrorNotification(
-          error?.message ?? "Error fetching search results",
+          error?.message ?? t("dashboard.dashboards.errorFetchingSearch"),
         );
       }
     });
@@ -1467,11 +1467,11 @@ export default defineComponent({
         htmlA.click();
 
         showPositiveNotification(
-          `${cleanedDashboards.length} Dashboards exported successfully.`,
+          t("dashboard.dashboards.exportedSuccessfully", { count: cleanedDashboards.length }),
         );
         selectedIds.value = [];
       } catch (error) {
-        showErrorNotification(error?.message ?? "Error exporting dashboards");
+        showErrorNotification(error?.message ?? t("dashboard.dashboards.errorExporting"));
       }
     };
 
@@ -1491,7 +1491,7 @@ export default defineComponent({
     const bulkDeleteDashboards = async () => {
       const dismiss = toast({
         variant: "loading",
-        message: "Deleting dashboards...",
+        message: t("dashboard.dashboards.deletingDashboards"),
         timeout: 0,
       });
 
@@ -1499,7 +1499,7 @@ export default defineComponent({
         if (selectedIds.value.length === 0) {
           toast({
             variant: "error",
-            message: "No dashboards selected for deletion",
+            message: t("dashboard.dashboards.noneSelectedForDeletion"),
           });
           dismiss();
           return;
@@ -1535,27 +1535,27 @@ export default defineComponent({
             // Partial success
             toast({
               variant: "warning",
-              message: `${successCount} dashboard(s) deleted successfully, ${failCount} failed`,
+              message: t("dashboard.dashboards.partialDeleteResult", { successCount, failCount }),
               timeout: 5000,
             });
           } else if (failCount > 0) {
             // All failed
             toast({
               variant: "error",
-              message: `Failed to delete ${failCount} dashboard(s)`,
+              message: t("dashboard.dashboards.failedToDeleteCount", { failCount }),
             });
           } else {
             // All successful
             toast({
               variant: "success",
-              message: `${successCount} dashboard(s) deleted successfully`,
+              message: t("dashboard.dashboards.deletedSuccessfullyCount", { count: successCount }),
             });
           }
         } else {
           // Fallback success message
           toast({
             variant: "success",
-            message: `${selectedIds.value.length} dashboard(s) deleted successfully`,
+            message: t("dashboard.dashboards.deletedSuccessfullyCount", { count: selectedIds.value.length }),
           });
         }
 
@@ -1576,7 +1576,7 @@ export default defineComponent({
         const errorMessage =
           error.response?.data?.message ||
           error?.message ||
-          "Error deleting dashboards. Please try again.";
+          t("dashboard.dashboards.errorDeleting");
         if (error.response?.status != 403 || error?.status != 403) {
           toast({
             variant: "error",

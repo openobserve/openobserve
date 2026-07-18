@@ -152,13 +152,13 @@ export default defineComponent({
         if (res?.data?.error_members != null) {
           toast({
             variant: "error",
-            message: "Error while updating organization member",
+            message: this.t("iam.updateRole.errorUpdatingMember"),
             timeout: 15000,
           });
         } else {
           toast({
             variant: "success",
-            message: "Organization member updated successfully.",
+            message: this.t("iam.updateRole.memberUpdatedSuccessfully"),
           });
         }
 
@@ -169,7 +169,7 @@ export default defineComponent({
           variant: "error",
           message:
             err?.response?.data?.message ||
-            "Error while updating organization member",
+            this.t("iam.updateRole.errorUpdatingMember"),
         });
       }
     },

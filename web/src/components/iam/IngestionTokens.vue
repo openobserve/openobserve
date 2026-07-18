@@ -387,13 +387,15 @@ export default defineComponent({
         store.dispatch("setOrgTokens", tokens.value);
         toast({
           variant: "success",
-          message: `Token ${enabled ? "enabled" : "disabled"} successfully.`,
+          message: enabled
+            ? t("iam.ingestionTokensPage.tokenEnabledSuccess")
+            : t("iam.ingestionTokensPage.tokenDisabledSuccess"),
           timeout: 3000,
         });
       } catch (e: any) {
         toast({
           variant: "error",
-          message: e.response?.data?.message || "Failed to update token.",
+          message: e.response?.data?.message || t("iam.ingestionTokensPage.tokenUpdateError"),
           timeout: 5000,
         });
       } finally {

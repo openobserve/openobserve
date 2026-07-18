@@ -127,7 +127,7 @@ import Activity from "~icons/material-symbols/vital-signs";
 import AlignLeft from "~icons/material-symbols/format-align-left";
 import AllInclusive from "~icons/material-symbols/all-inclusive";
 import AssignmentTurnedIn from "~icons/material-symbols/assignment-turned-in-outline";
-import AutoAwesome from "~icons/material-symbols/wand-stars-outline";
+import AutoAwesome from "~icons/material-symbols/auto-awesome-outline";
 import BarChart from "~icons/material-symbols/bar-chart-4-bars";
 import Bookmark from "~icons/material-symbols/bookmark-outline";
 import Build from "~icons/material-symbols/build-outline";

@@ -31,13 +31,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :select-all="variableItem.multiSelect"
       @update:model-value="emit('update:modelValue', $event)"
     >
-      <template #empty>No Data Found</template>
+      <template #empty>{{ t('dashboard.variableCustomValueSelector.noDataFound') }}</template>
     </OSelect>
   </div>
 </template>
 
 <script lang="ts">
 import { defineComponent, ref, watch } from "vue";
+import { useI18n } from "vue-i18n";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 
 export default defineComponent({
@@ -46,6 +47,7 @@ export default defineComponent({
   props: ["modelValue", "variableItem"],
   emits: ["update:modelValue"],
   setup(props: any, { emit }) {
+    const { t } = useI18n();
     const selectedValue = ref(props.variableItem?.value);
 
     watch(
@@ -61,6 +63,7 @@ export default defineComponent({
     });
 
     return {
+      t,
       selectedValue,
       emit,
     };

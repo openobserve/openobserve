@@ -189,7 +189,7 @@
         class="text-center py-[0.725rem] flex items-center justify-center"
       >
         <OIcon name="info" size="xs" />
-        <span class="pl-[0.375rem]">No matching fields found.</span>
+        <span class="pl-[0.375rem]">{{ t('logs.logsPluginFieldList.noMatchingFields') }}</span>
       </div>
     </template>
 

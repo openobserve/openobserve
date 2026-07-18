@@ -14,8 +14,11 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { mount, flushPromises } from "@vue/test-utils";
+import { mount, flushPromises, config } from "@vue/test-utils";
+import i18n from "@/locales";
 import QueryBuilder from "./QueryBuilder.vue";
+
+config.global.plugins = [...(config.global.plugins ?? []), i18n];
 
 
 // Mock the child components

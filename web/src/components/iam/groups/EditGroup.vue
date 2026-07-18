@@ -192,13 +192,13 @@ const tabs = computed(() => {
   const baseTabs = [
     {
       value: "roles",
-      label: "Roles",
+      label: t('iam.editGroup.roles'),
       icon: "shield",
       dirty: isRolesDirty.value,
     },
     {
       value: "users",
-      label: "Users",
+      label: t('iam.editGroup.users'),
       icon: "group",
       dirty: isUsersDirty.value,
     },
@@ -207,7 +207,7 @@ const tabs = computed(() => {
   if (store.state.zoConfig.service_account_enabled) {
     baseTabs.push({
       value: "serviceAccounts",
-      label: "Service Accounts",
+      label: t('iam.editGroup.serviceAccounts'),
       icon: "smart-toy",
       dirty: isServiceAccountsDirty.value,
     });
@@ -231,7 +231,7 @@ const getGroupDetails = () => {
     .catch((err) => {
       console.log(err);
       toast({
-        message: err?.message || "Group not found or has been deleted. Redirecting to groups list.",
+        message: err?.message || t('iam.editGroup.groupNotFound'),
         variant: "error",
       });
       router.push({
@@ -272,7 +272,7 @@ const saveGroupChanges = () => {
   ) {
     toast({
       variant: "info",
-      message: `No updates detected.`,
+      message: t('iam.editGroup.noUpdates'),
     });
 
     return;
@@ -286,7 +286,7 @@ const saveGroupChanges = () => {
     .then((res) => {
       toast({
         variant: "success",
-        message: `Updated group successfully!`,
+        message: t('iam.editGroup.updateSuccess'),
       });
 
       // Reset Roles
@@ -329,7 +329,7 @@ const saveGroupChanges = () => {
       if(err.response.status != 403){
         toast({
           variant: "error",
-          message: "Error while updating group!",
+          message: t('iam.editGroup.updateError'),
         });
       }
     });
