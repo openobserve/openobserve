@@ -240,11 +240,11 @@ pub fn get_pending_batch_count(org_id: &str) -> i64 {
 
 #[cfg(feature = "enterprise")]
 pub async fn send_grouped_notification(
-    batch: crate::service::alerts::grouping::PendingBatch,
+    batch: crate::alerts::grouping::PendingBatch,
 ) -> Result<(), anyhow::Error> {
     use config::meta::alerts::deduplication::SendStrategy;
 
-    use crate::service::alerts::alert::AlertExt;
+    use crate::alerts::alert::AlertExt;
 
     let elapsed_seconds =
         (chrono::Utc::now().timestamp_micros() - batch.timer_started_at) / 1_000_000;

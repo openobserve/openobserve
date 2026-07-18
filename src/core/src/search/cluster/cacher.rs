@@ -23,7 +23,7 @@ use proto::cluster_rpc;
 use tonic::{Request, codec::CompressionEncoding, metadata::MetadataValue};
 use tracing::{Instrument, info_span};
 
-use crate::service::search::server_internal_error;
+use crate::search::server_internal_error;
 
 pub async fn delete_cached_results(path: String, delete_ts: i64) -> bool {
     let trace_id = path.clone();
@@ -122,7 +122,7 @@ pub async fn delete_cached_results(path: String, delete_ts: i64) -> bool {
         );
         tasks.push(task);
     }
-    match crate::service::search::cache::cacher::delete_cache(&path, delete_ts, None, None).await {
+    match crate::search::cache::cacher::delete_cache(&path, delete_ts, None, None).await {
         Ok(_) => {
             log::info!(
                 "[trace_id {trace_id}] delete_cached_results->grpc: local node delete success"

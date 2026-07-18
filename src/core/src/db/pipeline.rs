@@ -33,7 +33,7 @@ use crate::{
         PIPELINE_ID_TO_ORG, PIPELINE_STREAM_MAPPING, SCHEDULED_PIPELINES,
         STREAM_EXECUTABLE_PIPELINES,
     },
-    service::pipeline::batch_execution::ExecutablePipeline,
+    pipeline::batch_execution::ExecutablePipeline,
 };
 
 #[derive(Debug, thiserror::Error)]
@@ -257,7 +257,7 @@ pub async fn cache() -> Result<(), anyhow::Error> {
         && !config::get_config().common.mmdb_disable_download
     {
         log::info!("[PIPELINE:CACHE] waiting mmdb data to be available");
-        Lazy::force(&crate::service::enrichment_table::geoip::MMDB_INIT_NOTIFIER)
+        Lazy::force(&crate::enrichment_table::geoip::MMDB_INIT_NOTIFIER)
             .notified()
             .await;
         log::info!("[PIPELINE:CACHE] done waiting");

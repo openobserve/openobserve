@@ -24,7 +24,7 @@ use crate::{
         meta::authz::Authz,
         utils::auth::{is_ofga_unsupported, remove_ownership, set_ownership},
     },
-    service::db::{
+    db::{
         self,
         alerts::{destinations::DestinationError, templates::TemplateError},
         user,

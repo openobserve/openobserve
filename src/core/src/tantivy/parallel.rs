@@ -40,7 +40,7 @@ use {
 };
 
 use super::{TantivyIndexSchema, convert_batch_to_docs_sync};
-use crate::service::tantivy::reader::{ChunkSelector, chunk_iter};
+use crate::tantivy::reader::{ChunkSelector, chunk_iter};
 
 pub(super) async fn build_index<D: tantivy::Directory + Send + Sync + 'static>(
     tantivy_dir: D,
@@ -293,7 +293,7 @@ mod tests {
     };
     use tantivy::directory::RamDirectory;
 
-    use crate::service::tantivy::{
+    use crate::tantivy::{
         sequential,
         tests::{create_test_parquet_bytes, make_index_schema},
     };
@@ -589,7 +589,7 @@ mod tests {
 
         const CHUNK_ROWS: u64 = PARQUET_MAX_ROW_GROUP_SIZE as u64;
 
-        use crate::service::tantivy::tests::make_index_schema;
+        use crate::tantivy::tests::make_index_schema;
 
         /// One row per marker, marker text is globally unique → search-by-marker
         /// recovers the row's doc_id so we can assert it equals the global row index.

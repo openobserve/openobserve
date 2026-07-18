@@ -15,7 +15,7 @@
 
 #[cfg(feature = "enterprise")]
 use {
-    crate::service::search::partition::sql_context::PartitionSqlContext,
+    crate::search::partition::sql_context::PartitionSqlContext,
     config::meta::search::SearchPartitionRequest,
     config::utils::sql::is_simple_aggregate_query,
     config::{
@@ -81,8 +81,8 @@ pub async fn prepare_streaming_aggregate(
 
         // check cardinality for group by fields
         let group_by_fields =
-            crate::service::search::sql::visitor::group_by::get_group_by_fields(&ctx.sql).await?;
-        let cardinality_map = crate::service::search::cardinality::check_cardinality(
+            crate::search::sql::visitor::group_by::get_group_by_fields(&ctx.sql).await?;
+        let cardinality_map = crate::search::cardinality::check_cardinality(
             org_id,
             stream_type,
             &stream_name,

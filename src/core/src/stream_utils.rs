@@ -20,12 +20,23 @@ use axum::response::Response;
 use config::{
     FILE_EXT_JSON, TIMESTAMP_COL_NAME, get_config,
     meta::{
-        stream::{FileMeta, StreamType},
+        stream::{FileMeta, StreamParams, StreamType},
         user::{User, UserRole},
     },
+    utils::schema::format_stream_name,
 };
 
-use crate::service::users;
+use crate::users;
+
+pub async fn get_formatted_stream_name(params: StreamParams) -> infra::errors::Result<String> {
+    let stream_name = params.stream_name.to_string();
+    let schema = infra::schema::get_cache(&params.org_id, &stream_name, params.stream_type).await?;
+    Ok(if schema.fields_map().is_empty() {
+        format_stream_name(stream_name)
+    } else {
+        stream_name
+    })
+}
 
 #[inline(always)]
 pub fn stream_type_query_param_error() -> Result<Response, Error> {

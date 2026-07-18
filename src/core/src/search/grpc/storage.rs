@@ -37,8 +37,8 @@ use infra::{
 use itertools::Itertools;
 use tracing::Instrument;
 
-pub use crate::service::search::tantivy::tantivy_search;
-use crate::service::{
+pub use crate::search::tantivy::tantivy_search;
+use crate::{
     file_list,
     search::{
         bloom_pruner,

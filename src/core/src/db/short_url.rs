@@ -20,7 +20,7 @@ use chrono::Utc;
 use config::get_config;
 use infra::{db::Event, table::short_urls};
 
-use crate::{common::infra::config::SHORT_URLS, service::db};
+use crate::{common::infra::config::SHORT_URLS, db};
 
 // DBKey to set short URL's
 pub const SHORT_URL_KEY: &str = "/short_urls/";

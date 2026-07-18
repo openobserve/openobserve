@@ -50,9 +50,7 @@ pub async fn check_stream_permissions(
         meta::mapping::{LOGS_INSIGHTS_KEY, LOGS_PATTERN_KEY, OFGA_MODELS},
     };
 
-    let user: User = crate::service::users::get_user(Some(org_id), user_id)
-        .await
-        .unwrap();
+    let user: User = crate::users::get_user(Some(org_id), user_id).await.unwrap();
     let stream_type_str = stream_type.as_str();
     let config = get_config();
     let mut o2_model_type = "";
@@ -168,7 +166,7 @@ pub async fn list_objects_for_user(
         return Ok(None);
     }
 
-    let role = crate::service::users::get_user(Some(org_id), user_id)
+    let role = crate::users::get_user(Some(org_id), user_id)
         .await
         .map(|user| user.role.to_string())
         .unwrap_or_default();

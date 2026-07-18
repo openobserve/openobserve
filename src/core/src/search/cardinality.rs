@@ -19,7 +19,7 @@ use config::{RwHashMap, meta::stream::StreamType, utils::time::now_micros};
 use hashbrown::HashMap;
 use infra::errors::{Error, Result};
 
-use crate::service::search as searchService;
+use crate::search as searchService;
 
 /// This module is used to check the cardinality for one or multiple fields in a stream.
 ///
@@ -34,7 +34,7 @@ use crate::service::search as searchService;
 /// ```rust
 /// use config::meta::stream::StreamType;
 ///
-/// use crate::service::search::cardinality::check_cardinality;
+/// use crate::search::cardinality::check_cardinality;
 ///
 /// let cardinality =
 ///     check_cardinality("my_org", StreamType::Logs, "my_stream", "field_name").await?;
@@ -45,7 +45,7 @@ use crate::service::search as searchService;
 /// ```rust
 /// use config::meta::stream::StreamType;
 ///
-/// use crate::service::search::cardinality::check_cardinality;
+/// use crate::search::cardinality::check_cardinality;
 ///
 /// let fields = vec!["field1", "field2", "field3"];
 /// let results = check_cardinality("my_org", StreamType::Logs, "my_stream", &fields).await?;

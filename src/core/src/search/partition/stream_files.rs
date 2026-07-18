@@ -24,7 +24,7 @@ use infra::{cache::stats, errors::Error, file_list::FileId, schema::unwrap_strea
 
 use crate::{
     common::utils::stream::get_settings_max_query_range,
-    service::search::partition::sql_context::PartitionSqlContext,
+    search::partition::sql_context::PartitionSqlContext,
 };
 
 /// Result of collecting stream file information across all streams in a query.
@@ -70,7 +70,7 @@ pub async fn collect_stream_files(
         };
 
         if !use_single_partition && !use_stream_stats_for_partition {
-            let stream_files = crate::service::file_list::query_ids(
+            let stream_files = crate::file_list::query_ids(
                 trace_id,
                 org_id,
                 stream_type,

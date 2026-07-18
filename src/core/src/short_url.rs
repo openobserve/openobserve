@@ -20,7 +20,7 @@ use infra::{
     table::short_urls::ShortUrlRecord,
 };
 
-use crate::service::db;
+use crate::db;
 
 const SHORT_URL_WEB_PATH: &str = "short/";
 

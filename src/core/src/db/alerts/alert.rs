@@ -34,8 +34,9 @@ use sea_orm::{ConnectionTrait, TransactionTrait};
 use svix_ksuid::Ksuid;
 
 use crate::{
+    alerts::alert::get_folder_alert_by_id_db,
     common::infra::config::{ALERTS, STREAM_ALERTS},
-    service::{alerts::alert::get_folder_alert_by_id_db, db},
+    db,
 };
 
 /// Gets the alert and its parent folder.

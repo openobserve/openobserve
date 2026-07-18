@@ -55,17 +55,15 @@ use o2_enterprise::enterprise::re_patterns::PATTERN_MANAGER;
 
 use super::db::enrichment_table;
 #[cfg(feature = "vectorscan")]
-use crate::service::db::re_pattern::process_association_changes;
+use crate::db::re_pattern::process_association_changes;
 use crate::{
     common::meta::{
         authz::Authz,
         http::{ERROR_HEADER, HttpResponse as MetaHttpResponse},
         stream::{FieldUpdate, Stream, StreamCreate},
     },
-    service::{
-        db::{self, distinct_values},
-        metrics::get_prom_metadata_from_schema,
-    },
+    db::{self, distinct_values},
+    metrics::get_prom_metadata_from_schema,
 };
 
 const LOCAL: &str = "disk";
@@ -1110,7 +1108,7 @@ pub async fn delete_stream(
     // enrichment table cleanup
 
     if stream_type == StreamType::EnrichmentTables {
-        crate::service::enrichment_table::cleanup_enrichment_table_resources(
+        crate::enrichment_table::cleanup_enrichment_table_resources(
             org_id,
             stream_name,
             stream_type,
@@ -1222,7 +1220,7 @@ pub async fn delete_stream_data_by_time_range(
     };
 
     // Create a job to delete the data by the time range
-    let (key, _created) = match crate::service::db::compact::retention::delete_stream(
+    let (key, _created) = match crate::db::compact::retention::delete_stream(
         org_id,
         stream_type,
         stream_name,
@@ -1244,7 +1242,7 @@ pub async fn delete_stream_data_by_time_range(
         created_at: Utc::now().timestamp_micros(),
         ended_at: 0,
     };
-    crate::service::db::compact::compactor_manual_jobs::add_job(job).await
+    crate::db::compact::compactor_manual_jobs::add_job(job).await
 }
 
 async fn transform_stats(

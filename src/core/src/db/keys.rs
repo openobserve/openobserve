@@ -23,7 +23,7 @@ use infra::{
 };
 use o2_enterprise::enterprise::cipher::CipherData;
 
-use crate::{cipher::registry::REGISTRY, service::db};
+use crate::{cipher::registry::REGISTRY, db};
 
 // DBKey to set cipher keys
 pub const CIPHER_KEY_PREFIX: &str = "/cipher_keys/";

@@ -17,7 +17,7 @@ use std::sync::Arc;
 
 use config::utils::json;
 
-use crate::{common::infra::config::REALTIME_ALERT_TRIGGERS, service::db};
+use crate::{common::infra::config::REALTIME_ALERT_TRIGGERS, db};
 
 // Parses the item key from the event key and extracts org_id and module_key
 fn parse_item_key(key_prefix: &str, event_key: &str) -> (String, String, String) {

@@ -22,7 +22,7 @@ use infra::{
 use parquet::data_type::AsBytes;
 use tokio::sync::RwLock;
 
-use crate::service::db;
+use crate::db;
 
 // DBKey to set sourcemaps keys
 pub const OSP_PREFIX: &str = "/org_storage_providers/";

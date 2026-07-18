@@ -24,7 +24,7 @@ use cron::Schedule;
 use infra::table;
 use sea_orm::{ConnectionTrait, TransactionTrait};
 
-use crate::service::{dashboards::reports::ReportError, db, folders};
+use crate::{dashboards::reports::ReportError, db, folders};
 
 pub async fn get<C: ConnectionTrait + TransactionTrait>(
     conn: &C,

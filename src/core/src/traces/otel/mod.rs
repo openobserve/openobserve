@@ -43,7 +43,7 @@
 //! # Usage
 //!
 //! ```rust,ignore
-//! use crate::service::traces::otel::OtelIngestionProcessor;
+//! use crate::traces::otel::OtelIngestionProcessor;
 //!
 //! let processor = OtelIngestionProcessor::new();
 //! let mut span_attributes = /* ... */;
@@ -117,7 +117,7 @@ mod tests {
     use super::*;
     use crate::{
         common::meta::traces::Event,
-        service::traces::otel::attributes::{
+        traces::otel::attributes::{
             GenAiAttributes, GenAiExtensions, O2Attributes, OtelAttributes,
         },
     };

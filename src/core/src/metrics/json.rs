@@ -33,7 +33,7 @@ use config::{
     metrics,
     utils::{
         flatten, json,
-        schema::infer_json_schema,
+        schema::{format_stream_name, infer_json_schema},
         schema_ext::SchemaExt,
         time::{self, now_micros},
     },
@@ -43,22 +43,20 @@ use infra::schema::{SchemaCache, get_partition_time_level};
 
 use super::get_exclude_labels;
 use crate::{
+    alerts::alert::AlertExt,
     common::meta::{
         authz::Authz,
         ingestion::{IngestionResponse, StreamStatus},
         stream::SchemaRecords,
     },
-    service::{
-        alerts::alert::AlertExt,
-        db, format_stream_name,
-        ingestion::{
-            TriggerAlertData, check_ingestion_allowed, evaluate_trigger, get_thread_id,
-            get_write_partition_key, write_file,
-        },
-        pipeline::batch_execution::ExecutablePipeline,
-        schema::check_for_schema,
-        self_reporting::report_request_usage_stats,
+    db,
+    ingestion::{
+        TriggerAlertData, check_ingestion_allowed, evaluate_trigger, get_thread_id,
+        get_write_partition_key, write_file,
     },
+    pipeline::batch_execution::ExecutablePipeline,
+    schema::check_for_schema,
+    self_reporting::report_request_usage_stats,
 };
 
 const VALID_METRICS_TYPES: &[&str] = &["counter", "gauge", "histogram", "summary"];
@@ -164,14 +162,13 @@ pub async fn ingest(
         // Start retrieve associated pipeline and initialize ExecutablePipeline
         let stream_param = StreamParams::new(org_id, &stream_name, StreamType::Metrics);
         if !stream_executable_pipelines.contains_key(&stream_name) {
-            let pipelines =
-                crate::service::ingestion::get_stream_executable_pipelines(&stream_param).await;
+            let pipelines = crate::ingestion::get_stream_executable_pipelines(&stream_param).await;
             stream_executable_pipelines.insert(stream_name.clone(), pipelines);
         }
         // End pipeline params construction
 
         // get user defined schema
-        crate::service::ingestion::get_uds_and_original_data_streams(
+        crate::ingestion::get_uds_and_original_data_streams(
             std::slice::from_ref(&stream_param),
             &mut user_defined_schema_map,
             &mut streams_need_original_map,
@@ -256,7 +253,7 @@ pub async fn ingest(
             };
 
             if let Some(Some(fields)) = user_defined_schema_map.get(&stream_name) {
-                local_val = crate::service::ingestion::refactor_map(local_val, fields);
+                local_val = crate::ingestion::refactor_map(local_val, fields);
             }
 
             // buffer to downstream processing directly
@@ -313,13 +310,12 @@ pub async fn ingest(
 
                         // add partition keys
                         if !stream_partitioning_map.contains_key(&destination_stream) {
-                            let partition_det =
-                                crate::service::ingestion::get_stream_partition_keys(
-                                    org_id,
-                                    &StreamType::Metrics,
-                                    &destination_stream,
-                                )
-                                .await;
+                            let partition_det = crate::ingestion::get_stream_partition_keys(
+                                org_id,
+                                &StreamType::Metrics,
+                                &destination_stream,
+                            )
+                            .await;
                             stream_partitioning_map
                                 .insert(destination_stream.clone(), partition_det.clone());
                         }
@@ -333,8 +329,7 @@ pub async fn ingest(
                             if let Some(Some(fields)) =
                                 user_defined_schema_map.get(&destination_stream)
                             {
-                                local_val =
-                                    crate::service::ingestion::refactor_map(local_val, fields);
+                                local_val = crate::ingestion::refactor_map(local_val, fields);
                             }
 
                             // buffer to downstream processing directly
@@ -356,7 +351,7 @@ pub async fn ingest(
                 };
 
                 if let Some(Some(fields)) = user_defined_schema_map.get(stream_name) {
-                    local_val = crate::service::ingestion::refactor_map(local_val, fields);
+                    local_val = crate::ingestion::refactor_map(local_val, fields);
                 }
 
                 json_data_by_stream
@@ -369,7 +364,7 @@ pub async fn ingest(
 
     for (stream_name, json_data) in json_data_by_stream {
         if !stream_partitioning_map.contains_key(&stream_name) {
-            let partition_det = crate::service::ingestion::get_stream_partition_keys(
+            let partition_det = crate::ingestion::get_stream_partition_keys(
                 org_id,
                 &StreamType::Metrics,
                 &stream_name,
@@ -387,7 +382,7 @@ pub async fn ingest(
         for (mut record, metric_type) in json_data {
             // Start get stream alerts
             if !stream_alerts_map.contains_key(&stream_name) {
-                crate::service::ingestion::get_stream_alerts(
+                crate::ingestion::get_stream_alerts(
                     &[StreamParams {
                         org_id: org_id.to_owned().into(),
                         stream_name: stream_name.to_owned().into(),

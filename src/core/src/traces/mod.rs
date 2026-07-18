@@ -38,7 +38,10 @@ use config::{
         stream::{StreamParams, StreamPartition, StreamType},
     },
     metrics,
-    utils::{flatten, json, schema_ext::SchemaExt, time::now_micros, util::DISTINCT_STREAM_PREFIX},
+    utils::{
+        flatten, json, schema::format_stream_name, schema_ext::SchemaExt, time::now_micros,
+        util::DISTINCT_STREAM_PREFIX,
+    },
 };
 use infra::schema::{SchemaCache, get_partition_time_level};
 use opentelemetry::trace::{SpanId, TraceId};
@@ -57,30 +60,26 @@ pub mod schema_compat;
 pub mod service_graph;
 
 #[cfg(feature = "cloud")]
-use crate::service::stream::get_stream;
+use crate::stream::get_stream;
 use crate::{
+    alerts::alert::AlertExt,
     common::meta::{
         http::{ERROR_HEADER, HttpResponse as MetaHttpResponse},
         ingestion::IngestUser,
         stream::SchemaRecords,
         traces::{Event, Span, SpanLink, SpanLinkContext, SpanRefType},
     },
-    service::{
-        alerts::alert::AlertExt,
-        format_stream_name,
-        ingestion::{
-            TriggerAlertData, check_ingestion_allowed, evaluate_trigger, get_thread_id,
-            grpc::get_val, write_file,
-        },
-        logs::O2IngestJsonData,
-        metadata::{
-            MetadataItem, MetadataType, distinct_values::DvItem, trace_list_index::TraceListItem,
-            write,
-        },
-        schema::{check_for_schema, stream_schema_exists},
-        self_reporting::report_request_usage_stats,
-        traces::otel::{OtelIngestionProcessor, is_llm_trace},
+    ingestion::{
+        TriggerAlertData, check_ingestion_allowed, evaluate_trigger, get_thread_id, grpc::get_val,
+        write_file,
     },
+    logs::O2IngestJsonData,
+    metadata::{
+        MetadataItem, MetadataType, distinct_values::DvItem, trace_list_index::TraceListItem, write,
+    },
+    schema::{check_for_schema, stream_schema_exists},
+    self_reporting::report_request_usage_stats,
+    traces::otel::{OtelIngestionProcessor, is_llm_trace},
 };
 
 const SERVICE_NAME: &str = "service.name";
@@ -410,7 +409,7 @@ pub async fn handle_otlp_request(
     // Start retrieving associated pipeline and construct pipeline params
     let stream_param = StreamParams::new(org_id, &traces_stream_name, StreamType::Traces);
     let executable_pipelines =
-        crate::service::ingestion::get_stream_executable_pipelines(&stream_param).await;
+        crate::ingestion::get_stream_executable_pipelines(&stream_param).await;
     let mut stream_pipeline_inputs = Vec::new();
     // End pipeline params construction
 
@@ -419,7 +418,7 @@ pub async fn handle_otlp_request(
         HashMap::with_capacity(1);
     let mut streams_need_original_map: HashMap<String, bool> = HashMap::with_capacity(1);
     let mut streams_need_all_values_map: HashMap<String, bool> = HashMap::with_capacity(1);
-    crate::service::ingestion::get_uds_and_original_data_streams(
+    crate::ingestion::get_uds_and_original_data_streams(
         std::slice::from_ref(&stream_param),
         &mut user_defined_schema_map,
         &mut streams_need_original_map,
@@ -439,16 +438,16 @@ pub async fn handle_otlp_request(
     // Pre-load user-defined model pricing entries for this org (in-memory cache, no I/O).
     // When ZO_MODEL_PRICING_ENABLED=false, skip DB pricing and fall back to hardcoded values.
     static EMPTY_PRICING: std::sync::OnceLock<
-        std::sync::Arc<Vec<crate::service::db::model_pricing::CachedModelPricing>>,
+        std::sync::Arc<Vec<crate::db::model_pricing::CachedModelPricing>>,
     > = std::sync::OnceLock::new();
     let org_pricing_entries = if config::get_config().common.model_pricing_enabled {
-        crate::service::db::model_pricing::get_org_pricing_entries(org_id)
+        crate::db::model_pricing::get_org_pricing_entries(org_id)
     } else {
         std::sync::Arc::clone(EMPTY_PRICING.get_or_init(|| std::sync::Arc::new(vec![])))
     };
 
     let gen_ai_agent_mapping_config =
-        crate::service::db::system_settings::get_gen_ai_agent_mapping_config(org_id).await;
+        crate::db::system_settings::get_gen_ai_agent_mapping_config(org_id).await;
     let mut agent_observations = AgentObservationBuffer::default();
 
     for res_span in res_spans {
@@ -801,8 +800,7 @@ pub async fn handle_otlp_request(
                             if let Some(Some(fields)) =
                                 user_defined_schema_map.get(&stream_params.stream_name.to_string())
                             {
-                                record_val =
-                                    crate::service::ingestion::refactor_map(record_val, fields);
+                                record_val = crate::ingestion::refactor_map(record_val, fields);
                             }
                             restore_canonical_agent_fields(&mut record_val, canonical_agent_fields);
 
@@ -970,7 +968,7 @@ fn finalize_and_buffer_trace_span(
         agent_observations,
     );
     if let Some(Some(fields)) = user_defined_schema_map.get(traces_stream_name) {
-        record_val = crate::service::ingestion::refactor_map(record_val, fields);
+        record_val = crate::ingestion::refactor_map(record_val, fields);
     }
     restore_canonical_agent_fields(&mut record_val, canonical_agent_fields);
     let (ts_data, _) = json_data_by_stream
@@ -1042,7 +1040,7 @@ pub async fn ingest_json(
     let mut json_data_by_stream = HashMap::new();
     let mut partial_success = ExportTracePartialSuccess::default();
     let gen_ai_agent_mapping_config =
-        crate::service::db::system_settings::get_gen_ai_agent_mapping_config(org_id).await;
+        crate::db::system_settings::get_gen_ai_agent_mapping_config(org_id).await;
     let mut agent_observations = AgentObservationBuffer::default();
     for mut value in json_values {
         let timestamp = value[TIMESTAMP_COL_NAME].as_i64().unwrap_or(
@@ -1343,17 +1341,14 @@ async fn write_traces(
     let mut partition_keys: Vec<StreamPartition> = vec![];
     let partition_time_level = get_partition_time_level(StreamType::Traces);
     if stream_schema.has_partition_keys {
-        partition_keys = crate::service::ingestion::get_stream_partition_keys(
-            org_id,
-            &StreamType::Traces,
-            stream_name,
-        )
-        .await
+        partition_keys =
+            crate::ingestion::get_stream_partition_keys(org_id, &StreamType::Traces, stream_name)
+                .await
     }
 
     // Start get stream alerts
     let mut stream_alerts_map: HashMap<String, Vec<Alert>> = HashMap::new();
-    crate::service::ingestion::get_stream_alerts(
+    crate::ingestion::get_stream_alerts(
         &[StreamParams {
             org_id: org_id.to_owned().into(),
             stream_name: stream_name.to_owned().into(),
@@ -1571,7 +1566,7 @@ mod tests {
     use config::utils::json::json;
     use opentelemetry_proto::tonic::trace::v1::{Status, status::StatusCode};
 
-    use crate::service::ingestion::grpc::get_val_for_attr;
+    use crate::ingestion::grpc::get_val_for_attr;
 
     #[test]
     fn test_get_val_for_attr() {
@@ -2466,7 +2461,7 @@ mod tests {
 
     #[test]
     fn test_detect_llm_stream_hashmap_gen_ai() {
-        use crate::service::traces::otel::attributes::GenAiAttributes;
+        use crate::traces::otel::attributes::GenAiAttributes;
 
         let keys = [
             GenAiAttributes::USAGE_INPUT_TOKENS,
@@ -2487,7 +2482,7 @@ mod tests {
 
     #[test]
     fn test_detect_llm_stream_hashmap_gen_ai_attrs() {
-        use crate::service::traces::otel::attributes::GenAiAttributes;
+        use crate::traces::otel::attributes::GenAiAttributes;
 
         let mut map: std::collections::HashMap<String, config::utils::json::Value> =
             std::collections::HashMap::new();
@@ -2505,7 +2500,7 @@ mod tests {
 
     #[test]
     fn test_detect_llm_stream_hashmap_langfuse() {
-        use crate::service::traces::otel::attributes::LangfuseAttributes;
+        use crate::traces::otel::attributes::LangfuseAttributes;
 
         let mut map: std::collections::HashMap<String, config::utils::json::Value> =
             std::collections::HashMap::new();
@@ -2520,7 +2515,7 @@ mod tests {
 
     #[test]
     fn test_detect_llm_stream_json_map() {
-        use crate::service::traces::otel::attributes::GenAiAttributes;
+        use crate::traces::otel::attributes::GenAiAttributes;
 
         let mut obj = config::utils::json::Map::new();
         obj.insert("service.name".to_string(), json!("api"));
@@ -2532,7 +2527,7 @@ mod tests {
 
     #[test]
     fn test_detect_llm_stream_mixed_attrs_match_first() {
-        use crate::service::traces::otel::attributes::GenAiAttributes;
+        use crate::traces::otel::attributes::GenAiAttributes;
 
         let mut map: std::collections::HashMap<String, config::utils::json::Value> =
             std::collections::HashMap::new();

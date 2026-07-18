@@ -40,12 +40,10 @@ use tokio::sync::{RwLock, mpsc};
 
 use crate::{
     common::meta::stream::SchemaRecords,
-    service::{
-        db,
-        ingestion::{self, get_thread_id},
-        metadata::{Metadata, MetadataItem},
-        schema::get_schema_changes,
-    },
+    db,
+    ingestion::{self, get_thread_id},
+    metadata::{Metadata, MetadataItem},
+    schema::get_schema_changes,
 };
 
 const CHANNEL_SIZE: usize = 10240;

@@ -613,7 +613,7 @@ fn record_usage_internal(
         ..credit_event.clone()
     };
 
-    crate::service::self_reporting::report_usage(vec![credit_event, feature_event]);
+    crate::self_reporting::report_usage(vec![credit_event, feature_event]);
 }
 
 /// Record free credit usage (all orgs). Writes `AiFreeCredits` — not billed.

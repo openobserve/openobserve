@@ -16,7 +16,7 @@
 use ::common::infra::wal;
 use config::{cache_instance_id, ider};
 
-use crate::service::db::metas;
+use crate::db::metas;
 
 pub async fn init() -> Result<(), anyhow::Error> {
     let instance_id = match metas::instance::get().await {

@@ -49,6 +49,7 @@ use super::{
     self_reporting::publish_triggers_usage,
 };
 use crate::{
+    alerts::alert::AlertExt,
     common::{
         infra::config::{REALTIME_ALERT_TRIGGERS, STREAM_ALERTS},
         meta::{ingestion::IngestionRequest, stream::SchemaRecords},
@@ -56,11 +57,8 @@ use crate::{
             JSRuntimeConfig, apply_js_fn as apply_js, compile_js_function as compile_js_func,
         },
     },
-    service::{
-        alerts::alert::AlertExt,
-        db::{self, alerts::alert::scheduler_key},
-        logs::bulk::TRANSFORM_FAILED,
-    },
+    db::{self, alerts::alert::scheduler_key},
+    logs::bulk::TRANSFORM_FAILED,
 };
 
 pub mod grpc;

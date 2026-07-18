@@ -42,7 +42,7 @@ use crate::{
         infra::config::{ORG_USERS, ORGANIZATIONS, USERS},
         meta::organization::DEFAULT_ORG,
     },
-    service::db,
+    db,
 };
 
 pub async fn init() -> Result<(), anyhow::Error> {

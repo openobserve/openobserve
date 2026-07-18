@@ -298,7 +298,7 @@ pub async fn query_edges_from_stream_internal(
 
     // Execute search
     let trace_id = config::ider::generate();
-    let resp = crate::service::search::search(&trace_id, org_id, StreamType::Logs, None, &req)
+    let resp = crate::search::search(&trace_id, org_id, StreamType::Logs, None, &req)
         .await
         .map_err(|e| {
             log::error!("[ServiceGraph] Stream query failed: {}", e);
@@ -432,15 +432,7 @@ pub async fn get_edge_history(
     }
 
     let trace_id = config::ider::generate();
-    let resp = match crate::service::search::search(
-        &trace_id,
-        &org_id,
-        StreamType::Logs,
-        None,
-        &req,
-    )
-    .await
-    {
+    let resp = match crate::search::search(&trace_id, &org_id, StreamType::Logs, None, &req).await {
         Ok(r) => r,
         Err(e) => {
             log::error!("[ServiceGraph] Edge history query failed: {}", e);

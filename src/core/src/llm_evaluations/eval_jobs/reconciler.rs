@@ -41,7 +41,7 @@ use config::{
 };
 use infra::table::online_eval_jobs::{OnlineEvalJob, SamplingMode};
 
-use crate::service::db::pipeline::PipelineError;
+use crate::db::pipeline::PipelineError;
 
 /// Errors raised by the reconciler.
 #[derive(Debug, thiserror::Error)]
@@ -92,7 +92,7 @@ pub async fn tear_down(job: &OnlineEvalJob) -> Result<(), ReconcileError> {
 
 /// Delete the pipeline, swallowing NotFound to remain idempotent.
 async fn best_effort_delete(pipeline_id: &str) {
-    match crate::service::pipeline::delete_pipeline(pipeline_id).await {
+    match crate::pipeline::delete_pipeline(pipeline_id).await {
         Ok(()) => {}
         Err(PipelineError::NotFound(_)) => {
             // Already gone — fine.
@@ -125,7 +125,7 @@ async fn ensure_pipeline(
             // First-time provisioning.
             let new_id = ider::generate();
             let pipeline = build_pipeline_from_job(job, &new_id, desired_enabled, 1);
-            crate::service::pipeline::save_pipeline(pipeline).await?;
+            crate::pipeline::save_pipeline(pipeline).await?;
             // save_pipeline persists `enabled` as-is, so no separate enable_pipeline call
             // is needed for the create path. If we later want to be defensive against
             // future changes in save_pipeline semantics, we can re-assert enable state
@@ -134,13 +134,13 @@ async fn ensure_pipeline(
         }
         Some(pipeline_id) => {
             // Pipeline should already exist. Fetch and compare.
-            let existing = match crate::service::db::pipeline::get_by_id(pipeline_id).await {
+            let existing = match crate::db::pipeline::get_by_id(pipeline_id).await {
                 Ok(p) => p,
                 Err(PipelineError::NotFound(_)) => {
                     // Drift: job thinks a pipeline exists but it's gone. Recreate
                     // with the same id so the job row stays consistent.
                     let pipeline = build_pipeline_from_job(job, pipeline_id, desired_enabled, 1);
-                    crate::service::pipeline::save_pipeline(pipeline).await?;
+                    crate::pipeline::save_pipeline(pipeline).await?;
                     return Ok(pipeline_id.to_string());
                 }
                 Err(e) => return Err(e.into()),
@@ -150,7 +150,7 @@ async fn ensure_pipeline(
             if !pipeline_matches_job(&existing, job) {
                 let updated =
                     build_pipeline_from_job(job, pipeline_id, desired_enabled, existing.version);
-                crate::service::pipeline::update_pipeline(updated).await?;
+                crate::pipeline::update_pipeline(updated).await?;
             }
 
             // Ensure enable state. update_pipeline preserves whatever `enabled` was
@@ -159,13 +159,8 @@ async fn ensure_pipeline(
             if existing.enabled != desired_enabled || pipeline_matches_job(&existing, job) {
                 // For evaluation pipelines, sampling has no time-of-day semantics
                 // so starts_from_now is always false.
-                crate::service::pipeline::enable_pipeline(
-                    &job.org_id,
-                    pipeline_id,
-                    desired_enabled,
-                    false,
-                )
-                .await?;
+                crate::pipeline::enable_pipeline(&job.org_id, pipeline_id, desired_enabled, false)
+                    .await?;
             }
 
             Ok(pipeline_id.to_string())

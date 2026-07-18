@@ -29,7 +29,7 @@ use crate::{
         infra::config::{ORGANIZATION_SETTING, ORGANIZATIONS},
         meta::organization::{Organization, OrganizationSetting},
     },
-    service::db,
+    db,
 };
 
 // DBKey to set settings for an org

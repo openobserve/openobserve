@@ -19,9 +19,7 @@ use std::collections::HashMap;
 
 use config::utils::json;
 
-use crate::service::traces::otel::attributes::{
-    GenAiAttributes, LangfuseAttributes, VercelAiSdkAttributes,
-};
+use crate::traces::otel::attributes::{GenAiAttributes, LangfuseAttributes, VercelAiSdkAttributes};
 
 pub struct ProviderExtractor;
 

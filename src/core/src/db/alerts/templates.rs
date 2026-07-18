@@ -24,7 +24,7 @@ use crate::{
         infra::config::{ALERTS, ALERTS_TEMPLATES, DESTINATIONS},
         meta::organization::DEFAULT_ORG,
     },
-    service::db,
+    db,
 };
 
 // db cache watcher prefix

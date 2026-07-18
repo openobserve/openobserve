@@ -6,7 +6,7 @@ use proto::cluster_rpc;
 use serde::{Deserialize, Serialize};
 use tokio::sync::Mutex;
 
-use crate::service::ingestion::ingestion_service;
+use crate::ingestion::ingestion_service;
 
 const CLOUD_EVENT_STREAM: &str = "cloud_events";
 

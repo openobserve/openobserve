@@ -54,12 +54,10 @@ use crate::{
         },
         utils::auth::{delete_org_tuples, is_root_user, save_org_tuples},
     },
-    service::{
-        db::{self, org_users},
-        ingestion_tokens, self_reporting,
-        stream::get_streams,
-        users::add_admin_to_org,
-    },
+    db::{self, org_users},
+    ingestion_tokens, self_reporting,
+    stream::get_streams,
+    users::add_admin_to_org,
 };
 
 const MASKED_TOKEN: &str = "NOT_AVAILABLE";
@@ -592,7 +590,7 @@ pub async fn create_org(
                 );
 
                 // Create user record if it doesn't exist as ServiceAccount
-                use crate::service::users::create_service_account_if_not_exists;
+                use crate::users::create_service_account_if_not_exists;
                 create_service_account_if_not_exists(service_account_email).await?;
 
                 // Add service account to the org with ServiceAccount role
@@ -694,8 +692,7 @@ pub async fn create_org(
             // send the info in response, else ignore
             let service_account_info = if let Some(sa) = org.service_account.as_ref() {
                 // Check if they're a service account in _meta org
-                if let Some(meta_user) =
-                    crate::service::users::get_user(Some(config::META_ORG_ID), sa).await
+                if let Some(meta_user) = crate::users::get_user(Some(config::META_ORG_ID), sa).await
                 {
                     if meta_user.role == UserRole::ServiceAccount {
                         // Return service account info with instructions to use
@@ -1066,7 +1063,7 @@ pub async fn generate_invitation(
 pub async fn accept_invitation(user_email: &str, invite_token: &str) -> Result<(), anyhow::Error> {
     use std::str::FromStr;
 
-    use crate::service::db::org_users::get_cached_user_org;
+    use crate::db::org_users::get_cached_user_org;
 
     let invite = org_invites::get_by_token_user(invite_token, &user_email.to_lowercase())
         .await
@@ -1257,7 +1254,7 @@ pub async fn ensure_sys_rca_agent(org_id: &str) -> Result<(), anyhow::Error> {
     use config::{meta::user::UserRole, utils::rand::generate_random_string};
     use o2_openfga::authorizer::authz::{get_add_user_to_org_tuples, update_tuples};
 
-    use crate::service::users::create_service_account_if_not_exists;
+    use crate::users::create_service_account_if_not_exists;
 
     let email = sre_agent_email(org_id);
 
@@ -1350,7 +1347,7 @@ mod tests {
     use infra::{db as infra_db, table as infra_table};
 
     use super::*;
-    use crate::{common::meta::user::UserRequest, service::users};
+    use crate::{common::meta::user::UserRequest, users};
 
     // TODO: move these tests to integration tests,
     // the below test case will fail as is_root_user()

@@ -48,7 +48,9 @@ use crate::{
         infra::config::{ENRICHMENT_TABLES, ORGANIZATIONS},
         meta::stream::StreamSchema,
     },
-    service::{db, enrichment::StreamTable, organization::check_and_create_org},
+    db,
+    enrichment::StreamTable,
+    organization::check_and_create_org,
 };
 
 pub async fn merge(

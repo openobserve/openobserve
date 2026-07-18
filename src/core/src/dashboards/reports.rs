@@ -51,7 +51,7 @@ use crate::{
         meta::authz::Authz,
         utils::auth::{is_ofga_unsupported, remove_ownership, set_ownership},
     },
-    service::{db, short_url},
+    db, short_url,
 };
 
 /// Errors that can occur when interacting with reports.

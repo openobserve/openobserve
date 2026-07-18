@@ -22,7 +22,7 @@ use arrow_schema::Schema;
 use serde::{Deserialize, Serialize};
 use tokio::try_join;
 
-use crate::service::metadata::{distinct_values::DvItem, trace_list_index::TraceListItem};
+use crate::metadata::{distinct_values::DvItem, trace_list_index::TraceListItem};
 
 pub mod distinct_values;
 pub mod trace_list_index;

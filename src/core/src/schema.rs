@@ -51,7 +51,7 @@ use serde_json::{Map, Value};
 use super::logs::bulk::SCHEMA_CONFORMANCE_FAILED;
 use crate::{
     common::meta::{authz::Authz, ingestion::StreamSchemaChk, stream::SchemaEvolution},
-    service::db,
+    db,
 };
 
 pub(crate) fn get_upto_discard_error() -> anyhow::Error {

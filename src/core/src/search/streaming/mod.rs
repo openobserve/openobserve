@@ -48,14 +48,12 @@ use tracing::Instrument;
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 use vector_enrichment::TableRegistry;
 
-#[cfg(feature = "enterprise")]
-use crate::service::{http::map_error_to_http_response, self_reporting::audit};
 use crate::{
     common::{
         meta::search::{AuditContext, SearchResultType},
         utils::stream::get_max_query_range,
     },
-    service::search::{
+    search::{
         cache as search_cache,
         inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
         sql::visitor::histogram_interval::{
@@ -63,6 +61,8 @@ use crate::{
         },
     },
 };
+#[cfg(feature = "enterprise")]
+use crate::{http::map_error_to_http_response, self_reporting::audit};
 
 pub mod cache;
 pub mod execution;
@@ -1168,7 +1168,7 @@ fn compute_vrl_responses(
 
     log::debug!("[trace_id {trace_id}] Compiling VRL function...");
     let mut runtime = crate::common::utils::functions::init_vrl_runtime();
-    let program = match crate::service::ingestion::compile_vrl_function(&input_fn, org_id) {
+    let program = match crate::ingestion::compile_vrl_function(&input_fn, org_id) {
         Ok(program) => {
             let registry = program.config.get_custom::<TableRegistry>().unwrap();
             registry.finish_load();
@@ -1195,7 +1195,7 @@ fn compute_vrl_responses(
 
     let transformed_hits: Vec<json::Value> = if apply_over_hits {
         // Apply VRL on the entire 2D array at once
-        let (ret_val, err) = crate::service::ingestion::apply_vrl_fn(
+        let (ret_val, err) = crate::ingestion::apply_vrl_fn(
             &mut runtime,
             &VRLResultResolver {
                 program: program.program.clone(),
@@ -1230,7 +1230,7 @@ fn compute_vrl_responses(
                 let transformed: Vec<json::Value> = query_hits
                     .into_iter()
                     .filter_map(|hit| {
-                        let (ret_val, err) = crate::service::ingestion::apply_vrl_fn(
+                        let (ret_val, err) = crate::ingestion::apply_vrl_fn(
                             &mut runtime,
                             &VRLResultResolver {
                                 program: program.program.clone(),

@@ -34,7 +34,7 @@ use promql_parser::label::Matchers;
 use proto::cluster_rpc::{self, IndexInfo, QueryIdentifier};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
-use crate::service::{
+use crate::{
     promql::search::grpc::Context,
     search::{
         datafusion::{

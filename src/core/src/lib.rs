@@ -80,6 +80,7 @@ pub mod stream_utils;
 pub mod synthetics;
 pub mod tantivy;
 pub mod tls;
+pub mod trace_utils;
 pub mod traces;
 #[cfg(feature = "cloud")]
 pub mod trial_quota;
@@ -92,7 +93,7 @@ pub mod common {
     pub mod meta {
         pub use ::common::meta::*;
 
-        pub use crate::service::ingestion_types as ingestion;
+        pub use crate::ingestion_types as ingestion;
 
         /// Lives here rather than in the `common` crate so that `common` does not
         /// depend on the `search` crate.
@@ -111,16 +112,16 @@ pub mod common {
         pub mod config {
             pub use ::common::infra::config::*;
 
-            pub use crate::service::cache::{REALTIME_ALERT_TRIGGERS, STREAM_EXECUTABLE_PIPELINES};
+            pub use crate::cache::{REALTIME_ALERT_TRIGGERS, STREAM_EXECUTABLE_PIPELINES};
         }
 
         #[cfg(feature = "enterprise")]
-        pub use crate::service::ofga;
+        pub use crate::ofga;
     }
 
     pub mod utils {
         pub use ::common::utils::*;
 
-        pub use crate::service::{auth, stream_utils as stream};
+        pub use crate::{auth, stream_utils as stream};
     }
 }

@@ -19,7 +19,7 @@ use config::meta::destinations::Destination;
 use infra::table;
 use itertools::Itertools;
 
-use crate::{common::infra::config::DESTINATIONS, service::db};
+use crate::{common::infra::config::DESTINATIONS, db};
 
 // db cache watcher prefix
 const DESTINATION_WATCHER_PREFIX: &str = "/destinations/";

@@ -18,7 +18,7 @@ use itertools::Itertools;
 
 use crate::{
     common::meta::search::{CacheQueryRequest, ResultCacheSelectionStrategy},
-    service::search::cache::{CachedQueryResponse, cacher::select_cache_meta},
+    search::cache::{CachedQueryResponse, cacher::select_cache_meta},
 };
 
 pub async fn get_cached_results(

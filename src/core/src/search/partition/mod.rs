@@ -23,7 +23,7 @@ pub mod stream_files;
 
 use config::get_config;
 
-use crate::service::search::partition::{
+use crate::search::partition::{
     histogram::generate_partitions_aligned_with_histogram_interval,
     regular_partition::generate_partitions_with_mini_partition, settings::PartitionSettings,
     sql_context::PartitionSqlContext,

@@ -20,7 +20,7 @@ use crate::{
     common::meta::saved_view::{
         CreateViewRequest, UpdateViewRequest, View, ViewWithoutData, ViewsWithoutData,
     },
-    service::db,
+    db,
 };
 
 pub const SAVED_VIEWS_KEY_PREFIX: &str = "/organization/savedviews";

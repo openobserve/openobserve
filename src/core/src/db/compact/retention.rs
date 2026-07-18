@@ -21,7 +21,7 @@ use config::{
     utils::time::{hour_micros, now_micros},
 };
 
-use crate::service::db;
+use crate::db;
 
 static CACHE: Lazy<RwHashMap<String, i64>> = Lazy::new(Default::default);
 

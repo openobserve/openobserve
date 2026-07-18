@@ -67,6 +67,7 @@ use crate::common::utils::auth::check_permissions;
 #[cfg(feature = "enterprise")]
 use crate::common::utils::http::get_or_create_trace_id;
 use crate::{
+    alerts::{QueryConditionExt, build_sql, destinations},
     common::{
         infra::config::ORGANIZATIONS,
         meta::authz::Authz,
@@ -75,12 +76,9 @@ use crate::{
             ssrf_guard::SsrfGuard,
         },
     },
-    service::{
-        alerts::{QueryConditionExt, build_sql, destinations},
-        db, folders,
-        search::sql::RE_ONLY_SELECT,
-        short_url,
-    },
+    db, folders,
+    search::sql::RE_ONLY_SELECT,
+    short_url,
 };
 
 /// Errors that can occur when interacting with alerts.
@@ -858,7 +856,7 @@ pub async fn trigger_by_id<C: ConnectionTrait>(
         let synthetic_row = synthetic_row.as_object().unwrap();
         let notify = std::slice::from_ref(synthetic_row);
 
-        match crate::service::alerts::incidents::correlate_alert_to_incident(
+        match crate::alerts::incidents::correlate_alert_to_incident(
             &alert,
             synthetic_row,
             notify,
@@ -936,7 +934,7 @@ pub async fn trigger_by_name(
         let synthetic_row = synthetic_row.as_object().unwrap();
         let notify = std::slice::from_ref(synthetic_row);
 
-        match crate::service::alerts::incidents::correlate_alert_to_incident(
+        match crate::alerts::incidents::correlate_alert_to_incident(
             &alert,
             synthetic_row,
             notify,
@@ -2186,14 +2184,14 @@ async fn permitted_alerts(
 
     use o2_openfga::meta::mapping::OFGA_MODELS;
 
-    use crate::{common::utils::auth::AuthExtractor, service::db::user::get as get_user};
+    use crate::{common::utils::auth::AuthExtractor, db::user::get as get_user};
 
     if let Some(folder_id) = folder_id {
         let user_role = match get_user(Some(org_id), user_id).await {
             Ok(Some(user)) => user.role,
             _ => return Err(AlertError::UserNotFound),
         };
-        let permitted = crate::service::authz::check_permissions(
+        let permitted = crate::authz::check_permissions(
             user_id,
             AuthExtractor {
                 org_id: org_id.to_string(),
@@ -2225,7 +2223,7 @@ async fn permitted_alerts(
     // to see the dashboard. This is used to check if the user has permission to see a specific
     // dashboard.
 
-    let permitted_objects = crate::service::authz::list_objects_for_user(
+    let permitted_objects = crate::authz::list_objects_for_user(
         org_id,
         user_id,
         "GET_INDIVIDUAL_FROM_ROLE",
@@ -2243,7 +2241,7 @@ mod tests {
     use serde_json::json;
 
     use super::*;
-    use crate::service::alerts::{Condition, build_expr};
+    use crate::alerts::{Condition, build_expr};
 
     #[test]
     fn test_format_variable_value() {

@@ -39,7 +39,7 @@ use crate::{
         meta::authz::Authz,
         utils::auth::{remove_ownership, set_ownership},
     },
-    service::db::system_settings,
+    db::system_settings,
 };
 pub mod reports;
 pub mod timed_annotations;
@@ -1098,14 +1098,14 @@ async fn filter_permitted_dashboards(
 
     use o2_openfga::meta::mapping::OFGA_MODELS;
 
-    use crate::{common::utils::auth::AuthExtractor, service::db::user::get as get_user};
+    use crate::{common::utils::auth::AuthExtractor, db::user::get as get_user};
 
     if let Some(folder_id) = folder_id {
         let user_role = match get_user(Some(org_id), user_id).await {
             Ok(Some(user)) => user.role,
             _ => return Err(DashboardError::UserNotFound),
         };
-        let permitted = crate::service::authz::check_permissions(
+        let permitted = crate::authz::check_permissions(
             user_id,
             AuthExtractor {
                 org_id: org_id.to_string(),
@@ -1134,7 +1134,7 @@ async fn filter_permitted_dashboards(
     // to see the dashboard. This is used to check if the user has permission to see a specific
     // dashboard.
 
-    let permitted_objects = crate::service::authz::list_objects_for_user(
+    let permitted_objects = crate::authz::list_objects_for_user(
         org_id,
         user_id,
         "GET_INDIVIDUAL_FROM_ROLE",

@@ -17,7 +17,7 @@ use std::sync::LazyLock as Lazy;
 
 use config::{RwAHashMap, meta::stream::StreamParams};
 
-use crate::service::{db::scheduler::Trigger, pipeline::batch_execution::ExecutablePipeline};
+use crate::{db::scheduler::Trigger, pipeline::batch_execution::ExecutablePipeline};
 
 pub static REALTIME_ALERT_TRIGGERS: Lazy<RwAHashMap<String, Trigger>> = Lazy::new(Default::default);
 

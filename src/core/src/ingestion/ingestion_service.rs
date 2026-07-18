@@ -18,7 +18,7 @@ use infra::errors::{Error, Result};
 use proto::cluster_rpc;
 use tonic::{Request, codec::CompressionEncoding, metadata::MetadataValue};
 
-use crate::service::grpc::get_ingester_channel;
+use crate::grpc::get_ingester_channel;
 
 pub async fn ingest(req: cluster_rpc::IngestionRequest) -> Result<cluster_rpc::IngestionResponse> {
     let cfg = config::get_config();

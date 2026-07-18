@@ -37,7 +37,7 @@ use infra::{
 };
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
-use crate::service::{
+use crate::{
     db::enrichment_table,
     search::{
         SEARCH_SERVER,
@@ -209,7 +209,7 @@ pub async fn search(
     );
 
     // check work group
-    let _lock = crate::service::search::work_group::acquire_work_group_lock(
+    let _lock = crate::search::work_group::acquire_work_group_lock(
         &trace_id,
         &req,
         &mut took_watch,
@@ -348,14 +348,9 @@ pub async fn get_file_id_lists(
         let end = config::utils::time::now_micros();
         time_range = (start, end);
     }
-    let file_id_list = crate::service::file_list::query_ids(
-        trace_id,
-        org_id,
-        stream_type,
-        &stream_name,
-        time_range,
-    )
-    .await?;
+    let file_id_list =
+        crate::file_list::query_ids(trace_id, org_id, stream_type, &stream_name, time_range)
+            .await?;
     Ok(file_id_list)
 }
 

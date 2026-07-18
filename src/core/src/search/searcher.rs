@@ -81,7 +81,7 @@ impl Searcher {
                 && ctx.dashboard_name.is_none()
                 && let Some(org_id) = &query_status.org_id
                 && let Ok((folder, dashboard)) =
-                    crate::service::dashboards::get_folder_and_dashboard(org_id, dashboard_id).await
+                    crate::dashboards::get_folder_and_dashboard(org_id, dashboard_id).await
             {
                 ctx.dashboard_name = Some(dashboard.title().unwrap_or("").to_string());
                 ctx.dashboard_folder_name = Some(folder.name);

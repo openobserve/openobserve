@@ -21,7 +21,7 @@
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-use crate::service::github::types::GitHubError;
+use crate::github::types::GitHubError;
 
 /// Generic pattern format - supports multiple field name variations
 /// This makes the system flexible to work with different JSON sources
@@ -120,7 +120,7 @@ impl PyWhatAdapter {
     /// Fetch and transform patterns
     /// Used for frontend-only caching flow
     pub async fn fetch_built_in_patterns(
-        github_service: &crate::service::github::GitHubDataService,
+        github_service: &crate::github::GitHubDataService,
     ) -> Result<Vec<BuiltInPatternResponse>, GitHubError> {
         let config = config::get_config();
         let url = &config.common.regex_patterns_source_url;

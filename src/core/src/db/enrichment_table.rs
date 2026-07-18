@@ -29,7 +29,7 @@ use rayon::prelude::*;
 use vrl::prelude::NotNan;
 #[cfg(feature = "enterprise")]
 use {
-    crate::service::search::SEARCH_SERVER,
+    crate::search::SEARCH_SERVER,
     o2_enterprise::enterprise::{
         search::TaskStatus, super_cluster::queue::ENRICHMENT_TABLE_URL_JOB_KEY,
     },
@@ -37,11 +37,9 @@ use {
 
 use crate::{
     common::infra::config::ENRICHMENT_TABLES,
-    service::{
-        db as db_service,
-        enrichment::{StreamTable, storage::Values},
-        search::cluster::http as search_cluster,
-    },
+    db as db_service,
+    enrichment::{StreamTable, storage::Values},
+    search::cluster::http as search_cluster,
 };
 
 /// Will no longer be used as we are using the meta stream stats to store start, end time and size

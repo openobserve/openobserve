@@ -18,7 +18,7 @@ use std::sync::Arc;
 use bytes::Bytes;
 use config::{cluster::LOCAL_NODE, meta::promql::ClusterLeader, utils::json};
 
-use crate::{common::infra::config::METRIC_CLUSTER_LEADER, service::db};
+use crate::{common::infra::config::METRIC_CLUSTER_LEADER, db};
 
 pub async fn set_prom_cluster_info(cluster: &str, members: &[String]) -> Result<(), anyhow::Error> {
     let key = format!("/metrics_members/{cluster}");

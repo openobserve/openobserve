@@ -27,7 +27,7 @@ use std::collections::HashMap;
 use config::utils::json;
 
 use super::utils::extract_f64;
-use crate::service::traces::otel::attributes::O2Attributes;
+use crate::traces::otel::attributes::O2Attributes;
 
 /// Evaluator type classification
 #[derive(Debug, Clone, PartialEq)]

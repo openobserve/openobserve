@@ -26,7 +26,7 @@ use crate::{
         meta::{authz::Authz, organization::DEFAULT_ORG},
         utils::auth::{is_ofga_unsupported, remove_ownership, set_ownership},
     },
-    service::db::{self, alerts::templates::TemplateError},
+    db::{self, alerts::templates::TemplateError},
 };
 
 pub async fn save(

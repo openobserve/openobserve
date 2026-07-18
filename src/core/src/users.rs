@@ -54,7 +54,7 @@ use crate::{
         },
         utils::auth::{get_hash, get_role, is_root_user, is_valid_email},
     },
-    service::{db, organization},
+    db, organization,
 };
 
 fn redact_token(token: &str) -> String {
@@ -585,14 +585,8 @@ pub async fn add_admin_to_org(org_id: &str, user_email: &str) -> Result<(), anyh
         let role = UserRole::Admin;
 
         // Add user to the organization
-        crate::service::db::org_users::add(
-            org_id,
-            user_email,
-            role.clone(),
-            &token,
-            Some(rum_token),
-        )
-        .await?;
+        crate::db::org_users::add(org_id, user_email, role.clone(), &token, Some(rum_token))
+            .await?;
 
         // Update OFGA
         #[cfg(feature = "enterprise")]
@@ -804,7 +798,7 @@ pub async fn list_users(
         // This user does not have list users permission
         // Hence only return this specific user
         if let Some(user) = get_user(Some(org_id), _user_id).await {
-            let is_system = crate::service::organization::is_system_service_account(&user.email);
+            let is_system = crate::organization::is_system_service_account(&user.email);
             user_list.push(UserResponse {
                 email: user.email.clone(),
                 role: user.role.to_string(),
@@ -851,8 +845,7 @@ pub async fn list_users(
                 } else {
                     None
                 };
-                let is_system =
-                    crate::service::organization::is_system_service_account(&user.email);
+                let is_system = crate::organization::is_system_service_account(&user.email);
                 user_list.push(UserResponse {
                     email: user.email.clone(),
                     role: user.role.to_string(),
@@ -882,7 +875,7 @@ pub async fn list_users(
                 }
                 None => ("".to_string(), 0),
             };
-            let is_system = crate::service::organization::is_system_service_account(&user.email);
+            let is_system = crate::organization::is_system_service_account(&user.email);
             user_list.push(UserResponse {
                 email: user.email.clone(),
                 role,
@@ -980,7 +973,7 @@ pub async fn remove_user_from_org(
                     .organizations
                     .iter()
                     .any(|o| o.role == UserRole::SreAgent)
-                    || crate::service::organization::is_system_service_account(&user.email)
+                    || crate::organization::is_system_service_account(&user.email)
                 {
                     return Ok(MetaHttpResponse::forbidden(
                         "System service accounts cannot be deleted",

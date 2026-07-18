@@ -41,7 +41,7 @@ use tracing::Instrument;
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 #[cfg(feature = "enterprise")]
 use {
-    crate::service::search::partition::aggregate::prepare_streaming_aggregate,
+    crate::search::partition::aggregate::prepare_streaming_aggregate,
     config::{META_ORG_ID, meta::self_reporting::usage::USAGE_STREAM},
     infra::{client::grpc::make_grpc_search_client, cluster::get_cached_online_query_nodes},
     o2_enterprise::enterprise::{
@@ -55,7 +55,7 @@ use {
 use super::self_reporting::report_request_usage_stats;
 use crate::{
     common::utils::functions::{get_all_transform_keys, init_vrl_runtime},
-    service::search::{
+    search::{
         inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
         partition::{
             cpu_cores::estimated_secs, generate_partitions, settings::calculate_partition_settings,
@@ -232,7 +232,7 @@ pub async fn search(
     match res {
         Ok(mut res) => {
             if in_req.query.streaming_output && meta.order_by.is_empty() {
-                res = crate::service::search::streaming::order_search_results(res, None);
+                res = crate::search::streaming::order_search_results(res, None);
             }
             res.set_work_group(_work_group.clone());
             let time = start.elapsed().as_secs_f64();
@@ -458,7 +458,7 @@ pub async fn search_multi(
 
         let apply_over_hits = RESULT_ARRAY.is_match(&input_fn);
         let mut runtime = init_vrl_runtime();
-        let program = match crate::service::ingestion::compile_vrl_function(&input_fn, org_id) {
+        let program = match crate::ingestion::compile_vrl_function(&input_fn, org_id) {
             Ok(program) => {
                 let registry = program
                     .config
@@ -478,7 +478,7 @@ pub async fn search_multi(
             Some(program) => {
                 report_function_usage = true;
                 if apply_over_hits {
-                    let (ret_val, err) = crate::service::ingestion::apply_vrl_fn(
+                    let (ret_val, err) = crate::ingestion::apply_vrl_fn(
                         &mut runtime,
                         &config::meta::function::VRLResultResolver {
                             program: program.program.clone(),
@@ -518,7 +518,7 @@ pub async fn search_multi(
                         .hits
                         .into_iter()
                         .filter_map(|hit| {
-                            let (ret_val, err) = crate::service::ingestion::apply_vrl_fn(
+                            let (ret_val, err) = crate::ingestion::apply_vrl_fn(
                                 &mut runtime,
                                 &config::meta::function::VRLResultResolver {
                                     program: program.program.clone(),

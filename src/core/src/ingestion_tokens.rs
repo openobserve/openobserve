@@ -16,7 +16,7 @@
 use config::ider;
 use infra::table::org_ingestion_tokens;
 
-use crate::{common::meta::organization::OrgIngestionToken, service::db};
+use crate::{common::meta::organization::OrgIngestionToken, db};
 
 /// Create the default ingestion token for a newly created org.
 pub async fn create_default_token(org_id: &str, created_by: &str) -> Result<(), anyhow::Error> {

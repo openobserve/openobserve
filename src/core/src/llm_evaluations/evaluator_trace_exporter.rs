@@ -16,9 +16,7 @@
 use opentelemetry_proto::tonic::collector::trace::v1::trace_service_client::TraceServiceClient;
 use tonic::{Request, codec::CompressionEncoding, metadata::MetadataValue};
 
-use crate::service::llm_evaluations::evaluator_trace::{
-    EvaluatorTrace, create_evaluator_trace_request,
-};
+use crate::llm_evaluations::evaluator_trace::{EvaluatorTrace, create_evaluator_trace_request};
 
 #[derive(Debug, Default)]
 pub struct EvaluatorTraceExporter;
@@ -46,7 +44,7 @@ impl EvaluatorTraceExporter {
             }
         };
 
-        let (_addr, channel) = match crate::service::grpc::get_ingester_channel().await {
+        let (_addr, channel) = match crate::grpc::get_ingester_channel().await {
             Ok(v) => v,
             Err(e) => {
                 log::error!(

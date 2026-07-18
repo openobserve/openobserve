@@ -17,7 +17,7 @@ use std::sync::LazyLock as Lazy;
 
 use config::{RwAHashMap, cluster::LOCAL_NODE, meta::stream::StreamType};
 
-use crate::service::db;
+use crate::db;
 
 static CACHES: Lazy<RwAHashMap<String, (i64, String)>> = Lazy::new(Default::default);
 

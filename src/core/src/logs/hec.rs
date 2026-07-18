@@ -24,7 +24,7 @@ use crate::{
     common::meta::ingestion::{
         HecResponse, HecStatus, IngestUser, IngestionRequest, IngestionValueType,
     },
-    service::ingestion::check_ingestion_allowed,
+    ingestion::check_ingestion_allowed,
 };
 
 #[derive(Deserialize, Clone)]

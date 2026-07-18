@@ -33,12 +33,10 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     common::meta::stream::SchemaRecords,
-    service::{
-        db,
-        ingestion::{self, get_thread_id},
-        metadata::{Metadata, MetadataItem},
-        stream,
-    },
+    db,
+    ingestion::{self, get_thread_id},
+    metadata::{Metadata, MetadataItem},
+    stream,
 };
 
 const STREAM_NAME: &str = "trace_list_index";
@@ -248,12 +246,10 @@ mod tests {
 
     use crate::{
         common::meta::stream::SchemaRecords,
-        service::{
-            ingestion,
-            metadata::{
-                Metadata, MetadataItem,
-                trace_list_index::{STREAM_NAME, TraceListIndex, TraceListItem},
-            },
+        ingestion,
+        metadata::{
+            Metadata, MetadataItem,
+            trace_list_index::{STREAM_NAME, TraceListIndex, TraceListItem},
         },
     };
 

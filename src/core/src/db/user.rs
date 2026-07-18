@@ -32,7 +32,7 @@ use crate::{
         infra::config::{ROOT_USER, USERS, USERS_RUM_TOKEN},
         utils::auth::is_root_user,
     },
-    service::db,
+    db,
 };
 
 pub const USER_RECORD_KEY: &str = "/user_record/";
@@ -435,7 +435,7 @@ mod tests {
     use infra::{db as infra_db, table as infra_table};
 
     use super::*;
-    use crate::service::organization;
+    use crate::organization;
 
     #[tokio::test]
     async fn test_user() {

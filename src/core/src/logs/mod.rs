@@ -42,17 +42,15 @@ use infra::{
 };
 
 #[cfg(feature = "cloud")]
-use crate::service::stream::get_stream;
+use crate::stream::get_stream;
 use crate::{
+    alerts::alert::AlertExt,
     common::meta::{ingestion::IngestionStatus, stream::SchemaRecords},
-    service::{
-        alerts::alert::AlertExt,
-        db,
-        ingestion::{TriggerAlertData, evaluate_trigger, get_write_partition_key, write_file},
-        metadata::{MetadataItem, MetadataType, distinct_values::DvItem, write},
-        schema::{check_for_schema, stream_schema_exists},
-        self_reporting::report_request_usage_stats,
-    },
+    db,
+    ingestion::{TriggerAlertData, evaluate_trigger, get_write_partition_key, write_file},
+    metadata::{MetadataItem, MetadataType, distinct_values::DvItem, write},
+    schema::{check_for_schema, stream_schema_exists},
+    self_reporting::report_request_usage_stats,
 };
 
 pub mod bulk;
@@ -337,7 +335,7 @@ async fn write_logs(
 
     // Start get stream alerts
     let mut stream_alerts_map: HashMap<String, Vec<Alert>> = HashMap::new();
-    crate::service::ingestion::get_stream_alerts(
+    crate::ingestion::get_stream_alerts(
         &[StreamParams {
             org_id: org_id.to_owned().into(),
             stream_name: stream_name.to_owned().into(),

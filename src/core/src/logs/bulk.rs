@@ -27,6 +27,7 @@ use config::{
     metrics,
     utils::{
         json,
+        schema::format_stream_name,
         time::{now_micros, parse_timestamp_micro_from_value},
     },
 };
@@ -36,12 +37,9 @@ use crate::{
     common::meta::ingestion::{
         BulkResponse, BulkResponseError, BulkResponseItem, IngestionRequest, IngestionValueType,
     },
-    service::{
-        format_stream_name,
-        ingestion::check_ingestion_allowed,
-        logs::{ingestion_log_enabled, log_failed_record},
-        schema::{get_future_discard_error, get_upto_discard_error},
-    },
+    ingestion::check_ingestion_allowed,
+    logs::{ingestion_log_enabled, log_failed_record},
+    schema::{get_future_discard_error, get_upto_discard_error},
 };
 
 pub const TRANSFORM_FAILED: &str = "document_failed_transform";

@@ -30,7 +30,7 @@ use crate::{
     common::meta::search::{
         CacheQueryRequest, CachedQueryResponse, QueryDelta, ResultCacheSelectionStrategy,
     },
-    service::search::{
+    search::{
         cache::{
             MultiCachedQueryResponse,
             result_utils::{get_ts_value, has_non_timestamp_ordering, is_timestamp_field},
@@ -981,7 +981,7 @@ mod tests {
     use proto::cluster_rpc::SearchQuery;
 
     use super::*;
-    use crate::{common::meta::search::CachedQueryResponse, service::search::Sql};
+    use crate::{common::meta::search::CachedQueryResponse, search::Sql};
 
     #[test]
     fn test_parse_cache_file_timestamps_valid() {

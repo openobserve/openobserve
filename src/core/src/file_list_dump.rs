@@ -32,7 +32,7 @@ use infra::{
 use itertools::Itertools;
 use rayon::slice::ParallelSliceMut;
 
-use crate::service::search::datafusion::{
+use crate::search::datafusion::{
     exec::{DataFusionContextBuilder, TableBuilder},
     table_provider::uniontable::NewUnionTable,
 };

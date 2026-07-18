@@ -37,7 +37,7 @@ use o2_enterprise::enterprise::{
 };
 use tokio::sync::mpsc;
 
-use crate::service::{
+use crate::{
     db::search_job::{search_job_partitions::*, search_job_results::*, search_jobs::*},
     search::grpc_search::{grpc_search, grpc_search_partition},
 };
