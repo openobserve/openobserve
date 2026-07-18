@@ -34,7 +34,6 @@ pub mod enrichment;
 pub mod enrichment_table;
 pub mod folders;
 pub mod functions;
-pub mod github;
 pub mod http;
 pub mod ingestion;
 #[cfg(feature = "enterprise")]

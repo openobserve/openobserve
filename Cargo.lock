@@ -8800,12 +8800,15 @@ dependencies = [
  "parquet",
  "proto",
  "regex",
+ "reqwest 0.13.2",
  "sea-orm",
  "serde",
  "serde_json",
  "sourcemap",
+ "thiserror 2.0.18",
  "tokio",
  "tonic",
+ "utoipa",
  "zip 8.2.0",
 ]
 

@@ -5,6 +5,7 @@
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 
+pub mod github;
 pub mod kv;
 pub mod model_pricing;
 pub mod saved_view;

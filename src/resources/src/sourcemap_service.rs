@@ -815,9 +815,9 @@ mod tests {
         // stack is incorrect
         let res = translate_stacktrace(
             "default",
-            Some("svc1".into()),
-            Some("env1".into()),
-            Some("v1".into()),
+            Some("svc-translate".into()),
+            Some("env-translate".into()),
+            Some("v-translate".into()),
             stack2.into(),
         )
         .await
