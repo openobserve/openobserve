@@ -45,13 +45,14 @@ use lettre::{
     message::{MultiPart, SinglePart, header::ContentType},
 };
 use reqwest::Client;
+use resources::short_url;
 
 use crate::{
     common::{
         meta::authz::Authz,
         utils::auth::{is_ofga_unsupported, remove_ownership, set_ownership},
     },
-    db, short_url,
+    db,
 };
 
 /// Errors that can occur when interacting with reports.

@@ -18,9 +18,10 @@ use std::sync::Arc;
 use anyhow::{Context, anyhow};
 use chrono::Utc;
 use common::infra::config::SHORT_URLS;
-use config::get_config;
+use config::{get_config, utils::md5};
 use infra::{
     db::{self as db, Event},
+    errors::{DbError, Error},
     table::short_urls,
 };
 
@@ -29,6 +30,71 @@ pub const SHORT_URL_KEY: &str = "/short_urls/";
 // GC interval for `SHORT_URLS` cache in days
 const SHORT_URL_GC_INTERVAL: i64 = 1; // days
 const SHORT_URL_CACHE_LIMIT: i64 = 10_000; // records
+const SHORT_URL_WEB_PATH: &str = "short/";
+
+pub fn get_base_url() -> String {
+    let cfg = get_config();
+    format!("{}{}", cfg.common.web_url, cfg.common.base_uri)
+}
+
+pub fn construct_short_url(org_id: &str, short_id: &str) -> String {
+    format!(
+        "{}/{}/{}{}?org_identifier={}",
+        get_base_url(),
+        "web",
+        SHORT_URL_WEB_PATH,
+        short_id,
+        org_id,
+    )
+}
+
+async fn store_short_url(
+    org_id: &str,
+    short_id: &str,
+    original_url: &str,
+) -> Result<String, anyhow::Error> {
+    let entry = short_urls::ShortUrlRecord::new(short_id, original_url, org_id);
+    set(short_id, entry).await?;
+    Ok(construct_short_url(org_id, short_id))
+}
+
+fn generate_short_id(original_url: &str, timestamp: Option<i64>) -> String {
+    match timestamp {
+        Some(timestamp) => md5::short_hash(&format!("{original_url}{timestamp}")),
+        None => md5::short_hash(original_url),
+    }
+}
+
+/// Shorten a URL and persist the mapping in the resources store.
+pub async fn shorten(org_id: &str, original_url: &str) -> Result<String, anyhow::Error> {
+    let mut short_id = generate_short_id(original_url, None);
+
+    if let Ok(existing_url) = get(&short_id, org_id).await
+        && existing_url == original_url
+    {
+        return Ok(construct_short_url(org_id, &short_id));
+    }
+
+    match store_short_url(org_id, &short_id, original_url).await {
+        Ok(url) => Ok(url),
+        Err(error) => {
+            if matches!(
+                error.downcast_ref::<Error>(),
+                Some(Error::DbError(DbError::UniqueViolation))
+            ) {
+                short_id = generate_short_id(original_url, Some(Utc::now().timestamp_micros()));
+                store_short_url(org_id, &short_id, original_url).await
+            } else {
+                Err(error)
+            }
+        }
+    }
+}
+
+/// Retrieve the original URL for an organization-scoped short identifier.
+pub async fn retrieve(org_id: &str, short_id: &str) -> Option<String> {
+    get(short_id, org_id).await.ok()
+}
 
 pub async fn get(short_id: &str, org_id: &str) -> Result<String, anyhow::Error> {
     // Check cache first; re-validate org_id ownership (legacy rows have empty org_id).
@@ -190,6 +256,21 @@ mod tests {
     #[test]
     fn test_days_to_minutes_seven_days() {
         assert_eq!(days_to_minutes(7), 7 * 1440);
+    }
+
+    #[test]
+    fn test_construct_short_url_is_scoped_to_org() {
+        let url = construct_short_url("default", "abc123");
+        assert!(url.contains("/web/short/abc123"));
+        assert!(url.ends_with("org_identifier=default"));
+    }
+
+    #[test]
+    fn test_generate_short_id_is_stable_without_timestamp() {
+        let first = generate_short_id("https://example.com", None);
+        let second = generate_short_id("https://example.com", None);
+        assert_eq!(first, second);
+        assert_eq!(first.len(), 16);
     }
 }
 

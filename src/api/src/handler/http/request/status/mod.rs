@@ -967,9 +967,9 @@ pub async fn redirect(Query(query): Query<std::collections::HashMap<String, Stri
     };
 
     match query.get("state") {
-        Some(code) => match openobserve_core::kv::get(PKCE_STATE_ORG, code).await {
+        Some(code) => match resources::kv::get(PKCE_STATE_ORG, code).await {
             Ok(_) => {
-                let _ = openobserve_core::kv::delete(PKCE_STATE_ORG, code).await;
+                let _ = resources::kv::delete(PKCE_STATE_ORG, code).await;
             }
             Err(_) => {
                 // Bad Request
@@ -1105,7 +1105,7 @@ pub async fn redirect(Query(query): Query<std::collections::HashMap<String, Stri
             }
 
             // store session_id in cluster co-ordinator
-            if openobserve_core::session::set_session(&session_id, &access_token)
+            if organization_domain::session::set_session(&session_id, &access_token)
                 .await
                 .is_none()
             {
@@ -1173,7 +1173,7 @@ pub async fn dex_login() -> impl IntoResponse {
 
     let login_data: PreLoginData = get_dex_login();
     let state = login_data.state.clone();
-    let _ = openobserve_core::kv::set(PKCE_STATE_ORG, &state, state.clone().into()).await;
+    let _ = resources::kv::set(PKCE_STATE_ORG, &state, state.clone().into()).await;
 
     crate::common::meta::http::HttpResponse::json(login_data.url)
 }
@@ -1220,7 +1220,7 @@ pub async fn refresh_token_with_dex(
         // remove old session id from cluster co-ordinator
         let access_token = auth_tokens.access_token;
         if access_token.starts_with("session") {
-            openobserve_core::session::remove_session(
+            organization_domain::session::remove_session(
                 access_token.strip_prefix("session ").unwrap(),
             )
             .await;
@@ -1304,7 +1304,7 @@ pub async fn refresh_token_with_dex(
             }
 
             // store session_id in cluster co-ordinator
-            if openobserve_core::session::set_session(&session_id, &access_token)
+            if organization_domain::session::set_session(&session_id, &access_token)
                 .await
                 .is_none()
             {
@@ -1416,7 +1416,7 @@ pub async fn logout(
         let access_token = auth_tokens.access_token;
 
         if access_token.starts_with("session") {
-            openobserve_core::session::remove_session(
+            organization_domain::session::remove_session(
                 access_token.strip_prefix("session ").unwrap(),
             )
             .await;

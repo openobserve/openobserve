@@ -15,6 +15,7 @@
 
 use std::sync::Arc;
 
+use base64::Engine;
 use bytes::Bytes;
 use common::infra::config::{USER_SESSIONS, USER_SESSIONS_EXPIRY};
 use infra::db::{delete_from_db_coordinator, put_into_db_coordinator};
@@ -23,6 +24,73 @@ use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
 
 // Key prefix for session events in coordinator
 pub const USER_SESSION_KEY: &str = "/user_sessions/";
+
+/// Return the access token stored for a session, or `None` when it is missing
+/// or expired.
+pub async fn get_session(session_id: &str) -> Option<String> {
+    get(session_id).await.ok()
+}
+
+/// Extract the JWT expiry in microseconds. Malformed tokens use a conservative
+/// 24-hour fallback so callers keep the historical session behavior.
+fn extract_jwt_expiry(access_token: &str) -> i64 {
+    let default_expiry = chrono::Utc::now().timestamp_micros() + (24 * 60 * 60 * 1_000_000);
+    let parts: Vec<&str> = access_token.split('.').collect();
+    if parts.len() != 3 {
+        log::warn!("Invalid JWT token format, using default expiry");
+        return default_expiry;
+    }
+
+    let payload = match base64::engine::general_purpose::URL_SAFE.decode(parts[1]) {
+        Ok(data) => data,
+        Err(error) => {
+            log::warn!("Failed to decode JWT payload: {error}, using default expiry");
+            return default_expiry;
+        }
+    };
+    let payload = match std::str::from_utf8(&payload) {
+        Ok(payload) => payload,
+        Err(error) => {
+            log::warn!("Invalid UTF-8 in JWT payload: {error}, using default expiry");
+            return default_expiry;
+        }
+    };
+    let payload: serde_json::Value = match serde_json::from_str(payload) {
+        Ok(payload) => payload,
+        Err(error) => {
+            log::warn!("Failed to parse JWT payload JSON: {error}, using default expiry");
+            return default_expiry;
+        }
+    };
+
+    payload
+        .get("exp")
+        .and_then(serde_json::Value::as_i64)
+        .map_or_else(
+            || {
+                log::warn!("No 'exp' claim in JWT token, using default expiry");
+                default_expiry
+            },
+            |seconds| seconds * 1_000_000,
+        )
+}
+
+/// Persist a session and derive its expiry from the access token.
+pub async fn set_session(session_id: &str, access_token: &str) -> Option<()> {
+    let expires_at = extract_jwt_expiry(access_token);
+    match set_with_expiry(session_id, access_token, expires_at).await {
+        Ok(()) => Some(()),
+        Err(error) => {
+            log::error!("Failed to write session {session_id} to database: {error}");
+            None
+        }
+    }
+}
+
+/// Remove a session, preserving the historical best-effort API.
+pub async fn remove_session(session_id: &str) {
+    let _ = delete(session_id).await;
+}
 
 pub async fn get(session_id: &str) -> Result<String, anyhow::Error> {
     // Check cache first for performance
@@ -302,7 +370,25 @@ pub async fn cleanup_expired() -> Result<u64, anyhow::Error> {
 
 #[cfg(test)]
 mod tests {
+    use base64::Engine;
+
     use super::*;
+
+    fn jwt_with_expiry(expiry: i64) -> String {
+        let header = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(r#"{"alg":"HS256"}"#);
+        let payload = base64::engine::general_purpose::URL_SAFE_NO_PAD
+            .encode(format!(r#"{{"exp":{expiry}}}"#));
+        format!("{header}.{payload}.signature")
+    }
+
+    #[test]
+    fn test_extract_jwt_expiry() {
+        let expiry = chrono::Utc::now().timestamp() + 3600;
+        assert_eq!(
+            extract_jwt_expiry(&jwt_with_expiry(expiry)),
+            expiry * 1_000_000
+        );
+    }
 
     #[test]
     fn test_user_session_key_format() {

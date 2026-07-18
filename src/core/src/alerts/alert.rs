@@ -57,6 +57,7 @@ use o2_openfga::{
     authorizer::authz::{get_ofga_type, remove_parent_relation, set_parent_relation},
     config::get_config as get_openfga_config,
 };
+use resources::short_url;
 use sea_orm::{ConnectionTrait, TransactionTrait};
 use svix_ksuid::Ksuid;
 #[cfg(feature = "enterprise")]
@@ -78,7 +79,6 @@ use crate::{
     },
     db, folders,
     search::sql::RE_ONLY_SELECT,
-    short_url,
 };
 
 /// Errors that can occur when interacting with alerts.

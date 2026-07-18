@@ -28,6 +28,7 @@ use config::{
 use infra::table::{self, org_users::UserOrgExpandedRecord};
 #[cfg(feature = "enterprise")]
 use o2_openfga::config::get_config as get_openfga_config;
+use organization_domain::ingestion_tokens;
 #[cfg(feature = "cloud")]
 use {
     crate::common::meta::organization::{
@@ -57,7 +58,7 @@ use crate::{
         utils::auth::{delete_org_tuples, is_root_user, save_org_tuples},
     },
     db::{self, org_users},
-    ingestion_tokens, search,
+    search,
     stream::get_streams,
     users::add_admin_to_org,
 };

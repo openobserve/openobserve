@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use axum::{Json, extract::Path, response::Response};
+use organization_domain::ingestion_tokens;
 use serde_json::json;
 
 use crate::{
@@ -28,7 +29,6 @@ use crate::{
         utils::auth::UserEmail,
     },
     extractors::Headers,
-    service::ingestion_tokens,
 };
 
 /// List all org-level ingestion tokens.

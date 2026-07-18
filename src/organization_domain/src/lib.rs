@@ -6,9 +6,10 @@
 // (at your option) any later version.
 
 pub mod identity {
-    pub use crate::{org_ingestion_tokens, session};
+    pub use crate::{ingestion_tokens, org_ingestion_tokens, session};
 }
 
+pub mod ingestion_tokens;
 pub mod org_ingestion_tokens;
 pub mod org_status;
 pub mod session;

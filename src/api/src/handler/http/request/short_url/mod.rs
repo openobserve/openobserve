@@ -20,11 +20,12 @@ use axum::{
     response::{IntoResponse, Response},
 };
 use config::meta::short_url::{ShortenUrlRequest, ShortenUrlResponse};
+use resources::short_url;
 use serde::Deserialize;
 
 use crate::{
     common::utils::redirect_response::RedirectResponseBuilder,
-    handler::http::request::search::error_utils::map_error_to_http_response, service::short_url,
+    handler::http::request::search::error_utils::map_error_to_http_response,
 };
 
 /// Shorten a URL

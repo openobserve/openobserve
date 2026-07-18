@@ -20,8 +20,9 @@ use axum::{
     response::{IntoResponse, Response},
 };
 use hashbrown::HashMap;
+use resources::kv;
 
-use crate::{common::meta::http::HttpResponse as MetaHttpResponse, service::kv};
+use crate::common::meta::http::HttpResponse as MetaHttpResponse;
 
 /// GetValue
 

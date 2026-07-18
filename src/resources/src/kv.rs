@@ -101,6 +101,14 @@ pub async fn list_keys(org_id: &str, prefix: &str) -> Result<Vec<String>, anyhow
     Ok(keys)
 }
 
+/// List keys for an organization, optionally filtered by a prefix.
+///
+/// This is the resource-service API; `list_keys` remains the persistence-facing
+/// name used by cache/bootstrap code.
+pub async fn list(org_id: &str, prefix: &str) -> Result<Vec<String>, anyhow::Error> {
+    list_keys(org_id, prefix).await
+}
+
 /// Watch function for KV changes
 ///
 /// This function watches the `/kv/` path in the coordinator for event notifications.

@@ -41,8 +41,6 @@ pub mod github;
 pub mod grpc;
 pub mod http;
 pub mod ingestion;
-pub mod ingestion_tokens;
-pub mod kv;
 #[cfg(feature = "enterprise")]
 pub mod llm_evaluations;
 pub mod logs;
@@ -69,8 +67,6 @@ pub mod search;
 #[cfg(feature = "enterprise")]
 pub mod search_jobs;
 pub mod self_reporting;
-pub mod session;
-pub mod short_url;
 pub mod sourcemaps;
 pub mod stream;
 pub mod stream_utils;

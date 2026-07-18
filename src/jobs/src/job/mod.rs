@@ -66,10 +66,7 @@ async fn patch_sre_readonly_alerts_incidents() {
     const MIGRATION_ORG: &str = "_migration";
     const FLAG_KEY: &str = "sre_readonly_afolder_incidents_v2";
 
-    if openobserve_core::kv::get(MIGRATION_ORG, FLAG_KEY)
-        .await
-        .is_ok()
-    {
+    if resources::kv::get(MIGRATION_ORG, FLAG_KEY).await.is_ok() {
         return;
     }
 
@@ -114,9 +111,7 @@ async fn patch_sre_readonly_alerts_incidents() {
         return;
     }
 
-    if let Err(e) =
-        openobserve_core::kv::set(MIGRATION_ORG, FLAG_KEY, Bytes::from_static(b"done")).await
-    {
+    if let Err(e) = resources::kv::set(MIGRATION_ORG, FLAG_KEY, Bytes::from_static(b"done")).await {
         log::error!("Failed to set sre_readonly_afolder_incidents migration flag: {e}");
     } else {
         log::info!("sre-readonly alerts/incidents patch complete");
@@ -132,10 +127,7 @@ async fn backfill_sys_rca_agent_openfga_tuples() {
     const FLAG_KEY: &str = "sys_rca_agent_openfga_migration_v1";
 
     // Check if already done via KV flag
-    if openobserve_core::kv::get(MIGRATION_ORG, FLAG_KEY)
-        .await
-        .is_ok()
-    {
+    if resources::kv::get(MIGRATION_ORG, FLAG_KEY).await.is_ok() {
         return; // Already done
     }
 
@@ -154,8 +146,7 @@ async fn backfill_sys_rca_agent_openfga_tuples() {
             }
             // Set flag so we don't run again
             if let Err(e) =
-                openobserve_core::kv::set(MIGRATION_ORG, FLAG_KEY, Bytes::from_static(b"done"))
-                    .await
+                resources::kv::set(MIGRATION_ORG, FLAG_KEY, Bytes::from_static(b"done")).await
             {
                 log::error!("Failed to set OpenFGA backfill flag: {e}");
             } else {
