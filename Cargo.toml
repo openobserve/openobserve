@@ -239,6 +239,7 @@ members = [
     "src/api_management",
     "src/api_query",
     "src/api_common",
+    "src/automation",
     "src/common",
     "src/catalog",
     "src/core",
@@ -287,6 +288,7 @@ openobserve-api = { path = "src/api" }
 openobserve-api-management = { path = "src/api_management" }
 openobserve-api-query = { path = "src/api_query" }
 openobserve-api-common = { path = "src/api_common" }
+automation = { path = "src/automation" }
 openobserve-jobs = { path = "src/jobs" }
 o2_dex = { path = "src/enterprise/o2_dex" }
 o2_enterprise = { path = "src/enterprise/o2_enterprise", default-features = false }

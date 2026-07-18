@@ -11,6 +11,7 @@ path = "src/lib.rs"
 [features]
 default = []
 enterprise = [
+    "automation/enterprise",
     "catalog/enterprise",
     "dep:aws-config",
     "dep:aws-credential-types",
@@ -39,6 +40,7 @@ vortex = [
 
 [dependencies]
 common.workspace = true
+automation.workspace = true
 catalog.workspace = true
 ingestion.workspace = true
 telemetry.workspace = true

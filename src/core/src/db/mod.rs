@@ -22,7 +22,6 @@ use {
 };
 
 pub mod alerts;
-pub mod backfill;
 pub mod compact;
 pub mod dashboards;
 pub mod distinct_values;
@@ -44,11 +43,10 @@ pub mod org_storage_providers;
 pub mod org_users;
 pub mod organization;
 pub mod pipeline;
-pub mod pipeline_errors;
 #[cfg(feature = "vectorscan")]
 pub mod re_pattern;
 pub mod saved_view;
-pub mod scheduler;
+pub use ::automation::{backfill, pipeline_errors, scheduler};
 #[cfg(feature = "enterprise")]
 pub mod service_graph;
 pub mod session;
