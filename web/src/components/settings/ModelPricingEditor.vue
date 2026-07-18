@@ -1005,7 +1005,7 @@ onBeforeMount(async () => {
         if (isDuplicate) {
           model.value.id = null;
           model.value.org_id = orgIdentifier.value;
-          model.value.name = model.value.name + " (Copy)";
+          model.value.name = model.value.name + t("settings.modelPricingEditor.copySuffix");
           // Clear source so create endpoint assigns the correct one
           delete model.value.source;
         }

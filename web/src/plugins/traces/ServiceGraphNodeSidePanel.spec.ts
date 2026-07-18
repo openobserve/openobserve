@@ -67,11 +67,31 @@ vi.mock("@/utils/dashboard/convertDashboardSchemaVersion", () => ({
   convertDashboardSchemaVersion: vi.fn((d: any) => d),
 }));
 
-vi.mock("vue-i18n", () => ({
-  useI18n: vi.fn(() => ({
-    t: (key: string) => key,
-  })),
-}));
+vi.mock("vue-i18n", async () => {
+  // Resolve keys against the real English locale so migrated t("...") calls
+  // render the actual translated text (badges, caller column, "No operations
+  // found", etc.), instead of the raw key paths the old identity mock returned.
+  const enLocaleFull = (await import("@/locales/languages/en.json")).default;
+  // A few tests assert on the raw i18n key (locale-independent), matching the
+  // original identity-mock behavior. Keep those keys mapping to themselves so
+  // those assertions still hold.
+  const identityKeys = new Set<string>(["traces.noLogsAvailableForService"]);
+  const resolve = (key: string): string => {
+    if (identityKeys.has(key)) return key;
+    const val = key
+      .split(".")
+      .reduce<any>(
+        (acc, part) => (acc == null ? undefined : acc[part]),
+        enLocaleFull,
+      );
+    return typeof val === "string" ? val : key;
+  };
+  return {
+    useI18n: vi.fn(() => ({
+      t: (key: string) => resolve(key),
+    })),
+  };
+});
 
 vi.mock("vue-router", async (importOriginal) => {
   const actual = (await importOriginal()) as any;

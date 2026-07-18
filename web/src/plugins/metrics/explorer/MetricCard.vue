@@ -174,7 +174,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             🕑
             <OTooltip side="bottom" align="end">
               <template #content
-                >Last Refreshed:
+                >{{ t("metrics.metricCard.lastRefreshed") }}
                 <RelativeTime :timestamp="preview.lastTriggeredAt"
               /></template>
             </OTooltip>
@@ -699,7 +699,7 @@ export default defineComponent({
     // Kept for the card's aria label; the VISIBLE badge renders through the
     // registry's metricType group, which owns the label and colour.
     const badgeLabel = computed(
-      () => BADGE_LABELS[props.card.typeFilterBucket] ?? "Other",
+      () => BADGE_LABELS[props.card.typeFilterBucket] ?? t("metrics.metricCard.other"),
     );
 
     const o2Unit = computed(() =>
@@ -731,7 +731,9 @@ export default defineComponent({
       return [
         preview.error,
         preview.errorDetail,
-        preview.errorTraceId ? `Trace ID: ${preview.errorTraceId}` : "",
+        preview.errorTraceId
+          ? t("metrics.metricCard.traceId", { id: preview.errorTraceId })
+          : "",
       ]
         .filter(Boolean)
         .join("\n");
@@ -757,13 +759,21 @@ export default defineComponent({
       const preview = props.preview;
       if (!preview?.error) return "";
       return [
-        `Metric: ${props.card.name}`,
+        t("metrics.metricCard.metricLabel", { name: props.card.name }),
         ...(preview.errorQueries?.length
-          ? [`Query: ${preview.errorQueries.join("\n       ")}`]
+          ? [
+              t("metrics.metricCard.queryLabel", {
+                query: preview.errorQueries.join("\n       "),
+              }),
+            ]
           : []),
-        `Error: ${preview.error}`,
-        preview.errorDetail ? `Cause: ${preview.errorDetail}` : "",
-        preview.errorTraceId ? `Trace ID: ${preview.errorTraceId}` : "",
+        t("metrics.metricCard.errorLabel", { error: preview.error }),
+        preview.errorDetail
+          ? t("metrics.metricCard.causeLabel", { cause: preview.errorDetail })
+          : "",
+        preview.errorTraceId
+          ? t("metrics.metricCard.traceId", { id: preview.errorTraceId })
+          : "",
       ]
         .filter(Boolean)
         .join("\n");

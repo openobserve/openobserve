@@ -91,6 +91,10 @@ const credentialHeader = computed(() =>
 interface ClientDef {
   id: string;
   build: (endpoint: string, auth: string | null) => string;
+  // One-click install deep link (vscode: / cursor: / https:) — the client
+  // receives the config and asks the user to confirm, no copy/paste. Return
+  // null when the link can't carry the current auth mode (hides the button).
+  deepLink?: (endpoint: string, auth: string | null) => string | null;
 }
 
 // mcpServers-shaped config (url + optional headers) shared by Cursor, Claude
@@ -120,9 +124,38 @@ const CLIENTS: ClientDef[] = [
   --header "${auth}"`
         : `claude mcp add openobserve ${ep} -t http`,
   },
-  { id: "cursor", build: mcpServersUrl },
+  {
+    // Codex reads ~/.codex/config.toml (TOML); remote HTTP servers use `url`
+    // plus an optional `http_headers` map.
+    id: "codex",
+    build: (ep, auth) => `[mcp_servers.openobserve]
+url = "${ep}"${
+      auth
+        ? `
+http_headers = { "Authorization" = "${auth}" }`
+        : ``
+    }`,
+  },
+  {
+    id: "cursor",
+    build: mcpServersUrl,
+    deepLink: (ep, auth) => {
+      const cfg: Record<string, unknown> = { url: ep };
+      if (auth) cfg.headers = { Authorization: auth };
+      return `cursor://anysphere.cursor-deeplink/mcp/install?name=openobserve&config=${b64EncodeStandard(JSON.stringify(cfg))}`;
+    },
+  },
   {
     id: "vscode",
+    deepLink: (ep, auth) => {
+      const cfg: Record<string, unknown> = {
+        name: "openobserve",
+        type: "http",
+        url: ep,
+      };
+      if (auth) cfg.headers = { Authorization: auth };
+      return `vscode:mcp/install?${encodeURIComponent(JSON.stringify(cfg))}`;
+    },
     build: (ep, auth) => `{
   "servers": {
     "openobserve": {
@@ -139,7 +172,16 @@ const CLIENTS: ClientDef[] = [
   }
 }`,
   },
-  { id: "claudeDesktop", build: mcpServersUrl },
+  {
+    id: "claudeDesktop",
+    build: mcpServersUrl,
+    // Prefills claude.ai's "Add custom connector" modal. Custom connectors
+    // authenticate via OAuth only, so no link in token mode.
+    deepLink: (ep, auth) =>
+      auth
+        ? null
+        : `https://claude.ai/settings/connectors?modal=add-custom-connector&mcpName=OpenObserve&mcpServerUrl=${encodeURIComponent(ep)}`,
+  },
   { id: "windsurf", build: mcpServersUrl },
   {
     id: "chatgpt",
@@ -230,6 +272,20 @@ const activeClient = computed(
 const activeConfig = computed(() =>
   activeClient.value.build(endpoint.value, authValue.value),
 );
+const activeDeepLink = computed(
+  () => activeClient.value.deepLink?.(endpoint.value, authValue.value) ?? null,
+);
+const openDeepLink = () => {
+  const link = activeDeepLink.value;
+  if (!link) return;
+  if (link.startsWith("https://")) {
+    window.open(link, "_blank", "noopener,noreferrer");
+  } else {
+    // Custom-protocol links (vscode:, cursor:) must navigate the current
+    // window — the OS hands them to the editor without leaving the page.
+    window.location.href = link;
+  }
+};
 
 const onGenerate = () => generate();
 
@@ -391,6 +447,21 @@ const openDocs = () => {
       <p class="text-text-secondary">
         {{ t(`ingestion.mcp.desc.${selectedClient}`) }}
       </p>
+      <div v-if="activeDeepLink">
+        <OButton
+          variant="primary"
+          size="sm-action"
+          data-test="ai-integrations-mcp-install-btn"
+          @click="openDeepLink"
+        >
+          <OIcon name="open-in-new" size="sm" />
+          {{
+            t("ingestion.mcp.installOneClick", {
+              client: t(`ingestion.mcp.clients.${selectedClient}`),
+            })
+          }}
+        </OButton>
+      </div>
       <CopyContent :content="activeConfig" />
     </div>
 

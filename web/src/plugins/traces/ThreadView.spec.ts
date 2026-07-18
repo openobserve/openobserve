@@ -39,9 +39,14 @@ vi.mock("vuex", async (importOriginal) => {
 // ---------------------------------------------------------------------------
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { mount, VueWrapper } from "@vue/test-utils";
+import { mount, VueWrapper, config } from "@vue/test-utils";
+import i18n from "@/locales";
 
 import ThreadView from "./ThreadView.vue";
+
+// Install the real app i18n for every mount in this file so the migrated
+// useI18n() calls in ThreadView.vue resolve real translations.
+config.global.plugins = [...(config.global.plugins ?? []), i18n];
 
 // ---------------------------------------------------------------------------
 // Fixture helpers

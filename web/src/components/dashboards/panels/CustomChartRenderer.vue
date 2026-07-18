@@ -38,6 +38,7 @@ import {
   inject,
 } from "vue";
 import * as echarts from "echarts";
+import { useI18n } from "vue-i18n";
 
 // Import all components and renderers once for generic usage
 import {
@@ -83,6 +84,7 @@ export default defineComponent({
     },
   },
   setup(props, { emit }) {
+    const { t } = useI18n();
     const chartRef = ref(null);
     let chart = null;
 
@@ -93,7 +95,7 @@ export default defineComponent({
           return new Function(`return ${obj}`)(); // Convert string to function
         } catch (error) {
           emit({
-            message: `Error while executing the code: ${error.message}`,
+            message: t("dashboard.customChartRenderer.errorExecutingCodeWithMessage", { message: error.message }),
             code: "",
           });
         }
@@ -159,7 +161,7 @@ export default defineComponent({
         }
       } catch (e) {
         emit({
-          message: "Error while executing the code",
+          message: t("dashboard.customChartRenderer.errorExecutingCode"),
           code: "",
         });
       }

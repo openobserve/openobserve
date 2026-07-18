@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          table's own toolbar (built-in global filter). -->
     <AppPageHeader
       :title="t('organization.header')"
-      :subtitle="'Organizations you can access'"
+      :subtitle="t('iam.listOrganizations.subtitle')"
       icon="corporate-fare"
       class="shrink-0 px-4 border-b border-border-default"
     >
@@ -124,7 +124,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 variant="ghost"
                 size="icon-sm"
                 :disabled="row.status !== 'active'"
-                :title="row.status === 'deleting' ? 'Cannot edit while deletion is in progress' : 'Edit'"
+                :title="row.status === 'deleting' ? t('iam.listOrganizations.cannotEditWhileDeleting') : t('iam.listOrganizations.edit')"
                 @click="row.status === 'active' && renameOrganization(row)"
               >
                 <OIcon name="edit" size="sm" />
@@ -134,7 +134,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="organization-delete"
                 variant="ghost"
                 size="icon-sm"
-                title="Delete organization"
+                :title="t('iam.listOrganizations.deleteOrganization')"
                 @click="deleteOrganization(row)"
               >
                 <OIcon name="delete" size="sm" />
@@ -144,7 +144,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="organization-cleanup-tasks"
                 variant="ghost"
                 size="icon-sm"
-                title="View deletion progress"
+                :title="t('iam.listOrganizations.viewDeletionProgress')"
                 @click="viewCleanupTasks(row)"
               >
                 <OIcon name="history" size="sm" />
@@ -290,7 +290,7 @@ export default defineComponent({
       },
       {
         id: "status",
-        header: "Status",
+        header: t("iam.listOrganizations.status"),
         accessorKey: "status",
         sortable: true,
         resizable: true,
@@ -364,7 +364,7 @@ export default defineComponent({
     const getOrganizations = () => {
       const dismiss = toast({
         variant: "loading",
-        message: "Please wait while loading organizations...",
+        message: t("iam.listOrganizations.loadingOrganizations"),
               timeout: 0,
 });
       loading.value = true;
@@ -520,19 +520,19 @@ export default defineComponent({
 
     const deleteOrganization = async (row: any) => {
       const confirmed = await confirm({
-        title: "Delete organization",
-        message: `Are you sure you want to delete "${row.name}"? This will permanently remove all data and cannot be undone.`,
-        confirmLabel: "Delete",
-        cancelLabel: "Cancel",
+        title: t("iam.listOrganizations.deleteOrganization"),
+        message: t("iam.listOrganizations.deleteConfirm", { name: row.name }),
+        confirmLabel: t("iam.listOrganizations.delete"),
+        cancelLabel: t("iam.listOrganizations.cancel"),
       });
       if (!confirmed) return;
 
       try {
         await organizationsService.delete_org(row.identifier);
-        toast({ variant: "success", message: "Organization deletion initiated." });
+        toast({ variant: "success", message: t("iam.listOrganizations.deletionInitiated") });
         getOrganizations();
       } catch (e: any) {
-        const msg = e?.response?.data?.message || e?.message || "Failed to initiate deletion.";
+        const msg = e?.response?.data?.message || e?.message || t("iam.listOrganizations.failedToInitiateDeletion");
         toast({ variant: "error", message: msg });
       }
     };
@@ -554,10 +554,10 @@ export default defineComponent({
     const resurrectOrganization = async (row: any) => {
       try {
         await organizationsService.resurrect_org("_meta", row.identifier);
-        toast({ variant: "success", message: "Organization resurrected." });
+        toast({ variant: "success", message: t("iam.listOrganizations.organizationResurrected") });
         getOrganizations();
       } catch (e: any) {
-        toast({ variant: "error", message: e?.response?.data?.message || "Failed to resurrect." });
+        toast({ variant: "error", message: e?.response?.data?.message || t("iam.listOrganizations.failedToResurrect") });
       }
     };
 
@@ -634,21 +634,21 @@ export default defineComponent({
 
       toast({
         variant: "success",
-        message: isUpdated ? 'Organization updated successfully.' : 'Organization added successfully.',
+        message: isUpdated ? this.t('iam.listOrganizations.organizationUpdated') : this.t('iam.listOrganizations.organizationAdded'),
       });
     },
     joinOrganization() {
       toast({
         variant: "success",
-        message: "Request completed successfully.",
+        message: this.t("iam.listOrganizations.requestCompleted"),
         timeout: 5000,
       });
       this.showJoinOrganizationDialog = false;
     },
     copyAPIKey() {
       copyToClipboard(this.organizationAPIKey, {
-        successMessage: "API Key Copied Successfully!",
-        errorMessage: "Error while copy API Key.",
+        successMessage: this.t("iam.listOrganizations.apiKeyCopied"),
+        errorMessage: this.t("iam.listOrganizations.apiKeyCopyError"),
         timeout: 5000,
       });
     },

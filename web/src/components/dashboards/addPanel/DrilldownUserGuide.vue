@@ -7,7 +7,7 @@
       data-test="dashboard-drilldown-help-btn"
       icon-left="help-outline"
     >
-      <OTooltip content="User Guide" side="bottom" align="center" />
+      <OTooltip :content="t('dashboard.drilldownUserGuide.userGuide')" side="bottom" align="center" />
     </OButton>
   </div>
   <Teleport to="body">
@@ -33,73 +33,69 @@
     ref="userGuideDivRef"
   >
     <p>
-      In URL or while drilldown to another dashboard, you can use the following
-      dynamic variables:
+      {{ t('dashboard.drilldownUserGuide.intro') }}
     </p>
 
-    <div class="font-bold">Use current dashboard's variable</div>
-    <p>You can reference a variable with the following format:</p>
+    <div class="font-bold">{{ t('dashboard.drilldownUserGuide.useCurrentDashboardVariable') }}</div>
+    <p>{{ t('dashboard.drilldownUserGuide.referenceVariableFormat') }}</p>
     <ul>
       <li>
         <span class="bg-highlight" :class="store.state.theme == 'dark' ? 'bg-[#747474]' : 'bg-[#e7e6e6]'">${variable_name}</span>
         <br />
-        (For Example, if your variable name is "test", you can use
+        {{ t('dashboard.drilldownUserGuide.variableExample') }}
         <span class="bg-highlight" :class="store.state.theme == 'dark' ? 'bg-[#747474]' : 'bg-[#e7e6e6]'">${test}</span>)
       </li>
     </ul>
 
     <br />
 
-    <div class="font-bold">Use current query</div>
-    <p>You can reference current query with the following format:</p>
+    <div class="font-bold">{{ t('dashboard.drilldownUserGuide.useCurrentQuery') }}</div>
+    <p>{{ t('dashboard.drilldownUserGuide.referenceCurrentQueryFormat') }}</p>
     <ul>
       <li><span class="bg-highlight" :class="store.state.theme == 'dark' ? 'bg-[#747474]' : 'bg-[#e7e6e6]'">${query}</span></li>
       <li><span class="bg-highlight" :class="store.state.theme == 'dark' ? 'bg-[#747474]' : 'bg-[#e7e6e6]'">${query_encoded}</span></li>
     </ul>
     <br />
 
-    <div class="font-bold">Use current selected time period</div>
+    <div class="font-bold">{{ t('dashboard.drilldownUserGuide.useCurrentSelectedTimePeriod') }}</div>
     <p>
-      You can reference current selected Time period with the following format:
+      {{ t('dashboard.drilldownUserGuide.referenceTimePeriodFormat') }}
     </p>
     <ul>
       <li><span class="bg-highlight" :class="store.state.theme == 'dark' ? 'bg-[#747474]' : 'bg-[#e7e6e6]'">${start_time}</span></li>
       <li><span class="bg-highlight" :class="store.state.theme == 'dark' ? 'bg-[#747474]' : 'bg-[#e7e6e6]'">${end_time}</span></li>
     </ul>
-    For Example:
+    {{ t('dashboard.drilldownUserGuide.forExample') }}
     <span class="bg-highlight" :class="store.state.theme == 'dark' ? 'bg-[#747474]' : 'bg-[#e7e6e6]'">from=${start_time}&to=${end_time}</span>
     <br />
-    <span class="font-bold">Note: </span>
+    <span class="font-bold">{{ t('dashboard.drilldownUserGuide.note') }}</span>
     <span
-      >Even with a relative time period, you can still use
-      <span class="bg-highlight" :class="store.state.theme == 'dark' ? 'bg-[#747474]' : 'bg-[#e7e6e6]'">start_time</span> and
+      >{{ t('dashboard.drilldownUserGuide.relativeTimeNote') }}
+      <span class="bg-highlight" :class="store.state.theme == 'dark' ? 'bg-[#747474]' : 'bg-[#e7e6e6]'">start_time</span> {{ t('dashboard.drilldownUserGuide.and') }}
       <span class="bg-highlight" :class="store.state.theme == 'dark' ? 'bg-[#747474]' : 'bg-[#e7e6e6]'">end_time</span>.</span
     >
     <br />
     <br />
-    <div class="font-bold">Use Series name and value</div>
-    <p>You can reference the following variables to pass chart data:</p>
+    <div class="font-bold">{{ t('dashboard.drilldownUserGuide.useSeriesNameAndValue') }}</div>
+    <p>{{ t('dashboard.drilldownUserGuide.referenceChartDataFormat') }}</p>
 
     <ul>
       <li>
-        <span class="bg-highlight" :class="store.state.theme == 'dark' ? 'bg-[#747474]' : 'bg-[#e7e6e6]'">${series.__name}</span> – The name of the
-        series.
+        <span class="bg-highlight" :class="store.state.theme == 'dark' ? 'bg-[#747474]' : 'bg-[#e7e6e6]'">${series.__name}</span> {{ t('dashboard.drilldownUserGuide.seriesNameDesc') }}
       </li>
       <li>
-        <span class="bg-highlight" :class="store.state.theme == 'dark' ? 'bg-[#747474]' : 'bg-[#e7e6e6]'">${series.__value}</span> – The numeric value
-        of the data point.
+        <span class="bg-highlight" :class="store.state.theme == 'dark' ? 'bg-[#747474]' : 'bg-[#e7e6e6]'">${series.__value}</span> {{ t('dashboard.drilldownUserGuide.seriesValueDesc') }}
       </li>
       <li>
-        <span class="bg-highlight" :class="store.state.theme == 'dark' ? 'bg-[#747474]' : 'bg-[#e7e6e6]'">${series.__axisValue}</span> – The value on
-        the axis for the selected/clicked data point.
+        <span class="bg-highlight" :class="store.state.theme == 'dark' ? 'bg-[#747474]' : 'bg-[#e7e6e6]'">${series.__axisValue}</span> {{ t('dashboard.drilldownUserGuide.seriesAxisValueDesc') }}
       </li>
     </ul>
 
     <br />
 
-    <div class="font-bold">For table chart drilldown</div>
+    <div class="font-bold">{{ t('dashboard.drilldownUserGuide.forTableChartDrilldown') }}</div>
     <p>
-      You can reference the row field and index with the following variables:
+      {{ t('dashboard.drilldownUserGuide.referenceRowFieldIndex') }}
     </p>
     <ul>
       <li>
@@ -107,8 +103,8 @@
           >${row.field["field_label"]} or ${row.field.field_label}</span
         >
         <br />
-        (For Example, if your want to use "test" column's value of clicked row,
-        you can use <span class="bg-highlight" :class="store.state.theme == 'dark' ? 'bg-[#747474]' : 'bg-[#e7e6e6]'">${row.field.test} </span> or
+        {{ t('dashboard.drilldownUserGuide.rowFieldExample') }}
+        <span class="bg-highlight" :class="store.state.theme == 'dark' ? 'bg-[#747474]' : 'bg-[#e7e6e6]'">${row.field.test} </span> {{ t('dashboard.drilldownUserGuide.or') }}
         <span class="bg-highlight" :class="store.state.theme == 'dark' ? 'bg-[#747474]' : 'bg-[#e7e6e6]'">${row.field["test"]}</span>)
       </li>
       <li><span class="bg-highlight" :class="store.state.theme == 'dark' ? 'bg-[#747474]' : 'bg-[#e7e6e6]'">${row.index}</span></li>
@@ -116,8 +112,8 @@
 
     <br />
 
-    <div class="font-bold">For Pie/Donut chart drilldown</div>
-    <p>You can reference the series and value with the following variables:</p>
+    <div class="font-bold">{{ t('dashboard.drilldownUserGuide.forPieDonutChartDrilldown') }}</div>
+    <p>{{ t('dashboard.drilldownUserGuide.referenceSeriesValue') }}</p>
     <ul>
       <li><span class="bg-highlight" :class="store.state.theme == 'dark' ? 'bg-[#747474]' : 'bg-[#e7e6e6]'">${series.__name}</span></li>
       <li><span class="bg-highlight" :class="store.state.theme == 'dark' ? 'bg-[#747474]' : 'bg-[#e7e6e6]'">${series.__value}</span></li>
@@ -125,19 +121,18 @@
 
     <br />
 
-    <div class="font-bold">For Sankey chart drilldown</div>
+    <div class="font-bold">{{ t('dashboard.drilldownUserGuide.forSankeyChartDrilldown') }}</div>
     <p>
-      You can reference the edge source, target, and value, as well as the node
-      name and value, with the following variables:
+      {{ t('dashboard.drilldownUserGuide.referenceSankey') }}
     </p>
     <ul>
-      <li class="font-bold">Edge</li>
+      <li class="font-bold">{{ t('dashboard.drilldownUserGuide.edge') }}</li>
       <ul>
         <li><span class="bg-highlight" :class="store.state.theme == 'dark' ? 'bg-[#747474]' : 'bg-[#e7e6e6]'">${edge.__source}</span></li>
         <li><span class="bg-highlight" :class="store.state.theme == 'dark' ? 'bg-[#747474]' : 'bg-[#e7e6e6]'">${edge.__target}</span></li>
         <li><span class="bg-highlight" :class="store.state.theme == 'dark' ? 'bg-[#747474]' : 'bg-[#e7e6e6]'">${edge.__value}</span></li>
       </ul>
-      <li class="font-bold">Node</li>
+      <li class="font-bold">{{ t('dashboard.drilldownUserGuide.node') }}</li>
       <ul>
         <li><span class="bg-highlight" :class="store.state.theme == 'dark' ? 'bg-[#747474]' : 'bg-[#e7e6e6]'">${node.__name}</span></li>
         <li><span class="bg-highlight" :class="store.state.theme == 'dark' ? 'bg-[#747474]' : 'bg-[#e7e6e6]'">${node.__value}</span></li>
@@ -150,6 +145,7 @@
 <script lang="ts">
 import { ref } from "vue";
 import { useStore } from "vuex";
+import { useI18n } from "vue-i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
@@ -157,6 +153,7 @@ export default {
   components: { OButton, OTooltip },
   name: "DrilldownUserGuide",
   setup() {
+    const { t } = useI18n();
     const store = useStore();
     const showUserGuide = ref(false);
 
@@ -175,6 +172,7 @@ export default {
     };
 
     return {
+      t,
       store,
       onUserGuideClick,
       showUserGuide,

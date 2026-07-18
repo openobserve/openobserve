@@ -14,8 +14,12 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { mount, flushPromises } from "@vue/test-utils";
+import { mount, flushPromises, config } from "@vue/test-utils";
+import i18n from "@/locales";
 import ChunkedContent from "./ChunkedContent.vue";
+
+// Component uses useI18n(); provide the app i18n plugin for all mounts.
+config.global.plugins = [...(config.global.plugins ?? []), i18n];
 
 
 const {

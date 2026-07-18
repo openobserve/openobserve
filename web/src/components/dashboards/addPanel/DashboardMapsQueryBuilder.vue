@@ -420,7 +420,13 @@ export default defineComponent({
           ) {
             const maxAllowedAxisFields = 1;
 
-            const errorMessage = `Max ${maxAllowedAxisFields} field in ${targetAxis.toUpperCase()} is allowed.`;
+            const errorMessage = t(
+              "dashboard.dashboardMapsQueryBuilder.maxFieldAllowed",
+              {
+                count: maxAllowedAxisFields,
+                axis: targetAxis.toUpperCase(),
+              },
+            );
 
             showErrorNotification(errorMessage);
             cleanupDraggingFields();
@@ -445,7 +451,9 @@ export default defineComponent({
         )?.value;
 
         if (!firstFieldTypeArg) {
-          showErrorNotification("Without field, not able to drag");
+          showErrorNotification(
+            t("dashboard.dashboardMapsQueryBuilder.withoutFieldNotDrag"),
+          );
           cleanupDraggingFields();
           return;
         }

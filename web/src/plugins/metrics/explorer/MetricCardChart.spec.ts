@@ -14,8 +14,11 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { mount } from "@vue/test-utils";
+import { mount, config } from "@vue/test-utils";
 import { nextTick } from "vue";
+import i18n from "@/locales";
+
+config.global.plugins = [...(config.global.plugins ?? []), i18n];
 
 // Hoisted: a vi.mock factory runs before module-level consts exist.
 const { convertPromQLData } = vi.hoisted(() => ({

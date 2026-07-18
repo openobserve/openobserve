@@ -27,8 +27,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="text-gray-500 mb-1"
         align="left"
       >
-        <OTab name="raw" label="Raw" data-test="rum-error-stack-trace-raw-tab" />
-        <OTab name="pretty" label="Pretty" data-test="rum-error-stack-trace-pretty-tab" />
+        <OTab name="raw" :label="t('rum.stackTraceRaw')" data-test="rum-error-stack-trace-raw-tab" />
+        <OTab name="pretty" :label="t('rum.stackTracePretty')" data-test="rum-error-stack-trace-pretty-tab" />
       </OTabs>
 
       <OSeparator class="mb-2" />

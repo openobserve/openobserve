@@ -81,7 +81,7 @@ const props = defineProps({
 
 const copyErrorId = (id: string) => {
   copyToClipboard(id, {
-    successMessage: "Copied to clipboard",
+    successMessage: t("rum.copiedToClipboard"),
     timeout: 1500,
   });
 };

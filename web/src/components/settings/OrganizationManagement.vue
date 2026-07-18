@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <AppPageHeader
         :title="t('settings.organizationManagement')"
         icon="lan"
-        :subtitle="'Create and manage organizations'"
+        :subtitle="t('settings.organizationManagementPage.subtitle')"
         class="shrink-0 px-4 border-b border-border-default"
       />
       <div class="card-container flex-1 min-h-0 mt-2.5 overflow-hidden">
@@ -91,7 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="org-management-add-contract-btn"
               @click.stop="toggleContractDialog(row, 'create')"
             >
-              <OTooltip content="Add Contract" />
+              <OTooltip :content="t('settings.organizationManagementPage.addContract')" />
             </OButton>
             <OButton
               v-if="row.billing_provider === 'no_op'"
@@ -101,7 +101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="org-management-extend-contract-btn"
               @click.stop="toggleContractDialog(row, 'extend')"
             >
-              <OTooltip content="Extend Contract" />
+              <OTooltip :content="t('settings.organizationManagementPage.extendContract')" />
             </OButton>
             <OButton
               v-if="row.billing_provider === 'no_op'"
@@ -111,7 +111,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="org-management-revoke-contract-btn"
               @click.stop="confirmRevokeContract(row)"
             >
-              <OTooltip content="Revoke" />
+              <OTooltip :content="t('settings.organizationManagementPage.revoke')" />
             </OButton>
             <OButton
               v-if="!row.org_storage_enabled"
@@ -121,7 +121,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="org-management-storage-enable-btn"
               @click.stop="toggleOrgStorage(row)"
             >
-              <OTooltip content="Enable Storage" />
+              <OTooltip :content="t('settings.organizationManagementPage.enableStorage')" />
             </OButton>
             <OButton
               v-else
@@ -132,7 +132,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="text-green-500"
               data-test="org-management-storage-enabled-btn"
             >
-              <OTooltip content="Storage Enabled" />
+              <OTooltip :content="t('settings.organizationManagementPage.storageEnabled')" />
             </OButton>
           </div>
         </template>
@@ -145,10 +145,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="organization-management-extend-trial-dialog"
       v-model:open="extendTrialPrompt"
       size="sm"
-      :title="`Extend Trial for ${extendTrialDataRow?.name}`"
-      sub-title="Set the new trial extension period."
+      :title="t('settings.organizationManagementPage.extendTrialTitle', { name: extendTrialDataRow?.name })"
+      :sub-title="t('settings.organizationManagementPage.extendTrialSubtitle')"
       :secondary-button-label="t('common.cancel')"
-      :primary-button-label="`Extend trial by ${extendedTrial} week(s)`"
+      :primary-button-label="t('settings.organizationManagementPage.extendTrialByWeeks', { n: extendedTrial })"
       form-id="org-extend-trial-form"
       @click:secondary="extendTrialPrompt = false"
     >
@@ -160,7 +160,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @submit="onExtendTrialSubmit"
       >
         <div class="flex flex-col gap-3">
-          <div class="font-bold">Week(s)</div>
+          <div class="font-bold">{{ t('settings.organizationManagementPage.weeks') }}</div>
           <div class="flex gap-1">
             <span
               v-for="page in 4"
@@ -185,9 +185,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="organization-management-contract-dialog"
       v-model:open="contractPrompt"
       size="sm"
-      :title="`${contractMode === 'create' ? 'Create' : 'Extend'} External Contract for ${contractDataRow?.name}`"
+      :title="contractMode === 'create'
+        ? t('settings.organizationManagementPage.createContractTitle', { name: contractDataRow?.name })
+        : t('settings.organizationManagementPage.extendContractTitle', { name: contractDataRow?.name })"
       :secondary-button-label="t('common.cancel')"
-      :primary-button-label="contractMode === 'create' ? 'Create Contract' : 'Extend Contract'"
+      :primary-button-label="contractMode === 'create'
+        ? t('settings.organizationManagementPage.createContract')
+        : t('settings.organizationManagementPage.extendContract')"
       form-id="org-contract-form"
       @click:secondary="contractPrompt = false"
     >
@@ -202,7 +206,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             name="contractEndDate"
             type="date"
             data-test="contract-end-date-input"
-            :label="contractMode === 'create' ? 'End Date' : 'New End Date'"
+            :label="contractMode === 'create'
+              ? t('settings.organizationManagementPage.endDate')
+              : t('settings.organizationManagementPage.newEndDate')"
             required
           />
         </div>
@@ -210,7 +216,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="contractMode === 'extend' && contractDataRow?.contract_end_date"
           class="text-xs text-gray-500"
         >
-          Current end date: {{ formatMicrosToDate(contractDataRow.contract_end_date) }}
+          {{ t('settings.organizationManagementPage.currentEndDate', { date: formatMicrosToDate(contractDataRow.contract_end_date) }) }}
         </div>
       </OForm>
     </ODialog>
@@ -361,7 +367,7 @@ export default defineComponent({
       },
       {
         id: "billing_provider",
-        header: "Provider",
+        header: t("settings.organizationManagementPage.provider"),
         accessorKey: "billing_provider",
         sortable: true,
         resizable: true,
@@ -391,7 +397,7 @@ export default defineComponent({
       },
       {
         id: "contract_end_date",
-        header: "Contract End",
+        header: t("settings.organizationManagementPage.contractEnd"),
         accessorKey: "contract_end_date_display",
         sortable: true,
         resizable: true,
@@ -410,10 +416,10 @@ export default defineComponent({
     ];
 
     const subscriptionPlans: any = {
-      "0": "Free",
-      "1": "Pay as you go",
-      "2": "Enterprise",
-      "3": "External Contract",
+      "0": t("settings.organizationManagementPage.planFree"),
+      "1": t("settings.organizationManagementPage.planPayAsYouGo"),
+      "2": t("settings.organizationManagementPage.planEnterprise"),
+      "3": t("settings.organizationManagementPage.planExternalContract"),
     };
 
     const formatMicrosToDate = (micros: number): string => {
@@ -432,7 +438,7 @@ export default defineComponent({
       loading.value = true;
       const dismiss = toast({
         variant: "loading",
-        message: "Please wait while loading data...",
+        message: t("settings.organizationManagementPage.loadingData"),
               timeout: 0,
 });
 
@@ -481,7 +487,7 @@ export default defineComponent({
               variant: "error",
               message:
                 error.response?.data?.message ||
-                "Failed to fetch organization data. Please try again.",
+                t("settings.organizationManagementPage.fetchDataError"),
               timeout: 5000,
             });
           }
@@ -519,14 +525,14 @@ export default defineComponent({
         loading.value = true;
         const dismiss = toast({
           variant: "loading",
-          message: "Creating external contract...",
+          message: t("settings.organizationManagementPage.creatingContract"),
                   timeout: 0,
 });
         return OrganizationServices.create_external_contract(metaOrg, payload)
           .then(() => {
             toast({
               variant: "success",
-              message: "External contract created successfully.",
+              message: t("settings.organizationManagementPage.contractCreatedSuccess"),
             });
             contractPrompt.value = false;
             getData();
@@ -540,7 +546,7 @@ export default defineComponent({
               variant: "error",
               message:
                 error.response?.data?.message ||
-                "Failed to create external contract.",
+                t("settings.organizationManagementPage.createContractError"),
               timeout: 5000,
             });
           });
@@ -553,14 +559,14 @@ export default defineComponent({
         loading.value = true;
         const dismiss = toast({
           variant: "loading",
-          message: "Extending external contract...",
+          message: t("settings.organizationManagementPage.extendingContract"),
                   timeout: 0,
 });
         return OrganizationServices.extend_external_contract(metaOrg, payload)
           .then(() => {
             toast({
               variant: "success",
-              message: "External contract extended successfully.",
+              message: t("settings.organizationManagementPage.contractExtendedSuccess"),
             });
             contractPrompt.value = false;
             getData();
@@ -574,7 +580,7 @@ export default defineComponent({
               variant: "error",
               message:
                 error.response?.data?.message ||
-                "Failed to extend external contract.",
+                t("settings.organizationManagementPage.extendContractError"),
               timeout: 5000,
             });
           });
@@ -583,22 +589,22 @@ export default defineComponent({
 
     const confirmRevokeContract = async (row: any) => {
       const ok = await confirm({
-        title: "Revoke External Contract",
-        message: `Are you sure you want to revoke the external contract for "${row.name}"? The organization will revert to the Free tier.`,
+        title: t("settings.organizationManagementPage.revokeConfirmTitle"),
+        message: t("settings.organizationManagementPage.revokeConfirmMessage", { name: row.name }),
       });
       if (ok) {
         const metaOrg = store.state.selectedOrganization.identifier;
         loading.value = true;
         const dismiss = toast({
           variant: "loading",
-          message: "Revoking external contract...",
+          message: t("settings.organizationManagementPage.revokingContract"),
                   timeout: 0,
 });
         OrganizationServices.revoke_external_contract(metaOrg, row.identifier)
           .then(() => {
             toast({
               variant: "success",
-              message: "External contract revoked successfully.",
+              message: t("settings.organizationManagementPage.contractRevokedSuccess"),
             });
             getData();
             loading.value = false;
@@ -611,7 +617,7 @@ export default defineComponent({
               variant: "error",
               message:
                 error.response?.data?.message ||
-                "Failed to revoke external contract.",
+                t("settings.organizationManagementPage.revokeContractError"),
               timeout: 5000,
             });
           });
@@ -620,14 +626,14 @@ export default defineComponent({
 
     const toggleOrgStorage = async (row: any) => {
       const ok = await confirm({
-        title: "Enable BYOB",
-        message: `Are you sure you want to enable BYOB for "${row.name}"?`,
+        title: t("settings.organizationManagementPage.enableByobTitle"),
+        message: t("settings.organizationManagementPage.enableByobMessage", { name: row.name }),
       });
       if (ok) {
         loading.value = true;
         const dismiss = toast({
           variant: "loading",
-          message: "enabling storage settings...",
+          message: t("settings.organizationManagementPage.enablingStorage"),
                   timeout: 0,
 });
         orgStorageService
@@ -635,7 +641,7 @@ export default defineComponent({
           .then(() => {
             toast({
               variant: "success",
-              message: "Storage settings enabled successfully.",
+              message: t("settings.organizationManagementPage.storageEnabledSuccess"),
             });
             getData();
             loading.value = false;
@@ -648,7 +654,7 @@ export default defineComponent({
               variant: "error",
               message:
                 error.response?.data?.message ||
-                "Failed to enable storage settings.",
+                t("settings.organizationManagementPage.enableStorageError"),
               timeout: 5000,
             });
           });
@@ -664,8 +670,7 @@ export default defineComponent({
       loading.value = true;
       const dismiss = toast({
         variant: "loading",
-        message:
-          "Please wait while processing trial period extension request...",
+        message: t("settings.organizationManagementPage.processingTrialExtension"),
               timeout: 0,
 });
       return OrganizationServices.extend_trial_period(
@@ -676,7 +681,7 @@ export default defineComponent({
           if (response.data) {
             toast({
               variant: "success",
-              message: "Trial period extended successfully.",
+              message: t("settings.organizationManagementPage.trialExtendedSuccess"),
             });
             extendTrialPrompt.value = false;
             extendTrialDataRow.value = {};
@@ -694,7 +699,7 @@ export default defineComponent({
               variant: "error",
               message:
                 error.response?.data?.message ||
-                "Failed to extend trial period. Please try again.",
+                t("settings.organizationManagementPage.extendTrialError"),
               timeout: 5000,
             });
           }

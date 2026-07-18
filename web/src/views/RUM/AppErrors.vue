@@ -58,34 +58,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="logs-search-bar-date-time-dropdown"
               @on:date-change="updateDateChange"
             />
-            <!-- Run query button -->
+            <!-- Run query button (also bound to the refresh shortcut) -->
             <OButton
               data-test="errors-run-query-button"
               variant="primary"
               size="sm-toolbar"
-              :title="t('metrics.runQuery')"
+              :loading="isLoadingIssues"
               @click="runQuery"
               class="shrink-0"
             >
               {{ t("metrics.runQuery") }}
+              <OTooltip side="bottom" :content="t('metrics.runQuery')" shortcut-id="rumErrorsRefresh" />
             </OButton>
             <OTableColumnToggle
               :columns="tableColumns"
               :column-visibility="columnVisibility"
               @update:column-visibility="setColumnVisibility"
             />
-            <!-- Refresh button -->
-            <OButton
-              variant="outline"
-              size="icon-toolbar"
-              icon-left="refresh"
-              :loading="isLoadingIssues"
-              data-test="rum-app-errors-refresh-btn"
-              class="shrink-0"
-              @click="runQuery"
-            >
-              <OTooltip side="bottom" :content="t('common.refresh')" shortcut-id="rumErrorsRefresh" />
-            </OButton>
           </div><!-- end controls -->
         </div><!-- end flex row -->
       </div><!-- end card-container -->
@@ -151,6 +140,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTable
             :data="visibleIssues"
             :columns="tableColumns"
+            :default-columns="false"
             :column-visibility="columnVisibility"
             :loading="!!isLoading.length || isLoadingIssues"
             row-key="_rowKey"
@@ -159,7 +149,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :dense="false"
             :row-height="60"
             :show-global-filter="false"
-            horizontal-scroll
             class="h-full"
             data-test="rum-app-errors-table"
             row-class="cursor-pointer"

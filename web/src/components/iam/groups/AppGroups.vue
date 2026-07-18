@@ -137,16 +137,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @added:group="onGroupAdded"
     />
     <ConfirmDialog
-      title="Delete Group"
-      :message="`Are you sure you want to delete '${deleteConformDialog?.data?.group_name as string}'?`"
+      :title="t('iam.appGroups.deleteGroupTitle')"
+      :message="t('iam.appGroups.deleteGroupConfirm', { name: deleteConformDialog?.data?.group_name })"
       :warning-message="deleteImpactMessage"
       @update:ok="_deleteGroup"
       @update:cancel="deleteConformDialog.show = false"
       v-model="deleteConformDialog.show"
     />
     <ConfirmDialog
-      title="Bulk Delete Groups"
-      :message="`Are you sure you want to delete ${selectedGroups.length} group(s)?`"
+      :title="t('iam.appGroups.bulkDeleteGroupsTitle')"
+      :message="t('iam.appGroups.bulkDeleteGroupsConfirm', { count: selectedGroups.length })"
       :warning-message="bulkDeleteImpactMessage"
       @update:ok="bulkDeleteUserGroups"
       @update:cancel="confirmBulkDelete = false"
@@ -327,7 +327,7 @@ const deleteUserGroup = (group: any) => {
   deleteGroup(group.group_name, store.state.selectedOrganization.identifier)
     .then(() => {
       toast({
-        message: "Group deleted successfully!",
+        message: t("iam.appGroups.groupDeletedSuccess"),
         variant: "success",
       });
       setupGroups();
@@ -335,7 +335,7 @@ const deleteUserGroup = (group: any) => {
     .catch((error: any) => {
       if (error.response.status != 403) {
         toast({
-          message: "Error while deleting group!",
+          message: t("iam.appGroups.errorDeletingGroup"),
           variant: "error",
         });
       }
@@ -417,17 +417,20 @@ const bulkDeleteUserGroups = async () => {
 
     if (successful.length > 0 && unsuccessful.length === 0) {
       toast({
-        message: `Successfully deleted ${successful.length} group(s)`,
+        message: t("iam.appGroups.bulkDeleteSuccess", { count: successful.length }),
         variant: "success",
       });
     } else if (successful.length > 0 && unsuccessful.length > 0) {
       toast({
-        message: `Deleted ${successful.length} group(s). Failed to delete ${unsuccessful.length} group(s)`,
+        message: t("iam.appGroups.bulkDeletePartial", {
+          successCount: successful.length,
+          failCount: unsuccessful.length,
+        }),
         variant: "warning",
       });
     } else if (unsuccessful.length > 0) {
       toast({
-        message: `Failed to delete ${unsuccessful.length} group(s)`,
+        message: t("iam.appGroups.bulkDeleteFailed", { count: unsuccessful.length }),
         variant: "error",
       });
     }
@@ -438,7 +441,7 @@ const bulkDeleteUserGroups = async () => {
   } catch (error: any) {
     if (error.response?.status != 403 || error?.status != 403) {
       toast({
-        message: error.response?.data?.message || error?.message || "Error while deleting groups",
+        message: error.response?.data?.message || error?.message || t("iam.appGroups.errorDeletingGroups"),
         variant: "error",
       });
     }

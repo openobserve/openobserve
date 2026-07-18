@@ -101,7 +101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             :showing="
                               metricLabelValues[row.name]?.isLoading
                             "
-                            label="Fetching values..."
+                            :label="t('metrics.metricList.fetchingValues')"
                             size="xs"
                           />
                         </div>
@@ -113,7 +113,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           "
                           class="pl-3 py-1 text-sm font-medium"
                         >
-                          No values found
+                          {{ t('metrics.metricList.noValuesFound') }}
                         </div>
                         <div
                           v-for="value in metricLabelValues[row.name]
@@ -158,7 +158,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                   class="mr-1"
                                   size="icon-xs"
                                   variant="ghost"
-                                  title="Include Term"
+                                  :title="t('metrics.metricList.includeTerm')"
                                   @click="
                                     addValueToEditor(
                                       row.name,
@@ -173,7 +173,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                   class="mr-1"
                                   size="icon-xs"
                                   variant="ghost"
-                                  title="Exclude Term"
+                                  :title="t('metrics.metricList.excludeTerm')"
                                   @click="
                                     addValueToEditor(
                                       row.name,
@@ -376,7 +376,7 @@ export default defineComponent({
           .catch(() => {
             toast({
               variant: "error",
-              message: "Error while fetching field values",
+              message: t("metrics.metricList.errorFetchingFieldValues"),
             });
           })
           .finally(() => {
