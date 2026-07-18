@@ -476,7 +476,7 @@ describe("Ingestion", () => {
 
       expect(mockNotify).toHaveBeenCalledWith({
         variant: "error",
-        message: "API Key not found.",
+        message: "Passcode not found.",
         timeout: 5000,
       });
     });
@@ -565,7 +565,7 @@ describe("Ingestion", () => {
 
       expect(mockNotify).toHaveBeenCalledWith({
         variant: "error",
-        message: "API Key not found.",
+        message: "Passcode not found.",
         timeout: 5000,
       });
     });
