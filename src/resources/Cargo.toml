@@ -1,0 +1,28 @@
+[package]
+name = "resources"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[features]
+default = []
+enterprise = ["dep:o2_enterprise"]
+
+[dependencies]
+anyhow.workspace = true
+bytes.workspace = true
+chrono.workspace = true
+common.workspace = true
+config.workspace = true
+dashmap.workspace = true
+hashbrown.workspace = true
+hashlink.workspace = true
+infra.workspace = true
+log.workspace = true
+o2_enterprise = { workspace = true, optional = true, default-features = false }
+parquet.workspace = true
+regex.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tokio.workspace = true

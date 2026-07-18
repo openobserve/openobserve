@@ -13,6 +13,9 @@ default = []
 enterprise = [
     "automation/enterprise",
     "catalog/enterprise",
+    "maintenance/enterprise",
+    "organization-domain/enterprise",
+    "resources/enterprise",
     "dep:aws-config",
     "dep:aws-credential-types",
     "dep:o2_dex",
@@ -29,6 +32,7 @@ cloud = [
     "enterprise",
     "o2_enterprise/cloud",
     "common/cloud",
+    "organization-domain/cloud",
 ]
 vectorscan = ["o2_enterprise/vectorscan", "search/vectorscan"]
 vortex = [
@@ -43,6 +47,9 @@ common.workspace = true
 automation.workspace = true
 catalog.workspace = true
 ingestion.workspace = true
+maintenance.workspace = true
+organization-domain.workspace = true
+resources.workspace = true
 telemetry.workspace = true
 transform.workspace = true
 promql.workspace = true

@@ -16,9 +16,8 @@
 use std::sync::Arc;
 
 use bytes::Bytes;
-use infra::db::{delete_from_db_coordinator, put_into_db_coordinator};
-
-use crate::{common::infra::config::KVS, db};
+use common::infra::config::KVS;
+use infra::db::{self as db, delete_from_db_coordinator, put_into_db_coordinator};
 
 fn mk_cache_key(org_id: &str, key: &str) -> String {
     // NOTE: This assumes org_id does not contain '/' character.

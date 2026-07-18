@@ -22,22 +22,20 @@ use {
 };
 
 pub mod alerts;
-pub mod compact;
+pub use ::maintenance::compact;
 pub mod dashboards;
 pub mod distinct_values;
 #[cfg(feature = "enterprise")]
 pub mod keys;
-pub mod kv;
 #[cfg(feature = "enterprise")]
 pub mod license;
 pub mod metas;
 pub mod metrics;
-pub mod model_pricing;
+pub use ::resources::{kv, model_pricing, saved_view, short_url, sourcemaps};
 pub mod model_pricing_sync;
 #[cfg(feature = "enterprise")]
 pub mod ofga;
-pub mod org_ingestion_tokens;
-pub mod org_status;
+pub use ::organization_domain::{org_ingestion_tokens, org_status, session};
 #[cfg(feature = "enterprise")]
 pub mod org_storage_providers;
 pub mod org_users;
@@ -45,13 +43,9 @@ pub mod organization;
 pub mod pipeline;
 #[cfg(feature = "vectorscan")]
 pub mod re_pattern;
-pub mod saved_view;
 pub use ::automation::{backfill, pipeline_errors, scheduler};
 #[cfg(feature = "enterprise")]
 pub mod service_graph;
-pub mod session;
-pub mod short_url;
-pub mod sourcemaps;
 pub mod system_settings;
 pub mod user;
 
@@ -126,29 +120,9 @@ pub(crate) async fn delete(
 }
 
 #[inline]
-pub(crate) async fn delete_if_exists(key: &str, with_prefix: bool, need_watch: bool) -> Result<()> {
-    // super cluster
-    #[cfg(feature = "enterprise")]
-    if get_o2_config().super_cluster.enabled {
-        o2_enterprise::enterprise::super_cluster::queue::delete(key, with_prefix, need_watch, None)
-            .await
-            .map_err(|e| Error::Message(e.to_string()))?;
-    }
-
-    let db = infra_db::get_db().await;
-    db.delete_if_exists(key, with_prefix, need_watch).await
-}
-
-#[inline]
 pub(crate) async fn list(prefix: &str) -> Result<HashMap<String, Bytes>> {
     let db = infra_db::get_db().await;
     db.list(prefix).await
-}
-
-#[inline]
-pub(crate) async fn list_values(prefix: &str) -> Result<Vec<Bytes>> {
-    let db = infra_db::get_db().await;
-    db.list_values(prefix).await
 }
 
 #[cfg(test)]

@@ -17,7 +17,7 @@ use std::sync::LazyLock as Lazy;
 
 use config::{RwAHashMap, cluster::LOCAL_NODE, meta::stream::StreamType};
 
-use crate::db;
+use crate::store as db;
 
 static CACHES: Lazy<RwAHashMap<String, (i64, String)>> = Lazy::new(Default::default);
 
@@ -161,6 +161,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore = "requires a configured metadata database"]
     async fn test_downsampling() {
         const OFFSET: i64 = 100;
         set_offset(

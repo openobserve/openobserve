@@ -252,9 +252,12 @@ members = [
     "src/infra",
     "src/ingestion",
     "src/ingester",
+    "src/maintenance",
+    "src/organization_domain",
     "src/wal",
     "src/proto",
     "src/report_server",
+    "src/resources",
     "src/flight",
     "src/tantivy_utils",
     "src/web",
@@ -271,9 +274,12 @@ config = { path = "src/config" }
 infra = { path = "src/infra" }
 ingestion = { package = "ingestion-service", path = "src/ingestion" }
 ingester = { path = "src/ingester" }
+maintenance = { path = "src/maintenance" }
+organization-domain = { path = "src/organization_domain" }
 wal = { path = "src/wal" }
 proto = { path = "src/proto" }
 report_server = { path = "src/report_server" }
+resources = { path = "src/resources" }
 flight = { path = "src/flight" }
 tantivy_utils = { path = "src/tantivy_utils" }
 web = { path = "src/web" }

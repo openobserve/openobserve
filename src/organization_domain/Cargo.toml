@@ -1,0 +1,25 @@
+[package]
+name = "organization-domain"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[features]
+default = []
+enterprise = ["dep:o2_enterprise"]
+cloud = ["enterprise", "o2_enterprise/cloud"]
+
+[dependencies]
+anyhow.workspace = true
+bytes.workspace = true
+chrono.workspace = true
+common.workspace = true
+config.workspace = true
+infra.workspace = true
+log.workspace = true
+o2_enterprise = { workspace = true, optional = true, default-features = false }
+serde_json.workspace = true
+
+[dev-dependencies]
+tokio.workspace = true

@@ -17,7 +17,7 @@ use std::sync::LazyLock as Lazy;
 
 use config::RwHashMap;
 
-use crate::db;
+use crate::store as db;
 
 pub static STREAMS: Lazy<RwHashMap<String, RwHashMap<String, i64>>> = Lazy::new(Default::default);
 

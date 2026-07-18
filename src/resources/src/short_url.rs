@@ -17,10 +17,12 @@ use std::sync::Arc;
 
 use anyhow::{Context, anyhow};
 use chrono::Utc;
+use common::infra::config::SHORT_URLS;
 use config::get_config;
-use infra::{db::Event, table::short_urls};
-
-use crate::{common::infra::config::SHORT_URLS, db};
+use infra::{
+    db::{self as db, Event},
+    table::short_urls,
+};
 
 // DBKey to set short URL's
 pub const SHORT_URL_KEY: &str = "/short_urls/";

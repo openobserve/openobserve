@@ -16,12 +16,11 @@
 use std::sync::Arc;
 
 use bytes::Bytes;
+use common::infra::config::ORG_INGESTION_TOKENS;
 use infra::{
     db::{self, delete_from_db_coordinator, get_coordinator, put_into_db_coordinator},
     table::org_ingestion_tokens::{self, OrgIngestionTokenListRecord, OrgIngestionTokenRecord},
 };
-
-use crate::common::infra::config::ORG_INGESTION_TOKENS;
 
 const ORG_INGESTION_TOKENS_KEY_PREFIX: &str = "/org_ingestion_tokens/";
 

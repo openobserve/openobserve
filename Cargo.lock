@@ -5794,6 +5794,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "maintenance"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "bytes",
+ "config",
+ "hashbrown 0.16.1",
+ "infra",
+ "log",
+ "o2_enterprise",
+ "tokio",
+]
+
+[[package]]
 name = "mappings"
 version = "0.7.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6835,6 +6849,7 @@ dependencies = [
  "jsonwebtoken",
  "lettre",
  "log",
+ "maintenance",
  "maxminddb",
  "md5",
  "multer",
@@ -6844,6 +6859,7 @@ dependencies = [
  "object_store",
  "opentelemetry",
  "opentelemetry-proto",
+ "organization-domain",
  "parking_lot 0.12.5",
  "parquet",
  "prometheus",
@@ -6858,6 +6874,7 @@ dependencies = [
  "rcgen",
  "regex",
  "reqwest 0.13.2",
+ "resources",
  "rustls",
  "rustls-native-certs",
  "sea-orm",
@@ -7043,6 +7060,22 @@ dependencies = [
  "num-traits",
  "rand 0.8.5",
  "serde",
+]
+
+[[package]]
+name = "organization-domain"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "bytes",
+ "chrono",
+ "common",
+ "config",
+ "infra",
+ "log",
+ "o2_enterprise",
+ "serde_json",
+ "tokio",
 ]
 
 [[package]]
@@ -8725,6 +8758,28 @@ dependencies = [
  "thiserror 1.0.69",
  "tokio",
  "wasm-timer",
+]
+
+[[package]]
+name = "resources"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "bytes",
+ "chrono",
+ "common",
+ "config",
+ "dashmap",
+ "hashbrown 0.16.1",
+ "hashlink 0.11.0",
+ "infra",
+ "log",
+ "o2_enterprise",
+ "parquet",
+ "regex",
+ "serde",
+ "serde_json",
+ "tokio",
 ]
 
 [[package]]
