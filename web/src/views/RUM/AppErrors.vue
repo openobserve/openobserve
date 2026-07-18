@@ -243,7 +243,7 @@ import { useSqlEditorDiagnostics } from "@/composables/useSqlEditorDiagnostics";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTableColumnToggle from "@/lib/core/Table/sub-components/OTableColumnToggle.vue";
 import useExternalColumnToggle from "@/composables/useExternalColumnToggle";
-import { COL } from "@/lib/core/Table/OTable.types";
+import { COL, type OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import { b64DecodeUnicode, b64EncodeUnicode } from "@/utils/zincutils";
 import { useRouter } from "vue-router";
@@ -509,7 +509,7 @@ const tableColumns = [
     size: COL.status,
     meta: { align: "left" },
   },
-];
+] satisfies OTableColumnDef[];
 
 const userDataSet = new Set([
   "user_agent_device_brand",
