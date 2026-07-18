@@ -132,11 +132,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   <div class="flex flex-col flex-1 min-w-0">
                     <span class="block text-xs text-muted-foreground">Source File</span>
-                    <span class="font-[SF_Mono,Monaco,Inconsolata,'Fira_Code','Droid_Sans_Mono',monospace] break-all text-sm">{{ file.source_file_name }}</span>
+                    <span class="font-mono break-all text-sm">{{ file.source_file_name }}</span>
                   </div>
                   <div class="flex flex-col flex-1 min-w-0">
                     <span class="block text-xs text-muted-foreground">Source Map File</span>
-                    <span class="font-[SF_Mono,Monaco,Inconsolata,'Fira_Code','Droid_Sans_Mono',monospace] break-all text-sm">{{ file.source_map_file_name }}</span>
+                    <span class="font-mono break-all text-sm">{{ file.source_map_file_name }}</span>
                   </div>
                 </li>
               </ul>

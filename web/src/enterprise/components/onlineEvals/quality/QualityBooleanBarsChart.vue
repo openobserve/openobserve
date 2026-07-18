@@ -7,6 +7,7 @@ import { onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useStore } from "vuex";
 import * as echarts from "echarts";
 import { chartColor } from "@/utils/chartTheme";
+import { withChartFont } from "@/utils/fonts";
 
 const props = defineProps<{
   trueCount: number;
@@ -59,7 +60,7 @@ function buildOption(): echarts.EChartsOption {
 
 function render() {
   if (!chart) return;
-  chart.setOption(buildOption(), true);
+  chart.setOption(withChartFont(buildOption()), true);
 }
 
 onMounted(() => {

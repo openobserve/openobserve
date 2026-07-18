@@ -126,7 +126,7 @@ html.theme-switching *::after {
  * The placeholder text token is theme-paired, so no dark override is needed.
  */
 .query-editor-placeholder-overlay .query-editor-placeholder-typewriter {
-  font-family: monospace;
+  font-family: var(--font-mono);
   font-size: var(--text-sm);
   line-height: 1.3125rem;
   color: var(--color-text-placeholder);

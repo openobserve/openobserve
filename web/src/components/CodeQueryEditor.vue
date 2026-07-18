@@ -83,6 +83,7 @@ import { useI18n } from "vue-i18n";
 import useNotifications from "@/composables/useNotifications";
 import { getImageURL } from "@/utils/zincutils";
 import { isAuthError } from "@/utils/authErrors";
+import { getFontMono } from "@/utils/fonts";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -651,6 +652,10 @@ export default defineComponent({
       editorObj = monaco.editor.create(editorElement as HTMLElement, {
         value: props.query?.trim(),
         language: props.language,
+        // Monaco paints its own text and ignores the CSS cascade — without this it
+        // falls back to its built-in Menlo/Monaco/Courier New stack, which differs
+        // per OS and from the rest of the app.
+        fontFamily: getFontMono(),
         theme: isDark.value ? "myCustomDarkTheme" : "myCustomTheme",
         showFoldingControls: enableCodeFolding.value ? "always" : "never",
         folding: enableCodeFolding.value,

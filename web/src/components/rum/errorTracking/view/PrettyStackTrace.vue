@@ -120,7 +120,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div
                 v-if="stackTrace.stack[0].line"
                 data-test="rum-pretty-stack-trace-frame-line"
-                class="stack-line-header [font-family:'SF_Mono','Monaco','Inconsolata','Fira_Code','Droid_Sans_Mono',monospace] text-compact font-medium break-all flex-1 [line-height:1.5]"
+                class="stack-line-header font-mono text-compact font-medium break-all flex-1 [line-height:1.5]"
                 :style="{ color: textColor }"
               >
                 {{ stackTrace.stack[0].line }}
@@ -208,7 +208,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div
                     v-if="frame.line"
                     data-test="rum-pretty-stack-trace-frame-line"
-                    class="stack-line-collapsed [font-family:'SF_Mono','Monaco','Inconsolata','Fira_Code','Droid_Sans_Mono',monospace] text-2xs [line-height:1.5] break-all flex-1 opacity-85"
+                    class="stack-line-collapsed font-mono text-2xs [line-height:1.5] break-all flex-1 opacity-85"
                     :style="{ color: mutedTextColor }"
                   >
                     {{ frame.line }}

@@ -44,14 +44,14 @@ const logoSrc = computed(() =>
         t("aiAssistant.welcome.taglineHighlight")
       }}</span
       >{{ t("aiAssistant.welcome.taglineTail") }}
-      <span class="welcome-hero__code welcome-hero__code--sql font-[var(--font-mono,ui-monospace,SFMono-Regular,Menlo,monospace)] text-xs font-semibold py-px px-1.5 rounded-default tracking-[0.01em] text-lang-sql-text bg-lang-sql-bg">{{
+      <span class="welcome-hero__code welcome-hero__code--sql font-mono text-xs font-semibold py-px px-1.5 rounded-default tracking-[0.01em] text-lang-sql-text bg-lang-sql-bg">{{
         t("aiAssistant.welcome.taglineSql")
       }}</span>,
-      <span class="welcome-hero__code welcome-hero__code--vrl font-[var(--font-mono,ui-monospace,SFMono-Regular,Menlo,monospace)] text-xs font-semibold py-px px-1.5 rounded-default tracking-[0.01em] text-lang-vrl-text bg-lang-vrl-bg">{{
+      <span class="welcome-hero__code welcome-hero__code--vrl font-mono text-xs font-semibold py-px px-1.5 rounded-default tracking-[0.01em] text-lang-vrl-text bg-lang-vrl-bg">{{
         t("aiAssistant.welcome.taglineVrl")
       }}</span>
       and
-      <span class="welcome-hero__code welcome-hero__code--promql font-[var(--font-mono,ui-monospace,SFMono-Regular,Menlo,monospace)] text-xs font-semibold py-px px-1.5 rounded-default tracking-[0.01em] text-lang-promql-text bg-lang-promql-bg">{{
+      <span class="welcome-hero__code welcome-hero__code--promql font-mono text-xs font-semibold py-px px-1.5 rounded-default tracking-[0.01em] text-lang-promql-text bg-lang-promql-bg">{{
         t("aiAssistant.welcome.taglinePromql")
       }}</span>
       — {{ t("aiAssistant.welcome.taglineAnd") }}

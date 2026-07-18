@@ -11,6 +11,7 @@ import type {
   BooleanTrendPoint,
   BooleanTrendSeries,
 } from "../composables/useQualityDetailCharts";
+import { withChartFont } from "@/utils/fonts";
 
 const props = defineProps<{
   series?: BooleanTrendSeries[];
@@ -104,7 +105,7 @@ function buildOption(): echarts.EChartsOption {
 
 function render() {
   if (!chart) return;
-  chart.setOption(buildOption(), true);
+  chart.setOption(withChartFont(buildOption()), true);
 }
 
 onMounted(() => {

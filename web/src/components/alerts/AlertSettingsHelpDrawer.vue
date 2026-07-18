@@ -669,7 +669,7 @@ defineExpose({ applyTemplate, previewTemplate });
     min-width: 3.5rem;
     padding: 0.0625rem 0.375rem;
     border-radius: var(--radius-sm);
-    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-family: var(--font-mono);
     font-size: 0.6875rem;
     line-height: 1.4;
     text-align: center;
@@ -899,7 +899,7 @@ defineExpose({ applyTemplate, previewTemplate });
   border: 1px solid var(--color-border-default);
   border-radius: var(--radius-md);
   background: transparent;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-family: var(--font-mono);
   font-size: 0.75rem;
   color: var(--color-text-code);
   cursor: pointer;
@@ -929,7 +929,7 @@ defineExpose({ applyTemplate, previewTemplate });
   border-radius: var(--radius-md);
 
   &__key {
-    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-family: var(--font-mono);
     font-size: 0.75rem;
     color: var(--color-text-code);
   }
@@ -942,7 +942,7 @@ defineExpose({ applyTemplate, previewTemplate });
 .preview-box {
   white-space: pre-wrap;
   word-break: break-word;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-family: var(--font-mono);
   font-size: 0.75rem;
   line-height: 1.6;
   margin: 0;

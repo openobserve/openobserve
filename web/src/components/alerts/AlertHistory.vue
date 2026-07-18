@@ -371,7 +371,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       white-space: pre-wrap;
                       word-break: break-word;
                       margin: 0;
-                      font-family: 'Courier New', monospace;
+                      font-family: var(--font-mono);
                       font-size: 12px;
                     "
                     >{{ selectedRow.error }}</pre
@@ -399,7 +399,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       white-space: pre-wrap;
                       word-break: break-word;
                       margin: 0;
-                      font-family: 'Courier New', monospace;
+                      font-family: var(--font-mono);
                       font-size: 12px;
                     "
                     >{{ selectedRow.success_response }}</pre

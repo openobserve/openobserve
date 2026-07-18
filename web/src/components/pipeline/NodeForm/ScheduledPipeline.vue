@@ -829,7 +829,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       v-if="!query && queryEditorPlaceholderFlag && expandState.query"
                       class="query-editor-placeholder-overlay absolute inset-0 flex items-start pt-0.75 pl-[2.15rem] pr-2 pointer-events-none z-1 select-none"
                     >
-                      <span class="query-editor-placeholder-typewriter [font-family:monospace] text-[var(--text-sm)] [line-height:1.3125rem] text-text-placeholder whitespace-nowrap overflow-hidden text-ellipsis">{{ editorPlaceholder }}</span>
+                      <span class="query-editor-placeholder-typewriter font-mono text-[var(--text-sm)] [line-height:1.3125rem] text-text-placeholder whitespace-nowrap overflow-hidden text-ellipsis">{{ editorPlaceholder }}</span>
                     </div>
                   </div>
 

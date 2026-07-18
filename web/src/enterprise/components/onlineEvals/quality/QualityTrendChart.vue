@@ -8,6 +8,7 @@ import { useStore } from "vuex";
 import * as echarts from "echarts";
 import { chartColor } from "@/utils/chartTheme";
 import type { TrendPoint } from "../composables/useQualityDetailCharts";
+import { withChartFont } from "@/utils/fonts";
 
 const props = defineProps<{
   points: TrendPoint[];
@@ -111,7 +112,7 @@ function buildOption(): echarts.EChartsOption {
 
 function render() {
   if (!chart) return;
-  chart.setOption(buildOption(), true);
+  chart.setOption(withChartFont(buildOption()), true);
 }
 
 onMounted(() => {

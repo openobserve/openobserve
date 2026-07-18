@@ -322,6 +322,7 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { canvasFont } from "@/utils/fonts";
 
 // Props
 const props = defineProps<CorrelatedLogsProps>();
@@ -780,12 +781,13 @@ const getColumnWidth = (
   }
 
   try {
-    // Font of table header
-    canvasContext.font = "bold 14px sans-serif";
+    // Font of table header — must match what actually renders, or the measured
+    // width is wrong and cells truncate/overflow.
+    canvasContext.font = canvasFont("14px", "sans", "bold");
     let max = canvasContext.measureText(field).width + 16;
 
     // Font of the table content
-    canvasContext.font = "12px monospace";
+    canvasContext.font = canvasFont("12px", "mono");
 
     const hits = searchResults.value || [];
     for (let i = 0; i < Math.min(5, hits.length); i++) {

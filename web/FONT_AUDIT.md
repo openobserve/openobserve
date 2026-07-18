@@ -5,12 +5,40 @@ Date: 2026-07-18 · Branch: `fix/token` · Scope: `web/`
 **Goal:** the app should render in exactly two families — one sans, one mono — both
 reached only through `var(--font-sans)` / `var(--font-mono)`.
 
-**Verdict:** the token layer is correct and the target architecture *already exists*.
-Almost nothing honours it. The app currently renders in a set of fonts that **varies by
-operating system**, loads **5 families to use 2**, and its two highest-surface-area
-components (code editors, dashboard charts) are off-token entirely.
+**Original verdict:** the token layer was correct and the target architecture *already
+existed*. Almost nothing honoured it. The app rendered in a set of fonts that **varied by
+operating system**, loaded **5 families to use 2**, and its two highest-surface-area
+components (code editors, dashboard charts) were off-token entirely.
 
-This is a **cleanup, not a build** — see §2.
+It was a **cleanup, not a build** — see §2.
+
+---
+
+## STATUS — executed 2026-07-18
+
+All findings below are **remediated** except one, tracked in §10.
+
+| § | Finding | Status |
+|---|---|---|
+| 2 | `'JetBrains Mono'` (no `@font-face`) in the mono stack | ✅ removed |
+| 3 | Monaco renders in its own built-in stack | ✅ `fontFamily: getFontMono()` |
+| 3 | ECharts renders in its default `sans-serif` | ✅ `withChartFont()` on 9 renderers |
+| 4 | 49 dead `@font-face` blocks | ✅ deleted — 2 remain (Geist, Geist Mono) |
+| 4 | 24 orphaned `.woff2` (~454 KB) | ✅ deleted — `src/styles/fonts/` 648K → 144K |
+| 4 | 2 stale comments claiming IBM Plex Mono | ✅ corrected to Geist Mono |
+| 5 | ~70 literal font stacks, 12 distinct | ✅ tokenised; only the §5.2 email exception remains |
+| 6 | 5 canvas `ctx.font` measuring in the wrong font | ✅ via `canvasFont()` |
+| 7 | No guard covers `font-family` | ✅ stylelint rule + `literalFontFamily` ratchet |
+| 4 | No preload for the critical first-paint face | ⚠️ **not done — see §10** |
+
+**New module:** [`src/utils/fonts.ts`](src/utils/fonts.ts) — the single JS bridge to the
+CSS tokens (`getFontSans`, `getFontMono`, `canvasFont`, `withChartFont`). Anything that
+paints outside the CSS cascade goes through it.
+
+**Verification:** `type-check` clean · all four CI guards pass · ESLint 0 issues in
+touched files · 5,814 unit tests pass across affected areas (+408 dashboard panels).
+Both guards were checked against an injected violation to confirm they are not
+vacuously green. **Not** visually verified in a browser — see §11.
 
 ---
 
@@ -231,7 +259,14 @@ bugs that look random. Fix regardless of the consistency goal.
 
 ---
 
-## 7. Why this drifted: no guard covers fonts
+## 7. Why this drifted: no guard covered fonts — now fixed
+
+> **Resolved.** Both halves described below are implemented: a `font-family` entry in
+> `.stylelintrc.json` (with `src/lib/styles/tokens/base.css` overridden, since it owns
+> the `@font-face` blocks and must name real families), and a `literalFontFamily`
+> ratchet in `scripts/check-design-consistency.mjs` covering Tailwind arbitrary values
+> in `class` attributes *and* `.ts` files that build HTML strings. `email.ts` and
+> `fonts.ts` are allowlisted. Both were tested against an injected violation.
 
 Four CSS guards run on every PR
 (`.github/workflows/playwright.yml:141-150`, `build-pr-image.yml:58-64`):
@@ -306,17 +341,68 @@ visual diffs.
 
 ---
 
-## 9. Recommended order of work
+## 9. What was executed
 
-1. **Zero-risk deletion** — dead `@font-face`, `.woff2`, stale OText comments.
-   Gives a clean baseline before any visual diff lands.
-2. **Monaco + ECharts + canvas `ctx.font`** (atomic) — largest visual win, fixes real
-   width-calculation bugs.
-3. **Collapse the ~70 literals** per the mapping in §5.
-4. **Remove `'JetBrains Mono'`** from `--font-mono` (§2).
-5. **Add the guard** — stylelint rule *and* class-attribute check (§7). Same PR as any
-   of the above, so it cannot regress.
-6. **Preload `Geist-Variable.woff2`**; add the §5.2 exception comment to `email.ts`.
+72 files: 24 `.woff2` deleted, 47 modified, 1 added (`src/utils/fonts.ts`).
 
-Steps 1–4 are behaviour-preserving except that text starts rendering in Geist — which is
-the point.
+The order in the original plan was followed — zero-risk deletion first, then the atomic
+Monaco/ECharts/canvas tier, then the literals, then the guards.
+
+### 9.1 Design decisions taken during the work
+
+**ECharts font applied to the options, not via `registerTheme`.** Two reasons, both
+discovered while implementing: the renderers pass ECharts' built-in `"dark"`/`"light"`
+themes and a custom theme would *replace* those palettes rather than extend them; and
+several `setOption` calls use `notMerge`, which discards anything applied post-init.
+`withChartFont()` stamps `textStyle.fontFamily` onto the options, and any per-chart
+`textStyle.fontFamily` already present still wins.
+
+**`--font-mono` keeps a broad fallback chain.** The glyph-coverage risk flagged in §8 is
+largely self-mitigating: CSS font fallback is **per-glyph**, so any character Geist Mono
+lacks (CJK, box-drawing, symbols in log data) falls through to Menlo/Consolas
+automatically. The chain is therefore kept deliberately broad — but families we ship no
+`@font-face` for were removed, since those resolve only on machines that happen to have
+them installed. That is precisely how the app drifted to a per-OS look.
+
+**Font tokens are read once and cached.** `getComputedStyle` forces a style recalc; this
+runs for every axis label of every panel.
+
+### 9.2 Bug introduced and fixed during implementation — worth knowing
+
+The first version of `withChartFont()` mutated the options object in place. The renderers
+pass `props.data.options`, so writing to a **reactive prop from inside the render
+watcher** retriggered that watcher and spun until the Vitest worker was killed. In
+production this would have been an infinite render loop, not merely a test failure.
+
+`withChartFont()` now returns a new object and never mutates. The comment in
+`src/utils/fonts.ts` records why, so it is not "simplified" back into a mutation.
+
+---
+
+## 10. Outstanding — font preload
+
+`<link rel="preload">` for `Geist-Variable.woff2` was **not** added.
+
+Vite hashes that asset at build time, so a hand-written preload in `index.html` is only
+correct if Vite rewrites the path. Confirming that requires `npm run build`, which the
+project conventions reserve for explicit request. A wrong preload yields either a 404 or
+a duplicate font download, so it was left rather than guessed.
+
+Pick this up deliberately, with a build to verify the emitted URL.
+
+---
+
+## 11. Residual risk — needs human eyes
+
+Verified statically and by tests; **not** exercised in a browser.
+
+The §8 moderate tier still applies: Geist Mono's advance widths differ from
+Menlo/Monaco/Courier New, so anything measured in character counts reflows — log table
+columns, stack traces, query previews, trace tooltips. Nothing should break, but the
+visual diffs across traces, alerts, pipelines, RUM and dashboards want review.
+
+There is no visual-regression suite, so nothing detects these automatically.
+
+Out of scope, deliberately: `font-family: Helvetica` inside two decorative SVG assets
+(`src/assets/images/common/pointer-to-demo*.svg`) and the vendored
+`src/assets/dashboard/echarts.min.js`. Neither is app CSS.

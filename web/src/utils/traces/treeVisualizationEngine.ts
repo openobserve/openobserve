@@ -358,7 +358,7 @@ export function createTreeVisualizationEngine() {
       -webkit-backdrop-filter: blur(24px) saturate(180%);
       border: 1px solid ${isDarkMode ? "rgba(255,255,255,0.07)" : "rgba(0,0,0,0.06)"};
       border-radius: 8px; padding: 9px 13px; font-size: 12px; line-height: 1.5;
-      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+      font-family: var(--font-sans);
       letter-spacing: 0.01em; white-space: nowrap; display: none;
       color: ${isDarkMode ? "rgba(255,255,255,0.88)" : "rgba(0,0,0,0.82)"};
     `

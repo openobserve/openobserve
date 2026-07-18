@@ -101,7 +101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OSeparator />
               <OCardSection class="p-0 function-definition-content">
                 <div class="function-code-container bg-code-block-bg dark:border dark:border-border-default rounded-none max-w-146 max-h-62.5 overflow-y-auto relative">
-                  <pre class="function-code text-code-block-text bg-transparent m-0 p-4 font-[JetBrains_Mono,Fira_Code,Monaco,Menlo,Ubuntu_Mono,monospace] text-compact leading-normal whitespace-pre-wrap break-words border-0 font-normal cursor-default select-text selection:bg-primary-100 dark:selection:bg-primary-600 dark:selection:text-text-inverse">{{
+                  <pre class="function-code text-code-block-text bg-transparent m-0 p-4 font-mono text-compact leading-normal whitespace-pre-wrap break-words border-0 font-normal cursor-default select-text selection:bg-primary-100 dark:selection:bg-primary-600 dark:selection:text-text-inverse">{{
                     pipelineObj.functions[selectedFunction]?.function ||
                     "No definition available"
                   }}</pre>

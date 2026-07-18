@@ -1,6 +1,21 @@
 {
   "overrides": [
     {
+      "comment": "base.css owns the @font-face blocks, which must name real families. It is the ONE file allowed to write a literal font-family; the --font-sans/--font-mono tokens it defines are what everything else consumes.",
+      "files": ["src/lib/styles/tokens/base.css"],
+      "rules": {
+        "declaration-property-value-disallowed-list": [
+          {
+            "/.*/": ["/var\\(\\s*--o2-/", "/var\\(\\s*--color-text-(primary|caption)\\b/"]
+          },
+          {
+            "message": "Banned token. --o2-* is legacy; --color-text-primary/-caption were retired (Tier 1) — use --color-text-heading / --color-text-secondary.",
+            "severity": "error"
+          }
+        ]
+      }
+    },
+    {
       "files": ["**/*.vue"],
       "customSyntax": "postcss-html",
       "rules": {
@@ -23,9 +38,12 @@
   ],
   "rules": {
     "declaration-property-value-disallowed-list": [
-      { "/.*/": ["/var\\(\\s*--o2-/", "/var\\(\\s*--color-text-(primary|caption)\\b/"] },
       {
-        "message": "Banned token. --o2-* is legacy; --color-text-primary/-caption were retired (Tier 1) — use --color-text-heading / --color-text-secondary.",
+        "/.*/": ["/var\\(\\s*--o2-/", "/var\\(\\s*--color-text-(primary|caption)\\b/"],
+        "font-family": ["/^(?!.*(var\\(--font-(sans|mono)\\)|inherit)).*$/"]
+      },
+      {
+        "message": "Banned value. --o2-* is legacy; --color-text-primary/-caption were retired (Tier 1) — use --color-text-heading / --color-text-secondary. font-family must be var(--font-sans) or var(--font-mono) — no literal font stacks (FONT_AUDIT.md).",
         "severity": "error"
       }
     ]

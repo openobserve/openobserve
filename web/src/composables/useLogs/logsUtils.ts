@@ -18,6 +18,7 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import config from "@/aws-exports";
 import { b64EncodeUnicode, useLocalLogFilterField, } from "@/utils/zincutils";
+import { canvasFont } from "@/utils/fonts";
 
 import {
   encodeVisualizationConfig,
@@ -530,12 +531,13 @@ export const logsUtils = () => {
    * @returns - Width of the column
    */
   const getColumnWidth = (context: any, field: string) => {
-    // Font of table header
-    context.font = "bold 14px sans-serif";
+    // Font of table header — must match what actually renders, or the measured
+    // width is wrong and cells truncate/overflow.
+    context.font = canvasFont("14px", "sans", "bold");
     let max = context.measureText(field).width + 16;
 
     // Font of the table content
-    context.font = "12px monospace";
+    context.font = canvasFont("12px", "mono");
     let width = 0;
     try {
       for (let i = 0; i < 5; i++) {

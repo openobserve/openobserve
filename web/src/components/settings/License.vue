@@ -448,7 +448,7 @@
         v-model="licenseData.key"
         readonly
         :rows="8"
-        style="font-family: monospace; font-size: 12px"
+        style="font-family: var(--font-mono); font-size: 12px"
       />
     </ODialog>
   </div>

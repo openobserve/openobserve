@@ -69,6 +69,14 @@ const TS_HEX_ALLOWLIST = [
 // theme / declare an isDark flag, so they are exempt from the darkMechanism count.
 const DARK_SEAM_ALLOWLIST = ["composables/useTheme.ts", "utils/chartTheme.ts"];
 
+// Files allowed to carry a literal font stack. Email markup renders inside a mail
+// client, which can load neither our webfont nor our custom properties, so a
+// system stack is the correct choice there (FONT_AUDIT.md §5.2).
+const FONT_ALLOWLIST = [
+  "utils/prebuilt-templates/email.ts",
+  "utils/fonts.ts", // defines the fallback stacks the tokens mirror
+];
+
 const PALETTE = "slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose";
 const PROPS = "text|bg|border|ring|fill|stroke|divide|outline|decoration|placeholder|from|via|to";
 
@@ -102,6 +110,26 @@ const WHOLE = {
   quasarUtil: /\b(?:q-(?:pa|pt|pb|pl|pr|px|py|ma|mt|mb|ml|mr|mx|my|gutter)-(?:none|xs|sm|md|lg|xl)|text-weight-[a-z]+)\b/g,
   arbPx: /\b(?:gap|p[trblxy]?|m[trblxy]?|w|h|size|min-w|min-h|max-w|max-h|top|left|right|bottom|inset|leading)-\[[0-9.]+px\]/g,
   arbZ: /\bz-\[[0-9]+\]/g,
+  // Literal font stacks. The app ships exactly two families, reached only via
+  // var(--font-sans) / var(--font-mono) (FONT_AUDIT.md). Anything else resolves
+  // to whatever the visitor's OS happens to have, which is how the app came to
+  // render in ~14 different stacks. Covers CSS declarations, Tailwind arbitrary
+  // values (`[font-family:…]`), and `font-[…]` when the value looks like a
+  // family rather than a weight (`font-[600]` stays legal).
+  literalFontFamily: new RegExp(
+    [
+      // font-family: <anything that isn't our token / inherit>.
+      // The lookahead absorbs the whitespace itself — if `\s*` were consumed
+      // first it could backtrack to zero width and let ` var(--font-mono)` slip
+      // through as a "literal" starting with a space.
+      String.raw`font-family:(?!\s*(?:var\(--font-(?:sans|mono)\)|inherit))\s*[^;"'\`\n}]+`,
+      // [font-family:<literal>]
+      String.raw`\[font-family:(?!(?:var\(--font-(?:sans|mono)\)|inherit)\])[^\]]+\]`,
+      // font-[<literal family>] — weights like font-[600] are not families
+      String.raw`\bfont-\[(?!\d+\]|var\(--font-(?:sans|mono)\)\]|inherit\])[^\]]*(?:mono|serif|Menlo|Monaco|Consolas|Courier|Geist|Inconsolata|Fira|Ubuntu|Segoe|Roboto|apple-system)[^\]]*\]`,
+    ].join("|"),
+    "g",
+  ),
   // Dark-mode mechanism fragmentation (§3.R.2 mechanisms 1,2,5,6,7)
   darkMechanism: /theme\s*[=!]==?\s*['"]dark['"]|const\s+(?:isDark|isDarkMode|darkMode)\s*=|\.body--(?:dark|light)|classList\.contains\(['"]body--|\.(?:light|dark)-mode\b/g,
 };
@@ -195,6 +223,12 @@ function countFile(file, rel) {
     if (!isSpec && !DARK_SEAM_ALLOWLIST.some((p) => rel.endsWith(p))) {
       const n = (text.match(WHOLE.darkMechanism) || []).length;
       if (n) counts.darkMechanism = n;
+    }
+    // Literal font stacks also leak in via .ts that builds HTML/CSS strings
+    // (trace tooltips, chart tooltips) — that surface was ~20 of the original hits.
+    if (!isSpec && !FONT_ALLOWLIST.some((p) => rel.endsWith(p))) {
+      const n = (text.match(WHOLE.literalFontFamily) || []).length;
+      if (n) counts.literalFontFamily = n;
     }
   }
   return counts;

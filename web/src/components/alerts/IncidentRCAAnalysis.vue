@@ -159,7 +159,7 @@ export default defineComponent({
   --rca-icon-color: var(--color-text-body);
   --rca-shadow: var(--shadow-md);
 
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+  font-family: var(--font-sans);
   line-height: 1.6;
   color: var(--rca-text-secondary);
 }

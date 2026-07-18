@@ -1,7 +1,7 @@
 /* Log Highlighting CSS Classes */
 /* Base highlighting classes */
 .log-highlight {
-  font-family: monospace;
+  font-family: var(--font-mono);
   font-size: 12px;
   word-break: break-word;
   display: inline;
@@ -191,7 +191,7 @@
 
 /* Special classes for performance optimization */
 .log-simple-text {
-  font-family: monospace;
+  font-family: var(--font-mono);
   font-size: 12px;
   word-break: break-word;
 

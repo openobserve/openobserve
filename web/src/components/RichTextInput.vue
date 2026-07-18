@@ -31,7 +31,7 @@
       }"
       @click.stop
     >
-      <div class="card-content overflow-y-auto max-h-75 py-1 px-2 font-[Monaco,Menlo,'Courier_New',monospace] text-2xs leading-[1.5] whitespace-pre-wrap break-words text-text-body"
+      <div class="card-content overflow-y-auto max-h-75 py-1 px-2 font-mono text-2xs leading-[1.5] whitespace-pre-wrap break-words text-text-body"
         v-html="formatContent(detailCardContent)"></div>
     </div>
   </div>

@@ -50,6 +50,7 @@ import {
 import { CanvasRenderer, SVGRenderer } from "echarts/renderers";
 
 import DOMPurify from "dompurify";
+import { withChartFont } from "@/utils/fonts";
 
 // Register necessary components
 echarts.use([
@@ -145,7 +146,7 @@ export default defineComponent({
       try {
         const convertedData = convertStringToFunction(props.data);
         const safeChartOptions = deepSanitize(convertedData);
-        chart.setOption(safeChartOptions);
+        chart.setOption(withChartFont(safeChartOptions));
 
         if (convertedData.o2_events) {
           // Add event listeners for custom interactions

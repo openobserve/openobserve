@@ -55,7 +55,7 @@
 
               <template v-if="dataType === 'numeric' && numericRange">
                 <dt class="text-xs font-semibold text-text-secondary">{{ t("onlineEvals.scoreConfig.detail.rangeLabel") }}</dt>
-                <dd class="m-0 text-compact text-text-body font-[ui-monospace,SFMono-Regular,Menlo,monospace] [font-variant-numeric:tabular-nums]">{{ numericRange.min }} – {{ numericRange.max }}</dd>
+                <dd class="m-0 text-compact text-text-body font-mono [font-variant-numeric:tabular-nums]">{{ numericRange.min }} – {{ numericRange.max }}</dd>
               </template>
 
               <template v-if="dataType === 'categorical' && categories.length">
@@ -67,7 +67,7 @@
 
               <template v-if="dataType === 'boolean'">
                 <dt class="text-xs font-semibold text-text-secondary">{{ t("onlineEvals.scoreConfig.detail.valuesLabel") }}</dt>
-                <dd class="m-0 text-compact text-text-body font-[ui-monospace,SFMono-Regular,Menlo,monospace] [font-variant-numeric:tabular-nums]">true / false</dd>
+                <dd class="m-0 text-compact text-text-body font-mono [font-variant-numeric:tabular-nums]">true / false</dd>
               </template>
             </dl>
           </section>
@@ -82,7 +82,7 @@
               class="flex items-baseline gap-2 p-[12px_14px] border border-[color-mix(in_srgb,var(--color-status-success-text)_35%,transparent)] bg-[color-mix(in_srgb,var(--color-status-success-text)_8%,transparent)] rounded-default"
             >
               <span class="text-lg font-bold text-status-success-text">{{ thresholdSign }}</span>
-              <span class="font-[ui-monospace,SFMono-Regular,Menlo,monospace] font-bold text-sm text-text-body">{{ healthyLabel }}</span>
+              <span class="font-mono font-bold text-sm text-text-body">{{ healthyLabel }}</span>
               <span class="ml-auto text-2xs text-text-secondary">{{ t("onlineEvals.scoreConfig.detail.thresholdHint") }}</span>
             </div>
             <p v-else class="m-0 text-compact leading-[1.55] text-text-secondary">
@@ -102,11 +102,11 @@
                 </OTag>
               </dd>
               <dt class="text-xs font-semibold text-text-secondary">{{ t("onlineEvals.scoreConfig.detail.versionLabel") }}</dt>
-              <dd class="m-0 text-compact text-text-body font-[ui-monospace,SFMono-Regular,Menlo,monospace] [font-variant-numeric:tabular-nums]">v{{ row.version }}</dd>
+              <dd class="m-0 text-compact text-text-body font-mono [font-variant-numeric:tabular-nums]">v{{ row.version }}</dd>
               <dt v-if="createdAt" class="text-xs font-semibold text-text-secondary">{{ t("onlineEvals.scoreConfig.detail.createdLabel") }}</dt>
-              <dd v-if="createdAt" class="m-0 text-compact text-text-body font-[ui-monospace,SFMono-Regular,Menlo,monospace] [font-variant-numeric:tabular-nums]">{{ formatTimestamp(createdAt) }}</dd>
+              <dd v-if="createdAt" class="m-0 text-compact text-text-body font-mono [font-variant-numeric:tabular-nums]">{{ formatTimestamp(createdAt) }}</dd>
               <dt v-if="updatedAt" class="text-xs font-semibold text-text-secondary">{{ t("onlineEvals.scoreConfig.detail.updatedLabel") }}</dt>
-              <dd v-if="updatedAt" class="m-0 text-compact text-text-body font-[ui-monospace,SFMono-Regular,Menlo,monospace] [font-variant-numeric:tabular-nums]">{{ formatTimestamp(updatedAt) }}</dd>
+              <dd v-if="updatedAt" class="m-0 text-compact text-text-body font-mono [font-variant-numeric:tabular-nums]">{{ formatTimestamp(updatedAt) }}</dd>
             </dl>
           </section>
         </template>
@@ -119,12 +119,12 @@
               class="p-[12px_14px] bg-card-bg border border-[color-mix(in_srgb,var(--color-primary-600,#3F7994)_30%,transparent)] bg-[color-mix(in_srgb,var(--color-primary-600,#3F7994)_5%,var(--color-card-bg))]! rounded-default"
             >
               <div class="flex items-center gap-2">
-                <span class="font-[ui-monospace,SFMono-Regular,Menlo,monospace] [font-variant-numeric:tabular-nums] font-bold text-compact text-text-body">v{{ row.version }}</span>
+                <span class="font-mono [font-variant-numeric:tabular-nums] font-bold text-compact text-text-body">v{{ row.version }}</span>
                 <OTag type="activeVersionFlag" value="active" />
               </div>
               <div v-if="updatedAt" class="mt-1.5 text-2xs text-text-secondary">
                 {{ t("onlineEvals.scoreConfig.detail.lastUpdated") }}
-                <span class="font-[ui-monospace,SFMono-Regular,Menlo,monospace] [font-variant-numeric:tabular-nums]">{{ formatTimestamp(updatedAt) }}</span>
+                <span class="font-mono [font-variant-numeric:tabular-nums]">{{ formatTimestamp(updatedAt) }}</span>
               </div>
             </li>
           </ul>
@@ -150,7 +150,7 @@
               >
                 <div class="flex-1 min-w-0">
                   <div class="flex items-center gap-2">
-                    <span class="font-[ui-monospace,SFMono-Regular,Menlo,monospace] [font-variant-numeric:tabular-nums] font-bold text-compact text-text-heading">{{ scorer.name }}</span>
+                    <span class="font-mono [font-variant-numeric:tabular-nums] font-bold text-compact text-text-heading">{{ scorer.name }}</span>
                     <OTag type="scorerType" :value="scorerTypeOf(scorer)" />
                     <span class="text-2xs text-text-secondary [font-variant-numeric:tabular-nums]">v{{ scorer.version }}</span>
                   </div>

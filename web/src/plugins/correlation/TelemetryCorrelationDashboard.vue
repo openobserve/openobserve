@@ -1154,7 +1154,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </div>
               <div class="flex flex-col flex-1 min-w-0">
-                <span class="text-sm font-[monospace]">{{ stream.stream_name }}</span>
+                <span class="text-sm font-mono">{{ stream.stream_name }}</span>
               </div>
             </div>
           </template>

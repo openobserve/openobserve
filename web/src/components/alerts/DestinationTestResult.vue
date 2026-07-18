@@ -32,7 +32,7 @@ limitations under the License. -->
           <OTag v-if="result.statusCode" type="httpStatus" :value="httpStatusBucket(result.statusCode)">
             {{ result.statusCode }}
           </OTag>
-          <span v-if="result.responseTime" class="font-['Monaco','Consolas','Courier_New',monospace] text-text-secondary">
+          <span v-if="result.responseTime" class="font-mono text-text-secondary">
             {{ result.responseTime }}ms
           </span>
         </div>
@@ -57,7 +57,7 @@ limitations under the License. -->
           <OTag v-if="result.statusCode" type="httpStatus" :value="httpStatusBucket(result.statusCode)">
             {{ result.statusCode }}
           </OTag>
-          <span v-if="result.responseTime" class="font-['Monaco','Consolas','Courier_New',monospace] text-text-secondary">
+          <span v-if="result.responseTime" class="font-mono text-text-secondary">
             {{ result.responseTime }}ms
           </span>
         </div>
@@ -95,7 +95,7 @@ limitations under the License. -->
 
             <div v-if="result.responseBody" data-test="test-response-body" class="error-item mb-3">
               <div class="text-3xs font-semibold uppercase tracking-[0.5px] text-text-secondary mb-1">{{ t('alerts.responseBody') }}</div>
-              <pre class="bg-[rgba(0,0,0,0.05)] dark:bg-[rgba(255,255,255,0.05)] border border-[rgba(0,0,0,0.1)] dark:border-[rgba(255,255,255,0.1)] rounded-default p-2 font-['Monaco','Consolas','Courier_New',monospace] text-3xs leading-[1.5] max-h-37.5 overflow-y-auto m-0 whitespace-pre text-text-body">{{ formatResponseBody(result.responseBody) }}</pre>
+              <pre class="bg-[rgba(0,0,0,0.05)] dark:bg-[rgba(255,255,255,0.05)] border border-[rgba(0,0,0,0.1)] dark:border-[rgba(255,255,255,0.1)] rounded-default p-2 font-mono text-3xs leading-[1.5] max-h-37.5 overflow-y-auto m-0 whitespace-pre text-text-body">{{ formatResponseBody(result.responseBody) }}</pre>
             </div>
           </div>
         </OCollapsible>

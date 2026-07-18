@@ -719,7 +719,7 @@ const renderMarkdown = (content: string): string => {
 }
 
 .messages-view .message-item .message-content :deep(code) {
-  font-family: monospace;
+  font-family: var(--font-mono);
   font-size: 0.75rem;
   background-color: color-mix(in srgb, var(--color-black) 5%, transparent);
   padding: 0.125rem 0.25rem;

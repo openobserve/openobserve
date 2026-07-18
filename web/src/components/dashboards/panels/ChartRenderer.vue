@@ -127,6 +127,7 @@ import type {
   TreeSeriesOption,
 } from "echarts/charts";
 import type { ComposeOption } from "echarts/core";
+import { withChartFont } from "@/utils/fonts";
 import type {
   TitleComponentOption,
   TooltipComponentOption,
@@ -666,7 +667,7 @@ export default defineComponent({
             props.data?.notMerge !== undefined ? props.data.notMerge : true;
           const lazyUpdate =
             props.data?.lazyUpdate !== undefined ? props.data.lazyUpdate : true;
-          chart?.setOption(options, { lazyUpdate, notMerge });
+          chart?.setOption(withChartFont(options), { lazyUpdate, notMerge });
           chart?.setOption({ animation: true }, { lazyUpdate: true });
         } catch (e: any) {
           emit("error", {
@@ -695,7 +696,7 @@ export default defineComponent({
             renderer: props.renderType,
           });
         }
-        chart?.setOption(props?.data?.options || {}, {
+        chart?.setOption(withChartFont(props?.data?.options || {}), {
           lazyUpdate: true,
           notMerge: true,
         });
@@ -785,7 +786,7 @@ export default defineComponent({
             renderer: props.renderType,
           });
         }
-        chart?.setOption(props?.data?.options || {}, {
+        chart?.setOption(withChartFont(props?.data?.options || {}), {
           lazyUpdate: true,
           notMerge: true,
         });
@@ -830,7 +831,7 @@ export default defineComponent({
           await nextTick();
           chart?.resize();
           try {
-            chart?.setOption(props?.data?.options || {}, {
+            chart?.setOption(withChartFont(props?.data?.options || {}), {
               lazyUpdate: true,
               notMerge: true,
             });

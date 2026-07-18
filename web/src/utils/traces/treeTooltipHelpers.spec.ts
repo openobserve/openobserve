@@ -424,11 +424,13 @@ describe('treeTooltipHelpers', () => {
       const result = generateTracePatternTooltipContent(mockMetadata);
 
       // generateTracePatternTooltipContent uses inline styles, not CSS classes
-      expect(result).toContain('font-family: -apple-system');
+      expect(result).toContain("font-family: var(--font-sans)");
       expect(result).toContain('font-weight: 600');
       expect(result).toContain('border-bottom: 1px solid');
       expect(result).toContain('Calls:');
-      expect(result).toContain('<span style="font-family: monospace;">1</span>');
+      expect(result).toContain(
+        '<span style="font-family: var(--font-mono);">1</span>',
+      );
     });
   });
 

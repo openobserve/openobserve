@@ -94,7 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       v-if="!formData.function && functionEditorPlaceholderFlag"
                       class="absolute inset-0 flex items-start pt-0.75 pr-2 pb-0 pl-[2.15rem] pointer-events-none z-1 select-none"
                     >
-                      <span class="[font-family:monospace] text-[var(--text-sm)] [line-height:1.3125rem] text-text-placeholder whitespace-nowrap overflow-hidden [text-overflow:ellipsis]">{{
+                      <span class="font-mono text-[var(--text-sm)] [line-height:1.3125rem] text-text-placeholder whitespace-nowrap overflow-hidden [text-overflow:ellipsis]">{{
                         transType === '1' ? jsPlaceholder : vrlPlaceholder
                       }}</span>
                     </div>
@@ -111,7 +111,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         v-if="expandState.functionError"
                         class="px-2 pb-2 border-l-4 border-status-negative bg-surface-subtle"
                       >
-                        <pre class="my-0 text-status-error-text" style="white-space: pre-wrap; font-family: 'Courier New', monospace; font-size: 13px;">{{
+                        <pre class="my-0 text-status-error-text" style="white-space: pre-wrap; font-family: var(--font-mono); font-size: 13px;">{{
                           vrlFunctionError
                         }}</pre>
                       </div>

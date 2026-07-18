@@ -8,6 +8,7 @@ import { useStore } from "vuex";
 import * as echarts from "echarts";
 import { chartColor } from "@/utils/chartTheme";
 import type { DistributionBucket } from "../composables/useQualityDetailCharts";
+import { withChartFont } from "@/utils/fonts";
 
 const props = defineProps<{
   buckets: DistributionBucket[];
@@ -108,7 +109,7 @@ function thresholdBucketIndex(): number {
 
 function render() {
   if (!chart) return;
-  chart.setOption(buildOption(), true);
+  chart.setOption(withChartFont(buildOption()), true);
 }
 
 onMounted(() => {

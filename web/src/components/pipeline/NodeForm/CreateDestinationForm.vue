@@ -367,7 +367,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="mt-2 p-2 rounded-default text-compact bg-surface-base"
                 >
                   <strong>Example:</strong>
-                  <code class="ml-1 bg-transparent p-0 font-[Monaco,Menlo,'Ubuntu_Mono',monospace] text-text-link">{{ connectionNotes.example }}</code>
+                  <code class="ml-1 bg-transparent p-0 font-mono text-text-link">{{ connectionNotes.example }}</code>
                 </div>
               </div>
             </OCardSection>

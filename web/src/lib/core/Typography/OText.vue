@@ -96,7 +96,7 @@ const variantClasses: Record<NonNullable<TextProps["variant"]>, string> = {
   ].join(" "),
 
   // Monospace: cron expressions, stream names (non-linked), field paths, IDs.
-  // Uses IBM Plex Mono via the --font-mono CSS custom property.
+  // Uses Geist Mono via the --font-mono CSS custom property.
   // For actual executable code / query content, prefer OCode instead.
   "mono": [
     "text-xs font-mono",

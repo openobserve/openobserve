@@ -77,6 +77,7 @@ import type {
   TreeSeriesOption,
 } from "echarts/charts";
 import type { ComposeOption } from "echarts/core";
+import { withChartFont } from "@/utils/fonts";
 import type {
   TitleComponentOption,
   TooltipComponentOption,
@@ -176,7 +177,7 @@ export default defineComponent({
         ...props.data.options,
         lmap: lmapOptions,
       };
-      chart?.setOption(options || {}, true);
+      chart?.setOption(withChartFont(options || {}), true);
       window.addEventListener("resize", windowResizeEventCallback);
 
       // Get Leaflet extension component
@@ -227,7 +228,7 @@ export default defineComponent({
           ...props.data.options,
           lmap: lmapOptions,
         };
-        chart?.setOption(options || {}, true);
+        chart?.setOption(withChartFont(options || {}), true);
         // Get Leaflet extension component
         // getModel and getComponent do not seem to be exported in echarts typescript
         // add the following two comments to circumvent this

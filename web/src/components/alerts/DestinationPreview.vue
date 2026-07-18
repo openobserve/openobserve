@@ -185,7 +185,7 @@ limitations under the License.
         <div v-if="type === 'servicenow'" data-test="servicenow-preview" class="servicenow-incident max-w-150 mx-auto bg-white border border-[var(--color-brand-msg-divider)] rounded-default overflow-hidden shadow-[0_2px_8px_rgba(0,0,0,0.1)]">
           <div class="servicenow-header bg-[var(--color-brand-slack-avatar)] text-white p-4 flex justify-between items-center">
             <div class="servicenow-title font-bold text-lg">ServiceNow Incident</div>
-            <div class="servicenow-number [font-family:monospace] font-bold">INC0000123</div>
+            <div class="servicenow-number font-mono font-bold">INC0000123</div>
           </div>
           <div class="servicenow-content p-6">
             <div class="servicenow-field mb-3 text-[var(--color-brand-msg-text)]">

@@ -31,7 +31,7 @@ export type TextVariant =
   | "label"
   /** Metadata: timestamps, counts, hints. 12px normal secondary. */
   | "meta"
-  /** Monospace: cron expressions, IDs, field names. 12px IBM Plex Mono. */
+  /** Monospace: cron expressions, IDs, field names. 12px Geist Mono. */
   | "mono";
 
 export interface TextProps {

@@ -201,7 +201,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="bg-code-bg rounded-default border border-border-default p-3 overflow-x-auto max-h-150 overflow-y-auto"
                 data-test="exception-stacktrace-container"
               >
-                <div class="stacktrace-content m-0 p-0 text-2xs leading-[1.6] text-code-text font-[Monaco,Menlo,'Ubuntu_Mono',Consolas,'source-code-pro',monospace] whitespace-pre-wrap break-words" v-html="formatStackTrace(row['exception.stacktrace'])" />
+                <div class="stacktrace-content m-0 p-0 text-2xs leading-[1.6] text-code-text font-mono whitespace-pre-wrap break-words" v-html="formatStackTrace(row['exception.stacktrace'])" />
               </div>
               <div v-else class="flex items-center justify-center bg-code-bg text-text-muted text-xs italic py-4 px-3 border border-dashed border-border-default rounded-default" data-test="exception-stacktrace-empty">
                 <OIcon name="info" size="sm" class="mr-1" />
