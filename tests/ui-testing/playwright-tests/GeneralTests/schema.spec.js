@@ -11,7 +11,7 @@ test.describe("Schema testcases", () => {
     const streamName = `stream${Date.now()}`;
 
     // Ingestion helper function 
-    async function ingestion(page, testStreamName) {
+    async function ingestion(page, testStreamName, maxRetries = 5) {
         testLogger.debug('Starting ingestion for test stream', { testStreamName });
         const orgId = getOrgIdentifier();
 
@@ -20,29 +20,53 @@ test.describe("Schema testcases", () => {
             "Content-Type": "application/json",
         };
 
-        const response = await page.evaluate(async ({ url, headers, orgId, streamName, logsdata }) => {
-            const fetchResponse = await fetch(`${url}/api/${orgId}/${streamName}/_json`, {
-                method: 'POST',
+        // Retry until the ingest is ACCEPTED (HTTP 200). The stream names are now
+        // unique-per-invocation (test1_<uniq> etc.) so a POST no longer collides with a
+        // prior run's still-deleting "test1/2/3" stream — the local run proved that
+        // fixed names returned 400 "stream is being deleted" for ~45s per attempt.
+        // This retry now only guards genuine transient cloud errors (connection blip /
+        // 5xx); the old single-shot POST swallowed failures, leaving the stream with no
+        // data so it never listed and the readiness gate / selectStream timed out.
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+            const response = await page.evaluate(async ({ url, headers, orgId, streamName, logsdata }) => {
+                try {
+                    const fetchResponse = await fetch(`${url}/api/${orgId}/${streamName}/_json`, {
+                        method: 'POST',
+                        headers: headers,
+                        body: JSON.stringify(logsdata)
+                    });
+                    const contentType = fetchResponse.headers.get('content-type');
+                    const body = (contentType && contentType.includes('application/json'))
+                        ? await fetchResponse.json()
+                        : { error: await fetchResponse.text() };
+                    return { status: fetchResponse.status, body };
+                } catch (e) {
+                    return { status: 0, body: { error: String((e && e.message) || e) } };
+                }
+            }, {
+                url: process.env.INGESTION_URL,
                 headers: headers,
-                body: JSON.stringify(logsdata)
+                orgId: orgId,
+                streamName: testStreamName,
+                logsdata: logsdata
             });
 
-            const contentType = fetchResponse.headers.get('content-type');
-            if (contentType && contentType.includes('application/json')) {
-                return await fetchResponse.json();
-            } else {
-                const text = await fetchResponse.text();
-                return { error: text, status: fetchResponse.status };
+            testLogger.debug('Ingestion response', { attempt, response });
+
+            if (response.status === 200) {
+                return; // accepted — stream will index and become listable
             }
-        }, {
-            url: process.env.INGESTION_URL,
-            headers: headers,
-            orgId: orgId,
-            streamName: testStreamName,
-            logsdata: logsdata
-        });
-        
-        testLogger.debug('Ingestion response', { response });
+
+            const msg = JSON.stringify(response.body || {});
+            const retriable = response.status === 0
+                || response.status >= 500
+                || /being deleted|Connection|timeout|ECONNRESET|socket hang up/i.test(msg);
+            if (!retriable || attempt === maxRetries) {
+                throw new Error(`Ingestion into "${testStreamName}" failed after ${attempt} attempt(s): status=${response.status} body=${msg}`);
+            }
+            testLogger.warn(`Ingestion into ${testStreamName} not accepted (status ${response.status}) — retrying`, { attempt });
+            await page.waitForTimeout(attempt * 2000);
+        }
     }
 
     /**
@@ -78,7 +102,7 @@ test.describe("Schema testcases", () => {
         // Bounded poll: ~60s worst case (20 attempts x 3s backoff), well above the
         // observed consistency lag while still failing fast if the stream is truly
         // never created. Transient network errors are tolerated and retried.
-        const maxAttempts = 20;
+        const maxAttempts = 30; // ~90s: freshly-ingested streams can lag the streams-list under cloud load
         const backoffMs = 3000;
 
         for (let attempt = 1; attempt <= maxAttempts; attempt++) {
@@ -130,7 +154,7 @@ test.describe("Schema testcases", () => {
     }
 
     test('stream schema settings updated to be displayed under logs', async ({ page }, testInfo) => {
-        const testStreamName = "test1";
+        const testStreamName = `test1_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
         
         // Initialize test setup
         testLogger.testStart(testInfo.title, testInfo.file);
@@ -168,7 +192,7 @@ test.describe("Schema testcases", () => {
     });
 
     test('should display stream details on navigating from blank stream to stream with details', async ({ page }, testInfo) => {
-        const testStreamName = "test2";
+        const testStreamName = `test2_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
         
         // Initialize test setup
         testLogger.testStart(testInfo.title, testInfo.file);
@@ -202,7 +226,7 @@ test.describe("Schema testcases", () => {
     });
 
     test('should add a new field and delete it from schema', async ({ page }, testInfo) => {
-        const testStreamName = "test3";
+        const testStreamName = `test3_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
         
         // Initialize test setup
         testLogger.testStart(testInfo.title, testInfo.file);

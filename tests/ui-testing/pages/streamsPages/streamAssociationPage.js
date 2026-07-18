@@ -60,9 +60,24 @@ export class StreamAssociationPage {
     testLogger.info(`Opening stream detail for: ${streamName}`);
     await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
-    // Find the cell with stream name
+    // Find the cell with stream name. A freshly-ingested stream can lag the
+    // /streams table under cloud load — the row may be absent on first load even
+    // after search (the caller already navigated + searched). Reload the streams
+    // page and re-search until the stream's row actually appears (bounded ~90s), so
+    // the row is reliably present before we resolve its Stream Detail button.
+    // NOTE: use waitFor (auto-waits up to timeout), NOT isVisible (instant check) —
+    // the stream needs time to appear in the table after each reload.
     const streamCell = this.page.getByRole('cell', { name: streamName }).first();
-    await streamCell.waitFor({ state: 'visible', timeout: 5000 });
+    let cellVisible = await streamCell.waitFor({ state: 'visible', timeout: 8000 }).then(() => true).catch(() => false);
+    for (let attempt = 1; attempt <= 6 && !cellVisible; attempt++) {
+      testLogger.info(`Stream "${streamName}" row not yet in /streams (attempt ${attempt}) — reloading + re-searching`);
+      await this.navigateToStreams();
+      await this.searchForStream(streamName);
+      cellVisible = await streamCell.waitFor({ state: 'visible', timeout: 12000 }).then(() => true).catch(() => false);
+    }
+    if (!cellVisible) {
+      throw new Error(`openStreamDetail: stream "${streamName}" row not found in /streams after reload + re-search retries (backend never listed the ingested stream)`);
+    }
     testLogger.info(`Found stream cell for: ${streamName}`);
 
     // Navigate to parent row
