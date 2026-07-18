@@ -25,12 +25,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <!-- Error Summary: HTTP / gRPC status code -->
   <div
     v-if="hasSpanError && (spanStatusCode || spanGrpcStatusCode)"
-    class="error-summary rounded-default p-[0.5rem] mb-[0.5rem] border border-solid bg-status-error-bg border-status-error-text"
+    class="error-summary rounded-default p-2 mb-2 border border-solid bg-status-error-bg border-status-error-text"
     data-test="trace-details-sidebar-error-summary"
   >
     <div class="flex-col items-center gap-1">
       <div
-        class="text-text-label! text-sm tracking-[0.03rem] pl-[0.5rem] w-full pb-[0.125rem]"
+        class="text-text-label! text-sm tracking-[0.03rem] pl-2 w-full pb-0.5"
       >
         {{ spanStatusCode ? "HTTP Status Code" : "gRPC Status Code" }}
       </div>
@@ -54,16 +54,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <!-- DB Response Status Code -->
   <div
     v-if="hasSpanError && spanDbResponseStatusCode"
-    class="error-summary rounded-default p-[0.5rem] mb-[0.5rem] border border-solid bg-status-error-bg border-status-error-text"
+    class="error-summary rounded-default p-2 mb-2 border border-solid bg-status-error-bg border-status-error-text"
     data-test="trace-details-sidebar-db-response-status-code"
   >
     <div class="flex-col items-center gap-1">
       <div
-        class="text-text-label! text-3xs tracking-[0.03rem] pl-[0.5rem] w-full pb-[0.125rem]"
+        class="text-text-label! text-3xs tracking-[0.03rem] pl-2 w-full pb-0.5"
       >
         DB Response Status Code
       </div>
-      <div class="flex items-center pl-[0.5rem]">
+      <div class="flex items-center pl-2">
         <span
           class="text-sm font-semibold text-status-error-text"
           data-test="trace-details-sidebar-db-response-status-code-value"
@@ -77,16 +77,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <!-- Process Exit Code -->
   <div
     v-if="hasSpanError && spanProcessExitCode"
-    class="error-summary rounded-default p-[0.5rem] mb-[0.5rem] border border-solid bg-status-error-bg border-status-error-text"
+    class="error-summary rounded-default p-2 mb-2 border border-solid bg-status-error-bg border-status-error-text"
     data-test="trace-details-sidebar-process-exit-code"
   >
     <div class="flex-col items-center gap-1">
       <div
-        class="text-text-label! text-3xs tracking-[0.03rem] pl-[0.5rem] w-full pb-[0.125rem]"
+        class="text-text-label! text-3xs tracking-[0.03rem] pl-2 w-full pb-0.5"
       >
         Process Exit Code
       </div>
-      <div class="flex items-center pl-[0.5rem]">
+      <div class="flex items-center pl-2">
         <span
           class="text-sm font-semibold text-status-error-text"
           data-test="trace-details-sidebar-process-exit-code-value"
@@ -102,10 +102,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     v-if="
       hasSpanError && (errorBannerTitle || errorBannerMessage || spanErrorType)
     "
-    class="error-summary rounded-default p-[0.5rem] mb-[0.5rem] border border-solid bg-status-error-bg border-status-error-text"
+    class="error-summary rounded-default p-2 mb-2 border border-solid bg-status-error-bg border-status-error-text"
     data-test="trace-details-sidebar-error-summary"
   >
-    <div class="flex items-center gap-2 mb-[0.25rem]">
+    <div class="flex items-center gap-2 mb-1">
       <OIcon
         name="error"
         size="sm"
@@ -120,7 +120,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <div
       v-if="errorBannerMessage"
-      class="ml-[1.5rem] text-sm mb-[0.25rem] text-text-secondary"
+      class="ml-6 text-sm mb-1 text-text-secondary"
       data-test="trace-details-sidebar-error-summary-message"
     >
       {{ errorBannerMessage }}

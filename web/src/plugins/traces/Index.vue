@@ -136,7 +136,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </template>
               <template #after>
-                <div class="h-full pb-[0.625rem]">
+                <div class="h-full pb-2.5">
                   <!-- No trace streams in org yet -->
                   <TracesNoDataState
                     v-if="
@@ -166,7 +166,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     "
                     class="bg-card-glass-bg h-full"
                   >
-                    <div class="text-center pt-[2rem]">
+                    <div class="text-center pt-8">
                       <!-- Actual error case -->
                       <div
                         data-test="traces-search-error-message"
@@ -187,16 +187,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </div>
                       <!-- Collapsible error detail — shown below results when toggled -->
                       <div class="text-center">
-                        <div class="my-none text-base! px-[2rem]!">
+                        <div class="my-none text-base! px-8!">
                           <span v-if="disableMoreErrorDetails">
                             <SanitizedHtmlRenderer
                               data-test="traces-search-detail-error-message"
                               :htmlContent="searchObj?.data?.errorMsg"
-                              class="pt-[1rem]"
+                              class="pt-4"
                             />
                             <div
                               v-if="searchObj?.data?.errorDetail"
-                              class="error-display__message pt-[1rem]! text-text-secondary!"
+                              class="error-display__message pt-4! text-text-secondary!"
                             >
                               {{ searchObj.data.errorDetail }}
                             </div>
@@ -237,7 +237,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <SanitizedHtmlRenderer
                       data-test="traces-search-detail-error-message"
                       :htmlContent="searchObj?.data?.errorMsg"
-                      class="pt-[1rem]"
+                      class="pt-4"
                     />
                   </div>
                   <div v-else-if="!isStreamSelected">

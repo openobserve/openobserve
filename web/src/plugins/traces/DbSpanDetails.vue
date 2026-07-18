@@ -120,7 +120,7 @@ const metadataRows = computed(() =>
       data-test="traces-db-span-details-query-editor"
     >
       <OCardSection
-        class="flex-1 flex flex-col p-0 min-h-[18.75rem] p-[0.375rem]!"
+        class="flex-1 flex flex-col p-0 min-h-[18.75rem] p-1.5!"
       >
         <CodeQueryEditor
           v-if="queryText"

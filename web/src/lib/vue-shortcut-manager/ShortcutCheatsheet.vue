@@ -147,7 +147,7 @@
                       >
                       <kbd
                         v-else
-                        class="inline-flex items-center justify-center min-w-[1.5rem] h-6 px-1.5 bg-surface-base border border-border-default rounded-default font-mono text-2xs font-medium text-text-secondary whitespace-nowrap shadow-[0_1px_0_0_var(--color-border-default)]"
+                        class="inline-flex items-center justify-center min-w-6 h-6 px-1.5 bg-surface-base border border-border-default rounded-default font-mono text-2xs font-medium text-text-secondary whitespace-nowrap shadow-[0_1px_0_0_var(--color-border-default)]"
                         >{{ part }}</kbd
                       >
                     </template>
@@ -220,7 +220,7 @@
                       >
                       <kbd
                         v-else
-                        class="inline-flex items-center justify-center min-w-[1.5rem] h-6 px-1.5 bg-surface-base border border-border-default rounded-default font-mono text-2xs font-medium text-text-secondary whitespace-nowrap shadow-[0_1px_0_0_var(--color-border-default)]"
+                        class="inline-flex items-center justify-center min-w-6 h-6 px-1.5 bg-surface-base border border-border-default rounded-default font-mono text-2xs font-medium text-text-secondary whitespace-nowrap shadow-[0_1px_0_0_var(--color-border-default)]"
                         >{{ part }}</kbd
                       >
                     </template>

@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         "
         ref="sectionHeaderRef"
         data-test="traces-section-header"
-        class="flex items-center px-[0.4rem]! h-[2.25rem] shrink-0 border-b border-[rgba(0,0,0,0.07)]"
+        class="flex items-center px-[0.4rem]! h-9 shrink-0 border-b border-[rgba(0,0,0,0.07)]"
       >
         <!-- Field panel toggle — same style as logs page -->
         <OButton
@@ -65,7 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="traces-error-count-badge"
           variant="error"
           :clickable="true"
-          class="text-xs rounded-default! py-[0.4rem]! px-[0.625rem]! text-xs!"
+          class="text-xs rounded-default! py-[0.4rem]! px-2.5! text-xs!"
           :class="showErrorOnly
             ? 'bg-badge-error-solid-bg! text-badge-error-solid-text!'
             : 'bg-error-tag-bg! text-error-tag-text!'"
@@ -106,7 +106,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OSelect
             :model-value="searchObj.meta.resultGrid.rowsPerPage"
             :options="rowsPerPageOptions"
-            class="select-pagination mr-[0.25rem] mt-0! ml-1"
+            class="select-pagination mr-1 mt-0! ml-1"
             size="sm"
             data-test="traces-search-result-records-per-page"
             @update:model-value="changeRowsPerPage"

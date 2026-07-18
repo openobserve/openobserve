@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          instead of floating inside a padded box. -->
     <div
       v-if="availableStreams.length > 0"
-      class="flex items-center justify-end gap-[0.5rem] px-4 py-[0.5rem]"
+      class="flex items-center justify-end gap-2 px-4 py-2"
     >
       <!-- Filter mode: view a whole Stream, or a single Agent. Sits directly
            beside the picker so switching mode and choosing the value are one
@@ -49,7 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         v-if="filterMode === 'stream'"
         data-test="llm-insights-stream-selector"
-        class="w-[14rem] flex-shrink-0"
+        class="w-56 flex-shrink-0"
       >
         <OSelect
           v-model="activeStream"
@@ -65,7 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         v-else
         data-test="llm-insights-agent-selector"
-        class="w-[14rem] flex-shrink-0"
+        class="w-56 flex-shrink-0"
       >
         <!-- Hold a picker-shaped skeleton until the agents list lands the first
              time, so the dropdown doesn't flash an empty "Agent" picker before
@@ -157,12 +157,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <LLMInsightsSkeleton
         v-if="loading || !hasLoadedOnce"
         kpi-only
-        class="mt-[0.625rem] mb-[0.625rem]"
+        class="mt-2.5 mb-2.5"
       />
       <!-- KPI Cards Row -->
       <div
         v-else
-        class="grid grid-cols-5 gap-[0.625rem] mt-[0.625rem] mb-[0.625rem]"
+        class="grid grid-cols-5 gap-2.5 mt-2.5 mb-2.5"
       >
         <div
           v-for="card in kpiCards"
@@ -174,7 +174,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                LLMInsightsSkeleton). Its sparkline comes from the histogram, but
                showing a chart before the number reads as ready, so we hold both. -->
           <template v-if="card.loading">
-            <div class="flex flex-col gap-[0.25rem]">
+            <div class="flex flex-col gap-1">
               <OSkeleton type="text" class="w-[60%] h-3" />
               <OSkeleton type="text" class="w-[55%] h-5.5" />
             </div>
@@ -183,8 +183,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </template>
           <template v-else>
-            <div class="flex flex-col gap-[0.25rem]">
-              <div class="flex items-center justify-between gap-2 mb-[0.25rem]">
+            <div class="flex flex-col gap-1">
+              <div class="flex items-center justify-between gap-2 mb-1">
                 <div class="text-2xs leading-normal font-semibold text-text-secondary min-w-0 truncate">
                   {{ card.label }}
                 </div>
@@ -224,7 +224,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            remount is what lets it restore an already-fetched result instead of
            re-querying. Same selection + window → instant cache hit; a new one →
            a clean miss that fetches. -->
-      <div class="grid grid-cols-2 gap-[0.625rem]">
+      <div class="grid grid-cols-2 gap-2.5">
         <div
           v-for="panel in LLM_INSIGHTS_PANELS"
           :key="`${panel.id}::${panelCacheDashboardId}`"

@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="shrink-0 px-4 border-b border-border-default"
     />
     <div :style="{ marginTop: 0 }" class="app-table-container flex flex-col flex-1 min-h-0">
-      <div class="bg-card-glass-bg mb-[0.625rem] mt-2.5">
+      <div class="bg-card-glass-bg mb-2.5 mt-2.5">
         <div class="px-3 py-2">
           <div class="flex items-center justify-between w-full mb-2">
             <div class="flex items-center">
@@ -186,7 +186,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <div
-        class="bg-card-glass-bg pb-[0.625rem] flex-1 min-h-0"
+        class="bg-card-glass-bg pb-2.5 flex-1 min-h-0"
         v-if="activeTab == 'api-limits' && activeType == 'json'"
       >
         <query-editor

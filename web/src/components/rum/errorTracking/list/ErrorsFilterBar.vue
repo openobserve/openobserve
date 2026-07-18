@@ -82,7 +82,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :model-value="service || ALL_SERVICES"
         :options="serviceOptions"
         size="sm"
-        class="min-w-[9rem]"
+        class="min-w-36"
         data-test="rum-errors-filter-service-select"
         @update:model-value="onServiceSelect"
       />

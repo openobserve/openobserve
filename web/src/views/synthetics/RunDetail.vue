@@ -147,18 +147,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- ════════════ SUMMARY ════════════ -->
         <OTabPanel name="summary" data-test="synthetics-run-detail-summary-tab">
           <div
-            class="py-[0.875rem] pb-[1.75rem] flex flex-col"
+            class="py-3.5 pb-7 flex flex-col"
           >
             <!-- Info chips skeleton -->
             <template v-if="loading">
               <div
-                class="grid grid-cols-5 gap-[0.625rem] px-2"
+                class="grid grid-cols-5 gap-2.5 px-2"
                 data-test="synthetics-run-detail-info-skeleton"
               >
                 <div
                   v-for="i in 5"
                   :key="i"
-                  class="card-container rounded-default flex flex-row items-center px-[0.875rem] py-[0.625rem] gap-1.5 bg-surface-base border border-border-default"
+                  class="card-container rounded-default flex flex-row items-center px-3.5 py-2.5 gap-1.5 bg-surface-base border border-border-default"
                 >
                   <OSkeleton type="circle" class="h-4 w-4 shrink-0" />
                   <OSkeleton type="text" class="h-4 w-20" />
@@ -168,13 +168,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Info chips -->
             <template v-else>
               <div
-                class="grid grid-cols-5 gap-[0.625rem] px-2"
+                class="grid grid-cols-5 gap-2.5 px-2"
                 data-test="synthetics-run-detail-info-bar"
               >
                 <div
                   v-for="chip in infoChips"
                   :key="chip.label"
-                  class="card-container rounded-default flex flex-row items-center px-[0.875rem] py-[0.625rem] gap-1.5 bg-surface-base border border-border-default"
+                  class="card-container rounded-default flex flex-row items-center px-3.5 py-2.5 gap-1.5 bg-surface-base border border-border-default"
                 >
                   <OIcon
                     v-if="chip.icon"

@@ -144,7 +144,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- List view -->
     <div v-else class="flex flex-col overflow-hidden h-full px-2">
       <!-- Filter bar -->
-      <div class="flex items-center pr-2 py-1  shrink-0 min-h-[2rem]">
+      <div class="flex items-center pr-2 py-1  shrink-0 min-h-8">
         <OTag
           type="logsResultChip"
           value="neutral"

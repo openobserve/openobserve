@@ -87,7 +87,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <template v-if="field.name === 'duration'" #body>
                   <div
                     v-if="durationPercentilesLoading"
-                    class="flex justify-center py-[0.5rem]"
+                    class="flex justify-center py-2"
                   >
                     <OSpinner size="xs" />
                   </div>
@@ -95,31 +95,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div
                       v-for="p in PERCENTILE_LABELS"
                       :key="p.key"
-                      class="flex items-center justify-between py-[0.15rem] pl-[0.5rem]"
+                      class="flex items-center justify-between py-[0.15rem] pl-2"
                     >
-                      <span class="text-xs w-[2rem] shrink-0">{{ p.label }}</span>
-                      <span class="text-xs flex-1 text-right pr-[0.25rem]">
+                      <span class="text-xs w-8 shrink-0">{{ p.label }}</span>
+                      <span class="text-xs flex-1 text-right pr-1">
                         {{ formatTimeWithSuffix(durationPercentiles[p.key]) }}
                       </span>
-                      <div class="flex w-[3rem]">
+                      <div class="flex w-12">
                         <OButton
                           v-if="p.key !== 'max'"
                           variant="ghost"
                           size="icon-xs-circle"
                           :title="`duration >= ${formatTimeWithSuffix(durationPercentiles[p.key])}`"
                           @click.stop="addSearchTerm(`duration>='${formatTimeWithSuffix(durationPercentiles[p.key])}'`)"
-                          class="o2-custom-button-hover ml-[0.25rem]! border! border-card-glass-border!"
+                          class="o2-custom-button-hover ml-1! border! border-card-glass-border!"
                         >
-                          <OIcon name="arrow-forward-ios" size="sm" class="h-[0.5rem]! w-[0.5rem]!" />
+                          <OIcon name="arrow-forward-ios" size="sm" class="h-2! w-2!" />
                         </OButton>
                         <OButton
                           variant="ghost"
                           size="icon-xs-circle"
                           :title="`duration <= ${formatTimeWithSuffix(durationPercentiles[p.key])}`"
                           @click.stop="addSearchTerm(`duration<='${formatTimeWithSuffix(durationPercentiles[p.key])}'`)"
-                          class="o2-custom-button-hover mr-[0.625rem]! border! border-card-glass-border! ml-auto!"
+                          class="o2-custom-button-hover mr-2.5! border! border-card-glass-border! ml-auto!"
                         >
-                          <OIcon name="arrow-back-ios" size="sm" class="h-[0.5rem]! w-[0.5rem]!" />
+                          <OIcon name="arrow-back-ios" size="sm" class="h-2! w-2!" />
                         </OButton>
                       </div>
                     </div>
@@ -150,7 +150,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <template #loading>
           <div
-            class="flex items-center justify-center w-full pt-[2rem]"
+            class="flex items-center justify-center w-full pt-8"
           >
             <div
               class="text-sm font-medium font-bold w-fit mx-auto my-0 flex-col justify-items-center"

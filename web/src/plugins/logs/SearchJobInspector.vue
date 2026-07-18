@@ -50,7 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </AppPageHeader>
     <div class="w-full flex flex-col flex-1 min-h-0 overflow-hidden pt-2.5">
       <!-- Summary Stats Card -->
-      <div v-if="!loading" class="mb-[0.625rem] mx-2.5 shrink-0">
+      <div v-if="!loading" class="mb-2.5 mx-2.5 shrink-0">
         <div class="grid gap-3" style="grid-template-columns: 1fr 1fr 1fr 1.6fr 0.9fr;">
           <!-- Results Returned -->
           <div class="stat-tile">
@@ -219,7 +219,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         variant="error"
         icon="error"
         :content="errorMessage"
-        class="mb-[0.625rem] shrink-0"
+        class="mb-2.5 shrink-0"
         data-test="inspector-error-banner"
       />
 

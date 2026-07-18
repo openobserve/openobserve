@@ -268,7 +268,7 @@ function failedAtStep(steps: StepResult[]): string {
                       </span>
                     </td>
                     <td class="px-3 py-2 text-right tabular-nums text-text-secondary">{{ fmtDuration(ex.durationMs) }}</td>
-                    <td class="px-3 py-2 text-text-muted font-mono truncate max-w-[12rem]">
+                    <td class="px-3 py-2 text-text-muted font-mono truncate max-w-48">
                       {{ ex.status !== 'passed' ? failedAtStep(ex.steps) : '—' }}
                     </td>
                   </tr>

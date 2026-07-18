@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <!-- Baseline Chip -->
         <div
-          class="time-range-chip baseline-chip flex items-center gap-1 px-2 py-[0.375rem] rounded-default text-sm"
+          class="time-range-chip baseline-chip flex items-center gap-1 px-2 py-1.5 rounded-default text-sm"
           :style="{ '--chip-color': chipColors.baseline }"
         >
           <span class="uppercase tracking-wide opacity-70"
@@ -53,7 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Selected Chip -->
         <div
           v-if="hasSelectedTimeRange"
-          class="time-range-chip selected-chip flex items-center gap-1 px-2 py-[0.375rem] rounded-default text-sm"
+          class="time-range-chip selected-chip flex items-center gap-1 px-2 py-1.5 rounded-default text-sm"
           :style="{ '--chip-color': chipColors.selected }"
         >
           <span class="uppercase tracking-wide opacity-70"
@@ -111,7 +111,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :label="tab.label"
           :icon="tab.icon"
           :data-test="`traces-analysis-dashboard-${tab.name}-tab`"
-          class="min-h-[3rem]"
+          class="min-h-12"
         />
       </OTabs>
 
@@ -160,7 +160,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <!-- Search Input -->
                 <div
-                  class="p-[0.625rem] border-solid border-card-glass-border"
+                  class="p-2.5 border-solid border-card-glass-border"
                 >
                   <OSearchInput
                     v-model="dimensionSearchText"

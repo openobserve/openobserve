@@ -1,12 +1,12 @@
 <template>
   <div
-    class="bg-card-glass-bg rounded-default flex flex-col px-[0.875rem] pt-[0.625rem] pb-[0.625rem] gap-[0.25rem] border border-border-default transition-shadow duration-200 ease-in-out hover:shadow-[0_1px_6px_rgba(0,0,0,0.08)]"
+    class="bg-card-glass-bg rounded-default flex flex-col px-3.5 pt-2.5 pb-2.5 gap-1 border border-border-default transition-shadow duration-200 ease-in-out hover:shadow-[0_1px_6px_rgba(0,0,0,0.08)]"
     :data-test="`quality-kpi-${kpi.id}`"
   >
-    <div class="flex flex-col gap-[0.25rem]">
+    <div class="flex flex-col gap-1">
       <!-- Label + a metric icon in a soft corner tile — same KPI-card pattern
            as LLM Insights / Session Detail so every card reads the same. -->
-      <div class="flex items-center justify-between gap-2 mb-[0.25rem]">
+      <div class="flex items-center justify-between gap-2 mb-1">
         <div class="kpi-label text-2xs font-semibold leading-normal text-text-secondary min-w-0 truncate">
           {{ t(`onlineEvals.quality.kpis.${kpi.id}.title`) }}
         </div>
@@ -42,7 +42,7 @@
            short history) rather than zero. -->
       <div
         v-if="kpi.value != null"
-        class="text-3xs font-medium flex items-center gap-[0.25rem]"
+        class="text-3xs font-medium flex items-center gap-1"
         :class="{
           'text-status-success-text': (delta != null ? trendSentiment : 'neutral') === 'good',
           'text-error-600': (delta != null ? trendSentiment : 'neutral') === 'bad',

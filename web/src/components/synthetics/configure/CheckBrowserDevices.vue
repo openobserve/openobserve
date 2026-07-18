@@ -86,7 +86,7 @@ function toggle(browserId: string, deviceId: string) {
     class="rounded-default border border-border-default mb-4"
     data-test="synthetics-check-browser-devices"
   >
-    <div class="flex items-center border-b border-border-default py-[0.625rem] px-3">
+    <div class="flex items-center border-b border-border-default py-2.5 px-3">
       <div class="w-[0.1875rem] h-4 rounded-default mr-2 shrink-0 bg-primary-600" />
       <h3 class="text-base font-semibold text-text-heading">
         {{ t('synthetics.browserDevices.title') }}

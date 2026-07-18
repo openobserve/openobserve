@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="pt-[0.625rem] flex flex-col gap-[0.625rem] tile-content"
+    class="pt-2.5 flex flex-col gap-2.5 tile-content"
   >
     <!-- Toolbar: Stream/Agent toggle + picker. Only in the full-page skeleton
          when the real toolbar is hidden (initial !streamsLoaded). On a mid-session
@@ -24,18 +24,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          avoid a duplicate toggle/picker row. The kpiOnly variant never shows it. -->
     <div
       v-if="!kpiOnly && !hideToolbar"
-      class="flex items-center justify-end gap-[0.5rem] py-[0.5rem]"
+      class="flex items-center justify-end gap-2 py-2"
     >
       <OSkeleton type="text" class="w-29 h-8" />
       <OSkeleton type="text" class="w-56 h-9" />
     </div>
 
     <!-- Row 1: 5 KPI cards -->
-    <div class="grid grid-cols-5 gap-[0.625rem]">
+    <div class="grid grid-cols-5 gap-2.5">
       <div
         v-for="n in 5"
         :key="n"
-        class="bg-(--tile-bg) border border-(--tile-border) text-(--text-primary) rounded-default py-[0.625rem] px-[0.875rem] flex flex-col gap-2 h-32.5 tile-content"
+        class="bg-(--tile-bg) border border-(--tile-border) text-(--text-primary) rounded-default py-2.5 px-3.5 flex flex-col gap-2 h-32.5 tile-content"
       >
         <OSkeleton type="text" class="w-[60%] h-3" />
         <OSkeleton type="text" class="w-[55%] h-5.5" />
@@ -47,7 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Row 2 & 3: 2-column trend panel grid -->
-    <div v-if="!kpiOnly" class="grid grid-cols-2 gap-[0.625rem]">
+    <div v-if="!kpiOnly" class="grid grid-cols-2 gap-2.5">
       <div
         v-for="n in 4"
         :key="n"

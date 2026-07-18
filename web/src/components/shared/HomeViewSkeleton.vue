@@ -3,7 +3,7 @@
        skeleton must not add one (otherwise a top/outer border flashes only while
        loading and disappears once data arrives). -->
   <div
-    class="home-view-skeleton w-full px-[0.625rem] py-[0.625rem] flex flex-col h-[calc(100vh-3.25rem)]"
+    class="home-view-skeleton w-full px-2.5 py-2.5 flex flex-col h-[calc(100vh-3.25rem)]"
   >
     <!-- 1st section - Streams container -->
     <div

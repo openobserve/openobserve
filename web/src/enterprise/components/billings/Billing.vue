@@ -46,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="flex-1 min-h-0"
     >
       <template v-slot:before>
-        <div class="w-full h-full pl-[0.625rem] pt-2 pb-[0.625rem]">
+        <div class="w-full h-full pl-2.5 pt-2 pb-2.5">
           <div class="overflow-y-auto h-full">
             <OTabs
               v-model="billingtab"
@@ -153,7 +153,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
           </div>
-          <div class="flex-1 min-h-0 pr-[0.625rem] pb-[0.625rem] flex gap-[0.625rem]">
+          <div class="flex-1 min-h-0 pr-2.5 pb-2.5 flex gap-2.5">
             <div
               v-if="isUsageRoute && billingMembers.length > 0"
               class="w-65 shrink-0 h-full"

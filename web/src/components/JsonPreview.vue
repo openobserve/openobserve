@@ -47,7 +47,7 @@
       </ODropdown>
 
       <span
-        class="pl-[0.625rem]"
+        class="pl-2.5"
         :data-test="`json-preview-key-${key}`"
       >
         <span class="log-key">{{ key }}</span

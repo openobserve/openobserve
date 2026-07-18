@@ -182,14 +182,14 @@ const showAssertions = computed(
           {{ statusMeta.label }}
         </OBadge>
         <OBadge v-if="run" variant="default" size="sm">{{ run.type.toUpperCase() }}</OBadge>
-        <OBadge v-if="run?.target" variant="default" size="sm" icon="link" class="truncate max-w-[15rem]">
+        <OBadge v-if="run?.target" variant="default" size="sm" icon="link" class="truncate max-w-60">
           {{ run.target }}
         </OBadge>
       </template>
     </AppPageHeader>
 
     <div class="flex-1 min-h-0 overflow-y-auto p-4">
-      <OSkeleton v-if="loading" class="h-[20rem] w-full" />
+      <OSkeleton v-if="loading" class="h-80 w-full" />
 
       <OEmptyState
         v-else-if="!run"
@@ -239,7 +239,7 @@ const showAssertions = computed(
           </div>
           <div class="px-3 py-3 flex flex-col gap-2">
             <div v-for="bar in timingBars" :key="bar.phase" class="flex items-center gap-2">
-              <span class="w-[5rem] shrink-0 text-xs text-text-secondary">{{ t(`synthetics.protocolRun.phase.${bar.phase}`) }}</span>
+              <span class="w-20 shrink-0 text-xs text-text-secondary">{{ t(`synthetics.protocolRun.phase.${bar.phase}`) }}</span>
               <div class="flex-1 h-3 rounded-default bg-surface-subtle overflow-hidden">
                 <div
                   class="h-full rounded-default bg-primary-600"
@@ -249,7 +249,7 @@ const showAssertions = computed(
               <span class="w-[4.5rem] shrink-0 text-right text-xs text-text-secondary">{{ fmtMs(bar.ms) }}</span>
             </div>
             <div class="flex items-center gap-2 pt-1 border-t border-border-default">
-              <span class="w-[5rem] shrink-0 text-xs font-semibold text-text-body">{{ t('synthetics.protocolRun.phase.total') }}</span>
+              <span class="w-20 shrink-0 text-xs font-semibold text-text-body">{{ t('synthetics.protocolRun.phase.total') }}</span>
               <div class="flex-1" />
               <span class="w-[4.5rem] shrink-0 text-right text-xs font-semibold text-text-body">{{ fmtMs(run.totalMs) }}</span>
             </div>

@@ -51,7 +51,7 @@
       <slot name="empty">
         <div class="text-center py-[0.725rem] flex items-center justify-center">
           <OIcon name="info" size="xs" />
-          <span class="pl-[0.375rem]">{{ t("search.noFieldFound") }}</span>
+          <span class="pl-1.5">{{ t("search.noFieldFound") }}</span>
         </div>
       </slot>
     </template>

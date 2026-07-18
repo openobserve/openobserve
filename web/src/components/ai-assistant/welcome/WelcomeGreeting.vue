@@ -23,8 +23,8 @@ const logoSrc = computed(() =>
 </script>
 
 <template>
-  <header class="welcome-hero flex flex-col items-center text-center gap-[0.625rem] max-w-[44rem]">
-    <div class="welcome-hero__row flex items-center gap-[0.875rem]">
+  <header class="welcome-hero flex flex-col items-center text-center gap-2.5 max-w-[44rem]">
+    <div class="welcome-hero__row flex items-center gap-3.5">
       <div class="welcome-hero__logo-wrap relative inline-flex">
         <span class="welcome-hero__logo-halo absolute inset-[-18px] rounded-full bg-[radial-gradient(closest-side,rgba(123,97,255,0.35),rgba(245,158,11,0.12)_55%,transparent_70%)] blur-[14px] pointer-events-none z-0" aria-hidden="true"></span>
         <img :src="logoSrc" alt="O2 Assistant" class="welcome-hero__logo relative z-1 w-14 h-14" />
@@ -57,7 +57,7 @@ const logoSrc = computed(() =>
       — {{ t("aiAssistant.welcome.taglineAnd") }}
     </div>
 
-    <div v-if="email" class="welcome-hero__meta inline-flex flex-wrap items-center justify-center gap-x-2 gap-y-[0.375rem] mt-[0.375rem] py-[0.375rem] px-3 rounded-full bg-[color-mix(in_srgb,var(--color-border-default)_30%,transparent)] text-2xs">
+    <div v-if="email" class="welcome-hero__meta inline-flex flex-wrap items-center justify-center gap-x-2 gap-y-1.5 mt-1.5 py-1.5 px-3 rounded-full bg-[color-mix(in_srgb,var(--color-border-default)_30%,transparent)] text-2xs">
       <span class="welcome-hero__meta-item inline-flex items-center gap-1">
         <span class="welcome-hero__meta-label text-typography-meta">{{
           t("aiAssistant.welcome.signedInAs")

@@ -37,13 +37,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          wraps its OWN chips internally (flex-wrap), so the row does not need
          items-start to let chips grow — that only left the controls top-aligned
          and visibly out of line with each other. -->
-    <!-- `p-[0.375rem]`, the SAME padding the Logs and Traces toolbars use
+    <!-- `p-1.5`, the SAME padding the Logs and Traces toolbars use
          (SearchBar.vue:23 / traces SearchBar.vue:19). It was `px-4 py-2`, which
          put the mode toggle 10px further right than the Logs one — switching
          Logs -> Metrics visibly jumped the control that is in the same place on
          both pages. The toolbars are the same object; they must share geometry. -->
     <div
-      class="flex items-center gap-2 shrink-0 p-[0.375rem] border-b border-border-default"
+      class="flex items-center gap-2 shrink-0 p-1.5 border-b border-border-default"
       data-test="metrics-explorer-filter-bar"
     >
       <!-- Page mode toggle at the start of the toolbar — Explore (browse grid)
@@ -153,7 +153,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     -->
     <div
       v-if="isGridMode"
-      class="flex items-center gap-2 shrink-0 p-[0.375rem] border-b border-border-default"
+      class="flex items-center gap-2 shrink-0 p-1.5 border-b border-border-default"
       data-test="metrics-explorer-filter-row"
     >
       <!-- No "Filters" caption: the chips already read `action = accept_challenge`

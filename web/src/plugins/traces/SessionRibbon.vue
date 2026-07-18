@@ -21,11 +21,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <div
-    class="bg-card-glass-bg rounded-default border border-border-default pt-[1rem] px-[1rem] pb-[0.625rem] flex flex-col"
+    class="bg-card-glass-bg rounded-default border border-border-default pt-4 px-4 pb-2.5 flex flex-col"
     data-test="session-ribbon"
   >
     <!-- Header: title + subtitle (left) · metric toggle (right) -->
-    <div class="flex items-baseline justify-between gap-[0.5rem] mb-[0.75rem]">
+    <div class="flex items-baseline justify-between gap-2 mb-3">
       <div>
         <div class="text-sm font-semibold text-text-heading">
           {{ t('traces.sessionDetail.ribbon.title') }}
@@ -53,9 +53,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          whole session when it fits, otherwise just the selected window. -->
     <div class="flex flex-col flex-1 min-h-0">
       <!-- chart region: y-axis labels + bars, sharing the grown height -->
-      <div class="flex gap-[0.5rem] flex-1 min-h-0">
+      <div class="flex gap-2 flex-1 min-h-0">
         <div
-          class="flex flex-col justify-between items-end h-full w-[2.75rem] flex-shrink-0 text-3xs text-text-muted tabular-nums"
+          class="flex flex-col justify-between items-end h-full w-11 flex-shrink-0 text-3xs text-text-muted tabular-nums"
         >
           <span>{{ maxLabel }}</span>
           <span>{{ midLabel }}</span>
@@ -89,10 +89,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- x-axis + title, offset by the y-axis column width so the numbers stay
            aligned under their bars. With the window capped at WINDOW turns, every
            visible bar is wide enough to print its turn number. -->
-      <div class="flex gap-[0.5rem] flex-shrink-0">
-        <div class="w-[2.75rem] flex-shrink-0" />
+      <div class="flex gap-2 flex-shrink-0">
+        <div class="w-11 flex-shrink-0" />
         <div class="flex-1 min-w-0">
-          <div class="flex gap-0.75 mt-[0.25rem]">
+          <div class="flex gap-0.75 mt-1">
             <span
               v-for="bar in detailBars"
               :key="bar.index"
@@ -105,7 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- x-axis title — matches the dashboard axis name (nameLocation
                "middle" + nameTextStyle bold/14px). -->
           <div
-            class="text-center text-sm font-bold text-text-heading mt-[0.25rem]"
+            class="text-center text-sm font-bold text-text-heading mt-1"
           >
             {{ t('traces.sessionDetail.turnLabel') }}
           </div>
@@ -121,9 +121,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          up with the bars above. -->
     <div
       v-if="windowed"
-      class="flex gap-[0.5rem] flex-shrink-0 mt-[0.625rem]"
+      class="flex gap-2 flex-shrink-0 mt-2.5"
     >
-      <div class="w-[2.75rem] flex-shrink-0" />
+      <div class="w-11 flex-shrink-0" />
       <div
         ref="overviewTrackRef"
         class="relative flex-1 min-w-0 h-6.5 flex items-end gap-px select-none touch-none"

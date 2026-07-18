@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Padding lives on the header only, so the table spans edge-to-edge
          (no left/right/bottom inset) and sits flush within the card. -->
     <div
-      class="flex items-baseline justify-between mb-[0.5rem] px-[1rem] pt-[1rem]"
+      class="flex items-baseline justify-between mb-2 px-4 pt-4"
     >
       <div>
         <div

@@ -74,7 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div
               v-if="filterMode === 'stream'"
               data-test="sessions-list-stream-selector"
-              class="w-[14rem] flex-shrink-0"
+              class="w-56 flex-shrink-0"
             >
               <!-- Hold a picker-shaped skeleton until the stream list lands, so
                    the selector doesn't flash an empty dropdown then populate. -->
@@ -94,7 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div
               v-else
               data-test="sessions-list-agent-selector"
-              class="w-[14rem] flex-shrink-0"
+              class="w-56 flex-shrink-0"
             >
               <!-- Same treatment for agents: toggling to Agent mode kicks off the
                    listAgents fetch, so show the skeleton until it resolves

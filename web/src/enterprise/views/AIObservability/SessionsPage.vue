@@ -37,13 +37,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           }"
           :default-relative-time="dateState.relativeTimePeriod ?? ''"
           data-test="ai-sessions-date-time"
-          class="h-[2rem]"
+          class="h-8"
           @on:date-change="onDateChange"
         />
         <!-- Last-refresh + refresh control (logs-style), consistent with the
              LLM Insights page header. -->
         <div
-          class="inline-flex items-center border border-border-default rounded-default px-1 h-[2rem] overflow-hidden"
+          class="inline-flex items-center border border-border-default rounded-default px-1 h-8 overflow-hidden"
         >
           <ORefreshButton
             :last-run-at="sessionsLastRunAt"

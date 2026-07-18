@@ -51,7 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         v-for="i in 2"
         :key="i"
-        class="flex items-center gap-3 py-[0.625rem] px-[0.875rem] bg-surface-base border-b-[0.0625em] border-b-border-default last:border-b-0"
+        class="flex items-center gap-3 py-2.5 px-3.5 bg-surface-base border-b-[0.0625em] border-b-border-default last:border-b-0"
       >
         <OSkeleton type="circle" class="w-4 shrink-0" />
         <OSkeleton class="w-8 h-4 shrink-0" />
@@ -67,7 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           v-for="i in 4"
           :key="i"
-          class="py-3 px-[0.875rem] rounded-default border border-[0.0625em] border-border-default bg-surface-base basis-40 grow-0 shrink-0 min-w-40 max-w-40 flex flex-col gap-2"
+          class="py-3 px-3.5 rounded-default border border-[0.0625em] border-border-default bg-surface-base basis-40 grow-0 shrink-0 min-w-40 max-w-40 flex flex-col gap-2"
         >
           <OSkeleton class="h-4 max-w-[7em]" />
           <OSkeleton class="h-3 max-w-[4.5em]" />
@@ -76,11 +76,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- ANOMALIES: free-standing rows, gap-separated -->
-    <div v-else-if="section === 'anomalies'" class="flex flex-col gap-[0.375rem]">
+    <div v-else-if="section === 'anomalies'" class="flex flex-col gap-1.5">
       <div
         v-for="i in 2"
         :key="i"
-        class="flex items-center gap-3 py-[0.625rem] px-[0.875rem] rounded-default border border-[0.0625em] border-border-default bg-surface-base"
+        class="flex items-center gap-3 py-2.5 px-3.5 rounded-default border border-[0.0625em] border-border-default bg-surface-base"
       >
         <OSkeleton type="circle" class="w-4 shrink-0" />
         <OSkeleton class="h-4 max-w-[24em]" />
@@ -95,7 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         v-for="i in 3"
         :key="i"
-        class="flex items-center gap-3 py-2 px-[0.875rem] border-b border-b-[0.0625em] border-b-border-default last:border-b-0"
+        class="flex items-center gap-3 py-2 px-3.5 border-b border-b-[0.0625em] border-b-border-default last:border-b-0"
       >
         <OSkeleton class="w-12 h-4 shrink-0" />
         <OSkeleton class="w-[7.5em] h-3 shrink-0" />

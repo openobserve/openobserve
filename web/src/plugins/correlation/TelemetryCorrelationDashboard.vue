@@ -176,7 +176,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <!-- Search -->
                   <div
-                    class="dimension-sidebar-search-container p-[0.625rem] border-b border-solid border-card-glass-border"
+                    class="dimension-sidebar-search-container p-2.5 border-b border-solid border-card-glass-border"
                   >
                     <OSearchInput
                       v-model="metricSearchText"
@@ -206,7 +206,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           class="flex items-center justify-between py-1.5 px-2 bg-section-header-bg border-b border-solid border-border-default sticky top-0 z-10 cursor-pointer"
                           @click="toggleGroupCollapse(group.id)"
                         >
-                          <div class="flex items-center gap-[0.375rem] text-2xs font-bold uppercase tracking-[0.05em] opacity-75">
+                          <div class="flex items-center gap-1.5 text-2xs font-bold uppercase tracking-[0.05em] opacity-75">
                             <OIcon
                               :name="
                                 collapsedGroups.has(group.id)
@@ -548,7 +548,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- No Traces Found State -->
           <div
             v-else-if="traceCorrelationMode !== null"
-            class="min-h-[20rem]"
+            class="min-h-80"
           >
             <OEmptyState
               size="hero"
@@ -679,7 +679,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="h-full min-h-0 flex flex-col bg-surface-overlay"
             >
             <div
-              class="dimension-sidebar-search-container p-[0.625rem] border-b border-solid border-card-glass-border"
+              class="dimension-sidebar-search-container p-2.5 border-b border-solid border-card-glass-border"
             >
               <OSearchInput
                 v-model="metricSearchText"
@@ -709,7 +709,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         class="flex items-center justify-between py-1.5 px-2 bg-section-header-bg border-b border-solid border-border-default sticky top-0 z-10 cursor-pointer"
                         @click="toggleGroupCollapse(group.id)"
                       >
-                        <div class="flex items-center gap-[0.375rem] text-2xs font-bold uppercase tracking-[0.05em] opacity-75">
+                        <div class="flex items-center gap-1.5 text-2xs font-bold uppercase tracking-[0.05em] opacity-75">
                           <OIcon
                             :name="
                               collapsedGroups.has(group.id)
@@ -1107,7 +1107,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template v-if="group.streams.length > 0">
             <!-- Group header -->
             <div class="flex items-center justify-between py-1.5 px-2 bg-section-header-bg border-b border-solid border-border-default sticky top-0 z-10">
-              <div class="flex items-center gap-[0.375rem] text-2xs font-bold uppercase tracking-[0.05em] opacity-75">
+              <div class="flex items-center gap-1.5 text-2xs font-bold uppercase tracking-[0.05em] opacity-75">
                 <OIcon v-if="typeof group.icon === 'string'" :name="group.icon" size="xs" class="mr-0.5" />
                 <component v-else :is="group.icon" />
                 <span>{{ group.label }}</span>

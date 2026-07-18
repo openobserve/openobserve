@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="monitor-status-timeline"
   >
     <div
-      class="flex items-center gap-2 px-[0.875rem] pt-[0.625rem] pb-[0.5rem]"
+      class="flex items-center gap-2 px-3.5 pt-2.5 pb-2"
     >
       <span class="font-bold text-xs text-text-heading"> {{ t('synthetics.timeline.title') }} </span>
       <span class="flex-1" />
@@ -56,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </span>
     </div>
     <div class="border-t border-border-default" />
-    <div class="flex flex-col gap-1 py-2 px-[0.875rem]">
+    <div class="flex flex-col gap-1 py-2 px-3.5">
       <div class="flex items-center gap-1">
         <OButton
           variant="ghost"

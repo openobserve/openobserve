@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
     <div
       data-test="edit-group-section-title"
-      class="px-2.5 pt-2.5 pb-[0.625rem] flex-shrink-0"
+      class="px-2.5 pt-2.5 pb-2.5 flex-shrink-0"
     >
     <div class="bg-card-glass-bg py-3">
     <AppTabs

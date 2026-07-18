@@ -1,7 +1,7 @@
 ﻿<template>
   <OCard class="h-full flex flex-col">
     <!-- Top toolbar: [stream-selector] [search-input]  Â·Â·Â·spacerÂ·Â·Â·  [legends] -->
-    <div class="flex items-center gap-2 p-[0.375rem] pb-0">
+    <div class="flex items-center gap-2 p-1.5 pb-0">
       <!-- Stream selector -->
       <div
         data-test="service-graph-stream-selector"

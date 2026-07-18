@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <slot />
     <div
       v-if="$slots.actions"
-      class="o-field-row__actions absolute right-0 top-0 bottom-0 hidden group-hover:flex items-center py-0 px-1 gap-[0.375rem] bg-field-list-actions-bg rounded-default overflow-hidden"
+      class="o-field-row__actions absolute right-0 top-0 bottom-0 hidden group-hover:flex items-center py-0 px-1 gap-1.5 bg-field-list-actions-bg rounded-default overflow-hidden"
     >
       <slot name="actions" />
     </div>

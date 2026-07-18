@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="!hideHeader"
       :title="title"
       :back="{ label: '', onClick: handleBack, dataTest: `${testPrefix}-import-back-btn` }"
-      class="-mx-[0.625rem] px-4 border-b border-border-default"
+      class="-mx-2.5 px-4 border-b border-border-default"
       :class="headerContainerClass"
     >
       <template #actions>
@@ -286,7 +286,7 @@ export default defineComponent({
     // Custom classes
     containerClass: {
       type: String,
-      default: "px-[0.625rem] mb-[0.625rem]",
+      default: "px-2.5 mb-2.5",
     },
     containerStyle: {
       type: String,

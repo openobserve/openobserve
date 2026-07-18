@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <img
       data-test="trace-row-service-icon"
       :src="serviceIconUrl"
-      class="mr-2 shrink-0 w-[1.25rem] h-[1.25rem]"
+      class="mr-2 shrink-0 w-5 h-5"
       aria-hidden="true"
       alt=""
     />

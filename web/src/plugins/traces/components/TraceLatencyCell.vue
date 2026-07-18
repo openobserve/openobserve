@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-for="[service, svc] in serviceEntries"
       :key="service"
       data-test="trace-row-latency-segment"
-      class="h-full min-w-[0.125rem]"
+      class="h-full min-w-0.5"
       :style="segmentStyle(service, svc as any)"
     >
       <OTooltip side="left" align="center">
@@ -36,13 +36,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             v-for="[s, sv] in serviceEntries"
             :key="s"
-            class="grid items-center gap-x-[0.5rem] py-[0.1rem] grid-cols-[0.5rem_1fr_auto_auto]"
+            class="grid items-center gap-x-2 py-[0.1rem] grid-cols-[0.5rem_1fr_auto_auto]"
             :class="
               s === service ? 'font-bold' : 'font-normal opacity-75'
             "
           >
             <span
-              class="inline-block w-[0.5rem] h-[0.5rem] rounded-full shrink-0"
+              class="inline-block w-2 h-2 rounded-full shrink-0"
               :style="serviceDotStyle(s)"
             />
             <span class="truncate">{{ s }}</span>

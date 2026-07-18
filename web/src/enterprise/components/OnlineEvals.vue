@@ -155,7 +155,7 @@ the Free Software Foundation, either version 3 of the License, or
           <!-- Bordered wrapper matches the Sessions / LLM Insights headers —
                ORefreshButton renders no border of its own. -->
           <div
-            class="inline-flex items-center border border-border-default rounded-default px-1 h-[2rem] overflow-hidden"
+            class="inline-flex items-center border border-border-default rounded-default px-1 h-8 overflow-hidden"
           >
             <ORefreshButton
               :last-run-at="qualityLastRunAt"

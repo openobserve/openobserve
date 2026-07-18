@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="logs-search-bar-component"
     id="searchBarComponent"
   >
-    <div class="flex m-0! p-[0.375rem]! items-center! w-full overflow-hidden border-b solid border-b-card-glass-border">
+    <div class="flex m-0! p-1.5! items-center! w-full overflow-hidden border-b solid border-b-card-glass-border">
       <div
         ref="toolbarLeftRef"
         class="flex items-center gap-1 flex-nowrap flex-1 min-w-0"
@@ -600,7 +600,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :aria-disabled="isDownloadDisabled || undefined"
               @mouseenter="!isDownloadDisabled && (showDownloadSubmenu = true)"
               @mouseleave="showDownloadSubmenu = false"
-              class="relative flex items-center gap-2 py-[0.375rem] px-3 text-[var(--text-sm)] [line-height:1.2] cursor-pointer select-none hover:bg-interactive-hover-bg search-download-item before:content-[''] before:absolute before:top-0 before:right-full before:w-2.5 before:h-full"
+              class="relative flex items-center gap-2 py-1.5 px-3 text-[var(--text-sm)] [line-height:1.2] cursor-pointer select-none hover:bg-interactive-hover-bg search-download-item before:content-[''] before:absolute before:top-0 before:right-full before:w-2.5 before:h-full"
               :class="{ 'cursor-not-allowed! text-text-muted hover:bg-transparent!': isDownloadDisabled }"
             >
               <span class="inline-flex items-center justify-center w-7 h-7 rounded-default bg-section-header-bg text-text-secondary shrink-0">
@@ -617,7 +617,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <button
                   type="button"
                   data-test="search-download-csv-btn"
-                  class="flex items-center gap-[0.625rem] w-full py-[0.375rem] px-3 text-[var(--text-sm)] [line-height:1.2] text-left bg-transparent border-0 cursor-pointer text-text-body hover:bg-interactive-hover-bg"
+                  class="flex items-center gap-2.5 w-full py-1.5 px-3 text-[var(--text-sm)] [line-height:1.2] text-left bg-transparent border-0 cursor-pointer text-text-body hover:bg-interactive-hover-bg"
                   @click="downloadLogs(searchObj.data.queryResults.hits, 'csv'); showDownloadSubmenu = false"
                 >
                   <OIcon name="grid-on" size="sm" />
@@ -626,7 +626,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <button
                   type="button"
                   data-test="search-download-json-btn"
-                  class="flex items-center gap-[0.625rem] w-full py-[0.375rem] px-3 text-[var(--text-sm)] [line-height:1.2] text-left bg-transparent border-0 cursor-pointer text-text-body hover:bg-interactive-hover-bg"
+                  class="flex items-center gap-2.5 w-full py-1.5 px-3 text-[var(--text-sm)] [line-height:1.2] text-left bg-transparent border-0 cursor-pointer text-text-body hover:bg-interactive-hover-bg"
                   @click="downloadLogs(searchObj.data.queryResults.hits, 'json'); showDownloadSubmenu = false"
                 >
                   <OIcon name="data-object" size="sm" />
@@ -826,7 +826,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   <OInput
                     clearable
-                    class="mb-[0.375rem]! indexlist-search-input mx-2 mt-2"
+                    class="mb-1.5! indexlist-search-input mx-2 mt-2"
                     v-model="regionFilter"
                     :label="t('search.regionFilterMsg')"
                   />
@@ -1301,7 +1301,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         variant="ghost"
         size="icon-toolbar"
         @click="toggleEditorFullscreen"
-        class="absolute! z-[51] top-[0.1875rem] right-[0.25rem] [border:1px_solid_var(--color-card-glass-border)]! rounded-default w-7.5! h-7.5! min-w-7.5! min-h-7.5!"
+        class="absolute! z-[51] top-[0.1875rem] right-1 [border:1px_solid_var(--color-card-glass-border)]! rounded-default w-7.5! h-7.5! min-w-7.5! min-h-7.5!"
       >
         <OTooltip :content="isFocused ? t('search.collapse') : t('search.expand')" />
       </OButton>

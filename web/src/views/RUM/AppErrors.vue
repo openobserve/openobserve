@@ -17,14 +17,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="sessions_page flex flex-col flex-1 min-h-0 overflow-hidden">
     <div>
-      <div class="bg-card-glass-bg border-b border-border-default py-[0.375rem] px-[0.375rem]">
+      <div class="bg-card-glass-bg border-b border-border-default py-1.5 px-1.5">
         <div class="flex items-start gap-1">
           <!-- Query editor (flex-grow to fill available space) -->
           <div class="flex-1 min-w-0 relative">
             <query-editor
               ref="errorQueryEditorRef"
               editor-id="rum-errors-query-editor"
-              :class="['border', 'solid', 'border-card-glass-border', 'p-[0.25rem]', 'rounded-default', 'overflow-y-auto', errorEditorHeight]"
+              :class="['border', 'solid', 'border-card-glass-border', 'p-1', 'rounded-default', 'overflow-y-auto', errorEditorHeight]"
               v-model:query="errorTrackingState.data.editorValue"
               :debounce-time="300"
               :keywords="effectiveKeywords"
@@ -116,7 +116,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="h-full flex flex-col min-h-0">
           <!-- Errors-over-time chart + KPI summary -->
           <div
-            class="grid grid-cols-1 lg:grid-cols-5 gap-2 px-2 pt-1.5 h-[11rem] shrink-0"
+            class="grid grid-cols-1 lg:grid-cols-5 gap-2 px-2 pt-1.5 h-44 shrink-0"
           >
             <ErrorsOverTimeChart
               class="lg:col-span-3"
@@ -455,9 +455,9 @@ const onServiceFilterChange = (value: string) => {
 // Dynamic editor height based on content lines
 const errorEditorHeight = computed(() => {
   const lines = (errorTrackingState.data.editorValue.match(/\n/g) || []).length + 1;
-  if (lines === 1) return 'h-[2rem]!';
-  if (lines === 2) return 'h-[3.5rem]!';
-  return 'h-[5rem]!'; // 3+ lines, capped at 5rem (approx 3 lines)
+  if (lines === 1) return 'h-8!';
+  if (lines === 2) return 'h-14!';
+  return 'h-20!'; // 3+ lines, capped at 5rem (approx 3 lines)
 });
 
 const { columnVisibility, setColumnVisibility } = useExternalColumnToggle(

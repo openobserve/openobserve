@@ -8,7 +8,7 @@
   <div
     v-for="n in count"
     :key="n"
-    class="kpi-card-skeleton rounded-default flex flex-col px-[0.875rem] pt-[0.625rem] pb-[0.625rem] gap-[0.5rem] bg-surface-base border border-border-default"
+    class="kpi-card-skeleton rounded-default flex flex-col px-3.5 pt-2.5 pb-2.5 gap-2 bg-surface-base border border-border-default"
     data-test="kpi-cards-skeleton"
   >
     <OSkeleton type="text" class="w-[55%] h-3" />

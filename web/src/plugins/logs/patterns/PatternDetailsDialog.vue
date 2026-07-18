@@ -65,7 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OCard
                 class="bg-card-glass-solid border border-solid border-card-glass-border"
               >
-                <OCardSection class="p-[0.375rem]">
+                <OCardSection class="p-1.5">
                   <div
                     class="text-xs"
                     :class="
@@ -86,7 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <div class="w-1/2">
               <OCard class="bg-card-glass-solid border border-solid border-card-glass-border">
-                <OCardSection class="p-[0.375rem]">
+                <OCardSection class="p-1.5">
                   <div
                     class="text-xs"
                     :class="
@@ -219,7 +219,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             selectedPattern.pattern.examples &&
             selectedPattern.pattern.examples.length > 0
           "
-          class="mb-[1rem]"
+          class="mb-4"
         >
           <div class="text-sm font-medium mb-1.5">
             {{ t("search.patternExampleLogsWithCount", { count: selectedPattern.pattern.examples.length }) }}
@@ -227,7 +227,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             v-for="(example, exIdx) in selectedPattern.pattern.examples"
             :key="exIdx"
-            class="px-[0.625rem] py-[0.375rem] mb-[0.375rem] font-mono text-xs leading-[1.6] rounded-default break-all whitespace-pre-wrap border-l-[0.1875rem] border-solid bg-surface-panel border-l-border-default"
+            class="px-2.5 py-1.5 mb-1.5 font-mono text-xs leading-[1.6] rounded-default break-all whitespace-pre-wrap border-l-[0.1875rem] border-solid bg-surface-panel border-l-border-default"
           >
             <LogsHighLighting
               :data="example.log_message"

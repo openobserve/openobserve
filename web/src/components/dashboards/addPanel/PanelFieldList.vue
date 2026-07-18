@@ -358,11 +358,11 @@
           <div
             v-for="i in 6"
             :key="i"
-            class="flex items-center gap-2 py-[0.25rem]"
+            class="flex items-center gap-2 py-1"
           >
             <OSkeleton
               type="rect"
-              class="w-[0.875rem] h-[0.875rem] rounded-default flex-shrink-0"
+              class="w-3.5 h-3.5 rounded-default flex-shrink-0"
             />
             <OSkeleton type="text" class="flex-1" />
           </div>
@@ -375,7 +375,7 @@
           class="text-center py-[0.725rem] flex items-center justify-center"
         >
           <OIcon name="info" size="xs" />
-          <span class="pl-[0.375rem]">{{ t("search.noFieldFound") }}</span>
+          <span class="pl-1.5">{{ t("search.noFieldFound") }}</span>
         </div>
       </template>
 

@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          search-class). The scrolling list itself deliberately does NOT: it runs
          flush to the divider so its scrollbar lands on the panel edge. -->
     <div
-      class="flex items-center gap-2 pr-[0.625rem]"
+      class="flex items-center gap-2 pr-2.5"
       style="max-width: 100%; overflow: hidden"
     >
       <OButton
@@ -117,7 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         ref="fieldListRef"
         :fields="streamFieldsRows"
         :search="searchObj.data.stream.filterField"
-        search-class="pr-[0.625rem]"
+        search-class="pr-2.5"
         :loading="searchObj.loadingStream"
         :theme="store.state.theme"
         :show-pagination="true"
@@ -209,20 +209,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OSkeleton type="rect" class="h-3 w-3 rounded-default" />
             </div>
             <!-- Group 1 fields -->
-            <div class="flex items-center gap-2 px-3 py-[0.375rem]">
-              <OSkeleton type="rect" class="w-[0.875rem] h-[0.875rem] rounded-default shrink-0" />
+            <div class="flex items-center gap-2 px-3 py-1.5">
+              <OSkeleton type="rect" class="w-3.5 h-3.5 rounded-default shrink-0" />
               <OSkeleton type="text" class="flex-1" />
             </div>
-            <div class="flex items-center gap-2 px-3 py-[0.375rem]">
-              <OSkeleton type="rect" class="w-[0.875rem] h-[0.875rem] rounded-default shrink-0" />
+            <div class="flex items-center gap-2 px-3 py-1.5">
+              <OSkeleton type="rect" class="w-3.5 h-3.5 rounded-default shrink-0" />
               <OSkeleton type="text" class="w-3/4" />
             </div>
-            <div class="flex items-center gap-2 px-3 py-[0.375rem]">
-              <OSkeleton type="rect" class="w-[0.875rem] h-[0.875rem] rounded-default shrink-0" />
+            <div class="flex items-center gap-2 px-3 py-1.5">
+              <OSkeleton type="rect" class="w-3.5 h-3.5 rounded-default shrink-0" />
               <OSkeleton type="text" class="flex-1" />
             </div>
-            <div class="flex items-center gap-2 px-3 py-[0.375rem]">
-              <OSkeleton type="rect" class="w-[0.875rem] h-[0.875rem] rounded-default shrink-0" />
+            <div class="flex items-center gap-2 px-3 py-1.5">
+              <OSkeleton type="rect" class="w-3.5 h-3.5 rounded-default shrink-0" />
               <OSkeleton type="text" class="w-4/5" />
             </div>
             <!-- Group 2 header -->
@@ -231,8 +231,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OSkeleton type="rect" class="h-3 w-3 rounded-default" />
             </div>
             <!-- Group 2 field -->
-            <div class="flex items-center gap-2 px-3 py-[0.375rem]">
-              <OSkeleton type="rect" class="w-[0.875rem] h-[0.875rem] rounded-default shrink-0" />
+            <div class="flex items-center gap-2 px-3 py-1.5">
+              <OSkeleton type="rect" class="w-3.5 h-3.5 rounded-default shrink-0" />
               <OSkeleton type="text" class="w-2/3" />
             </div>
             <!-- Group 3 header -->
@@ -241,24 +241,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OSkeleton type="rect" class="h-3 w-3 rounded-default" />
             </div>
             <!-- Group 3 fields -->
-            <div class="flex items-center gap-2 px-3 py-[0.375rem]">
-              <OSkeleton type="rect" class="w-[0.875rem] h-[0.875rem] rounded-default shrink-0" />
+            <div class="flex items-center gap-2 px-3 py-1.5">
+              <OSkeleton type="rect" class="w-3.5 h-3.5 rounded-default shrink-0" />
               <OSkeleton type="text" class="flex-1" />
             </div>
-            <div class="flex items-center gap-2 px-3 py-[0.375rem]">
-              <OSkeleton type="rect" class="w-[0.875rem] h-[0.875rem] rounded-default shrink-0" />
+            <div class="flex items-center gap-2 px-3 py-1.5">
+              <OSkeleton type="rect" class="w-3.5 h-3.5 rounded-default shrink-0" />
               <OSkeleton type="text" class="w-4/5" />
             </div>
-            <div class="flex items-center gap-2 px-3 py-[0.375rem]">
-              <OSkeleton type="rect" class="w-[0.875rem] h-[0.875rem] rounded-default shrink-0" />
+            <div class="flex items-center gap-2 px-3 py-1.5">
+              <OSkeleton type="rect" class="w-3.5 h-3.5 rounded-default shrink-0" />
               <OSkeleton type="text" class="flex-1" />
             </div>
-            <div class="flex items-center gap-2 px-3 py-[0.375rem]">
-              <OSkeleton type="rect" class="w-[0.875rem] h-[0.875rem] rounded-default shrink-0" />
+            <div class="flex items-center gap-2 px-3 py-1.5">
+              <OSkeleton type="rect" class="w-3.5 h-3.5 rounded-default shrink-0" />
               <OSkeleton type="text" class="w-3/4" />
             </div>
-            <div class="flex items-center gap-2 px-3 py-[0.375rem]">
-              <OSkeleton type="rect" class="w-[0.875rem] h-[0.875rem] rounded-default shrink-0" />
+            <div class="flex items-center gap-2 px-3 py-1.5">
+              <OSkeleton type="rect" class="w-3.5 h-3.5 rounded-default shrink-0" />
               <OSkeleton type="text" class="flex-1" />
             </div>
           </div>

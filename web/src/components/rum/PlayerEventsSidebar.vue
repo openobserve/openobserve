@@ -57,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
     <template v-else>
       <div
-        class="flex items-center justify-between w-full pt-2 px-[0.375rem]"
+        class="flex items-center justify-between w-full pt-2 px-1.5"
       >
         <div class="pr-1 w-[60%]">
           <OInput

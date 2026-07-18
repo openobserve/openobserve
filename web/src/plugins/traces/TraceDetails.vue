@@ -179,7 +179,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Embedded (logs) header: existing inline header, kept as-is -->
         <header
           v-else
-          class="h-auto py-[0.125rem] flex! items-center justify-between bg-surface-base pl-1"
+          class="h-auto py-0.5 flex! items-center justify-between bg-surface-base pl-1"
         >
           <div class="flex items-center space-x-4 w-fit!">
             <!-- Back button -->
@@ -196,12 +196,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
 
             <div
-              class="flex min-w-0 w-full gap-[0.625rem]! items-center"
+              class="flex min-w-0 w-full gap-2.5! items-center"
             >
               <!-- Operation Name -->
               <div
                 data-test="trace-details-operation-name"
-                class="text-base font-semibold leading-tight text-text-heading truncate min-w-0 max-w-[24rem]!"
+                class="text-base font-semibold leading-tight text-text-heading truncate min-w-0 max-w-96!"
                 :title="traceTree[0]?.operationName"
               >
                 {{ traceTree[0]?.operationName || t("traces.loadingTrace") }}
@@ -214,9 +214,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <span>{{ formatTimestamp(traceStartTime, store.state.timezone) }}</span>
                 <div
-                  class="bg-text-label py-[0rem] w-px h-4"
+                  class="bg-text-label py-0 w-px h-4"
                 />
-                <span class="mr-[0.25rem]">
+                <span class="mr-1">
                   {{ t("traces.traceId") }}:
                   <span
                     v-if="mode === 'embedded'"
@@ -250,9 +250,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <!-- Session ID (LLM traces) -->
                 <template v-if="sessionId">
                   <div
-                    class="bg-text-label py-[0rem] w-px h-4"
+                    class="bg-text-label py-0 w-px h-4"
                   />
-                  <span class="mr-[0.25rem]">
+                  <span class="mr-1">
                     Session ID:
                     <span
                       data-test="trace-details-session-id"
@@ -285,7 +285,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
               <div
-                class="bg-text-label py-[0rem] w-px h-4"
+                class="bg-text-label py-0 w-px h-4"
               />
               <!-- Span Count Badge -->
               <span class="inline-flex">
@@ -303,7 +303,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </span>
 
               <div
-                class="bg-text-label py-[0rem] w-px h-4"
+                class="bg-text-label py-0 w-px h-4"
               />
 
               <!-- Error Count Badge -->
@@ -443,7 +443,7 @@ size="sm">
             </OToggleGroup>
           </div>
 
-          <div class="flex items-center space-x-2 gap-[0.5rem] pr-[0.325rem]">
+          <div class="flex items-center space-x-2 gap-2 pr-[0.325rem]">
             <!-- Unified Search Input Group -->
             <div
               v-if="
@@ -465,7 +465,7 @@ size="sm">
                 />
               </div>
               <!-- Search Results Navigation -->
-              <div class="inline-flex items-center bg-transparent px-[0.125rem] [transition:all_0.2s_ease] rounded-default border border-input-border dark:hover:border-theme-accent h-8.2! py-0!">
+              <div class="inline-flex items-center bg-transparent px-0.5 [transition:all_0.2s_ease] rounded-default border border-input-border dark:hover:border-theme-accent h-8.2! py-0!">
                 <div
                   class="flex items-center text-xs font-medium px-1 gap-[0.0625rem] select-none"
                   data-test="trace-details-search-results"
@@ -473,7 +473,7 @@ size="sm">
                   <span class="text-text-secondary">{{
                     searchResults ? currentIndex + 1 : 0
                   }}</span>
-                  <span class="text-text-secondary mx-[0.125rem]">/</span>
+                  <span class="text-text-secondary mx-0.5">/</span>
                   <span class="text-text-secondary">{{ searchResults }}</span>
                 </div>
                 <div class="flex items-center h-full ml-1">
@@ -487,7 +487,7 @@ size="sm">
                     <OIcon name="keyboard-arrow-up" size="sm" />
                     <OTooltip :content="t('traces.previousMatch')" />
                   </OButton>
-                  <div class="w-px h-[1.125rem] bg-card-glass-border mx-[0.125rem]"></div>
+                  <div class="w-px h-[1.125rem] bg-card-glass-border mx-0.5"></div>
                   <OButton
                     data-test="trace-details-search-next-btn"
                     :disabled="
@@ -877,7 +877,7 @@ size="sm">
               >
                 <div
                   style="text-align: center"
-                  class="w-full h-full p-[0.625rem]"
+                  class="w-full h-full p-2.5"
                 >
                   <ChartRenderer
                     ref="chartRendererRef"

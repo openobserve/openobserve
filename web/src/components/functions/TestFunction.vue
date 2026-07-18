@@ -5,7 +5,7 @@
   >
     <div
       data-test="test-function-query-section"
-      class="test-function-query-container w-[100%]"
+      class="test-function-query-container w-full"
     >
       <FullViewContainer
           data-test="test-function-query-title-section"
@@ -41,7 +41,7 @@
           </template>
         </FullViewContainer>
         <div
-          class="flex items-center flex-wrap gap-x-3 py-2 w-[100%] bg-surface-base"
+          class="flex items-center flex-wrap gap-x-3 py-2 w-full bg-surface-base"
           v-show="expandState.query"
           data-test="test-function-query-editor-section"
         >
@@ -94,11 +94,11 @@
             />
           </div>
 
-          <div class="text-xs w-[100%] mt-1 text-text-label">
+          <div class="text-xs w-full mt-1 text-text-label">
             {{ t("common.query") + " *" }}
           </div>
           <div
-            class="relative w-[100%]"
+            class="relative w-full"
           >
             <query-editor
               data-test="vrl-function-test-sql-editor"

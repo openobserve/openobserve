@@ -89,7 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- Header with title -->
-      <div class="bg-card-glass-bg shrink-0 mb-[0.625rem]">
+      <div class="bg-card-glass-bg shrink-0 mb-2.5">
         <div
           class="services-header-bar flex justify-between items-center w-full py-3 px-4 h-[4.25rem]"
         >
@@ -113,7 +113,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               searchable
               :placeholder="t('settings.correlation.selectFieldPlaceholder')"
               data-test="service-filter-key"
-              class="o2-search-input filter-select min-w-[10rem]"
+              class="o2-search-input filter-select min-w-40"
               @update:model-value="filterValue = null"
             />
             <span>
@@ -125,7 +125,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :disabled="!filterKey"
                 :placeholder="t('settings.correlation.selectValuePlaceholder')"
                 data-test="service-filter-value"
-                class="o2-search-input filter-select min-w-[10rem]"
+                class="o2-search-input filter-select min-w-40"
               />
               <OTooltip v-if="!filterKey" :content="t('settings.correlation.selectFieldFirst')" side="top" />
             </span>
@@ -316,7 +316,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Bottom -->
             <template #bottom>
               <div
-                class="flex items-center justify-between w-full h-[2.25rem]"
+                class="flex items-center justify-between w-full h-9"
               >
                 <div class="text-xs font-normal w-[15.625rem] mr-md">
                   {{
@@ -360,7 +360,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Default set warning banner -->
       <div
         v-if="selectedService?.set_id === 'default'"
-        class="panel-warning-banner flex items-start gap-[0.625rem] py-3 px-5 bg-banner-warning-bg border-b border-b-banner-warning-border text-banner-warning-text"
+        class="panel-warning-banner flex items-start gap-2.5 py-3 px-5 bg-banner-warning-bg border-b border-b-banner-warning-border text-banner-warning-text"
       >
         <OIcon name="info-outline" size="sm" class="shrink-0 mt-0.5" />
         <div class="text-xs leading-relaxed">
@@ -377,7 +377,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="panel-body flex-1 overflow-y-auto p-0">
         <!-- Instance Identity -->
         <div class="panel-block py-4 px-5 border-b border-b-border-default">
-          <div class="panel-block-label text-xs font-semibold normal-case tracking-normal text-text-label mb-[0.625rem]">
+          <div class="panel-block-label text-xs font-semibold normal-case tracking-normal text-text-label mb-2.5">
             {{ t("settings.correlation.instanceIdentity") }}
           </div>
           <div
@@ -403,7 +403,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Stream Sources -->
         <div class="panel-block py-4 px-5 border-b border-b-border-default">
-          <div class="panel-block-label text-xs font-semibold normal-case tracking-normal text-text-label mb-[0.625rem]">
+          <div class="panel-block-label text-xs font-semibold normal-case tracking-normal text-text-label mb-2.5">
             {{ t("settings.correlation.streamSources") }}
           </div>
           <div class="flex flex-col gap-3">
@@ -484,7 +484,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
           class="panel-block py-4 px-5 border-b border-b-border-default"
         >
-          <div class="panel-block-label text-xs font-semibold normal-case tracking-normal text-text-label mb-[0.625rem]">
+          <div class="panel-block-label text-xs font-semibold normal-case tracking-normal text-text-label mb-2.5">
             {{ t("settings.correlation.fieldNameMapping") }}
           </div>
           <div class="panel-mapping-grid">
@@ -494,13 +494,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               ).sort(([a], [b]) => a.localeCompare(b))"
               :key="raw"
             >
-              <span class="mapping-key font-mono text-2xs py-[0.0625rem] px-[0.375rem] rounded-default border whitespace-nowrap bg-surface-subtle text-text-body border-border-default">{{ raw }}</span>
+              <span class="mapping-key font-mono text-2xs py-[0.0625rem] px-1.5 rounded-default border whitespace-nowrap bg-surface-subtle text-text-body border-border-default">{{ raw }}</span>
               <OIcon
                 name="arrow-forward"
                 size="xs"
                 class="text-text-muted justify-self-center"
               />
-              <span class="mapping-val font-mono text-2xs py-[0.0625rem] px-[0.375rem] rounded-default border whitespace-nowrap bg-badge-success-soft-bg text-badge-success-soft-text border-badge-success-ol-border">{{ mapped }}</span>
+              <span class="mapping-val font-mono text-2xs py-[0.0625rem] px-1.5 rounded-default border whitespace-nowrap bg-badge-success-soft-bg text-badge-success-soft-text border-badge-success-ol-border">{{ mapped }}</span>
             </template>
           </div>
         </div>

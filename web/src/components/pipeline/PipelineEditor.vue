@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="w-full h-full pr-[0.625rem]">
+  <div class="w-full h-full pr-2.5">
     <div class="bg-card-glass-bg h-[calc(100vh-50px)]">
       <!-- The shell (Functions.vue) renders the "Pipelines › <name>" breadcrumb
            header; we contribute the editor actions to it via the portal and the

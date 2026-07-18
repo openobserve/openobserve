@@ -427,7 +427,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div class="mx-2">
         <div
-          class="flex justify-end gap-2 px-3 w-full py-[0.625rem] bg-card-glass-bg"
+          class="flex justify-end gap-2 px-3 w-full py-2.5 bg-card-glass-bg"
           style="position: sticky; bottom: 0px; z-index: 2"
         >
           <OButton

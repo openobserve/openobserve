@@ -56,14 +56,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </template>
     <!-- form inputs starts here -->
-    <div class="flex w-[100%] h-full">
+    <div class="flex w-full h-full">
       <div
         :class="
           store.state.isAiChatEnabled
             ? isFullScreen
               ? 'w-[75%] pl-2'
               : 'w-[65%] pl-2'
-            : 'w-[100%] px-3'
+            : 'w-full px-3'
         "
       >
         <OForm

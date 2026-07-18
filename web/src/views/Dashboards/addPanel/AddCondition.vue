@@ -5,7 +5,7 @@
       v-model="condition.logicalOperator"
       :options="filterOptions"
       @update:model-value="emitLogicalOperatorChange"
-      class="condition-logical-operator w-fit max-w-[8rem]"
+      class="condition-logical-operator w-fit max-w-32"
       :data-test="`dashboard-add-condition-logical-operator-${conditionIndex}`"
     />
     <OButtonGroup class="axis-field shrink-0" radius="sm">

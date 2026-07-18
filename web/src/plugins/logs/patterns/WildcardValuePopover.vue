@@ -27,10 +27,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <!-- ── Header ── -->
     <div
-      class="wcp__header flex items-center justify-between gap-2 pt-[0.625rem] px-3 pb-[0.375rem]"
+      class="wcp__header flex items-center justify-between gap-2 pt-2.5 px-3 pb-1.5"
     >
       <div
-        class="wcp__header-left flex items-center gap-[0.375rem] min-w-0"
+        class="wcp__header-left flex items-center gap-1.5 min-w-0"
       >
         <OTag
           type="fieldType"
@@ -62,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         v-for="(item, i) in displayValues.slice(0, 10)"
         :key="i"
-        class="wcp__row px-3 pt-[0.375rem] pb-1 not-first:pt-2"
+        class="wcp__row px-3 pt-1.5 pb-1 not-first:pt-2"
         :data-test="`wildcard-value-row-${i}`"
       >
         <!-- Value name + count -->

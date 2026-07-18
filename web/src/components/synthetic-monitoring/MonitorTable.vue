@@ -122,7 +122,7 @@
             class="flex-1"
           />
           <span
-            :class="'font-mono text-sm font-semibold min-w-[2.75rem] text-right text-xs '
+            :class="'font-mono text-sm font-semibold min-w-11 text-right text-xs '
               + ((row as any).uptime >= 99 ? 'text-[var(--color-success-600)]' : (row as any).uptime >= 95 ? 'text-[var(--color-warning-600)]' : 'text-[var(--color-error-600)]')"
           >{{ (row as any).uptime }}%</span>
         </div>

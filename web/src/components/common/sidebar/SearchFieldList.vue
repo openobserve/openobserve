@@ -108,16 +108,16 @@
               <OSkeleton type="rect" class="h-3 w-3 rounded-default" />
             </div>
             <!-- Group 1 fields -->
-            <div class="flex items-center gap-2 px-3 py-[0.375rem]">
-              <OSkeleton type="rect" class="w-[0.875rem] h-[0.875rem] rounded-default shrink-0" />
+            <div class="flex items-center gap-2 px-3 py-1.5">
+              <OSkeleton type="rect" class="w-3.5 h-3.5 rounded-default shrink-0" />
               <OSkeleton type="text" class="flex-1" />
             </div>
-            <div class="flex items-center gap-2 px-3 py-[0.375rem]">
-              <OSkeleton type="rect" class="w-[0.875rem] h-[0.875rem] rounded-default shrink-0" />
+            <div class="flex items-center gap-2 px-3 py-1.5">
+              <OSkeleton type="rect" class="w-3.5 h-3.5 rounded-default shrink-0" />
               <OSkeleton type="text" class="w-3/4" />
             </div>
-            <div class="flex items-center gap-2 px-3 py-[0.375rem]">
-              <OSkeleton type="rect" class="w-[0.875rem] h-[0.875rem] rounded-default shrink-0" />
+            <div class="flex items-center gap-2 px-3 py-1.5">
+              <OSkeleton type="rect" class="w-3.5 h-3.5 rounded-default shrink-0" />
               <OSkeleton type="text" class="flex-1" />
             </div>
             <!-- Group 2 header -->
@@ -126,12 +126,12 @@
               <OSkeleton type="rect" class="h-3 w-3 rounded-default" />
             </div>
             <!-- Group 2 fields -->
-            <div class="flex items-center gap-2 px-3 py-[0.375rem]">
-              <OSkeleton type="rect" class="w-[0.875rem] h-[0.875rem] rounded-default shrink-0" />
+            <div class="flex items-center gap-2 px-3 py-1.5">
+              <OSkeleton type="rect" class="w-3.5 h-3.5 rounded-default shrink-0" />
               <OSkeleton type="text" class="w-4/5" />
             </div>
-            <div class="flex items-center gap-2 px-3 py-[0.375rem]">
-              <OSkeleton type="rect" class="w-[0.875rem] h-[0.875rem] rounded-default shrink-0" />
+            <div class="flex items-center gap-2 px-3 py-1.5">
+              <OSkeleton type="rect" class="w-3.5 h-3.5 rounded-default shrink-0" />
               <OSkeleton type="text" class="w-2/3" />
             </div>
             <!-- Group 3 header -->
@@ -140,16 +140,16 @@
               <OSkeleton type="rect" class="h-3 w-3 rounded-default" />
             </div>
             <!-- Group 3 fields -->
-            <div class="flex items-center gap-2 px-3 py-[0.375rem]">
-              <OSkeleton type="rect" class="w-[0.875rem] h-[0.875rem] rounded-default shrink-0" />
+            <div class="flex items-center gap-2 px-3 py-1.5">
+              <OSkeleton type="rect" class="w-3.5 h-3.5 rounded-default shrink-0" />
               <OSkeleton type="text" class="flex-1" />
             </div>
-            <div class="flex items-center gap-2 px-3 py-[0.375rem]">
-              <OSkeleton type="rect" class="w-[0.875rem] h-[0.875rem] rounded-default shrink-0" />
+            <div class="flex items-center gap-2 px-3 py-1.5">
+              <OSkeleton type="rect" class="w-3.5 h-3.5 rounded-default shrink-0" />
               <OSkeleton type="text" class="w-3/4" />
             </div>
-            <div class="flex items-center gap-2 px-3 py-[0.375rem]">
-              <OSkeleton type="rect" class="w-[0.875rem] h-[0.875rem] rounded-default shrink-0" />
+            <div class="flex items-center gap-2 px-3 py-1.5">
+              <OSkeleton type="rect" class="w-3.5 h-3.5 rounded-default shrink-0" />
               <OSkeleton type="text" class="flex-1" />
             </div>
           </div>

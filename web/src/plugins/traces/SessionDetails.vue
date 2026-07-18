@@ -57,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Scrollable body — owns its own scroll so the header above stays fixed.
          Pads itself horizontally (the card has no px) so focus rings on edge
          controls aren't clipped by the scroll container's overflow. -->
-    <div class="flex-1 flex flex-col min-h-0 overflow-y-auto px-[0.625rem] pt-[0.625rem]">
+    <div class="flex-1 flex flex-col min-h-0 overflow-y-auto px-2.5 pt-2.5">
     <!-- Loading — full-page skeleton mirroring the real layout (standard O2 wave
          shimmer) so nothing jumps when data lands. -->
     <div
@@ -66,52 +66,52 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="session-detail-skeleton"
     >
       <!-- Shape row: KPI tiles + ribbon -->
-      <div class="grid grid-cols-2 gap-[0.625rem] mb-[0.625rem] flex-shrink-0">
-        <div class="grid grid-cols-3 gap-[0.625rem]">
+      <div class="grid grid-cols-2 gap-2.5 mb-2.5 flex-shrink-0">
+        <div class="grid grid-cols-3 gap-2.5">
           <div v-for="n in 6" :key="n" :class="kpiCardClass()">
-            <OSkeleton type="rect" animation="wave" class="rounded-default w-[3rem] h-[0.7rem]" />
+            <OSkeleton type="rect" animation="wave" class="rounded-default w-12 h-[0.7rem]" />
             <OSkeleton type="rect" animation="wave" class="rounded-default w-[4.5rem] h-[1.3rem] mt-[0.3rem]" />
             <OSkeleton type="rect" animation="wave" class="rounded-default w-[6.5rem] h-[0.6rem] mt-[0.4rem]" />
           </div>
         </div>
-        <div class="bg-card-glass-bg rounded-default border border-border-default pt-[1rem] px-[1rem] pb-[0.625rem] flex flex-col">
-          <OSkeleton type="rect" animation="wave" class="rounded-default w-[8rem] h-[0.85rem] flex-shrink-0" />
+        <div class="bg-card-glass-bg rounded-default border border-border-default pt-4 px-4 pb-2.5 flex flex-col">
+          <OSkeleton type="rect" animation="wave" class="rounded-default w-32 h-[0.85rem] flex-shrink-0" />
           <!-- Fill the panel height (it stretches to the 6-tile block on the left)
                so the skeleton matches the real ribbon and leaves no gap below. -->
-          <OSkeleton type="rect" animation="wave" class="rounded-default w-full flex-1 min-h-0 mt-[0.75rem]" />
+          <OSkeleton type="rect" animation="wave" class="rounded-default w-full flex-1 min-h-0 mt-3" />
         </div>
       </div>
 
       <!-- Lower: conversation (left) + rail (right) -->
-      <div class="grid grid-cols-[minmax(0,1fr)_340px] gap-[0.625rem] flex-1 min-h-0">
+      <div class="grid grid-cols-[minmax(0,1fr)_340px] gap-2.5 flex-1 min-h-0">
         <!-- Conversation column: toolbar + panel -->
         <div class="flex flex-col min-w-0 min-h-0">
-          <div class="flex items-center gap-[0.5rem] mb-[0.625rem] flex-shrink-0">
+          <div class="flex items-center gap-2 mb-2.5 flex-shrink-0">
             <OSkeleton type="rect" animation="wave" class="rounded-default flex-1 h-9" />
-            <OSkeleton v-for="n in 3" :key="n" type="rect" animation="wave" class="rounded-default w-[8rem] h-9" />
+            <OSkeleton v-for="n in 3" :key="n" type="rect" animation="wave" class="rounded-default w-32 h-9" />
           </div>
           <div class="bg-card-glass-bg rounded-default border border-border-default flex flex-col overflow-hidden">
-            <div class="flex items-center gap-[0.625rem] px-[1rem] py-[0.75rem] border-b border-border-default flex-shrink-0">
-              <OSkeleton type="rect" animation="wave" class="rounded-default w-[7rem] h-[1rem]" />
+            <div class="flex items-center gap-2.5 px-4 py-3 border-b border-border-default flex-shrink-0">
+              <OSkeleton type="rect" animation="wave" class="rounded-default w-28 h-4" />
             </div>
-            <div class="flex flex-col gap-[0.5rem] p-[0.5rem] flex-1 min-h-0 overflow-hidden">
-              <OSkeleton v-for="n in 14" :key="n" type="rect" animation="wave" class="rounded-default w-full h-[3rem] flex-shrink-0" />
+            <div class="flex flex-col gap-2 p-2 flex-1 min-h-0 overflow-hidden">
+              <OSkeleton v-for="n in 14" :key="n" type="rect" animation="wave" class="rounded-default w-full h-12 flex-shrink-0" />
             </div>
           </div>
         </div>
 
         <!-- Rail: 3 hotspot card skeletons (share the rail height) -->
-        <div class="flex flex-col gap-[0.625rem] min-h-0">
+        <div class="flex flex-col gap-2.5 min-h-0">
           <div
             v-for="c in 3"
             :key="c"
             class="bg-card-glass-bg rounded-default border border-border-default flex flex-col overflow-hidden"
           >
-            <div class="px-[0.75rem] py-[0.5rem] border-b border-border-default flex-shrink-0">
-              <OSkeleton type="rect" animation="wave" class="rounded-default w-[6rem] h-[0.8rem]" />
+            <div class="px-3 py-2 border-b border-border-default flex-shrink-0">
+              <OSkeleton type="rect" animation="wave" class="rounded-default w-24 h-[0.8rem]" />
             </div>
-            <div class="flex flex-col gap-[0.4rem] p-[0.5rem] flex-1 min-h-0 overflow-hidden">
-              <OSkeleton v-for="r in 8" :key="r" type="rect" animation="wave" class="rounded-default w-full h-[1.25rem] flex-shrink-0" />
+            <div class="flex flex-col gap-[0.4rem] p-2 flex-1 min-h-0 overflow-hidden">
+              <OSkeleton v-for="r in 8" :key="r" type="rect" animation="wave" class="rounded-default w-full h-5 flex-shrink-0" />
             </div>
           </div>
         </div>
@@ -162,13 +162,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Shape row: KPI tiles (left) + session ribbon (right), always two
            equal columns side by side (matches the mockup's 1fr 1fr). -->
       <div
-        class="grid grid-cols-2 gap-[0.625rem] mb-[0.625rem] flex-shrink-0"
+        class="grid grid-cols-2 gap-2.5 mb-2.5 flex-shrink-0"
       >
       <!-- KPI strip — six session-level metric tiles. Card chrome + danger
            variant are Tailwind utilities (see kpiCardClass / kpiAccentClass),
            matching the LLM Insights dashboard so the AI module stays consistent. -->
       <div
-        class="grid grid-cols-3 grid-rows-2 h-full gap-[0.625rem]"
+        class="grid grid-cols-3 grid-rows-2 h-full gap-2.5"
         data-test="session-detail-kpis"
       >
         <div
@@ -245,7 +245,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :cache-pct="cacheRatio"
               >
                 <span
-                  class="inline-flex items-center justify-center min-w-[1rem] h-[1.05rem] px-[0.3rem] rounded-default border border-border-default bg-surface-base text-text-body text-2xs font-bold leading-none cursor-pointer transition-colors hover:bg-[color-mix(in_srgb,var(--color-text-heading)_8%,var(--color-surface-base))] hover:border-[color-mix(in_srgb,var(--color-text-heading)_25%,var(--color-border-default))]"
+                  class="inline-flex items-center justify-center min-w-4 h-[1.05rem] px-[0.3rem] rounded-default border border-border-default bg-surface-base text-text-body text-2xs font-bold leading-none cursor-pointer transition-colors hover:bg-[color-mix(in_srgb,var(--color-text-heading)_8%,var(--color-surface-base))] hover:border-[color-mix(in_srgb,var(--color-text-heading)_25%,var(--color-border-default))]"
                   @click="jumpToTurn(chip.n)"
                 >{{ chip.label }}</span>
               </TurnPreviewCard>
@@ -281,14 +281,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            scroll — the column grows with content; the rail sticks (items-start so
            it doesn't stretch to the tall conversation's height). -->
       <div
-        class="grid grid-cols-[minmax(0,1fr)_340px] gap-[0.625rem] items-start"
+        class="grid grid-cols-[minmax(0,1fr)_340px] gap-2.5 items-start"
       >
       <!-- Conversation column: toolbar + panel -->
       <div class="flex flex-col min-w-0 min-h-0">
 
       <!-- Conversation toolbar: search (fills width) + status + model filters.
            Sorting lives on the Collapsed view's metric column headers. -->
-      <div class="flex items-center gap-[0.5rem] mb-[0.625rem] flex-shrink-0">
+      <div class="flex items-center gap-2 mb-2.5 flex-shrink-0">
         <OSearchInput
           v-model="searchText"
           :placeholder="t('traces.sessionDetail.searchPlaceholder')"
@@ -297,7 +297,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="xs"
           class="no-border flex-1! h-9"
         />
-        <div class="w-[9rem] flex-shrink-0">
+        <div class="w-36 flex-shrink-0">
           <OSelect
             v-model="statusFilter"
             :label="t('traces.sessionDetail.filters.status')"
@@ -305,7 +305,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :options="statusOptions"
           />
         </div>
-        <div class="w-[12rem] flex-shrink-0">
+        <div class="w-48 flex-shrink-0">
           <OSelect
             v-model="modelFilter"
             :label="t('traces.sessionDetail.filters.model')"
@@ -317,12 +317,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Conversation panel -->
       <div
-        class="bg-card-glass-bg rounded-default border border-border-default mb-[0.625rem] flex flex-col overflow-hidden"
+        class="bg-card-glass-bg rounded-default border border-border-default mb-2.5 flex flex-col overflow-hidden"
         data-test="session-conversation-panel"
       >
         <!-- panel header: title + count chip + jump buttons -->
         <div
-          class="flex items-center gap-[0.625rem] px-[1rem] py-[0.75rem] border-b border-border-default flex-shrink-0"
+          class="flex items-center gap-2.5 px-4 py-3 border-b border-border-default flex-shrink-0"
         >
           <span class="text-base font-semibold text-text-heading">
             {{ t('traces.sessionDetail.conversation') }}
@@ -349,14 +349,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- turn list (Collapsed view) -->
         <div
           v-show="viewMode === 'collapsed'"
-          class="flex flex-col gap-[0.5rem] p-[0.5rem]"
+          class="flex flex-col gap-2 p-2"
         >
           <!-- column headers — clickable sort controls for the three metric bars
                (OTable-style arrows). Aligned to the same grid template as each
                turn row, sticky so they persist on scroll. -->
           <div
             v-if="filteredTraces.length"
-            class="sticky top-0 z-[5] grid grid-cols-[auto_auto_minmax(0,1fr)_5rem_5rem_5rem] items-center gap-[0.75rem] px-[0.75rem] py-[0.4rem] bg-surface-base border-b border-border-default text-xs font-medium text-text-label"
+            class="sticky top-0 z-[5] grid grid-cols-[auto_auto_minmax(0,1fr)_5rem_5rem_5rem] items-center gap-3 px-3 py-[0.4rem] bg-surface-base border-b border-border-default text-xs font-medium text-text-label"
             data-test="session-turn-columns"
           >
             <span></span>
@@ -387,7 +387,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <!-- collapsed header (click to expand) -->
             <div
-              class="grid grid-cols-[auto_auto_minmax(0,1fr)_5rem_5rem_5rem] items-center gap-[0.75rem] px-[0.75rem] py-[0.6rem] cursor-pointer hover:bg-[color-mix(in_srgb,var(--color-text-heading)_3%,var(--color-surface-base))]"
+              class="grid grid-cols-[auto_auto_minmax(0,1fr)_5rem_5rem_5rem] items-center gap-3 px-3 py-[0.6rem] cursor-pointer hover:bg-[color-mix(in_srgb,var(--color-text-heading)_3%,var(--color-surface-base))]"
               :data-test="`session-turn-header-${trace.traceId}`"
               @click="toggleTurn(trace.traceId)"
             >
@@ -397,7 +397,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="text-text-muted flex-shrink-0"
               />
               <span
-                class="inline-flex items-center justify-center w-[1.5rem] h-[1.5rem] rounded-full text-2xs font-bold tabular-nums flex-shrink-0"
+                class="inline-flex items-center justify-center w-6 h-6 rounded-full text-2xs font-bold tabular-nums flex-shrink-0"
                 :class="trace.status === 'error'
                   ? 'bg-[color-mix(in_srgb,var(--color-error-500)_15%,transparent)] text-error-500'
                   : 'bg-[color-mix(in_srgb,var(--color-success-500)_15%,transparent)] text-status-success-text'"
@@ -442,7 +442,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- expanded body (basic messages + stats; full Ledger is S6) -->
             <div
               v-if="isExpanded(trace.traceId)"
-              class="border-t border-border-default bg-surface-base p-[0.75rem]"
+              class="border-t border-border-default bg-surface-base p-3"
               :data-test="`session-turn-body-${trace.traceId}`"
             >
               <!-- loading skeleton -->
@@ -453,10 +453,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OSkeleton type="rect" animation="wave" class="rounded-default w-[60%] h-[0.65rem]" />
               </div>
 
-              <div v-else class="flex flex-col gap-[0.625rem]">
+              <div v-else class="flex flex-col gap-2.5">
                 <!-- user block -->
                 <div class="rounded-default border border-border-default bg-surface-base overflow-hidden">
-                  <div class="flex items-center justify-between px-[0.625rem] py-[0.375rem] border-b border-border-default">
+                  <div class="flex items-center justify-between px-2.5 py-1.5 border-b border-border-default">
                     <span class="text-xs font-bold text-text-heading">
                       {{ t('traces.sessionDetail.roles.user') }}
                     </span>
@@ -468,7 +468,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @click="copyText(turnDetail(trace.traceId)?.userMessage?.content)"
                     />
                   </div>
-                  <div class="px-[0.75rem] py-[0.625rem] text-compact leading-relaxed text-text-body whitespace-pre-wrap break-words max-h-[12rem] overflow-y-auto">
+                  <div class="px-3 py-2.5 text-compact leading-relaxed text-text-body whitespace-pre-wrap break-words max-h-48 overflow-y-auto">
                     {{ turnDetail(trace.traceId)?.userMessage?.content || t('traces.sessionDetail.noUserMessage') }}
                   </div>
                 </div>
@@ -482,8 +482,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                 <!-- assistant block -->
                 <div class="rounded-default border border-border-default bg-surface-base overflow-hidden">
-                  <div class="flex items-center justify-between px-[0.625rem] py-[0.375rem] border-b border-border-default">
-                    <span class="flex items-center gap-[0.375rem] text-xs font-bold text-text-heading">
+                  <div class="flex items-center justify-between px-2.5 py-1.5 border-b border-border-default">
+                    <span class="flex items-center gap-1.5 text-xs font-bold text-text-heading">
                       {{ t('traces.sessionDetail.roles.assistant') }}
                       <OTag v-if="turnDetail(trace.traceId)?.model" variant="purple-soft" size="sm">
                         {{ turnDetail(trace.traceId)?.model }}
@@ -501,19 +501,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                        code, bold). v-html is sanitized in renderMarkdown(). -->
                   <div
                     v-if="turnDetail(trace.traceId)?.assistantMessage?.content"
-                    class="markdown-body px-[0.75rem] py-[0.625rem] text-compact text-text-body break-words max-h-[16rem] overflow-auto"
+                    class="markdown-body px-3 py-2.5 text-compact text-text-body break-words max-h-64 overflow-auto"
                     v-html="renderMarkdown(turnDetail(trace.traceId)?.assistantMessage?.content)"
                   />
                   <div
                     v-else
-                    class="px-[0.75rem] py-[0.625rem] text-compact text-text-muted"
+                    class="px-3 py-2.5 text-compact text-text-muted"
                   >
                     {{ t('traces.sessionDetail.noAssistantMessage') }}
                   </div>
                 </div>
 
                 <!-- compact stats footer -->
-                <div class="flex flex-wrap items-center gap-x-[0.75rem] gap-y-[0.25rem] text-2xs text-text-secondary tabular-nums">
+                <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-2xs text-text-secondary tabular-nums">
                   <span>{{ formatTime(trace.startTimeMicros) }}</span>
                   <span>· {{ formatDuration(trace.durationNanos) }}</span>
                   <span>· ${{ trace.cost.toFixed(4) }}</span>
@@ -524,7 +524,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </span>
                   <div class="flex-1"></div>
                   <OButton variant="outline" size="sm" @click="openTrace(trace.traceId)">
-                    <OIcon name="open-in-new" size="xs" class="mr-[0.25rem]" />
+                    <OIcon name="open-in-new" size="xs" class="mr-1" />
                     {{ t('traces.sessionDetail.openInTraceExplorer') }}
                   </OButton>
                 </div>
@@ -535,7 +535,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- empty state -->
           <div
             v-if="filteredTraces.length === 0"
-            class="flex flex-col items-center justify-center gap-[0.5rem] py-[3rem] text-text-muted"
+            class="flex flex-col items-center justify-center gap-2 py-12 text-text-muted"
           >
             <OIcon name="search-off" size="lg" />
             <span class="text-compact">{{ t('traces.sessionDetail.noTurnsMatch') }}</span>
@@ -548,12 +548,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div v-if="viewMode === 'pretty'">
           <div
             v-if="sessionSpansLoading"
-            class="flex flex-col gap-[0.5rem] p-[0.75rem]"
+            class="flex flex-col gap-2 p-3"
             data-test="session-pretty-skeleton"
           >
-            <OSkeleton type="rect" animation="wave" class="rounded-default w-[30%] h-[1.5rem]" />
-            <OSkeleton type="rect" animation="wave" class="rounded-default w-[70%] h-[3rem] mt-[0.5rem]" />
-            <OSkeleton type="rect" animation="wave" class="rounded-default w-[85%] h-[4rem]" />
+            <OSkeleton type="rect" animation="wave" class="rounded-default w-[30%] h-6" />
+            <OSkeleton type="rect" animation="wave" class="rounded-default w-[70%] h-12 mt-2" />
+            <OSkeleton type="rect" animation="wave" class="rounded-default w-[85%] h-16" />
           </div>
           <ThreadView
             v-else
@@ -575,12 +575,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            scrolls internally when it genuinely overflows. The rail sticks to the
            top and never exceeds the viewport. -->
       <aside
-        class="sticky top-0 self-start flex flex-col gap-[0.625rem] max-h-[calc(100vh-2.6rem-68px-1.25rem)] overflow-y-auto pb-[0.625rem]"
+        class="sticky top-0 self-start flex flex-col gap-2.5 max-h-[calc(100vh-2.6rem-68px-1.25rem)] overflow-y-auto pb-2.5"
         data-test="session-rail"
       >
         <!-- Tool Hotspots (by time + calls; cost pending backend attribution) -->
         <div class="bg-card-glass-bg rounded-default border border-border-default flex flex-col overflow-hidden">
-          <div class="flex items-center gap-[0.4rem] px-[0.75rem] py-[0.5rem] border-b border-border-default flex-shrink-0">
+          <div class="flex items-center gap-[0.4rem] px-3 py-2 border-b border-border-default flex-shrink-0">
             <OIcon name="build" size="xs" class="text-text-muted" />
             <span class="text-xs font-semibold text-text-heading">
               {{ t('traces.sessionDetail.rail.toolHotspots') }}
@@ -588,13 +588,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div
             v-if="sessionSpansLoading"
-            class="flex flex-col gap-[0.4rem] p-[0.625rem]"
+            class="flex flex-col gap-[0.4rem] p-2.5"
           >
             <OSkeleton v-for="n in 3" :key="n" type="rect" animation="wave" class="rounded-default w-full h-[1.1rem]" />
           </div>
           <div
             v-else-if="toolHotspots.length"
-            class="max-h-[15rem] overflow-y-auto p-[0.375rem] flex flex-col gap-[0.1rem]"
+            class="max-h-60 overflow-y-auto p-1.5 flex flex-col gap-[0.1rem]"
           >
             <span
               v-for="(row, i) in toolHotspots"
@@ -602,10 +602,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="contents"
             >
               <button
-                class="flex items-center gap-[0.5rem] w-full px-[0.4rem] py-[0.35rem] rounded-default text-left cursor-pointer hover:bg-[color-mix(in_srgb,var(--color-text-heading)_4%,transparent)]"
+                class="flex items-center gap-2 w-full px-[0.4rem] py-[0.35rem] rounded-default text-left cursor-pointer hover:bg-[color-mix(in_srgb,var(--color-text-heading)_4%,transparent)]"
                 @click="jumpToTurn(originalTurnIndex(row.topTraceId) + 1)"
               >
-                <span class="w-[1.25rem] h-[1.25rem] rounded-default grid place-items-center text-3xs font-bold tabular-nums flex-shrink-0 bg-[color-mix(in_srgb,var(--color-text-heading)_8%,transparent)] text-text-secondary">
+                <span class="w-5 h-5 rounded-default grid place-items-center text-3xs font-bold tabular-nums flex-shrink-0 bg-[color-mix(in_srgb,var(--color-text-heading)_8%,transparent)] text-text-secondary">
                   {{ i + 1 }}
                 </span>
                 <span class="text-xs font-semibold text-text-heading flex-1 min-w-0 truncate" :title="row.name">
@@ -646,20 +646,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OTooltip>
             </span>
           </div>
-          <div v-else class="px-[0.75rem] py-[1.25rem] text-center text-xs text-text-muted">
+          <div v-else class="px-3 py-5 text-center text-xs text-text-muted">
             {{ t('traces.sessionDetail.rail.noTools') }}
           </div>
         </div>
 
         <!-- Cost Hotspots -->
         <div class="bg-card-glass-bg rounded-default border border-border-default flex flex-col overflow-hidden">
-          <div class="flex items-center gap-[0.4rem] px-[0.75rem] py-[0.5rem] border-b border-border-default flex-shrink-0">
+          <div class="flex items-center gap-[0.4rem] px-3 py-2 border-b border-border-default flex-shrink-0">
             <OIcon name="trending-up" size="xs" class="text-text-muted" />
             <span class="text-xs font-semibold text-text-heading">
               {{ t('traces.sessionDetail.rail.costHotspots') }}
             </span>
           </div>
-          <div class="max-h-[15rem] overflow-y-auto p-[0.375rem] flex flex-col gap-[0.1rem]">
+          <div class="max-h-60 overflow-y-auto p-1.5 flex flex-col gap-[0.1rem]">
             <TurnPreviewCard
               v-for="(row, i) in costHotspots"
               :key="row.n"
@@ -669,13 +669,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               side="right"
             >
               <button
-                class="flex items-center gap-[0.5rem] w-full px-[0.4rem] py-[0.35rem] rounded-default text-left cursor-pointer hover:bg-[color-mix(in_srgb,var(--color-text-heading)_4%,transparent)]"
+                class="flex items-center gap-2 w-full px-[0.4rem] py-[0.35rem] rounded-default text-left cursor-pointer hover:bg-[color-mix(in_srgb,var(--color-text-heading)_4%,transparent)]"
                 @click="jumpToTurn(row.n)"
               >
-                <span class="w-[1.25rem] h-[1.25rem] rounded-default grid place-items-center text-3xs font-bold tabular-nums flex-shrink-0 bg-[color-mix(in_srgb,var(--color-text-heading)_8%,transparent)] text-text-secondary">
+                <span class="w-5 h-5 rounded-default grid place-items-center text-3xs font-bold tabular-nums flex-shrink-0 bg-[color-mix(in_srgb,var(--color-text-heading)_8%,transparent)] text-text-secondary">
                   {{ i + 1 }}
                 </span>
-                <span class="text-xs font-semibold text-text-heading w-[2.75rem] flex-shrink-0">
+                <span class="text-xs font-semibold text-text-heading w-11 flex-shrink-0">
                   {{ t('traces.sessionDetail.turnLabel') }} {{ row.n }}
                 </span>
                 <span class="flex-1 min-w-0">
@@ -697,13 +697,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Slowest Turns -->
         <div class="bg-card-glass-bg rounded-default border border-border-default flex flex-col overflow-hidden">
-          <div class="flex items-center gap-[0.4rem] px-[0.75rem] py-[0.5rem] border-b border-border-default flex-shrink-0">
+          <div class="flex items-center gap-[0.4rem] px-3 py-2 border-b border-border-default flex-shrink-0">
             <OIcon name="schedule" size="xs" class="text-text-muted" />
             <span class="text-xs font-semibold text-text-heading">
               {{ t('traces.sessionDetail.rail.slowestTurns') }}
             </span>
           </div>
-          <div class="max-h-[15rem] overflow-y-auto p-[0.375rem] flex flex-col gap-[0.1rem]">
+          <div class="max-h-60 overflow-y-auto p-1.5 flex flex-col gap-[0.1rem]">
             <TurnPreviewCard
               v-for="(row, i) in slowestTurns"
               :key="row.n"
@@ -713,19 +713,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               side="right"
             >
               <button
-                class="flex items-center gap-[0.5rem] w-full px-[0.4rem] py-[0.35rem] rounded-default text-left cursor-pointer hover:bg-[color-mix(in_srgb,var(--color-text-heading)_4%,transparent)]"
+                class="flex items-center gap-2 w-full px-[0.4rem] py-[0.35rem] rounded-default text-left cursor-pointer hover:bg-[color-mix(in_srgb,var(--color-text-heading)_4%,transparent)]"
                 @click="jumpToTurn(row.n)"
               >
-                <span class="w-[1.25rem] h-[1.25rem] rounded-default grid place-items-center text-3xs font-bold tabular-nums flex-shrink-0 bg-[color-mix(in_srgb,var(--color-text-heading)_8%,transparent)] text-text-secondary">
+                <span class="w-5 h-5 rounded-default grid place-items-center text-3xs font-bold tabular-nums flex-shrink-0 bg-[color-mix(in_srgb,var(--color-text-heading)_8%,transparent)] text-text-secondary">
                   {{ i + 1 }}
                 </span>
-                <span class="text-xs font-semibold text-text-heading w-[2.75rem] flex-shrink-0">
+                <span class="text-xs font-semibold text-text-heading w-11 flex-shrink-0">
                   {{ t('traces.sessionDetail.turnLabel') }} {{ row.n }}
                 </span>
                 <span class="flex-1 min-w-0">
                   <OProgressBar :value="ratio(row.lat, maxTurnLat)" :variant="row.status === 'error' ? 'danger' : 'warning'" size="xs" />
                 </span>
-                <span class="text-2xs font-semibold tabular-nums text-text-secondary min-w-[2.75rem] text-right">
+                <span class="text-2xs font-semibold tabular-nums text-text-secondary min-w-11 text-right">
                   {{ formatDuration(row.lat) }}
                 </span>
                 <OIcon name="chevron-right" size="xs" class="text-text-muted flex-shrink-0" />

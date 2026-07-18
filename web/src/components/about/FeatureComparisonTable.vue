@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OIcon name="compare-arrows" size="md" />
       </div>
       <div>
-        <div class="text-[length:var(--text-xs)] font-semibold uppercase tracking-[0.1em] text-accent m-0 mb-[0.125rem]">EDITIONS</div>
+        <div class="text-[length:var(--text-xs)] font-semibold uppercase tracking-[0.1em] text-accent m-0 mb-0.5">EDITIONS</div>
         <div class="text-[length:var(--text-xl)] font-semibold text-text-heading m-0 tracking-[-0.015em]">{{ t("about.feature_comparison_lbl") }}</div>
       </div>
     </div>
@@ -44,15 +44,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :class="{ 'border-2 border-accent pt-7 max-[1024px]:pt-5': buildType === ed.id }"
       >
         <!-- Your Plan badge (floats above the card top border) -->
-        <div v-if="buildType === ed.id" data-test="feature-comparison-table-your-plan-badge" class="absolute top-[-14px] left-1/2 -translate-x-1/2 inline-flex items-center py-1 px-[0.875rem] rounded-full text-3xs font-bold uppercase tracking-[0.08em] whitespace-nowrap bg-accent text-button-primary-foreground">
+        <div v-if="buildType === ed.id" data-test="feature-comparison-table-your-plan-badge" class="absolute top-[-14px] left-1/2 -translate-x-1/2 inline-flex items-center py-1 px-3.5 rounded-full text-3xs font-bold uppercase tracking-[0.08em] whitespace-nowrap bg-accent text-button-primary-foreground">
           <OIcon name="arrow-upward" size="sm" class="mr-1" />
           Your Plan
         </div>
 
         <!-- Edition name + hosting + price ────────────────────────────── -->
         <div class="mb-5">
-          <div class="text-base font-bold text-text-heading m-0 mb-[0.125rem]">{{ ed.shortName }}</div>
-          <div class="text-compact text-text-muted m-0 mb-[0.875rem]">{{ ed.hosting }}</div>
+          <div class="text-base font-bold text-text-heading m-0 mb-0.5">{{ ed.shortName }}</div>
+          <div class="text-compact text-text-muted m-0 mb-3.5">{{ ed.hosting }}</div>
           <div class="text-3xl font-bold text-accent m-0 mb-1 tracking-[-0.03em] leading-[1.1]">{{ ed.price }}</div>
           <div class="text-compact text-text-muted m-0 leading-[1.4]">{{ ed.priceSub }}</div>
         </div>
@@ -61,11 +61,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="bg-[color-mix(in_srgb,var(--color-accent)_5%,var(--color-card-glass-bg))] border border-[color-mix(in_srgb,var(--color-accent)_15%,transparent)] rounded-default p-3 mb-4">
           <div class="text-3xs font-bold uppercase tracking-[0.12em] text-text-label m-0 mb-2">ALL FIVE PILLARS</div>
           <div class="flex flex-wrap gap-1.5 mb-1.5">
-            <span v-for="pillarId in PILLAR_IDS" :key="pillarId" data-test="feature-comparison-table-pillar-chip" class="inline-flex items-center py-[0.1875rem] px-2 rounded-default text-2xs font-medium bg-[color-mix(in_srgb,var(--color-accent)_10%,var(--color-card-glass-bg))] text-accent border border-[color-mix(in_srgb,var(--color-accent)_20%,transparent)] mr-[0.375rem] mb-[0.375rem]">
+            <span v-for="pillarId in PILLAR_IDS" :key="pillarId" data-test="feature-comparison-table-pillar-chip" class="inline-flex items-center py-[0.1875rem] px-2 rounded-default text-2xs font-medium bg-[color-mix(in_srgb,var(--color-accent)_10%,var(--color-card-glass-bg))] text-accent border border-[color-mix(in_srgb,var(--color-accent)_20%,transparent)] mr-1.5 mb-1.5">
               {{ t(`about.feature_${pillarId}`) }}
             </span>
           </div>
-          <span class="inline-flex items-center py-[0.1875rem] px-2 rounded-default text-2xs font-medium bg-[color-mix(in_srgb,var(--color-accent)_10%,var(--color-card-glass-bg))] text-accent border border-[color-mix(in_srgb,var(--color-accent)_20%,transparent)] mr-[0.375rem] mb-[0.375rem]">{{ t('about.feature_dashboards') }}</span>
+          <span class="inline-flex items-center py-[0.1875rem] px-2 rounded-default text-2xs font-medium bg-[color-mix(in_srgb,var(--color-accent)_10%,var(--color-card-glass-bg))] text-accent border border-[color-mix(in_srgb,var(--color-accent)_20%,transparent)] mr-1.5 mb-1.5">{{ t('about.feature_dashboards') }}</span>
         </div>
 
         <!-- Feature list ───────────────────────────────────────────────── -->
@@ -80,7 +80,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               'text-text-muted': getFeatureStatus(feature, ed.id) === 'unavailable',
             }"
           >
-            <span class="shrink-0 mt-[0.125rem] leading-none"
+            <span class="shrink-0 mt-0.5 leading-none"
               :class="{
                 'text-status-positive': getFeatureStatus(feature, ed.id) !== 'unavailable',
                 'text-text-muted': getFeatureStatus(feature, ed.id) === 'unavailable',
@@ -109,12 +109,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Footer: license + support + CTA ──────────────────────────── -->
         <div class="mt-4">
           <div class="h-px bg-card-glass-border mb-3"></div>
-          <div class="mb-[0.875rem]">
-            <div data-test="feature-comparison-table-footer-row" class="flex justify-between items-baseline text-compact py-[0.125rem]">
+          <div class="mb-3.5">
+            <div data-test="feature-comparison-table-footer-row" class="flex justify-between items-baseline text-compact py-0.5">
               <span class="text-text-muted font-medium">{{ t('about.feature_license') }}</span>
               <span class="text-text-body font-semibold">{{ ed.license }}</span>
             </div>
-            <div data-test="feature-comparison-table-footer-row" class="flex justify-between items-baseline text-compact py-[0.125rem]">
+            <div data-test="feature-comparison-table-footer-row" class="flex justify-between items-baseline text-compact py-0.5">
               <span class="text-text-muted font-medium">{{ t('about.feature_support') }}</span>
               <span class="text-text-body font-semibold">{{ ed.support }}</span>
             </div>

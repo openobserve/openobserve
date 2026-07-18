@@ -3,7 +3,7 @@
     <div class="pb-1 flex justify-start px-3 copy-log-btn">
       <app-tabs
         v-if="filteredTabs.length"
-        class="mb-[0.375rem] mr-2 h-fit overflow-hidden border-t border-l border-r border-solid border-card-glass-border rounded-default"
+        class="mb-1.5 mr-2 h-fit overflow-hidden border-t border-l border-r border-solid border-card-glass-border rounded-default"
         data-test="logs-json-preview-tabs"
         :tabs="filteredTabs"
         v-model:active-tab="activeTab"
@@ -14,14 +14,14 @@
         :label="t('common.copyToClipboard')"
         size="xs"
         variant="outline"
-        class="mb-[0.375rem] mr-2"
+        class="mb-1.5 mr-2"
         @click="copyLogToClipboard"
       ><OIcon name="content-copy" size="xs" class="mr-1" />{{ t('common.copyToClipboard') }}</OButton>
         <OButton
         v-if="showViewRelatedBtn"
         size="xs"
         variant="outline"
-        class="mb-[0.375rem] mr-2"
+        class="mb-1.5 mr-2"
         @click="openCorrelation"
         data-test="log-correlation-btn"
       >

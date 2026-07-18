@@ -103,7 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @mouseleave="onUnhoverSpan"
           :data-test="`trace-tree-span-container-${(spans as any[])[virtualRow.index].spanId}`"
         >
-          <div :style="{ width: leftWidth + 'px' }" class="pl-[0.375rem]">
+          <div :style="{ width: leftWidth + 'px' }" class="pl-1.5">
             <div
               :style="{
                 height: '100%',
@@ -247,7 +247,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           )
                         "
                         :title="getSpanTech((spans as any[])[virtualRow.index])"
-                        class="mr-1 shrink-0 w-[0.875rem] h-[0.875rem] inline-block opacity-60"
+                        class="mr-1 shrink-0 w-3.5 h-3.5 inline-block opacity-60"
                         aria-hidden="true"
                         alt=""
                         :data-test="`trace-tree-span-tech-icon-${(spans as any[])[virtualRow.index].spanId}`"
@@ -263,7 +263,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <!-- LLM Metrics -->
                     <div
                       v-if="isLLMTrace((spans as any[])[virtualRow.index])"
-                      class="flex items-center text-xs text-status-error-text! mt-[-0.125rem] mb-[0.125rem] leading-none"
+                      class="flex items-center text-xs text-status-error-text! mt-[-0.125rem] mb-0.5 leading-none"
                     >
                       <span
                         v-if="
@@ -299,7 +299,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       v-if="
                         getHttpStatusVars((spans as any[])[virtualRow.index])
                       "
-                      class="text-xs font-semibold leading-none py-[0.4rem] px-1 mr-[0.25rem] rounded-default whitespace-nowrap"
+                      class="text-xs font-semibold leading-none py-[0.4rem] px-1 mr-1 rounded-default whitespace-nowrap"
                       :style="{
                         backgroundColor: getHttpStatusVars(
                           (spans as any[])[virtualRow.index],

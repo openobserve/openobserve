@@ -30,7 +30,7 @@
         <div
           v-for="kpi in kpis"
           :key="kpi.id"
-          class="rounded-default flex flex-col px-[0.875rem] pt-[0.625rem] pb-[0.625rem] gap-[0.25rem] bg-surface-base border border-border-default transition-shadow duration-200 hover:shadow-[0_0.0625rem_0.375rem_rgba(0,0,0,0.08)]"
+          class="rounded-default flex flex-col px-3.5 pt-2.5 pb-2.5 gap-1 bg-surface-base border border-border-default transition-shadow duration-200 hover:shadow-[0_0.0625rem_0.375rem_rgba(0,0,0,0.08)]"
           :data-test="`quality-detail-kpi-${kpi.id}`"
         >
           <div class="text-2xs font-semibold text-text-secondary">

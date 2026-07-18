@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div class="mb-2 stepper-header w-full flex h-full">
       <div
-        :class="store.state.isAiChatEnabled ? 'w-[75%]' : 'w-[100%]'"
+        :class="store.state.isAiChatEnabled ? 'w-[75%]' : 'w-full'"
         style="height: 100% !important; display: flex;"
       >
         <!-- Collapsed field list bar (shown when hidden) -->
@@ -162,7 +162,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 >
                                   <div
                                     v-if="durationPercentilesLoading"
-                                    class="flex justify-center py-[0.5rem]"
+                                    class="flex justify-center py-2"
                                   >
                                     <OSpinner size="xs" />
                                   </div>
@@ -170,10 +170,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                     <div
                                       v-for="p in PERCENTILE_LABELS"
                                       :key="p.key"
-                                      class="flex items-center justify-between py-[0.15rem] pl-[0.5rem]"
+                                      class="flex items-center justify-between py-[0.15rem] pl-2"
                                     >
-                                      <span class="text-2xs w-[2rem] shrink-0">{{ p.label }}</span>
-                                      <span class="text-2xs flex-1 text-right pr-[0.25rem]">
+                                      <span class="text-2xs w-8 shrink-0">{{ p.label }}</span>
+                                      <span class="text-2xs flex-1 text-right pr-1">
                                         {{ formatTimeWithSuffix(durationPercentiles[p.key]) }}
                                       </span>
                                       <div class="flex w-[2.7rem]">
@@ -183,7 +183,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                           size="icon-xs-circle"
                                           :title="`duration >= ${formatTimeWithSuffix(durationPercentiles[p.key])}`"
                                           @click.stop="addFieldSearchTerm(`duration>='${formatTimeWithSuffix(durationPercentiles[p.key])}'`)"
-                                          class="ml-[0.125rem]! border! border-card-glass-border!"
+                                          class="ml-0.5! border! border-card-glass-border!"
                                         >
                                           <OIcon name="arrow-forward-ios" size="sm" class="h-[0.4rem]! w-[0.4rem]!" />
                                         </OButton>
@@ -192,7 +192,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                           size="icon-xs-circle"
                                           :title="`duration <= ${formatTimeWithSuffix(durationPercentiles[p.key])}`"
                                           @click.stop="addFieldSearchTerm(`duration<='${formatTimeWithSuffix(durationPercentiles[p.key])}'`)"
-                                          class="ml-auto! mr-[0.5rem]! border! border-card-glass-border!"
+                                          class="ml-auto! mr-2! border! border-card-glass-border!"
                                         >
                                           <OIcon name="arrow-back-ios" size="sm" class="h-[0.4rem]! w-[0.4rem]!" />
                                         </OButton>

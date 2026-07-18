@@ -463,7 +463,7 @@ function openChromeExtensions() {
       <OInput
         v-model="filterQuery"
         :placeholder="t('synthetics.journey.filterSteps')"
-        class="flex-1 min-w-[8rem]!"
+        class="flex-1 min-w-32!"
         data-test="synthetics-journey-filter-input"
       />
       <!-- Fixed-width action area — buttons right-aligned, widest set (Add Step + Record + Replay/Stop) fits in 320px -->

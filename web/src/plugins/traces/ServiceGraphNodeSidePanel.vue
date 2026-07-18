@@ -143,11 +143,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
 
-        <OSeparator v-if="streamFilter !== 'all' && dashboardData" class="my-[1rem]!" />
+        <OSeparator v-if="streamFilter !== 'all' && dashboardData" class="my-4!" />
         <!-- Tabs: Operations / Nodes / Pods -->
         <template v-if="streamFilter !== 'all'">
           <div
-            class="flex items-end border-b border-b-card-glass-border mx-[0.5rem] mb-[0.375rem]"
+            class="flex items-end border-b border-b-card-glass-border mx-2 mb-1.5"
             data-test="service-graph-node-panel-tabs-row"
           >
             <OTabs
@@ -198,12 +198,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </OButton>
               </template>
               <div
-                class="min-w-[12rem]!"
+                class="min-w-48!"
                 data-test="service-graph-node-panel-workload-fields-menu"
               >
                 <template v-for="env in detectedEnvironments" :key="env.key">
                   <div
-                    class="text-xs px-3 pb-0 py-[0.375rem]! uppercase tracking-wide text-muted-foreground"
+                    class="text-xs px-3 pb-0 py-1.5! uppercase tracking-wide text-muted-foreground"
                   >
                     {{ env.label }}
                   </div>

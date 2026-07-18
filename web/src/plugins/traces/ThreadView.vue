@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div v-if="props.showSummary" class="thread-summary flex flex-wrap items-center gap-[0.4rem] py-2 px-4 bg-surface-base border-b border-border-default">
       <OTag
         type="metricChip"
-        class="thread-chip thread-chip--steps h-6.5! px-[0.625rem]! py-0! bg-surface-base! border border-border-default rounded-default! text-xs! text-text-body! border-l-[3px]! border-l-[color-mix(in_srgb,var(--color-orange-700)_75%,var(--color-grey-300))]!"
+        class="thread-chip thread-chip--steps h-6.5! px-2.5! py-0! bg-surface-base! border border-border-default rounded-default! text-xs! text-text-body! border-l-[3px]! border-l-[color-mix(in_srgb,var(--color-orange-700)_75%,var(--color-grey-300))]!"
         :title="`${summary.turnCount} LLM step${summary.turnCount === 1 ? '' : 's'}`"
       >
         <template #icon><OIcon name="auto-awesome" size="xs" /></template>
@@ -42,13 +42,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span class="thread-chip__value text-text-body font-semibold text-xs">{{ summary.turnCount }}</span>
       </OTag>
 
-      <OTag type="metricChip" class="thread-chip thread-chip--tools h-6.5! px-[0.625rem]! py-0! bg-surface-base! border border-border-default rounded-default! text-xs! text-text-body! border-l-[3px]! border-l-[color-mix(in_srgb,var(--color-cyan-500)_55%,var(--color-blue-500))]!">
+      <OTag type="metricChip" class="thread-chip thread-chip--tools h-6.5! px-2.5! py-0! bg-surface-base! border border-border-default rounded-default! text-xs! text-text-body! border-l-[3px]! border-l-[color-mix(in_srgb,var(--color-cyan-500)_55%,var(--color-blue-500))]!">
         <template #icon><OIcon name="build" size="xs" /></template>
         <span class="thread-chip__label text-text-secondary font-medium mr-[0.3125rem] tracking-normal text-2xs">Tools</span>
         <span class="thread-chip__value text-text-body font-semibold text-xs">{{ summary.toolCallCount }}</span>
       </OTag>
 
-      <OTag type="metricChip" class="thread-chip thread-chip--duration h-6.5! px-[0.625rem]! py-0! bg-surface-base! border border-border-default rounded-default! text-xs! text-text-body! border-l-[3px]! border-l-[color-mix(in_srgb,var(--color-grey-500)_80%,var(--color-blue-800))]!">
+      <OTag type="metricChip" class="thread-chip thread-chip--duration h-6.5! px-2.5! py-0! bg-surface-base! border border-border-default rounded-default! text-xs! text-text-body! border-l-[3px]! border-l-[color-mix(in_srgb,var(--color-grey-500)_80%,var(--color-blue-800))]!">
         <template #icon><OIcon name="schedule" size="xs" /></template>
         <span class="thread-chip__label text-text-secondary font-medium mr-[0.3125rem] tracking-normal text-2xs">Duration</span>
         <span class="thread-chip__value text-text-body font-semibold text-xs">
@@ -56,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </span>
       </OTag>
 
-      <OTag type="metricChip" class="thread-chip thread-chip--cost h-6.5! px-[0.625rem]! py-0! bg-surface-base! border border-border-default rounded-default! text-xs! text-text-body! border-l-[3px]! border-l-success-600!">
+      <OTag type="metricChip" class="thread-chip thread-chip--cost h-6.5! px-2.5! py-0! bg-surface-base! border border-border-default rounded-default! text-xs! text-text-body! border-l-[3px]! border-l-success-600!">
         <template #icon><OIcon name="payments" size="xs" /></template>
         <span class="thread-chip__label text-text-secondary font-medium mr-[0.3125rem] tracking-normal text-2xs">Cost</span>
         <span class="thread-chip__value text-text-body font-semibold text-xs">
@@ -67,7 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OTag
         v-if="summary.dominantModel"
         type="metricChip"
-        class="thread-chip thread-chip--model h-6.5! px-[0.625rem]! py-0! bg-surface-base! border border-border-default rounded-default! text-xs! text-text-body! border-l-[3px]! border-l-ai-accent! dark:border-l-(--color-purple-400)!"
+        class="thread-chip thread-chip--model h-6.5! px-2.5! py-0! bg-surface-base! border border-border-default rounded-default! text-xs! text-text-body! border-l-[3px]! border-l-ai-accent! dark:border-l-(--color-purple-400)!"
         :title="summary.dominantModel"
       >
         <template #icon><OIcon name="bolt" size="xs" /></template>
@@ -78,7 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OTag
         v-if="summary.errorCount > 0"
         type="metricChip"
-        class="thread-chip thread-chip--error h-6.5! px-[0.625rem]! py-0! bg-surface-base! border border-border-default rounded-default! text-xs! text-text-body! border-l-[3px]! border-l-error-600!"
+        class="thread-chip thread-chip--error h-6.5! px-2.5! py-0! bg-surface-base! border border-border-default rounded-default! text-xs! text-text-body! border-l-[3px]! border-l-error-600!"
       >
         <template #icon><OIcon name="error-outline" size="xs" /></template>
         <span class="thread-chip__label text-text-secondary font-medium mr-[0.3125rem] tracking-normal text-2xs">Errors</span>
@@ -108,7 +108,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="thread-system mb-4 border border-border-default border-l-[3px] border-l-ai-accent dark:border-l-(--color-purple-400) rounded-default bg-surface-base overflow-hidden"
       >
         <div
-          class="thread-system__head flex items-center gap-[0.625rem] py-2 px-3 cursor-pointer transition-all duration-120 hover:bg-[color-mix(in_srgb,var(--color-ai-accent)_4%,transparent)] dark:hover:bg-[color-mix(in_srgb,var(--color-ai-accent)_8%,transparent)]"
+          class="thread-system__head flex items-center gap-2.5 py-2 px-3 cursor-pointer transition-all duration-120 hover:bg-[color-mix(in_srgb,var(--color-ai-accent)_4%,transparent)] dark:hover:bg-[color-mix(in_srgb,var(--color-ai-accent)_8%,transparent)]"
           @click="showSystemFull = !showSystemFull"
         >
           <span class="thread-system__badge inline-flex items-center py-[0.15rem] px-2 bg-[color-mix(in_srgb,var(--color-ai-accent)_10%,transparent)] dark:bg-[color-mix(in_srgb,var(--color-ai-accent)_18%,transparent)] text-ai-accent dark:text-(--color-purple-400) rounded-default text-2xs font-semibold tracking-[0.02rem] shrink-0">
@@ -131,7 +131,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div
           v-if="showSystemFull"
-          class="thread-system__content py-3 px-[0.875rem] border-t border-border-default bg-surface-base text-compact leading-[1.55] text-text-secondary whitespace-pre-wrap break-words max-h-90 overflow-auto"
+          class="thread-system__content py-3 px-3.5 border-t border-border-default bg-surface-base text-compact leading-[1.55] text-text-secondary whitespace-pre-wrap break-words max-h-90 overflow-auto"
         >
           {{ head.systemPrompt }}
         </div>
@@ -142,7 +142,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              same session — these are answered in earlier traces. -->
         <div
           v-if="group.historicalUserCount > 0"
-          class="thread-prior flex items-center gap-[0.5rem] px-[0.75rem] py-[0.4rem] mb-[0.5rem] rounded-default border border-dashed border-border-default text-xs text-text-muted"
+          class="thread-prior flex items-center gap-2 px-3 py-[0.4rem] mb-2 rounded-default border border-dashed border-border-default text-xs text-text-muted"
         >
           <span>↶</span>
           <span>
@@ -155,7 +155,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- This group's user query. -->
         <div
           v-if="group.userQuery"
-          class="thread-bubble thread-bubble--user thread-user-row flex items-start gap-[0.625rem] mb-4 ml-auto max-w-[40%] w-fit py-[0.625rem] px-[0.875rem] rounded-default text-sm leading-normal whitespace-pre-wrap break-words bg-[image:var(--color-chat-bubble-user)] border border-(--color-indigo-100) dark:border-[color-mix(in_srgb,var(--color-indigo-900)_55%,var(--color-grey-700))] text-text-body shadow-[0_0.0625rem_0.125rem_color-mix(in_srgb,var(--color-black)_6%,transparent)] dark:shadow-[0_0.0625rem_0.125rem_color-mix(in_srgb,var(--color-white)_8%,transparent)]"
+          class="thread-bubble thread-bubble--user thread-user-row flex items-start gap-2.5 mb-4 ml-auto max-w-[40%] w-fit py-2.5 px-3.5 rounded-default text-sm leading-normal whitespace-pre-wrap break-words bg-[image:var(--color-chat-bubble-user)] border border-(--color-indigo-100) dark:border-[color-mix(in_srgb,var(--color-indigo-900)_55%,var(--color-grey-700))] text-text-body shadow-[0_0.0625rem_0.125rem_color-mix(in_srgb,var(--color-black)_6%,transparent)] dark:shadow-[0_0.0625rem_0.125rem_color-mix(in_srgb,var(--color-white)_8%,transparent)]"
         >
           <div
             class="thread-user-avatar w-6 h-6 rounded-full bg-[image:var(--color-gradient-ai)] dark:bg-[image:linear-gradient(135deg,var(--color-indigo-600)_0%,var(--color-indigo-500)_100%)] text-white inline-flex items-center justify-content-center text-2xs font-bold shrink-0 cursor-default"
@@ -178,7 +178,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             v-for="turn in group.turns"
             :key="turn.span.span_id"
-            class="thread-turn relative flex gap-[0.875rem] pb-4 before:content-[''] before:absolute before:top-[1.875rem] before:bottom-0 before:left-[0.875rem] before:w-0.5 before:rounded-full before:bg-border-default last:before:hidden"
+            class="thread-turn relative flex gap-3.5 pb-4 before:content-[''] before:absolute before:top-[1.875rem] before:bottom-0 before:left-3.5 before:w-0.5 before:rounded-full before:bg-border-default last:before:hidden"
           >
           <div class="thread-turn__avatar shrink-0 relative z-1 w-7 h-7 rounded-full bg-(--color-purple-100) dark:bg-[color-mix(in_srgb,var(--color-ai-accent)_16%,transparent)] text-ai-accent dark:text-(--color-purple-400) flex items-center justify-center border border-[color-mix(in_srgb,var(--color-ai-accent)_25%,transparent)] dark:border-[color-mix(in_srgb,var(--color-ai-accent)_40%,transparent)] shadow-[0_0_0_0.25rem_var(--color-surface-base)]">
             <OIcon name="auto-awesome" size="xs" />
@@ -188,7 +188,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             v-for="(u, uIdx) in turn.followupUsers"
             :key="`u-${uIdx}`"
-            class="thread-bubble thread-bubble--user thread-bubble--user-followup py-[0.625rem] px-[0.875rem] rounded-default text-sm leading-normal whitespace-pre-wrap break-words max-w-[min(40rem,75%)] bg-[image:var(--color-chat-bubble-user)] border border-(--color-indigo-100) dark:border-[color-mix(in_srgb,var(--color-indigo-900)_55%,var(--color-grey-700))] text-text-body shadow-[0_0.0625rem_0.125rem_color-mix(in_srgb,var(--color-black)_6%,transparent)] dark:shadow-[0_0.0625rem_0.125rem_color-mix(in_srgb,var(--color-white)_8%,transparent)]"
+            class="thread-bubble thread-bubble--user thread-bubble--user-followup py-2.5 px-3.5 rounded-default text-sm leading-normal whitespace-pre-wrap break-words max-w-[min(40rem,75%)] bg-[image:var(--color-chat-bubble-user)] border border-(--color-indigo-100) dark:border-[color-mix(in_srgb,var(--color-indigo-900)_55%,var(--color-grey-700))] text-text-body shadow-[0_0.0625rem_0.125rem_color-mix(in_srgb,var(--color-black)_6%,transparent)] dark:shadow-[0_0.0625rem_0.125rem_color-mix(in_srgb,var(--color-white)_8%,transparent)]"
           >
             {{ u.content }}
           </div>
@@ -207,7 +207,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             v-for="(msg, mIdx) in turn.assistant"
             :key="`a-${mIdx}`"
-            class="thread-bubble thread-bubble--assistant markdown-body self-start bg-surface-base border border-border-default text-text-body max-w-full shadow-[0_0.0625rem_0.125rem_color-mix(in_srgb,var(--color-black)_6%,transparent)] dark:shadow-[0_0.0625rem_0.125rem_color-mix(in_srgb,var(--color-white)_8%,transparent)] py-[0.625rem] px-[0.875rem] rounded-default text-sm leading-normal break-words whitespace-normal"
+            class="thread-bubble thread-bubble--assistant markdown-body self-start bg-surface-base border border-border-default text-text-body max-w-full shadow-[0_0.0625rem_0.125rem_color-mix(in_srgb,var(--color-black)_6%,transparent)] dark:shadow-[0_0.0625rem_0.125rem_color-mix(in_srgb,var(--color-white)_8%,transparent)] py-2.5 px-3.5 rounded-default text-sm leading-normal break-words whitespace-normal"
             v-html="renderMarkdown(msg.content)"
           />
 

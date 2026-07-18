@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="flex flex-col pb-[0.625rem] h-full" data-test="edit-role-page">
+  <div class="flex flex-col pb-2.5 h-full" data-test="edit-role-page">
     <!-- Sub-page header: the listing's icon becomes a Back button (→ Roles). -->
     <AppPageHeader
       :title="editingRole"
@@ -239,7 +239,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       <div
-        class="flex justify-end w-full flex-shrink-0 mt-[0.625rem]"
+        class="flex justify-end w-full flex-shrink-0 mt-2.5"
         style="z-index: 2"
       >
       <div class="bg-card-glass-bg w-full py-2 px-3 justify-end flex gap-2 border-t border-border-default">

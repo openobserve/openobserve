@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template v-if="isSessionReplayEnabled">
       <div>
         <div
-          class="bg-card-glass-bg border-b border-border-default py-[0.375rem] px-[0.375rem]"
+          class="bg-card-glass-bg border-b border-border-default py-1.5 px-1.5"
         >
           <div class="flex items-start gap-1">
             <!-- Query editor (flex-grow to fill available space) -->
@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   'border',
                   'solid',
                   'border-card-glass-border',
-                  'p-[0.25rem]',
+                  'p-1',
                   'rounded-default',
                   'overflow-y-auto',
                   queryEditorHeight,
@@ -549,9 +549,9 @@ const completeQuery = computed(() => {
 // Dynamic editor height based on content lines
 const queryEditorHeight = computed(() => {
   const lines = (sessionState.data.editorValue.match(/\n/g) || []).length + 1;
-  if (lines === 1) return "h-[2rem]!";
-  if (lines === 2) return "h-[3.5rem]!";
-  return "h-[5rem]!"; // 3+ lines, capped at 5rem (approx 3 lines)
+  if (lines === 1) return "h-8!";
+  if (lines === 2) return "h-14!";
+  return "h-20!"; // 3+ lines, capped at 5rem (approx 3 lines)
 });
 
 const isMounted = ref(false);

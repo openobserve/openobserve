@@ -17,12 +17,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="trace-details-sidebar flex flex-col h-full">
     <div
-      class="flex justify-start items-center pl-3 pr-2 h-[2rem] border-b border-solid border-b-card-glass-border bg-surface-panel"
+      class="flex justify-start items-center pl-3 pr-2 h-8 border-b border-solid border-b-card-glass-border bg-surface-panel"
       data-test="trace-details-sidebar-header"
     >
       <div
         :title="span.operation_name"
-        class="w-[calc(100%-1.5rem)] pb-0 pl-[0.25rem] truncate flex items-center"
+        class="w-[calc(100%-1.5rem)] pb-0 pl-1 truncate flex items-center"
         data-test="trace-details-sidebar-header-operation-name"
       >
         <!-- Status Code Badge -->
@@ -75,7 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #icon>
               <img
                 :src="serviceIconUrl"
-                class="w-[0.875rem] h-[0.875rem] shrink-0"
+                class="w-3.5 h-3.5 shrink-0"
                 aria-hidden="true"
                 alt=""
               />
@@ -343,7 +343,7 @@ class="h-full overflow-y-auto">
               ref="ioContainerRef"
             >
               <!-- Input Section -->
-              <div class="w-1/2 io-section basis-[calc(50%-0.4rem)] grow-0 shrink-0 flex flex-col h-full pr-[0.5rem]">
+              <div class="w-1/2 io-section basis-[calc(50%-0.4rem)] grow-0 shrink-0 flex flex-col h-full pr-2">
                 <div
                   class="section-label font-bold mb-2 flex items-center justify-between text-text-heading text-sm"
                 >
@@ -645,8 +645,8 @@ class="h-5! text-xs!">
                 <template #expanded-row="{ row }">
                   <json-preview
                     :value="row"
-                    class="py-[0.375rem] pl-[0.375rem]"
-                    copyButtonClass="left-[0.25rem]! w-fit! sticky!"
+                    class="py-1.5 pl-1.5"
+                    copyButtonClass="left-1! w-fit! sticky!"
                     mode="expanded"
                   />
                 </template>
@@ -682,7 +682,7 @@ class="h-5! text-xs!">
         </OTabPanel>
 
         <OTabPanel name="links">
-          <div v-if="spanLinks.length" class="overflow-auto max-h-[20rem]">
+          <div v-if="spanLinks.length" class="overflow-auto max-h-80">
             <table
               class="trace-detail-tab-table border border-solid border-card-glass-border w-full"
               data-test="trace-details-sidebar-links-table"

@@ -21,11 +21,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @update:open="emit('update:open', $event)"
   >
     <template #header>
-      <div class="px-1 py-[0.625rem] w-full">
+      <div class="px-1 py-2.5 w-full">
         <div class="flex items-center flex-nowrap w-full">
         <div class="flex flex-col w-full">
           <!-- Event Header -->
-          <div class="flex items-center justify-between mb-[0.625rem]">
+          <div class="flex items-center justify-between mb-2.5">
               <div
                 class="flex items-center w-full"
               >

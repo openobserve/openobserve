@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       ref="searchListContainer"
     >
       <!-- Section header: static at top -->
-      <div class="flex items-center h-[2.25rem] shrink-0 border-b border-card-glass-border bg-card-glass-bg">
+      <div class="flex items-center h-9 shrink-0 border-b border-card-glass-border bg-card-glass-bg">
         <!-- Field panel toggle — same style as add-panel config sidebar -->
         <OButton
           variant="outline"

@@ -18,7 +18,7 @@
            above the cards (right-aligned) so it reads as a page-level control,
            not a per-tab filter. Refresh re-queries everything. -->
       <div
-        class="flex items-center justify-end gap-[0.5rem] px-5 pt-3"
+        class="flex items-center justify-end gap-2 px-5 pt-3"
       >
         <DateTimePickerDashboard
           ref="dateTimePickerRef"
@@ -44,7 +44,7 @@
            consistent. Pinned band (shrink-0) with a bottom divider; the cards
            below carry their own chrome via Tailwind. -->
       <section
-        class="flex-shrink-0 grid grid-cols-4 gap-[0.625rem] px-5 py-4 border-b border-b-dialog-header-border"
+        class="flex-shrink-0 grid grid-cols-4 gap-2.5 px-5 py-4 border-b border-b-dialog-header-border"
       >
         <!-- While the KPI query is in flight, show skeleton tiles in place of
              the cards (matches the LLM Insights dashboard pattern). -->
@@ -53,10 +53,10 @@
           v-for="card in kpiCards"
           v-else
           :key="card.label"
-          class="rounded-default flex flex-col px-[0.875rem] pt-[0.625rem] pb-[0.625rem] gap-[0.25rem] bg-surface-base border border-border-default transition-shadow duration-200 hover:shadow-[0_0.0625rem_0.375rem_color-mix(in_srgb,var(--color-black)_8%,transparent)]"
+          class="rounded-default flex flex-col px-3.5 pt-2.5 pb-2.5 gap-1 bg-surface-base border border-border-default transition-shadow duration-200 hover:shadow-[0_0.0625rem_0.375rem_color-mix(in_srgb,var(--color-black)_8%,transparent)]"
         >
           <div
-            class="kpi-label text-2xs leading-normal font-semibold mb-[0.25rem] text-text-secondary"
+            class="kpi-label text-2xs leading-normal font-semibold mb-1 text-text-secondary"
           >
             {{ card.label }}
           </div>
@@ -110,7 +110,7 @@
           v-show="tableEnabled"
           class="flex items-center justify-end gap-2 flex-wrap px-5"
         >
-          <div class="w-[14rem] flex-shrink-0">
+          <div class="w-56 flex-shrink-0">
             <OSelect
               v-model="agentKey"
               :options="agentOptions"
@@ -127,7 +127,7 @@
           <!-- Target -->
           <section class="flex flex-col gap-2 px-5">
             <h4
-              class="m-0 pb-[0.375rem] inline-flex items-center gap-[0.375rem] text-compact font-semibold leading-[1.5] text-text-heading border-b border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)]"
+              class="m-0 pb-1.5 inline-flex items-center gap-1.5 text-compact font-semibold leading-[1.5] text-text-heading border-b border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)]"
             >
               {{ t("onlineEvals.job.detail.targetSection") }}
             </h4>
@@ -178,7 +178,7 @@
           <!-- Scorers -->
           <section class="flex flex-col gap-2 px-5">
             <h4
-              class="m-0 pb-[0.375rem] inline-flex items-center gap-[0.375rem] text-compact font-semibold leading-[1.5] text-text-heading border-b border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)]"
+              class="m-0 pb-1.5 inline-flex items-center gap-1.5 text-compact font-semibold leading-[1.5] text-text-heading border-b border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)]"
             >
               {{ t("onlineEvals.job.detail.scorersSection") }}
               <OTag type="fieldTag" value="soft">{{ resolvedScorers.length }}</OTag>
@@ -286,7 +286,7 @@
           <!-- Sampling -->
           <section class="flex flex-col gap-2 px-5">
             <h4
-              class="m-0 pb-[0.375rem] inline-flex items-center gap-[0.375rem] text-compact font-semibold leading-[1.5] text-text-heading border-b border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)]"
+              class="m-0 pb-1.5 inline-flex items-center gap-1.5 text-compact font-semibold leading-[1.5] text-text-heading border-b border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)]"
             >
               {{ t("onlineEvals.job.detail.samplingSection") }}
             </h4>
@@ -306,7 +306,7 @@
           <!-- Metadata -->
           <section class="flex flex-col gap-2 px-5">
             <h4
-              class="m-0 pb-[0.375rem] inline-flex items-center gap-[0.375rem] text-compact font-semibold leading-[1.5] text-text-heading border-b border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)]"
+              class="m-0 pb-1.5 inline-flex items-center gap-1.5 text-compact font-semibold leading-[1.5] text-text-heading border-b border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)]"
             >
               {{ t("onlineEvals.job.detail.metadataSection") }}
             </h4>

@@ -1327,7 +1327,7 @@ const fieldWidthClass = computed(() => {
 
                 <!-- Virtual scroll container — keyboard nav handled by handleDropdownKeydown
                    on the ListboxFilter input above. Items are index-highlighted reactively. -->
-                <div ref="listboxScrollEl" :class="['overflow-auto', multiple && rowClickSingleSelect ? 'flex-1 min-h-[6rem]' : 'max-h-60']">
+                <div ref="listboxScrollEl" :class="['overflow-auto', multiple && rowClickSingleSelect ? 'flex-1 min-h-24' : 'max-h-60']">
                   <div
                     v-if="filteredOptions.length === 0"
                     class="px-3 py-2 text-sm text-select-placeholder"

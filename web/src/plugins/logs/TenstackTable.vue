@@ -157,7 +157,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-if="(header.column.columnDef.meta as any).closable"
                 :data-test="`logs-search-result-table-th-remove-${header.column.columnDef.header}-btn`"
                 name="close"
-                class="m-0 mt-[0.125rem]! close-icon cursor-pointer text-icon-color"
+                class="m-0 mt-0.5! close-icon cursor-pointer text-icon-color"
                 :title="t('common.close')"
                 size="sm"
                 @click.stop="closeColumn(header.column.columnDef)"
@@ -350,7 +350,7 @@ class="mr-1" />
               <json-preview
                 :value="tableRows[virtualRow.index - 1] as any"
                 show-copy-button
-                class="py-[0.375rem]"
+                class="py-1.5"
                 mode="expanded"
                 :index="calculateActualIndex(virtualRow.index - 1)"
                 :highlight-query="highlightQuery"

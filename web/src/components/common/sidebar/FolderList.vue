@@ -55,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-for="tab in filteredTabs"
           :key="tab.folderId"
           :name="tab.folderId"
-          class="test-class min-h-[1.5rem]"
+          class="test-class min-h-6"
           :data-test="`dashboard-folder-tab-${tab.folderId}`"
           @click="onTabClick(tab.folderId)"
           >
