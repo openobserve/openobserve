@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+#[cfg(feature = "enterprise")]
+use ::search::search_job::{search_job_partitions::*, search_jobs::*};
 use axum::{
     Json,
     extract::{Path, Query},
@@ -22,21 +24,18 @@ use axum::{
 use config::meta::search::Request;
 #[cfg(feature = "enterprise")]
 use {
+    crate::common::{
+        meta::http::HttpResponse as MetaHttpResponse,
+        utils::http::{
+            get_or_create_trace_id, get_search_event_context_from_request,
+            get_stream_type_from_request, get_use_cache_from_request,
+        },
+    },
     crate::search::{
         query_manager::cancel_query_inner,
         utils::{StreamPermissionResourceType, check_stream_permissions},
     },
     crate::service::search_jobs::{get_result, merge_response},
-    crate::{
-        common::{
-            meta::http::HttpResponse as MetaHttpResponse,
-            utils::http::{
-                get_or_create_trace_id, get_search_event_context_from_request,
-                get_stream_type_from_request, get_use_cache_from_request,
-            },
-        },
-        service::db::search_job::{search_job_partitions::*, search_jobs::*},
-    },
     axum::http::HeaderMap,
     config::{
         get_config,

@@ -412,7 +412,7 @@ async fn get_max_file_list(
     let mut file_list = Vec::new();
     let mut max_records = 0;
     for stream_name in metrics_name {
-        let stream_file_list = crate::file_list::query(
+        let stream_file_list = ::search::file_list::query(
             trace_id,
             org_id,
             StreamType::Metrics,

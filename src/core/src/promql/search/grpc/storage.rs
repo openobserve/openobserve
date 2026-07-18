@@ -15,6 +15,7 @@
 
 use std::sync::Arc;
 
+use ::search::file_list;
 use config::{
     TIMESTAMP_COL_NAME, get_config,
     meta::{
@@ -39,7 +40,7 @@ use promql_parser::label::{MatchOp, Matchers};
 use tracing::Instrument;
 
 use crate::{
-    db, file_list,
+    db,
     promql::search::grpc::Context,
     search::{
         datafusion::exec::register_metrics_table,

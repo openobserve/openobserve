@@ -16,6 +16,7 @@
 use std::sync::Arc;
 
 use ::datafusion::{arrow::datatypes::Schema, error::DataFusionError};
+use ::search::file_list;
 use bytes::Bytes;
 use chrono::{DateTime, Datelike, Duration, TimeZone, Utc};
 use config::{
@@ -54,7 +55,7 @@ use tokio::{
 
 use super::worker::{MergeBatch, MergeSender};
 use crate::{
-    db, file_list,
+    db,
     schema::generate_schema_for_defined_schema_fields,
     search::datafusion::{
         exec::TableBuilder,
@@ -1094,7 +1095,7 @@ async fn write_file_list(
                     event.id = *id;
                 }
             }
-            if let Err(e) = db::file_list::broadcast::send(&events).await {
+            if let Err(e) = ::search::file_list::broadcast::send(&events).await {
                 log::error!("[COMPACTOR] send broadcast for file_list failed: {e}");
             }
         }

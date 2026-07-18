@@ -15,6 +15,7 @@
 
 use std::{path::Path, sync::Arc};
 
+use ::search::file_list;
 use arrow::array::{ArrayRef, new_null_array};
 use arrow_schema::{DataType, Field};
 use chrono::DateTime;
@@ -51,7 +52,6 @@ use rayon::iter::{IntoParallelIterator, ParallelIterator};
 
 use crate::{
     common::infra::wal,
-    file_list,
     search::{
         datafusion::table_provider::memtable::NewMemTable,
         generate_filter_from_equal_items, generate_search_schema_diff,
@@ -566,7 +566,7 @@ async fn get_file_list(
     }
 
     // filter by pending delete
-    let mut files = crate::db::file_list::local::filter_by_pending_delete(files).await;
+    let mut files = ::search::file_list::local::filter_by_pending_delete(files).await;
     if files.is_empty() {
         return Ok(vec![]);
     }

@@ -226,7 +226,7 @@ pub mod remote {
             .await
             .map_err(|e| anyhow!("Failed to upload enrichment table to remote: {}", e))?;
 
-        crate::db::file_list::set(&account, &remote_key, Some(file_meta), false).await?;
+        ::search::file_list::set(&account, &remote_key, Some(file_meta), false).await?;
 
         log::debug!("Uploaded enrichment table {table_name} to remote");
         Ok(())

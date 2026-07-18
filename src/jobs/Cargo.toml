@@ -23,6 +23,7 @@ vortex = ["openobserve-core/vortex"]
 [dependencies]
 openobserve-core.workspace = true
 catalog.workspace = true
+search.workspace = true
 anyhow.workspace = true
 arrow.workspace = true
 arrow-schema.workspace = true

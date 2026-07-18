@@ -759,13 +759,13 @@ pub async fn cache_status() -> impl IntoResponse {
     );
 
     // File list caches (2) from src/core/src/service/db/file_list/mod.rs
-    let (len, cap, mem_size) = crate::service::db::file_list::DELETED_FILES.stats();
+    let (len, cap, mem_size) = ::search::file_list::DELETED_FILES.stats();
     stats.insert(
         "DELETED_FILES",
         json::json!({"len": len, "cap": cap, "mem_size": mem_size}),
     );
 
-    let (len, cap, mem_size) = crate::service::db::file_list::DEDUPLICATE_FILES.stats();
+    let (len, cap, mem_size) = ::search::file_list::DEDUPLICATE_FILES.stats();
     stats.insert(
         "DEDUPLICATE_FILES",
         json::json!({"len": len, "cap": cap, "mem_size": mem_size}),

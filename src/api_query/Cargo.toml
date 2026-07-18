@@ -23,6 +23,7 @@ vortex = ["openobserve-core/vortex"]
 openobserve-api-common.workspace = true
 openobserve-core.workspace = true
 catalog.workspace = true
+search.workspace = true
 transform.workspace = true
 arrow-schema.workspace = true
 axum.workspace = true

@@ -678,7 +678,8 @@ pub async fn get_file_id_lists(
         }
         // get file list
         let file_id_list =
-            crate::file_list::query_ids(trace_id, org_id, stream_type, &name, time_range).await?;
+            ::search::file_list::query_ids(trace_id, org_id, stream_type, &name, time_range)
+                .await?;
         file_lists.insert(stream.clone(), file_id_list);
     }
     Ok(file_lists)

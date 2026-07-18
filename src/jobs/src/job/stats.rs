@@ -16,7 +16,7 @@
 use config::{cluster::LOCAL_NODE, deverbatim, get_config, spawn_pausable_job};
 use tokio::time;
 
-use crate::service::{compact::stats::update_stats_from_file_list, db};
+use crate::service::compact::stats::update_stats_from_file_list;
 
 pub async fn run() -> Result<(), anyhow::Error> {
     tokio::task::spawn(update_node_memory_usage());
@@ -88,7 +88,7 @@ async fn cache_stream_stats() -> Option<tokio::task::JoinHandle<()>> {
         "cache_stream_stats",
         std::cmp::max(60, get_config().limit.calculate_stats_interval),
         {
-            if let Err(e) = db::file_list::cache_stats().await {
+            if let Err(e) = ::search::file_list::cache_stats().await {
                 log::error!("[STATS] run cached stream stats error: {e}");
             } else {
                 log::debug!("[STATS] run cached stream stats success");

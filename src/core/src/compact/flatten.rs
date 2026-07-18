@@ -42,8 +42,6 @@ use infra::{
 use parking_lot::RwLock;
 use tokio::sync::{Semaphore, mpsc};
 
-use crate::db;
-
 static PROCESSING_FILES: Lazy<RwLock<HashSet<String>>> = Lazy::new(|| RwLock::new(HashSet::new()));
 
 pub async fn run_generate(worker_tx: mpsc::Sender<FileKey>) -> Result<(), anyhow::Error> {
@@ -52,7 +50,8 @@ pub async fn run_generate(worker_tx: mpsc::Sender<FileKey>) -> Result<(), anyhow
     let stream_types = [StreamType::Logs];
     for org_id in orgs {
         // check backlist
-        if !db::file_list::BLOCKED_ORGS.is_empty() && db::file_list::BLOCKED_ORGS.contains(&org_id)
+        if !::search::file_list::BLOCKED_ORGS.is_empty()
+            && ::search::file_list::BLOCKED_ORGS.contains(&org_id)
         {
             continue;
         }

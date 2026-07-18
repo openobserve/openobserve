@@ -26,7 +26,6 @@ pub mod backfill;
 pub mod compact;
 pub mod dashboards;
 pub mod distinct_values;
-pub mod file_list;
 #[cfg(feature = "enterprise")]
 pub mod keys;
 pub mod kv;
@@ -50,7 +49,6 @@ pub mod pipeline_errors;
 pub mod re_pattern;
 pub mod saved_view;
 pub mod scheduler;
-pub mod search_job;
 #[cfg(feature = "enterprise")]
 pub mod service_graph;
 pub mod session;

@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use ::search::search_job::{search_job_partitions::*, search_job_results::*, search_jobs::*};
 use chrono::{DateTime, Datelike, TimeZone, Utc};
 use config::{
     meta::{
@@ -37,10 +38,7 @@ use o2_enterprise::enterprise::{
 };
 use tokio::sync::mpsc;
 
-use crate::{
-    db::search_job::{search_job_partitions::*, search_job_results::*, search_jobs::*},
-    search::grpc_search::{grpc_search, grpc_search_partition},
-};
+use crate::search::grpc_search::{grpc_search, grpc_search_partition};
 
 // 1. get the oldest job from `search_jobs` table
 // 2. check if the job is previous running (get error then retry, be cancel then retry) (case 1) or

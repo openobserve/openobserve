@@ -27,7 +27,11 @@ use o2_enterprise::enterprise::{
     super_cluster::stream::client::super_cluster_cache_stats,
 };
 pub mod broadcast;
+pub mod dump;
 pub mod local;
+mod service;
+
+pub use service::*;
 
 pub static DEDUPLICATE_FILES: Lazy<RwHashSet<String>> =
     Lazy::new(|| DashSet::with_capacity_and_hasher(1024, Default::default()));

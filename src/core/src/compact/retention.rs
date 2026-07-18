@@ -15,6 +15,7 @@
 
 use std::{collections::HashMap, path::PathBuf};
 
+use ::search::file_list::{self, dump::generate_dump_stream_name};
 use chrono::{DateTime, Duration, TimeZone, Timelike, Utc};
 use config::{
     cluster::LOCAL_NODE,
@@ -35,7 +36,7 @@ use infra::{
 };
 use itertools::Itertools;
 
-use crate::{db, file_list, file_list_dump::generate_dump_stream_name};
+use crate::db;
 
 pub(crate) async fn generate_jobs() -> Result<(), anyhow::Error> {
     let cfg = get_config();

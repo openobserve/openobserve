@@ -28,8 +28,8 @@ use infra::{errors::Result, file_list as infra_file_list, storage};
 use rayon::slice::ParallelSliceMut;
 
 use crate::{
-    file_list_dump,
-    search::inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
+    file_list::dump,
+    inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
 };
 
 #[tracing::instrument(
@@ -55,7 +55,7 @@ pub async fn query(
         None,
     )
     .await?;
-    let dumped_files = file_list_dump::query(
+    let dumped_files = dump::query(
         trace_id,
         org_id,
         stream_type,
@@ -191,7 +191,7 @@ pub async fn query_by_ids(
     let ids_set = ids_set.difference(&db_ids).cloned().collect::<HashSet<_>>();
     if !ids_set.is_empty() {
         let ids: Vec<_> = ids_set.iter().cloned().collect();
-        let dumped_files = file_list_dump::query(
+        let dumped_files = dump::query(
             trace_id,
             org_id,
             stream_type,
@@ -263,8 +263,7 @@ pub async fn query_ids(
     let mut files =
         infra_file_list::query_ids(org_id, stream_type, stream_name, time_range).await?;
     let dumped_files =
-        super::file_list_dump::query_ids(trace_id, org_id, stream_type, stream_name, time_range)
-            .await?;
+        dump::query_ids(trace_id, org_id, stream_type, stream_name, time_range).await?;
     files.extend(dumped_files);
     files.par_sort_unstable_by(|a, b| a.id.cmp(&b.id));
     files.dedup_by(|a, b| a.id == b.id);

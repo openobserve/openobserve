@@ -13,9 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use ::search::file_list::broadcast;
 use config::cluster;
-
-use crate::service::db::file_list::broadcast;
 
 pub async fn run() -> Result<(), anyhow::Error> {
     loop {

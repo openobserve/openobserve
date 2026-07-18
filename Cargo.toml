@@ -279,7 +279,7 @@ common = { path = "src/common" }
 catalog = { path = "src/catalog" }
 telemetry = { path = "src/telemetry" }
 transform = { path = "src/transform" }
-search = { path = "src/search" }
+search = { package = "query-service", path = "src/search" }
 promql = { path = "src/promql" }
 openobserve-api = { path = "src/api" }
 openobserve-api-management = { path = "src/api_management" }

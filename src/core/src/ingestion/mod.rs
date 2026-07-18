@@ -331,8 +331,8 @@ pub async fn check_ingestion_allowed(
     }
 
     // check if the org is blocked
-    if !db::file_list::BLOCKED_ORGS.is_empty()
-        && db::file_list::BLOCKED_ORGS.contains(&org_id.to_string())
+    if !::search::file_list::BLOCKED_ORGS.is_empty()
+        && ::search::file_list::BLOCKED_ORGS.contains(&org_id.to_string())
     {
         return Err(Error::IngestionError(format!(
             "Quota exceeded for this organization [{org_id}]"

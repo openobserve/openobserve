@@ -50,6 +50,7 @@ ignored = ["tikv-jemalloc-sys"]
 [dependencies]
 openobserve-core.workspace = true
 catalog.workspace = true
+search.workspace = true
 openobserve-api-management.workspace = true
 openobserve-api-query.workspace = true
 openobserve-api-common.workspace = true

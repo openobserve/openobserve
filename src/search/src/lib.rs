@@ -19,11 +19,14 @@ pub mod cipher;
 pub mod datafusion;
 pub mod enrichment;
 pub mod file_cache;
+pub mod file_list;
 pub mod index;
 pub mod inspector;
+pub mod search_job;
 pub mod sql;
 pub mod tantivy;
 pub mod types;
+pub mod usage;
 pub mod utils;
 
 use config::meta::{

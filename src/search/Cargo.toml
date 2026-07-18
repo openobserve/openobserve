@@ -1,5 +1,5 @@
 [package]
-name = "search"
+name = "query-service"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -24,6 +24,7 @@ arrow-schema.workspace = true
 async-stream.workspace = true
 async-trait.workspace = true
 bytes.workspace = true
+catalog.workspace = true
 chrono.workspace = true
 config.workspace = true
 dashmap.workspace = true

@@ -13,16 +13,16 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+pub use ::search::{file_list, file_list::dump as file_list_dump};
 pub use config::utils::schema::format_stream_name;
 
 pub use crate::{
     alerts, auth, authz, bootstrap, cache, catalog_runtime, cluster_info, compact, dashboards, db,
-    enrichment, enrichment_table, file_downloader, file_list, file_list_dump, folders, functions,
-    github, grpc, http, ingestion, ingestion_tokens, ingestion_types, kv, logs, metadata, metrics,
-    node, org_cleanup, organization, pipeline, promql, runtime_metrics, schema, search,
-    self_reporting, session, short_url, sourcemaps, stream, stream_utils,
-    stream_utils::get_formatted_stream_name, synthetics, tantivy, telemetry, tls,
-    trace_utils::setup_tracing_with_trace_id, traces, users,
+    enrichment, enrichment_table, file_downloader, folders, functions, github, grpc, http,
+    ingestion, ingestion_tokens, ingestion_types, kv, logs, metadata, metrics, node, org_cleanup,
+    organization, pipeline, promql, runtime_metrics, schema, search, self_reporting, session,
+    short_url, sourcemaps, stream, stream_utils, stream_utils::get_formatted_stream_name,
+    synthetics, tantivy, telemetry, tls, trace_utils::setup_tracing_with_trace_id, traces, users,
 };
 #[cfg(feature = "enterprise")]
 pub use crate::{

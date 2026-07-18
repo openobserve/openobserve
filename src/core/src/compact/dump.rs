@@ -15,6 +15,7 @@
 
 use std::sync::Arc;
 
+use ::search::file_list::dump::*;
 use arrow::{
     array::{BooleanBuilder, Int64Builder, StringBuilder},
     record_batch::RecordBatch,
@@ -45,7 +46,7 @@ use itertools::Itertools;
 use parquet::{arrow::AsyncArrowWriter, file::properties::WriterProperties};
 use tokio::sync::mpsc;
 
-use crate::{db, file_list_dump::*};
+use crate::db;
 
 #[derive(Clone)]
 pub struct DumpJob {
@@ -1501,7 +1502,7 @@ mod tests {
         };
 
         let batch = create_record_batch(vec![original.clone()]).unwrap();
-        let recovered = crate::file_list_dump::record_batch_to_file_record(batch);
+        let recovered = ::search::file_list::dump::record_batch_to_file_record(batch);
 
         assert_eq!(recovered.len(), 1);
         let r = &recovered[0];
@@ -1547,7 +1548,7 @@ mod tests {
 
         let count = files.len();
         let batch = create_record_batch(files).unwrap();
-        let recovered = crate::file_list_dump::record_batch_to_file_record(batch);
+        let recovered = ::search::file_list::dump::record_batch_to_file_record(batch);
 
         assert_eq!(recovered.len(), count);
         // Verify sorting: record_batch_to_file_record sorts by id
@@ -1559,7 +1560,7 @@ mod tests {
     #[test]
     fn test_roundtrip_empty_batch() {
         let batch = create_record_batch(vec![]).unwrap();
-        let recovered = crate::file_list_dump::record_batch_to_file_record(batch);
+        let recovered = ::search::file_list::dump::record_batch_to_file_record(batch);
         assert_eq!(recovered.len(), 0);
     }
 

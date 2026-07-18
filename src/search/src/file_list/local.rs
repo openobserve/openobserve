@@ -80,11 +80,19 @@ pub async fn filter_by_pending_delete(mut files: Vec<String>) -> Vec<String> {
 pub async fn load_pending_delete() -> Result<()> {
     let files = infra::file_list::LOCAL_CACHE.list_deleted().await?;
     for file in files {
-        if ingester::is_wal_file(&file.file) {
+        if is_wal_file(&file.file) {
             PENDING_DELETE_FILES.write().await.insert(file.file);
         }
     }
     Ok(())
+}
+
+fn is_wal_file(file: &str) -> bool {
+    let columns = file.split('/').collect::<Vec<_>>();
+    !(columns.len() < 11
+        || columns[4].len() == 4
+        || columns[9].len() != 16
+        || columns[9].contains('='))
 }
 
 pub async fn add_removing(file: &str) -> Result<()> {
