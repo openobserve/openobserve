@@ -226,6 +226,7 @@ openobserve-core.workspace = true
 ingestion.workspace = true
 organization-domain.workspace = true
 resources.workspace = true
+runtime-services.workspace = true
 search.workspace = true
 catalog.workspace = true
 openobserve-jobs.workspace = true
@@ -262,6 +263,7 @@ members = [
     "src/proto",
     "src/report_server",
     "src/resources",
+    "src/runtime_services",
     "src/flight",
     "src/tantivy_utils",
     "src/web",
@@ -284,6 +286,7 @@ wal = { path = "src/wal" }
 proto = { path = "src/proto" }
 report_server = { path = "src/report_server" }
 resources = { path = "src/resources" }
+runtime-services = { path = "src/runtime_services" }
 flight = { path = "src/flight" }
 tantivy_utils = { path = "src/tantivy_utils" }
 web = { path = "src/web" }

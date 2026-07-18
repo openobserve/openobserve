@@ -34,13 +34,13 @@ use config::{
         json::{Map, Value},
     },
 };
+use runtime_services::trace_utils::setup_tracing_with_trace_id;
 use tracing::Instrument;
 
 use super::promql;
 use crate::{
     search::{self as SearchService, utils::is_permissable_function_error},
     telemetry::record_http_metrics,
-    trace_utils::setup_tracing_with_trace_id,
 };
 
 pub mod alert;

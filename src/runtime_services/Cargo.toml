@@ -1,0 +1,25 @@
+[package]
+name = "runtime-services"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ["cfg(tokio_unstable)"] }
+
+[dependencies]
+anyhow.workspace = true
+common.workspace = true
+config.workspace = true
+infra.workspace = true
+ingester.workspace = true
+log.workspace = true
+maintenance.workspace = true
+opentelemetry.workspace = true
+prometheus.workspace = true
+proto.workspace = true
+tokio.workspace = true
+tonic.workspace = true
+tracing.workspace = true
+tracing-opentelemetry.workspace = true

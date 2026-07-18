@@ -942,7 +942,7 @@ async fn get_super_cluster_delete_status(
     let mut errors = Vec::new();
 
     for cluster in clusters {
-        match openobserve_core::cluster_info::get_super_cluster_delete_job_status(
+        match runtime_services::cluster_info::get_super_cluster_delete_job_status(
             &trace_id,
             cluster.clone(),
             id,

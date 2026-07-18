@@ -6601,6 +6601,7 @@ dependencies = [
  "reqwest 0.13.2",
  "resources",
  "rquickjs",
+ "runtime-services",
  "rust-embed-for-web",
  "rustls",
  "rustls-native-certs",
@@ -6708,6 +6709,7 @@ dependencies = [
  "regex",
  "reqwest 0.13.2",
  "resources",
+ "runtime-services",
  "rust-embed-for-web",
  "serde",
  "serde_json",
@@ -6769,6 +6771,7 @@ dependencies = [
  "regex",
  "reqwest 0.13.2",
  "resources",
+ "runtime-services",
  "sea-orm",
  "serde",
  "serde_json",
@@ -6887,6 +6890,7 @@ dependencies = [
  "regex",
  "reqwest 0.13.2",
  "resources",
+ "runtime-services",
  "rustls",
  "rustls-native-certs",
  "sea-orm",
@@ -6948,6 +6952,7 @@ dependencies = [
  "report_server",
  "reqwest 0.13.2",
  "resources",
+ "runtime-services",
  "serde_json",
  "tokio",
  "tonic",
@@ -8950,6 +8955,26 @@ dependencies = [
  "spki",
  "subtle",
  "zeroize",
+]
+
+[[package]]
+name = "runtime-services"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "common",
+ "config",
+ "infra",
+ "ingester",
+ "log",
+ "maintenance",
+ "opentelemetry",
+ "prometheus",
+ "proto",
+ "tokio",
+ "tonic",
+ "tracing",
+ "tracing-opentelemetry",
 ]
 
 [[package]]

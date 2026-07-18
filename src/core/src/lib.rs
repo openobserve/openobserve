@@ -27,8 +27,6 @@ pub mod auth;
 pub mod authz;
 pub mod bootstrap;
 pub mod cache;
-pub mod catalog_runtime;
-pub mod cluster_info;
 pub mod compact;
 pub mod dashboards;
 pub mod db;
@@ -37,7 +35,6 @@ pub mod enrichment_table;
 pub mod folders;
 pub mod functions;
 pub mod github;
-pub mod grpc;
 pub mod http;
 pub mod ingestion;
 #[cfg(feature = "enterprise")]
@@ -45,7 +42,6 @@ pub mod llm_evaluations;
 pub mod logs;
 pub mod metadata;
 pub mod metrics;
-pub mod node;
 #[cfg(feature = "enterprise")]
 pub mod ofga;
 pub mod org_cleanup;
@@ -60,7 +56,6 @@ pub mod promql;
 pub mod providers;
 #[cfg(feature = "enterprise")]
 pub mod ratelimit;
-pub mod runtime_metrics;
 pub mod schema;
 pub mod search;
 #[cfg(feature = "enterprise")]
@@ -72,7 +67,6 @@ pub mod synthetics;
 pub mod tantivy;
 pub mod telemetry;
 pub mod tls;
-pub mod trace_utils;
 pub mod traces;
 #[cfg(feature = "cloud")]
 pub mod trial_quota;

@@ -26,6 +26,7 @@ use hashbrown::HashSet;
 use proto::cluster_rpc::{
     IngestionData, IngestionRequest, IngestionType, ingest_client::IngestClient,
 };
+use runtime_services::grpc::get_ingester_channel;
 use serde_json::Value;
 use tokio::time::{self, Duration};
 use tonic::{
@@ -36,7 +37,7 @@ use tonic::{
 
 use crate::{
     common::meta::ingestion::{IngestUser, SystemJobType},
-    service::{self, grpc::get_ingester_channel},
+    service,
 };
 
 static METRICS_WHITELIST: Lazy<HashSet<String>> = Lazy::new(|| {

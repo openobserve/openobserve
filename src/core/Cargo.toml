@@ -50,6 +50,7 @@ ingestion.workspace = true
 maintenance.workspace = true
 organization-domain.workspace = true
 resources.workspace = true
+runtime-services.workspace = true
 telemetry.workspace = true
 transform.workspace = true
 promql.workspace = true

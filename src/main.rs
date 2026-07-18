@@ -56,11 +56,9 @@ use openobserve::{
 };
 use openobserve_core::{
     bootstrap,
-    cluster_info::ClusterInfoService,
     common::{infra::cluster, meta},
     db::{self, scheduler::TriggerModule::QueryRecommendations},
     metadata,
-    node::NodeService,
     search::SEARCH_SERVER,
     self_reporting,
 };
@@ -78,6 +76,7 @@ use proto::cluster_rpc::{
     node_service_server::NodeServiceServer, query_cache_server::QueryCacheServer,
     search_server::SearchServer, streams_server::StreamsServer,
 };
+use runtime_services::{cluster_info::ClusterInfoService, node::NodeService};
 use tokio::{net::TcpListener, sync::oneshot};
 use tonic::{
     codec::CompressionEncoding,
@@ -263,7 +262,7 @@ async fn main() -> Result<(), anyhow::Error> {
 
             // Register job runtime for metrics collection
             if let Ok(handle) = tokio::runtime::Handle::try_current() {
-                openobserve_core::runtime_metrics::register_runtime("job".to_string(), handle);
+                runtime_services::runtime_metrics::register_runtime("job".to_string(), handle);
             }
 
             job_init_tx.send(true).ok();
@@ -304,7 +303,7 @@ async fn main() -> Result<(), anyhow::Error> {
         };
 
         // Register gRPC runtime for metrics collection
-        openobserve_core::runtime_metrics::register_runtime(
+        runtime_services::runtime_metrics::register_runtime(
             "grpc".to_string(),
             rt.handle().clone(),
         );
@@ -328,11 +327,11 @@ async fn main() -> Result<(), anyhow::Error> {
 
     // Register main HTTP runtime for metrics collection
     if let Ok(handle) = tokio::runtime::Handle::try_current() {
-        openobserve_core::runtime_metrics::register_runtime("http".to_string(), handle);
+        runtime_services::runtime_metrics::register_runtime("http".to_string(), handle);
     }
 
     // Start runtime metrics collector
-    openobserve_core::runtime_metrics::start_metrics_collector().await;
+    runtime_services::runtime_metrics::start_metrics_collector().await;
 
     // let node online
     let _ = cluster::set_online().await;
@@ -1044,7 +1043,7 @@ impl opentelemetry_sdk::trace::SpanExporter for MetaOrgTraceExporter {
                     }
                 };
 
-                let (_addr, channel) = match openobserve_core::grpc::get_ingester_channel().await {
+                let (_addr, channel) = match runtime_services::grpc::get_ingester_channel().await {
                     Ok(v) => v,
                     Err(e) => {
                         log::error!("[SEARCH-INSPECTOR] Failed to get ingester channel: {e}");

@@ -34,6 +34,7 @@ automation.workspace = true
 catalog.workspace = true
 organization-domain.workspace = true
 resources.workspace = true
+runtime-services.workspace = true
 transform.workspace = true
 anyhow.workspace = true
 axum.workspace = true

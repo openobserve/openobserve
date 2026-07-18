@@ -471,7 +471,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
         |org_id, stream_type, stream_name| async move {
             maintenance::compact::files::del_offset(&org_id, stream_type, &stream_name).await?;
             tokio::task::spawn(async move {
-                if let Err(error) = openobserve_core::catalog_runtime::flush_cache_for_stream(
+                if let Err(error) = runtime_services::catalog_runtime::flush_cache_for_stream(
                     &org_id,
                     stream_type,
                     &stream_name,

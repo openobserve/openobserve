@@ -36,6 +36,7 @@ catalog.workspace = true
 maintenance.workspace = true
 organization-domain.workspace = true
 resources.workspace = true
+runtime-services.workspace = true
 search.workspace = true
 anyhow.workspace = true
 arrow.workspace = true
