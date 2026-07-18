@@ -55,25 +55,35 @@ const MODEL_VENDOR_RULES: Array<{ re: RegExp; slug: string }> = [
 ];
 
 /**
- * Resolve a model name to a bundled vendor-logo URL, or "" if none matches.
- * `isDark` picks the dark-mode variant when the vendor ships one.
+ * Map a model name to its vendor slug (folder under `generated/<slug>/`), or
+ * `undefined` if no rule matches. Pure name→slug logic with no dependency on the
+ * logo assets — so it is deterministically testable even when the (gitignored,
+ * fetched-at-build) logo files are absent.
  */
-export function resolveModelVendorLogo(
-  modelName: string | undefined,
-  isDark = false,
-): string {
-  if (!modelName) return "";
+export function modelVendorSlug(modelName: string | undefined): string | undefined {
+  if (!modelName) return undefined;
   // Strip a provider prefix like "anthropic/claude-3-5" or "openai/gpt-4o".
   const bare = modelName.includes("/")
     ? modelName.slice(modelName.lastIndexOf("/") + 1)
     : modelName;
   const probe = `${modelName} ${bare}`;
-  for (const { re, slug } of MODEL_VENDOR_RULES) {
-    if (re.test(probe)) {
-      const b = logosBySlug[slug];
-      if (!b) continue;
-      return (isDark ? b.dark || b.light : b.light || b.dark) ?? "";
-    }
-  }
-  return "";
+  return MODEL_VENDOR_RULES.find(({ re }) => re.test(probe))?.slug;
+}
+
+/**
+ * Resolve a model name to a bundled vendor-logo `data:` URL. Returns "" when the
+ * model matches no vendor rule OR the matched vendor's logo asset is not present
+ * (the `generated/` assets are gitignored and fetched at build time, so callers
+ * must treat "" as "no logo — use the chip-icon fallback"). `isDark` picks the
+ * dark-mode variant when the vendor ships one.
+ */
+export function resolveModelVendorLogo(
+  modelName: string | undefined,
+  isDark = false,
+): string {
+  const slug = modelVendorSlug(modelName);
+  if (!slug) return "";
+  const b = logosBySlug[slug];
+  if (!b) return "";
+  return (isDark ? b.dark || b.light : b.light || b.dark) ?? "";
 }
