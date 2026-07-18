@@ -284,8 +284,11 @@ export class CommonActions {
         // concurrent CI load the wizard's stream-list fetch can run before registration
         // completes, so the freshly-ingested stream never renders as an option (the exact
         // failure seen for auto_playwright_stream). Mirrors initializeAlertTestStream.
+        // 60s budget to match initializeAlertTestStream — cloud stream registration under
+        // concurrent full-suite load can exceed 20s; a late-but-present stream avoids the
+        // downstream "wizard stream dropdown empty" flake. Returns immediately once registered.
         let registered = false;
-        for (let i = 0; i < 20 && !registered; i++) {
+        for (let i = 0; i < 60 && !registered; i++) {
             const listResp = await this.page.request.get(listUrl, { headers }).catch(() => null);
             if (listResp && listResp.ok()) {
                 const body = await listResp.json().catch(() => null);
@@ -377,9 +380,16 @@ export class CommonActions {
         // page immediately after this call; if the SPA fetches its stream list before
         // registration completes, the stale list is cached and the alert wizard's
         // stream dropdown never shows the stream.
+        // Budget = 60s (not 15s): on the shared cloud alpha org, stream registration in the
+        // streams-list API routinely exceeds 15s while the full multi-shard suite runs
+        // concurrently (global-setup itself budgets 90s for indexing). 15s was too tight and
+        // caused batch failures across the self-seeded alert_e2e_* / alert_import_* streams in
+        // Import/Export and E2E-Flow. Returns as soon as the stream registers, so the healthy
+        // case stays fast; the larger cap only absorbs cloud latency spikes.
         const listUrl = `${baseUrl}/api/${orgName}/streams?type=logs`;
+        const maxWaitSeconds = 60;
         let registered = false;
-        for (let i = 0; i < 15 && !registered; i++) {
+        for (let i = 0; i < maxWaitSeconds && !registered; i++) {
             const listResp = await this.page.request.get(listUrl, { headers }).catch(() => null);
             if (listResp && listResp.ok()) {
                 const body = await listResp.json().catch(() => null);
@@ -388,7 +398,7 @@ export class CommonActions {
             if (!registered) await this.page.waitForTimeout(1000);
         }
         if (!registered) {
-            throw new Error(`Stream ${streamName} did not appear in streams list within 15s of ingestion`);
+            throw new Error(`Stream ${streamName} did not appear in streams list within ${maxWaitSeconds}s of ingestion`);
         }
 
         testLogger.info(`Successfully initialized stream: ${streamName}`);
