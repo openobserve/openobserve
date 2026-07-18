@@ -5730,7 +5730,7 @@
     },
     "general": {
       "close": "Close",
-      "fileCounterLabel": "{constraint} {filesNumber} file | {totalSize}"
+      "fileCounterLabel": "{constraint} {filesNumber} file {'|'} {totalSize}"
     },
     "llmProvidersSettings": {
       "subtitle": "LLM providers for online evaluations"
@@ -5748,7 +5748,7 @@
       "awsRoleArn": "AWS Role ARN"
     },
     "organizationSettings": {
-      "fieldNameHelp": "Use alphanumeric and '+=,.@-_' characters only, without spaces.",
+      "fieldNameHelp": "Use alphanumeric and '+=,.{'@'}-_' characters only, without spaces.",
       "settingsUpdated": "Organization settings updated successfully",
       "settingsSaveError": "Error saving organization settings"
     },
