@@ -996,29 +996,6 @@
     "searchEvents": "Search Events",
     "loadingSessions": "Hold on tight, we're fetching sessions.",
     "errorStack": "Error Stack",
-    "stackTraceRaw": "Raw",
-    "stackTracePretty": "Pretty",
-    "copiedToClipboard": "Copied to clipboard",
-    "categoryNavigation": "Navigation",
-    "categoryReload": "Reload",
-    "ipLabel": "IP",
-    "browserImageAlt": "Browser",
-    "osImageAlt": "OS",
-    "versionPrefix": "Version ",
-    "unknown": "Unknown",
-    "unknownUser": "Unknown User",
-    "translatingStackTrace": "Translating stack trace with source maps...",
-    "translatingStackTraceHint": "This may take a few moments",
-    "sourceMapsNotAvailable": "Source Maps Not Available",
-    "sourceMapsNotAvailableBody": "To view detailed stack traces with original source code and line numbers, please upload source maps for this application.",
-    "serviceBadge": "Service:",
-    "versionBadge": "Version:",
-    "stackLine": "Line",
-    "stackLines": "Lines",
-    "showMoreFrame": "Show {count} more frame",
-    "showMoreFrames": "Show {count} more frames",
-    "unableToTranslateStackTrace": "Unable to translate stack trace. Source maps may not be available.",
-    "failedToTranslateStackTrace": "Failed to translate stack trace. Source maps may not be available.",
     "sessionReplay": "Session Replay",
     "viewSessionReplay": "View Session Replay",
     "playSessionReplay": "Play Session Replay",
@@ -1041,7 +1018,30 @@
     "seekToMoment": "Seek to this moment in the session",
     "timeInSession": "Session Time",
     "route": "Route",
-    "duration": "Duration"
+    "duration": "Duration",
+    "stackTraceRaw": "Raw",
+    "stackTracePretty": "Pretty",
+    "copiedToClipboard": "Copied to clipboard",
+    "categoryNavigation": "Navigation",
+    "categoryReload": "Reload",
+    "ipLabel": "IP",
+    "browserImageAlt": "Browser",
+    "osImageAlt": "OS",
+    "versionPrefix": "Version ",
+    "unknown": "Unknown",
+    "unknownUser": "Unknown User",
+    "translatingStackTrace": "Translating stack trace with source maps...",
+    "translatingStackTraceHint": "This may take a few moments",
+    "sourceMapsNotAvailable": "Source Maps Not Available",
+    "sourceMapsNotAvailableBody": "To view detailed stack traces with original source code and line numbers, please upload source maps for this application.",
+    "serviceBadge": "Service:",
+    "versionBadge": "Version:",
+    "stackLine": "Line",
+    "stackLines": "Lines",
+    "showMoreFrame": "Show {count} more frame",
+    "showMoreFrames": "Show {count} more frames",
+    "unableToTranslateStackTrace": "Unable to translate stack trace. Source maps may not be available.",
+    "failedToTranslateStackTrace": "Failed to translate stack trace. Source maps may not be available."
   },
   "about": {
     "name": "OpenObserve",
@@ -2446,10 +2446,8 @@
       "securityTitle": "Use a dedicated, least-privilege credential",
       "securityBody": "The token defaults to your own account credentials. For production, generate a read-only credential above (or create a scoped service account) and never commit tokens to source control.",
       "docsCta": "Read the full MCP documentation",
-      "installOneClick": "Add to {client}",
       "clients": {
         "claudeCode": "Claude Code",
-        "codex": "Codex",
         "cursor": "Cursor",
         "vscode": "VS Code",
         "claudeDesktop": "Claude Desktop",
@@ -2458,11 +2456,11 @@
         "antigravity": "Antigravity",
         "opencode": "opencode",
         "openclaw": "OpenClaw",
-        "hermes": "Hermes"
+        "hermes": "Hermes",
+        "codex": "Codex"
       },
       "desc": {
         "claudeCode": "Run this once — it registers the server in Claude Code.",
-        "codex": "Add to ~/.codex/config.toml (TOML), then restart Codex.",
         "cursor": "Add to ~/.cursor/mcp.json, then reload Cursor.",
         "vscode": "Add to .vscode/mcp.json in your workspace, then reload VS Code.",
         "claudeDesktop": "Add to claude_desktop_config.json, then restart Claude Desktop.",
@@ -2471,8 +2469,10 @@
         "antigravity": "Settings → Customizations → Open MCP Config (~/.gemini/config/mcp_config.json). Antigravity uses serverUrl, not url.",
         "opencode": "Add to opencode.json (project root or ~/.config/opencode/), then restart opencode.",
         "openclaw": "Add to ~/.openclaw/openclaw.json (run `openclaw mcp status` to locate it).",
-        "hermes": "Add to ~/.hermes/config.yaml (YAML), then run /reload-mcp."
-      }
+        "hermes": "Add to ~/.hermes/config.yaml (YAML), then run /reload-mcp.",
+        "codex": "Add to ~/.codex/config.toml (TOML), then restart Codex."
+      },
+      "installOneClick": "Add to {client}"
     },
     "manageTokensBtnLabel": "Manage Tokens",
     "orgLevelExplanation": "These are organization-level ingestion tokens. They are not tied to individual users and will continue working even if the user who created them leaves the organization. Tokens can only be used on ingestion endpoints.",
@@ -6103,7 +6103,10 @@
         "database": "Datastores",
         "queue": "Queues",
         "external": "External",
-        "rpc": "RPC"
+        "rpc": "RPC",
+        "agent": "Agents",
+        "tool": "Tools",
+        "model": "Models"
       },
       "loading": "Loading service graph...",
       "retry": "Retry",
@@ -7363,6 +7366,7 @@
     "nav": {
       "llmInsights": "LLM Insights",
       "sessions": "LLM Sessions",
+      "agentGraph": "Agent Graph",
       "quality": "Quality",
       "evalJobs": "Eval Jobs",
       "scorers": "Scorers",
@@ -7371,10 +7375,16 @@
     "subtitle": {
       "llmInsights": "Track latency, errors, tokens, and cost across your LLM traffic",
       "sessions": "Browse and inspect agent sessions turn by turn",
+      "agentGraph": "See what your agents interact with — tools, models, services, and datastores",
       "quality": "Score and track the quality of your LLM responses",
       "evalJobs": "Run and monitor evaluation jobs across your sessions",
       "scorers": "Create and manage the scorers that grade LLM outputs",
       "scoreConfigs": "Configure the scoring rubrics used by your evaluations"
+    },
+    "agentGraph": {
+      "allAgents": "All agents",
+      "stream": "Stream",
+      "agent": "Agent"
     },
     "kpi": {
       "totalCost": "Total Cost",

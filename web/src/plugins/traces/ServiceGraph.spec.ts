@@ -197,10 +197,11 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
     },
   };
 
-  const createWrapper = (storeOverrides = {}) => {
+  const createWrapper = (storeOverrides = {}, props = {}) => {
     mockStore = createMockStore(storeOverrides);
 
     return mount(ServiceGraph, {
+      props,
       global: {
         plugins: [i18n],
         mocks: {
@@ -438,6 +439,63 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
 
       expect(wrapper.emitted("request:stream-change")).toBeTruthy();
       expect(wrapper.emitted("request:stream-change")![0]).toEqual(["all"]);
+    });
+  });
+
+  describe("Parent-driven streamFilter prop (Agent Graph page)", () => {
+    afterEach(() => {
+      if (wrapper) wrapper.unmount();
+    });
+
+    it("reloads the graph when the streamFilter prop changes", async () => {
+      vi.mocked(serviceGraphService.getCurrentTopology).mockResolvedValue({
+        data: { nodes: [], edges: [] },
+      } as any);
+      wrapper = createWrapper({}, { streamFilter: "stream-a" });
+      await flushPromises();
+      vi.mocked(serviceGraphService.getCurrentTopology).mockClear();
+
+      // Parent selects a different agent → its source_stream flows in as the prop.
+      await wrapper.setProps({ streamFilter: "stream-b" });
+      await flushPromises();
+
+      // Regression: previously the prop watcher only synced the ref and never
+      // refetched, so the graph never refreshed on agent change.
+      expect(serviceGraphService.getCurrentTopology).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ streamName: "stream-b" }),
+      );
+    });
+
+    it("does not reload when the streamFilter prop is unchanged", async () => {
+      vi.mocked(serviceGraphService.getCurrentTopology).mockResolvedValue({
+        data: { nodes: [], edges: [] },
+      } as any);
+      wrapper = createWrapper({}, { streamFilter: "stream-a" });
+      await flushPromises();
+      vi.mocked(serviceGraphService.getCurrentTopology).mockClear();
+
+      await wrapper.setProps({ streamFilter: "stream-a" });
+      await flushPromises();
+
+      expect(serviceGraphService.getCurrentTopology).not.toHaveBeenCalled();
+    });
+
+    // Both the Agent Graph page (agentHighlight) and the Service Graph tab read
+    // the pre-aggregated _o2_service_graph stream via /topology/current — a cheap
+    // small-stream read that scales to TB-level trace volumes. We deliberately do
+    // NOT re-scan raw traces per load.
+    it("reads the persisted /current topology on the Agent Graph page (agentHighlight)", async () => {
+      wrapper = createWrapper(
+        {},
+        { streamFilter: "fw_crewai", agentHighlight: true },
+      );
+      await flushPromises();
+
+      expect(serviceGraphService.getCurrentTopology).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ streamName: "fw_crewai" }),
+      );
     });
   });
 
@@ -1984,6 +2042,9 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
         queue: 0,
         external: 1,
         rpc: 0,
+        agent: 0,
+        tool: 0,
+        model: 0,
       });
     });
 
