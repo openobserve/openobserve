@@ -21,17 +21,15 @@ use axum::{
 };
 use config::{
     meta::{
-        function::{
-            FunctionList, RESULT_ARRAY, TestVRLResponse, Transform, VRLResult, VRLResultResolver,
-        },
+        function::{FunctionList, RESULT_ARRAY, Transform},
         pipeline::{PipelineDependencyItem, PipelineDependencyResponse},
     },
     utils::json::Value,
 };
+use transform::{compile_vrl_function, js::compile_js_function};
 
 use crate::{
     common::{
-        self,
         meta::{
             authz::Authz,
             http::{ERROR_HEADER, HttpResponse as MetaHttpResponse},
@@ -40,8 +38,9 @@ use crate::{
     },
     db,
     http::map_error_to_http_response,
-    ingestion::compile_vrl_function,
 };
+
+mod transform_test;
 
 const FN_SUCCESS: &str = "Function saved successfully";
 const FN_NOT_FOUND: &str = "Function not found";
@@ -92,9 +91,7 @@ pub async fn save_function(org_id: String, mut func: Transform) -> Result<HttpRe
             }
             1 => {
                 // JS function
-                if let Err(e) =
-                    crate::ingestion::compile_js_function(func.function.as_str(), &org_id)
-                {
+                if let Err(e) = compile_js_function(func.function.as_str(), &org_id) {
                     return Ok(MetaHttpResponse::bad_request(e));
                 }
             }
@@ -146,189 +143,10 @@ pub async fn test_run_function(
         ));
     }
 
-    match trans_type {
-        0 => test_run_vrl_function(org_id, function, events).await,
-        1 => test_run_js_function(org_id, function, events).await,
-        _ => Ok(MetaHttpResponse::bad_request(
-            "Invalid transform type. Use 0 for VRL or 1 for JS.",
-        )),
+    match transform_test::run(org_id, function, events, trans_type).await {
+        Ok(results) => Ok(MetaHttpResponse::json(results)),
+        Err(error) => Ok(MetaHttpResponse::bad_request(error)),
     }
-}
-
-#[tracing::instrument(skip(org_id, function))]
-async fn test_run_vrl_function(
-    org_id: &str,
-    mut function: String,
-    events: Vec<Value>,
-) -> Result<HttpResponse, anyhow::Error> {
-    // Append a dot at the end of the function if it doesn't exist
-    if !function.ends_with('.') {
-        function = format!("{function} \n .");
-    }
-
-    let apply_over_hits = RESULT_ARRAY.is_match(&function);
-
-    let runtime_config = match compile_vrl_function(&function, org_id) {
-        Ok(program) => {
-            let registry = program
-                .config
-                .get_custom::<vector_enrichment::TableRegistry>()
-                .unwrap();
-            registry.finish_load();
-            program
-        }
-        Err(e) => {
-            return Ok(MetaHttpResponse::bad_request(e));
-        }
-    };
-
-    let mut runtime = common::utils::functions::init_vrl_runtime();
-    let fields = runtime_config.fields;
-    let program = runtime_config.program;
-
-    let mut transformed_events = vec![];
-    if apply_over_hits {
-        let (ret_val, err) = crate::ingestion::apply_vrl_fn(
-            &mut runtime,
-            &VRLResultResolver {
-                program: program.clone(),
-                fields: fields.clone(),
-            },
-            Value::Array(events),
-            org_id,
-            &[String::new()],
-        );
-
-        if let Some(err) = err {
-            return Ok(MetaHttpResponse::bad_request(err));
-        }
-
-        ret_val
-            .as_array()
-            .unwrap()
-            .iter()
-            .for_each(|record| match record {
-                Value::Object(hit) => transformed_events.push(VRLResult::new(
-                    "",
-                    config::utils::flatten::flatten(Value::Object(hit.clone())).unwrap(),
-                )),
-                Value::Array(hits) => hits.iter().for_each(|hit| {
-                    if let Value::Object(hit) = hit {
-                        transformed_events.push(VRLResult::new(
-                            "",
-                            config::utils::flatten::flatten(Value::Object(hit.clone())).unwrap(),
-                        ))
-                    }
-                }),
-                _ => {}
-            });
-    } else {
-        events.into_iter().for_each(|event| {
-            let (ret_val, err) = crate::ingestion::apply_vrl_fn(
-                &mut runtime,
-                &config::meta::function::VRLResultResolver {
-                    program: program.clone(),
-                    fields: fields.clone(),
-                },
-                event.clone(),
-                org_id,
-                &[String::new()],
-            );
-            if let Some(err) = err {
-                transformed_events.push(VRLResult::new(&err, event));
-                return;
-            }
-
-            let transform = if !ret_val.is_null() && ret_val.is_object() {
-                config::utils::flatten::flatten(ret_val).unwrap_or("".into())
-            } else {
-                "".into()
-            };
-            transformed_events.push(VRLResult::new("", transform));
-        });
-    }
-
-    let results = TestVRLResponse {
-        results: transformed_events,
-    };
-
-    Ok(MetaHttpResponse::json(results))
-}
-
-#[tracing::instrument(skip(org_id, function))]
-async fn test_run_js_function(
-    org_id: &str,
-    function: String,
-    events: Vec<Value>,
-) -> Result<HttpResponse, anyhow::Error> {
-    // Check if function uses #ResultArray# marker
-    let apply_over_array = RESULT_ARRAY.is_match(&function);
-
-    // Compile the JS function
-    let js_config = match crate::ingestion::compile_js_function(&function, org_id) {
-        Ok(config) => config,
-        Err(e) => {
-            return Ok(MetaHttpResponse::bad_request(e));
-        }
-    };
-
-    let mut transformed_events = vec![];
-
-    if apply_over_array {
-        // #ResultArray# mode: apply function once over entire array
-        let (ret_val, err) = crate::ingestion::apply_js_fn(
-            &js_config,
-            Value::Array(events),
-            org_id,
-            &[String::new()],
-        );
-
-        if let Some(err) = err {
-            transformed_events.push(VRLResult::new(&err, Value::Null));
-        } else if ret_val.is_array() {
-            // Result is an array - flatten each element
-            let result_array = ret_val.as_array().unwrap();
-            for item in result_array {
-                let transform = if item.is_object() {
-                    config::utils::flatten::flatten(item.clone()).unwrap_or("".into())
-                } else {
-                    item.clone()
-                };
-                transformed_events.push(VRLResult::new("", transform));
-            }
-        } else {
-            // Result is not an array - return as single result
-            let transform = if ret_val.is_object() {
-                config::utils::flatten::flatten(ret_val).unwrap_or("".into())
-            } else {
-                ret_val
-            };
-            transformed_events.push(VRLResult::new("", transform));
-        }
-    } else {
-        // Normal mode: apply function to each event
-        for event in events {
-            let (ret_val, err) =
-                crate::ingestion::apply_js_fn(&js_config, event.clone(), org_id, &[String::new()]);
-
-            if let Some(err) = err {
-                transformed_events.push(VRLResult::new(&err, event));
-            } else {
-                let transform = if !ret_val.is_null() && ret_val.is_object() {
-                    config::utils::flatten::flatten(ret_val).unwrap_or("".into())
-                } else {
-                    "".into()
-                };
-                transformed_events.push(VRLResult::new("", transform));
-            }
-        }
-    }
-
-    let results = TestVRLResponse {
-        results: transformed_events,
-    };
-
-    Ok(MetaHttpResponse::json(results))
 }
 
 #[tracing::instrument(skip(func))]
@@ -380,7 +198,7 @@ pub async fn update_function(
         }
         1 => {
             // JS function
-            if let Err(e) = crate::ingestion::compile_js_function(&func.function, org_id) {
+            if let Err(e) = compile_js_function(&func.function, org_id) {
                 return Ok(MetaHttpResponse::bad_request(e));
             }
         }
@@ -540,7 +358,10 @@ async fn check_existing_fn(org_id: &str, fn_name: &str) -> Option<Transform> {
 
 #[cfg(test)]
 mod tests {
-    use config::meta::{function::StreamOrder, stream::StreamType};
+    use config::meta::{
+        function::{StreamOrder, TestVRLResponse},
+        stream::StreamType,
+    };
 
     use super::*;
 

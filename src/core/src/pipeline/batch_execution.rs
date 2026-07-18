@@ -46,11 +46,14 @@ use proto::cluster_rpc;
 #[cfg(feature = "enterprise")]
 use tokio::sync::Mutex;
 use tokio::sync::mpsc::{Receiver, Sender, channel};
+use transform::{
+    apply_vrl_fn, compile_vrl_function,
+    js::{JSRuntimeConfig, apply_js_fn, compile_js_function},
+};
 
 use crate::{
     alerts::{ConditionExt, ConditionGroupExt},
-    common::{infra::config::QUERY_FUNCTIONS, utils::js::JSRuntimeConfig},
-    ingestion::{apply_js_fn, apply_vrl_fn, compile_js_function, compile_vrl_function},
+    common::infra::config::QUERY_FUNCTIONS,
     self_reporting::publish_error,
 };
 
@@ -1221,7 +1224,7 @@ async fn process_function_node(
         metadata.pipeline_name,
         metadata.node_idx
     );
-    let mut vrl_runtime_state = crate::ingestion::init_functions_runtime();
+    let mut vrl_runtime_state = transform::init_vrl_runtime();
     let stream_name = metadata.stream_name.unwrap_or("pipeline".to_string());
     let mut result_array_records = Vec::new();
     while let Some(pipeline_item) = channels.receiver.recv().await {
@@ -2405,7 +2408,7 @@ mod tests {
     // Tests for CompiledFunctionRuntime enum
     #[test]
     fn test_compiled_function_runtime_enum_js_variant() {
-        use crate::common::utils::js::JSRuntimeConfig;
+        use transform::js::JSRuntimeConfig;
 
         let js_config = JSRuntimeConfig {
             function: "function(row) { return row; }".to_string(),
@@ -2427,7 +2430,7 @@ mod tests {
 
     #[test]
     fn test_compiled_function_runtime_enum_vrl_variant() {
-        use crate::ingestion::compile_vrl_function;
+        use transform::compile_vrl_function;
 
         // Use actual VRL compilation to get a valid program
         let vrl_code = ". = {}";
@@ -2456,7 +2459,7 @@ mod tests {
 
     #[test]
     fn test_compiled_function_runtime_result_array_flags() {
-        use crate::{common::utils::js::JSRuntimeConfig, ingestion::compile_vrl_function};
+        use transform::{compile_vrl_function, js::JSRuntimeConfig};
 
         let js_config = JSRuntimeConfig {
             function: "function(rows) { return rows; }".to_string(),
@@ -2491,7 +2494,7 @@ mod tests {
 
     #[test]
     fn test_compiled_function_runtime_clone() {
-        use crate::common::utils::js::JSRuntimeConfig;
+        use transform::js::JSRuntimeConfig;
 
         let js_config = JSRuntimeConfig {
             function: "function(row) { return row; }".to_string(),
@@ -2584,7 +2587,7 @@ mod tests {
     // Test error handling for JS functions
     #[test]
     fn test_js_compilation_error_handling() {
-        use crate::ingestion::compile_js_function;
+        use transform::js::compile_js_function;
 
         // Test invalid JS function
         let invalid_js = "this is not valid javascript {{{";
@@ -2596,7 +2599,7 @@ mod tests {
 
     #[test]
     fn test_js_execution_with_simple_record() {
-        use crate::ingestion::{apply_js_fn, compile_js_function};
+        use transform::js::{apply_js_fn, compile_js_function};
 
         // Compile a simple JS function (operates directly on 'row' variable)
         let js_code = r#"

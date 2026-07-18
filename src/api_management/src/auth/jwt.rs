@@ -38,6 +38,7 @@ use {
     serde_json::Value,
     std::collections::HashMap,
     std::sync::LazyLock as Lazy,
+    transform::{apply_vrl, compile_vrl_function, init_vrl_runtime},
 };
 
 #[cfg(feature = "cloud")]
@@ -1078,53 +1079,34 @@ async fn process_custom_claim_parsing(
     // Use String as compiled program type for Send compatibility
     let vrl_compile_fn = |function_content: &str| -> Result<String, anyhow::Error> {
         // Just validate that it compiles, but return the source for execution
-        crate::service::ingestion::compile_vrl_function(function_content, "_meta")
+        compile_vrl_function(function_content, "_meta")
             .map_err(|e| anyhow::anyhow!("VRL compilation failed: {}", e))?;
         Ok(function_content.to_string())
     };
 
-    let vrl_execute_fn = |function_content: &String,
-                          claims: Value|
-     -> Result<Value, anyhow::Error> {
-        use vrl::compiler::{TargetValue, runtime::Runtime};
+    let vrl_execute_fn =
+        |function_content: &String, claims: Value| -> Result<Value, anyhow::Error> {
+            // Compile the VRL function
+            let vrl_config = compile_vrl_function(function_content, "_meta")
+                .map_err(|e| anyhow::anyhow!("VRL compilation failed: {}", e))?;
+            let resolver = config::meta::function::VRLResultResolver {
+                program: vrl_config.program,
+                fields: vrl_config.fields,
+            };
+            let mut runtime = init_vrl_runtime();
 
-        // Compile the VRL function
-        let vrl_config = crate::service::ingestion::compile_vrl_function(function_content, "_meta")
-            .map_err(|e| anyhow::anyhow!("VRL compilation failed: {}", e))?;
-
-        let mut runtime = Runtime::default();
-        let timezone = vrl::compiler::TimeZone::Local;
-        let mut target = TargetValue {
-            value: claims.into(),
-            metadata: vrl::value::Value::Object(Default::default()),
-            secrets: vrl::value::Secrets::new(),
+            apply_vrl(&mut runtime, &resolver, &claims, "_meta", &[])
+                .map_err(|error| anyhow::anyhow!("VRL execution failed: {error}"))
         };
-
-        let result = match vrl::compiler::VrlRuntime::default() {
-            vrl::compiler::VrlRuntime::Ast => {
-                runtime.resolve(&mut target, &vrl_config.program, &timezone)
-            }
-        };
-
-        match result {
-            Ok(res) => {
-                let output: Value = res
-                    .try_into()
-                    .map_err(|e| anyhow::anyhow!("Failed to convert VRL result: {:?}", e))?;
-                Ok(output)
-            }
-            Err(e) => Err(anyhow::anyhow!("VRL execution failed: {}", e)),
-        }
-    };
 
     let js_execute_fn = |function_content: &str, claims: Value| -> Result<Value, anyhow::Error> {
         // Compile the JavaScript function
-        let js_config = crate::service::ingestion::compile_js_function(function_content, "_meta")
+        let js_config = transform::js::compile_js_function(function_content, "_meta")
             .map_err(|e| anyhow::anyhow!("JavaScript compilation failed: {}", e))?;
 
         // Execute JavaScript with claims as input
         let (result, error) =
-            crate::service::ingestion::apply_js_fn(&js_config, claims, "_meta", &[String::new()]);
+            transform::js::apply_js_fn(&js_config, claims, "_meta", &[String::new()]);
 
         if let Some(err) = error {
             return Err(anyhow::anyhow!("JavaScript execution failed: {}", err));

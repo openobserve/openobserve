@@ -18,6 +18,7 @@ enterprise = [
     "dep:o2_openfga",
     "common/enterprise",
     "config/enterprise",
+    "transform/enterprise",
     "promql/enterprise",
     "search/enterprise",
 ]
@@ -37,7 +38,7 @@ vortex = [
 
 [dependencies]
 common.workspace = true
-openobserve-vrl.workspace = true
+transform.workspace = true
 promql.workspace = true
 search.workspace = true
 axum.workspace = true

@@ -39,6 +39,7 @@ use proto::cluster_rpc::SearchQuery;
 use sql::Sql;
 use tracing::Instrument;
 use tracing_opentelemetry::OpenTelemetrySpanExt;
+use transform::{apply_vrl_fn, compile_vrl_function};
 #[cfg(feature = "enterprise")]
 use {
     crate::search::partition::aggregate::prepare_streaming_aggregate,
@@ -458,7 +459,7 @@ pub async fn search_multi(
 
         let apply_over_hits = RESULT_ARRAY.is_match(&input_fn);
         let mut runtime = init_vrl_runtime();
-        let program = match crate::ingestion::compile_vrl_function(&input_fn, org_id) {
+        let program = match compile_vrl_function(&input_fn, org_id) {
             Ok(program) => {
                 let registry = program
                     .config
@@ -478,7 +479,7 @@ pub async fn search_multi(
             Some(program) => {
                 report_function_usage = true;
                 if apply_over_hits {
-                    let (ret_val, err) = crate::ingestion::apply_vrl_fn(
+                    let (ret_val, err) = apply_vrl_fn(
                         &mut runtime,
                         &config::meta::function::VRLResultResolver {
                             program: program.program.clone(),
@@ -518,7 +519,7 @@ pub async fn search_multi(
                         .hits
                         .into_iter()
                         .filter_map(|hit| {
-                            let (ret_val, err) = crate::ingestion::apply_vrl_fn(
+                            let (ret_val, err) = apply_vrl_fn(
                                 &mut runtime,
                                 &config::meta::function::VRLResultResolver {
                                     program: program.program.clone(),

@@ -46,6 +46,7 @@ use sqlparser::ast::VisitMut;
 use tokio::sync::mpsc;
 use tracing::Instrument;
 use tracing_opentelemetry::OpenTelemetrySpanExt;
+use transform::{apply_vrl_fn, compile_vrl_function};
 use vector_enrichment::TableRegistry;
 
 use crate::{
@@ -1168,7 +1169,7 @@ fn compute_vrl_responses(
 
     log::debug!("[trace_id {trace_id}] Compiling VRL function...");
     let mut runtime = crate::common::utils::functions::init_vrl_runtime();
-    let program = match crate::ingestion::compile_vrl_function(&input_fn, org_id) {
+    let program = match compile_vrl_function(&input_fn, org_id) {
         Ok(program) => {
             let registry = program.config.get_custom::<TableRegistry>().unwrap();
             registry.finish_load();
@@ -1195,7 +1196,7 @@ fn compute_vrl_responses(
 
     let transformed_hits: Vec<json::Value> = if apply_over_hits {
         // Apply VRL on the entire 2D array at once
-        let (ret_val, err) = crate::ingestion::apply_vrl_fn(
+        let (ret_val, err) = apply_vrl_fn(
             &mut runtime,
             &VRLResultResolver {
                 program: program.program.clone(),
@@ -1230,7 +1231,7 @@ fn compute_vrl_responses(
                 let transformed: Vec<json::Value> = query_hits
                     .into_iter()
                     .filter_map(|hit| {
-                        let (ret_val, err) = crate::ingestion::apply_vrl_fn(
+                        let (ret_val, err) = apply_vrl_fn(
                             &mut runtime,
                             &VRLResultResolver {
                                 program: program.program.clone(),

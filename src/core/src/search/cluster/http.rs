@@ -34,6 +34,7 @@ use o2_enterprise::enterprise::actions::{
     meta::{ActionTriggerResult, TriggerSource},
 };
 use proto::cluster_rpc::SearchQuery;
+use transform::{apply_vrl_fn, compile_vrl_function};
 use vector_enrichment::TableRegistry;
 
 use crate::search::{
@@ -112,7 +113,7 @@ pub async fn search(
 
             let apply_over_hits = super::super::RESULT_ARRAY.is_match(input_fn);
             let mut runtime = crate::common::utils::functions::init_vrl_runtime();
-            let program = match crate::ingestion::compile_vrl_function(&query_fn, &sql.org_id) {
+            let program = match compile_vrl_function(&query_fn, &sql.org_id) {
                 Ok(program) => {
                     let registry = program.config.get_custom::<TableRegistry>().unwrap();
                     registry.finish_load();
@@ -132,7 +133,7 @@ pub async fn search(
             match program {
                 Some(program) => {
                     if apply_over_hits {
-                        let (ret_val, err) = crate::ingestion::apply_vrl_fn(
+                        let (ret_val, err) = apply_vrl_fn(
                             &mut runtime,
                             &VRLResultResolver {
                                 program: program.program.clone(),
@@ -170,7 +171,7 @@ pub async fn search(
                             .into_iter()
                             .filter(|v| !v.is_empty())
                             .filter_map(|hit| {
-                                let (ret_val, err) = crate::ingestion::apply_vrl_fn(
+                                let (ret_val, err) = apply_vrl_fn(
                                     &mut runtime,
                                     &VRLResultResolver {
                                         program: program.program.clone(),

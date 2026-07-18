@@ -27,8 +27,11 @@ use vector_enrichment::{Table, TableRegistry};
 use vrl::compiler::{CompilationResult, runtime::Runtime};
 
 pub mod enrichment;
+pub mod js;
+mod runtime;
 
 use enrichment::ENRICHMENT_TABLES;
+pub use runtime::{TransformError, apply_vrl, apply_vrl_fn};
 
 /// Query and ingestion transform definitions, keyed by `org_id/function_name`.
 pub static QUERY_FUNCTIONS: LazyLock<RwHashMap<String, Transform>> =

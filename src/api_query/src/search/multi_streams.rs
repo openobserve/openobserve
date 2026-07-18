@@ -38,6 +38,7 @@ use hashbrown::HashMap;
 use infra::errors;
 use tokio::sync::mpsc;
 use tracing::{Instrument, Span};
+use transform::{apply_vrl_fn, compile_vrl_function, init_vrl_runtime};
 #[cfg(feature = "cloud")]
 use {
     crate::service::organization::is_org_in_free_trial_period,
@@ -539,8 +540,8 @@ pub async fn search_multi(
         // compile vrl function & apply the same before returning the response
 
         let apply_over_hits = RESULT_ARRAY.is_match(input_fn);
-        let mut runtime = crate::common::utils::functions::init_vrl_runtime();
-        let program = match crate::service::ingestion::compile_vrl_function(input_fn, &org_id) {
+        let mut runtime = init_vrl_runtime();
+        let program = match compile_vrl_function(input_fn, &org_id) {
             Ok(program) => {
                 let registry = program
                     .config
@@ -560,7 +561,7 @@ pub async fn search_multi(
             Some(program) => {
                 report_function_usage = true;
                 if apply_over_hits {
-                    let (ret_val, err) = crate::service::ingestion::apply_vrl_fn(
+                    let (ret_val, err) = apply_vrl_fn(
                         &mut runtime,
                         &VRLResultResolver {
                             program: program.program.clone(),
@@ -623,7 +624,7 @@ pub async fn search_multi(
                         .hits
                         .into_iter()
                         .filter_map(|hit| {
-                            let (ret_val, err) = crate::service::ingestion::apply_vrl_fn(
+                            let (ret_val, err) = apply_vrl_fn(
                                 &mut runtime,
                                 &VRLResultResolver {
                                     program: program.program.clone(),

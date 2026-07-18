@@ -49,6 +49,7 @@ use o2_enterprise::enterprise::re_patterns::get_pattern_manager;
 use proto::cluster_rpc::SearchQuery;
 use result_utils::get_ts_value;
 use tracing::Instrument;
+use transform::{apply_vrl_fn, compile_vrl_function};
 
 use crate::{
     common::{
@@ -1080,7 +1081,7 @@ pub fn apply_vrl_to_response(
             input_fn = RESULT_ARRAY_SKIP_VRL.replace(&input_fn, "").to_string();
         }
         let mut runtime = init_vrl_runtime();
-        let program = match crate::ingestion::compile_vrl_function(&input_fn, org_id) {
+        let program = match compile_vrl_function(&input_fn, org_id) {
             Ok(program) => {
                 let registry = program
                     .config
@@ -1099,7 +1100,7 @@ pub fn apply_vrl_to_response(
         match program {
             Some(program) => {
                 if apply_over_hits {
-                    let (ret_val, err) = crate::ingestion::apply_vrl_fn(
+                    let (ret_val, err) = apply_vrl_fn(
                         &mut runtime,
                         &config::meta::function::VRLResultResolver {
                             program: program.program.clone(),
@@ -1127,7 +1128,7 @@ pub fn apply_vrl_to_response(
                         .hits
                         .into_iter()
                         .filter_map(|hit| {
-                            let (ret_val, err) = crate::ingestion::apply_vrl_fn(
+                            let (ret_val, err) = apply_vrl_fn(
                                 &mut runtime,
                                 &config::meta::function::VRLResultResolver {
                                     program: program.program.clone(),
