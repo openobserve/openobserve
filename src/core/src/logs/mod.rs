@@ -50,7 +50,7 @@ use crate::{
     ingestion::{TriggerAlertData, evaluate_trigger, get_write_partition_key, write_file},
     metadata::{MetadataItem, MetadataType, distinct_values::DvItem, write},
     schema::{check_for_schema, stream_schema_exists},
-    self_reporting::report_request_usage_stats,
+    telemetry::report_request_usage,
 };
 
 pub mod bulk;
@@ -222,17 +222,15 @@ async fn write_logs_by_stream(
                 Some(org) => org,
             };
 
-            super::self_reporting::cloud_events::enqueue_cloud_event(
-                super::self_reporting::cloud_events::CloudEvent {
-                    org_id: org.identifier.clone(),
-                    org_name: org.name.clone(),
-                    org_type: org.org_type.clone(),
-                    user: Some(user_email.to_string()),
-                    event: super::self_reporting::cloud_events::EventType::StreamCreated,
-                    subscription_type: None,
-                    stream_name: Some(stream_name.clone()),
-                },
-            )
+            crate::telemetry::report_cloud_event(crate::telemetry::CloudEvent {
+                org_id: org.identifier.clone(),
+                org_name: org.name.clone(),
+                org_type: org.org_type.clone(),
+                user: Some(user_email.to_string()),
+                event: crate::telemetry::CloudEventType::StreamCreated,
+                subscription_type: None,
+                stream_name: Some(stream_name.clone()),
+            })
             .await;
         }
 
@@ -282,7 +280,7 @@ async fn write_logs_by_stream(
                 // req_stats already divides the size in mb
                 req_stats.size = *size as f64 / SIZE_IN_MB;
             }
-            report_request_usage_stats(
+            report_request_usage(
                 req_stats,
                 org_id,
                 &stream_name,

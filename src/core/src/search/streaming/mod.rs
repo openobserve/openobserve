@@ -36,10 +36,7 @@ use config::{
 use log;
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::{
-    common::{
-        auditor::{AuditMessage, Protocol, ResponseMeta},
-        config::get_config as get_o2_config,
-    },
+    common::config::get_config as get_o2_config,
     log_patterns::{PatternAccumulator, PatternExtractionConfig},
 };
 use sqlparser::ast::VisitMut;
@@ -63,7 +60,10 @@ use crate::{
     },
 };
 #[cfg(feature = "enterprise")]
-use crate::{http::map_error_to_http_response, self_reporting::audit};
+use crate::{
+    http::map_error_to_http_response,
+    telemetry::{AuditEvent, AuditProtocol, AuditResponse, audit},
+};
 
 pub mod cache;
 pub mod execution;
@@ -283,12 +283,12 @@ pub async fn process_search_stream_request(
                     let resp = map_error_to_http_response(&e, None).status().into();
                     if audit_enabled {
                         // Using spawn to handle the async call
-                        audit(AuditMessage {
+                        audit(AuditEvent {
                             user_email: user_id,
                             org_id,
-                            _timestamp: chrono::Utc::now().timestamp(),
-                            protocol: Protocol::Http,
-                            response_meta: ResponseMeta {
+                            timestamp: chrono::Utc::now().timestamp(),
+                            protocol: AuditProtocol::Http,
+                            response: AuditResponse {
                                 http_method: _audit_ctx.as_ref().unwrap().method.to_string(),
                                 http_path: _audit_ctx.as_ref().unwrap().path.to_string(),
                                 http_query_params: _audit_ctx
@@ -388,12 +388,12 @@ pub async fn process_search_stream_request(
                     let resp = map_error_to_http_response(&e, None).status().into();
                     if audit_enabled {
                         // Using spawn to handle the async call
-                        audit(AuditMessage {
+                        audit(AuditEvent {
                             user_email: user_id,
                             org_id,
-                            _timestamp: chrono::Utc::now().timestamp(),
-                            protocol: Protocol::Http,
-                            response_meta: ResponseMeta {
+                            timestamp: chrono::Utc::now().timestamp(),
+                            protocol: AuditProtocol::Http,
+                            response: AuditResponse {
                                 http_method: _audit_ctx.as_ref().unwrap().method.to_string(),
                                 http_path: _audit_ctx.as_ref().unwrap().path.to_string(),
                                 http_query_params: _audit_ctx
@@ -467,12 +467,12 @@ pub async fn process_search_stream_request(
                     let resp = map_error_to_http_response(&e, None).status().into();
                     if audit_enabled {
                         // Using spawn to handle the async call
-                        audit(AuditMessage {
+                        audit(AuditEvent {
                             user_email: user_id,
                             org_id,
-                            _timestamp: chrono::Utc::now().timestamp(),
-                            protocol: Protocol::Http,
-                            response_meta: ResponseMeta {
+                            timestamp: chrono::Utc::now().timestamp(),
+                            protocol: AuditProtocol::Http,
+                            response: AuditResponse {
                                 http_method: _audit_ctx.as_ref().unwrap().method.to_string(),
                                 http_path: _audit_ctx.as_ref().unwrap().path.to_string(),
                                 http_query_params: _audit_ctx
@@ -540,12 +540,12 @@ pub async fn process_search_stream_request(
                 let resp = map_error_to_http_response(&e, None).status().into();
                 if audit_enabled {
                     // Using spawn to handle the async call
-                    audit(AuditMessage {
+                    audit(AuditEvent {
                         user_email: user_id,
                         org_id,
-                        _timestamp: chrono::Utc::now().timestamp(),
-                        protocol: Protocol::Http,
-                        response_meta: ResponseMeta {
+                        timestamp: chrono::Utc::now().timestamp(),
+                        protocol: AuditProtocol::Http,
+                        response: AuditResponse {
                             http_method: _audit_ctx.as_ref().unwrap().method.to_string(),
                             http_path: _audit_ctx.as_ref().unwrap().path.to_string(),
                             http_query_params: _audit_ctx
@@ -601,12 +601,12 @@ pub async fn process_search_stream_request(
                 let resp = map_error_to_http_response(&e, None).status().into();
                 if audit_enabled {
                     // Using spawn to handle the async call
-                    audit(AuditMessage {
+                    audit(AuditEvent {
                         user_email: user_id,
                         org_id,
-                        _timestamp: chrono::Utc::now().timestamp(),
-                        protocol: Protocol::Http,
-                        response_meta: ResponseMeta {
+                        timestamp: chrono::Utc::now().timestamp(),
+                        protocol: AuditProtocol::Http,
+                        response: AuditResponse {
                             http_method: _audit_ctx.as_ref().unwrap().method.to_string(),
                             http_path: _audit_ctx.as_ref().unwrap().path.to_string(),
                             http_query_params: _audit_ctx
@@ -683,12 +683,12 @@ pub async fn process_search_stream_request(
             && let Some(audit_ctx) = _audit_ctx.as_ref()
         {
             // Using spawn to handle the async call
-            audit(AuditMessage {
+            audit(AuditEvent {
                 user_email: user_id,
                 org_id,
-                _timestamp: chrono::Utc::now().timestamp(),
-                protocol: Protocol::Http,
-                response_meta: ResponseMeta {
+                timestamp: chrono::Utc::now().timestamp(),
+                protocol: AuditProtocol::Http,
+                response: AuditResponse {
                     http_method: audit_ctx.method.to_string(),
                     http_path: audit_ctx.path.to_string(),
                     http_query_params: audit_ctx.query_params.to_string(),
@@ -1092,12 +1092,12 @@ pub async fn process_search_stream_request_multi(
     if let Some(audit_ctx) = _audit_ctx
         && get_o2_config().common.audit_enabled
     {
-        audit(AuditMessage {
+        audit(AuditEvent {
             user_email: user_id,
             org_id,
-            _timestamp: chrono::Utc::now().timestamp(),
-            protocol: Protocol::Http,
-            response_meta: ResponseMeta {
+            timestamp: chrono::Utc::now().timestamp(),
+            protocol: AuditProtocol::Http,
+            response: AuditResponse {
                 http_method: audit_ctx.method.to_string(),
                 http_path: audit_ctx.path.to_string(),
                 http_query_params: audit_ctx.query_params.to_string(),

@@ -56,14 +56,13 @@ use {
         jwt::process_token,
         validator::{ID_TOKEN_HEADER, PKCE_STATE_ORG, get_user_email_from_auth_str},
     },
-    crate::service::self_reporting::audit,
+    crate::service::telemetry::{AuditEvent, AuditProtocol, AuditResponse, audit},
     config::{ider, utils::time::now_micros},
     o2_dex::{
         config::{get_config as get_dex_config, refresh_config as refresh_dex_config},
         service::auth::{exchange_code, get_dex_jwks, get_dex_login, refresh_token},
     },
     o2_enterprise::enterprise::common::{
-        auditor::{AuditMessage, Protocol, ResponseMeta},
         config::{get_config as get_o2_config, refresh_config as refresh_o2_config},
         settings::{get_logo, get_logo_dark, get_logo_text},
     },
@@ -832,12 +831,12 @@ pub async fn config_reload(Headers(user_email): Headers<UserEmail>) -> impl Into
     let status = "successfully reloaded config";
     // Audit this event
     #[cfg(feature = "enterprise")]
-    audit(AuditMessage {
+    audit(AuditEvent {
         user_email: user_id.to_string(),
         org_id: "".to_string(),
-        _timestamp: now_micros(),
-        protocol: Protocol::Http,
-        response_meta: ResponseMeta {
+        timestamp: now_micros(),
+        protocol: AuditProtocol::Http,
+        response: AuditResponse {
             http_method: "GET".to_string(),
             http_path: "/config/reload".to_string(),
             http_query_params: "".to_string(),
@@ -950,12 +949,12 @@ pub async fn redirect(Query(query): Query<std::collections::HashMap<String, Stri
         }
     };
     let query_string = query.iter().map(|(k, v)| format!("{k}={v}")).join("&");
-    let mut audit_message = AuditMessage {
+    let mut audit_message = AuditEvent {
         user_email: "".to_string(),
         org_id: "".to_string(),
-        _timestamp: now_micros(),
-        protocol: Protocol::Http,
-        response_meta: ResponseMeta {
+        timestamp: now_micros(),
+        protocol: AuditProtocol::Http,
+        response: AuditResponse {
             http_method: "GET".to_string(),
             http_path: "/config/redirect".to_string(),
             http_body: "".to_string(),
@@ -973,7 +972,7 @@ pub async fn redirect(Query(query): Query<std::collections::HashMap<String, Stri
             }
             Err(_) => {
                 // Bad Request
-                audit_message.response_meta.http_response_code = 400;
+                audit_message.response.http_response_code = 400;
                 audit(audit_message).await;
                 return Response::builder()
                     .status(StatusCode::BAD_REQUEST)
@@ -984,7 +983,7 @@ pub async fn redirect(Query(query): Query<std::collections::HashMap<String, Stri
 
         None => {
             // Bad Request
-            audit_message.response_meta.http_response_code = 400;
+            audit_message.response.http_response_code = 400;
             audit(audit_message).await;
             return Response::builder()
                 .status(StatusCode::BAD_REQUEST)
@@ -1032,8 +1031,8 @@ pub async fn redirect(Query(query): Query<std::collections::HashMap<String, Stri
                     {
                         Ok(allowed) => {
                             if !allowed {
-                                audit_message.response_meta.http_response_code = 403;
-                                audit_message._timestamp = now_micros();
+                                audit_message.response.http_response_code = 403;
+                                audit_message.timestamp = now_micros();
                                 audit(audit_message).await;
                                 return Response::builder()
                                     .status(StatusCode::UNAUTHORIZED)
@@ -1079,8 +1078,8 @@ pub async fn redirect(Query(query): Query<std::collections::HashMap<String, Stri
                     );
                 }
                 Err(e) => {
-                    audit_message.response_meta.http_response_code = 400;
-                    audit_message._timestamp = now_micros();
+                    audit_message.response.http_response_code = 400;
+                    audit_message.timestamp = now_micros();
                     audit(audit_message).await;
                     return Response::builder()
                         .status(StatusCode::UNAUTHORIZED)
@@ -1094,8 +1093,8 @@ pub async fn redirect(Query(query): Query<std::collections::HashMap<String, Stri
             let session_id = ider::uuid();
 
             if access_token.is_empty() {
-                audit_message.response_meta.http_response_code = 400;
-                audit_message._timestamp = now_micros();
+                audit_message.response.http_response_code = 400;
+                audit_message.timestamp = now_micros();
                 audit(audit_message).await;
                 return Response::builder()
                     .status(StatusCode::UNAUTHORIZED)
@@ -1139,7 +1138,7 @@ pub async fn redirect(Query(query): Query<std::collections::HashMap<String, Stri
             }
             log::info!("Redirecting user after processing token");
 
-            audit_message._timestamp = now_micros();
+            audit_message.timestamp = now_micros();
             audit(audit_message).await;
             Response::builder()
                 .status(StatusCode::FOUND)
@@ -1149,8 +1148,8 @@ pub async fn redirect(Query(query): Query<std::collections::HashMap<String, Stri
                 .unwrap()
         }
         Err(e) => {
-            audit_message.response_meta.http_response_code = 400;
-            audit_message._timestamp = now_micros();
+            audit_message.response.http_response_code = 400;
+            audit_message.timestamp = now_micros();
             audit(audit_message).await;
             Response::builder()
                 .status(StatusCode::UNAUTHORIZED)
@@ -1197,12 +1196,12 @@ pub async fn refresh_token_with_dex(
         .map(|(k, v)| format!("{}={}", k, v))
         .collect::<Vec<_>>()
         .join("&");
-    let mut audit_message = AuditMessage {
+    let mut audit_message = AuditEvent {
         user_email: "".to_string(),
         org_id: "".to_string(),
-        _timestamp: now_micros(),
-        protocol: Protocol::Http,
-        response_meta: ResponseMeta {
+        timestamp: now_micros(),
+        protocol: AuditProtocol::Http,
+        response: AuditResponse {
             http_method: "GET".to_string(),
             http_path: "/config/dex_refresh".to_string(),
             http_body: "".to_string(),
@@ -1239,8 +1238,8 @@ pub async fn refresh_token_with_dex(
             let session_id = ider::uuid();
 
             if access_token.is_empty() {
-                audit_message.response_meta.http_response_code = 400;
-                audit_message._timestamp = now_micros();
+                audit_message.response.http_response_code = 400;
+                audit_message.timestamp = now_micros();
                 audit(audit_message).await;
                 return Response::builder()
                     .status(StatusCode::UNAUTHORIZED)
@@ -1274,8 +1273,8 @@ pub async fn refresh_token_with_dex(
                 if blocked {
                     let email = refreshed_email.unwrap_or_default();
                     log::warn!("Blocked external identity denied at token refresh: {email}");
-                    audit_message.response_meta.http_response_code = 401;
-                    audit_message._timestamp = now_micros();
+                    audit_message.response.http_response_code = 401;
+                    audit_message.timestamp = now_micros();
                     audit(audit_message).await;
 
                     let conf = get_config();
@@ -1423,12 +1422,12 @@ pub async fn logout(
 
     #[cfg(feature = "enterprise")]
     if let Some(user_email) = user_email {
-        audit(AuditMessage {
+        audit(AuditEvent {
             user_email,
             org_id: "".to_string(),
-            _timestamp: now_micros(),
-            protocol: Protocol::Http,
-            response_meta: ResponseMeta {
+            timestamp: now_micros(),
+            protocol: AuditProtocol::Http,
+            response: AuditResponse {
                 http_method: "GET".to_string(),
                 http_path: "/config/logout".to_string(),
                 http_query_params: "".to_string(),

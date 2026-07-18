@@ -63,7 +63,7 @@ use crate::{
     pipeline::batch_execution::ExecutablePipeline,
     schema::{check_for_schema, stream_schema_exists},
     search as search_service,
-    self_reporting::report_request_usage_stats,
+    telemetry::report_request_usage,
 };
 
 pub async fn remote_write(
@@ -684,7 +684,7 @@ pub async fn remote_write(
             Some(email_str)
         };
         let t = std::time::Instant::now();
-        report_request_usage_stats(
+        report_request_usage(
             req_stats,
             org_id,
             &stream_name,

@@ -43,7 +43,9 @@ use {
 };
 
 #[cfg(feature = "cloud")]
-use super::self_reporting::cloud_events::{CloudEvent, EventType, enqueue_cloud_event};
+use crate::telemetry::{
+    CloudEvent, CloudEventType as EventType, report_cloud_event as enqueue_cloud_event,
+};
 use crate::{
     common::{
         infra::config::ORG_USERS,
@@ -55,7 +57,7 @@ use crate::{
         utils::auth::{delete_org_tuples, is_root_user, save_org_tuples},
     },
     db::{self, org_users},
-    ingestion_tokens, self_reporting,
+    ingestion_tokens, search,
     stream::get_streams,
     users::add_admin_to_org,
 };
@@ -142,7 +144,7 @@ pub async fn get_summary(org_id: &str) -> OrgSummary {
         );
         let end_time = time::now_micros();
         let start_time = end_time - time::second_micros(900); // 15 mins
-        self_reporting::search::get_usage(sql, start_time, end_time, false)
+        search::usage::get_usage(sql, start_time, end_time, false)
             .await
             .unwrap_or_default()
             .into_iter()

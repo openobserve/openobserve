@@ -58,7 +58,7 @@ use crate::{
     db::{self, alerts::alert::set_without_updating_trigger},
     ingestion::ingestion_service,
     pipeline::batch_execution::ExecutablePipeline,
-    self_reporting::publish_triggers_usage,
+    telemetry::report_trigger,
 };
 
 pub async fn handle_triggers(
@@ -161,7 +161,7 @@ async fn handle_anomaly_detection_triggers(
         trigger.status = db::scheduler::TriggerStatus::Waiting;
         db::scheduler::update_trigger(trigger.clone(), true, "").await?;
 
-        crate::self_reporting::publish_triggers_usage(TriggerData {
+        crate::telemetry::report_trigger(TriggerData {
             _timestamp: now_micros(),
             org: trigger.org.clone(),
             module: TriggerDataType::AnomalyDetection,
@@ -221,7 +221,7 @@ async fn handle_anomaly_detection_triggers(
     // Publish trigger run record to the triggers stream (same as alerts).
     let interval_us = parse_detection_interval_to_micros(&config.schedule_interval);
     let next_run = now_micros() + interval_us;
-    crate::self_reporting::publish_triggers_usage(TriggerData {
+    crate::telemetry::report_trigger(TriggerData {
         _timestamp: run_start_us,
         org: trigger.org.clone(),
         module: TriggerDataType::AnomalyDetection,
@@ -419,7 +419,7 @@ async fn handle_alert_triggers(
                         "[SCHEDULER trace_id {scheduler_trace_id}] Error deleting trigger job: {e}"
                     );
                 }
-                publish_triggers_usage(TriggerData {
+                report_trigger(TriggerData {
                     _timestamp: now,
                     org: trigger.org.clone(),
                     module: TriggerDataType::Alert,
@@ -463,7 +463,7 @@ async fn handle_alert_triggers(
                     )
                     .await?;
                 }
-                publish_triggers_usage(TriggerData {
+                report_trigger(TriggerData {
                     _timestamp: now,
                     org: trigger.org.clone(),
                     module: TriggerDataType::Alert,
@@ -501,7 +501,7 @@ async fn handle_alert_triggers(
                 "[SCHEDULER trace_id {scheduler_trace_id}] Error deleting trigger job: {e}"
             );
         }
-        publish_triggers_usage(TriggerData {
+        report_trigger(TriggerData {
             _timestamp: now,
             org: trigger.org.clone(),
             module: TriggerDataType::Alert,
@@ -695,7 +695,7 @@ async fn handle_alert_triggers(
             let skipped_alerts_count = skipped_timestamps.len();
             // If delay is greater than the alert frequency, skip them and report the event
             // to the `triggers` usage stream.
-            publish_triggers_usage(TriggerData {
+            report_trigger(TriggerData {
                 _timestamp: now - 1,
                 org: trigger.org.clone(),
                 module: TriggerDataType::Alert,
@@ -823,7 +823,7 @@ async fn handle_alert_triggers(
             )
             .await?;
         }
-        publish_triggers_usage(trigger_data_stream);
+        report_trigger(trigger_data_stream);
 
         // [ENTERPRISE] Mark completion even on failure
         // #[cfg(feature = "enterprise")]
@@ -984,7 +984,7 @@ async fn handle_alert_triggers(
                 };
                 new_trigger.data = json::to_string(&trigger_data).unwrap();
                 db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
-                publish_triggers_usage(trigger_data_stream);
+                report_trigger(trigger_data_stream);
                 return Ok(());
             }
         }
@@ -1015,7 +1015,7 @@ async fn handle_alert_triggers(
                         };
                         new_trigger.data = json::to_string(&trigger_data).unwrap();
                         db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
-                        publish_triggers_usage(trigger_data_stream);
+                        report_trigger(trigger_data_stream);
                         return Ok(());
                     }
                     deduplicated_data
@@ -1264,11 +1264,11 @@ async fn handle_alert_triggers(
     }
 
     log::debug!(
-        "[SCHEDULER trace_id {scheduler_trace_id}] publish_triggers_usage for alert: {}",
+        "[SCHEDULER trace_id {scheduler_trace_id}] report_trigger for alert: {}",
         trigger_data_stream.key
     );
     // publish the triggers as stream
-    publish_triggers_usage(trigger_data_stream);
+    report_trigger(trigger_data_stream);
 
     // [ENTERPRISE] Mark alert completed and process batch if this was the last alert
     // #[cfg(feature = "enterprise")]
@@ -1415,7 +1415,7 @@ async fn handle_report_triggers(
                 )
                 .await?;
             }
-            publish_triggers_usage(TriggerData {
+            report_trigger(TriggerData {
                 _timestamp: now,
                 org: trigger.org.clone(),
                 module: TriggerDataType::Report,
@@ -1679,10 +1679,10 @@ async fn handle_report_triggers(
         }
     }
     log::debug!(
-        "[SCHEDULER trace_id {scheduler_trace_id}] publish_triggers_usage for report: {}",
+        "[SCHEDULER trace_id {scheduler_trace_id}] report_trigger for report: {}",
         trigger_data_stream.key
     );
-    publish_triggers_usage(trigger_data_stream);
+    report_trigger(trigger_data_stream);
 
     Ok(())
 }
@@ -1785,7 +1785,7 @@ async fn handle_derived_stream_triggers(
                 new_trigger_data.reset();
                 new_trigger.data = new_trigger_data.to_json_string();
                 db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
-                publish_triggers_usage(trigger_data_stream);
+                report_trigger(trigger_data_stream);
                 return Err(anyhow::anyhow!(
                     "[SCHEDULER trace_id {scheduler_trace_id}] {}",
                     err_msg
@@ -1864,7 +1864,7 @@ async fn handle_derived_stream_triggers(
         };
         log::info!("[SCHEDULER trace_id {scheduler_trace_id}] {msg}");
         db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
-        publish_triggers_usage(trigger_data_stream);
+        report_trigger(trigger_data_stream);
         return Ok(());
     }
 
@@ -1903,7 +1903,7 @@ async fn handle_derived_stream_triggers(
         new_trigger_data.reset();
         new_trigger.data = new_trigger_data.to_json_string();
         db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
-        publish_triggers_usage(trigger_data_stream);
+        report_trigger(trigger_data_stream);
         return Err(anyhow::anyhow!(
             "[SCHEDULER trace_id {scheduler_trace_id}] {}",
             err_msg
@@ -2079,7 +2079,7 @@ async fn handle_derived_stream_triggers(
             "Invalid timerange - start: {start_time}, end: {end}, should be fixed in the next run"
         ));
         db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
-        publish_triggers_usage(trigger_data_stream);
+        report_trigger(trigger_data_stream);
         return Ok(());
     }
 
@@ -2151,7 +2151,7 @@ async fn handle_derived_stream_triggers(
                 error: Some(err_msg),
                 node_errors: HashMap::new(),
             };
-            crate::self_reporting::publish_error(ErrorData {
+            crate::telemetry::publish_error(ErrorData {
                 _timestamp: Utc::now().timestamp_micros(),
                 stream_params: pipeline.get_source_stream_params(),
                 error_source: ErrorSource::Pipeline(pipeline_error),
@@ -2299,7 +2299,7 @@ async fn handle_derived_stream_triggers(
                         error: Some(err),
                         node_errors: HashMap::new(),
                     };
-                    crate::self_reporting::publish_error(ErrorData {
+                    crate::telemetry::publish_error(ErrorData {
                         _timestamp: Utc::now().timestamp_micros(),
                         stream_params: pipeline.get_source_stream_params(),
                         error_source: ErrorSource::Pipeline(pipeline_error),
@@ -2377,7 +2377,7 @@ async fn handle_derived_stream_triggers(
     trigger_data_stream.next_run_at = new_trigger.next_run_at;
 
     // publish the triggers as stream
-    publish_triggers_usage(trigger_data_stream);
+    report_trigger(trigger_data_stream);
 
     // If it reaches max retries, go to the next nun at, but use the same trigger start time
     if new_trigger.retries >= max_retries {
@@ -2396,7 +2396,7 @@ async fn handle_derived_stream_triggers(
             error: Some(err_msg),
             node_errors: HashMap::new(),
         };
-        crate::self_reporting::publish_error(ErrorData {
+        crate::telemetry::publish_error(ErrorData {
             _timestamp: Utc::now().timestamp_micros(),
             stream_params: pipeline.get_source_stream_params(),
             error_source: ErrorSource::Pipeline(pipeline_error),
@@ -2477,7 +2477,7 @@ async fn handle_backfill_triggers(
                 &job_id,
             )
             .await;
-            publish_triggers_usage(TriggerData {
+            report_trigger(TriggerData {
                 _timestamp: now,
                 org: trigger.org.clone(),
                 module: TriggerDataType::Backfill,
@@ -2560,7 +2560,7 @@ async fn handle_backfill_triggers(
                 )
                 .await;
             }
-            publish_triggers_usage(TriggerData {
+            report_trigger(TriggerData {
                 _timestamp: now,
                 org: trigger.org.clone(),
                 module: TriggerDataType::Backfill,
@@ -2618,7 +2618,7 @@ async fn handle_backfill_triggers(
                 )
                 .await;
             }
-            publish_triggers_usage(TriggerData {
+            report_trigger(TriggerData {
                 _timestamp: now,
                 org: trigger.org.clone(),
                 module: TriggerDataType::Backfill,
@@ -2659,7 +2659,7 @@ async fn handle_backfill_triggers(
                     &job_id,
                 )
                 .await;
-                publish_triggers_usage(TriggerData {
+                report_trigger(TriggerData {
                     _timestamp: now,
                     org: trigger.org.clone(),
                     module: TriggerDataType::Backfill,
@@ -2693,7 +2693,7 @@ async fn handle_backfill_triggers(
                     trace_id,
                 )
                 .await;
-                publish_triggers_usage(TriggerData {
+                report_trigger(TriggerData {
                     _timestamp: now,
                     org: trigger.org.clone(),
                     module: TriggerDataType::Backfill,
@@ -2734,7 +2734,7 @@ async fn handle_backfill_triggers(
                 &job_id,
             )
             .await;
-            publish_triggers_usage(TriggerData {
+            report_trigger(TriggerData {
                 _timestamp: now,
                 org: trigger.org.clone(),
                 module: TriggerDataType::Backfill,
@@ -2772,7 +2772,7 @@ async fn handle_backfill_triggers(
                 &job_id,
             )
             .await;
-            publish_triggers_usage(TriggerData {
+            report_trigger(TriggerData {
                 _timestamp: now,
                 org: trigger.org.clone(),
                 module: TriggerDataType::Backfill,
@@ -3112,7 +3112,7 @@ async fn handle_backfill_triggers(
                 ),
                 ..Default::default()
             };
-            publish_triggers_usage(trigger_data_stream);
+            report_trigger(trigger_data_stream);
 
             return Err(anyhow::anyhow!(
                 "Failed to evaluate pipeline: {}",
@@ -3205,7 +3205,7 @@ async fn handle_backfill_triggers(
                 ),
                 ..Default::default()
             };
-            publish_triggers_usage(trigger_data_stream);
+            report_trigger(trigger_data_stream);
 
             return Err(anyhow::anyhow!(
                 "Failed to create executable pipeline: {}",
@@ -3305,7 +3305,7 @@ async fn handle_backfill_triggers(
                     ),
                     ..Default::default()
                 };
-                publish_triggers_usage(trigger_data_stream);
+                report_trigger(trigger_data_stream);
 
                 return Err(anyhow::anyhow!("Failed to process batch: {}", error_msg));
             }
@@ -3461,7 +3461,7 @@ async fn handle_backfill_triggers(
             ),
             ..Default::default()
         };
-        publish_triggers_usage(trigger_data_stream);
+        report_trigger(trigger_data_stream);
 
         return Err(anyhow::anyhow!("Failed to ingest data: {}", error_msg));
     }
@@ -3543,7 +3543,7 @@ async fn handle_backfill_triggers(
             ),
             ..Default::default()
         };
-        publish_triggers_usage(trigger_data_stream);
+        report_trigger(trigger_data_stream);
     } else {
         // Update progress and schedule next chunk
         backfill_job.current_position = chunk_end;
@@ -3621,7 +3621,7 @@ async fn handle_backfill_triggers(
             ),
             ..Default::default()
         };
-        publish_triggers_usage(trigger_data_stream);
+        report_trigger(trigger_data_stream);
     }
 
     Ok(())

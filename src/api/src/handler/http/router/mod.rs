@@ -32,14 +32,11 @@ use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 #[cfg(feature = "enterprise")]
 use {
-    crate::service::self_reporting::audit,
+    crate::service::telemetry::{AuditEvent, AuditProtocol, AuditResponse, audit},
     axum::body::{Body, to_bytes},
     base64::{Engine as _, engine::general_purpose},
     config::utils::time::now_micros,
-    o2_enterprise::enterprise::common::{
-        auditor::{AuditMessage, Protocol, ResponseMeta},
-        config::get_config as get_o2_config,
-    },
+    o2_enterprise::enterprise::common::config::get_config as get_o2_config,
 };
 
 use super::request::*;
@@ -368,12 +365,12 @@ pub async fn audit_middleware(request: Request, next: Next) -> Response {
 
             response.headers_mut().remove(ERROR_HEADER);
 
-            audit(AuditMessage {
+            audit(AuditEvent {
                 user_email,
                 org_id,
-                _timestamp: now_micros(),
-                protocol: Protocol::Http,
-                response_meta: ResponseMeta {
+                timestamp: now_micros(),
+                protocol: AuditProtocol::Http,
+                response: AuditResponse {
                     http_method: method,
                     http_path: path,
                     http_body: body,

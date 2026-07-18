@@ -34,10 +34,7 @@ use futures::stream::StreamExt;
 use hashbrown::HashMap;
 use log;
 #[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::common::{
-    auditor::{AuditMessage, Protocol, ResponseMeta},
-    config::get_config as get_o2_config,
-};
+use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
 use tokio::sync::mpsc;
 use tracing::Span;
 
@@ -48,7 +45,7 @@ use crate::{
     common::meta::search::AuditContext,
     common::utils::auth::check_permissions,
     search::utils::{StreamPermissionResourceType, check_stream_permissions},
-    service::self_reporting::audit,
+    service::telemetry::{AuditEvent, AuditProtocol, AuditResponse, audit},
 };
 use crate::{
     common::{
@@ -663,12 +660,12 @@ pub async fn report_to_audit(
     let is_audit_enabled = get_o2_config().common.audit_enabled;
     if is_audit_enabled {
         // Using spawn to handle the async call
-        audit(AuditMessage {
+        audit(AuditEvent {
             user_email: user_id,
             org_id,
-            _timestamp: chrono::Utc::now().timestamp(),
-            protocol: Protocol::Http,
-            response_meta: ResponseMeta {
+            timestamp: chrono::Utc::now().timestamp(),
+            protocol: AuditProtocol::Http,
+            response: AuditResponse {
                 http_method,
                 http_path,
                 http_query_params,

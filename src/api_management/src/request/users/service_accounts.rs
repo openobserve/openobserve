@@ -20,11 +20,10 @@ use axum::{
 };
 #[cfg(feature = "enterprise")]
 use {
-    crate::service::self_reporting::audit,
+    crate::service::telemetry::{AuditEvent, AuditProtocol, AuditResponse, audit},
     crate::{auth::jwt::process_token, common::utils::jwt::verify_decode_token},
     config::utils::time::now_micros,
     o2_dex::{config::get_config as get_dex_config, service::auth::get_dex_jwks},
-    o2_enterprise::enterprise::common::auditor::{AuditMessage, Protocol, ResponseMeta},
 };
 
 #[cfg(feature = "enterprise")]
@@ -33,12 +32,12 @@ pub async fn exchange_token(
 ) -> Response {
     let result = o2_dex::service::token_exchange::exchange_token(&body).await;
 
-    let mut audit_message = AuditMessage {
+    let mut audit_message = AuditEvent {
         user_email: "".to_string(),
         org_id: "".to_string(),
-        _timestamp: now_micros(),
-        protocol: Protocol::Http,
-        response_meta: ResponseMeta {
+        timestamp: now_micros(),
+        protocol: AuditProtocol::Http,
+        response: AuditResponse {
             http_method: "POST".to_string(),
             http_path: "/token".to_string(),
             http_body: "".to_string(),
@@ -64,20 +63,20 @@ pub async fn exchange_token(
                     _ = process_token(res).await;
                 }
                 Err(e) => {
-                    audit_message.response_meta.http_response_code = 401;
-                    audit_message._timestamp = now_micros();
+                    audit_message.response.http_response_code = 401;
+                    audit_message.timestamp = now_micros();
                     audit(audit_message).await;
                     return (StatusCode::UNAUTHORIZED, Json(e.to_string())).into_response();
                 }
             }
-            audit_message._timestamp = now_micros();
+            audit_message.timestamp = now_micros();
             audit(audit_message).await;
             (StatusCode::OK, Json(response)).into_response()
         }
         Err(e) => {
             log::error!("Error: {e}");
-            audit_message.response_meta.http_response_code = 401;
-            audit_message._timestamp = now_micros();
+            audit_message.response.http_response_code = 401;
+            audit_message.timestamp = now_micros();
             audit(audit_message).await;
             (StatusCode::UNAUTHORIZED, Json(e.to_string())).into_response()
         }

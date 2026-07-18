@@ -63,7 +63,7 @@ use crate::{
         inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
         sql::RE_SELECT_FROM,
     },
-    self_reporting::{http_report_metrics, report_request_usage_stats},
+    telemetry::{UsageReport, record_http_metrics, report_usage as emit_usage},
 };
 
 pub mod cacher;
@@ -330,7 +330,7 @@ pub async fn search(
         .map(|t| t.to_string())
         .unwrap_or("".to_string());
     let search_group = work_group.clone().unwrap_or("".to_string());
-    http_report_metrics(
+    record_http_metrics(
         start,
         org_id,
         stream_type,
@@ -378,15 +378,15 @@ pub async fn search(
         peak_memory_usage: res.peak_memory_usage,
         ..Default::default()
     };
-    report_request_usage_stats(
+    emit_usage(UsageReport::new(
         req_stats,
         org_id,
-        &all_streams,
+        all_streams,
         stream_type,
         UsageType::Search,
         num_fn,
         started_at,
-    )
+    ))
     .await;
 
     if res.is_partial {

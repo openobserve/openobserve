@@ -56,7 +56,7 @@ use crate::{
     },
     pipeline::batch_execution::ExecutablePipeline,
     schema::check_for_schema,
-    self_reporting::report_request_usage_stats,
+    telemetry::report_request_usage,
 };
 
 const VALID_METRICS_TYPES: &[&str] = &["counter", "gauge", "histogram", "summary"];
@@ -570,7 +570,7 @@ pub async fn ingest(
             .map_or(0, |pipelines| {
                 pipelines.iter().map(|exec_pl| exec_pl.num_of_func()).sum()
             });
-        report_request_usage_stats(
+        report_request_usage(
             req_stats,
             org_id,
             &stream_name,

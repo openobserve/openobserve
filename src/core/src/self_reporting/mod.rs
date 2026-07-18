@@ -16,10 +16,6 @@
 use std::time::Duration;
 
 use chrono::{DateTime, Datelike, Timelike};
-#[cfg(feature = "enterprise")]
-use config::META_ORG_ID;
-#[cfg(feature = "enterprise")]
-use config::spawn_pausable_job;
 use config::{
     SIZE_IN_MB,
     cluster::LOCAL_NODE,
@@ -34,10 +30,6 @@ use config::{
     },
     metrics,
 };
-#[cfg(feature = "enterprise")]
-pub use o2_enterprise::enterprise::common::auditor;
-#[cfg(feature = "enterprise")]
-use proto::cluster_rpc;
 use tokio::sync::oneshot;
 
 #[cfg(feature = "cloud")]
@@ -48,7 +40,6 @@ mod ingestion;
 #[cfg(feature = "enterprise")]
 mod llm_scores_schema;
 mod queues;
-pub mod search;
 mod triggers_schema;
 mod usage_schema;
 
@@ -393,7 +384,7 @@ pub async fn publish_error(error_data: ErrorData) {
 pub async fn flush() {
     // flush audit data
     #[cfg(feature = "enterprise")]
-    flush_audit().await;
+    crate::telemetry::flush_audit().await;
 
     let cfg = get_config();
 
@@ -423,80 +414,4 @@ pub async fn flush() {
         // wait for flush ingestion job
         error_receiver.await.ok();
     }
-}
-
-// Cron job to frequently publish auditted events
-#[cfg(feature = "enterprise")]
-pub fn run_audit_publish() -> Option<tokio::task::JoinHandle<()>> {
-    let o2cfg = o2_enterprise::enterprise::common::config::get_config();
-    if !o2cfg.common.audit_enabled {
-        return None;
-    }
-
-    Some(spawn_pausable_job!(
-        "audit_publish",
-        o2cfg.common.audit_publish_interval,
-        {
-            log::debug!("Audit ingestion loop running");
-            o2_enterprise::enterprise::common::auditor::publish_existing_audits(
-                META_ORG_ID,
-                publish_audit,
-            )
-            .await;
-        },
-        pause_if: o2cfg.common.audit_publish_interval == 0 || !o2_enterprise::enterprise::common::config::get_config().common.audit_enabled
-    ))
-}
-
-#[cfg(feature = "enterprise")]
-pub async fn audit(msg: auditor::AuditMessage) {
-    auditor::audit(META_ORG_ID, msg, publish_audit).await;
-}
-
-#[cfg(feature = "enterprise")]
-pub async fn flush_audit() {
-    auditor::flush_audit(META_ORG_ID, publish_audit).await;
-}
-
-#[cfg(feature = "enterprise")]
-async fn publish_audit(
-    req: cluster_rpc::IngestionRequest,
-) -> Result<cluster_rpc::IngestionResponse, anyhow::Error> {
-    crate::ingestion::ingestion_service::ingest(req)
-        .await
-        .map_err(|e| anyhow::anyhow!(e.to_string()))
-}
-
-#[inline]
-pub fn http_report_metrics(
-    start: std::time::Instant,
-    org_id: &str,
-    stream_type: StreamType,
-    code: &str,
-    uri: &str,
-    search_type: &str,
-    search_group: &str,
-) {
-    let time = start.elapsed().as_secs_f64();
-    let uri = format!("/api/org/{uri}");
-    metrics::HTTP_RESPONSE_TIME
-        .with_label_values(&[
-            uri.as_str(),
-            code,
-            org_id,
-            stream_type.as_str(),
-            search_type,
-            search_group,
-        ])
-        .observe(time);
-    metrics::HTTP_INCOMING_REQUESTS
-        .with_label_values(&[
-            uri.as_str(),
-            code,
-            org_id,
-            stream_type.as_str(),
-            search_type,
-            search_group,
-        ])
-        .inc();
 }

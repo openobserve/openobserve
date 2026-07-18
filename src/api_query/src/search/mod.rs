@@ -70,7 +70,10 @@ use crate::{
             self as SearchService, datafusion::plan::projections::get_result_schema,
             sql::visitor::pickup_where::pickup_where, utils::is_permissable_function_error,
         },
-        self_reporting::{http_report_metrics, report_request_usage_stats},
+        telemetry::{
+            record_http_metrics as http_report_metrics,
+            report_request_usage as report_request_usage_stats,
+        },
     },
 };
 

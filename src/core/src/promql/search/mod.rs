@@ -50,8 +50,7 @@ use {
 };
 
 use crate::{
-    promql::MetricsQueryRequest, search::server_internal_error,
-    self_reporting::report_request_usage_stats,
+    promql::MetricsQueryRequest, search::server_internal_error, telemetry::report_request_usage,
 };
 
 mod cache;
@@ -520,7 +519,7 @@ async fn search_in_cluster(
         ..Default::default()
     };
 
-    report_request_usage_stats(
+    report_request_usage(
         req_stats,
         &req.org_id,
         "", // TODO see if we can add metric name

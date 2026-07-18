@@ -21,7 +21,7 @@ pub use crate::{
     http, ingestion, ingestion_tokens, ingestion_types, kv, logs, metadata, metrics, node,
     org_cleanup, organization, pipeline, promql, runtime_metrics, schema, search, self_reporting,
     session, short_url, sourcemaps, stream, stream_utils, stream_utils::get_formatted_stream_name,
-    synthetics, tantivy, tls, trace_utils::setup_tracing_with_trace_id, traces, users,
+    synthetics, tantivy, telemetry, tls, trace_utils::setup_tracing_with_trace_id, traces, users,
 };
 #[cfg(feature = "enterprise")]
 pub use crate::{

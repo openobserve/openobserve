@@ -39,7 +39,7 @@ use tracing::Instrument;
 use super::promql;
 use crate::{
     search::{self as SearchService, utils::is_permissable_function_error},
-    self_reporting::http_report_metrics,
+    telemetry::record_http_metrics,
     trace_utils::setup_tracing_with_trace_id,
 };
 
@@ -462,7 +462,7 @@ impl QueryConditionExt for QueryCondition {
                 }
 
                 // the search request doesn't via cache layer, so need report usage separately
-                http_report_metrics(
+                record_http_metrics(
                     req_start,
                     org_id,
                     stream_type,

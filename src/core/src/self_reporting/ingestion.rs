@@ -17,9 +17,7 @@ use anyhow::{Result, anyhow};
 #[cfg(feature = "cloud")]
 use config::meta::self_reporting::usage::{DATA_RETENTION_USAGE_STREAM, DataRetentionUsageData};
 use config::{
-    META_ORG_ID,
-    cluster::LOCAL_NODE,
-    get_config,
+    META_ORG_ID, get_config,
     meta::{
         search::SearchEventType,
         self_reporting::{
@@ -31,9 +29,9 @@ use config::{
     utils::json,
 };
 use hashbrown::{HashMap, hash_map::Entry};
-use proto::cluster_rpc;
 use reqwest::header::{AUTHORIZATION, CONTENT_TYPE};
 
+#[cfg(test)]
 use crate::common::meta::ingestion::{self, IngestUser, SystemJobType};
 
 pub(super) async fn ingest_usages(mut curr_usages: Vec<UsageData>) {
@@ -274,73 +272,14 @@ pub(super) async fn ingest_reporting_data(
         return Ok(());
     }
 
-    if LOCAL_NODE.is_ingester() {
-        // ingest directly for ingester node
-        let (org_id, stream_name): (String, String) = (
-            stream_params.org_id.into(),
-            stream_params.stream_name.into(),
-        );
-        let bytes = bytes::Bytes::from(json::to_string(&reporting_data_json).unwrap());
-        let req = ingestion::IngestionRequest::Usage(bytes);
-        match crate::logs::ingest::ingest(
-            0,
-            &org_id,
-            &stream_name,
-            req,
-            IngestUser::SystemJob(SystemJobType::SelfReporting),
-            None,
-            false,
-        )
-        .await
-        {
-            Ok(resp) if resp.code == 200 => {
-                log::debug!(
-                    "[SELF-REPORTING] ReportingData successfully ingested to stream {org_id}/{stream_name}"
-                );
-                Ok(())
-            }
-            error => {
-                let err =
-                    error.map_or_else(|e| e.to_string(), |resp| resp.error.unwrap_or_default());
-                log::error!(
-                    "[SELF-REPORTING] ReportingData errored while ingesting to stream {org_id}/{stream_name}. Error: {err}"
-                );
-                Err(anyhow!("{err}"))
-            }
-        }
-    } else {
-        // call gRPC ingestion service
-        let (org_id, stream_name, stream_type): (String, String, String) = (
-            stream_params.org_id.into(),
-            stream_params.stream_name.into(),
-            stream_params.stream_type.to_string(),
-        );
-
-        let req = cluster_rpc::IngestionRequest {
-            org_id: org_id.clone(),
-            stream_name: stream_name.clone(),
-            stream_type,
-            data: Some(cluster_rpc::IngestionData::from(reporting_data_json)),
-            ingestion_type: Some(cluster_rpc::IngestionType::Usage.into()),
-            metadata: None,
-        };
-
-        match crate::ingestion::ingestion_service::ingest(req).await {
-            Ok(resp) if resp.status_code == 200 => {
-                log::debug!(
-                    "[SELF-REPORTING] ReportingData successfully ingested to stream {org_id}/{stream_name}"
-                );
-                Ok(())
-            }
-            error => {
-                let err = error.map_or_else(|e| e.to_string(), |resp| resp.message);
-                log::error!(
-                    "[SELF-REPORTING] ReportingData errored while ingesting to stream {org_id}/{stream_name}. Error: {err}"
-                );
-                Err(anyhow!("{err}"))
-            }
-        }
-    }
+    crate::telemetry::write_internal(telemetry::TelemetryWriteRequest::new(
+        String::from(stream_params.org_id),
+        String::from(stream_params.stream_name),
+        stream_params.stream_type,
+        reporting_data_json,
+    ))
+    .await
+    .map_err(|error| anyhow!(error.to_string()))
 }
 
 #[cfg(feature = "cloud")]

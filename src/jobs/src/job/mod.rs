@@ -21,6 +21,8 @@ use {
     o2_openfga::config::get_config as get_openfga_config,
 };
 
+#[cfg(any(feature = "enterprise", feature = "cloud"))]
+use crate::service::telemetry;
 use crate::{
     common::meta::{
         organization::DEFAULT_ORG,
@@ -388,11 +390,11 @@ pub async fn init() -> Result<(), anyhow::Error> {
 
     // Auth auditing should be done by router also
     #[cfg(feature = "enterprise")]
-    if self_reporting::run_audit_publish().is_none() {
+    if telemetry::run_audit_publish().is_none() {
         log::error!("Failed to run audit publish");
     };
     #[cfg(feature = "cloud")]
-    tokio::task::spawn(self_reporting::cloud_events::flush_cloud_events());
+    tokio::task::spawn(telemetry::flush_cloud_events());
 
     #[cfg(feature = "enterprise")]
     {
@@ -759,7 +761,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
                     use config::meta::self_reporting::usage::{
                         TriggerData, TriggerDataStatus, TriggerDataType,
                     };
-                    crate::service::self_reporting::publish_triggers_usage(TriggerData {
+                    crate::service::telemetry::report_trigger(TriggerData {
                         _timestamp: start_us,
                         org: org_id,
                         module: TriggerDataType::AnomalyDetectionTraining,
@@ -957,7 +959,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
             .await
             .expect("cloud ofga migrations failed");
 
-        use crate::service::self_reporting::{ingest_data_retention_usages, search::get_usage};
+        use crate::service::{
+            search::usage::get_usage, self_reporting::ingest_data_retention_usages,
+        };
         o2_enterprise::enterprise::metering::init(
             get_metering_lock,
             get_usage,
@@ -989,9 +993,9 @@ pub async fn init_deferred() -> Result<(), anyhow::Error> {
     #[cfg(feature = "enterprise")]
     {
         o2_enterprise::enterprise::license::start_license_check(
-            crate::service::self_reporting::search::get_usage,
+            crate::service::search::usage::get_usage,
             get_nats_lock,
-            crate::service::self_reporting::search::get_license_usage_data_from_node,
+            crate::service::search::usage::get_license_usage_data_from_node,
             LOCAL_NODE.is_router() || LOCAL_NODE.is_single_role(),
         )
         .await;

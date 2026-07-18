@@ -997,21 +997,19 @@ async fn process_ack(
     let resp = o2_enterprise::enterprise::synthetics::job_api::ack(req).await?;
 
     // Emit trigger usage record for synthetics telemetry.
-    crate::service::self_reporting::publish_triggers_usage(
-        config::meta::self_reporting::usage::TriggerData {
-            _timestamp: checked_at,
-            org: resp.org_id.clone(),
-            module: config::meta::self_reporting::usage::TriggerDataType::Synthetics,
-            key: format!("{}/{}", resp.synthetics_name, resp.synthetics_id),
-            start_time: checked_at,
-            end_time: checked_at,
-            status: config::meta::self_reporting::usage::TriggerDataStatus::Completed,
-            success_response: Some(status.clone()),
-            error: error.clone(),
-            evaluation_took_in_secs: Some(response_time_ms / 1000.0),
-            ..Default::default()
-        },
-    );
+    crate::service::telemetry::report_trigger(config::meta::self_reporting::usage::TriggerData {
+        _timestamp: checked_at,
+        org: resp.org_id.clone(),
+        module: config::meta::self_reporting::usage::TriggerDataType::Synthetics,
+        key: format!("{}/{}", resp.synthetics_name, resp.synthetics_id),
+        start_time: checked_at,
+        end_time: checked_at,
+        status: config::meta::self_reporting::usage::TriggerDataStatus::Completed,
+        success_response: Some(status.clone()),
+        error: error.clone(),
+        evaluation_took_in_secs: Some(response_time_ms / 1000.0),
+        ..Default::default()
+    });
 
     // Notify once per run, not once per job ack.
     if resp.run_complete && !resp.destinations.is_empty() {

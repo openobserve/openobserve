@@ -42,6 +42,7 @@ use opentelemetry_proto::tonic::collector::logs::v1::{
     ExportLogsPartialSuccess, ExportLogsServiceRequest, ExportLogsServiceResponse,
 };
 use prost::Message;
+use transform::TRANSFORM_FAILED;
 
 use super::{bulk::TS_PARSE_FAILED, ingestion_log_enabled, log_failed_record};
 use crate::{
@@ -53,7 +54,6 @@ use crate::{
         check_ingestion_allowed,
         grpc::{get_val, get_val_with_type_retained},
     },
-    logs::bulk::TRANSFORM_FAILED,
     schema::{get_future_discard_error, get_upto_discard_error},
 };
 

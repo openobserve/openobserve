@@ -238,9 +238,9 @@ async fn process_org_tasks(tasks: Vec<org_cleanup_tasks::CleanupTask>) {
 async fn emit_failed_alert(org_id: &str, _step: &str) {
     #[cfg(feature = "cloud")]
     {
-        use crate::self_reporting::cloud_events::{CloudEvent, EventType, enqueue_cloud_event};
-        enqueue_cloud_event(CloudEvent {
-            event: EventType::OrgCleanupFailed,
+        use crate::telemetry::{CloudEvent, CloudEventType, report_cloud_event};
+        report_cloud_event(CloudEvent {
+            event: CloudEventType::OrgCleanupFailed,
             org_id: org_id.to_string(),
             org_name: org_id.to_string(),
             org_type: String::new(),
@@ -612,13 +612,13 @@ async fn step_delete_users(org_id: &str) -> Result<(), anyhow::Error> {
 async fn emit_status_audit(org_id: &str, actor: &str, from: &str, to: &str) {
     #[cfg(feature = "enterprise")]
     {
-        use crate::self_reporting::{audit, auditor};
-        audit(auditor::AuditMessage {
+        use crate::telemetry::{AuditEvent, AuditProtocol, AuditResponse, audit};
+        audit(AuditEvent {
             user_email: actor.to_string(),
             org_id: org_id.to_string(),
-            _timestamp: config::utils::time::now_micros(),
-            protocol: auditor::Protocol::Http,
-            response_meta: auditor::ResponseMeta {
+            timestamp: config::utils::time::now_micros(),
+            protocol: AuditProtocol::Http,
+            response: AuditResponse {
                 http_method: "SYSTEM".to_string(),
                 http_path: format!("/system/org_cleanup/{from}_to_{to}"),
                 http_query_params: String::new(),

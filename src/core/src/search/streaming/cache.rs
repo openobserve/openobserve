@@ -38,7 +38,7 @@ use crate::{
         cache,
         inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
     },
-    self_reporting::report_request_usage_stats,
+    telemetry::{UsageReport, report_usage as emit_usage},
 };
 
 /// Write accumulated search results to cache
@@ -492,7 +492,7 @@ async fn send_cached_responses(
         peak_memory_usage: cached.cached_response.peak_memory_usage,
         ..Default::default()
     };
-    report_request_usage_stats(
+    emit_usage(UsageReport::new(
         req_stats,
         org_id,
         all_streams,
@@ -500,7 +500,7 @@ async fn send_cached_responses(
         UsageType::Search,
         num_fn,
         started_at,
-    )
+    ))
     .await;
 
     Ok(())

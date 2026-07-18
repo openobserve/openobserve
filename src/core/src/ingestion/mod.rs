@@ -43,7 +43,6 @@ use proto::cluster_rpc::IngestionType;
 use super::{
     db::{alerts::alert, pipeline},
     pipeline::batch_execution::ExecutablePipeline,
-    self_reporting::publish_triggers_usage,
 };
 use crate::{
     alerts::alert::AlertExt,
@@ -52,6 +51,7 @@ use crate::{
         meta::{ingestion::IngestionRequest, stream::SchemaRecords},
     },
     db::{self, alerts::alert::scheduler_key},
+    telemetry::report_trigger,
 };
 
 pub mod grpc;
@@ -232,7 +232,7 @@ pub async fn evaluate_trigger(triggers: TriggerAlertData) {
     }
 
     for trigger_data_stream in trigger_usage_reports {
-        publish_triggers_usage(trigger_data_stream);
+        report_trigger(trigger_data_stream);
     }
 }
 

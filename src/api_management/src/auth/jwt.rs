@@ -48,7 +48,9 @@ use crate::{
         telemetry,
     },
     service::organization::list_org_users_by_user,
-    service::self_reporting::cloud_events::{CloudEvent, EventType, enqueue_cloud_event},
+    service::telemetry::{
+        CloudEvent, CloudEventType as EventType, report_cloud_event as enqueue_cloud_event,
+    },
 };
 
 #[cfg(feature = "enterprise")]
@@ -826,7 +828,7 @@ async fn publish_org_not_found_error(org_id: &str, user_email: &str) {
         }),
     };
 
-    crate::service::self_reporting::publish_error(error_data).await;
+    crate::service::telemetry::publish_error(error_data).await;
 }
 
 #[cfg(feature = "cloud")]
@@ -1140,7 +1142,7 @@ async fn process_custom_claim_parsing(
                     }),
                 };
 
-                crate::service::self_reporting::publish_error(error_data).await;
+                crate::service::telemetry::publish_error(error_data).await;
             }) as std::pin::Pin<Box<dyn std::future::Future<Output = ()> + Send>>
         };
 

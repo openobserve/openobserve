@@ -79,6 +79,7 @@ pub mod stream;
 pub mod stream_utils;
 pub mod synthetics;
 pub mod tantivy;
+pub mod telemetry;
 pub mod tls;
 pub mod trace_utils;
 pub mod traces;

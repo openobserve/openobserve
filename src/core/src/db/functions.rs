@@ -25,7 +25,7 @@ use config::{
     utils::json,
 };
 
-use crate::{common::infra::config::QUERY_FUNCTIONS, db, self_reporting::publish_error};
+use crate::{common::infra::config::QUERY_FUNCTIONS, db, telemetry::publish_error};
 
 pub async fn set(org_id: &str, name: &str, func_val: &Transform) -> Result<(), anyhow::Error> {
     let key = format!("/function/{org_id}/{name}");

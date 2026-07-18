@@ -28,8 +28,7 @@ use infra::table::org_users::get_admin;
 use crate::{
     common::{infra::config::ORGANIZATIONS, meta::telemetry},
     service::{
-        organization::is_org_in_free_trial_period, self_reporting::search::get_usage,
-        stream::get_streams,
+        organization::is_org_in_free_trial_period, search::usage::get_usage, stream::get_streams,
     },
 };
 

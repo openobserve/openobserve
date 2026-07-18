@@ -53,7 +53,6 @@ use {
     tracing::info_span,
 };
 
-use super::self_reporting::report_request_usage_stats;
 use crate::{
     common::utils::functions::{get_all_transform_keys, init_vrl_runtime},
     search::{
@@ -63,6 +62,7 @@ use crate::{
             sql_context::PartitionSqlContext, stream_files::collect_stream_files,
         },
     },
+    telemetry::{UsageReport, report_usage as emit_usage},
 };
 
 pub mod cache;
@@ -77,6 +77,7 @@ mod searcher;
 pub mod streaming;
 #[cfg(feature = "enterprise")]
 pub mod super_cluster;
+pub mod usage;
 pub mod work_group;
 
 pub use ::search::{bloom_pruner, datafusion, index, inspector, sql, tantivy, utils};
@@ -297,15 +298,15 @@ pub async fn search(
                     ..Default::default()
                 };
                 let num_fn = if req_query.query_fn.is_empty() { 0 } else { 1 };
-                report_request_usage_stats(
+                emit_usage(UsageReport::new(
                     req_stats,
                     org_id,
-                    &stream_name,
+                    stream_name,
                     stream_type,
                     UsageType::Search,
                     num_fn,
                     started_at,
-                )
+                ))
                 .await;
             }
             Ok(res)
@@ -576,15 +577,15 @@ pub async fn search_multi(
             search_event_context: multi_req.search_event_context.clone(),
             ..Default::default()
         };
-        report_request_usage_stats(
+        emit_usage(UsageReport::new(
             req_stats,
             org_id,
-            &stream_names.join(","),
+            stream_names.join(","),
             stream_type,
             UsageType::Functions,
             0, // The request stats already contains function event
             started_at,
-        )
+        ))
         .await;
     }
     Ok(multi_res)

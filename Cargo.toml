@@ -240,6 +240,7 @@ members = [
     "src/api_common",
     "src/common",
     "src/core",
+    "src/telemetry",
     "src/transform",
     "src/search",
     "src/promql",
@@ -273,6 +274,7 @@ tantivy_utils = { path = "src/tantivy_utils" }
 web = { path = "src/web" }
 openobserve-core = { path = "src/core" }
 common = { path = "src/common" }
+telemetry = { path = "src/telemetry" }
 transform = { path = "src/transform" }
 search = { path = "src/search" }
 promql = { path = "src/promql" }

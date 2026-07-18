@@ -39,7 +39,9 @@ use crate::{
     },
     service::{
         organization,
-        self_reporting::cloud_events::{CloudEvent, EventType, enqueue_cloud_event},
+        telemetry::{
+            CloudEvent, CloudEventType as EventType, report_cloud_event as enqueue_cloud_event,
+        },
     },
 };
 

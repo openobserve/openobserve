@@ -54,7 +54,7 @@ use transform::{
 use crate::{
     alerts::{ConditionExt, ConditionGroupExt},
     common::infra::config::QUERY_FUNCTIONS,
-    self_reporting::publish_error,
+    telemetry::publish_error,
 };
 
 // Global batch buffer for accumulating remote stream records
@@ -596,7 +596,7 @@ impl ExecutablePipeline {
                 ..config::meta::self_reporting::usage::RequestStats::default()
             };
 
-            crate::self_reporting::report_request_usage_stats(
+            crate::telemetry::report_request_usage(
                 req_stats,
                 org_id,
                 &self.id,
@@ -1179,7 +1179,7 @@ async fn process_remote_stream_node(
                                 ..config::meta::self_reporting::usage::RequestStats::default()
                             };
 
-                            crate::self_reporting::report_request_usage_stats(
+                            crate::telemetry::report_request_usage(
                                 req_stats,
                                 &metadata.org_id,
                                 &remote_stream.destination_name,
@@ -1846,7 +1846,7 @@ pub async fn flush_all_buffers() -> Result<(), anyhow::Error> {
                             ..config::meta::self_reporting::usage::RequestStats::default()
                         };
 
-                        crate::self_reporting::report_request_usage_stats(
+                        crate::telemetry::report_request_usage(
                             req_stats,
                             &org_id,
                             &destination_name,

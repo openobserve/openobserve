@@ -65,7 +65,7 @@ use crate::{
     metrics::get_exclude_labels,
     pipeline::batch_execution::ExecutablePipeline,
     schema::{check_for_schema, stream_schema_exists},
-    self_reporting::report_request_usage_stats,
+    telemetry::report_request_usage,
 };
 
 pub async fn otlp_proto(
@@ -625,7 +625,7 @@ pub async fn handle_otlp_request(
         } else {
             Some(email_str)
         };
-        report_request_usage_stats(
+        report_request_usage(
             req_stats,
             org_id,
             &stream_name,

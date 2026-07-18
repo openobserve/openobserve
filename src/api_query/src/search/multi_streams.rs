@@ -48,7 +48,10 @@ use {
 #[cfg(feature = "enterprise")]
 use crate::service::search::sql::visitor::cipher_key::get_cipher_key_names;
 #[cfg(feature = "enterprise")]
-use crate::{common::meta::search::AuditContext, service::self_reporting::audit};
+use crate::{
+    common::meta::search::AuditContext,
+    service::telemetry::{AuditEvent, AuditProtocol, AuditResponse, audit},
+};
 use crate::{
     common::{
         meta::{self, http::HttpResponse as MetaHttpResponse},
@@ -68,7 +71,7 @@ use crate::{
     search::{error_utils::map_error_to_http_response, utils::SearchStreamGuard},
     service::{
         search::{self as SearchService, streaming::process_search_stream_request_multi},
-        self_reporting::report_request_usage_stats,
+        telemetry::report_request_usage,
     },
 };
 
@@ -447,7 +450,7 @@ pub async fn search_multi(
                 };
                 let num_fn = req.query.query_fn.is_some() as u16;
 
-                report_request_usage_stats(
+                report_request_usage(
                     req_stats,
                     &org_id,
                     &stream_name,
@@ -689,7 +692,7 @@ pub async fn search_multi(
             search_event_context: multi_req.search_event_context.clone(),
             ..Default::default()
         };
-        report_request_usage_stats(
+        report_request_usage(
             req_stats,
             &org_id,
             &vrl_stream_name,
@@ -1581,19 +1584,16 @@ pub async fn report_to_audit(
     http_query_params: String,
     req_body: String,
 ) {
-    use o2_enterprise::enterprise::common::{
-        auditor::{AuditMessage, Protocol, ResponseMeta},
-        config::get_config as get_o2_config,
-    };
+    use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
 
     let is_audit_enabled = get_o2_config().common.audit_enabled;
     if is_audit_enabled {
-        audit(AuditMessage {
+        audit(AuditEvent {
             user_email: user_id,
             org_id,
-            _timestamp: chrono::Utc::now().timestamp(),
-            protocol: Protocol::Http,
-            response_meta: ResponseMeta {
+            timestamp: chrono::Utc::now().timestamp(),
+            protocol: AuditProtocol::Http,
+            response: AuditResponse {
                 http_method,
                 http_path,
                 http_query_params,

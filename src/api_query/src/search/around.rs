@@ -37,7 +37,10 @@ use crate::{
                 add_ordering_term::check_or_add_order_by_timestamp,
             },
         },
-        self_reporting::{http_report_metrics, report_request_usage_stats},
+        telemetry::{
+            record_http_metrics as http_report_metrics,
+            report_request_usage as report_request_usage_stats,
+        },
     },
 };
 

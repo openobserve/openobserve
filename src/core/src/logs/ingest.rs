@@ -50,6 +50,7 @@ use opentelemetry_proto::tonic::{
 };
 use prost::Message;
 use serde_json::json;
+use transform::TRANSFORM_FAILED;
 
 use super::{bulk::TS_PARSE_FAILED, ingestion_log_enabled, log_failed_record};
 use crate::{
@@ -59,7 +60,6 @@ use crate::{
         IngestionValueType, KinesisFHIngestionResponse, StreamStatus,
     },
     ingestion::check_ingestion_allowed,
-    logs::bulk::TRANSFORM_FAILED,
     schema::{get_future_discard_error, get_upto_discard_error},
     stream_utils::get_formatted_stream_name,
 };

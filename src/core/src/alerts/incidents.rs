@@ -839,7 +839,7 @@ async fn create_new_incident(
     );
 
     // Report incident creation to the usage stream
-    crate::self_reporting::report_request_usage_stats(
+    crate::telemetry::report_request_usage(
         config::meta::self_reporting::usage::RequestStats {
             records: 1,
             request_body: Some(serde_json::json!({"incident_id": incident.id}).to_string()),

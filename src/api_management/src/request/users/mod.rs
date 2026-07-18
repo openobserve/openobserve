@@ -31,10 +31,9 @@ use serde::Serialize;
 #[cfg(feature = "enterprise")]
 use {
     crate::common::utils::auth::check_permissions,
-    crate::service::self_reporting::audit,
+    crate::service::telemetry::{AuditEvent, AuditProtocol, AuditResponse, audit},
     config::utils::time::now_micros,
     o2_dex::config::get_config as get_dex_config,
-    o2_enterprise::enterprise::common::auditor::{AuditMessage, Protocol, ResponseMeta},
     o2_openfga::config::get_config as get_openfga_config,
 };
 
@@ -559,12 +558,12 @@ pub async fn authentication(
 
     // Until decoding the token or body, we can not know the the user_email
     #[cfg(feature = "enterprise")]
-    let mut audit_message = AuditMessage {
+    let mut audit_message = AuditEvent {
         user_email: "".to_string(),
         org_id: "".to_string(),
-        _timestamp: now_micros(),
-        protocol: Protocol::Http,
-        response_meta: ResponseMeta {
+        timestamp: now_micros(),
+        protocol: AuditProtocol::Http,
+        response: AuditResponse {
             http_method: "POST".to_string(),
             http_path: "/auth/login".to_string(),
             http_body: "".to_string(),
@@ -746,12 +745,12 @@ pub async fn get_presigned_url(
             .map(|(k, v)| format!("{}={}", k, v))
             .collect::<Vec<_>>()
             .join("&");
-        let audit_message = AuditMessage {
+        let audit_message = AuditEvent {
             user_email: user_id,
             org_id: "".to_string(),
-            _timestamp: now_micros(),
-            protocol: Protocol::Http,
-            response_meta: ResponseMeta {
+            timestamp: now_micros(),
+            protocol: AuditProtocol::Http,
+            response: AuditResponse {
                 http_method: "GET".to_string(),
                 http_path: "/auth/presigned-url".to_string(),
                 http_body: "".to_string(),
@@ -784,12 +783,12 @@ pub async fn get_auth(
         let mut expires_in = 300;
         let mut req_ts = 0;
 
-        let mut audit_message = AuditMessage {
+        let mut audit_message = AuditEvent {
             user_email: "".to_string(),
             org_id: "".to_string(),
-            _timestamp: now_micros(),
-            protocol: Protocol::Http,
-            response_meta: ResponseMeta {
+            timestamp: now_micros(),
+            protocol: AuditProtocol::Http,
+            response: AuditResponse {
                 http_method: "GET".to_string(),
                 http_path: "/auth/login".to_string(),
                 http_body: "".to_string(),
@@ -932,7 +931,7 @@ pub async fn get_auth(
                 ID_TOKEN_HEADER,
                 base64::encode(&id_token.to_string())
             );
-            audit_message._timestamp = chrono::Utc::now().timestamp_micros();
+            audit_message.timestamp = chrono::Utc::now().timestamp_micros();
             audit(audit_message).await;
             Response::builder()
                 .status(StatusCode::FOUND)
@@ -1022,11 +1021,11 @@ fn unauthorized_error(mut resp: SignInResponse) -> Response {
 }
 
 #[cfg(feature = "enterprise")]
-async fn audit_unauthorized_error(mut audit_message: AuditMessage) {
+async fn audit_unauthorized_error(mut audit_message: AuditEvent) {
     use chrono::Utc;
 
-    audit_message._timestamp = Utc::now().timestamp_micros();
-    audit_message.response_meta.http_response_code = 401;
+    audit_message.timestamp = Utc::now().timestamp_micros();
+    audit_message.response.http_response_code = 401;
     // Even if the user_email of audit_message is not set, still the event should be audited
     audit(audit_message).await;
 }

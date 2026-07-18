@@ -2,40 +2,10 @@ use std::sync::LazyLock as Lazy;
 
 use config::{META_ORG_ID, meta::stream::StreamType, utils::json};
 use o2_enterprise::enterprise::common::config::get_config;
-use proto::cluster_rpc;
-use serde::{Deserialize, Serialize};
+pub use telemetry::{CloudEvent, CloudEventType as EventType};
 use tokio::sync::Mutex;
 
-use crate::ingestion::ingestion_service;
-
 const CLOUD_EVENT_STREAM: &str = "cloud_events";
-
-#[derive(Serialize, Deserialize, Debug, Hash)]
-pub enum EventType {
-    OrgCreated,
-    OrgDeleted,
-    OrgCleanupFailed,
-    UserJoined,
-    CheckoutSessionCreated,
-    SubscriptionCreated,
-    SubscriptionChanged,
-    SubscriptionDeleted,
-    StreamCreated,
-}
-
-#[derive(Serialize, Deserialize, Debug, Hash)]
-pub struct CloudEvent {
-    pub org_id: String,
-    pub org_name: String,
-    pub org_type: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub user: Option<String>,
-    pub event: EventType,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub subscription_type: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub stream_name: Option<String>,
-}
 
 pub(super) static CLOUD_EVENT_QUEUE: Lazy<Mutex<Vec<CloudEvent>>> =
     Lazy::new(|| Mutex::new(vec![]));
@@ -107,16 +77,14 @@ async fn _inner_flush() {
     }
 
     if &cfg.cloud.cloud_events_reporting_mode != "remote" {
-        let req = cluster_rpc::IngestionRequest {
-            org_id: META_ORG_ID.to_owned(),
-            stream_name: CLOUD_EVENT_STREAM.to_owned(),
-            data: Some(cluster_rpc::IngestionData::from(json_events)),
-            stream_type: StreamType::Logs.to_string(),
-            ingestion_type: Some(cluster_rpc::IngestionType::Usage.into()),
-            metadata: None,
-        };
-
-        match ingestion_service::ingest(req).await {
+        match crate::telemetry::write_internal(telemetry::TelemetryWriteRequest::new(
+            META_ORG_ID,
+            CLOUD_EVENT_STREAM,
+            StreamType::Logs,
+            json_events,
+        ))
+        .await
+        {
             Ok(_) => {}
             Err(e) => {
                 log::error!("error in reporting cloud events :{e}");

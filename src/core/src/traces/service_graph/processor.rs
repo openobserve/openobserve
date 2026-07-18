@@ -71,7 +71,7 @@ pub async fn process_service_graph() -> Result<(), anyhow::Error> {
         GROUP BY org_id, stream_name"#
         .to_string();
 
-    let usage_results = match crate::self_reporting::search::get_usage(
+    let usage_results = match crate::search::usage::get_usage(
         sql,
         last_updated_at,
         next_updated_at,

@@ -47,7 +47,7 @@ use crate::{
     },
     service::{
         search::{inspector::*, sql::visitor::cipher_key::get_cipher_key_names},
-        self_reporting::http_report_metrics,
+        telemetry::record_http_metrics,
     },
 };
 
@@ -372,7 +372,7 @@ pub async fn get_search_profile(
                 .search_type
                 .map(|t| t.to_string())
                 .unwrap_or("".to_string());
-            http_report_metrics(
+            record_http_metrics(
                 start,
                 org_id,
                 stream_type,
