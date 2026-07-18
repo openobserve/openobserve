@@ -336,11 +336,15 @@ import Tab from "~icons/material-symbols/tab-outline";
 import Web from "~icons/material-symbols/web";
 import SmartDisplay from "~icons/material-symbols/smart-display-outline";
 
+// Brand mark (not a Material Symbol) — a local inline SVG component. See McpLogo.vue.
+import McpLogo from "./McpLogo.vue";
+
 import type { Component } from "vue";
 
 export const iconRegistry = {
   "alarm": Alarm,
   "add": Add,
+  "mcp": McpLogo,
   "arrow-back": ArrowBack,
   "arrow-back-ios-new": ArrowBackIosNew,
   "arrow-downward": ArrowDownward,
