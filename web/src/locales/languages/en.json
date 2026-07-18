@@ -1437,7 +1437,9 @@
   },
   "serviceAccounts": {
     "header": "Service Accounts",
-    "emailInvalid": "Please enter a valid email address",
+    "nameInvalid": "Use lowercase letters, numbers and hyphens (up to {max} characters)",
+    "createFailed": "Failed to create the service account. Please try again.",
+    "updateFailed": "Failed to update the service account. Please try again.",
     "headerSubtitle": "Programmatic access tokens for APIs",
     "search": "Search Service Account",
     "refresh": "Refresh Service Token",
@@ -1472,17 +1474,29 @@
       "addToGroup": "Add to a user group",
       "addToRole": "Assign a role",
       "step1Title": "Copy your token",
-      "step2Title": "Grant permissions",
       "copyHint": "Copy this token now — you won't be able to see it again.",
-      "next": "Next: grant permissions",
-      "back": "Back",
-      "done": "Done"
+      "done": "Done",
+      "applying": "Applying access grants…",
+      "grantedRoles": "Roles assigned: {roles}",
+      "grantedGroups": "Added to user groups: {groups}",
+      "failedRoles": "Could not assign roles: {roles}",
+      "failedGroups": "Could not add to user groups: {groups}",
+      "failedHint": "You can grant these later from the Roles and User Groups pages."
     },
     "form": {
-      "identifier": {
-        "label": "Identifier",
-        "placeholder": "Enter email address",
-        "help": "Email address used as the service account identifier"
+      "name": {
+        "label": "Service account name",
+        "placeholder": "e.g. ingest-bot",
+        "help": "Lowercase letters, numbers and hyphens. Saved as name{suffix}"
+      },
+      "roles": {
+        "label": "Assign roles",
+        "create": "New role",
+        "readonlySeeded": "Read-only permissions applied to role \"{role}\".",
+        "readonlySeedFailed": "Role \"{role}\" was created, but read-only permissions could not be applied. Grant them from the Roles page."
+      },
+      "groups": {
+        "label": "Add to user groups"
       }
     },
     "list": {
