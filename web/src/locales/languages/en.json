@@ -2180,10 +2180,27 @@
       "tagline": "Connect Claude, Cursor, VS Code and other AI clients to this organization over the Model Context Protocol (MCP).",
       "enterpriseNote": "MCP server is an Enterprise feature.",
       "endpointLabel": "MCP endpoint",
-      "clientLabel": "1. Choose your client",
-      "configLabel": "2. Add the configuration",
+      "authLabel": "1. Authentication",
+      "clientLabel": "2. Choose your client",
+      "configLabel": "3. Add the configuration",
+      "auth": {
+        "oauth": "OAuth — sign in (recommended)",
+        "token": "Access token",
+        "oauthNote": "No credential to manage: your MCP client opens a browser to sign in, and access is scoped by your existing permissions. Use it whenever your client supports OAuth."
+      },
+      "credential": {
+        "quickStartTitle": "Quick start — your account",
+        "quickStartBody": "Snippets use your own credentials, which carry your full permissions. For production, generate a dedicated read-only credential instead.",
+        "generate": "Generate read-only credential",
+        "created": "Read-only credential created",
+        "shownOnce": "For {email}. Copy it now — the token is shown only once and the snippets below now use it.",
+        "download": "Download",
+        "manage": "Manage / revoke",
+        "readonlyWarn": "The account was created but the read-only role couldn't be applied automatically — review its permissions in Service Accounts.",
+        "error": "Couldn't create the credential. Try again, or create a service account manually in IAM."
+      },
       "securityTitle": "Use a dedicated, least-privilege credential",
-      "securityBody": "The token above is built from your ingestion passcode. For production, create a service account with only the permissions the client needs and use its credentials instead.",
+      "securityBody": "The token defaults to your own account credentials. For production, generate a read-only credential above (or create a scoped service account) and never commit tokens to source control.",
       "docsCta": "Read the full MCP documentation",
       "clients": {
         "claudeCode": "Claude Code",
