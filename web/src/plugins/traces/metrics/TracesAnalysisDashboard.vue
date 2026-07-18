@@ -33,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :style="{ '--chip-color': chipColors.baseline }"
         >
           <span class="uppercase tracking-wide opacity-70"
-            >Baseline:</span
+            >{{ t('traces.tracesAnalysisDashboard.baseline') }}</span
           >
           <span class="whitespace-nowrap text-[0.7rem]">{{
             formatSmartTimestamp(
@@ -57,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :style="{ '--chip-color': chipColors.selected }"
         >
           <span class="uppercase tracking-wide opacity-70"
-            >Selected:</span
+            >{{ t('traces.tracesAnalysisDashboard.selected') }}</span
           >
           <span class="whitespace-nowrap text-[0.7rem]">{{
             formatSmartTimestamp(
@@ -126,7 +126,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="toggleDimensionSelector"
         >
           <OIcon name="expand-all" size="sm" class="field-list-collapsed-icon rotate-90 mt-2.5 text-[20px]" />
-          <div class="field-list-collapsed-title [writing-mode:vertical-rl] [text-orientation:mixed] font-bold text-xs">Dimensions</div>
+          <div class="field-list-collapsed-title [writing-mode:vertical-rl] [text-orientation:mixed] font-bold text-xs">{{ t('traces.tracesAnalysisDashboard.dimensions') }}</div>
         </div>
 
         <OSplitter
@@ -148,13 +148,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div
                   class="px-3 py-2 flex items-center justify-between shrink-0 border-b border-solid border-[var(--o2-border-color)]"
                 >
-                  <span class="font-semibold text-sm">Dimensions</span>
+                  <span class="font-semibold text-sm">{{ t('traces.tracesAnalysisDashboard.dimensions') }}</span>
                   <OButton
                     variant="outline"
                     size="icon-xs-sq"
                     class="rotate-90"
                     icon-left="unfold-less"
-                    title="Collapse Dimensions"
+                    :title="t('traces.tracesAnalysisDashboard.collapseDimensions')"
                     data-test="dimension-selector-collapse-btn"
                     @click="toggleDimensionSelector"
                   />
@@ -687,7 +687,7 @@ const filterMetadata = computed(() => {
     props.rateFilter &&
     !props.rateFilter.timeStart
   ) {
-    return `${t("volumeInsights.rateLabel")} ${props.rateFilter.start} - ${props.rateFilter.end} traces/interval`;
+    return `${t("volumeInsights.rateLabel")} ${props.rateFilter.start} - ${props.rateFilter.end} ${t('traces.tracesAnalysisDashboard.tracesPerInterval')}`;
   } else if (
     props.analysisType === "error" &&
     props.errorFilter &&

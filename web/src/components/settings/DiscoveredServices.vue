@@ -886,7 +886,7 @@ const loadServices = async (isRefresh = false) => {
   try {
     const orgId = store.state.selectedOrganization?.identifier;
     if (!orgId) {
-      throw new Error("No organization selected");
+      throw new Error(t("settings.discoveredServices.noOrganizationSelected"));
     }
 
     const response = await serviceStreamsService.getServicesList(orgId);
@@ -899,7 +899,7 @@ const loadServices = async (isRefresh = false) => {
     }));
   } catch (err: any) {
     console.error("Failed to load services:", err);
-    error.value = err?.message || "Failed to load services";
+    error.value = err?.message || t("settings.discoveredServices.failedToLoadServices");
   } finally {
     loading.value = false;
     refreshing.value = false;
@@ -917,7 +917,7 @@ const doResetServices = async () => {
   try {
     const orgId = store.state.selectedOrganization?.identifier;
     if (!orgId) {
-      throw new Error("No organization selected");
+      throw new Error(t("settings.discoveredServices.noOrganizationSelected"));
     }
 
     const response = await serviceStreamsService.resetServices(orgId);

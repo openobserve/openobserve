@@ -280,7 +280,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="outline"
               size="icon-md"
               :title="t('serviceAccounts.copyToken')"
-              @click.stop="copyToClipboard(serviceToken, { successMessage: 'Token Copied Successfully!', timeout: 5000 })"
+              @click.stop="copyToClipboard(serviceToken, { successMessage: t('iam.serviceAccountsList.tokenCopied'), timeout: 5000 })"
             >
               <OIcon name="content-copy" size="sm" />
             </OButton>
@@ -735,7 +735,7 @@ export default defineComponent({
     const getServiceAccountsUsers = async () =>{
       const dismiss = toast({
         variant: "loading",
-        message: "Please wait while loading service accounts...",
+        message: t("iam.serviceAccountsList.loading"),
               timeout: 0,
 });
 
@@ -865,7 +865,7 @@ export default defineComponent({
       if (res.code == 200 ) {
         if (operationType == "created") {
             toast({
-              message: "Service Account created successfully.",
+              message: t("iam.serviceAccountsList.createdSuccess"),
               variant: "success",
             });
 
@@ -909,7 +909,7 @@ export default defineComponent({
         } else {
           setTimeout(() => {
             toast({
-              message: "Service Account updated successfully.",
+              message: t("iam.serviceAccountsList.updatedSuccess"),
               variant: "success",
             });
           }, 2000);
@@ -936,7 +936,7 @@ export default defineComponent({
         .then(async (res: any) => {
           if (res.data.code == 200) {
             toast({
-              message: "Service Account deleted successfully.",
+              message: t("iam.serviceAccountsList.deletedSuccess"),
               variant: "success",
             });
             await getServiceAccountsUsers();
@@ -945,7 +945,7 @@ export default defineComponent({
         .catch((err: any) => {
           if(err.response?.status != 403){
             toast({
-            message: err.response?.data?.message || "Error while deleting user.",
+            message: err.response?.data?.message || t("iam.serviceAccountsList.deleteError"),
             variant: "error",
             });
           }
@@ -971,17 +971,17 @@ export default defineComponent({
 
         if (successful.length > 0 && unsuccessful.length === 0) {
           toast({
-            message: `Successfully deleted ${successful.length} service account(s)`,
+            message: t("iam.serviceAccountsList.bulkDeleteSuccess", { count: successful.length }),
             variant: "success",
           });
         } else if (successful.length > 0 && unsuccessful.length > 0) {
           toast({
-            message: `Deleted ${successful.length} service account(s), but ${unsuccessful.length} failed`,
+            message: t("iam.serviceAccountsList.bulkDeletePartial", { count: successful.length, failed: unsuccessful.length }),
             variant: "warning",
           });
         } else if (unsuccessful.length > 0) {
           toast({
-            message: `Failed to delete ${unsuccessful.length} service account(s)`,
+            message: t("iam.serviceAccountsList.bulkDeleteFailed", { count: unsuccessful.length }),
             variant: "error",
           });
         }
@@ -992,7 +992,7 @@ export default defineComponent({
       } catch (err: any) {
         if (err.response?.status != 403 || err?.status != 403) {
           toast({
-            message: err?.response?.data?.message || err?.message || "Error while deleting service accounts",
+            message: err?.response?.data?.message || err?.message || t("iam.serviceAccountsList.bulkDeleteError"),
             variant: "error",
           });
         }
@@ -1006,7 +1006,7 @@ export default defineComponent({
           revealToken(res.data.token, row.email);
 
         toast({
-          message: "Service token refreshed successfully.",
+          message: t("iam.serviceAccountsList.tokenRefreshedSuccess"),
           variant: "success",
         });
 
@@ -1014,7 +1014,7 @@ export default defineComponent({
       }).catch((err)=>{
         if(err.response?.status != 403){
           toast({
-          message: err.response?.data?.message || "Error while refreshing token.",
+          message: err.response?.data?.message || t("iam.serviceAccountsList.refreshTokenError"),
           variant: "error",
           });
         }

@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             class="font-semibold mb-[0.35rem] tracking-[0.03rem] opacity-100 text-[0.75rem]"
           >
-            {{ item.spans }} spans across {{ serviceEntries.length }} services
+            {{ t('traces.traceLatencyCell.spansAcrossServices', { spans: item.spans, services: serviceEntries.length }) }}
           </div>
           <div
             v-for="[s, sv] in serviceEntries"
@@ -62,6 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed } from "vue";
+import { useI18n } from "vue-i18n";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import useTraces from "@/composables/useTraces";
 import { formatTimeWithSuffix } from "@/utils/zincutils";
@@ -70,6 +71,7 @@ const props = defineProps<{
   item: Record<string, any>;
 }>();
 
+const { t } = useI18n();
 const { searchObj } = useTraces();
 const serviceColors = computed(() => searchObj.meta.serviceColors ?? {});
 

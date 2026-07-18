@@ -909,7 +909,7 @@ const formatTimestamp = (timestamp: number) => {
     const date = new Date(timestamp / 1000); // Convert microseconds to milliseconds
     return formatDistanceToNow(date, { addSuffix: true });
   } catch (e) {
-    return "Unknown time";
+    return t("settings.domainManagement.unknownTime");
   }
 };
 

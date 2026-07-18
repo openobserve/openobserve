@@ -97,7 +97,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="pattern-list-loading-skeleton"
       aria-busy="true"
       aria-live="polite"
-      aria-label="Extracting patterns from logs"
+      :aria-label="t('logs.patternList.extractingPatterns')"
     >
       <!-- Header skeleton -->
       <div
@@ -281,7 +281,7 @@ const jumpTargetSublabel = computed(() => {
   const formatted = DateTime.fromMillis(r.max / 1000)
     .setZone(zone)
     .toFormat("MMM d, yyyy HH:mm:ss");
-  return `Last data: ${formatted} (${zone})`;
+  return t("logs.patternList.lastData", { formatted, zone });
 });
 </script>
 

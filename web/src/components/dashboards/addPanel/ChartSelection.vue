@@ -155,27 +155,27 @@ export default defineComponent({
       },
       {
         image: "img:" + getImageURL("images/dashboard/charts/Gauge.png"),
-        title: "Gauge",
+        title: t("dashboard.chartSelection.gauge"),
         id: "gauge",
       },
       {
         image: "img:" + getImageURL("images/dashboard/charts/HTML.png"),
-        title: "HTML",
+        title: t("dashboard.chartSelection.html"),
         id: "html",
       },
       {
         image: "img:" + getImageURL("images/dashboard/charts/Markdown.svg"),
-        title: "Markdown",
+        title: t("dashboard.chartSelection.markdown"),
         id: "markdown",
       },
       {
         image: "img:" + getImageURL("images/dashboard/charts/sankey.svg"),
-        title: "Sankey",
+        title: t("dashboard.chartSelection.sankey"),
         id: "sankey",
       },
       {
         image: "img:" + getImageURL("images/dashboard/charts/chart.png"),
-        title: "Custom Chart",
+        title: t("dashboard.chartSelection.customChart"),
         id: "custom_chart",
       },
     ]);

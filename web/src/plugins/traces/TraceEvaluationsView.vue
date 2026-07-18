@@ -441,6 +441,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
 
 <script lang="ts">
 import { defineComponent, PropType, ref, watch, onMounted } from "vue";
+import { useI18n } from "vue-i18n";
 import { getQualityScoreColor } from "@/utils/llmUtils";
 import LLMContentRenderer from "./LLMContentRenderer.vue";
 import { useStore } from "vuex";
@@ -474,6 +475,7 @@ export default defineComponent({
   },
   setup(props) {
     const store = useStore();
+    const { t } = useI18n();
     const getBarWidth = (value: any): string => {
       if (value == null) return "0%";
       const num = parseFloat(value as any);
@@ -739,7 +741,7 @@ export default defineComponent({
       if (suggestions.length === 0) {
         const weakest = getWeakestDimension(record);
         if (weakest && weakest.score < 0.3 && weakest.reasoning) {
-          suggestions.push(`Focus on improving ${formatDimLabel(weakest.dimension)}: ${weakest.reasoning}`);
+          suggestions.push(t('traces.traceEvaluationsView.focusOnImproving', { dimension: formatDimLabel(weakest.dimension), reasoning: weakest.reasoning }));
         }
       }
 
@@ -769,7 +771,7 @@ export default defineComponent({
       ungrounded.forEach(val => {
         // Simple string replacement for now, could be improved with regex
         const regex = new RegExp(`\\b${val}\\b`, 'g');
-        content = content.replace(regex, `<span class="ungrounded-highlight" title="Ungrounded value detected">${val}</span>`);
+        content = content.replace(regex, `<span class="ungrounded-highlight" title="${t('traces.traceEvaluationsView.ungroundedValueDetected')}">${val}</span>`);
       });
 
       return content;
@@ -876,7 +878,7 @@ export default defineComponent({
             if (parsed?.config?.system_instruction) {
                return {
                  system: parsed.config.system_instruction,
-                 user: [{ role: "user", content: "Original Input Full JSON: " + JSON.stringify(parsed, null, 2) }]
+                 user: [{ role: "user", content: t('traces.traceEvaluationsView.originalInputFullJson') + JSON.stringify(parsed, null, 2) }]
                };
             }
             return {
@@ -1033,7 +1035,7 @@ export default defineComponent({
     // Name of the template that was actually used to evaluate this record.
     const evaluatedTemplateName = (record: any): string => {
       const usedId = record.llm_evaluation_template_id;
-      if (!usedId) return "unknown";
+      if (!usedId) return t('traces.traceEvaluationsView.unknown');
       const matched = availableTemplates.value.find((t: any) => t.id === usedId);
       return matched?.name ?? usedId;
     };

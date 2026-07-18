@@ -103,12 +103,12 @@ const isErrorEvent = (event: any) =>
   event.type === "error" && event.error_id === props.error.error_id;
 
 const getErrorCategory = (row: any) => {
-  if (row["type"] === "error") return row["error_type"] || "Error";
+  if (row["type"] === "error") return row["error_type"] || t("rum.error");
   else if (row["type"] === "resource") return row["resource_type"];
   else if (row["type"] === "view")
     return row["view_loading_type"] === "route_change"
-      ? "Navigation"
-      : "Reload";
+      ? t("rum.categoryNavigation")
+      : t("rum.categoryReload");
   else if (row["type"] === "action") return row["action_type"];
   else return row["type"];
 };

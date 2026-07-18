@@ -34,19 +34,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="sm"
               data-test="service-graph-node-panel-view-related-btn"
             >
-              View Related
+              {{ t('traces.serviceGraphNodeSidePanel.viewRelated') }}
               <OIcon name="arrow-drop-down" size="sm" />
             </OButton>
           </template>
           <ODropdownItem
             @select="viewRelatedLogs"
             data-test="service-graph-node-panel-view-related-logs-btn"
-            >Logs</ODropdownItem
+            >{{ t('traces.serviceGraphNodeSidePanel.logs') }}</ODropdownItem
           >
           <ODropdownItem
             @select="viewRelatedTraces"
             data-test="service-graph-node-panel-view-related-traces-btn"
-            >Traces</ODropdownItem
+            >{{ t('traces.serviceGraphNodeSidePanel.traces') }}</ODropdownItem
           >
         </ODropdown>
       </div>
@@ -124,7 +124,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template #icon-left>
                 <OIcon name="search" size="xs" />
               </template>
-              View Traces
+              {{ t('traces.serviceGraphNodeSidePanel.viewTraces') }}
             </OButton>
           </div>
           <div class="charts-wrapper py-0! min-h-[10.875rem] w-full">
@@ -159,7 +159,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <OTab
                 name="operations"
-                label="Operations"
+                :label="t('traces.serviceGraphNodeSidePanel.operations')"
                 style="text-transform: capitalize"
                 data-test="service-graph-node-panel-tab-operations"
               />
@@ -174,7 +174,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OTab
                 v-if="!isInferred"
                 name="metrics"
-                label="Metrics"
+                :label="t('traces.serviceGraphNodeSidePanel.metrics')"
                 style="text-transform: capitalize"
                 data-test="service-graph-node-panel-tab-metrics"
               />
@@ -246,7 +246,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="text-xs italic py-2 text-center"
                 style="color: var(--o2-text-secondary)"
               >
-                No operations found
+                {{ t('traces.serviceGraphNodeSidePanel.noOperationsFound') }}
               </div>
               <div
                   v-else-if="recentOperations.length > 0 || loadingOperations"
@@ -324,7 +324,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         "
                       >
                         <OIcon name="search" size="xs" />
-                        <OTooltip content="View in Traces" />
+                        <OTooltip :content="t('traces.serviceGraphNodeSidePanel.viewInTraces')" />
                       </OButton>
                     </template>
                     <template #empty>
@@ -332,7 +332,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         class="text-xs italic py-2 text-center"
                         style="color: var(--o2-text-secondary)"
                       >
-                        No operations found
+                        {{ t('traces.serviceGraphNodeSidePanel.noOperationsFound') }}
                       </div>
                     </template>
                   </TenstackTable>
@@ -353,7 +353,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="text-xs italic py-2 text-center"
                 style="color: var(--o2-text-secondary)"
               >
-                No {{ cfg.label.toLowerCase() }} data found
+                {{ t('traces.serviceGraphNodeSidePanel.noResourceDataFound', { resource: cfg.label.toLowerCase() }) }}
               </div>
               <div
                 v-else-if="resourceTabData[cfg.id]?.length > 0 || resourceTabLoading[cfg.id]"
@@ -401,7 +401,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       "
                     >
                       <OIcon name="search" size="xs" />
-                      <OTooltip content="View in Traces" />
+                      <OTooltip :content="t('traces.serviceGraphNodeSidePanel.viewInTraces')" />
                     </OButton>
                   </template>
                   <template #cell-errors="{ item }">
@@ -441,7 +441,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="text-xs italic py-2 text-center"
                       style="color: var(--o2-text-secondary)"
                     >
-                      No {{ cfg.label.toLowerCase() }} data found
+                      {{ t('traces.serviceGraphNodeSidePanel.noResourceDataFound', { resource: cfg.label.toLowerCase() }) }}
                     </div>
                   </template>
                 </TenstackTable>
@@ -463,7 +463,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="service-graph-side-panel-metrics-loading"
               >
                 <OSpinner size="xs" />
-                <span>Loading metrics...</span>
+                <span>{{ t('traces.serviceGraphNodeSidePanel.loadingMetrics') }}</span>
               </div>
 
               <!-- Error state -->
@@ -479,7 +479,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   size="sm"
                   data-test="service-graph-side-panel-metrics-retry-btn"
                   @click="fetchMetricsCorrelation(true)"
-                  >Retry</OButton
+                  >{{ t('traces.serviceGraphNodeSidePanel.retry') }}</OButton
                 >
               </div>
 
@@ -516,7 +516,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 style="color: var(--o2-text-secondary)"
                 data-test="service-graph-side-panel-metrics-empty"
               >
-                No metrics available for this service.
+                {{ t('traces.serviceGraphNodeSidePanel.noMetricsAvailable') }}
               </div>
             </OTabPanel>
           </OTabPanels>
@@ -1131,10 +1131,13 @@ export default defineComponent({
           chips.push({
             key,
             type: "duration",
-            label: `Duration: ${formatTimeWithSuffix(f.start)} – ${formatTimeWithSuffix(f.end)}`,
+            label: t("traces.serviceGraphNodeSidePanel.durationRange", {
+              start: formatTimeWithSuffix(f.start),
+              end: formatTimeWithSuffix(f.end),
+            }),
           });
         } else if (f.panelTitle === "Errors") {
-          chips.push({ key, type: "error", label: "Status: Error" });
+          chips.push({ key, type: "error", label: t("traces.serviceGraphNodeSidePanel.statusError") });
         }
       });
       return chips;
@@ -1242,7 +1245,7 @@ export default defineComponent({
 
         const data = correlateResponse.data;
         if (!data) {
-          correlationError.value = "No correlated streams found.";
+          correlationError.value = t("traces.serviceGraphNodeSidePanel.noCorrelatedStreams");
           correlationData.value = null;
           return;
         }
@@ -1261,10 +1264,10 @@ export default defineComponent({
       } catch (err: any) {
         if (err.response?.status === 403) {
           correlationError.value =
-            "Service Discovery is an enterprise feature.";
+            t("traces.serviceGraphNodeSidePanel.enterpriseFeature");
         } else {
           correlationError.value =
-            err.message || "Failed to load service streams.";
+            err.message || t("traces.serviceGraphNodeSidePanel.failedToLoadStreams");
         }
         correlationData.value = null;
       } finally {
@@ -1411,10 +1414,10 @@ export default defineComponent({
       } catch (err: any) {
         if (err.response?.status === 403) {
           metricsCorrelationError.value =
-            "Service Discovery is an enterprise feature.";
+            t("traces.serviceGraphNodeSidePanel.enterpriseFeature");
         } else {
           metricsCorrelationError.value =
-            err.message || "Failed to load metrics.";
+            err.message || t("traces.serviceGraphNodeSidePanel.failedToLoadMetrics");
         }
         metricsCorrelationData.value = null;
       } finally {
@@ -1665,7 +1668,7 @@ export default defineComponent({
       if (!props.selectedNode) {
         return {
           status: "unknown",
-          text: "Unknown",
+          text: t("traces.serviceGraphNodeSidePanel.unknown"),
         };
       }
 
@@ -1675,17 +1678,17 @@ export default defineComponent({
       if (errorRate > 10) {
         return {
           status: "critical",
-          text: "Critical",
+          text: t("traces.serviceGraphNodeSidePanel.critical"),
         };
       } else if (errorRate > 5) {
         return {
           status: "degraded",
-          text: "Degraded",
+          text: t("traces.serviceGraphNodeSidePanel.degraded"),
         };
       } else {
         return {
           status: "healthy",
-          text: "Healthy",
+          text: t("traces.serviceGraphNodeSidePanel.healthy"),
         };
       }
     });
@@ -1806,7 +1809,7 @@ export default defineComponent({
       {
         id: "requests",
         accessorFn: (row: any) => formatNumber(row.requests),
-        header: "Requests",
+        header: t("traces.serviceGraphNodeSidePanel.requests"),
         size: 100,
         enableSorting: true,
         meta: { sortable: true },
@@ -1814,7 +1817,7 @@ export default defineComponent({
       {
         id: "errors",
         accessorKey: "errors",
-        header: "Errors",
+        header: t("traces.serviceGraphNodeSidePanel.errors"),
         size: 80,
         enableSorting: true,
         meta: { slot: true, sortable: true },
@@ -1847,12 +1850,12 @@ export default defineComponent({
 
     // Computed: Operations table columns
     const operationsTableColumns = computed(() => {
-      const cols = buildEntityTableColumns("operation", "Operation");
+      const cols = buildEntityTableColumns("operation", t("traces.serviceGraphNodeSidePanel.operation"));
       if (isInferred.value) {
         cols.unshift({
           id: "caller",
           accessorKey: "caller",
-          header: "Caller",
+          header: t("traces.serviceGraphNodeSidePanel.caller"),
           size: 180,
           enableSorting: true,
           meta: { slot: false, sortable: true },

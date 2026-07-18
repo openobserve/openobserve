@@ -121,7 +121,7 @@ export default defineComponent({
         if (data.data.invalid_members != null) {
           toast({
             variant: "error",
-            message: `Error while member invitation: ${data.data.invalid_members.toString()}`,
+            message: t('iam.memberInvitation.errorWhileInvitation', { members: data.data.invalid_members.toString() }),
             timeout: 15000,
           });
         } else {

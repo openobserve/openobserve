@@ -69,7 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OToggleGroup>
     </div>
     <ConfirmDialog
-      title="Change Query Mode"
+      :title="t('dashboard.queryTypeSelector.changeQueryMode')"
       :message="confirmDialogMessage"
       @update:ok="changeToggle()"
       @update:cancel="confirmQueryModeChangeDialog = false"
@@ -130,7 +130,7 @@ export default defineComponent({
     const SEED_ON_TOGGLE_PAGES = ["dashboard", "metrics", "build", "logs"];
     const confirmQueryModeChangeDialog = ref(false);
     const confirmDialogMessage = ref(
-      "Are you sure you want to change the query mode? The data saved for X-Axis, Y-Axis and Filters will be wiped off.",
+      t("dashboard.queryTypeSelector.changeQueryModeConfirm"),
     );
 
     const selectedButtonQueryType = ref("sql");
@@ -266,12 +266,14 @@ export default defineComponent({
             selectedQueryType === "builder"
           ) {
             // Switching from PromQL custom to builder
-            confirmDialogMessage.value =
-              "Are you sure you want to switch to builder mode? Your custom PromQL query will be wiped off.";
+            confirmDialogMessage.value = t(
+              "dashboard.queryTypeSelector.switchToBuilderConfirm",
+            );
           } else {
             // Default message for other transitions
-            confirmDialogMessage.value =
-              "Are you sure you want to change the query mode? The data saved for X-Axis, Y-Axis and Filters will be wiped off.";
+            confirmDialogMessage.value = t(
+              "dashboard.queryTypeSelector.changeQueryModeConfirm",
+            );
           }
 
           dashboardPanelData.data.queries[

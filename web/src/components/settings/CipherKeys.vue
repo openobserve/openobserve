@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <AppPageHeader
         :title="t('cipherKey.header')"
         icon="key"
-        :subtitle="'Encryption keys for sensitive fields'"
+        :subtitle="t('settings.cipherKeysPage.subtitle')"
         class="shrink-0 px-4 border-b border-border-default"
       >
         <template #actions>
@@ -113,7 +113,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           #bottom
         >
           <span class="text-xs text-text-primary font-medium">
-            {{ selectedKeys.length }} selected
+            {{ t('settings.cipherKeysPage.selected', { count: selectedKeys.length }) }}
           </span>
           <OButton
             data-test="cipher-keys-list-delete-keys-btn"
@@ -122,7 +122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             icon-left="delete"
             @click="openBulkDeleteDialog"
           >
-            Delete
+            {{ t('settings.cipherKeysPage.delete') }}
           </OButton>
         </template>
       </OTable>
@@ -133,16 +133,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
   </div>
   <ConfirmDialog
-    title="Delete Cipher Key"
-    message="Are you sure you want to delete Cipher Key?"
+    :title="t('settings.cipherKeysPage.deleteCipherKeyTitle')"
+    :message="t('settings.cipherKeysPage.deleteCipherKeyMessage')"
     @update:ok="deleteCipherKey"
     @update:cancel="cancelDeleteCipherKey"
     v-model="confirmDelete.visible"
   />
 
   <ConfirmDialog
-    title="Delete Cipher Keys"
-    :message="`Are you sure you want to delete ${selectedKeys.length} cipher key(s)?`"
+    :title="t('settings.cipherKeysPage.deleteCipherKeysTitle')"
+    :message="t('settings.cipherKeysPage.deleteCipherKeysMessage', { count: selectedKeys.length })"
     @update:ok="bulkDeleteCipherKeys"
     @update:cancel="confirmBulkDelete = false"
     v-model="confirmBulkDelete"
@@ -312,7 +312,7 @@ export default defineComponent({
       loading.value = true;
       const dismiss = toast({
         variant: "loading",
-        message: "Please wait while loading data...",
+        message: t("settings.cipherKeysPage.loadingData"),
               timeout: 0,
 });
 
@@ -342,7 +342,7 @@ export default defineComponent({
               variant: "error",
               message:
                 error.response?.data?.message ||
-                "Failed to fetch cipher keys. Please try again.",
+                t("settings.cipherKeysPage.fetchFailed"),
               timeout: 5000,
             });
           }
@@ -366,7 +366,7 @@ export default defineComponent({
       if (confirmDelete.value?.data?.name) {
         const dismiss = toast({
           variant: "loading",
-          message: "Please wait while processing delete request...",
+          message: t("settings.cipherKeysPage.processingDelete"),
                   timeout: 0,
 });
         CipherKeysService.delete(
@@ -377,7 +377,7 @@ export default defineComponent({
             dismiss();
             toast({
               variant: "success",
-              message: `Cipher Key deleted successfully`,
+              message: t("settings.cipherKeysPage.deleteSuccess"),
             });
 
             getData();
@@ -443,17 +443,17 @@ export default defineComponent({
           if (successful.length > 0 && unsuccessful.length === 0) {
             toast({
               variant: "success",
-              message: `Successfully deleted ${successful.length} cipher key(s)`,
+              message: t("settings.cipherKeysPage.bulkDeleteSuccess", { count: successful.length }),
             });
           } else if (successful.length > 0 && unsuccessful.length > 0) {
             toast({
               variant: "warning",
-              message: `Deleted ${successful.length} cipher key(s), but ${unsuccessful.length} failed`,
+              message: t("settings.cipherKeysPage.bulkDeletePartial", { successful: successful.length, failed: unsuccessful.length }),
             });
           } else if (unsuccessful.length > 0) {
             toast({
               variant: "error",
-              message: `Failed to delete ${unsuccessful.length} cipher key(s)`,
+              message: t("settings.cipherKeysPage.bulkDeleteFailed", { count: unsuccessful.length }),
             });
           }
 
@@ -465,7 +465,7 @@ export default defineComponent({
           if (err.response?.status != 403 || err?.status != 403) {
             toast({
               variant: "error",
-              message: err.response?.data?.message || err?.message || "Error while deleting cipher keys",
+              message: err.response?.data?.message || err?.message || t("settings.cipherKeysPage.bulkDeleteError"),
             });
           }
         });

@@ -234,7 +234,7 @@
               <div class="text-center flex flex-col items-center">
                 <OSpinner size="xl" />
                 <div class="text-base font-medium mt-3 text-gray-400">
-                  Loading service graph...
+                  {{ t("traces.serviceGraph.loading") }}
                 </div>
               </div>
             </div>
@@ -254,7 +254,7 @@
                   class="mt-4"
                   icon-left="refresh"
                 >
-                  Retry
+                  {{ t("traces.serviceGraph.retry") }}
                 </OButton>
               </div>
             </div>
@@ -347,16 +347,16 @@
   <ODialog data-test="service-graph-settings-dialog"
     v-model:open="showSettings"
     size="sm"
-    title="Service Graph Settings"
-    secondary-button-label="Close"
-    primary-button-label="Reset"
+    :title="t('traces.serviceGraph.settingsTitle')"
+    :secondary-button-label="t('traces.serviceGraph.close')"
+    :primary-button-label="t('traces.serviceGraph.reset')"
     @click:secondary="showSettings = false"
     @click:primary="resetSettings"
   >
     <div class="gap-3">
       <div class="text-xs text-gray-400">
-        Stream-based topology - all data persisted to storage
-        <OTooltip content="Service graph uses stream-only architecture with zero in-memory state" />
+        {{ t("traces.serviceGraph.settingsDescription") }}
+        <OTooltip :content="t('traces.serviceGraph.settingsTooltip')" />
       </div>
     </div>
   </ODialog>
@@ -1472,7 +1472,7 @@ export default defineComponent({
         const orgId = store.state.selectedOrganization.identifier;
 
         if (!orgId) {
-          throw new Error("No organization selected");
+          throw new Error(t("traces.serviceGraph.noOrganizationSelected"));
         }
 
         const { startTime, endTime } = getEffectiveTimeRange(
@@ -1566,23 +1566,20 @@ export default defineComponent({
 
         // Provide detailed error messages based on error type
         if (err.message === "Request timeout") {
-          error.value =
-            "Request timed out. The service graph may be processing large amounts of data. Please try again.";
+          error.value = t("traces.serviceGraph.errorRequestTimeout");
         } else if (err.response?.status === 404) {
-          error.value =
-            "Service Graph API endpoint not found. Ensure you're running enterprise version of OpenObserve.";
+          error.value = t("traces.serviceGraph.errorApiNotFound");
         } else if (err.response?.status === 403) {
-          error.value =
-            "Access denied. You may not have permission to view the service graph for this organization.";
+          error.value = t("traces.serviceGraph.errorAccessDenied");
         } else if (err.response?.status === 500) {
-          error.value = "Server error occurred. Check server logs for details.";
+          error.value = t("traces.serviceGraph.errorServerError");
         } else if (err.message === "Network Error" || !navigator.onLine) {
-          error.value = "Network error. Please check your internet connection.";
+          error.value = t("traces.serviceGraph.errorNetwork");
         } else {
           error.value =
             err.response?.data?.message ||
             err.message ||
-            "Failed to load service graph data. Please check server logs.";
+            t("traces.serviceGraph.errorLoadFailed");
         }
       } finally {
         loading.value = false;

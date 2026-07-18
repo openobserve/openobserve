@@ -17,6 +17,7 @@ import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import StreamFieldSelect from "@/components/dashboards/addPanel/StreamFieldSelect.vue";
 import { createStore } from "vuex";
+import i18n from "@/locales";
 
 const mockStore = createStore({
   state: {
@@ -102,7 +103,7 @@ describe("StreamFieldSelect", () => {
         ...props,
       },
       global: {
-        plugins: [mockStore],
+        plugins: [mockStore, i18n],
         provide: {
           dashboardPanelDataPageKey: "dashboard",
           ...provide,
