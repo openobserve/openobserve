@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::HashMap, fmt::Debug, sync::LazyLock as Lazy};
+use std::{collections::HashMap, fmt::Debug};
 
 use axum::{
     Json,
@@ -22,28 +22,26 @@ use axum::{
     response::{IntoResponse, Response},
 };
 use base64::Engine;
-use config::{
-    meta::user::UserRole,
-    utils::{hash::get_passcode_hash, json},
+#[cfg(test)]
+use config::meta::user::UserRole;
+use config::utils::{hash::get_passcode_hash, json};
+#[cfg(feature = "enterprise")]
+pub use organization_domain::authorization::is_ofga_object_visible;
+pub use organization_domain::authorization::{
+    RE_OFGA_UNSUPPORTED_NAME, delete_org_tuples, get_role, into_ofga_supported_format,
+    is_ofga_unsupported, is_root_user, remove_ownership, save_org_tuples, set_ownership,
 };
-use regex::Regex;
 #[cfg(feature = "enterprise")]
 use {
     crate::users::get_user, jsonwebtoken::TokenData, o2_dex::service::auth::get_dex_jwks,
-    o2_openfga::config::get_config as get_openfga_config, o2_openfga::meta::mapping::OFGA_MODELS,
-    serde_json::Value, std::str::FromStr,
+    o2_openfga::meta::mapping::OFGA_MODELS, serde_json::Value, std::str::FromStr,
 };
 
 #[cfg(feature = "enterprise")]
 use crate::common::meta::user::AuthTokensExt;
-use crate::common::{
-    infra::config::{ORG_USERS, PASSWORD_HASH},
-    meta::{
-        authz::Authz,
-        organization::DEFAULT_ORG,
-        user::{AuthTokens, UserOrgRole},
-    },
-};
+#[cfg(test)]
+use crate::common::meta::{organization::DEFAULT_ORG, user::UserOrgRole};
+use crate::common::{infra::config::PASSWORD_HASH, meta::user::AuthTokens};
 
 pub const V2_API_PREFIX: &str = "v2";
 
@@ -99,49 +97,10 @@ pub fn resolve_write_method(method: &str, path_columns: &[&str]) -> String {
     resolved
 }
 
-pub static RE_OFGA_UNSUPPORTED_NAME: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r#"[:#?\s'"%&]+"#).unwrap());
-static RE_SPACE_AROUND: Lazy<Regex> = Lazy::new(|| {
-    let char_pattern = r#"[^a-zA-Z0-9:#?'"&%\s]"#;
-    let pattern = format!(r"(\s+{char_pattern}\s+)|(\s+{char_pattern})|({char_pattern}\s+)");
-    Regex::new(&pattern).unwrap()
-});
-
 // Email validation lives in the shared `config` crate so the OSS auth layer and the enterprise
 // domain-management blocklist validate identically. Re-exported here to preserve the existing
 // `crate::common::utils::auth::{EMAIL_REGEX, is_valid_email}` API.
 pub use config::utils::str::{EMAIL_REGEX, is_valid_email};
-
-pub fn into_ofga_supported_format(name: &str) -> String {
-    // remove spaces around special characters
-    let result = RE_SPACE_AROUND.replace_all(name, |caps: &regex::Captures| {
-        caps.iter()
-            .find_map(|m| m)
-            .map(|m| m.as_str().trim())
-            .unwrap_or("")
-            .to_string()
-    });
-    RE_OFGA_UNSUPPORTED_NAME
-        .replace_all(&result, "_")
-        .to_string()
-}
-
-pub fn is_ofga_unsupported(name: &str) -> bool {
-    RE_OFGA_UNSUPPORTED_NAME.is_match(name)
-}
-
-#[cfg(feature = "enterprise")]
-pub fn is_ofga_object_visible(
-    org_id: &str,
-    object_type: &str,
-    object_id: &str,
-    permitted_objects: Option<&[String]>,
-) -> bool {
-    permitted_objects.is_none_or(|permitted_objects| {
-        permitted_objects.contains(&format!("{object_type}:{object_id}"))
-            || permitted_objects.contains(&format!("{object_type}:_all_{org_id}"))
-    })
-}
 
 pub fn get_hash(pass: &str, salt: &str) -> String {
     let key = format!("{pass}{salt}");
@@ -155,106 +114,6 @@ pub fn get_hash(pass: &str, salt: &str) -> String {
         }
     }
 }
-
-pub fn is_root_user(user_id: &str) -> bool {
-    match ORG_USERS.get(&format!("{DEFAULT_ORG}/{user_id}")) {
-        Some(user) => user.role.eq(&UserRole::Root),
-        None => false,
-    }
-}
-
-#[cfg(feature = "enterprise")]
-pub async fn save_org_tuples(org_id: &str) {
-    use o2_openfga::config::get_config as get_openfga_config;
-
-    if get_openfga_config().enabled {
-        o2_openfga::authorizer::authz::save_org_tuples(org_id).await
-    }
-}
-
-#[cfg(not(feature = "enterprise"))]
-pub async fn save_org_tuples(_org_id: &str) {}
-
-#[cfg(feature = "enterprise")]
-pub async fn delete_org_tuples(org_id: &str) {
-    use o2_openfga::config::get_config as get_openfga_config;
-
-    if get_openfga_config().enabled
-        && let Err(e) = o2_openfga::authorizer::authz::delete_org_tuples(org_id).await
-    {
-        log::error!("[auth] failed to delete org tuples for {org_id}: {e}");
-    }
-}
-
-#[cfg(not(feature = "enterprise"))]
-pub async fn delete_org_tuples(_org_id: &str) {}
-
-#[cfg(feature = "enterprise")]
-pub fn get_role(role: &UserOrgRole) -> UserRole {
-    use std::str::FromStr;
-
-    let role = o2_openfga::authorizer::roles::get_role(format!("{}", role.base_role));
-    UserRole::from_str(&role).unwrap()
-}
-
-#[cfg(not(feature = "enterprise"))]
-pub fn get_role(_role: &UserOrgRole) -> UserRole {
-    UserRole::Admin
-}
-
-#[cfg(feature = "enterprise")]
-pub async fn set_ownership(org_id: &str, obj_type: &str, obj: Authz) {
-    if get_openfga_config().enabled {
-        use o2_openfga::{authorizer, meta::mapping::OFGA_MODELS};
-
-        let obj_str = format!("{}:{}", OFGA_MODELS.get(obj_type).unwrap().key, obj.obj_id);
-
-        let parent_type = if obj.parent_type.is_empty() {
-            ""
-        } else {
-            OFGA_MODELS.get(obj.parent_type.as_str()).unwrap().key
-        };
-
-        // Default folder is already created in case of new org, this handles the case for old org
-        if obj_type.eq("folders")
-            && authorizer::authz::check_folder_exists(org_id, &obj.obj_id).await
-        {
-            // If the folder tuples are missing, it automatically creates them
-            // So we can return here
-            log::debug!(
-                "folder tuples already exists for org: {org_id}; folder: {}",
-                obj.obj_id
-            );
-            return;
-        } else if obj.parent_type.eq("folders") {
-            log::debug!("checking parent folder tuples for folder: {}", obj.parent);
-            // In case of dashboard, we need to check if the tuples for its folder exist
-            // If not, the below function creates the proper tuples for the folder
-            authorizer::authz::check_folder_exists(org_id, &obj.parent).await;
-        }
-        authorizer::authz::set_ownership(org_id, &obj_str, &obj.parent, parent_type).await;
-    }
-}
-#[cfg(not(feature = "enterprise"))]
-pub async fn set_ownership(_org_id: &str, _obj_type: &str, _obj: Authz) {}
-
-#[cfg(feature = "enterprise")]
-pub async fn remove_ownership(org_id: &str, obj_type: &str, obj: Authz) {
-    if get_openfga_config().enabled {
-        use o2_openfga::{authorizer, meta::mapping::OFGA_MODELS};
-        let obj_str = format!("{}:{}", OFGA_MODELS.get(obj_type).unwrap().key, obj.obj_id);
-
-        let parent_type = if obj.parent_type.is_empty() {
-            ""
-        } else {
-            OFGA_MODELS.get(obj.parent_type.as_str()).unwrap().key
-        };
-
-        authorizer::authz::remove_ownership(org_id, &obj_str, &obj.parent, parent_type).await;
-    }
-}
-#[cfg(not(feature = "enterprise"))]
-pub async fn remove_ownership(_org_id: &str, _obj_type: &str, _obj: Authz) {}
 
 fn deserialize_trimmed<'de, D>(deserializer: D) -> Result<String, D::Error>
 where
@@ -1160,7 +1019,6 @@ mod tests {
     fn test_regex_compilation() {
         // Test that the regexes compile without panicking
         assert!(RE_OFGA_UNSUPPORTED_NAME.is_match("test:name"));
-        assert!(RE_SPACE_AROUND.is_match("a @ b")); // @ is not in the exclusion list, so this should match
         assert!(EMAIL_REGEX.is_match("test@example.com"));
 
         // Test that the regexes work as expected

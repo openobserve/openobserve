@@ -7,7 +7,7 @@ publish = false
 
 [features]
 default = []
-enterprise = ["dep:o2_enterprise"]
+enterprise = ["dep:o2_enterprise", "dep:o2_openfga"]
 cloud = ["enterprise", "o2_enterprise/cloud"]
 
 [dependencies]
@@ -20,6 +20,8 @@ config.workspace = true
 infra.workspace = true
 log.workspace = true
 o2_enterprise = { workspace = true, optional = true, default-features = false }
+o2_openfga = { workspace = true, optional = true }
+regex.workspace = true
 serde_json.workspace = true
 
 [dev-dependencies]

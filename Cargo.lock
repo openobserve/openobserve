@@ -7097,6 +7097,8 @@ dependencies = [
  "infra",
  "log",
  "o2_enterprise",
+ "o2_openfga",
+ "regex",
  "serde_json",
  "tokio",
 ]

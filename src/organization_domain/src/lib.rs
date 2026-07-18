@@ -5,6 +5,8 @@
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 
+pub mod authorization;
+
 pub mod identity {
     pub use crate::{ingestion_tokens, org_ingestion_tokens, session};
 }
