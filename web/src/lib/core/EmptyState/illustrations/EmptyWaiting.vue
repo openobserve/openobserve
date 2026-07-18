@@ -68,13 +68,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <path d="M250 230 Q246 224 252 220 L266 216 Q272 215 274 221 L280 236 Q281 240 275 241 L258 240 Q251 240 250 234 Z" fill="var(--color-primary-500)" />
       <!-- arm: elbow on knee, hand to chin -->
       <path d="M254 226 Q246 222 244 212 Q243 207 248 208 Q252 209 253 214 Q254 220 260 222 Z" fill="var(--color-primary-600)" opacity="0.9" />
-      <ellipse cx="247" cy="210" rx="4" ry="3.5" fill="#f0c29a" />
+      <ellipse cx="247" cy="210" rx="4" ry="3.5" fill="var(--color-illustration-sand)" />
       <!-- head tilted up toward the hourglass -->
       <g class="es-head">
-        <ellipse cx="250" cy="200" rx="11" ry="12" fill="#f0c29a" transform="rotate(-12 250 200)" />
-        <path d="M239 196 Q236 184 249 182 Q262 183 261 195 Q261 188 255 187 Q258 191 256 196 Q251 188 245 190 Q240 191 239 197 Z" fill="#5b4a3a" />
-        <circle cx="246" cy="198" r="1.5" fill="#3a2f25" />
-        <path d="M243 203 Q246 205 249 202" stroke="#b5764a" stroke-width="1.4" stroke-linecap="round" fill="none" />
+        <ellipse cx="250" cy="200" rx="11" ry="12" fill="var(--color-illustration-sand)" transform="rotate(-12 250 200)" />
+        <path d="M239 196 Q236 184 249 182 Q262 183 261 195 Q261 188 255 187 Q258 191 256 196 Q251 188 245 190 Q240 191 239 197 Z" fill="var(--color-illustration-umber)" />
+        <circle cx="246" cy="198" r="1.5" fill="var(--color-illustration-espresso)" />
+        <path d="M243 203 Q246 205 249 202" stroke="var(--color-illustration-clay)" stroke-width="1.4" stroke-linecap="round" fill="none" />
       </g>
     </g>
   </svg>

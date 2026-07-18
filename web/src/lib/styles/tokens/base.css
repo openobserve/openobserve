@@ -545,4 +545,18 @@
   --color-wildcard-bar-green: #55A76A;
   --color-wildcard-bar-orange: #E56D17;
   --color-wildcard-bar-purple: #834DF0;
+
+  /* Empty-state illustration palette — a fixed warm-earth decorative set for
+     the empty-state character/scene art. Theme-independent by design (like the
+     brand replicas): the illustrations read the same in light and dark.
+     Consumed as SVG fill/stroke in lib/core/EmptyState/illustrations/**;
+     not registered as Tailwind utilities. Ordered light → dark. */
+  --color-illustration-sand:     #f0c29a;
+  --color-illustration-tan:      #e8b48c;
+  --color-illustration-clay:     #b5764a;
+  --color-illustration-bark:     #8a6d4f;
+  --color-illustration-wood:     #7a5e43;
+  --color-illustration-umber:    #5b4a3a;
+  --color-illustration-cocoa:    #4a3b2d;
+  --color-illustration-espresso: #3a2f25;
 }
