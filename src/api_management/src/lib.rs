@@ -18,11 +18,10 @@
 #![recursion_limit = "256"]
 #![feature(variant_count)]
 
-// Path-compatibility re-exports: these modules are owned by their source
-// crates; re-exporting them keeps `crate::extractors`, `crate::common`, and
-// `crate::service` paths working in handlers moved from `openobserve-api`.
+// The extractor remains a public transport contract. Core aliases are private while handlers are
+// migrated to direct domain-crate imports.
 pub use openobserve_api_common::extractors;
-pub use openobserve_core::{common, service};
+use openobserve_core::{self as service, common};
 
 pub mod auth;
 pub mod models;

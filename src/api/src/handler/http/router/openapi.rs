@@ -236,7 +236,7 @@ use crate::{common::meta, handler::http::request};
         request::search::search_stream::search_http2_stream,
         request::search::search_stream::values_http2_stream,
         request::patterns::extract_patterns,
-        crate::service::traces::service_graph::api::get_current_topology,
+        openobserve_core::traces::service_graph::api::get_current_topology,
         request::service_streams::list_services,
         request::service_streams::get_dimension_analytics,
         request::service_streams::correlate_streams,
@@ -454,7 +454,7 @@ use crate::{common::meta, handler::http::request};
             // Backfill
             request::pipelines::backfill::BackfillRequest,
             request::pipelines::backfill::BackfillResponse,
-            crate::service::alerts::backfill::BackfillJobStatus,
+            openobserve_core::alerts::backfill::BackfillJobStatus,
             // Synthetics
             config::meta::synthetics::Synthetic,
             config::meta::synthetics::SyntheticType,

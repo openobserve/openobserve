@@ -537,7 +537,7 @@ pub mod deprecated {
 
 #[cfg(test)]
 mod tests {
-    use openobserve_core::service::folders::FolderError;
+    use openobserve_core::folders::FolderError;
 
     use super::*;
 

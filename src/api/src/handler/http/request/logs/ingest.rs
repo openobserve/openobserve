@@ -26,11 +26,11 @@ use config::{
     axum::middlewares::{get_process_time, insert_process_time_header},
     meta::otlp::OtlpRequestType,
 };
+#[cfg(feature = "cloud")]
+use openobserve_core::ingestion::check_ingestion_allowed;
 use opentelemetry_proto::tonic::collector::logs::v1::ExportLogsServiceRequest;
 use prost::Message;
 
-#[cfg(feature = "cloud")]
-use crate::service::ingestion::check_ingestion_allowed;
 use crate::{
     common::{
         meta::{

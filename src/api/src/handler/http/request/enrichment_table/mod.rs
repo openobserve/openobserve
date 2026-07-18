@@ -233,8 +233,7 @@ pub async fn save_enrichment_table_from_url(
 ) -> Response {
     use catalog::enrichment::{delete_url_job, get_url_jobs_for_table, save_url_job};
     use config::meta::enrichment_table::{EnrichmentTableStatus, EnrichmentTableUrlJob};
-
-    use crate::service::enrichment_table::url_processor::trigger_url_job_processing;
+    use openobserve_core::enrichment_table::url_processor::trigger_url_job_processing;
 
     let request_body = body;
 
@@ -514,7 +513,7 @@ pub async fn save_enrichment_table_from_url(
         // Retry: already checked before, reuse the value
         if !resume && !retry {
             let supports_range = {
-                use crate::service::enrichment_table::url_processor::check_range_support_for_url;
+                use openobserve_core::enrichment_table::url_processor::check_range_support_for_url;
                 match check_range_support_for_url(&job.url, &org_id, &table_name).await {
                     Ok(true) => {
                         log::info!(

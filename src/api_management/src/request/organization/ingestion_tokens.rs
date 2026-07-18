@@ -65,7 +65,7 @@ pub async fn list_ingestion_tokens(
     {
         let user_id = _user_email.user_id.as_str();
         if !crate::common::utils::auth::is_root_user(user_id) {
-            match crate::service::users::get_user(Some(&org_id), user_id).await {
+            match openobserve_core::users::get_user(Some(&org_id), user_id).await {
                 Some(initiator)
                     if initiator.role == config::meta::user::UserRole::Admin
                         || initiator.role == config::meta::user::UserRole::Root => {}
@@ -122,7 +122,7 @@ pub async fn create_ingestion_token(
     #[cfg(not(feature = "enterprise"))]
     {
         if !crate::common::utils::auth::is_root_user(user_id) {
-            match crate::service::users::get_user(Some(&org_id), user_id).await {
+            match openobserve_core::users::get_user(Some(&org_id), user_id).await {
                 Some(initiator)
                     if initiator.role == config::meta::user::UserRole::Admin
                         || initiator.role == config::meta::user::UserRole::Root => {}
@@ -181,7 +181,7 @@ pub async fn enable_disable_ingestion_token(
     #[cfg(not(feature = "enterprise"))]
     {
         if !crate::common::utils::auth::is_root_user(_user_id) {
-            match crate::service::users::get_user(Some(&org_id), _user_id).await {
+            match openobserve_core::users::get_user(Some(&org_id), _user_id).await {
                 Some(initiator)
                     if initiator.role == config::meta::user::UserRole::Admin
                         || initiator.role == config::meta::user::UserRole::Root => {}

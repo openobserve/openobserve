@@ -189,13 +189,13 @@ pub async fn chat(Path(org_id): Path<String>, in_req: axum::extract::Request) ->
         // Stripe billing; unpaid orgs get a hard 402.
         #[cfg(feature = "cloud")]
         {
-            let deduction = crate::service::trial_quota::try_deduct(
+            let deduction = openobserve_core::trial_quota::try_deduct(
                 org_id_str,
-                crate::service::trial_quota::TrialQuotaFeature::AiChat,
+                openobserve_core::trial_quota::TrialQuotaFeature::AiChat,
             )
             .await;
 
-            let usage_ctx = crate::service::trial_quota::AiUsageContext {
+            let usage_ctx = openobserve_core::trial_quota::AiUsageContext {
                 user_email: user_id.to_string(),
                 trace_id: Some(trace_id.clone()),
                 session_id: None,
@@ -203,18 +203,19 @@ pub async fn chat(Path(org_id): Path<String>, in_req: axum::extract::Request) ->
             };
             match &deduction {
                 Ok(_) => {
-                    crate::service::trial_quota::record_free_ai_usage(
+                    openobserve_core::trial_quota::record_free_ai_usage(
                         org_id_str,
                         &usage_ctx,
-                        crate::service::trial_quota::TrialQuotaFeature::AiChat,
+                        openobserve_core::trial_quota::TrialQuotaFeature::AiChat,
                     );
                 }
                 Err(e) => {
-                    if crate::service::trial_quota::org_has_active_subscription(org_id_str).await {
-                        crate::service::trial_quota::record_billable_ai_usage(
+                    if openobserve_core::trial_quota::org_has_active_subscription(org_id_str).await
+                    {
+                        openobserve_core::trial_quota::record_billable_ai_usage(
                             org_id_str,
                             &usage_ctx,
-                            crate::service::trial_quota::TrialQuotaFeature::AiChat,
+                            openobserve_core::trial_quota::TrialQuotaFeature::AiChat,
                         );
                     } else {
                         return MetaHttpResponse::payment_required(e.to_string());
@@ -619,13 +620,13 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
         // Stripe billing; unpaid orgs get a hard 402.
         #[cfg(feature = "cloud")]
         {
-            let deduction = crate::service::trial_quota::try_deduct(
+            let deduction = openobserve_core::trial_quota::try_deduct(
                 &org_id_str,
-                crate::service::trial_quota::TrialQuotaFeature::AiChat,
+                openobserve_core::trial_quota::TrialQuotaFeature::AiChat,
             )
             .await;
 
-            let usage_ctx = crate::service::trial_quota::AiUsageContext {
+            let usage_ctx = openobserve_core::trial_quota::AiUsageContext {
                 user_email: user_id.clone(),
                 trace_id: Some(trace_id.clone()),
                 session_id: forward_headers
@@ -635,18 +636,19 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
             };
             match &deduction {
                 Ok(_) => {
-                    crate::service::trial_quota::record_free_ai_usage(
+                    openobserve_core::trial_quota::record_free_ai_usage(
                         &org_id_str,
                         &usage_ctx,
-                        crate::service::trial_quota::TrialQuotaFeature::AiChat,
+                        openobserve_core::trial_quota::TrialQuotaFeature::AiChat,
                     );
                 }
                 Err(e) => {
-                    if crate::service::trial_quota::org_has_active_subscription(&org_id_str).await {
-                        crate::service::trial_quota::record_billable_ai_usage(
+                    if openobserve_core::trial_quota::org_has_active_subscription(&org_id_str).await
+                    {
+                        openobserve_core::trial_quota::record_billable_ai_usage(
                             &org_id_str,
                             &usage_ctx,
-                            crate::service::trial_quota::TrialQuotaFeature::AiChat,
+                            openobserve_core::trial_quota::TrialQuotaFeature::AiChat,
                         );
                     } else {
                         return MetaHttpResponse::payment_required(e.to_string());

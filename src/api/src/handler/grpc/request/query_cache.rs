@@ -13,12 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use openobserve_core::search::cache::cacher;
 use proto::cluster_rpc::{
     DeleteResultCacheRequest, DeleteResultCacheResponse, query_cache_server::QueryCache,
 };
 use tonic::{Request, Response, Status};
-
-use crate::service::search::cache::cacher;
 
 #[derive(Default)]
 pub struct QueryCacheServerImpl;

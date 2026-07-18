@@ -30,7 +30,7 @@ pub async fn process_expired_batches() {
 
         #[cfg(feature = "enterprise")]
         {
-            let batches = crate::service::alerts::grouping::get_expired_batches();
+            let batches = openobserve_core::alerts::grouping::get_expired_batches();
 
             if !batches.is_empty() {
                 log::debug!(
@@ -40,7 +40,7 @@ pub async fn process_expired_batches() {
 
                 for batch in batches {
                     if let Err(e) =
-                        crate::service::alerts::grouping::send_grouped_notification(batch).await
+                        openobserve_core::alerts::grouping::send_grouped_notification(batch).await
                     {
                         log::error!(
                             "[alert_grouping_worker] Error sending grouped notification: {}",

@@ -56,7 +56,6 @@ use {
         jwt::process_token,
         validator::{ID_TOKEN_HEADER, PKCE_STATE_ORG, get_user_email_from_auth_str},
     },
-    crate::service::telemetry::{AuditEvent, AuditProtocol, AuditResponse, audit},
     config::{ider, utils::time::now_micros},
     o2_dex::{
         config::{get_config as get_dex_config, refresh_config as refresh_dex_config},
@@ -72,6 +71,7 @@ use {
     o2_openfga::config::{
         get_config as get_openfga_config, refresh_config as refresh_openfga_config,
     },
+    openobserve_core::telemetry::{AuditEvent, AuditProtocol, AuditResponse, audit},
 };
 
 use crate::{
@@ -595,7 +595,8 @@ pub async fn cache_status() -> impl IntoResponse {
     );
 
     #[cfg(feature = "enterprise")]
-    let (total_count, expired_count) = crate::service::search::cardinality::get_cache_stats().await;
+    let (total_count, expired_count) =
+        openobserve_core::search::cardinality::get_cache_stats().await;
     #[cfg(not(feature = "enterprise"))]
     let (total_count, expired_count) = (0, 0);
     stats.insert(
@@ -604,7 +605,7 @@ pub async fn cache_status() -> impl IntoResponse {
     );
 
     // query cache
-    let (len, cap, mem_size) = crate::service::promql::search::get_cache_stats().await;
+    let (len, cap, mem_size) = openobserve_core::promql::search::get_cache_stats().await;
     stats.insert(
         "PROMQL_QUERY_CACHE",
         json::json!({"len": len, "cap": cap, "mem_size": mem_size}),
@@ -773,7 +774,7 @@ pub async fn cache_status() -> impl IntoResponse {
 
     // Organization streams cache from
     // src/core/src/service/db/compact/organization.rs line 21
-    let (len, cap, mem_size) = crate::service::db::compact::organization::STREAMS.stats();
+    let (len, cap, mem_size) = maintenance::compact::organization::STREAMS.stats();
     stats.insert(
         "COMPACT_ORGANIZATION_STREAMS",
         json::json!({"len": len, "cap": cap, "mem_size": mem_size}),
@@ -966,9 +967,9 @@ pub async fn redirect(Query(query): Query<std::collections::HashMap<String, Stri
     };
 
     match query.get("state") {
-        Some(code) => match crate::service::kv::get(PKCE_STATE_ORG, code).await {
+        Some(code) => match openobserve_core::kv::get(PKCE_STATE_ORG, code).await {
             Ok(_) => {
-                let _ = crate::service::kv::delete(PKCE_STATE_ORG, code).await;
+                let _ = openobserve_core::kv::delete(PKCE_STATE_ORG, code).await;
             }
             Err(_) => {
                 // Bad Request
@@ -1104,7 +1105,7 @@ pub async fn redirect(Query(query): Query<std::collections::HashMap<String, Stri
             }
 
             // store session_id in cluster co-ordinator
-            if crate::service::session::set_session(&session_id, &access_token)
+            if openobserve_core::session::set_session(&session_id, &access_token)
                 .await
                 .is_none()
             {
@@ -1172,7 +1173,7 @@ pub async fn dex_login() -> impl IntoResponse {
 
     let login_data: PreLoginData = get_dex_login();
     let state = login_data.state.clone();
-    let _ = crate::service::kv::set(PKCE_STATE_ORG, &state, state.clone().into()).await;
+    let _ = openobserve_core::kv::set(PKCE_STATE_ORG, &state, state.clone().into()).await;
 
     crate::common::meta::http::HttpResponse::json(login_data.url)
 }
@@ -1219,8 +1220,10 @@ pub async fn refresh_token_with_dex(
         // remove old session id from cluster co-ordinator
         let access_token = auth_tokens.access_token;
         if access_token.starts_with("session") {
-            crate::service::session::remove_session(access_token.strip_prefix("session ").unwrap())
-                .await;
+            openobserve_core::session::remove_session(
+                access_token.strip_prefix("session ").unwrap(),
+            )
+            .await;
         }
 
         auth_tokens.refresh_token
@@ -1301,7 +1304,7 @@ pub async fn refresh_token_with_dex(
             }
 
             // store session_id in cluster co-ordinator
-            if crate::service::session::set_session(&session_id, &access_token)
+            if openobserve_core::session::set_session(&session_id, &access_token)
                 .await
                 .is_none()
             {
@@ -1413,8 +1416,10 @@ pub async fn logout(
         let access_token = auth_tokens.access_token;
 
         if access_token.starts_with("session") {
-            crate::service::session::remove_session(access_token.strip_prefix("session ").unwrap())
-                .await;
+            openobserve_core::session::remove_session(
+                access_token.strip_prefix("session ").unwrap(),
+            )
+            .await;
         }
     };
     let auth_cookie = prepare_empty_cookie("auth_tokens", &AuthTokens::default(), &conf);
@@ -1603,7 +1608,7 @@ async fn reload_module_cache(module: &str) -> Result<(), anyhow::Error> {
         "organization" => db::organization::cache().await,
         "user" => db::user::cache().await,
         "session" => db::session::cache().await,
-        "functions" => catalog::functions::cache(crate::service::telemetry::error_sink()).await,
+        "functions" => catalog::functions::cache(openobserve_core::telemetry::error_sink()).await,
         "pipeline" => db::pipeline::cache().await,
         "alerts" => db::alerts::alert::cache().await,
         "destinations" => db::alerts::destinations::cache().await,

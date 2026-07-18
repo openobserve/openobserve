@@ -57,7 +57,7 @@ impl LogsService for LogsServer {
             user_email = user_id.to_str().unwrap();
         };
 
-        match crate::service::logs::otlp::handle_request(
+        match openobserve_core::logs::otlp::handle_request(
             0,
             org_id.unwrap().to_str().unwrap(),
             in_req,

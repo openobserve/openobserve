@@ -32,11 +32,11 @@ use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 #[cfg(feature = "enterprise")]
 use {
-    crate::service::telemetry::{AuditEvent, AuditProtocol, AuditResponse, audit},
     axum::body::{Body, to_bytes},
     base64::{Engine as _, engine::general_purpose},
     config::utils::time::now_micros,
     o2_enterprise::enterprise::common::config::get_config as get_o2_config,
+    openobserve_core::telemetry::{AuditEvent, AuditProtocol, AuditResponse, audit},
 };
 
 use super::request::*;

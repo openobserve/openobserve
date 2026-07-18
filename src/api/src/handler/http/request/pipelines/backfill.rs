@@ -19,17 +19,17 @@ use axum::{
     extract::{Path, Query},
     response::Response,
 };
+#[cfg(feature = "enterprise")]
+use openobserve_core::alerts::backfill;
+pub use openobserve_core::alerts::backfill::BackfillRequest;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 use crate::common::meta::http::HttpResponse as MetaHttpResponse;
-#[cfg(feature = "enterprise")]
-use crate::service::alerts::backfill;
-pub use crate::service::alerts::backfill::BackfillRequest;
 
 #[cfg(feature = "enterprise")]
 async fn ensure_user_pipeline(org_id: &str, pipeline_id: &str) -> Result<(), Response> {
-    crate::service::pipeline::get_user_pipeline(org_id, pipeline_id)
+    openobserve_core::pipeline::get_user_pipeline(org_id, pipeline_id)
         .await
         .map(|_| ())
         .map_err(Into::into)

@@ -36,7 +36,6 @@ use config::{
 use infra::runtime::{create_grpc_runtime, create_job_runtime};
 use openobserve::{
     cli::basic::cli,
-    common::{infra::cluster, meta},
     handler::{
         grpc::{
             auth::check_auth,
@@ -54,15 +53,16 @@ use openobserve::{
         http::router::*,
     },
     job, migration, router,
-    service::{
-        bootstrap,
-        cluster_info::ClusterInfoService,
-        db::{self, scheduler::TriggerModule::QueryRecommendations},
-        metadata,
-        node::NodeService,
-        search::SEARCH_SERVER,
-        self_reporting,
-    },
+};
+use openobserve_core::{
+    bootstrap,
+    cluster_info::ClusterInfoService,
+    common::{infra::cluster, meta},
+    db::{self, scheduler::TriggerModule::QueryRecommendations},
+    metadata,
+    node::NodeService,
+    search::SEARCH_SERVER,
+    self_reporting,
 };
 use opentelemetry::{KeyValue, global, trace::TracerProvider};
 use opentelemetry_otlp::{WithExportConfig, WithHttpConfig, WithTonicConfig};
@@ -263,7 +263,7 @@ async fn main() -> Result<(), anyhow::Error> {
 
             // Register job runtime for metrics collection
             if let Ok(handle) = tokio::runtime::Handle::try_current() {
-                openobserve::service::runtime_metrics::register_runtime("job".to_string(), handle);
+                openobserve_core::runtime_metrics::register_runtime("job".to_string(), handle);
             }
 
             job_init_tx.send(true).ok();
@@ -304,7 +304,7 @@ async fn main() -> Result<(), anyhow::Error> {
         };
 
         // Register gRPC runtime for metrics collection
-        openobserve::service::runtime_metrics::register_runtime(
+        openobserve_core::runtime_metrics::register_runtime(
             "grpc".to_string(),
             rt.handle().clone(),
         );
@@ -328,11 +328,11 @@ async fn main() -> Result<(), anyhow::Error> {
 
     // Register main HTTP runtime for metrics collection
     if let Ok(handle) = tokio::runtime::Handle::try_current() {
-        openobserve::service::runtime_metrics::register_runtime("http".to_string(), handle);
+        openobserve_core::runtime_metrics::register_runtime("http".to_string(), handle);
     }
 
     // Start runtime metrics collector
-    openobserve::service::runtime_metrics::start_metrics_collector().await;
+    openobserve_core::runtime_metrics::start_metrics_collector().await;
 
     // let node online
     let _ = cluster::set_online().await;
@@ -1000,14 +1000,12 @@ impl opentelemetry_sdk::trace::SpanExporter for MetaOrgTraceExporter {
         async move {
             if LOCAL_NODE.is_ingester() {
                 // Ingest directly on ingester nodes
-                match openobserve::service::traces::handle_otlp_request(
+                match openobserve_core::traces::handle_otlp_request(
                     META_ORG_ID,
                     request,
                     config::meta::otlp::OtlpRequestType::HttpJson,
                     None,
-                    openobserve::common::meta::ingestion::IngestUser::SystemJob(
-                        openobserve::common::meta::ingestion::SystemJobType::SelfReporting,
-                    ),
+                    ingestion::IngestUser::SystemJob(ingestion::SystemJobType::SelfReporting),
                 )
                 .await
                 {
@@ -1046,16 +1044,15 @@ impl opentelemetry_sdk::trace::SpanExporter for MetaOrgTraceExporter {
                     }
                 };
 
-                let (_addr, channel) =
-                    match openobserve::service::grpc::get_ingester_channel().await {
-                        Ok(v) => v,
-                        Err(e) => {
-                            log::error!("[SEARCH-INSPECTOR] Failed to get ingester channel: {e}");
-                            return Err(opentelemetry_sdk::error::OTelSdkError::InternalFailure(
-                                format!("No ingester available: {e}"),
-                            ));
-                        }
-                    };
+                let (_addr, channel) = match openobserve_core::grpc::get_ingester_channel().await {
+                    Ok(v) => v,
+                    Err(e) => {
+                        log::error!("[SEARCH-INSPECTOR] Failed to get ingester channel: {e}");
+                        return Err(opentelemetry_sdk::error::OTelSdkError::InternalFailure(
+                            format!("No ingester available: {e}"),
+                        ));
+                    }
+                };
 
                 let client = opentelemetry_proto::tonic::collector::trace::v1::trace_service_client::TraceServiceClient::with_interceptor(
                     channel,

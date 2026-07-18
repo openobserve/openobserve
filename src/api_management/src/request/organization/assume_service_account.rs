@@ -120,7 +120,7 @@ pub async fn assume_service_account(
     }
 
     // Step 2: Call enterprise implementation
-    use crate::service::{db, users};
+    use openobserve_core::{db, users};
 
     // Clone for use in the session creation closure
     let target_service_account_for_session = target_service_account.clone();

@@ -17,10 +17,9 @@
 //! billings API endpoints.
 
 use o2_enterprise::enterprise::cloud::billings as cloud_billings;
+pub use openobserve_core::org_usage::{GetOrgUsageResponseBody, OrgUserData};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
-
-pub use crate::service::org_usage::{GetOrgUsageResponseBody, OrgUserData};
 
 #[derive(Debug, Deserialize)]
 pub struct CheckoutSessionDetailRequestQuery {

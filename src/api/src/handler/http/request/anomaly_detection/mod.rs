@@ -19,12 +19,12 @@ use axum::{
     http::StatusCode,
     response::{IntoResponse, Response},
 };
+pub use openobserve_core::anomaly_detection::{
+    CreateAnomalyConfigRequest, UpdateAnomalyConfigRequest,
+};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-pub use crate::service::anomaly_detection::{
-    CreateAnomalyConfigRequest, UpdateAnomalyConfigRequest,
-};
 use crate::{
     common::{meta::http::HttpResponse as MetaHttpResponse, utils::auth::UserEmail},
     handler::http::extractors::Headers,

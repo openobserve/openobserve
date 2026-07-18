@@ -17,13 +17,13 @@ use axum::{
     extract::{Path, Query},
     response::Response,
 };
+#[cfg(test)]
+use openobserve_core::llm_evaluations::eval_jobs::EvalJobError;
 
 #[cfg(feature = "enterprise")]
 use crate::common::utils::auth::UserEmail;
 #[cfg(feature = "enterprise")]
 use crate::handler::http::extractors::Headers;
-#[cfg(test)]
-use crate::service::llm_evaluations::eval_jobs::EvalJobError;
 use crate::{
     common::meta::http::HttpResponse as MetaHttpResponse,
     handler::http::models::eval_jobs::{

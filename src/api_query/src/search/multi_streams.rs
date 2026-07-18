@@ -36,17 +36,17 @@ use config::{
 use futures::stream::StreamExt;
 use hashbrown::HashMap;
 use infra::errors;
+#[cfg(feature = "enterprise")]
+use openobserve_core::search::sql::visitor::cipher_key::get_cipher_key_names;
 use tokio::sync::mpsc;
 use tracing::{Instrument, Span};
 use transform::{apply_vrl_fn, compile_vrl_function, init_vrl_runtime};
 #[cfg(feature = "cloud")]
 use {
-    crate::service::organization::is_org_in_free_trial_period,
     axum::http::StatusCode as AxumStatusCode,
+    openobserve_core::organization::is_org_in_free_trial_period,
 };
 
-#[cfg(feature = "enterprise")]
-use crate::service::search::sql::visitor::cipher_key::get_cipher_key_names;
 #[cfg(feature = "enterprise")]
 use crate::{
     common::meta::search::AuditContext,
@@ -300,7 +300,7 @@ pub async fn search_multi(
                     get_user(Some(&org_id), user_id).await.unwrap();
                 let stream_type_str = stream_type.as_str();
 
-                if !crate::service::authz::check_permissions(
+                if !openobserve_core::authz::check_permissions(
                     user_id,
                     AuthExtractor {
                         auth: "".to_string(),
@@ -344,7 +344,7 @@ pub async fn search_multi(
                     let user: config::meta::user::User =
                         get_user(Some(&org_id), user_id).await.unwrap();
 
-                    if !crate::service::authz::check_permissions(
+                    if !openobserve_core::authz::check_permissions(
                         user_id,
                         AuthExtractor {
                             auth: "".to_string(),
@@ -1326,7 +1326,7 @@ pub async fn search_multi_stream(
 
             // Check permissions for each unique stream
             for stream_name in stream_names {
-                if !crate::service::authz::check_permissions(
+                if !openobserve_core::authz::check_permissions(
                     &user_id,
                     AuthExtractor {
                         auth: "".to_string(),

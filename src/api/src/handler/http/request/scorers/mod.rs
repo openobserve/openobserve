@@ -463,7 +463,7 @@ async fn run_scorer_test(
     match &scorer.scorer_type {
         infra::table::scorers::ScorerType::LlmJudge => {
             let prepared =
-                crate::service::llm_evaluations::prepared_scorers::PreparedLlmJudgeScorer::prepare_with_score_config_info(
+                openobserve_core::llm_evaluations::prepared_scorers::PreparedLlmJudgeScorer::prepare_with_score_config_info(
                     org_id,
                     &scorer,
                     score_config_info,
@@ -505,7 +505,7 @@ async fn run_scorer_test(
         }
         infra::table::scorers::ScorerType::Remote => {
             let remote_cfg =
-                crate::service::llm_evaluations::prepared_scorers::PreparedRemoteScorer::prepare(
+                openobserve_core::llm_evaluations::prepared_scorers::PreparedRemoteScorer::prepare(
                     org_id, &scorer,
                 )
                 .await

@@ -59,7 +59,7 @@ impl MetricsService for MetricsIngester {
 
         let user = IngestUser::from_user_email(user_email);
 
-        let resp = crate::service::metrics::otlp::handle_otlp_request(
+        let resp = openobserve_core::metrics::otlp::handle_otlp_request(
             org_id.unwrap().to_str().unwrap(),
             in_req,
             OtlpRequestType::Grpc,

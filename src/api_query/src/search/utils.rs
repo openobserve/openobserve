@@ -20,10 +20,9 @@ use config::{
 };
 use hashbrown::HashMap;
 use infra::errors::{Error, ErrorCodes};
-
 #[cfg(feature = "enterprise")]
-pub use crate::service::authz::{StreamPermissionResourceType, check_stream_permissions};
-use crate::service::search::sql::Sql;
+pub use openobserve_core::authz::{StreamPermissionResourceType, check_stream_permissions};
+use openobserve_core::search::sql::Sql;
 
 // ============================================================================
 // Query Validation Helpers

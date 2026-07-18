@@ -828,7 +828,7 @@ async fn publish_org_not_found_error(org_id: &str, user_email: &str) {
         }),
     };
 
-    crate::service::telemetry::publish_error(error_data).await;
+    openobserve_core::telemetry::publish_error(error_data).await;
 }
 
 #[cfg(feature = "cloud")]
@@ -839,8 +839,7 @@ pub async fn check_and_add_to_org(
     use config::{ider, utils::json};
     use o2_enterprise::enterprise::cloud::OrgInviteStatus;
     use o2_openfga::authorizer::authz::save_org_tuples;
-
-    use crate::service::users::{add_admin_to_org, create_new_user};
+    use openobserve_core::users::{add_admin_to_org, create_new_user};
     let o2cfg = get_openfga_config();
 
     let mut is_new_user = false;
@@ -900,7 +899,7 @@ pub async fn check_and_add_to_org(
     }
     let org_users = org_users.map(|orgs| {
         orgs.into_iter()
-            .filter(|o| !crate::service::db::org_status::is_blocked(&o.org_id))
+            .filter(|o| !organization_domain::org_status::is_blocked(&o.org_id))
             .collect::<Vec<_>>()
     });
 
@@ -1142,7 +1141,7 @@ async fn process_custom_claim_parsing(
                     }),
                 };
 
-                crate::service::telemetry::publish_error(error_data).await;
+                openobserve_core::telemetry::publish_error(error_data).await;
             }) as std::pin::Pin<Box<dyn std::future::Future<Output = ()> + Send>>
         };
 

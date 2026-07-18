@@ -30,14 +30,14 @@ use config::{
 };
 use futures::stream::StreamExt;
 use hashbrown::HashMap;
+#[cfg(feature = "cloud")]
+use openobserve_core::ingestion::check_ingestion_allowed;
+// Re-export service graph API handlers
+pub use openobserve_core::traces::service_graph::{self, get_current_topology, get_edge_history};
 use serde::Serialize;
 use tokio::sync::mpsc;
 use tracing::{Instrument, Span};
 
-#[cfg(feature = "cloud")]
-use crate::service::ingestion::check_ingestion_allowed;
-// Re-export service graph API handlers
-pub use crate::service::traces::service_graph::{self, get_current_topology, get_edge_history};
 use crate::{
     common::{
         meta::http::{CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO, HttpResponse as MetaHttpResponse},
@@ -212,7 +212,8 @@ pub async fn get_latest_traces(
 
     #[cfg(feature = "enterprise")]
     {
-        if let Err(e) = crate::service::search::check_search_allowed(&org_id, Some(&stream_name)) {
+        if let Err(e) = openobserve_core::search::check_search_allowed(&org_id, Some(&stream_name))
+        {
             return MetaHttpResponse::too_many_requests(e.to_string());
         }
     }
@@ -246,7 +247,7 @@ pub async fn get_latest_traces(
             let user: config::meta::user::User = get_user(Some(&org_id), user_id).await.unwrap();
             let stream_type_str = StreamType::Traces.as_str();
 
-            if !crate::service::authz::check_permissions(
+            if !openobserve_core::authz::check_permissions(
                 user_id,
                 AuthExtractor {
                     auth: "".to_string(),
@@ -929,7 +930,8 @@ pub async fn get_latest_traces_stream(
 
     #[cfg(feature = "enterprise")]
     {
-        if let Err(e) = crate::service::search::check_search_allowed(&org_id, Some(&stream_name)) {
+        if let Err(e) = openobserve_core::search::check_search_allowed(&org_id, Some(&stream_name))
+        {
             return MetaHttpResponse::too_many_requests(e.to_string());
         }
     }
@@ -962,7 +964,7 @@ pub async fn get_latest_traces_stream(
             let user: config::meta::user::User = get_user(Some(&org_id), user_id).await.unwrap();
             let stream_type_str = StreamType::Traces.as_str();
 
-            if !crate::service::authz::check_permissions(
+            if !openobserve_core::authz::check_permissions(
                 user_id,
                 AuthExtractor {
                     auth: "".to_string(),

@@ -14,6 +14,8 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::{cluster::LOCAL_NODE, spawn_pausable_job};
+#[cfg(any(feature = "enterprise", feature = "cloud"))]
+use openobserve_core::telemetry;
 use regex::Regex;
 #[cfg(feature = "enterprise")]
 use {
@@ -21,8 +23,6 @@ use {
     o2_openfga::config::get_config as get_openfga_config,
 };
 
-#[cfg(any(feature = "enterprise", feature = "cloud"))]
-use crate::service::telemetry;
 use crate::{
     common::meta::{
         organization::DEFAULT_ORG,
@@ -66,7 +66,7 @@ async fn patch_sre_readonly_alerts_incidents() {
     const MIGRATION_ORG: &str = "_migration";
     const FLAG_KEY: &str = "sre_readonly_afolder_incidents_v2";
 
-    if crate::service::kv::get(MIGRATION_ORG, FLAG_KEY)
+    if openobserve_core::kv::get(MIGRATION_ORG, FLAG_KEY)
         .await
         .is_ok()
     {
@@ -87,7 +87,7 @@ async fn patch_sre_readonly_alerts_incidents() {
         return;
     }
 
-    let orgs = match crate::service::db::organization::list(None).await {
+    let orgs = match openobserve_core::db::organization::list(None).await {
         Ok(orgs) => orgs,
         Err(e) => {
             log::error!("Failed to list orgs for sre-readonly alerts/incidents patch: {e}");
@@ -115,7 +115,7 @@ async fn patch_sre_readonly_alerts_incidents() {
     }
 
     if let Err(e) =
-        crate::service::kv::set(MIGRATION_ORG, FLAG_KEY, Bytes::from_static(b"done")).await
+        openobserve_core::kv::set(MIGRATION_ORG, FLAG_KEY, Bytes::from_static(b"done")).await
     {
         log::error!("Failed to set sre_readonly_afolder_incidents migration flag: {e}");
     } else {
@@ -132,7 +132,7 @@ async fn backfill_sys_rca_agent_openfga_tuples() {
     const FLAG_KEY: &str = "sys_rca_agent_openfga_migration_v1";
 
     // Check if already done via KV flag
-    if crate::service::kv::get(MIGRATION_ORG, FLAG_KEY)
+    if openobserve_core::kv::get(MIGRATION_ORG, FLAG_KEY)
         .await
         .is_ok()
     {
@@ -140,11 +140,11 @@ async fn backfill_sys_rca_agent_openfga_tuples() {
     }
 
     // Get all orgs and ensure SA exists (idempotent — creates OpenFGA tuples for existing DB rows)
-    match crate::service::db::organization::list(None).await {
+    match openobserve_core::db::organization::list(None).await {
         Ok(orgs) => {
             for org in orgs {
                 if let Err(e) =
-                    crate::service::organization::ensure_sys_rca_agent(&org.identifier).await
+                    openobserve_core::organization::ensure_sys_rca_agent(&org.identifier).await
                 {
                     log::warn!(
                         "Failed to backfill SysRcaAgent OpenFGA tuples for org '{}': {e}",
@@ -154,7 +154,8 @@ async fn backfill_sys_rca_agent_openfga_tuples() {
             }
             // Set flag so we don't run again
             if let Err(e) =
-                crate::service::kv::set(MIGRATION_ORG, FLAG_KEY, Bytes::from_static(b"done")).await
+                openobserve_core::kv::set(MIGRATION_ORG, FLAG_KEY, Bytes::from_static(b"done"))
+                    .await
             {
                 log::error!("Failed to set OpenFGA backfill flag: {e}");
             } else {
@@ -178,7 +179,7 @@ async fn enforce_usage_stream_retention() {
         && s.data_retention < 32
     {
         s.data_retention = 32;
-        crate::service::stream::save_stream_settings(
+        openobserve_core::stream::save_stream_settings(
             META_ORG_ID,
             USAGE_STREAM,
             StreamType::Logs,
@@ -312,7 +313,8 @@ pub async fn init() -> Result<(), anyhow::Error> {
         {
             panic!("ZO_ROOT_USER_PASSWORD is too weak: {msg}");
         }
-        let _ = crate::service::organization::check_and_create_org_without_ofga(DEFAULT_ORG).await;
+        let _ =
+            openobserve_core::organization::check_and_create_org_without_ofga(DEFAULT_ORG).await;
         if let Err(e) = users::create_root_user(
             DEFAULT_ORG,
             UserRequest {
@@ -349,7 +351,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     // This ensures the stale job recovery task starts even if this ingester
     // never receives a URL enrichment event. Critical for distributed deployments.
     if LOCAL_NODE.is_ingester() {
-        crate::service::enrichment_table::init_url_processor();
+        openobserve_core::enrichment_table::init_url_processor();
     }
 
     db::user::cache().await.expect("user cache failed");
@@ -471,15 +473,14 @@ pub async fn init() -> Result<(), anyhow::Error> {
     // initialize metadata watcher
     tokio::task::spawn(catalog::schema::watch(
         |org_id| async move {
-            crate::service::organization::check_and_create_org(&org_id)
+            openobserve_core::organization::check_and_create_org(&org_id)
                 .await
                 .map(|_| ())
         },
         |org_id, stream_type, stream_name| async move {
-            crate::service::db::compact::files::del_offset(&org_id, stream_type, &stream_name)
-                .await?;
+            maintenance::compact::files::del_offset(&org_id, stream_type, &stream_name).await?;
             tokio::task::spawn(async move {
-                if let Err(error) = crate::service::catalog_runtime::flush_cache_for_stream(
+                if let Err(error) = openobserve_core::catalog_runtime::flush_cache_for_stream(
                     &org_id,
                     stream_type,
                     &stream_name,
@@ -534,7 +535,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     if LOCAL_NODE.is_ingester() || LOCAL_NODE.is_querier() || LOCAL_NODE.is_alert_manager() {
         tokio::task::spawn(catalog::enrichment::watch(
             |org_id, stream_name, apply_primary_region| async move {
-                crate::service::enrichment::get_enrichment_table(
+                openobserve_core::enrichment::get_enrichment_table(
                     &org_id,
                     &stream_name,
                     apply_primary_region,
@@ -548,7 +549,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
 
     // cache core metadata
     catalog::schema::cache().await.expect("stream cache failed");
-    catalog::functions::cache(crate::service::telemetry::error_sink())
+    catalog::functions::cache(openobserve_core::telemetry::error_sink())
         .await
         .expect("functions cache failed");
     db::compact::retention::cache()
@@ -665,7 +666,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
                         return Ok(());
                     }
 
-                    crate::service::self_reporting::ensure_llm_scores_stream_initialized(&org_id)
+                    openobserve_core::self_reporting::ensure_llm_scores_stream_initialized(&org_id)
                         .await
                         .map_err(|e| anyhow::anyhow!(e))?;
 
@@ -679,7 +680,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
                         metadata: None,
                     };
 
-                    match crate::service::ingestion::ingestion_service::ingest(req).await {
+                    match openobserve_core::ingestion::ingestion_service::ingest(req).await {
                         Ok(resp) if resp.status_code == 200 => Ok(()),
                         Ok(resp) => Err(anyhow::anyhow!(
                             "_llm_scores ingestion failed with status {}: {}",
@@ -695,12 +696,12 @@ pub async fn init() -> Result<(), anyhow::Error> {
         o2_enterprise::enterprise::llm_evaluations::eval_jobs::async_executor::register_evaluator_trace_exporter(
             |org_id, traces, node_idx| {
                 Box::pin(async move {
-                    if let Err(e) = crate::service::self_reporting::ensure_evaluator_stream_initialized(&org_id).await {
+                    if let Err(e) = openobserve_core::self_reporting::ensure_evaluator_stream_initialized(&org_id).await {
                         log::warn!(
                             "[Pipeline]: LLM evaluation node {node_idx} failed to ensure _evaluator stream initialized for {org_id}: {e}"
                         );
                     }
-                    crate::service::llm_evaluations::evaluator_trace_exporter::EvaluatorTraceExporter::export(
+                    openobserve_core::llm_evaluations::evaluator_trace_exporter::EvaluatorTraceExporter::export(
                         &org_id,
                         traces,
                         node_idx,
@@ -713,7 +714,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
         o2_enterprise::enterprise::anomaly_detection::query_executor::register_query_executor(
             |org_id, sql, start, end, cfg_id, stream_type| {
                 Box::pin(async move {
-                    crate::service::anomaly_detection::execute_anomaly_query(
+                    openobserve_core::anomaly_detection::execute_anomaly_query(
                         &org_id,
                         &sql,
                         start,
@@ -729,7 +730,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
         o2_enterprise::enterprise::anomaly_detection::query_executor::register_anomaly_writer(
             |org_id, records| {
                 Box::pin(async move {
-                    crate::service::anomaly_detection::write_anomalies_to_stream(&org_id, records)
+                    openobserve_core::anomaly_detection::write_anomalies_to_stream(&org_id, records)
                         .await
                 })
             },
@@ -747,7 +748,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
              window_start_us,
              window_end_us| {
                 Box::pin(async move {
-                    crate::service::anomaly_detection::send_anomaly_alert(
+                    openobserve_core::anomaly_detection::send_anomaly_alert(
                         org_id,
                         dest_id,
                         cfg_name,
@@ -770,11 +771,11 @@ pub async fn init() -> Result<(), anyhow::Error> {
             |org_id, config_id| {
                 Box::pin(async move {
                     use config::{meta::triggers::TriggerModule, utils::time::now_micros};
-                    match crate::service::db::scheduler::get(&org_id, TriggerModule::AnomalyDetection, &config_id).await {
+                    match automation::scheduler::get(&org_id, TriggerModule::AnomalyDetection, &config_id).await {
                         Ok(mut trigger) => {
                             trigger.next_run_at = now_micros();
-                            trigger.status = crate::service::db::scheduler::TriggerStatus::Waiting;
-                            crate::service::db::scheduler::update_trigger(trigger, false, "").await
+                            trigger.status = automation::scheduler::TriggerStatus::Waiting;
+                            automation::scheduler::update_trigger(trigger, false, "").await
                                 .map_err(|e| anyhow::anyhow!(e))
                         }
                         Err(e) => {
@@ -792,7 +793,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
                     use config::meta::self_reporting::usage::{
                         TriggerData, TriggerDataStatus, TriggerDataType,
                     };
-                    crate::service::telemetry::report_trigger(TriggerData {
+                    openobserve_core::telemetry::report_trigger(TriggerData {
                         _timestamp: start_us,
                         org: org_id,
                         module: TriggerDataType::AnomalyDetectionTraining,
@@ -828,7 +829,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     {
         // Ensure every enabled anomaly config has a live detection trigger after restart.
         // Handles: trigger row missing, or stuck in Processing from a previous crash.
-        crate::service::anomaly_detection::recover_detection_triggers_on_startup().await;
+        openobserve_core::anomaly_detection::recover_detection_triggers_on_startup().await;
 
         if let Err(e) =
             o2_enterprise::enterprise::anomaly_detection::scheduler::start_scheduler().await
@@ -845,7 +846,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(alert_manager::run());
     #[cfg(feature = "enterprise")]
     tokio::task::spawn(alert_grouping::process_expired_batches());
-    tokio::task::spawn(crate::service::file_downloader::run());
+    tokio::task::spawn(openobserve_core::file_downloader::run());
     // Note: Service discovery extraction runs automatically during parquet file processing
     // See src/jobs/src/job/files/parquet.rs:queue_services_from_data_file for
     // implementation
@@ -949,12 +950,12 @@ pub async fn init() -> Result<(), anyhow::Error> {
         // to fetch tasks and a per-task CAS guards execution; the promotion sweep uses
         // an atomic status CAS — so multiple compactors remain safe, just less
         // contended. (The org_status cache watch loop stays on every node — see below.)
-        tokio::task::spawn(crate::service::org_cleanup::run());
-        tokio::task::spawn(crate::service::org_cleanup::run_promotion_scheduler());
+        tokio::task::spawn(openobserve_core::org_cleanup::run());
+        tokio::task::spawn(openobserve_core::org_cleanup::run_promotion_scheduler());
     }
 
     // load metrics disk cache
-    tokio::task::spawn(crate::service::promql::search::init());
+    tokio::task::spawn(openobserve_core::promql::search::init());
 
     // start pipeline data retention
     #[cfg(feature = "enterprise")]
@@ -982,7 +983,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     // Initialize AI credits from DB, start quota jobs, and other cloud tasks
     #[cfg(feature = "cloud")]
     {
-        crate::service::trial_quota::init_from_db().await;
+        openobserve_core::trial_quota::init_from_db().await;
         cloud::start_trial_quota_jobs();
 
         // OpenFGA migration
@@ -990,7 +991,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
             .await
             .expect("cloud ofga migrations failed");
 
-        use crate::service::{
+        use openobserve_core::{
             search::usage::get_usage, self_reporting::ingest_data_retention_usages,
         };
         o2_enterprise::enterprise::metering::init(
@@ -1024,9 +1025,9 @@ pub async fn init_deferred() -> Result<(), anyhow::Error> {
     #[cfg(feature = "enterprise")]
     {
         o2_enterprise::enterprise::license::start_license_check(
-            crate::service::search::usage::get_usage,
+            openobserve_core::search::usage::get_usage,
             get_nats_lock,
-            crate::service::search::usage::get_license_usage_data_from_node,
+            openobserve_core::search::usage::get_license_usage_data_from_node,
             LOCAL_NODE.is_router() || LOCAL_NODE.is_single_role(),
         )
         .await;
@@ -1044,7 +1045,7 @@ pub async fn init_deferred() -> Result<(), anyhow::Error> {
 
     catalog::schema::cache_enrichment_tables(
         |org_id, stream_name, apply_primary_region| async move {
-            crate::service::enrichment::get_enrichment_table(
+            openobserve_core::enrichment::get_enrichment_table(
                 &org_id,
                 &stream_name,
                 apply_primary_region,

@@ -18,7 +18,7 @@
 #![recursion_limit = "256"]
 
 pub use openobserve_api_common::extractors;
-pub use openobserve_core::{common, service};
+use openobserve_core::{self as service, common};
 
 pub mod promql;
 pub mod search;

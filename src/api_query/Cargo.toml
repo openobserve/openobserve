@@ -11,6 +11,7 @@ path = "src/lib.rs"
 [features]
 default = []
 enterprise = [
+    "resources/enterprise",
     "dep:o2_enterprise",
     "dep:o2_openfga",
     "openobserve-core/enterprise",
@@ -23,6 +24,7 @@ vortex = ["openobserve-core/vortex"]
 openobserve-api-common.workspace = true
 openobserve-core.workspace = true
 catalog.workspace = true
+resources.workspace = true
 search.workspace = true
 transform.workspace = true
 arrow-schema.workspace = true

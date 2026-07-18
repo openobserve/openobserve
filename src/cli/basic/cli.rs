@@ -22,6 +22,7 @@ use infra::{
     db::{ORM_CLIENT, connect_to_orm},
     file_list as infra_file_list, table,
 };
+use search::file_list;
 
 use crate::{
     cli::data::{
@@ -31,7 +32,7 @@ use crate::{
     },
     common::{infra::config::USERS, meta},
     migration,
-    service::{compact, db, file_list, users},
+    service::{compact, db, users},
 };
 
 /// Not to be confused with [`clap::arg`] macro, this is a custom macro that
@@ -444,12 +445,12 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
             }
         }
         "import" => {
-            crate::service::bootstrap::init().await?;
+            openobserve_core::bootstrap::init().await?;
             crate::common::infra::cluster::register_and_keep_alive().await?;
             import::Import::operator(dataCli::arg_matches(command.clone())).await?;
         }
         "export" => {
-            crate::service::bootstrap::init().await?;
+            openobserve_core::bootstrap::init().await?;
             crate::common::infra::cluster::register_and_keep_alive().await?;
             export::Export::operator(dataCli::arg_matches(command.clone())).await?;
         }

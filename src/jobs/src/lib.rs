@@ -19,6 +19,6 @@
 
 #[cfg(feature = "enterprise")]
 pub use openobserve_core::cipher;
-pub use openobserve_core::{common, service};
+use openobserve_core::{self as service, common};
 
 pub mod job;
