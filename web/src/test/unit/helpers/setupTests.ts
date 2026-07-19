@@ -29,7 +29,7 @@ import store from "./store";
 // (some specs mock it). Resolve OTag `labelKey`s against the raw English JSON so
 // registry-labelled badges render real text in component tests.
 import { setBadgeTranslator } from "@/lib/core/Badge/badgeI18n";
-import enMessages from "@/locales/languages/en.json";
+import enMessages from "@/locales/languages/en-US.json";
 setBadgeTranslator((key: string) =>
   key
     .split(".")

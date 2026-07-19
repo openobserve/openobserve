@@ -3,7 +3,7 @@ import { mount, flushPromises } from '@vue/test-utils';
 import FilterGroup from './FilterGroup.vue';
 import { createStore } from 'vuex';
 import { createI18n } from 'vue-i18n';
-import enMessages from '@/locales/languages/en.json';
+import enMessages from '@/locales/languages/en-US.json';
 import { nextTick, defineComponent, reactive, ref } from 'vue';
 import { z } from 'zod';
 import OForm from '@/lib/forms/Form/OForm.vue';
