@@ -15,16 +15,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div
+  <AppPage
     data-test="ai-agent-graph-page"
-    class="flex flex-col h-full min-h-0 overflow-hidden"
+    :title="t('aiObservability.nav.agentGraph')"
+    :subtitle="t('aiObservability.subtitle.agentGraph')"
+    icon="hub"
+    bleed
+    :scroll="false"
   >
-    <AppPageHeader
-      :title="t('aiObservability.nav.agentGraph')"
-      :subtitle="t('aiObservability.subtitle.agentGraph')"
-      icon="hub"
-      class="border-b border-border-default"
-    >
       <template #actions>
         <date-time
           ref="dateTimeRef"
@@ -43,14 +41,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @on:date-change="onDateChange"
         />
       </template>
-    </AppPageHeader>
 
     <!-- Scope control — same Stream/Agent pattern as LLM Insights, so the two
          AI pages read as one product. Stream tab picks a trace stream; Agent
-         tab picks a discovered agent and the graph follows its source_stream. -->
-    <div
-      class="flex items-center gap-3 px-page-edge py-2 border-b border-border-default"
-    >
+         tab picks a discovered agent and the graph follows its source_stream.
+         Lives in AppPage's #subnav (which draws the full-bleed divider). -->
+    <template #subnav>
+    <div class="flex items-center gap-3 px-page-edge py-2">
       <OToggleGroup
         :model-value="filterMode"
         type="single"
@@ -68,7 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         v-if="filterMode === 'stream'"
         data-test="agent-graph-stream-selector"
-        class="w-[14rem] flex-shrink-0"
+        class="w-56 shrink-0"
       >
         <OSelect
           v-model="activeStream"
@@ -83,7 +80,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         v-else
         data-test="agent-graph-agent-selector"
-        class="w-[14rem] flex-shrink-0"
+        class="w-56 shrink-0"
       >
         <SkeletonBox
           v-if="!agentsLoaded"
@@ -103,16 +100,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
     </div>
+    </template>
 
-    <div class="flex-1 min-h-0 overflow-hidden">
-      <ServiceGraph
-        :stream-filter="effectiveStream"
-        hide-stream-selector
-        agent-highlight
-        class="h-full"
-      />
-    </div>
-  </div>
+    <ServiceGraph
+      :stream-filter="effectiveStream"
+      hide-stream-selector
+      agent-highlight
+      class="flex-1 min-h-0"
+    />
+  </AppPage>
 </template>
 
 <script setup lang="ts">
@@ -120,7 +116,7 @@ import { defineAsyncComponent, ref, computed, onMounted } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import DateTime from "@/components/DateTime.vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import AppPage from "@/components/common/AppPage.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";

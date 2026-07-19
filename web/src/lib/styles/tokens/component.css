@@ -256,12 +256,16 @@
      this was previously the same 230px written five different ways. */
   --spacing-rail: 14.375rem;
 
-  /* Spacing */
-  --spacing-dialog-header-px: var(--spacing-5);
+  /* Spacing — dialog/drawer surfaces share the SAME horizontal grid line as
+     pages (--spacing-page-edge): the header title, body content and footer
+     actions inside an ODialog/ODrawer land on one line, and a `bleed` body
+     (e.g. a full-bleed OTable, whose first column self-insets to page-edge)
+     aligns with the surface's own header instead of sitting 8px off it. */
+  --spacing-dialog-header-px: var(--spacing-page-edge);
   --spacing-dialog-header-py: var(--spacing-3);
-  --spacing-dialog-content-px: var(--spacing-5);
+  --spacing-dialog-content-px: var(--spacing-page-edge);
   --spacing-dialog-content-py: var(--spacing-3);
-  --spacing-dialog-footer-px: var(--spacing-5);
+  --spacing-dialog-footer-px: var(--spacing-page-edge);
   --spacing-dialog-footer-py: var(--spacing-3);
 
   /* Badge — default (neutral grey) */

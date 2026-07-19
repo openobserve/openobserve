@@ -9,12 +9,13 @@
       @cancel="closeForm"
     />
 
-    <template v-else>
-      <AppPageHeader
-        icon="smart-toy"
-        :subtitle="t('settings.llmProvidersSettings.subtitle')"
-        class="shrink-0 border-b border-border-default"
-      >
+    <AppPage
+      v-else
+      icon="smart-toy"
+      :subtitle="t('settings.llmProvidersSettings.subtitle')"
+      bleed
+      :scroll="false"
+    >
         <template #title>
           <span data-test="llm-providers-settings-title">{{ t("llmProviders.title") }}</span>
         </template>
@@ -28,7 +29,6 @@
             {{ t("llmProviders.newButton") }}
           </OButton>
         </template>
-      </AppPageHeader>
 
       <div v-if="isLoading" class="flex flex-1 items-center justify-center">
         <OSpinner size="md" />
@@ -78,7 +78,7 @@
               class="flex-1"
               :placeholder="t('llmProviders.searchPlaceholder')"
               data-test="llm-providers-search-input"
-            />
+              />
           </template>
           <template #toolbar-trailing>
             <OButton
@@ -146,7 +146,7 @@
           </template>
         </OTable>
       </div>
-    </template>
+    </AppPage>
 
     <ConfirmDialog
       v-model="confirmDeleteOpen"
@@ -182,7 +182,7 @@ import { showError } from "@/enterprise/components/onlineEvals/utils/evalFormat"
 import ProviderFormPage from "@/enterprise/components/onlineEvals/forms/ProviderFormPage.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import AppPage from "@/components/common/AppPage.vue";
 import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";

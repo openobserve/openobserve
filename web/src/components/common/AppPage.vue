@@ -32,17 +32,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   owns its own edge inset). A detail/form/tab page leaves `bleed` off and its
   content is inset automatically.
 
-    <!-- listing -->
-    <AppPage :title="t('channels.title')" icon="notifications" :subtitle="…" bleed>
-      <template #actions><OButton …/></template>
-      <OTable … />
-    </AppPage>
+    Listing:
+      <AppPage :title="t('channels.title')" icon="notifications" :subtitle="…" bleed>
+        <template #actions><OButton …/></template>
+        <OTable … />
+      </AppPage>
 
-    <!-- detail with tabs -->
-    <AppPage :title="incident.name" :back="{ label, onClick }">
-      <template #subnav><OTabs v-model="tab">…</OTabs></template>
-      <MyTabContent />        <!-- auto-inset to the grid, aligned with the tabs -->
-    </AppPage>
+    Detail with tabs (body auto-insets to the grid, aligned with the tabs):
+      <AppPage :title="incident.name" :back="{ label, onClick }">
+        <template #subnav><OTabs v-model="tab">…</OTabs></template>
+        <MyTabContent />
+      </AppPage>
 
   For pages with a left rail/sidebar, use PageLayout (it owns the split) and wrap
   its main content in <OContent> / <AppPage> as needed.
@@ -80,7 +80,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          table/chart out (it owns its own edge). -->
     <OContent
       :bleed="bleed"
-      :bleed-y="!padY"
+      :y="padY"
       :class="scroll ? 'flex-1 min-h-0 overflow-auto' : 'flex-1 min-h-0 flex flex-col overflow-hidden'"
     >
       <slot />

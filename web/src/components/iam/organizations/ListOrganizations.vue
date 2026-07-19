@@ -17,15 +17,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <div class="p-0 h-full flex flex-col">
-    <!-- Standard page header: title + actions only. Search lives in the
-         table's own toolbar (built-in global filter). -->
-    <AppPageHeader
-      :title="t('organization.header')"
-      :subtitle="t('iam.listOrganizations.subtitle')"
-      icon="corporate-fare"
-      class="shrink-0 border-b border-border-default"
-    >
+  <!-- AppPage owns the whole skeleton (header + body inset/bleed) — search
+       lives in the table's own toolbar. -->
+  <AppPage
+    :title="t('organization.header')"
+    :subtitle="t('iam.listOrganizations.subtitle')"
+    icon="corporate-fare"
+    bleed
+    :scroll="false"
+  >
       <template #actions>
         <OButton
           variant="primary"
@@ -36,7 +36,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t('organization.add') }}
         </OButton>
       </template>
-    </AppPageHeader>
     <div class="w-full flex-1 min-h-0 overflow-hidden">
       <div class="bg-card-glass-bg h-full">
       <OTable
@@ -176,7 +175,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :org-name="cleanupTargetOrg.name"
       @update:open="showCleanupDialog = $event"
     />
-  </div>
+  </AppPage>
 </template>
 
 <script lang="ts">
@@ -200,7 +199,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OCodeCell from "@/lib/core/Table/cells/OCodeCell.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import AppPage from "@/components/common/AppPage.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
@@ -224,7 +223,7 @@ export default defineComponent({
     OTooltip,
     OTag,
     OBadge,
-    AppPageHeader,
+    AppPage,
     OIcon,
     OTable,
     OSearchInput,

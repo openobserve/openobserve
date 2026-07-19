@@ -15,16 +15,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div
+  <AppPage
     data-test="ai-sessions-page"
-    class="flex flex-col h-full min-h-0 overflow-hidden"
+    :title="t('aiObservability.nav.sessions')"
+    :subtitle="t('aiObservability.subtitle.sessions')"
+    icon="forum"
+    bleed
+    :scroll="false"
   >
-    <AppPageHeader
-      :title="t('aiObservability.nav.sessions')"
-      :subtitle="t('aiObservability.subtitle.sessions')"
-      icon="forum"
-      class="border-b border-border-default"
-    >
       <template #actions>
         <date-time
           ref="dateTimeRef"
@@ -54,19 +52,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
       </template>
-    </AppPageHeader>
 
-    <div class="flex-1 min-h-0 overflow-hidden">
-      <SessionsList
-        ref="sessionsRef"
-        :stream-name="streamName"
-        :start-time="timeRange.startTime"
-        :end-time="timeRange.endTime"
-        detail-route-name="aiSessionDetails"
-        class="h-full"
-      />
-    </div>
-  </div>
+    <SessionsList
+      ref="sessionsRef"
+      :stream-name="streamName"
+      :start-time="timeRange.startTime"
+      :end-time="timeRange.endTime"
+      detail-route-name="aiSessionDetails"
+      class="flex-1 min-h-0"
+    />
+  </AppPage>
 </template>
 
 <script setup lang="ts">
@@ -75,7 +70,7 @@ import { useI18n } from "vue-i18n";
 import { useRoute, useRouter } from "vue-router";
 import DateTime from "@/components/DateTime.vue";
 import SessionsList from "@/plugins/traces/SessionsList.vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import AppPage from "@/components/common/AppPage.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import { getConsumableRelativeTime } from "@/utils/date";
 import {
