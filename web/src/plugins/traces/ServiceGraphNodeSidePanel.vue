@@ -54,7 +54,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
 
     <!-- Content Scrollable Area -->
-      <div class="panel-content flex-1 overflow-y-auto overflow-x-hidden bg-surface-base dark:bg-[color-mix(in_srgb,var(--color-grey-950)_85%,var(--color-indigo-900))] p-2.5">
+      <!-- No horizontal padding here: sections that need an inset (charts, chip row, tab labels)
+           add px-page-edge themselves, so dividers and tables can bleed to the edges naturally. -->
+      <div class="panel-content flex-1 overflow-y-auto overflow-x-hidden bg-surface-base dark:bg-[color-mix(in_srgb,var(--color-grey-950)_85%,var(--color-indigo-900))] py-2.5">
         <!-- RED Charts Section -->
         <div
           v-if="streamFilter !== 'all' && dashboardData"
@@ -64,7 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- DataZoom filter chips + View in Traces button -->
           <div
             v-if="filterChips.length"
-            class="flex items-center gap-2 px-2 py-[0.3rem] flex-wrap"
+            class="flex items-center gap-2 px-page-edge py-[0.3rem] flex-wrap"
             data-test="service-graph-side-panel-filter-chips"
           >
             <!-- Filter chip pills -->
@@ -144,11 +146,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
 
-        <OSeparator v-if="streamFilter !== 'all' && dashboardData" class="my-4!" />
+        <!-- Full-bleed divider: panel has no horizontal padding, so w-full reaches both edges -->
+        <OSeparator v-if="streamFilter !== 'all' && dashboardData" class="my-1.5!" />
         <!-- Tabs: Operations / Nodes / Pods -->
         <template v-if="streamFilter !== 'all'">
+          <!-- Row spans full width so the bottom border bleeds; px-page-edge keeps the tab labels inset -->
           <div
-            class="flex items-end border-b border-b-card-glass-border px-page-edge mb-1.5"
+            class="flex items-end border-b border-b-card-glass-border mb-0 px-page-edge"
             data-test="service-graph-node-panel-tabs-row"
           >
             <OTabs
@@ -244,13 +248,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <div
                 v-if="recentOperations.length === 0 && !loadingOperations"
-                class="text-xs italic py-2 text-center text-text-secondary"
+                class="flex flex-col items-center justify-center py-16 text-sm text-center text-text-secondary"
               >
                 {{ t('traces.serviceGraphNodeSidePanel.noOperationsFound') }}
               </div>
               <div
                   v-else-if="recentOperations.length > 0 || loadingOperations"
-                  class="overflow-hidden rounded-default"
+                  class="overflow-hidden svc-panel-table"
                   data-test="service-graph-side-panel-operations-table"
                 >
                   <TenstackTable
@@ -291,6 +295,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :max="rowMaxes(sortedOperationsTableRows, ['p99']).p99"
                         :label="formatOperationLatency(item.p99)"
                         variant="warning"
+                        align="right"
+                        inline
                       />
                     </template>
                     <template #cell-p95="{ item }">
@@ -298,6 +304,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :value="item.p95"
                         :max="rowMaxes(sortedOperationsTableRows, ['p95']).p95"
                         :label="formatOperationLatency(item.p95)"
+                        align="right"
+                        inline
                       />
                     </template>
                     <template #cell-p75="{ item }">
@@ -305,6 +313,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :value="item.p75"
                         :max="rowMaxes(sortedOperationsTableRows, ['p75']).p75"
                         :label="formatOperationLatency(item.p75)"
+                        align="right"
+                        inline
                       />
                     </template>
                     <template #cell-actions="{ row, column, active }">
@@ -312,7 +322,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         v-if="active"
                         variant="ghost"
                         size="icon"
-                        class="ml-1 absolute! right-2!"
+                        class="ml-1 absolute! right-1!"
                         data-test="service-graph-side-panel-view-traces-btn"
                         @click.stop="
                           navigateToTraces({
@@ -329,7 +339,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </template>
                     <template #empty>
                       <div
-                        class="text-xs italic py-2 text-center text-text-secondary"
+                        class="flex flex-col items-center justify-center py-16 text-sm text-center text-text-secondary"
                       >
                         {{ t('traces.serviceGraphNodeSidePanel.noOperationsFound') }}
                       </div>
@@ -349,13 +359,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <div
                 v-if="!resourceTabData[cfg.id]?.length && !resourceTabLoading[cfg.id]"
-                class="text-xs italic py-2 text-center text-text-secondary"
+                class="flex flex-col items-center justify-center py-16 text-sm text-center text-text-secondary"
               >
                 {{ t('traces.serviceGraphNodeSidePanel.noResourceDataFound', { resource: cfg.label.toLowerCase() }) }}
               </div>
               <div
                 v-else-if="resourceTabData[cfg.id]?.length > 0 || resourceTabLoading[cfg.id]"
-                class="overflow-hidden rounded-default"
+                class="overflow-hidden svc-panel-table"
                 :data-test="`service-graph-side-panel-${cfg.id}-table`"
               >
                 <TenstackTable
@@ -386,7 +396,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       v-if="active"
                       variant="ghost"
                       size="icon"
-                      class="ml-1 absolute! right-2!"
+                      class="ml-1 absolute! right-1! bg-table-row-hover-bg! rounded-default shadow-[-0.5rem_0_0.5rem_var(--color-table-row-hover-bg)]"
                       :data-test="`service-graph-side-panel-${cfg.id}-view-traces-btn`"
                       @click.stop="
                         navigateToTraces({
@@ -418,6 +428,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :max="rowMaxes(sortResourceRows(buildResourceTableRows(cfg)), ['p99']).p99"
                       :label="formatOperationLatency(item.p99)"
                       variant="warning"
+                      align="right"
+                      inline
                     />
                   </template>
                   <template #cell-p95="{ item }">
@@ -425,6 +437,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :value="item.p95"
                       :max="rowMaxes(sortResourceRows(buildResourceTableRows(cfg)), ['p95']).p95"
                       :label="formatOperationLatency(item.p95)"
+                      align="right"
+                      inline
                     />
                   </template>
                   <template #cell-p75="{ item }">
@@ -432,11 +446,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :value="item.p75"
                       :max="rowMaxes(sortResourceRows(buildResourceTableRows(cfg)), ['p75']).p75"
                       :label="formatOperationLatency(item.p75)"
+                      align="right"
+                      inline
                     />
                   </template>
                   <template #empty>
                     <div
-                      class="text-xs italic py-2 text-center text-text-secondary"
+                      class="flex flex-col items-center justify-center py-16 text-sm text-center text-text-secondary"
                     >
                       {{ t('traces.serviceGraphNodeSidePanel.noResourceDataFound', { resource: cfg.label.toLowerCase() }) }}
                     </div>
@@ -452,14 +468,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="p-0! panel-section mb-0! h-full!"
               data-test="service-graph-side-panel-metrics"
             >
-              <!-- Loading state -->
+              <!-- Loading state — shimmer skeletons standing in for the metric charts -->
               <div
                 v-if="metricsCorrelationLoading"
-                class="flex items-center gap-2 py-3 text-sm text-text-secondary"
+                class="flex flex-col gap-3 px-page-edge py-4"
                 data-test="service-graph-side-panel-metrics-loading"
               >
-                <OSpinner size="xs" />
-                <span>{{ t("traces.loadingMetrics") }}</span>
+                <OSkeleton type="text" class="w-40! h-4" />
+                <OSkeleton type="rect" class="w-full! h-40" />
+                <OSkeleton type="rect" class="w-full! h-40" />
               </div>
 
               <!-- Error state -->
@@ -504,14 +521,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="service-graph-side-panel-metrics-dashboard"
               />
 
-              <!-- Empty state -->
-              <div
+              <!-- Empty state — standard OEmptyState -->
+              <OEmptyState
                 v-else-if="metricsCorrelationLoaded"
-                class="text-xs italic py-2 text-center text-text-secondary"
+                size="inline"
+                icon="insights"
+                :title="t('traces.serviceGraphNodeSidePanel.noMetricsAvailable')"
+                hide-action
+                class="py-16"
                 data-test="service-graph-side-panel-metrics-empty"
-              >
-                {{ t('traces.serviceGraphNodeSidePanel.noMetricsAvailable') }}
-              </div>
+              />
             </OTabPanel>
           </OTabPanels>
         </template>
@@ -584,10 +603,11 @@ import { buildWorkloadChipDimensions } from "@/composables/useMetricSubjectButto
 import { normalizeSeverity } from "@/utils/sourceEventSeverity";
 import DeployedCode from "@/components/icons/DeployedCode.vue";
 import { useI18n } from "vue-i18n";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import ServiceCatalogBarCell from "./components/ServiceCatalogBarCell.vue";
 
@@ -822,6 +842,8 @@ export default defineComponent({
   components: {
     OTag,
     OSeparator,
+    OSkeleton,
+    OEmptyState,
     OTabs,
     OTab,
     OTabPanels,
@@ -833,7 +855,6 @@ export default defineComponent({
     TelemetryCorrelationDashboard,
     TenstackTable,
     RenderDashboardCharts,
-    OSpinner,
     OTooltip,
     OCheckbox,
     OIcon,
@@ -1745,11 +1766,21 @@ export default defineComponent({
 
     // ── Sorting state ──────────────────────────────────────────────────────
     const sortBy = ref<string>("");
-    const sortOrder = ref<"asc" | "desc">("");
+    const sortOrder = ref<"asc" | "desc" | "">("");
 
-    function handleSortChange(field: string, order: "asc" | "desc") {
-      sortBy.value = field;
-      sortOrder.value = order;
+    // 3-state sort cycle to match other O2 tables (OTable): asc → desc → cleared.
+    // TenstackTable itself only toggles asc/desc, so we drive the cycle from our
+    // own state and ignore its computed order — clearing restores the default order.
+    function handleSortChange(field: string) {
+      if (sortBy.value !== field) {
+        sortBy.value = field;
+        sortOrder.value = "asc";
+      } else if (sortOrder.value === "asc") {
+        sortOrder.value = "desc";
+      } else {
+        sortBy.value = "";
+        sortOrder.value = "";
+      }
     }
 
     const compareRows = (a: any, b: any, field: string): number => {
@@ -1804,41 +1835,41 @@ export default defineComponent({
         id: "requests",
         accessorFn: (row: any) => formatNumber(row.requests),
         header: t("traces.serviceGraphNodeSidePanel.requests"),
-        size: 100,
+        size: 130,
         enableSorting: true,
-        meta: { sortable: true },
+        meta: { sortable: true, align: "right" },
       },
       {
         id: "errors",
         accessorKey: "errors",
         header: t("traces.serviceGraphNodeSidePanel.errors"),
-        size: 80,
+        size: 110,
         enableSorting: true,
-        meta: { slot: true, sortable: true },
+        meta: { slot: true, sortable: true, align: "right" },
       },
       {
         id: "p99",
         accessorKey: "p99",
         header: "P99",
-        size: 80,
+        size: 118,
         enableSorting: true,
-        meta: { slot: true, sortable: true },
+        meta: { slot: true, sortable: true, align: "right" },
       },
       {
         id: "p95",
         accessorKey: "p95",
         header: "P95",
-        size: 80,
+        size: 118,
         enableSorting: true,
-        meta: { slot: true, sortable: true },
+        meta: { slot: true, sortable: true, align: "right" },
       },
       {
         id: "p75",
         accessorKey: "p75",
         header: "P75",
-        size: 80,
+        size: 118,
         enableSorting: true,
-        meta: { slot: true, sortable: true },
+        meta: { slot: true, sortable: true, align: "right" },
       },
     ];
 
@@ -2536,6 +2567,31 @@ export default defineComponent({
 
 .panel-section:last-child {
   margin-bottom: 0;
+}
+
+/* The panel itself scrolls, so these short summary tables should render at their
+   natural height without their own scrollbars. Let the inner scroll container
+   grow to content and hide its scrollbars. */
+.svc-panel-table :deep(.o2-scroll-container) {
+  overflow: hidden;
+  height: auto;
+  max-height: none;
+}
+
+/* Align the first column's content with the tab labels above (page-edge + the
+   tab's own 0.5rem px-2) while the header band and rows still bleed to the edge. */
+.svc-panel-table :deep(tr > th:first-child),
+.svc-panel-table :deep(tr > td:first-child) {
+  padding-left: calc(var(--spacing-page-edge) + 0.5rem);
+}
+
+/* Numeric columns reserve a fixed right-hand slot: the value sits just left of
+   it, and the per-cell "view in traces" button lives in that slot on hover — so
+   there's no overlap and no shift. Headers get the same reserve so their text /
+   sort-icon stay aligned with the values. */
+.svc-panel-table :deep(td[class~="text-right!"]) > div,
+.svc-panel-table :deep(th[class~="text-right!"]) {
+  padding-right: 1.75rem;
 }
 
 </style>

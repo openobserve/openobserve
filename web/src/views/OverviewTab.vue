@@ -137,8 +137,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           v-for="svc in services"
           :key="svc.id"
-          class="py-3 px-3.5 rounded-default border border-[0.0625em] border-border-default bg-surface-base transition-[background] duration-150 basis-40 grow-0 shrink-0 min-w-40 max-w-40 cursor-pointer hover:bg-table-row-hover-bg"
-          :class="[serviceCardClass(svc), { 'bg-table-row-hover-bg outline outline-[0.125em] outline-primary-600 [outline-offset:-0.0625em]': selectedService?.id === svc.id && servicePanelVisible }]"
+          class="py-3 px-3.5 rounded-default border border-[0.0625em] border-border-default bg-surface-base transition-[background-color,box-shadow,outline-color] duration-150 basis-40 grow-0 shrink-0 min-w-40 max-w-40 cursor-pointer"
+          :class="[
+            serviceCardClass(svc),
+            selectedService?.id === svc.id && servicePanelVisible
+              ? 'outline-solid outline-[0.125em] outline-primary-500 outline-offset-[-0.0625em] bg-[color-mix(in_srgb,var(--color-primary-500)_8%,var(--color-surface-base))] shadow-[0_0.125rem_0.5rem_color-mix(in_srgb,var(--color-primary-500)_22%,transparent)]'
+              : 'hover:bg-table-row-hover-bg',
+          ]"
           @click="openServicePanel(svc)"
         >
           <div class="flex items-center justify-between mb-2">
