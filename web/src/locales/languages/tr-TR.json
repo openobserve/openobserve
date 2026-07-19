@@ -844,6 +844,7 @@
     "slack": "Gevşek",
     "help": "Yardım",
     "dashboard": "Gösterge panoları",
+    "data": "Veri",
     "alerts": "Uyarılar",
     "incidents": "Olaylar",
     "openapi": "OpenAPI",

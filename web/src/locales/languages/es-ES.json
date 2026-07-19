@@ -844,6 +844,7 @@
     "slack": "Slack",
     "help": "Ayuda",
     "dashboard": "Paneles",
+    "data": "Datos",
     "alerts": "Alertas",
     "incidents": "Incidentes",
     "openapi": "API abierta",

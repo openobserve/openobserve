@@ -844,6 +844,7 @@
     "slack": "Slack",
     "help": "Trợ giúp",
     "dashboard": "Bảng điều khiển",
+    "data": "Dữ liệu",
     "alerts": "Cảnh báo",
     "incidents": "Sự cố",
     "openapi": "OpenAPI",

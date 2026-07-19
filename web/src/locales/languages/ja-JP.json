@@ -844,6 +844,7 @@
     "slack": "Slack",
     "help": "ヘルプ",
     "dashboard": "ダッシュボード",
+    "data": "データ",
     "alerts": "アラート",
     "incidents": "インシデント",
     "openapi": "OpenAPI",

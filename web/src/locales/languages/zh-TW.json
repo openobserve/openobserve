@@ -844,6 +844,7 @@
     "slack": "Slack",
     "help": "說明",
     "dashboard": "儀表板",
+    "data": "數據",
     "alerts": "警示",
     "incidents": "事件",
     "openapi": "OpenAPI",

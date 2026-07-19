@@ -844,6 +844,7 @@
     "slack": "Slack",
     "help": "Pomoc",
     "dashboard": "Pulpity",
+    "data": "Dane",
     "alerts": "Alerty",
     "incidents": "Incydenty",
     "openapi": "OpenAPI",
