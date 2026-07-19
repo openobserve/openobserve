@@ -13,7 +13,7 @@ import { getFoldersListByType } from '@/utils/commons'
 import syntheticsService from '@/services/synthetics'
 import destinationService from '@/services/alert_destination'
 import { toast } from '@/lib/feedback/Toast/useToast'
-import AppPageHeader from '@/components/common/AppPageHeader.vue'
+import PageLayout from '@/components/common/PageLayout.vue'
 import OButton from '@/lib/core/Button/OButton.vue'
 import OIcon from '@/lib/core/Icon/OIcon.vue'
 import OInput from '@/lib/forms/Input/OInput.vue'
@@ -469,13 +469,13 @@ function onClearResults() {
 
 <template>
   <!-- ── Non-loading: shared wrapper with page header ── -->
-  <div class="flex flex-col h-full bg-surface-base">
-    <AppPageHeader
-      :title="headerTitle"
-      :subtitle="folderName"
-      :back="{ label: t('synthetics.newCheck.back'), to: { name: 'synthetic' }, dataTest: 'synthetics-create-back-btn' }"
-      class="shrink-0 border-b border-border-default"
-    />
+  <PageLayout
+    class="bg-surface-base"
+    :title="headerTitle"
+    :subtitle="folderName"
+    :back="{ label: t('synthetics.newCheck.back'), to: { name: 'synthetic' }, dataTest: 'synthetics-create-back-btn' }"
+    bleed
+  >
 
     <!-- ── Gate phase: URL + name ── -->
     <main v-if="phase === 'gate'" class="flex-1 flex flex-col items-center justify-center">
@@ -807,5 +807,5 @@ function onClearResults() {
       </ODialog>
     </div>
   </template>
-  </div>
+  </PageLayout>
 </template>
