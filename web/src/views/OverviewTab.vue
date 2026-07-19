@@ -115,17 +115,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <button class="text-xs font-medium text-primary-600 bg-none border-none p-0 cursor-pointer whitespace-nowrap transition-opacity duration-150 opacity-80 hover:opacity-100 hover:underline" @click="goToServiceGraph">{{ t('overview.viewAll') }} →</button>
       </div>
-      <div class="flex items-stretch gap-2">
-        <button
-          class="shrink-0 w-6 flex items-center justify-center cursor-pointer border border-[0.0625em] border-border-default rounded-default bg-surface-base text-text-secondary shadow-[0_1px_3px_rgba(0,0,0,0.06)] transition-all duration-150 hover:not-disabled:bg-table-row-hover-bg hover:not-disabled:text-text-body hover:not-disabled:shadow-[0_2px_6px_rgba(0,0,0,0.12)] hover:not-disabled:-translate-y-px active:not-disabled:translate-y-0 active:not-disabled:shadow-[0_1px_2px_rgba(0,0,0,0.08)] disabled:opacity-25 disabled:cursor-not-allowed disabled:shadow-none"
-          :disabled="!svcScrollCanLeft"
-          @click="scrollServices(-1)"
+      <div class="relative">
+        <!-- Left fade + floating scroll control (only present when scrollable) -->
+        <div
+          class="pointer-events-none absolute inset-y-0 left-0 z-10 flex items-center pr-8 bg-linear-to-r from-surface-base to-transparent transition-opacity duration-200"
+          :class="svcScrollCanLeft ? 'opacity-100' : 'opacity-0'"
         >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-            <path d="M15 18l-6-6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-        </button>
-        <div ref="svcGridRef" class="flex flex-row gap-2 overflow-x-auto flex-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" @scroll="onSvcScroll">
+          <button
+            class="pointer-events-auto flex h-7 w-7 items-center justify-center cursor-pointer border-[0.0625em] border-border-default rounded-full bg-surface-base text-text-secondary shadow-[0_2px_6px_rgba(0,0,0,0.12)] transition-all duration-150 hover:bg-table-row-hover-bg hover:text-text-body hover:shadow-[0_3px_8px_rgba(0,0,0,0.16)] active:shadow-[0_1px_2px_rgba(0,0,0,0.08)]"
+            :tabindex="svcScrollCanLeft ? 0 : -1"
+            :aria-hidden="!svcScrollCanLeft"
+            :aria-label="t('overview.scrollLeft')"
+            @click="scrollServices(-1)"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+              <path d="M15 18l-6-6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </button>
+        </div>
+        <div ref="svcGridRef" class="flex flex-row gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" @scroll="onSvcScroll">
         <div
           v-for="svc in services"
           :key="svc.id"
@@ -169,15 +177,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
         </div>
-        <button
-          class="shrink-0 w-6 flex items-center justify-center cursor-pointer border border-[0.0625em] border-border-default rounded-default bg-surface-base text-text-secondary shadow-[0_1px_3px_rgba(0,0,0,0.06)] transition-all duration-150 hover:not-disabled:bg-table-row-hover-bg hover:not-disabled:text-text-body hover:not-disabled:shadow-[0_2px_6px_rgba(0,0,0,0.12)] hover:not-disabled:-translate-y-px active:not-disabled:translate-y-0 active:not-disabled:shadow-[0_1px_2px_rgba(0,0,0,0.08)] disabled:opacity-25 disabled:cursor-not-allowed disabled:shadow-none"
-          :disabled="!svcScrollCanRight"
-          @click="scrollServices(1)"
+        <!-- Right fade + floating scroll control (only present when scrollable) -->
+        <div
+          class="pointer-events-none absolute inset-y-0 right-0 z-10 flex items-center justify-end pl-8 bg-linear-to-l from-surface-base to-transparent transition-opacity duration-200"
+          :class="svcScrollCanRight ? 'opacity-100' : 'opacity-0'"
         >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-            <path d="M9 18l6-6-6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-        </button>
+          <button
+            class="pointer-events-auto flex h-7 w-7 items-center justify-center cursor-pointer border-[0.0625em] border-border-default rounded-full bg-surface-base text-text-secondary shadow-[0_2px_6px_rgba(0,0,0,0.12)] transition-all duration-150 hover:bg-table-row-hover-bg hover:text-text-body hover:shadow-[0_3px_8px_rgba(0,0,0,0.16)] active:shadow-[0_1px_2px_rgba(0,0,0,0.08)]"
+            :tabindex="svcScrollCanRight ? 0 : -1"
+            :aria-hidden="!svcScrollCanRight"
+            :aria-label="t('overview.scrollRight')"
+            @click="scrollServices(1)"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+              <path d="M9 18l6-6-6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </button>
+        </div>
       </div>
     </section>
     <OverviewSkeleton v-else-if="isEnterpriseOrCloud && isSectionPending('services')" section="services" />

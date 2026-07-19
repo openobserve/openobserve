@@ -3742,6 +3742,8 @@
     "colErrorRate": "Error rate",
     "colLatency": "Latency",
     "colReqs": "Reqs",
+    "scrollLeft": "Scroll services left",
+    "scrollRight": "Scroll services right",
     "untitledIncident": "Untitled Incident",
     "viewLatencyCharts": "View latency & RED charts",
     "elevatedErrorRate": "Elevated error rate",
