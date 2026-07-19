@@ -99,7 +99,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <a :href="homeUrl" @click.prevent="goToHome" class="inline-flex items-center">
           <img
             data-test="header-openobserve-logo"
-            class="openobserve-logo cursor-pointer h-8 max-w-37.5 block transition-opacity duration-200 hover:opacity-80"
+            class="openobserve-logo cursor-pointer h-8 max-w-37.5 block rounded-surface transition-opacity duration-200 hover:opacity-80"
             :src="
               getImageURL(
                 isDark
@@ -118,7 +118,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <a :href="homeUrl" @click.prevent="goToHome" class="inline-flex items-center">
         <img
           data-test="header-openobserve-logo"
-          class="openobserve-logo cursor-pointer h-8 max-w-37.5 block transition-opacity duration-200 hover:opacity-80"
+          class="openobserve-logo cursor-pointer h-8 max-w-37.5 block rounded-surface transition-opacity duration-200 hover:opacity-80"
           :src="
             getImageURL(
               isDark
