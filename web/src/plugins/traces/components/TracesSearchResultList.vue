@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Table scroll area: no overflow here — parent handles unified scroll -->
       <div
         data-test="traces-search-result-list"
-        class="w-full h-auto! overflow-x-auto relative"
+        class="w-full h-auto! relative"
       >
         <TenstackTable
           class="h-auto!"

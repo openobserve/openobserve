@@ -125,7 +125,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Combined scroll area: RED metrics + trace list scroll together.
            This is the single vertical scroller — the trace table delegates its
            virtualizer here (via :scroll-el) so it doesn't add a nested one. -->
-      <div ref="scrollContainerRef" class="flex-1 overflow-y-auto bg-card-glass-solid">
+      <div ref="scrollContainerRef" class="flex-1 overflow-auto bg-card-glass-solid">
         <!-- ════════════════════ RED Metrics Section ════════════════════ -->
         <transition
           enter-active-class="transition-all duration-300 ease-in-out"

@@ -18,8 +18,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div
     ref="parentRef"
     :class="[
-      'o2-scroll-container overflow-auto rounded-none! overflow-x-auto relative',
-      !props.scrollEl ? 'table-container' : '',
+      props.scrollEl
+        ? 'relative'
+        : 'o2-scroll-container overflow-auto rounded-none! overflow-x-auto table-container relative',
     ]"
     class="text-text-body"
   >

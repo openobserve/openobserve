@@ -265,7 +265,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- Combined scroll area: histogram + logs/patterns scroll together -->
-      <div class="flex-1 overflow-y-auto overflow-x-hidden" ref="scrollContainerRef">
+      <div class="flex-1 overflow-auto" ref="scrollContainerRef">
         <div
           ref="histogramRef"
           :class="[

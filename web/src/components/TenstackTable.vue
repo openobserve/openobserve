@@ -17,9 +17,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <!-- Outer wrapper: full panel height, flex-column so pagination sits below the scroll area -->
   <div
-    class="my-sticky-virtscroll-table h-full flex flex-col rounded-none! overflow-hidden"
+    class="my-sticky-virtscroll-table h-full flex flex-col rounded-none!"
     :data-sticky-id="tableId"
-    :class="{ 'pivot-sticky-totals': stickyRowTotals, 'wrap-enabled': wrap }"
+    :class="[
+      props.scrollEl ? 'overflow-visible' : 'overflow-hidden',
+      { 'pivot-sticky-totals': stickyRowTotals, 'wrap-enabled': wrap },
+    ]"
     :style="store.state.printMode ? { position: 'static' } : {}"
   >
     <!-- Scroll container: grows to fill available height -->
@@ -32,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         // tables can still scroll sideways; the delegated element owns vertical
         // scroll + virtualization. Without `scrollEl` it stays the scroller.
         props.scrollEl
-          ? 'overflow-x-auto overflow-y-hidden relative'
+          ? 'overflow-visible relative'
           : 'o2-scroll-container overflow-auto rounded-default table-container flex-1 min-h-0 relative',
         { 'virtual-scroll-active will-change-scroll': useVirtualScroll },
       ]"
