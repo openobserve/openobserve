@@ -459,7 +459,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="service-graph-side-panel-metrics-loading"
               >
                 <OSpinner size="xs" />
-                <span>Loading metrics...</span>
+                <span>{{ t("traces.loadingMetrics") }}</span>
               </div>
 
               <!-- Error state -->

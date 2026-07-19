@@ -227,9 +227,9 @@
           >
             <div v-if="loading" class="flex items-center justify-center h-full">
               <div class="text-center flex flex-col items-center">
-                <OSpinner size="xl" />
-                <div class="text-base font-medium mt-3 text-text-muted">
-                  Loading service graph...
+                <OSpinner size="lg" />
+                <div class="text-sm mt-3 text-text-secondary">
+                  {{ t("traces.loadingServiceGraph") }}
                 </div>
               </div>
             </div>

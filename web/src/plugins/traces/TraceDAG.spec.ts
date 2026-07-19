@@ -16,6 +16,7 @@
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import store from "@/test/unit/helpers/store";
+import i18n from "@/locales";
 import searchService from "@/services/search";
 
 // ---------------------------------------------------------------------------
@@ -171,6 +172,7 @@ function mountDAG(
     },
     global: {
       provide: { store },
+      plugins: [i18n],
     },
   });
 }

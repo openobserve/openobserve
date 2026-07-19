@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="w-full h-full min-h-125">
     <div v-if="isLoading" data-test="traces-trace-dag-loading-container" class="flex items-center justify-center flex-col p-6 h-125">
       <OSpinner size="lg" />
-      <div class="mt-3 text-text-muted">Loading trace DAG...</div>
+      <div class="mt-3 text-sm text-text-secondary">{{ t("traces.loadingTraceDag") }}</div>
     </div>
 
     <div v-else-if="error" data-test="traces-trace-dag-error-message" class="p-3">
@@ -84,6 +84,7 @@ import { VueFlow, Position, MarkerType, Handle, useVueFlow } from "@vue-flow/cor
 import { Background } from "@vue-flow/background";
 import { Controls } from "@vue-flow/controls";
 import { useStore } from "vuex";
+import { useI18n } from "vue-i18n";
 import searchService from "@/services/search";
 
 // VueFlow CSS imports
@@ -153,6 +154,7 @@ export default defineComponent({
   emits: ["node-click"],
   setup(props, { emit }) {
     const store = useStore();
+    const { t } = useI18n();
     const isLoading = ref(true);
     const error = ref<string | null>(null);
     const dagData = ref<DAGResponse | null>(null);
@@ -508,6 +510,7 @@ export default defineComponent({
     );
 
     return {
+      t,
       isLoading,
       error,
       dagData,

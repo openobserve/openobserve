@@ -245,7 +245,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="flex flex-col items-center justify-center h-full py-20"
                 >
                   <OSpinner
-                    size="xl"
+                    size="lg"
                     class="mb-4"
                     data-test="traces-analysis-dashboard-loading-indicator"
                   />

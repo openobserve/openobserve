@@ -154,8 +154,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="bg-card-glass-bg h-full flex flex-col items-center justify-center gap-2 text-text-secondary"
                     data-test="traces-search-loading"
                   >
-                    <OSpinner size="sm" />
-                    <span>{{ t("traces.fetchingTraces") }}</span>
+                    <OSpinner size="lg" />
+                    <span class="text-sm">{{ t("traces.fetchingTraces") }}</span>
                   </div>
                   <div
                     v-else-if="
