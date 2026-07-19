@@ -38,6 +38,8 @@ use tracing::{Instrument, Span};
 use crate::service::ingestion::check_ingestion_allowed;
 // Re-export service graph API handlers
 pub use crate::service::traces::service_graph::{self, get_current_topology, get_edge_history};
+// Re-export agent-signals read API handler
+pub use crate::service::traces::agent_signals::get_agent_signals;
 use crate::{
     common::{
         meta::http::{CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO, HttpResponse as MetaHttpResponse},

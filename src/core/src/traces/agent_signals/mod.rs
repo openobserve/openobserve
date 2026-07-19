@@ -14,7 +14,9 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 pub mod aggregator;
+pub mod api;
 pub mod processor;
 pub use aggregator::write_agent_signals;
+pub use api::get_agent_signals;
 #[cfg(feature = "enterprise")]
 pub use processor::process_agent_signals_stream;
