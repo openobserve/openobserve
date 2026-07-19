@@ -15,16 +15,20 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <div class="flex flex-col gap-6" data-test="agent-behavior-panel">
-    <!-- Looping agents -->
-    <div class="card-container flex flex-col">
-      <div class="flex items-center gap-2 px-4 py-3 border-b border-border-normal">
-        <span class="text-sm font-semibold text-text-primary">
+  <div class="grid grid-cols-2 gap-[0.625rem]" data-test="agent-behavior-panel">
+    <!-- Looping agents. Same card/header/table shape as the sibling LLM Insights
+         panels (LLMErrorTable) so the whole page reads as one surface. -->
+    <div
+      class="card-container llm-trend-panel rounded-lg flex flex-col overflow-hidden"
+      data-test="agent-behavior-loops-card"
+    >
+      <div class="flex flex-col mb-[0.5rem] px-[1rem] pt-[1rem]">
+        <div class="text-[0.85rem] font-semibold text-[var(--color-text-heading)]">
           {{ t("aiObservability.behavior.loopsTitle") }}
-        </span>
-        <span class="text-xs text-text-secondary">
+        </div>
+        <div class="text-[0.7rem] leading-normal mt-[0.1rem] text-[var(--color-text-secondary)]">
           {{ t("aiObservability.behavior.loopsHint") }}
-        </span>
+        </div>
       </div>
       <OTable
         data-test="agent-behavior-loops-table"
@@ -32,24 +36,27 @@
         :columns="loopColumns"
         :default-columns="false"
         :frame="false"
+        :show-global-filter="false"
+        :fill-height="false"
+        show-index
+        pagination="none"
+        :empty-message="t('aiObservability.behavior.noLoops')"
         @row-click="(r: any) => openDetail('loop', r)"
-      />
-      <OEmptyState
-        v-if="!loading && loopRows.length === 0"
-        preset="no-data"
-        :title="t('aiObservability.behavior.noLoops')"
       />
     </div>
 
     <!-- Failure taxonomy -->
-    <div class="card-container flex flex-col">
-      <div class="flex items-center gap-2 px-4 py-3 border-b border-border-normal">
-        <span class="text-sm font-semibold text-text-primary">
+    <div
+      class="card-container llm-trend-panel rounded-lg flex flex-col overflow-hidden"
+      data-test="agent-behavior-failures-card"
+    >
+      <div class="flex flex-col mb-[0.5rem] px-[1rem] pt-[1rem]">
+        <div class="text-[0.85rem] font-semibold text-[var(--color-text-heading)]">
           {{ t("aiObservability.behavior.failuresTitle") }}
-        </span>
-        <span class="text-xs text-text-secondary">
+        </div>
+        <div class="text-[0.7rem] leading-normal mt-[0.1rem] text-[var(--color-text-secondary)]">
           {{ t("aiObservability.behavior.failuresHint") }}
-        </span>
+        </div>
       </div>
       <OTable
         data-test="agent-behavior-failures-table"
@@ -57,24 +64,27 @@
         :columns="failureColumns"
         :default-columns="false"
         :frame="false"
+        :show-global-filter="false"
+        :fill-height="false"
+        show-index
+        pagination="none"
+        :empty-message="t('aiObservability.behavior.noFailures')"
         @row-click="(r: any) => openDetail('failure', r)"
-      />
-      <OEmptyState
-        v-if="!loading && failureRows.length === 0"
-        preset="no-data"
-        :title="t('aiObservability.behavior.noFailures')"
       />
     </div>
 
-    <!-- Cost & failure per agent -->
-    <div class="card-container flex flex-col">
-      <div class="flex items-center gap-2 px-4 py-3 border-b border-border-normal">
-        <span class="text-sm font-semibold text-text-primary">
+    <!-- Cost & failure per agent — full width, like the wide sibling panels. -->
+    <div
+      class="col-span-2 card-container llm-trend-panel rounded-lg flex flex-col overflow-hidden"
+      data-test="agent-behavior-cost-card"
+    >
+      <div class="flex flex-col mb-[0.5rem] px-[1rem] pt-[1rem]">
+        <div class="text-[0.85rem] font-semibold text-[var(--color-text-heading)]">
           {{ t("aiObservability.behavior.costTitle") }}
-        </span>
-        <span class="text-xs text-text-secondary">
+        </div>
+        <div class="text-[0.7rem] leading-normal mt-[0.1rem] text-[var(--color-text-secondary)]">
           {{ t("aiObservability.behavior.costHint") }}
-        </span>
+        </div>
       </div>
       <OTable
         data-test="agent-behavior-cost-table"
@@ -82,12 +92,12 @@
         :columns="costColumns"
         :default-columns="false"
         :frame="false"
+        :show-global-filter="false"
+        :fill-height="false"
+        show-index
+        pagination="none"
+        :empty-message="t('aiObservability.behavior.noCost')"
         @row-click="(r: any) => openDetail('cost', r)"
-      />
-      <OEmptyState
-        v-if="!loading && costRows.length === 0"
-        preset="no-data"
-        :title="t('aiObservability.behavior.noCost')"
       />
     </div>
 
@@ -108,7 +118,6 @@ import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
-import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import AgentSignalDetailPanel from "./AgentSignalDetailPanel.vue";
 import agentSignalsService, {
   type AgentSignalRecord,
