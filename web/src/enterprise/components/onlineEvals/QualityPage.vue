@@ -5,7 +5,7 @@
   >
     <!-- Agent filter — right-aligned at the top of the content container so it
          sits with the KPIs + table it scopes (matches LLM Insights). -->
-    <div class="flex items-center justify-end px-4">
+    <div class="flex items-center justify-end px-page-edge">
       <div class="w-[17rem] flex-shrink-0">
         <!-- While the agent list is loading we swap the select for a skeleton
              of the same height so the control reads as "loading" (and can't be
@@ -29,18 +29,16 @@
     <QualityKpiSkeleton
       v-if="showKpiSkeleton"
       :count="visibleKpis.length"
-      class="px-4"
+      class="px-page-edge"
     />
-    <section v-else class="quality-page__kpis grid gap-2.5 px-4" aria-label="Tier 1 KPIs"
-      style="grid-template-columns: repeat(auto-fit, minmax(180px, 1fr))"
-    >
+    <KpiCardRow v-else class="quality-page__kpis px-page-edge" aria-label="Tier 1 KPIs">
       <QualityKpiCard
         v-for="kpi in visibleKpis"
         :key="kpi.id"
         :kpi="kpi"
         :delta="deltaByKpi[kpi.id] ?? null"
       />
-    </section>
+    </KpiCardRow>
 
     <!-- Tier 2: the configs table is the persistent view; selecting a
          row opens the detail in a right-side ODrawer (70% width). The user
@@ -115,6 +113,7 @@ import {
 } from "./composables/useQualityScoreConfigs";
 import { useQualityConfigDetail } from "./composables/useQualityConfigDetail";
 import { useQualityDetailCharts } from "./composables/useQualityDetailCharts";
+import KpiCardRow from "@/components/common/KpiCardRow.vue";
 import QualityKpiCard from "./quality/QualityKpiCard.vue";
 import QualityKpiSkeleton from "./quality/QualityKpiSkeleton.vue";
 import QualityScoreConfigsTable from "./quality/QualityScoreConfigsTable.vue";

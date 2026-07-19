@@ -160,14 +160,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="mt-2.5 mb-2.5"
       />
       <!-- KPI Cards Row -->
-      <div
+      <KpiCardRow
         v-else
-        class="grid grid-cols-5 gap-2.5 mt-2.5 mb-2.5"
+        :columns="5"
+        class="mt-2.5 mb-2.5"
       >
         <div
           v-for="card in kpiCards"
           :key="card.label"
-          class="bg-card-glass-bg rounded-default flex flex-col px-3.5 pt-2.5 pb-2.5 gap-1 border border-border-default transition-shadow duration-200 hover:shadow-[0_1px_6px_rgba(0,0,0,0.08)]"
+          class="bg-card-glass-bg rounded-default flex flex-col px-3.5 py-2.5 gap-1 border border-border-default transition-shadow duration-200 hover:shadow-md"
         >
           <!-- P95 rides its own (slower) query — skeleton the WHOLE card while
                it loads, matching the initial strip skeleton tile (see
@@ -215,7 +216,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </template>
         </div>
-      </div>
+      </KpiCardRow>
 
       <!-- Trend panels (config-driven). The key carries the panel-cache id
            (stream + agent + window), so changing tab / agent / time range
@@ -271,6 +272,7 @@ import {
   splitCost,
 } from "./llmInsightsDashboard.utils";
 import KpiSparkline from "./KpiSparkline.vue";
+import KpiCardRow from "@/components/common/KpiCardRow.vue";
 import LLMSchemaPanel from "./LLMSchemaPanel.vue";
 import LLMErrorTable from "./LLMErrorTable.vue";
 import LLMInsightsSkeleton from "./LLMInsightsSkeleton.vue";
