@@ -32,7 +32,8 @@
                       Use for settings sections, single forms, org params, hubs, etc.
     contentSize     — reading-column width when constrained ('sm'|'md'|'lg'|'xl'; default 'lg')
     headerClass     — override the default header wrapper class
-                      (default: 'shrink-0 px-3 border-b border-border-default')
+                      (default: 'shrink-0 px-4 border-b border-border-default' —
+                      px-4 = 16px, the canonical page edge inset; see SPACING_AUDIT.md §7)
 
   v-model:sidebarWidth — bidirectional bind for the sidebar width when resizable=true,
                          so the page can react to resize/collapse (e.g. compact mode).
@@ -42,7 +43,7 @@
     <!-- ── Optional header ──────────────────────────────────────── -->
     <div
       v-if="$slots.header"
-      :class="headerClass ?? 'shrink-0 px-3 border-b border-border-default'"
+      :class="headerClass ?? 'shrink-0 px-4 border-b border-border-default'"
     >
       <slot name="header" />
     </div>
