@@ -80,8 +80,12 @@ def get_state_file_path():
 
 
 def get_supported_languages():
-    """Returns the list of auto-translated language codes."""
-    return ["tr", "zh", "fr", "es", "de", "it", "pt", "ja", "ko", "nl"]
+    """Returns the list of auto-translated language codes.
+
+    Derived from LANGUAGE_NAMES so the code list and the prompt's language names
+    are a single source of truth (dict preserves insertion order).
+    """
+    return list(LANGUAGE_NAMES.keys())
 
 
 def _hash(text):
@@ -202,11 +206,20 @@ def translate_batch(texts, locale, max_retries=3, _depth=0):
             content = resp.choices[0].message.content
             data = json.loads(content) if content else {}
             out = data.get("translations") if isinstance(data, dict) else None
-            if isinstance(out, list) and len(out) == len(texts):
-                return [x if isinstance(x, str) else None for x in out]
+            if not isinstance(out, list) or len(out) != len(texts):
+                raise TranslationError(
+                    f"expected {len(texts)} translations, got "
+                    f"{len(out) if isinstance(out, list) else type(out).__name__}"
+                )
+            # An empty/whitespace/non-string element is a failed item, not a valid
+            # translation — never write a blank label. Treat it like a shape
+            # mismatch so it flows through perturb-retry and, if it persists, the
+            # split below isolates just that index as None (retried next run).
+            cleaned = [x if isinstance(x, str) and x.strip() else None for x in out]
+            if all(c is not None for c in cleaned):
+                return cleaned
             raise TranslationError(
-                f"expected {len(texts)} translations, got "
-                f"{len(out) if isinstance(out, list) else type(out).__name__}"
+                f"{cleaned.count(None)} of {len(texts)} translations were empty/invalid"
             )
         except (json.JSONDecodeError, TranslationError, KeyError, IndexError, TypeError) as e:
             # Malformed / wrong-length response — perturb temperature and retry.
@@ -217,8 +230,10 @@ def translate_batch(texts, locale, max_retries=3, _depth=0):
             time.sleep(2 * (attempt + 1))
 
     # Retries exhausted. Split to isolate the offending element so its neighbours
-    # aren't lost with it. Bottoms out at a single string, which returns [None].
-    if len(texts) > 1 and _depth < 8:
+    # aren't lost with it. Recursion bottoms out naturally at a single string
+    # (which returns [None]); the depth guard is only a stack backstop and must be
+    # large enough to reach singletons for any batch size (log2(4096) = 12).
+    if len(texts) > 1 and _depth < 32:
         mid = len(texts) // 2
         left = translate_batch(texts[:mid], locale, max_retries, _depth + 1)
         right = translate_batch(texts[mid:], locale, max_retries, _depth + 1)
@@ -249,7 +264,11 @@ def _needs_translation(has_existing, prev_hash, cur_hash):
 
 
 def collect_pending_leaves(source, existing, state, path=()):
-    """Return a list of (path_tuple, source_text) for every leaf needing translation."""
+    """Return (path_tuple, value) for every leaf needing translation.
+
+    `value` is the raw source value — a string, or a list of strings for an array
+    leaf — so translate_pending can translate array elements and preserve the type.
+    """
     pending = []
     for key, value in source.items():
         cur_path = path + (key,)
@@ -367,11 +386,12 @@ def _validate(src, out):
     """
     Return `out` if it safely preserves `src`'s structure, else None.
 
-    Rejects a translation that changes the interpolation-placeholder multiset
-    ({count}, %s, @:key) or the vue-i18n pluralization pipe count (`|`), since
-    either silently breaks runtime rendering.
+    Rejects a translation that is empty/whitespace-only (which would blank the
+    label), changes the interpolation-placeholder multiset ({count}, %s, @:key),
+    or changes the vue-i18n pluralization pipe count (`|`) — each silently breaks
+    runtime rendering.
     """
-    if not isinstance(out, str):
+    if not isinstance(out, str) or not out.strip():
         return None
     if _placeholders(src) != _placeholders(out):
         return None
@@ -395,13 +415,13 @@ def translate_pending(pending, locale):
     # Flatten every translatable string across all leaves into one work list so
     # array elements share batches with plain strings. `slots` holds the eventual
     # per-leaf output (translated strings, kept non-str/empty elements, or None).
-    units = []  # [path, kind, slots, sources]
+    units = []  # [path, kind, slots]
     flat = []   # [(unit_idx, elem_idx, source_string)]
     for path, value in pending:
         if isinstance(value, list):
             slots = [None] * len(value)
             uidx = len(units)
-            units.append([path, "list", slots, value])
+            units.append([path, "list", slots])
             for i, el in enumerate(value):
                 if isinstance(el, str) and el.strip():
                     flat.append((uidx, i, el))
@@ -409,7 +429,7 @@ def translate_pending(pending, locale):
                     slots[i] = el  # non-string / empty — keep as-is, never billed
         else:
             uidx = len(units)
-            units.append([path, "str", [None], [value]])
+            units.append([path, "str", [None]])
             flat.append((uidx, 0, value))
 
     total = len(flat)
@@ -423,7 +443,7 @@ def translate_pending(pending, locale):
         print(f"    {locale}: {done}/{total} strings translated")
 
     translated = {}
-    for path, kind, slots, _ in units:
+    for path, kind, slots in units:
         if any(s is None for s in slots):
             # At least one string failed or changed structure — skip the whole
             # leaf so its state hash is not advanced and it retries next run.
