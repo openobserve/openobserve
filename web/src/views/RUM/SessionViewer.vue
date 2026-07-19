@@ -15,12 +15,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="flex flex-col qp-2 h-full">
-    <AppPageHeader
-      :title="sessionDetails.id || t('rum.sessionReplay')"
-      :back="{ onClick: () => router.back(), dataTest: 'session-viewer-back-btn' }"
-      class="shrink-0 border-b border-border-default"
-    >
+  <PageLayout
+    class="qp-2"
+    :title="sessionDetails.id || t('rum.sessionReplay')"
+    :back="{ onClick: () => router.back(), dataTest: 'session-viewer-back-btn' }"
+    bleed
+  >
       <template #subtitle>
         <div class="flex items-center flex-wrap gap-x-3 gap-y-1 min-w-0">
           <div class="text-xs truncate flex items-center gap-1.5">
@@ -65,7 +65,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
       </template>
-    </AppPageHeader>
     <div
       class="w-full flex bg-card-glass-bg overflow-hidden h-[calc(100%-3.125)]! flex-1 min-h-0"
     >
@@ -108,7 +107,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :session-id="sessionId"
       :session-details="sessionDetails"
     />
-  </div>
+  </PageLayout>
 </template>
 
 <script lang="ts" setup>
@@ -126,7 +125,7 @@ import useSessionsReplay from "@/composables/useSessionReplay";
 import usePerformance from "@/composables/rum/usePerformance";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import PageLayout from "@/components/common/PageLayout.vue";
 
 import { formatDate } from "@/utils/date";
 import { getUUID } from "@/utils/zincutils";

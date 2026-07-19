@@ -16,18 +16,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="rounded-default p-0" data-test="incident-detail-page">
-    <div class="w-full h-full flex flex-col">
-    <!-- Header — shared AppPageHeader: back button in the icon-tile spot, the
-         incident name as the title (with its status badges trailing), and the
-         section label "Incident" as the muted subtitle. -->
-    <AppPageHeader
+    <PageLayout
       :back="{
         onClick: close,
         label: t('alerts.incidents.goBack'),
         dataTest: 'incident-detail-back-btn',
       }"
       :subtitle="t('alerts.incidents.incident')"
-      class="shrink-0 border-b border-border-default"
+      bleed
     >
       <template #title>
         <!-- Incident name (inline-editable) -->
@@ -118,7 +114,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           ><OIcon name="edit" size="sm"/>{{ t("alerts.edit") }}<OTooltip :delay="500" :content="t('alerts.incidents.editIncidentTitleTooltip')" /></OButton>
         </template>
       </template>
-    </AppPageHeader>
 
     <!-- Content -->
     <div v-if="!loading && incidentDetails" class="bg-card-glass-bg flex flex-col overflow-hidden flex-1 min-h-0">
@@ -1046,7 +1041,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div v-if="loading" class="flex-1 flex items-center justify-center">
       <OSpinner size="md" />
     </div>
-  </div>
+  </PageLayout>
   </div>
 </template>
 
@@ -1087,7 +1082,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import PageLayout from "@/components/common/PageLayout.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { copyToClipboard as copyToClipboardUtil } from "@/utils/clipboard";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
@@ -1095,7 +1090,7 @@ import { useConfirmDialog } from "@/composables/useConfirmDialog";
 export default defineComponent({
   name: "IncidentDetailDrawer",
   components: {
-    AppPageHeader,
+    PageLayout,
     OTabs,
     OTab,
     TelemetryCorrelationDashboard,

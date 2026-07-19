@@ -21,19 +21,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     ROW 2: MonitorRuns (chrome-less tabbed content)
 -->
 <template>
-  <div
+  <PageLayout
     data-test="synthetic-monitor-results-page"
-    class="flex flex-col h-full min-h-0 overflow-hidden"
+    :title="monitorName"
+    :subtitle="folderName"
+    :back="{
+      label: t('synthetics.results.monitors'),
+      to: { name: 'synthetic' },
+    }"
+    bleed
   >
-    <AppPageHeader
-      :title="monitorName"
-      :subtitle="folderName"
-      :back="{
-        label: t('synthetics.results.monitors'),
-        to: { name: 'synthetic' },
-      }"
-      class="border-b border-border-default"
-    >
       <template #title-trail>
         <!-- <OBadge v-if="statusBadge" :variant="statusBadge.variant" size="sm" dot>
           {{ statusBadge.label }}
@@ -72,8 +69,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="refresh"
         />
       </template>
-    </AppPageHeader>
-
     <div class="flex-1 min-h-0 overflow-hidden">
       <MonitorRuns
         ref="runsRef"
@@ -86,7 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @jump-to-window="onJumpToWindow"
       />
     </div>
-  </div>
+  </PageLayout>
 
   <!-- ════════════ Run Detail Drawer ════════════ -->
   <ODrawer
@@ -135,7 +130,7 @@ import { computed, nextTick, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRoute, useRouter } from "vue-router";
 import DateTime from "@/components/DateTime.vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import PageLayout from "@/components/common/PageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
