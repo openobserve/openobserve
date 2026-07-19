@@ -23,11 +23,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <PageLayout bleed
       v-if="!showAddAlertDialog && !showImportAlertDialog"
-      :main-panel="false"    >
-      <!-- Standard header — title + actions only (Import/Add). The alert type
-           toggle, search and folder scope live in the table toolbar. -->
-      <template #header>
-        <AppPageHeader :title="t('alerts.header')" :subtitle="t('alerts.subtitle')" icon="shield-alert-outline">
+      :title="t('alerts.header')"
+      :subtitle="t('alerts.subtitle')"
+      icon="shield-alert-outline"
+    >
           <template #actions>
             <!-- Import button -->
             <OButton
@@ -63,8 +62,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               "
             >{{ t(`alerts.add`) }}</OButton>
           </template>
-        </AppPageHeader>
-      </template>
 
     <div
       data-test="alert-list-splitter"
@@ -656,8 +653,7 @@ import {
   computed,
   reactive,
 } from "vue";
-import PageLayout from "@/components/common/PageLayout.vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import PageLayout from "@/components/common/PageLayout.vue";
 import type { Ref } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -722,8 +718,7 @@ import { COL } from "@/lib/core/Table/OTable.types";
 export default defineComponent({
   name: "AlertList",
   components: {
-    PageLayout,
-    AppPageHeader,
+    PageLayout,
     OSeparator,
     AddAlert: defineAsyncComponent(
       () => import("@/components/alerts/AddAlert.vue"),
