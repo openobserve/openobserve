@@ -326,7 +326,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OTabs>
     </div>
     <OSeparator class="w-full" />
-    <div class="span_details_tab-panels h-[calc(100%-6rem)] overflow-hidden px-page-edge py-2">
+    <div
+      class="span_details_tab-panels h-[calc(100%-6rem)] overflow-hidden"
+      :class="
+        activeTab === 'correlated-logs' || activeTab === 'correlated-metrics'
+          ? ''
+          : 'px-page-edge py-2'
+      "
+    >
       <OTabPanels v-model="activeTab"
 grow
 class="h-full overflow-y-auto">

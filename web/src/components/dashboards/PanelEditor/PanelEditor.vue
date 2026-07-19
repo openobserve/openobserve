@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Collapsed field list bar -->
         <div
           v-if="!dashboardPanelData.layout.showFieldList"
-          class="cursor-pointer overflow-y-auto flex flex-col items-center justify-start bg-surface-panel! w-12.5 h-full shrink-0"
+          class="cursor-pointer overflow-y-auto flex flex-col items-center justify-start bg-surface-panel! border-r border-border-default w-12.5 h-full shrink-0"
           data-test="panel-editor-field-list-sidebar-collapsed"
           @click="collapseFieldList"
         >
@@ -63,6 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model="dashboardPanelData.layout.splitter"
           :limits="splitterLimits"
           :style="splitterStyle"
+          :disable="!dashboardPanelData.layout.showFieldList"
           separatorClass="field-list-separator"
           :separatorStyle="{ width: '10px', marginLeft: '-5px', marginRight: '-5px', zIndex: '10' }"
         >
@@ -425,7 +426,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Collapsed field list bar for custom chart -->
         <div
           v-if="!dashboardPanelData.layout.showFieldList"
-          class="cursor-pointer overflow-y-auto flex flex-col items-center justify-start bg-surface-panel! w-12.5 h-full shrink-0"
+          class="cursor-pointer overflow-y-auto flex flex-col items-center justify-start bg-surface-panel! border-r border-border-default w-12.5 h-full shrink-0"
           data-test="panel-editor-field-list-sidebar-collapsed"
           @click="collapseFieldList"
         >
@@ -444,6 +445,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OSplitter
           v-model="dashboardPanelData.layout.splitter"
           :limits="[0, 20]"
+          :disable="!dashboardPanelData.layout.showFieldList"
           :style="{
             width: dashboardPanelData.layout.showFieldList
               ? '100%'

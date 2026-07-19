@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="dialog-box"
   >
     <!-- Single Tab Row -->
-    <div class="flex justify-between pt-2 items-center shrink-0">
+    <div class="flex justify-between items-center shrink-0">
       <div class="flex items-center gap-2 -mb-0.75">
         <OTabs v-model="tab" align="left">
           <OTab

@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         )
       "
     >
-      <div v-if="showHeader" class="trace-combined-header-wrapper bg-card-glass-bg border-b border-border-default py-[0.2rem] shrink-0">
+      <div v-if="showHeader" class="trace-combined-header-wrapper bg-card-glass-bg py-[0.2rem] shrink-0">
         <!-- Standalone (routed) header: shared AppPageHeader -->
         <AppPageHeader
           v-if="mode === 'standalone'"
@@ -607,10 +607,9 @@ size="sm">
                         data-test="trace-details-resizer"
                         :style="{
                           left: `${leftWidth}px`,
-                          backgroundColor: 'var(--color-border-default)',
                           zIndex: 999,
                         }"
-                        class="absolute resize h-full cursor-col-resize top-0 w-px after:content-[''] after:absolute after:h-full after:-left-2.5 after:-right-2.5 after:top-0 after:bottom-0 after:z-999"
+                        class="absolute resize h-full cursor-col-resize top-0 w-px bg-border-default hover:bg-accent rounded-default transition-colors duration-200 after:content-[''] after:absolute after:h-full after:-left-2.5 after:-right-2.5 after:top-0 after:bottom-0 after:z-999"
                         @mousedown="startResize"
                       />
                       <trace-tree

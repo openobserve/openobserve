@@ -690,7 +690,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <!-- Grouped metric list -->
               <div
-                class="dimension-list-container flex-1 min-h-0 overflow-y-auto px-[0.325rem]"
+                class="dimension-list-container flex-1 min-h-0 overflow-y-auto"
                 style="max-height: calc(100vh - 210px)"
               >
                 <template

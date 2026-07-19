@@ -32,7 +32,7 @@
         'relative',
         'z-10',
         'focus:outline-2 focus:outline-accent focus:-outline-offset-2',
-        disable ? 'cursor-default! opacity-50' : '',
+        disable ? 'cursor-default! opacity-50 pointer-events-none' : '',
         horizontal ? 'h-px w-full cursor-row-resize' : 'h-full cursor-col-resize',
         separatorClass
       ]"
@@ -189,6 +189,6 @@ watch(() => props.modelValue, (newValue) => {
 }
 
 .field-list-separator:hover::after {
-  background-color: orange;
+  background-color: var(--color-accent);
 }
 </style>

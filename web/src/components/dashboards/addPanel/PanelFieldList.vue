@@ -2,7 +2,7 @@
 
 <template>
   <div class="w-full h-full flex flex-col bg-surface-panel border-r border-border-default">
-    <div class="flex items-center justify-between shrink-0 my-3">
+    <div class="flex items-center justify-between shrink-0 my-3 px-page-edge">
       <span class="text-base font-bold">{{ t("panel.fields") }}</span>
       <OButton
         variant="outline"
@@ -35,6 +35,7 @@
     >
       <!-- Stream selectors -->
       <template #before-list>
+        <div class="px-page-edge">
           <OSelect
             v-if="dashboardPanelDataPageKey !== 'metrics'"
             :model-value="currentStreamType"
@@ -64,12 +65,13 @@
             @search="onStreamSearch"
             @update:model-value="onStreamChange"
           />
+        </div>
       </template>
 
       <!-- Group header -->
       <template #group-header="{ row }">
         <div
-          class="h-7! w-full flex justify-between items-center rounded-default font-semibold text-xs cursor-default select-none bg-section-header-bg text-text-secondary"
+          class="h-7! w-[calc(100%+2*var(--spacing-page-edge))] shrink-0 -ml-page-edge px-page-edge flex justify-between items-center font-semibold text-xs cursor-default select-none bg-section-header-bg text-text-secondary"
           :title="row.groupName"
         >
           <div class="flex-1 min-w-0">{{ row.groupName }}</div>
