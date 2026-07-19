@@ -3728,7 +3728,9 @@
     "tabOverview": "Overview",
     "tabUsage": "Usage",
     "removeHomeDashboard": "Remove home dashboard",
-    "subtitle": "Your observability workspace at a glance"
+    "subtitle": "Your observability workspace at a glance",
+    "resources": "Resources",
+    "explore": "Explore"
   },
   "overview": {
     "title": "System Overview",

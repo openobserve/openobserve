@@ -35,16 +35,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div class="flex items-center justify-between gap-2 mb-1">
       <div
-        class="text-2xs font-semibold leading-normal text-text-secondary min-w-0 truncate"
+        class="min-w-0 truncate"
+        :class="labelClass || 'text-2xs font-semibold leading-normal text-text-secondary'"
       >
         <slot name="label">{{ label }}</slot>
       </div>
       <span
         v-if="icon || $slots.icon"
-        class="inline-flex items-center justify-center shrink-0 w-6 h-6 rounded-default bg-surface-subtle text-text-secondary"
+        class="inline-flex items-center justify-center shrink-0 rounded-default"
+        :class="[
+          iconSize === 'md' ? 'w-10 h-10' : 'w-6 h-6',
+          iconClass || 'bg-surface-subtle text-text-secondary',
+        ]"
       >
         <slot name="icon">
-          <OIcon v-if="icon" :name="icon" size="sm" />
+          <OIcon v-if="icon" :name="icon" :size="iconSize" />
         </slot>
       </span>
     </div>
@@ -71,14 +76,27 @@ import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 withDefaults(
   defineProps<{
     label?: string;
+    /** Override the label's typography classes. Omit for the compact default. */
+    labelClass?: string;
     icon?: IconName;
+    /**
+     * Override the icon badge's color classes (bg + text). Omit for the default
+     * monochrome subtle badge. Use token-backed utilities, e.g.
+     * `bg-(--color-indigo-50) text-(--color-indigo-600) dark:…`.
+     */
+    iconClass?: string;
+    /** Icon badge size. `md` renders the larger, more prominent colored tile. */
+    iconSize?: "sm" | "md";
     /** Element to render as — `button` when the tile is selectable. */
     as?: string;
     dataTest?: string;
   }>(),
   {
     label: "",
+    labelClass: undefined,
     icon: undefined,
+    iconClass: undefined,
+    iconSize: "sm",
     as: "div",
     dataTest: undefined,
   },
