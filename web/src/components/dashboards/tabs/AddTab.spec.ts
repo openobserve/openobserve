@@ -28,7 +28,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import AddTab from "./AddTab.vue";
-import enLocaleFull from "@/locales/languages/en.json";
+import enLocaleFull from "@/locales/languages/en-US.json";
 
 // Mock vue-router
 const mockRoute = {

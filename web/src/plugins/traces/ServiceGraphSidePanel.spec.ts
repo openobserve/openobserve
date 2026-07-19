@@ -39,7 +39,7 @@ vi.mock("vue-router", () => ({
 // labels and other text ("Healthy", "View Related", ...) come through instead
 // of raw key paths.
 vi.mock("vue-i18n", async () => {
-  const enLocaleFull = (await import("@/locales/languages/en.json")).default as Record<
+  const enLocaleFull = (await import("@/locales/languages/en-US.json")).default as Record<
     string,
     unknown
   >;

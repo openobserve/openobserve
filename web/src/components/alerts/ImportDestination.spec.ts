@@ -18,7 +18,7 @@ import { shallowMount } from "@vue/test-utils";
 import ImportDestination from "./ImportDestination.vue";
 import { createStore } from "vuex";
 import { createI18n } from "vue-i18n";
-import enMessages from "@/locales/languages/en.json";
+import enMessages from "@/locales/languages/en-US.json";
 import { ref } from "vue";
 
 // ─── Service mocks ───────────────────────────────────────────────────────────
