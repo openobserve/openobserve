@@ -16,14 +16,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/no-unused-components -->
 <template>
-  <div class="scroll flex flex-col h-full overflow-y-auto">
-    <!-- Header Section -->
-    <AppPageHeader
-      :back="{ label: currentDashboardData.data?.title || t('dashboard.header'), onClick: goBack, dataTest: 'dashboard-back-btn' }"
-      :title="editMode ? t('panel.editPanel') : t('panel.addPanel')"
-      class="border-b border-border-default"
-    >
-          <template #tabs>
+  <PageLayout
+    :back="{ label: currentDashboardData.data?.title || t('dashboard.header'), onClick: goBack, dataTest: 'dashboard-back-btn' }"
+    :title="editMode ? t('panel.editPanel') : t('panel.addPanel')"
+    bleed
+  >
+          <template #header-tabs>
             <OForm id="add-panel-form" :form="form">
               <OFormInput
                 data-test="dashboard-panel-name"
@@ -139,8 +137,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OButtonGroup>
             </template>
           </template>
-    </AppPageHeader>
-
     <!-- PanelEditor Content Area -->
     <PanelEditor
       ref="panelEditorRef"
@@ -185,7 +181,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
     </div>
-  </div>
+  </PageLayout>
 </template>
 
 <script lang="ts">
@@ -252,7 +248,7 @@ import { useOForm } from "@/lib/forms/Form/useOForm";
 import { makeAddPanelSchema, type AddPanelForm } from "./AddPanel.schema";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import PageLayout from "@/components/common/PageLayout.vue";
 import type { BreadcrumbItem } from "@/components/common/AppBreadcrumb.vue";
 
 const QueryInspector = defineAsyncComponent(() => {
@@ -267,7 +263,7 @@ export default defineComponent({
     OIcon,
     OButtonGroup,
     OButton,
-    AppPageHeader,
+    PageLayout,
     OForm,
     OFormInput,
     ODropdown,
