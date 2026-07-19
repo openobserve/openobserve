@@ -104,6 +104,7 @@ const ROUTE_TAB_MAPS: Record<string, Record<string, string>> = {
   ingestMetrics: {
     prometheus: "prometheus",
     vmagent: "vmagent",
+    nightingale: "nightingale",
     otelCollector: "otelCollector",
     telegraf: "telegraf",
     cloudwatchMetrics: "cloudwatchMetrics",
