@@ -15,18 +15,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="w-full h-full flex flex-col">
+  <PageLayout
+    :title="isEditingReport ? t('reports.update') : t('reports.add')"
+    title-data-test="add-report-title"
+    :back="{
+      label: t('reports.header'),
+      onClick: () => router.back(),
+      dataTest: 'add-report-back-btn',
+    }"
+    bleed
+  >
     <div data-test="add-report-section" class="w-full flex flex-col flex-1 min-h-0 create-report-page">
-      <AppPageHeader
-        :title="isEditingReport ? t('reports.update') : t('reports.add')"
-        title-data-test="add-report-title"
-        :back="{
-          label: t('reports.header'),
-          onClick: () => router.back(),
-          dataTest: 'add-report-back-btn',
-        }"
-        class="border-b border-border-default"
-      />
       <div
         class="flex bg-card-glass-bg flex-1 min-h-0 overflow-auto"
       >
@@ -703,7 +702,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ t("alerts.save") }}
       </OButton>
     </div>
-  </div>
+  </PageLayout>
   <ConfirmDialog
     v-model="dialog.show"
     :title="dialog.title"
@@ -728,7 +727,7 @@ import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { convertDateToTimestamp } from "@/utils/date";
 import { useReo } from "@/services/reodotdev_analytics";
 import SelectFolderDropdown from "@/components/common/sidebar/SelectFolderDropDown.vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import PageLayout from "@/components/common/PageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OStepper from "@/lib/navigation/Stepper/OStepper.vue";

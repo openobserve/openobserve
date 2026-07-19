@@ -15,14 +15,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="org-storage-settings ">
-      <template v-if="currentAction === 'list'">
-          <AppPageHeader
-            :title="t('storage_settings.title')"
-            icon="cloud"
-            :subtitle="t('settings.orgStorageSettings.subtitle')"
-            class="shrink-0 border-b border-border-default"
-          />
+  <div class="org-storage-settings h-full">
+      <PageLayout
+        v-if="currentAction === 'list'"
+        :title="t('storage_settings.title')"
+        icon="cloud"
+        :subtitle="t('settings.orgStorageSettings.subtitle')"
+        bleed
+        scroll
+      >
 
     <!-- Loading state -->
     <div v-if="loading" class="flex justify-center items-center min-h-[calc(100vh-var(--navbar-height)-7.5rem)]">
@@ -229,7 +230,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OCard>
       </div>
     </div>
-    </template>
+    </PageLayout>
     <OrgStorageEditor
       v-else
       :action="currentAction"
@@ -241,7 +242,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts" setup>
 import { ref, computed, onMounted } from "vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import PageLayout from "@/components/common/PageLayout.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import { useI18n } from "vue-i18n";
