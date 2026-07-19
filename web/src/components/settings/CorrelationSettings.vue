@@ -15,40 +15,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="flex flex-col h-full min-h-0">
-    <AppPageHeader
-      icon="group-work"
-      :subtitle="t('settings.correlationSettingsPage.subtitle')"
-      class="shrink-0 border-b border-border-default"
-      data-test="correlation-settings-header"
-    >
-      <template #title>
-        <span data-test="correlation-settings-page-title">{{ t('settings.correlationSettings') }}</span>
-      </template>
-    </AppPageHeader>
+  <PageLayout
+    icon="group-work"
+    :subtitle="t('settings.correlationSettingsPage.subtitle')"
+    data-test="correlation-settings-header"
+    bleed
+  >
+    <template #title>
+      <span data-test="correlation-settings-page-title">{{ t('settings.correlationSettings') }}</span>
+    </template>
 
     <!-- Tab bar -->
-    <div class="shrink-0 px-page-edge border-b border-border-default" data-test="correlation-settings-tabs">
-      <OTabs :model-value="activeTab" dense @update:model-value="onTabChange">
-        <OTab
-          name="services"
-          :label="t('settings.correlation.discoveredServicesTab')"
-        />
-        <OTab
-          name="discovery"
-          :label="t('settings.correlation.serviceDiscoveryTab')"
-        />
-        <OTab
-          name="alert-correlation"
-          :label="t('settings.correlation.alertCorrelationTab')"
-        />
-        <OTab
-          name="field-aliases"
-          data-test="correlation-settings-field-aliases-tab"
-          :label="t('settings.correlation.fieldAliasesTab')"
-        />
-      </OTabs>
-    </div>
+    <template #subnav>
+      <div class="px-page-edge" data-test="correlation-settings-tabs">
+        <OTabs :model-value="activeTab" dense @update:model-value="onTabChange">
+          <OTab
+            name="services"
+            :label="t('settings.correlation.discoveredServicesTab')"
+          />
+          <OTab
+            name="discovery"
+            :label="t('settings.correlation.serviceDiscoveryTab')"
+          />
+          <OTab
+            name="alert-correlation"
+            :label="t('settings.correlation.alertCorrelationTab')"
+          />
+          <OTab
+            name="field-aliases"
+            data-test="correlation-settings-field-aliases-tab"
+            :label="t('settings.correlation.fieldAliasesTab')"
+          />
+        </OTabs>
+      </div>
+    </template>
 
     <!-- Tab content -->
     <div class="flex-1 min-h-0 overflow-hidden">
@@ -95,7 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </SemanticFieldGroupsConfig>
       </div>
     </div>
-  </div>
+  </PageLayout>
 </template>
 
 <script lang="ts">
@@ -111,7 +111,7 @@ import ServiceIdentitySetup from "@/components/settings/ServiceIdentitySetup.vue
 import AppTabs from "@/components/common/AppTabs.vue";
 import SemanticFieldGroupsConfig from "@/components/alerts/SemanticFieldGroupsConfig.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import PageLayout from "@/components/common/PageLayout.vue";
 import serviceStreamsService from "@/services/service_streams";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
@@ -127,7 +127,7 @@ export default defineComponent({
     OTabs,
     OTab,
     OButton,
-    AppPageHeader,
+    PageLayout,
   },
   setup() {
     const store = useStore();
