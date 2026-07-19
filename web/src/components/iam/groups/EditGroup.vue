@@ -15,13 +15,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div data-test="edit-group-section" class="flex flex-col h-full">
-    <!-- Sub-page header: the listing's icon becomes a Back button (→ Groups). -->
-    <AppPageHeader
-      :title="groupDetails.group_name"
-      :back="{ label: t('iam.groups'), onClick: cancelEditGroup }"
-      class="shrink-0 border-b border-border-default"
-    />
+  <PageLayout
+    data-test="edit-group-section"
+    :title="groupDetails.group_name"
+    :back="{ label: t('iam.groups'), onClick: cancelEditGroup }"
+    bleed
+  >
     <div
       data-test="edit-group-section-title"
       class="px-2.5 pt-2.5 pb-2.5 flex-shrink-0"
@@ -92,7 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:cancel="onLeaveConfirm(false)"
       v-model="leaveConfirm.show"
     />
-  </div>
+  </PageLayout>
 </template>
 
 <script setup lang="ts">
@@ -102,7 +101,7 @@ import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import GroupRoles from "./GroupRoles.vue";
 import GroupUsers from "./GroupUsers.vue";
 import AppTabs from "@/components/common/AppTabs.vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import PageLayout from "@/components/common/PageLayout.vue";
 import { useI18n } from "vue-i18n";
 import { useRouter, onBeforeRouteLeave } from "vue-router";
 import { onBeforeMount } from "vue";
