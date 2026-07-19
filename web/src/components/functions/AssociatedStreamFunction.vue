@@ -30,6 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :page-size-options="pageSizeOptions"
       expansion="single"
       v-model:expanded-ids="expandedIds"
+      show-index
       :show-global-filter="false"
       :default-columns="false"
       width="100%"
@@ -208,7 +209,7 @@ import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
+import { COL } from "@/lib/core/Table/OTable.types";
 
 export default defineComponent({
   name: "PageLogStream",
@@ -229,13 +230,6 @@ export default defineComponent({
     const previousOrgIdentifier = ref("");
     const functionsList = ref<any>([]);
     const columns: OTableColumnDef[] = [
-      {
-        id: "#",
-        header: "#",
-        accessorKey: "#",
-        size: TABLE_INDEX_COL_SIZE,
-        meta: { align: "left" },
-      },
       {
         id: "name",
         accessorKey: "name",
@@ -395,7 +389,6 @@ export default defineComponent({
 
         getStreams("", false)
           .then((res: any) => {
-            let counter = 1;
             let doc_num = "";
             let storage_size = "";
             let compressed_size = "";
@@ -413,7 +406,6 @@ export default defineComponent({
                   compressed_size = data.stats.compressed_size + " MB";
                 }
                 return {
-                  "#": counter <= 9 ? `0${counter++}` : counter++,
                   name: data.name,
                   doc_num: doc_num,
                   storage_size: storage_size,

@@ -277,9 +277,8 @@ export default defineComponent({
           {},
         );
 
-        return Object.values(result).map((user: any, index: number) => ({
+        return Object.values(result).map((user: any) => ({
           ...user,
-          "#": index + 1,
           duration: user.duration,
           queryRange: user.queryRange,
         }));
@@ -395,12 +394,6 @@ export default defineComponent({
     };
 
     const columns = ref<{ name: string; label: string; field: string; align?: string; sortable?: boolean }[]>([
-      {
-        name: "#",
-        label: "#",
-        field: "#",
-        align: "left",
-      },
       {
         name: "user_id",
         field: "user_id",
@@ -696,10 +689,9 @@ export default defineComponent({
 
       rows.sort((a: any, b: any) => b.created_at - a.created_at);
 
-      return rows.map((row, index) => {
+      return rows.map((row: any) => {
         return {
           ...row,
-          "#": index < 9 ? `0${index + 1}` : index + 1,
         };
       });
     });
@@ -709,7 +701,7 @@ export default defineComponent({
 
       rows.sort((a: any, b: any) => b.created_at - a.created_at);
 
-      return rows.map((row: any, index) => {
+      return rows.map((row: any) => {
         const search_type = row?.search_type;
         var query_source = "-unknown-";
 
@@ -720,7 +712,6 @@ export default defineComponent({
         }
 
         return {
-          "#": index < 9 ? `0${index + 1}` : index + 1,
           user_id: row?.user_id,
           org_id: row?.org_id,
           duration: getDuration(row.created_at).durationInSeconds,

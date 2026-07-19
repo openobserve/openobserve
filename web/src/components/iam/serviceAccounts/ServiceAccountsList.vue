@@ -53,6 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :show-global-filter="false"
             filter-mode="client"
             :default-columns="false"
+            show-index
             :enable-column-resize="true"
             :persist-columns="true"
             table-id="iam-service-accounts-list"
@@ -439,7 +440,7 @@ import {
   getImageURL,
   verifyOrganizationStatus,
 } from "@/utils/zincutils";
-import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
+import { COL } from "@/lib/core/Table/OTable.types";
 
 // @ts-ignore
 import usePermissions from "@/composables/iam/usePermissions";
@@ -642,15 +643,6 @@ export default defineComponent({
 
     const columns: OTableColumnDef[] = [
       {
-        id: "#",
-        header: "#",
-        accessorKey: "#",
-        size: TABLE_INDEX_COL_SIZE,
-        minSize: 32,
-        maxSize: 40,
-        meta: { align: "left", compactPadding: true },
-      },
-      {
         id: "email",
         header: t("serviceAccounts.list.col.identifier"),
         accessorKey: "email",
@@ -741,11 +733,9 @@ export default defineComponent({
           )
           .then((res) => {
             resultTotal.value = res.data.data.length;
-            let counter = 1;
             currentUserRole.value = "";
             serviceAccountsState.service_accounts_users = res.data.data.map((data: any) => {
               return {
-                "#": counter <= 9 ? `0${counter++}` : counter++,
                 email: data.email,
                 first_name: data.first_name,
                 last_name: data.last_name,
@@ -884,10 +874,6 @@ export default defineComponent({
             store.state.selectedOrganization.identifier == data.organization
           ) {
             const user = {
-              "#":
-              serviceAccountsState.service_accounts_users.length + 1 <= 9
-                  ? `0${serviceAccountsState.service_accounts_users.length + 1}`
-                  : serviceAccountsState.service_accounts_users.length + 1,
               email: data.email,
               first_name: data.first_name,
               last_name: data.last_name,

@@ -113,7 +113,7 @@ import { ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { getRoles } from "@/services/iam";
 import { useStore } from "vuex";
-import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
+import { TABLE_CHECKBOX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
 
 // show selected users in the table
 // Add is_selected to the user object
@@ -178,7 +178,7 @@ const columns: OTableColumnDef[] = [
     header: "",
     accessorKey: "isInGroup",
     cell: (info: any) => info.getValue(),
-    size: TABLE_INDEX_COL_SIZE,
+    size: TABLE_CHECKBOX_COL_SIZE,
     minSize: 32,
     maxSize: 40,
     meta: { align: "center", compactPadding: true },
@@ -234,10 +234,9 @@ const getchOrgUsers = async () => {
       store.state.selectedOrganization.identifier
     );
 
-    users.value = cloneDeep(data.data).map((role: any, index: number) => {
+    users.value = cloneDeep(data.data).map((role: any) => {
       return {
         role_name: role,
-        "#": index + 1,
         isInGroup: groupUsersMap.value.has(role),
       };
     });

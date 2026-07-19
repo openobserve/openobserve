@@ -138,11 +138,7 @@ onBeforeMount(() => {
 });
 
 const updateTable = () => {
-   let counter = 1;
-  rows.value = rolesState.roles.map((role: { role_name: string }, index: number) => ({
-      ...role,
-      "#": counter <= 9 ? `0${counter++}` : counter++,
-    }));
+  rows.value = rolesState.roles;
 };
 
 const addRole = () => {

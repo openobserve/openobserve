@@ -50,6 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         sorting="client"
         filter-mode="client"
         :default-columns="false"
+        show-index
         :enable-column-resize="true"
         :persist-columns="true"
         table-id="settings-cipher-keys"
@@ -167,7 +168,7 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import PageLayout from "@/components/common/PageLayout.vue";
-import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
+import { COL } from "@/lib/core/Table/OTable.types";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 
@@ -192,13 +193,6 @@ export default defineComponent({
     const loading = ref(false);
     const filterQuery = ref("");
     const columns: OTableColumnDef[] = [
-      {
-        id: "#",
-        header: "#",
-        accessorKey: "#",
-        size: TABLE_INDEX_COL_SIZE,
-        meta: { align: "left" },
-      },
       {
         id: "name",
         header: t("cipherKey.name"),
@@ -319,7 +313,6 @@ export default defineComponent({
           const responseData = response.data.keys;
           for (let i = 0; i < responseData.length; i++) {
             data.push({
-              "#": i + 1,
               name: responseData[i].name,
               store_type: responseData[i].key.store.type,
               mechanism_type: responseData[i].key.mechanism.type,

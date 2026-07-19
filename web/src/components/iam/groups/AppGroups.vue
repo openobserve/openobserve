@@ -51,6 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           selection="multiple"
           filter-mode="client"
           :default-columns="false"
+          show-index
           @update:selected-ids="handleSelectedIdsUpdate"
         >
           <template #toolbar>
@@ -170,7 +171,6 @@ import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
-import { TABLE_INDEX_COL_SIZE } from "@/lib/core/Table/OTable.types";
 
 const showAddGroup = ref(false);
 
@@ -208,15 +208,6 @@ const confirmBulkDelete = ref(false);
 
 const columns: OTableColumnDef[] = [
   {
-    id: "#",
-    header: "#",
-    accessorFn: (row: any) => row["#"],
-    size: TABLE_INDEX_COL_SIZE,
-    minSize: 32,
-    maxSize: 40,
-    meta: { compactPadding: true, align: "left" },
-  },
-  {
     id: "group_name",
     header: t("iam.groupName"),
     accessorKey: "group_name",
@@ -242,13 +233,7 @@ onBeforeMount(() => {
 });
 
 const updateTable = () => {
-  let counter = 1;
-  rows.value = cloneDeep(
-    groupsState.groups.map((group: { group_name: string }, index: number) => ({
-      ...group,
-      "#": counter <= 9 ? `0${counter++}` : counter++,
-    }))
-  );
+  rows.value = cloneDeep(groupsState.groups);
 };
 
 const addGroup = () => {

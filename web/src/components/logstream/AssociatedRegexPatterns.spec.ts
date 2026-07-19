@@ -828,7 +828,7 @@ describe('AssociatedRegexPatterns.vue', () => {
       // Patterns should have additional formatting
       const patterns = vm.allPatterns;
       if (patterns.length > 0) {
-        expect(patterns[0]).toHaveProperty('#');
+        // Row numbering moved to OTable's built-in show-index (no '#' data field).
         expect(patterns[0]).toHaveProperty('created_at');
         expect(patterns[0]).toHaveProperty('updated_at');
         expect(patterns[0]).toHaveProperty('pattern_name');

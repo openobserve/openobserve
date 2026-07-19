@@ -84,6 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :columns="columns"
           :column-visibility="columnVisibility"
           :default-columns="false"
+          show-index
           :enable-column-resize="true"
           :persist-columns="true"
           table-id="pipelines-pipeline-history-list"
@@ -496,7 +497,7 @@ import pipelinesService from "@/services/pipelines";
 import http from "@/services/http";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
+import { COL } from "@/lib/core/Table/OTable.types";
 
 const { t } = useI18n();
 const store = useStore();
@@ -549,13 +550,6 @@ const errorMessage = ref<any>(null);
 
 // Table columns
 const columns = ref([
-  {
-    id: "row_number",
-    header: "#",
-    accessorKey: "#",
-    size: TABLE_INDEX_COL_SIZE,
-    meta: { align: "left" as const },
-  },
   {
     id: "pipeline_name",
     header: "Pipeline Name",
@@ -771,10 +765,6 @@ const fetchPipelineHistory = async () => {
       rows.value = (historyData.hits || []).map((hit: any, index: number) => ({
         ...hit,
         id: `${hit.timestamp}_${index}`,
-        "#":
-          index +
-          1 +
-          (pagination.value.page - 1) * pagination.value.rowsPerPage,
       }));
 
       // Update pagination total

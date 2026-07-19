@@ -57,6 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :page-size-options="perPageOptionsList"
               sorting="client"
               filter-mode="client"
+              show-index
               :show-global-filter="false"
               :default-columns="false"
               :enable-column-resize="true"
@@ -393,7 +394,7 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import ONumberCell from "@/lib/core/Table/cells/ONumberCell.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
-import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
+import { COL } from "@/lib/core/Table/OTable.types";
 
 export default defineComponent({
   name: "EnrichmentTableList",
@@ -442,7 +443,6 @@ export default defineComponent({
     const { track } = useReo();
     const { toast } = useToast();
     const columns: OTableColumnDef[] = [
-      { id: "#", header: "#", accessorKey: "#", size: TABLE_INDEX_COL_SIZE, meta: { align: "left" } },
       { id: "name", header: t("common.name"), accessorKey: "name", sortable: true, resizable: true, hideable: true, size: COL.name, minSize: 160, meta: { align: "left", flex: true } },
       { id: "type", header: "Type", accessorFn: (row: any) => (row.urlJobs && row.urlJobs.length > 0) ? "Url" : "File", sortable: true, resizable: true, hideable: true, meta: { align: "left" }, size: COL.type },
       { id: "doc_num", header: t("logStream.docNum"), accessorKey: "doc_num", sortable: true, resizable: true, hideable: true, meta: { align: "right" }, size: COL.count },
@@ -561,8 +561,7 @@ export default defineComponent({
           const urlJobs = urlJobMap[data.name] || [];
 
           allTables.set(data.name, {
-            "#": counter <= 9 ? `0${counter++}` : counter++,
-            id: data.name + counter,
+            id: data.name + counter++,
             name: data.name,
             doc_num: doc_num,
             storage_size: storage_size,
@@ -581,8 +580,7 @@ export default defineComponent({
           if (!allTables.has(tableName)) {
             // This is a URL job without a schema yet
             allTables.set(tableName, {
-              "#": counter <= 9 ? `0${counter++}` : counter++,
-              id: tableName + counter,
+              id: tableName + counter++,
               name: tableName,
               doc_num: "",
               storage_size: "",

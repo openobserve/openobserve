@@ -96,6 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :sort-by="sortBy"
           :sort-order="sortOrder"
           :loading="loading"
+          show-index
           :show-global-filter="false"
           :default-columns="false"
           width="100%"
@@ -457,7 +458,7 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
-import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
+import { COL } from "@/lib/core/Table/OTable.types";
 
 const { t } = useI18n();
 const store = useStore();
@@ -505,7 +506,6 @@ const errorMessage = ref("");
 
 // Table columns
 const columns = ref<OTableColumnDef[]>([
-  { id: "#", header: "#", accessorKey: "#", size: TABLE_INDEX_COL_SIZE, minSize: TABLE_INDEX_COL_SIZE, maxSize: TABLE_INDEX_COL_SIZE, sortable: false, meta: { align: "left" } },
   {
     id: "alert_name",
     header: t("alerts.alertName") || "Alert Name",
@@ -717,7 +717,6 @@ const fetchAlertHistory = async () => {
       rows.value = (historyData.hits || []).map((hit: any, index: number) => ({
         ...hit,
         id: `${hit.timestamp}_${index}`,
-        "#": (index + 1) + (currentPage.value - 1) * pageSize.value,
       }));
 
       totalCount.value = historyData.total || 0;

@@ -109,13 +109,7 @@ describe('AppRoles - setupRoles', () => {
     expect(rows[2]).toHaveProperty('role_name', 'Editor');
   });
 
-  it('formats row numbers with leading zeros for first 9', async () => {
-    const wrapper = await mountAppRoles();
-    const rows = (wrapper.vm as any).rows;
-    expect(rows[0]['#']).toBe('01');
-    expect(rows[1]['#']).toBe('02');
-    expect(rows[2]['#']).toBe('03');
-  });
+  // Row numbering moved to OTable's built-in show-index (no '#' data field).
 
   it('handles getRoles error gracefully', async () => {
     vi.mocked(getRoles).mockRejectedValueOnce(new Error('network error'));
@@ -423,11 +417,7 @@ describe('AppRoles - rows data', () => {
     expect((wrapper.vm as any).rows[0].role_name).toBe('Admin');
   });
 
-  it('includes row numbering in "#" field', async () => {
-    const wrapper = await mountAppRoles();
-    expect((wrapper.vm as any).rows[0]['#']).toBe('01');
-    expect((wrapper.vm as any).rows[1]['#']).toBe('02');
-  });
+  // Row numbering moved to OTable's built-in show-index (no '#' data field).
 });
 
 // 12. RoleTable integration

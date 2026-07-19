@@ -35,6 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         sorting="client"
         filter-mode="client"
         :default-columns="false"
+        show-index
         :show-global-filter="false"
         :enable-column-resize="true"
         :persist-columns="true"
@@ -228,7 +229,7 @@ import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
+import { COL } from "@/lib/core/Table/OTable.types";
 
 export default defineComponent({
   name: "IncidentList",
@@ -267,13 +268,6 @@ export default defineComponent({
     const pageSize = ref(20);
 
     const columns: OTableColumnDef[] = [
-      {
-        id: "#",
-        header: "#",
-        accessorKey: "#",
-        size: TABLE_INDEX_COL_SIZE,
-        meta: { align: "center" },
-      },
       {
         id: "title",
         header: t("alerts.incidents.title_field"),
@@ -369,7 +363,7 @@ export default defineComponent({
         filtered = filtered.filter((incident) => incident.status === statusFilter.value);
       }
       filtered = applyFrontendSearch(filtered, searchQuery.value);
-      return filtered.map((incident, i) => ({ ...incident, "#": i + 1 }));
+      return filtered;
     });
 
     const loadIncidents = async () => {

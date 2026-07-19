@@ -38,6 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :enable-column-resize="true"
         :persist-columns="true"
         :default-columns="false"
+        show-index
         table-id="pipelines-pipeline-list"
         v-model:selected-ids="selectedPipelineIds"
         :expansion="activeTab === 'scheduled' ? 'single' : 'none'"
@@ -465,7 +466,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
-import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
+import { COL } from "@/lib/core/Table/OTable.types";
 
 const { t } = useI18n();
 const router = useRouter();
@@ -548,11 +549,7 @@ const updateActiveTab = () => {
   }
 
   filteredPipelines.value = pipelines.value
-    .filter((pipeline: any) => pipeline.source.source_type === activeTab.value)
-    .map((pipeline: any, index) => ({
-      ...pipeline,
-      "#": index + 1 <= 9 ? `0${index + 1}` : index + 1,
-    }));
+    .filter((pipeline: any) => pipeline.source.source_type === activeTab.value);
 
   columns.value = getColumnsForActiveTab(activeTab.value);
 };
@@ -605,14 +602,6 @@ const togglePipelineState = (row: any, from_now: boolean) => {
 
 
 const getColumnsForActiveTab = (tab: any) => {
-  const hashColumn = {
-    id: "#",
-    header: "#",
-    accessorKey: "#",
-    sortable: false,
-    size: TABLE_INDEX_COL_SIZE,
-    meta: { align: "left" },
-  };
   const nameColumn = {
     id: "name",
     header: t("common.name"),
@@ -704,7 +693,6 @@ const getColumnsForActiveTab = (tab: any) => {
 
   if (tab === "all") {
     return [
-      hashColumn,
       nameColumn,
       typeColumn,
       streamNameColumn,
@@ -717,7 +705,6 @@ const getColumnsForActiveTab = (tab: any) => {
   }
   if (tab === "realtime") {
     return [
-      hashColumn,
       nameColumn,
       streamNameColumn,
       streamTypeColumn,
@@ -725,7 +712,6 @@ const getColumnsForActiveTab = (tab: any) => {
     ];
   }
   return [
-    hashColumn,
     nameColumn,
     scheduledStreamTypeColumn,
     frequencyColumn,
@@ -768,7 +754,7 @@ const getPipelines = async () => {
     );
     pipelines.value = [];
     // resultTotal.value = response.data.list.length;
-    pipelines.value = response.data.list.map((pipeline: any, index: any) => {
+    pipelines.value = response.data.list.map((pipeline: any) => {
       const updatedEdges = pipeline.edges.map((edge: any) => ({
         ...edge,
         markerEnd: {
@@ -809,7 +795,6 @@ const getPipelines = async () => {
       pipeline.edges = updatedEdges;
       return {
         ...pipeline,
-        "#": index + 1 <= 9 ? `0${index + 1}` : index + 1,
       };
     });
   } catch (error) {

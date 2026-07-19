@@ -33,6 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           sorting="client"
           filter-mode="client"
           :default-columns="false"
+          show-index
           :enable-column-resize="true"
           :persist-columns="true"
           table-id="iam-invitations-list"
@@ -157,7 +158,7 @@ import PageLayout from "@/components/common/PageLayout.vue";
 import usersService from "@/services/users";
 import organizationsService from "@/services/organizations";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
+import { COL } from "@/lib/core/Table/OTable.types";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 
@@ -192,15 +193,6 @@ export default defineComponent({
     const selectedInvitation = ref(null);
 
     const columns: OTableColumnDef[] = [
-      {
-        id: "#",
-        header: "#",
-        accessorKey: "#",
-        size: TABLE_INDEX_COL_SIZE,
-        minSize: 40,
-        maxSize: 64,
-        meta: { align: "center", compactPadding: true },
-      },
       {
         id: "org_name",
         header: t("invitation.organizationName"),
@@ -271,9 +263,7 @@ export default defineComponent({
       try {
         const response = await usersService.getPendingInvites();
 
-        let counter = 1;
         invitations.value = response.data.data.map((invitation: any) => ({
-          "#": counter <= 9 ? `0${counter++}` : counter++,
           ...invitation,
           expiry: formatExpiry(invitation.expires_at),
         }));

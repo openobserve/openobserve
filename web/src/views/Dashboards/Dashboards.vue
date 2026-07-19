@@ -113,6 +113,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :loading="loading"
             :frame="false"
             :default-columns="false"
+            show-index
             :global-filter="filterQuery"
             :show-global-filter="false"
             :footer-title="t('dashboard.header')"
@@ -530,7 +531,7 @@ import dashboardService from "../../services/dashboards";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
-import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
+import { COL } from "@/lib/core/Table/OTable.types";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { useRoute, useRouter } from "vue-router";
 import { toRaw } from "vue";
@@ -759,14 +760,6 @@ export default defineComponent({
     let currentSearchAbortController = null;
     const columns = computed(() => {
       const baseColumns = [
-        {
-          id: "#",
-          header: "#",
-          accessorKey: "#",
-          sortable: false,
-          size: TABLE_INDEX_COL_SIZE,
-          meta: { align: "left" },
-        },
         {
           id: "name",
           header: t("dashboard.name"),
@@ -1166,7 +1159,6 @@ export default defineComponent({
       index: number,
       folderInfo?: { name: string; id: string },
     ) => ({
-      "#": index < 9 ? `0${index + 1}` : index + 1,
       id: folderInfo ? board.dashboard.dashboardId : board.dashboardId,
       ...(folderInfo && {
         folder: folderInfo.name,
@@ -1203,7 +1195,6 @@ export default defineComponent({
             (board: any) => board.dashboardId === fav.dashboardId,
           );
           return {
-            "#": index < 9 ? `0${index + 1}` : index + 1,
             id: fav.dashboardId,
             folder: folderNames.get(fav.folderId) ?? fav.folderId,
             folder_id: fav.folderId,

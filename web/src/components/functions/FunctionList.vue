@@ -55,6 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :page-size-options="pageSizeOptions"
             selection="multiple"
             v-model:selected-ids="selectedFunctionIds"
+            show-index
             :show-global-filter="false"
             :default-columns="false"
             width="100%"
@@ -217,7 +218,6 @@ import { useI18n } from "vue-i18n";
 
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
-import { TABLE_INDEX_COL_SIZE } from "@/lib/core/Table/OTable.types";
 import jsTransformService from "../../services/jstransform";
 import NoData from "../shared/grid/NoData.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
@@ -278,14 +278,6 @@ export default defineComponent({
     const { track } = useReo();
     const columns: OTableColumnDef[] = [
       {
-        id: "#",
-        header: "#",
-        accessorKey: "#",
-        sortable: false,
-        size: TABLE_INDEX_COL_SIZE,
-        meta: { align: "left" },
-      },
-      {
         id: "name",
         accessorKey: "name",
         header: t("common.name"),
@@ -334,7 +326,6 @@ export default defineComponent({
           store.state.selectedOrganization.identifier,
         )
         .then((res) => {
-          var counter = 1;
           resultTotal.value = res.data.list.length;
           if (router.currentRoute.value.query.action == "add") {
             showAddUpdateFn({ row: undefined });
@@ -347,7 +338,6 @@ export default defineComponent({
             }
 
             return {
-              "#": counter <= 9 ? `0${counter++}` : counter++,
               name: data.name,
               function: data.function,
               params: data.params,

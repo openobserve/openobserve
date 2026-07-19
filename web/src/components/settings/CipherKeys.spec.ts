@@ -322,7 +322,6 @@ describe("CipherKeys", () => {
       
       expect(wrapper.vm.tabledata).toHaveLength(2);
       expect(wrapper.vm.tabledata[0]).toEqual({
-        "#": 1,
         name: "test-key-1",
         store_type: "env",
         mechanism_type: "aes",
@@ -607,40 +606,36 @@ describe("CipherKeys", () => {
     it("should have correct table columns configuration", () => {
       const wrapper = createWrapper();
 
-      expect(wrapper.vm.columns).toHaveLength(5);
+      expect(wrapper.vm.columns).toHaveLength(4);
 
-      // Column 0: #
-      expect(wrapper.vm.columns[0].id).toBe("#");
-      expect(wrapper.vm.columns[0].accessorKey).toBe("#");
-      expect(wrapper.vm.columns[0].size).toBe(44);
+      // Row numbering moved to OTable's built-in show-index (no '#' column).
+
+      // Column 0: name
+      expect(wrapper.vm.columns[0].id).toBe("name");
+      expect(wrapper.vm.columns[0].accessorKey).toBe("name");
+      expect(wrapper.vm.columns[0].sortable).toBe(true);
       expect(wrapper.vm.columns[0].meta.align).toBe("left");
 
-      // Column 1: name
-      expect(wrapper.vm.columns[1].id).toBe("name");
-      expect(wrapper.vm.columns[1].accessorKey).toBe("name");
+      // Column 1: store_type
+      expect(wrapper.vm.columns[1].id).toBe("store_type");
+      expect(wrapper.vm.columns[1].accessorKey).toBe("store_type");
       expect(wrapper.vm.columns[1].sortable).toBe(true);
+      expect(wrapper.vm.columns[1].size).toBe(180);
       expect(wrapper.vm.columns[1].meta.align).toBe("left");
 
-      // Column 2: store_type
-      expect(wrapper.vm.columns[2].id).toBe("store_type");
-      expect(wrapper.vm.columns[2].accessorKey).toBe("store_type");
+      // Column 2: mechanism_type
+      expect(wrapper.vm.columns[2].id).toBe("mechanism_type");
+      expect(wrapper.vm.columns[2].accessorKey).toBe("mechanism_type");
       expect(wrapper.vm.columns[2].sortable).toBe(true);
       expect(wrapper.vm.columns[2].size).toBe(180);
       expect(wrapper.vm.columns[2].meta.align).toBe("left");
 
-      // Column 3: mechanism_type
-      expect(wrapper.vm.columns[3].id).toBe("mechanism_type");
-      expect(wrapper.vm.columns[3].accessorKey).toBe("mechanism_type");
-      expect(wrapper.vm.columns[3].sortable).toBe(true);
-      expect(wrapper.vm.columns[3].size).toBe(180);
-      expect(wrapper.vm.columns[3].meta.align).toBe("left");
-
-      // Column 4: actions
-      expect(wrapper.vm.columns[4].id).toBe("actions");
-      expect(wrapper.vm.columns[4].isAction).toBe(true);
-      expect(wrapper.vm.columns[4].pinned).toBe("right");
-      expect(wrapper.vm.columns[4].size).toBe(100);
-      expect(wrapper.vm.columns[4].meta.align).toBe("center");
+      // Column 3: actions
+      expect(wrapper.vm.columns[3].id).toBe("actions");
+      expect(wrapper.vm.columns[3].isAction).toBe(true);
+      expect(wrapper.vm.columns[3].pinned).toBe("right");
+      expect(wrapper.vm.columns[3].size).toBe(100);
+      expect(wrapper.vm.columns[3].meta.align).toBe("center");
     });
   });
 

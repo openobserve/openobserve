@@ -75,6 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         sorting="client"
         filter-mode="client"
         :default-columns="false"
+        show-index
         :show-global-filter="false"
         @update:selected-ids="handleSelectedIdsUpdate"
       >
@@ -257,7 +258,6 @@ import { useReo } from "@/services/reodotdev_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
-import { TABLE_INDEX_COL_SIZE } from "@/lib/core/Table/OTable.types";
 
 const AddTemplate = defineAsyncComponent(
   () => import("@/components/alerts/AddTemplate.vue"),
@@ -269,13 +269,6 @@ const router = useRouter();
 const { track } = useReo();
 const templates: Ref<Template[]> = ref([]);
 const columns: OTableColumnDef[] = [
-  {
-    id: "#",
-    header: "#",
-    accessorKey: "#",
-    size: TABLE_INDEX_COL_SIZE,
-    meta: { align: "left" },
-  },
   {
     id: "name",
     header: t("alert_templates.name"),
@@ -361,10 +354,7 @@ const getTemplates = () => {
     })
     .then((res) => {
       resultTotal.value = res.data.length;
-      templates.value = res.data.map((data: any, index: number) => ({
-        ...data,
-        "#": index + 1 <= 9 ? `0${index + 1}` : index + 1,
-      }));
+      templates.value = res.data;
       updateRoute();
     })
     .catch((err) => {
@@ -525,7 +515,6 @@ const filterData = (rows: any, terms: any) => {
 const exportTemplate = (row: any) => {
   const findTemplate: any = getTemplateByName(row.name);
   const templateByName = { ...findTemplate };
-  if (templateByName.hasOwnProperty("#")) delete templateByName["#"];
   const templateJson = JSON.stringify(templateByName, null, 2);
   const blob = new Blob([templateJson], { type: "application/json" });
   const url = URL.createObjectURL(blob);

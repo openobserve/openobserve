@@ -63,6 +63,7 @@
           :global-filter="searchQuery"
           :show-global-filter="false"
           :default-columns="false"
+          show-index
           :enable-column-resize="true"
           :persist-columns="true"
           table-id="settings-llm-providers"
@@ -183,7 +184,7 @@ import ProviderFormPage from "@/enterprise/components/onlineEvals/forms/Provider
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import PageLayout from "@/components/common/PageLayout.vue";
-import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
+import { COL } from "@/lib/core/Table/OTable.types";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 
@@ -203,14 +204,6 @@ const pendingDeleteRow = ref<Provider | null>(null);
 const orgId = computed(() => store.state.selectedOrganization?.identifier);
 
 const columns = computed(() => [
-  {
-    id: "#",
-    header: "#",
-    accessorKey: "#",
-    sortable: false,
-    size: TABLE_INDEX_COL_SIZE,
-    meta: { align: "left" },
-  },
   {
     id: "name",
     header: t("llmProviders.columns.name"),
@@ -281,10 +274,7 @@ const filteredProviders = computed(() => {
           .filter(Boolean)
           .some((v) => String(v).toLowerCase().includes(query)),
       );
-  return filtered.map((row, index) => ({
-    ...row,
-    "#": index + 1 <= 9 ? `0${index + 1}` : String(index + 1),
-  }));
+  return filtered;
 });
 
 onBeforeMount(async () => {

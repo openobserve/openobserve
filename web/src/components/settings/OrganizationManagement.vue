@@ -35,6 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         sorting="client"
         filter-mode="client"
         :default-columns="false"
+        show-index
         :enable-column-resize="true"
         :persist-columns="true"
         table-id="org-management-list"
@@ -327,13 +328,6 @@ export default defineComponent({
 
     const columns: OTableColumnDef[] = [
       {
-        id: "#",
-        header: "#",
-        accessorKey: "#",
-        size: 50,
-        meta: { align: "left" },
-      },
-      {
         id: "name",
         header: t("settings.org_name"),
         accessorKey: "name",
@@ -448,7 +442,6 @@ export default defineComponent({
           const responseData = response.data.data;
           for (let i = 0; i < responseData.length; i++) {
             data.push({
-              "#": i + 1,
               id: responseData[i].id,
               name: responseData[i].name,
               identifier: responseData[i].identifier,

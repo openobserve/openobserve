@@ -59,6 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :is-row-selectable="(row: any) => row.enableDelete"
           filter-mode="client"
           :default-columns="false"
+          show-index
           :enable-column-resize="true"
           :persist-columns="true"
           table-id="iam-users-list"
@@ -277,7 +278,7 @@ import { getRoles as getCustomRolesApi, getRoleUsers } from "@/services/iam";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
-import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
+import { COL } from "@/lib/core/Table/OTable.types";
 
 export default defineComponent({
   name: "UserPageOpenSource",
@@ -386,15 +387,6 @@ export default defineComponent({
 
     const columns = computed<OTableColumnDef[]>(() => {
       const cols: OTableColumnDef[] = [
-        {
-          id: "#",
-          header: "#",
-          accessorFn: (row: any) => row["#"],
-          size: TABLE_INDEX_COL_SIZE,
-          minSize: 32,
-          maxSize: 50,
-          meta: { compactPadding: true, align: "left" },
-        },
         {
           id: "email",
           header: t("user.email"),
@@ -630,7 +622,6 @@ export default defineComponent({
               users = [...res.data.data, ...invitedMembers];
             }
 
-            let counter = 1;
             currentUserRole.value = "";
             usersState.users = users.map((data: any) => {
               if (store.state.userInfo.email?.toLowerCase() == data.email?.toLowerCase()) {
@@ -663,7 +654,6 @@ export default defineComponent({
 
 
               return {
-                "#": counter <= 9 ? `0${counter++}` : counter++,
                 email: maskText(data.email),
                 rawEmail: data.email,
                 first_name: data.first_name,

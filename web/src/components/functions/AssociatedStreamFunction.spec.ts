@@ -356,25 +356,8 @@ describe("AssociatedStreamFunction", () => {
       expect(vm.logStream[0].storage_size).toBe("--");
     });
 
-    it("should format row number with leading zero for first 9 items", async () => {
-      mockGetStreams.mockResolvedValue({
-        list: Array.from({ length: 10 }, (_, i) => ({
-          name: `stream${i + 1}`,
-          stream_type: "logs",
-          stats: null,
-        })),
-      });
-
-      const wrapper = mount(AssociatedStreamFunction, {
-        global: { plugins: [i18n, store, router], stubs: globalStubs },
-      });
-
-      await flushPromises();
-
-      const vm = wrapper.vm as any;
-      expect(vm.logStream[0]["#"]).toBe("01");
-      expect(vm.logStream[8]["#"]).toBe("09");
-    });
+    // Zero-padded row numbering is now OTable's built-in `show-index`
+    // (covered by OTable's own spec); `logStream` no longer carries a "#" field.
   });
 
   describe("Row Expansion (toggleStreamRow)", () => {

@@ -420,9 +420,10 @@ describe("Dashboards.vue", () => {
       expect(Array.isArray(columns)).toBe(true);
       expect(columns.length).toBeGreaterThan(0);
 
-      // Check specific required columns (columns use id/header, not name)
+      // Check specific required columns (columns use id/header, not name).
+      // "#" is no longer a member column — it's OTable's built-in show-index.
       const columnIds = columns.map((col: any) => col.id);
-      expect(columnIds).toContain("#");
+      expect(columnIds).not.toContain("#");
       expect(columnIds).toContain("name");
       expect(columnIds).toContain("actions");
     });
@@ -510,7 +511,6 @@ describe("Dashboards.vue", () => {
       expect(wrapper.vm.showFavoritesOnly).toBe(true);
       expect(wrapper.vm.dashboards).toHaveLength(1);
       expect(wrapper.vm.dashboards[0].id).toBe("dash2");
-      expect(wrapper.vm.dashboards[0]["#"]).toBe("01");
       expect(wrapper.vm.resultTotal).toBe(1);
 
       wrapper.vm.updateActiveFolderId("default");

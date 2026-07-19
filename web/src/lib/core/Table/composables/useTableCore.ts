@@ -77,7 +77,9 @@ export function useTableCore<TData>(
         const n = index + 1 + offset;
         return n <= 9 ? `0${n}` : `${n}`;
       }) as any,
-      meta: { align: "left" },
+      // tabular-nums: uniform digit width so 3-/4-digit values never clip to
+      // "2…" on the fixed-width column (see TABLE_INDEX_COL_SIZE).
+      meta: { align: "left", cellClass: "tabular-nums" },
     };
   });
 

@@ -62,6 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :page-size-options="perPageOptionsList"
       :show-global-filter="false"
       :default-columns="false"
+      show-index
       :loading="loading"
     >
       <template #cell-name="{ row }">
@@ -130,7 +131,7 @@ import AppTabs from "@/components/common/AppTabs.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
-import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
+import { COL } from "@/lib/core/Table/OTable.types";
 
 const props = defineProps({
   open: {
@@ -222,9 +223,8 @@ onMounted(() => {
 
 const formatReports = () => {
   props.reports.length > 0 &&
-    props.reports.forEach((report: any, index) => {
+    props.reports.forEach((report: any) => {
       scheduledReports.value.push({
-        "#": index + 1,
         name: report.name,
         tab: getTabName(report.dashboards?.[0]?.tabs?.[0]),
         time_range: getTimeRangeValue(report.dashboards?.[0]?.timerange),
@@ -260,25 +260,9 @@ const filterReports = () => {
       scheduledReports.value as ScheduledDashboardReport[]
     ).filter((report) => !report.isCached);
   }
-
-  formattedReports.value = formattedReports.value.map(
-    (report: any, index: number) => {
-      return {
-        ...report,
-        "#": index + 1,
-      };
-    },
-  );
 };
 
 const columns: OTableColumnDef[] = [
-  {
-    id: "#",
-    header: "#",
-    accessorKey: "#",
-    meta: { align: "left" },
-    size: TABLE_INDEX_COL_SIZE,
-  },
   {
     id: "name",
     header: t("reports.name"),

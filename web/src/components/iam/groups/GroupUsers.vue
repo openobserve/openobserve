@@ -157,7 +157,7 @@ import { ref, onBeforeMount } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
+import { TABLE_CHECKBOX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
 // show selected users in the table
 // Add is_selected to the user object
 const props = defineProps({
@@ -235,7 +235,7 @@ const columns = computed<OTableColumnDef[]>(() => {
       header: "",
       accessorKey: "isInGroup",
     cell: (info: any) => info.getValue(),
-    size: TABLE_INDEX_COL_SIZE,
+    size: TABLE_CHECKBOX_COL_SIZE,
       minSize: 32,
       maxSize: 40,
       meta: { align: "center", compactPadding: true },
@@ -353,10 +353,9 @@ const getchOrgUsers = async () => {
     );
 
     usersState.users = cloneDeep(
-      data.map((user: any, index: number) => {
+      data.map((user: any) => {
         return {
           email: user.email,
-          "#": index + 1,
           isInGroup: groupUsersMap.value.has(user.email),
           org: user.orgs?.length > 0 ? user.orgs.map((org:{ org_name: string }) => org.org_name).join(", ") : "", // Set default "N/A" for users with no orgs
           role: user.role,
@@ -366,9 +365,8 @@ const getchOrgUsers = async () => {
     );
 
     users.value = cloneDeep(usersState.users).map(
-      (user: any, index: number) => {
+      (user: any) => {
         return {
-          "#": index + 1,
           email: user.email,
           isInGroup: groupUsersMap.value.has(user.email),
           org: user.org,

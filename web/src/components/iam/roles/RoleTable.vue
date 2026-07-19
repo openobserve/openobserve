@@ -8,7 +8,6 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import { useI18n } from "vue-i18n";
-import { TABLE_INDEX_COL_SIZE } from "@/lib/core/Table/OTable.types";
 
 const { t } = useI18n();
 
@@ -37,15 +36,6 @@ const onEmptyStateAction = (id?: string) => {
 };
 
 const columns: OTableColumnDef[] = [
-  {
-    id: "#",
-    header: "#",
-    accessorFn: (row: any) => row["#"],
-    size: TABLE_INDEX_COL_SIZE,
-    minSize: 32,
-    maxSize: 50,
-    meta: { compactPadding: true, align: "left" },
-  },
   {
     id: "role_name",
     header: t("iam.roleName"),
@@ -84,6 +74,7 @@ const columns: OTableColumnDef[] = [
     row-key="role_name"
     filter-mode="client"
     :default-columns="false"
+    show-index
     @update:selected-ids="emit('update:selectedIds', $event)"
     @update:global-filter="emit('update:globalFilter', $event)"
   >

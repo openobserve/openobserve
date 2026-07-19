@@ -53,6 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       sorting="client"
       filter-mode="client"
       :default-columns="false"
+      show-index
       :enable-column-resize="true"
       :persist-columns="true"
       table-id="settings-regex-patterns"
@@ -203,7 +204,7 @@ import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import PageLayout from "@/components/common/PageLayout.vue";
-import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
+import { COL } from "@/lib/core/Table/OTable.types";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 
@@ -229,13 +230,6 @@ export default defineComponent({
     const router = useRouter();
 
     const columns: OTableColumnDef[] = [
-      {
-        id: "#",
-        header: "#",
-        accessorKey: "#",
-        size: TABLE_INDEX_COL_SIZE,
-        meta: { align: "left" },
-      },
       {
         id: "name",
         header: t("regex_patterns.name"),
@@ -363,10 +357,8 @@ export default defineComponent({
         const response = await regexPatternsService.list(
           store.state.selectedOrganization.identifier,
         );
-        let counter = 1;
         regexPatterns.value = response.data.patterns.map((pattern: any) => ({
           ...pattern,
-          "#": counter <= 9 ? `0${counter++}` : counter++,
           created_at: convertUnixToDateFormat(pattern.created_at),
           updated_at: convertUnixToDateFormat(pattern.updated_at),
         }));

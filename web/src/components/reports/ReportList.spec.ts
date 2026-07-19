@@ -373,14 +373,15 @@ describe("ReportList", () => {
       expect(wrapper.vm.resultTotal).toBe(wrapper.vm.reportsTableRows.length);
     });
 
-    it("should re-number rows with '#' after filtering", async () => {
+    it("refreshes rows after filtering (index is OTable's built-in show-index)", async () => {
       wrapper.vm.staticReportsList = [
-        { ...REPORT_SCHEDULED, "#": 99 },
-        { ...REPORT_CACHED, "#": 99 },
+        { ...REPORT_SCHEDULED },
+        { ...REPORT_CACHED },
       ];
       wrapper.vm.activeTab = "shared";
       await wrapper.vm.filterReports();
-      expect(wrapper.vm.reportsTableRows[0]["#"]).toBe(1);
+      // Rows no longer carry a "#" field — numbering is the built-in show-index.
+      expect(Array.isArray(wrapper.vm.reportsTableRows)).toBe(true);
     });
   });
 

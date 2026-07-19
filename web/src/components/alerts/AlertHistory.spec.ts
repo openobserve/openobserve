@@ -293,12 +293,8 @@ describe("AlertHistory.vue", () => {
       expect((wrapper.vm as any).loading).toBe(false);
     });
 
-    it("rows contain sequential index numbers prefixed with #", async () => {
-      await mountComponent();
-      const rows = (wrapper.vm as any).rows;
-      expect(rows[0]["#"]).toBe(1);
-      expect(rows[1]["#"]).toBe(2);
-    });
+    // Row numbering is now OTable's built-in `show-index` (page-offset aware);
+    // `rows` no longer carries a "#" field.
   });
 
   describe("async paths — rejected", () => {

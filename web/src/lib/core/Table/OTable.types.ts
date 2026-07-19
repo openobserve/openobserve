@@ -12,10 +12,13 @@ import type { ColumnDef, Row, Table } from "@tanstack/vue-table";
  */
 export const TABLE_CHECKBOX_COL_SIZE = 44;
 /**
- * Fixed width (px) of the row-index ("#") column. Wide enough to fit a
- * zero-padded 3-digit number at text-xs plus the cell's horizontal padding.
+ * Fixed width (px) of the row-index ("#") column. Fits a 4-digit number at
+ * text-xs after the `--spacing-table-edge` left inset (14px) + right padding.
+ * Paired with `tabular-nums` on the cell so every digit is the same advance
+ * width — otherwise a proportional font makes wide-glyph values (209, 200) clip
+ * to "2…" while narrow ones (215) fit, at the same column width.
  */
-export const TABLE_INDEX_COL_SIZE = 44;
+export const TABLE_INDEX_COL_SIZE = 56;
 
 export const COL = {
   name:         200,

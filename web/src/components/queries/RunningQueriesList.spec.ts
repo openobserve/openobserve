@@ -155,15 +155,10 @@ describe('RunningQueriesList.vue', () => {
     });
 
     it('should have correct number of columns', () => {
-      expect(wrapper.vm.columns).toHaveLength(11);
+      expect(wrapper.vm.columns).toHaveLength(10);
     });
 
-    it('should have correct column for row number', () => {
-      const column = wrapper.vm.columns.find((col: any) => col.id === '#');
-      expect(column).toBeDefined();
-      expect(column.accessorKey).toBe('#');
-      expect(column.header).toBe('#');
-    });
+    // Row numbering moved to OTable's built-in show-index (no '#' column).
 
     it('should have correct column for user_id', () => {
       const column = wrapper.vm.columns.find((col: any) => col.id === 'user_id');

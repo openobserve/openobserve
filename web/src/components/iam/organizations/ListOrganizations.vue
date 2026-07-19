@@ -53,6 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           sorting="client"
           filter-mode="client"
           :default-columns="false"
+          show-index
           :enable-column-resize="true"
           :persist-columns="true"
           table-id="iam-organizations-list"
@@ -208,7 +209,7 @@ import segment from "@/services/segment_analytics";
 import { convertToTitleCase } from "@/utils/zincutils";
 import config from "@/aws-exports";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
+import { COL } from "@/lib/core/Table/OTable.types";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 
@@ -248,13 +249,6 @@ export default defineComponent({
       identifier: "",
     });
     const columns: OTableColumnDef[] = [
-      {
-        id: "#",
-        header: "#",
-        accessorKey: "#",
-        size: TABLE_INDEX_COL_SIZE,
-        meta: { align: "left" },
-      },
       {
         id: "name",
         header: t("organization.name"),
@@ -372,7 +366,6 @@ export default defineComponent({
         ? organizationsService.get_admin_org("_meta")
         : organizationsService.list(0, 1000000, "name", false, "");
       request.then((res) => {
-        let counter = 1;
         const billingPlans = {
           "0": "Free",
           "1": "Pay as you go",
@@ -382,7 +375,6 @@ export default defineComponent({
           // Common fields for all configurations
 
           const commonOrganization = {
-            "#": counter <= 9 ? `0${counter++}` : counter++,
             name: data.name,
             identifier: data.identifier,
             type: convertToTitleCase(data.type),

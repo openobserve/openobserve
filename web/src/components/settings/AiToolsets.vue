@@ -45,6 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :page-size-options="[20, 50, 100]"
         sorting="client"
         :default-columns="false"
+        show-index
         :enable-column-resize="true"
         :persist-columns="true"
         table-id="settings-ai-toolsets"
@@ -143,7 +144,7 @@ import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import PageLayout from "@/components/common/PageLayout.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
-import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
+import { COL } from "@/lib/core/Table/OTable.types";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import AddAiToolset from "@/components/ai_toolsets/AddAiToolset.vue";
@@ -175,7 +176,6 @@ export default defineComponent({
     const filterQuery = ref("");
 
     const columns: OTableColumnDef[] = [
-      { id: "#", header: "#", accessorKey: "#", size: TABLE_INDEX_COL_SIZE, meta: { align: "left" } },
       { id: "name", header: t("aiToolset.name"), accessorKey: "name", sortable: true, resizable: true, hideable: true, size: COL.name, minSize: 160, meta: { align: "left", flex: true } },
       { id: "kind", header: t("aiToolset.kind"), accessorKey: "kind", sortable: true, resizable: true, hideable: true, size: COL.type, meta: { align: "left" } },
       { id: "description", header: t("aiToolset.description"), accessorKey: "description", resizable: true, hideable: true, size: COL.description, meta: { align: "left" } },
@@ -231,8 +231,7 @@ export default defineComponent({
         .list(store.state.selectedOrganization.identifier)
         .then((res) => {
           const items = res.data?.toolsets ?? [];
-          tabledata.value = items.map((item: any, i: number) => ({
-            "#": i + 1,
+          tabledata.value = items.map((item: any) => ({
             id: item.id,
             name: item.name,
             kind: item.kind,

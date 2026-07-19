@@ -66,6 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :enable-column-resize="true"
                 :persist-columns="true"
                 :default-columns="false"
+                show-index
                 table-id="reports-report-list"
               >
                 <!-- Toolbar: Scheduled/Cached tabs + search (inline folder scope) + refresh -->
@@ -310,7 +311,7 @@ import { ref, onBeforeMount, reactive, computed, watch, defineAsyncComponent } f
 import type { Ref } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import PageLayout from "@/components/common/PageLayout.vue";
+import PageLayout from "@/components/common/PageLayout.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import FolderList from "@/components/common/sidebar/FolderList.vue";
@@ -335,7 +336,7 @@ import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
+import { COL } from "@/lib/core/Table/OTable.types";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 
@@ -405,7 +406,6 @@ const confirmBulkDelete = ref<boolean>(false);
 
 const columns = computed<OTableColumnDef[]>(() => {
   const base: OTableColumnDef[] = [
-    { id: "#", header: "#", accessorKey: "#", size: TABLE_INDEX_COL_SIZE, meta: { align: "center" } },
     { id: "name", header: t("alerts.name"), accessorKey: "name", cell: " ", sortable: true, resizable: true, hideable: true, size: COL.name, minSize: 160, meta: { align: "left", flex: true } },
     { id: "owner", header: t("alerts.owner"), accessorKey: "owner", sortable: true, resizable: true, hideable: true, size: COL.owner },
     { id: "description", header: t("alerts.description"), accessorKey: "description", sortable: false, resizable: true, hideable: true, size: COL.description, meta: { align: "left" } },
@@ -462,8 +462,7 @@ const loadReports = async (folderId: string, nameQuery?: string) => {
       nameQuery || undefined,
     );
 
-    const mapped = (res.data ?? []).map((report: any, index: number) => ({
-      "#": index + 1,
+    const mapped = (res.data ?? []).map((report: any) => ({
       ...report,
       last_triggered_at_raw: report.last_triggered_at || null,
       last_triggered_at: report.last_triggered_at
@@ -509,10 +508,7 @@ const invalidateFolderCache = (folderId: string) => {
 };
 
 const filterReports = () => {
-  reportsTableRows.value = (staticReportsList.value as any[]).map((r: any, i: number) => ({
-    ...r,
-    "#": i + 1,
-  }));
+  reportsTableRows.value = [...(staticReportsList.value as any[])];
   resultTotal.value = reportsTableRows.value.length;
 };
 

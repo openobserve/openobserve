@@ -110,7 +110,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   import { ref, onBeforeMount } from "vue";
   import { useI18n } from "vue-i18n";
   import { useStore } from "vuex";
-  import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
+  import { TABLE_CHECKBOX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
   
   // show selected users in the table
   // Add is_selected to the user object
@@ -173,7 +173,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       header: "",
       accessorKey: "isInGroup",
     cell: (info: any) => info.getValue(),
-    size: TABLE_INDEX_COL_SIZE,
+    size: TABLE_CHECKBOX_COL_SIZE,
       minSize: 32,
       maxSize: 40,
       meta: { align: "center", compactPadding: true },
@@ -233,19 +233,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       serviceAccountsState.service_accounts_users = cloneDeep(
         data
           .filter((user: any) => user.is_system !== true) // Filter out system accounts
-          .map((user: any, index: number) => {
+          .map((user: any) => {
             return {
               email: user.email,
-              "#": index + 1,
               isInGroup: groupUsersMap.value.has(user.email),
             };
           })
       );
   
       users.value = cloneDeep(serviceAccountsState.service_accounts_users).map(
-        (user: any, index: number) => {
+        (user: any) => {
           return {
-            "#": index + 1,
             email: user.email,
             isInGroup: groupUsersMap.value.has(user.email),
           };

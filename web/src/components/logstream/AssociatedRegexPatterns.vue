@@ -661,10 +661,8 @@ export default defineComponent({
         const response = await regexPatternsService.list(
           store.state.selectedOrganization.identifier,
         );
-        let counter = 1;
         allPatterns.value = response.data.patterns.map((pattern: any) => ({
           ...pattern,
-          "#": counter <= 9 ? `0${counter++}` : counter++,
           created_at: convertUnixToDateFormat(pattern.created_at),
           updated_at: convertUnixToDateFormat(pattern.updated_at),
           pattern_name: pattern.name,

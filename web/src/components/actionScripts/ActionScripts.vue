@@ -51,6 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           sorting="client"
           filter-mode="client"
           :default-columns="false"
+          show-index
           :show-global-filter="false"
           :enable-column-resize="true"
           :persist-columns="true"
@@ -294,12 +295,11 @@ import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
+import { COL } from "@/lib/core/Table/OTable.types";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 
 interface ActionScriptList {
-  "#": string | number;
   id: any;
   name: any;
   uuid: any;
@@ -384,13 +384,6 @@ export default defineComponent({
     ]);
 
     const columns: OTableColumnDef[] = [
-      {
-        id: "#",
-        header: "#",
-        accessorKey: "#",
-        size: TABLE_INDEX_COL_SIZE,
-        meta: { align: "center" },
-      },
       {
         id: "name",
         header: t("alerts.name"),
@@ -491,7 +484,6 @@ export default defineComponent({
       loading.value = true;
       getAllActions()
         .then(() => {
-          var counter = 1;
           resultTotal.value = store.state.organizationData.actions.length;
           alerts.value = store.state.organizationData.actions.map(
             (alert: any) => {
@@ -509,7 +501,6 @@ export default defineComponent({
             if (data.execution_details_type === "once")
               data.execution_details_type = "Once";
             return {
-              "#": counter <= 9 ? `0${counter++}` : counter++,
               id: data.id,
               name: data.name,
               uuid: data.uuid,
