@@ -14,12 +14,12 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <div class="flex flex-col h-[calc(100vh-var(--navbar-height))] min-h-0 overflow-hidden">
-    <AppPageHeader
-      :title="t('dashboard.importDashboard')"
-      :back="{ label: t('dashboard.header'), onClick: goBack }"
-      class="shrink-0 border-b border-border-default"
-    >
+  <PageLayout
+    class="h-[calc(100vh-var(--navbar-height))]! overflow-hidden"
+    :title="t('dashboard.importDashboard')"
+    :back="{ label: t('dashboard.header'), onClick: goBack }"
+    bleed
+  >
       <template #actions>
         <OButton
           variant="outline"
@@ -46,7 +46,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >{{ t("dashboard.import") }}</OButton
         >
       </template>
-    </AppPageHeader>
     <div class="flex w-full flex-1 min-h-0">
       <div class="flex w-full min-w-0 min-h-0">
         <OSplitter
@@ -258,7 +257,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <div></div>
-  </div>
+  </PageLayout>
 </template>
 <script lang="ts">
 // @ts-nocheck
@@ -284,7 +283,7 @@ import { validateDashboardJson } from "@/utils/dashboard/panelValidation";
 import SelectFolderDropdown from "@/components/dashboards/SelectFolderDropdown.vue";
 import useNotifications from "@/composables/useNotifications";
 import AppTabs from "@/components/common/AppTabs.vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import PageLayout from "@/components/common/PageLayout.vue";
 
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -880,7 +879,7 @@ export default defineComponent({
       form,
     };
   },
-  components: { OSeparator, SelectFolderDropdown, AppTabs, AppPageHeader, QueryEditor, OButton, OInput, OSelect,
+  components: { OSeparator, SelectFolderDropdown, AppTabs, PageLayout, QueryEditor, OButton, OInput, OSelect,
     OForm, OFormInput, OFormFile,
     OIcon, OSplitter,
 },

@@ -15,14 +15,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="w-full h-full flex flex-col min-h-0 bg-surface-base">
-    <!-- Top Header Bar -->
-    <AppPageHeader
-      title="Upload Source Maps"
-      :back="{ onClick: navigateBack, dataTest: 'add-alert-back-btn' }"
-      class="border-b border-border-default"
-    />
-
+  <PageLayout
+    class="bg-surface-base"
+    title="Upload Source Maps"
+    :back="{ onClick: navigateBack, dataTest: 'add-alert-back-btn' }"
+    bleed
+  >
     <OForm
       id="upload-source-maps-form"
       class="contents"
@@ -91,7 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >Upload</OButton>
       </div>
     </OForm>
-  </div>
+  </PageLayout>
 </template>
 
 <script setup lang="ts">
@@ -105,7 +103,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import SourceMapDropzone from "./SourceMapDropzone.vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import PageLayout from "@/components/common/PageLayout.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import {
   makeUploadSourceMapsSchema,
