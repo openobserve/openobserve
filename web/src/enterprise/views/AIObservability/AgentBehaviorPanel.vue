@@ -15,7 +15,7 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <div class="grid grid-cols-2 gap-[0.625rem]" data-test="agent-behavior-panel">
+  <div class="flex flex-col gap-[0.625rem]" data-test="agent-behavior-panel">
     <!-- Looping agents. Same card/header/table shape as the sibling LLM Insights
          panels (LLMErrorTable) so the whole page reads as one surface. -->
     <div
@@ -73,33 +73,9 @@
       />
     </div>
 
-    <!-- Cost & failure per agent — full width, like the wide sibling panels. -->
-    <div
-      class="col-span-2 card-container llm-trend-panel rounded-lg flex flex-col overflow-hidden"
-      data-test="agent-behavior-cost-card"
-    >
-      <div class="flex flex-col mb-[0.5rem] px-[1rem] pt-[1rem]">
-        <div class="text-[0.85rem] font-semibold text-[var(--color-text-heading)]">
-          {{ t("aiObservability.behavior.costTitle") }}
-        </div>
-        <div class="text-[0.7rem] leading-normal mt-[0.1rem] text-[var(--color-text-secondary)]">
-          {{ t("aiObservability.behavior.costHint") }}
-        </div>
-      </div>
-      <OTable
-        data-test="agent-behavior-cost-table"
-        :data="costRows"
-        :columns="costColumns"
-        :default-columns="false"
-        :frame="false"
-        :show-global-filter="false"
-        :fill-height="false"
-        show-index
-        pagination="none"
-        :empty-message="t('aiObservability.behavior.noCost')"
-        @row-click="(r: any) => openDetail('cost', r)"
-      />
-    </div>
+    <!-- Cost is intentionally NOT a table here — LLM Insights already owns the
+         cost story (KPIs + trend panels). Per-agent cost drill-down is reachable
+         from a failure/loop row's detail panel instead of a duplicate table. -->
 
     <!-- Details side panel — opens on row click, shows the underlying traces. -->
     <AgentSignalDetailPanel
@@ -181,19 +157,6 @@ const failureRows = computed(() =>
     .sort((a, b) => b.count - a.count),
 );
 
-/** Cost rows: per agent, cost + tokens + errors. */
-const costRows = computed(() =>
-  signals.value
-    .filter((s) => s.signal_type === "cost")
-    .map((s) => ({
-      agent: s.agent_name ?? t("aiObservability.behavior.unknownAgent"),
-      cost: s.cost ?? 0,
-      tokens: s.tokens ?? 0,
-      errors: s.errors ?? 0,
-    }))
-    .sort((a, b) => b.cost - a.cost),
-);
-
 const loopColumns = computed<OTableColumnDef[]>(() => [
   {
     id: "agent",
@@ -251,37 +214,6 @@ const failureColumns = computed<OTableColumnDef[]>(() => [
     id: "count",
     header: t("aiObservability.behavior.colCount"),
     accessorKey: "count",
-    meta: { align: "right" },
-    sortable: true,
-  },
-]);
-
-const costColumns = computed<OTableColumnDef[]>(() => [
-  {
-    id: "agent",
-    header: t("aiObservability.behavior.colAgent"),
-    accessorKey: "agent",
-    meta: { align: "left", autoWidth: true },
-    sortable: true,
-  },
-  {
-    id: "cost",
-    header: t("aiObservability.behavior.colCost"),
-    accessorKey: "cost",
-    meta: { align: "right" },
-    sortable: true,
-  },
-  {
-    id: "tokens",
-    header: t("aiObservability.behavior.colTokens"),
-    accessorKey: "tokens",
-    meta: { align: "right" },
-    sortable: true,
-  },
-  {
-    id: "errors",
-    header: t("aiObservability.behavior.colErrors"),
-    accessorKey: "errors",
     meta: { align: "right" },
     sortable: true,
   },
