@@ -5203,11 +5203,14 @@
         "selectedCount": "{count} selected",
         "searchPrefixes": "Search prefixes",
         "searchSuffixes": "Search suffixes",
+        "searchTypes": "Search types",
         "searchPrefixesAria": "Search prefix filters",
         "searchSuffixesAria": "Search suffix filters",
+        "searchTypesAria": "Search type filters",
         "facetAria": "{label}, {count} metrics",
         "noPrefixMatch": "No prefixes match.",
-        "noSuffixMatch": "No suffixes match."
+        "noSuffixMatch": "No suffixes match.",
+        "noTypeMatch": "No types match."
       }
     },
     "index": {

@@ -223,10 +223,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-else-if="grid.activeRail.value === 'type'"
           class="flex flex-col min-h-0"
         >
-          <!-- Type has no facet search, but carries the SAME always-present
-               "Clear filters" row so the affordance is consistent across all
-               three facets. Count + button always shown; button disabled when
-               nothing is selected — no disappearing controls, no shift. -->
+          <!-- Type search — narrows the type LIST (mirrors the prefix/suffix
+               rails). px-2 matches the facet toggle's horizontal padding above. -->
+          <div class="px-2 pb-2">
+            <OInput
+              v-model="typeSearch"
+              size="sm"
+              clearable
+              :placeholder="t('metrics.explorer.facets.searchTypes')"
+              :aria-label="t('metrics.explorer.facets.searchTypesAria')"
+              data-test="metrics-explorer-type-search"
+            />
+          </div>
+          <!-- Always-present "Clear filters" row so the affordance is consistent
+               across all three facets. Count + button always shown; button
+               disabled when nothing is selected — no disappearing controls. -->
           <div
             class="flex items-center justify-between gap-2 px-3 pb-2"
           >
@@ -248,12 +259,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                composable / URL state — the array<->Set conversion is confined to
                this one binding (`selectedTypesArray`). -->
           <OCheckboxGroup
+            v-if="visibleTypeFacets.length"
             :model-value="selectedTypesArray"
             class="px-3 pb-2 overflow-y-auto"
             @update:model-value="onSelectedTypesChange"
           >
             <OCheckbox
-              v-for="facet in grid.typeFacets.value"
+              v-for="facet in visibleTypeFacets"
               :key="facet.id"
               size="xs"
               :value="facet.id"
@@ -261,6 +273,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :data-test="`metrics-explorer-type-${facet.id}`"
             />
           </OCheckboxGroup>
+          <OEmptyState
+            v-else
+            size="inline"
+            icon="search-off"
+            :title="t('metrics.explorer.facets.noTypeMatch')"
+            data-test="metrics-explorer-type-empty"
+          />
         </div>
       </aside>
 
@@ -560,6 +579,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OCheckboxGroup from "@/lib/forms/Checkbox/OCheckboxGroup.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
@@ -626,6 +646,7 @@ export default defineComponent({
     OIcon,
     OCheckbox,
     OCheckboxGroup,
+    OInput,
     OSearchInput,
     OSpinner,
     OEmptyState,
@@ -1001,6 +1022,17 @@ export default defineComponent({
       grid.selectedTypes.value = new Set(next.map(String));
       trackFilter("type");
     };
+
+    // Type-rail search — narrows the type LIST (mirrors the prefix/suffix rails).
+    // Matches against the human label (BADGE_LABELS), falling back to the id.
+    const typeSearch = ref("");
+    const visibleTypeFacets = computed(() => {
+      const term = typeSearch.value.trim().toLowerCase();
+      if (!term) return grid.typeFacets.value;
+      return grid.typeFacets.value.filter((facet: { id: string }) =>
+        (BADGE_LABELS[facet.id] ?? facet.id).toLowerCase().includes(term),
+      );
+    });
 
     const onPrefixChange = (next: Set<string>) => {
       grid.selectedPrefixes.value = next;
@@ -1650,6 +1682,8 @@ export default defineComponent({
       onClearAllFilters,
       selectedTypesArray,
       onSelectedTypesChange,
+      typeSearch,
+      visibleTypeFacets,
       onPrefixChange,
       onSuffixChange,
       onAddLabelFilter,
