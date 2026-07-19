@@ -50,7 +50,7 @@ export type BadgeSize = "xs" | "sm" | "md";
 /**
  * Corner shape:
  *   pill    — fully rounded (rounded-full). The default; classic status pill.
- *   rounded — small radius (rounded-md). For code/identifier-style chips.
+ *   rounded — small radius (rounded-default). For code/identifier-style chips.
  *   square  — no radius (rounded-none).
  */
 export type BadgeShape = "pill" | "rounded" | "square";

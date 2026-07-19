@@ -199,7 +199,7 @@ const sizeClasses: Record<NonNullable<BadgeProps["size"]>, string> = {
 // ── Shape (corner radius) class map ───────────────────────────────────────
 const shapeClasses: Record<NonNullable<BadgeProps["shape"]>, string> = {
   pill: "rounded-full",
-  rounded: "rounded-md",
+  rounded: "rounded-default",
   square: "rounded-none",
 };
 

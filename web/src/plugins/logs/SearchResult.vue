@@ -2104,7 +2104,7 @@ export default defineComponent({
   overflow-x: hidden;
   background: var(--color-surface-base);
   border: 1px solid var(--color-border-default);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-surface);
   box-shadow: var(--shadow-lg);
   padding: 0.5rem 0;
   font-size: var(--text-xs);
@@ -2164,7 +2164,7 @@ export default defineComponent({
     display: flex;
     align-items: center;
     justify-content: center;
-    border-radius: var(--radius-sm);
+    border-radius: var(--radius-default);
     cursor: pointer;
     font-size: var(--text-compact);
     font-weight: 700;

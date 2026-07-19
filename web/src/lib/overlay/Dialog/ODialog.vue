@@ -429,7 +429,7 @@ watch(internalOpen, (open) => {
           !isFullSize && 'max-h-[90vh]',
           // Surface
           'bg-dialog-bg border border-dialog-border',
-          !isFullSize && 'rounded-default',
+          !isFullSize && 'rounded-surface',
           'shadow-dialog',
           // Typography
           'text-dialog-content-text',
@@ -470,7 +470,7 @@ watch(internalOpen, (open) => {
             'px-dialog-header-px py-dialog-header-py',
             'bg-dialog-header-bg text-dialog-header-text',
             'border-b border-dialog-header-border',
-            !isFullSize && 'rounded-t-default',
+            !isFullSize && 'rounded-t-surface',
           ]"
         >
           <!-- CASE 1: Full override — backward compat, sub-slots are ignored -->
@@ -576,7 +576,7 @@ watch(internalOpen, (open) => {
             'px-dialog-footer-px py-dialog-footer-py',
             'bg-dialog-footer-bg',
             'border-t border-dialog-footer-border',
-            !isFullSize && 'rounded-b-default',
+            !isFullSize && 'rounded-b-surface',
           ]"
         >
           <!-- ── Built-in footer buttons ──────────────────────────────────────── -->

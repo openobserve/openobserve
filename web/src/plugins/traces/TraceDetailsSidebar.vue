@@ -2208,21 +2208,21 @@ export default defineComponent({
 
   tbody tr:first-child {
     td:first-child {
-      border-top-left-radius: var(--radius-lg);
+      border-top-left-radius: var(--radius-surface);
     }
 
     td:last-child {
-      border-top-right-radius: var(--radius-lg);
+      border-top-right-radius: var(--radius-surface);
     }
   }
 
   tbody tr:last-child {
     td:first-child {
-      border-bottom-left-radius: var(--radius-lg);
+      border-bottom-left-radius: var(--radius-surface);
     }
 
     td:last-child {
-      border-bottom-right-radius: var(--radius-lg);
+      border-bottom-right-radius: var(--radius-surface);
     }
   }
 }
@@ -2265,7 +2265,7 @@ export default defineComponent({
 
       .section-label {
         background: var(--color-surface-panel);
-        border-radius: var(--radius-sm);
+        border-radius: var(--radius-default);
       }
 
       .llm-content-box {

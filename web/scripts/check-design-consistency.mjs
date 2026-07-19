@@ -101,6 +101,15 @@ const WHOLE = {
   // reintroduction of the class utility is a regression.
   retiredTextAlias: /\btext-text-(?:primary|caption)\b/g,
   bareRounded: /(?:^|[\s"'`])rounded(?=[\s"'`]|$)/gm,
+  // Retired radius tiers: the app exposes exactly two corner radii —
+  // rounded-default (controls) and rounded-surface (large surfaces) — plus
+  // rounded-full. The old sm/md/lg/xl scale (and its var(--radius-*) refs) was a
+  // set of same-value aliases that lied about being distinct; it was repointed
+  // (small→default, large→surface) and the tokens deleted. Baseline 0 after the
+  // codemod, so any reintroduction falls back to Tailwind's stock scale and is a
+  // regression. Matches the class utility (incl. per-corner variants) and the var.
+  retiredRadiusAlias:
+    /\brounded(?:-(?:t|b|l|r|s|e|tl|tr|bl|br|ss|se|es|ee))?-(?:sm|md|lg|xl)\b|var\(--radius-(?:sm|md|lg|xl)\)/g,
   // Arbitrary radius VALUE — but not a CSS keyword (`rounded-[inherit]` etc.),
   // which is not a hardcoded dimension and has no scale-token equivalent.
   arbRadius: /rounded(?:-[a-z]+)*-\[(?!(?:inherit|initial|unset|revert|revert-layer)\])[^\]]+\]/g,

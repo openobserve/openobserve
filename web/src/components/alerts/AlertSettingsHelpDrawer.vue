@@ -641,7 +641,7 @@ defineExpose({ applyTemplate, previewTemplate });
   flex-direction: column;
   gap: 0.5rem;
   padding: 0.75rem;
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-default);
   background: var(--color-surface-subtle);
   font-size: var(--text-xs);
   color: var(--color-text-secondary);
@@ -668,7 +668,7 @@ defineExpose({ applyTemplate, previewTemplate });
     flex-shrink: 0;
     min-width: 3.5rem;
     padding: 0.0625rem 0.375rem;
-    border-radius: var(--radius-sm);
+    border-radius: var(--radius-default);
     font-family: var(--font-mono);
     font-size: var(--text-2xs);
     line-height: 1.4;
@@ -817,7 +817,7 @@ defineExpose({ applyTemplate, previewTemplate });
     gap: 0.375rem;
     padding: 0.75rem;
     border: 1px solid var(--color-border-default);
-    border-radius: var(--radius-lg);
+    border-radius: var(--radius-surface);
     border-left-width: 0.125rem;
 
     &--bad {
@@ -868,7 +868,7 @@ defineExpose({ applyTemplate, previewTemplate });
   gap: 0.5rem;
   padding: 0.75rem;
   border: 1px solid var(--color-border-default);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-surface);
   background: var(--color-surface-base);
 
   &__head {
@@ -897,7 +897,7 @@ defineExpose({ applyTemplate, previewTemplate });
 .help-chip {
   padding: 0.25rem 0.5rem;
   border: 1px solid var(--color-border-default);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-default);
   background: transparent;
   font-family: var(--font-mono);
   font-size: var(--text-xs);
@@ -926,7 +926,7 @@ defineExpose({ applyTemplate, previewTemplate });
   gap: 0.75rem;
   padding: 0.375rem 0.5rem;
   border: 1px solid var(--color-border-default);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-default);
 
   &__key {
     font-family: var(--font-mono);
@@ -947,7 +947,7 @@ defineExpose({ applyTemplate, previewTemplate });
   line-height: 1.6;
   margin: 0;
   padding: 0.75rem;
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-surface);
   border: 1px solid var(--color-border-default);
   background: var(--color-surface-subtle);
   color: var(--color-text-body);
@@ -974,7 +974,7 @@ defineExpose({ applyTemplate, previewTemplate });
 // previous version put faint text on a near-same gray and was unreadable.
 .seg-opaque {
   padding: 0 0.25rem;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-default);
   background: var(--color-surface-subtle-hover);
   color: var(--color-text-body);
 }

@@ -1250,7 +1250,7 @@ const cleanupPipelinesContextProvider = () => {
   width: auto;
   min-height: 2.75rem;
   transition: background 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
-  border-radius: var(--radius-xl);
+  border-radius: var(--radius-surface);
   box-shadow: 0 0.25rem 0.75rem color-mix(in srgb, var(--color-black) 8%, transparent);
   cursor: grab;
   display: flex;
@@ -1274,7 +1274,7 @@ const cleanupPipelinesContextProvider = () => {
 .o2vf_node .vue-flow__node-input {
   border: 1px solid var(--color-status-info-text);
   color: var(--color-text-body);
-  border-radius: var(--radius-xl);
+  border-radius: var(--radius-surface);
   background: var(--color-status-info-bg);
   box-shadow: 0 0.25rem 0.75rem color-mix(in srgb, var(--color-status-info-text) 10%, transparent);
   transition: background 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
@@ -1304,7 +1304,7 @@ const cleanupPipelinesContextProvider = () => {
   padding: 0.5rem 1rem;
   border: 1px solid var(--color-status-positive);
   color: var(--color-text-body);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-surface);
   background: var(--color-status-success-bg);
   box-shadow: 0 0.125rem 0.5rem color-mix(in srgb, var(--color-status-positive) 10%, transparent);
   transition: background 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
@@ -1331,7 +1331,7 @@ const cleanupPipelinesContextProvider = () => {
 .o2vf_node .vue-flow__node-default {
   border: 1px solid var(--color-status-warning-text);
   color: var(--color-text-body);
-  border-radius: var(--radius-xl);
+  border-radius: var(--radius-surface);
   background: var(--color-status-warning-bg);
   box-shadow: 0 0.25rem 0.75rem color-mix(in srgb, var(--color-status-warning-text) 10%, transparent);
   transition: background 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;

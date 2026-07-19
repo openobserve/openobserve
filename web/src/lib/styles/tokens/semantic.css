@@ -175,14 +175,11 @@
   --color-warning-600: var(--color-warning-600);
   --color-warning-700: var(--color-warning-700);
 
-  /* Radius / Shadow (re-exports from base.css) */
-  /* --radius-default is the app knob; sm/md/lg/xl are same-value aliases for
-     library internals + scoped var() refs. */
+  /* Radius / Shadow (re-exports from base.css for @theme registration).
+     Two real tiers only: rounded-default (controls) + rounded-surface (large
+     surfaces), plus rounded-full. sm/md/lg/xl were retired — see base.css. */
   --radius-default: var(--radius-default);
-  --radius-sm:   var(--radius-sm);
-  --radius-md:   var(--radius-md);
-  --radius-lg:   var(--radius-lg);
-  --radius-xl:   var(--radius-xl);
+  --radius-surface: var(--radius-surface);
   --radius-full: var(--radius-full);
 
   --shadow-md: var(--shadow-md);

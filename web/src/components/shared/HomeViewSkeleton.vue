@@ -122,7 +122,7 @@
                lg corners here: OSkeleton type="text" base `rounded-default` beats
                `rounded-default` on Tailwind's alphabetical emit order, while this
                inline binding beats both. -->
-          <OSkeleton type="text" custom-radius="var(--radius-lg)" class="w-full h-full" />
+          <OSkeleton type="text" custom-radius="var(--radius-surface)" class="w-full h-full" />
         </div>
       </div>
 
@@ -160,7 +160,7 @@
                lg corners here: OSkeleton type="text" base `rounded-default` beats
                `rounded-default` on Tailwind's alphabetical emit order, while this
                inline binding beats both. -->
-          <OSkeleton type="text" custom-radius="var(--radius-lg)" class="w-full h-full" />
+          <OSkeleton type="text" custom-radius="var(--radius-surface)" class="w-full h-full" />
         </div>
       </div>
     </div>

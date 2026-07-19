@@ -279,16 +279,18 @@
   --spacing-10:  2.5rem;    /* 40px */
 
   /* --- Radius scale --- */
-  /* One app corner radius: sm/md/lg/xl are all aliases of --radius-default, so
-     changing it retunes every corner at once and any `var(--radius-*)` ref (scoped
-     blocks, the OTag/OSkeleton `shape` API) still resolves. `full` is for
-     pills/avatars/circles. */
-  --radius-default: 0.25rem;   /* 4px — the one app corner radius */
-  --radius-sm:   var(--radius-default);
-  --radius-md:   var(--radius-default);
-  --radius-lg:   var(--radius-default);
-  --radius-xl:   var(--radius-default);
-  --radius-full: 9999px;
+  /* Two real corner radii, one job each — no fake tiers:
+       --radius-default (4px)   tight interactive controls (buttons, inputs,
+                                chips, small icon buttons)
+       --radius-surface (12px)  large surfaces (dialogs, drawers, cards/panels,
+                                the app-shell content area)
+     plus --radius-full for pills/avatars/circles. Changing either knob retunes
+     its whole tier at once. The old sm/md/lg/xl scale was retired — it exposed
+     five names for what was one value; every former ref was repointed
+     (small→default, large→surface). Do NOT reintroduce sm/md/lg/xl. */
+  --radius-default: 0.25rem;   /* 4px  — control tier */
+  --radius-surface: 0.75rem;   /* 12px — surface tier (matches the historical dialog curve) */
+  --radius-full: 9999px;       /* pills / avatars / circles */
 
   /* --- Shadow scale — hairline-border philosophy ---
      Only md/lg render real elevation (overlays: dialogs, menus). Cards use a

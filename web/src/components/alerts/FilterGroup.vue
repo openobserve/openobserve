@@ -571,7 +571,7 @@ defineExpose({
 
     .group-container::-webkit-scrollbar-thumb {
       background-color: var(--color-border-strong);
-      border-radius: var(--radius-sm);
+      border-radius: var(--radius-default);
     }
 
   </style>

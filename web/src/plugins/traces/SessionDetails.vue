@@ -1637,7 +1637,7 @@ onMounted(load);
     background: color-mix(in srgb, var(--color-text-heading) 5%, transparent);
     border: 1px solid var(--color-border-default);
     padding: 0.5rem 0.625rem;
-    border-radius: var(--radius-sm);
+    border-radius: var(--radius-default);
     overflow-x: auto;
     margin: 0.5rem 0;
   }

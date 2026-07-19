@@ -47,7 +47,7 @@ const props = withDefaults(
     /** Raw value (string | boolean | number). Optional for manual badges. */
     value?: unknown;
     size?: BadgeSize;
-    /** Override the corner shape (pill | rounded-sm | square). */
+    /** Override the corner shape: pill, rounded, or square. */
     shape?: BadgeShape;
     /** Override the resolved label with dynamic/runtime text. */
     label?: string;

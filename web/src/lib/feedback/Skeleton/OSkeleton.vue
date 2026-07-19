@@ -44,12 +44,12 @@ const shapeClasses = computed<string[]>(() => {
       return ["rounded-full", "aspect-square"];
     case "text":
       return [
-        "rounded-sm",
+        "rounded-default",
         ...(setsWidth.value ? [] : ["w-full"]),
         ...(setsHeight.value ? [] : ["h-4"]),
       ];
     default:
-      return ["rounded-md", ...(setsWidth.value ? [] : ["w-full"])];
+      return ["rounded-default", ...(setsWidth.value ? [] : ["w-full"])];
   }
 });
 

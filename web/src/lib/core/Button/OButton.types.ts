@@ -68,7 +68,7 @@ export type ButtonSize =
   | "icon-circle-sm"
   // 30×30px square — matches toolbar icon button height (share/hamburger/auto-refresh)
   | "icon-toolbar"
-  // 26px rounded-lg — compact modern icon button for panel header collapse/expand
+  // 26px rounded-default — compact modern icon button for panel header collapse/expand
   | "icon-panel"
   // Tall narrow vertical rectangle — 32×20px for splitter collapse/expand buttons
   | "sidebar-button"

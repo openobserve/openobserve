@@ -34,10 +34,11 @@ Six user-requested changes, each committed + pushed separately on `fix/token`, v
   only real headings.
 - **`--color-accent` documented** as the single brand colour with two exposures (primary-* ramp for
   button fills; `accent` for small marks with its dark-mode flip to primary-400). Not a second colour.
-- **Radius → one knob.** `--radius-default` (4px, the max-used value) is the single app corner radius;
-  `sm/md/lg/xl` kept as **aliases** of it (for scoped `var()` refs + the OTag/OSkeleton `shape` API);
-  `full` kept for pills. 1317 template class tokens codemodded `rounded-{sm,md,lg,xl}`→`rounded-default`
-  across 324 files; 2 specs realigned. See A5.
+- **Radius → two real knobs (revised 2026-07-19).** `--radius-default` (4px) for controls +
+  `--radius-surface` (12px) for large surfaces (dialogs, drawers, cards, app shell), plus `full` for
+  pills. The interim single-radius collapse made surfaces too boxy; `sm/md/lg/xl` were **deleted**
+  (not aliased) and every ref repointed by intent (`sm`/`md`→`default`, `lg`/`xl`→`surface`), guarded
+  by `retiredRadiusAlias`. See A5.
 - **Shadow → `shadow-sm` removed.** It was `none` (a no-op utility on 51 elements); token + 51 classes
   stripped (Tailwind's built-in `shadow-sm` would otherwise have leaked a real shadow). `md`/`lg` stay. See A6.
 - **Border → one app utility.** `border-strong`/`border-subtle` unregistered from `@theme` (kept as
@@ -318,31 +319,42 @@ AUDIT §8.3). Register the whole ladder and delete the hand-pinned `.text-sm`/`.
 
 ### A5 · Corner radius — `rounded-*`
 
-> **✅ EXECUTED (2026-07-18) — superseded to ONE radius.** Per the owner's call, the scale was
-> collapsed past the 4-step proposal below to a **single** app corner radius:
-> **`--radius-default` = 4px** (the max-used value) → `rounded-default`, plus **`rounded-full`** for
-> pills/circles. `sm/md/lg/xl` are kept only as **aliases** of `--radius-default` (so scoped
-> `var(--radius-*)` refs and the OTag/OSkeleton `shape` API keep resolving — all to the one value).
-> 1317 template class tokens were codemodded `rounded-{sm,md,lg,xl}` (incl. directional) →
-> `rounded-default` across 324 files. Change `--radius-default` to retune every corner at once.
+> **✅ EXECUTED (2026-07-18; revised 2026-07-19) — TWO real radii + circle.** The scale was first
+> collapsed to a *single* `--radius-default` (4px). On review that made large surfaces (dialogs, the
+> app shell) look as boxy as buttons, so a second **real** tier was reintroduced — as a meaningful
+> pair, not the old five same-value aliases:
+>
+> - **`--radius-default` = 4px** → `rounded-default` — tight interactive controls (buttons, inputs,
+>   chips, small icon buttons).
+> - **`--radius-surface` = 12px (0.75rem)** → `rounded-surface` — large surfaces (dialogs, drawers,
+>   cards/panels, the app-shell content area). 12px matches the historical dialog curve (`main`'s
+>   `rounded-xl`).
+> - **`--radius-full`** → `rounded-full` — pills / avatars / circles (unchanged).
+>
+> `sm/md/lg/xl` were **deleted** (tokens + every reference): they exposed five names for one value.
+> Each former ref was repointed by size intent — `sm`/`md` → `default`, `lg`/`xl` → `surface`. A CI
+> category (`retiredRadiusAlias` in `check-design-consistency.mjs`) bans their reintroduction, so a
+> stray `rounded-md` / `var(--radius-lg)` can no longer silently fall back to Tailwind's stock
+> 4/6/8/12px scale. Change `--radius-default` or `--radius-surface` to retune its whole tier at once.
 
 **~~Standardise on a 4-step scale: `sm / md / lg / full`.~~** *(superseded — see EXECUTED note above)* Measured usage makes the case decisively —
 `sm` **487**, `md` **336**, `lg` **290**, `full` **184** cover **96%** of all 1352 `rounded-*` uses.
 The remaining steps are long-tail noise: `xl` 40, `xs` 10, `2xl` 4, `3xl` 1. Do **not** register the
 unregistered ones (reverses the earlier "register xs/2xl/3xl" proposal) — retire them instead.
 
+*(The historical table below is superseded by the two-tier EXECUTED note above.)* The **current**
+canonical vocabulary is exactly three utilities:
+
 | Token | Utility | rem | Use for | |
 |---|---|---|---|---|
-| `--radius-sm` | `rounded-sm` | 0.25 | controls, inputs, chips, small cards | ✅ **canonical** |
-| `--radius-md` | `rounded-md` | 0.375 | cards, panels, popovers | ✅ **canonical** |
-| `--radius-lg` | `rounded-lg` | 0.5 | dialogs, large containers | ✅ **canonical** |
+| `--radius-default` | `rounded-default` | 0.25 | controls, inputs, chips, small icon buttons | ✅ **canonical** |
+| `--radius-surface` | `rounded-surface` | 0.75 | dialogs, drawers, cards/panels, app-shell content area | ✅ **canonical** |
 | `--radius-full` | `rounded-full` | 9999 | pills, avatars, circular | ✅ **canonical** |
-| `--radius-xl` | `rounded-xl` | 0.75 | — | ⚠️ **judgement call** (40 uses). Recommend fold into `lg`; keep only if a distinct "extra-large container" step is wanted. |
-| `--radius-xs` | `rounded-xs` | — | — | ⛔ **retire** (10 uses → `sm`; never registered) |
-| `--radius-2xl` / `--radius-3xl` | — | — | — | ⛔ **retire** (4 + 1 uses → `lg`; never registered) |
+| `--radius-{sm,md,lg,xl}` | — | — | — | ⛔ **retired & deleted** — `sm`/`md` → `default`, `lg`/`xl` → `surface`; banned by `retiredRadiusAlias` |
 
-> Total churn to reach the standard: **15 feature uses** to codemod (xs→sm, 2xl/3xl→lg), plus a
-> decision on `xl`'s 40. Ban bare `rounded` and `rounded-[…]` arbitrary values (already ratcheted).
+> Ban bare `rounded` and `rounded-[…]` arbitrary values (already ratcheted). Per-corner variants use
+> the same names: `rounded-t-surface` / `rounded-b-surface` (ODialog header/footer), `rounded-s-*` /
+> `rounded-e-*` for joined button groups.
 
 ### A6 · Elevation — `shadow-*`
 

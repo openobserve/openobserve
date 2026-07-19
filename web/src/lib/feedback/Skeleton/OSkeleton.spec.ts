@@ -9,9 +9,9 @@ describe("OSkeleton", () => {
   });
 
   describe("type prop", () => {
-    it("applies rounded-md and w-full for type=rect (default)", () => {
+    it("applies rounded-default and w-full for type=rect (default)", () => {
       const wrapper = mount(OSkeleton);
-      expect(wrapper.find("span").classes()).toContain("rounded-md");
+      expect(wrapper.find("span").classes()).toContain("rounded-default");
       expect(wrapper.find("span").classes()).toContain("w-full");
     });
 
@@ -21,9 +21,9 @@ describe("OSkeleton", () => {
       expect(wrapper.find("span").classes()).toContain("aspect-square");
     });
 
-    it("applies rounded-sm and h-4 for type=text", () => {
+    it("applies rounded-default and h-4 for type=text", () => {
       const wrapper = mount(OSkeleton, { props: { type: "text" } });
-      expect(wrapper.find("span").classes()).toContain("rounded-sm");
+      expect(wrapper.find("span").classes()).toContain("rounded-default");
       expect(wrapper.find("span").classes()).toContain("h-4");
     });
   });
@@ -89,7 +89,7 @@ describe("OSkeleton", () => {
       const classes = wrapper.find("span").classes();
       expect(classes).not.toContain("h-4");
       expect(classes).toContain("w-full");
-      expect(classes).toContain("rounded-sm");
+      expect(classes).toContain("rounded-default");
     });
 
     it("should keep both defaults for type=text when the caller sets neither axis", () => {

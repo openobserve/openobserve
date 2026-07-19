@@ -857,7 +857,7 @@ function fireConfetti() {
   width: 1.625rem;
   height: 1.625rem;
   flex: none;
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-default);
   display: grid;
   place-items: center;
   font-weight: 800;
@@ -870,7 +870,7 @@ function fireConfetti() {
 .ds-mono.xl {
   width: 2.875rem;
   height: 2.875rem;
-  border-radius: var(--radius-xl);
+  border-radius: var(--radius-surface);
   font-size: var(--text-xl);
 }
 .ds-mono.logo {
@@ -996,7 +996,7 @@ function fireConfetti() {
   background: var(--track);
   color: var(--text-1);
   padding: 1px 0.375rem;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-default);
 }
 
 /* ---- status bar ---- */
@@ -1006,7 +1006,7 @@ function fireConfetti() {
   gap: 0.8125rem;
   margin-top: 0.875rem;
   padding: 0.8125rem 1.125rem;
-  border-radius: var(--radius-xl);
+  border-radius: var(--radius-surface);
   border: 1px solid var(--border);
   background: var(--panel);
   transition: all 0.3s;
@@ -1075,7 +1075,7 @@ function fireConfetti() {
 /* ---- fix box ---- */
 .fixbox {
   border: 1px solid color-mix(in srgb, var(--warn) 38%, var(--border));
-  border-radius: var(--radius-xl);
+  border-radius: var(--radius-surface);
   background: var(--warn-soft);
   padding: 0.9375rem 1rem;
   animation: dirc-rise 0.35s ease;
@@ -1121,7 +1121,7 @@ function fireConfetti() {
   background: var(--track);
   color: var(--text-1);
   padding: 1px 0.3125rem;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-default);
 }
 
 /* ---- pills (now <OTag>) — just lay them out ---- */

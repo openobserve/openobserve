@@ -176,7 +176,7 @@ const renderedSections = computed(() =>
 .o2-card-md :deep(:not(pre) > code) {
   background: var(--color-code-bg);
   padding: 0.1rem 0.35rem;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-default);
   font-weight: 400;
 }
 

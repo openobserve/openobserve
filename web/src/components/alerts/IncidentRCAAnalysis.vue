@@ -253,7 +253,7 @@ export default defineComponent({
   }
 
   .rca-table-wrapper {
-    border-radius: var(--radius-lg);
+    border-radius: var(--radius-surface);
     overflow: hidden;
     box-shadow: var(--rca-shadow);
   }

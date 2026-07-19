@@ -1099,3 +1099,34 @@ plus `assets/styles/log-highlighting.css` for v-html-generated log syntax.
 Remaining: the **W2.d zero-tolerance flips** (`unscopedStyle`/`styleBlockHex` → 0,
 `vue/enforce-style-attribute` → error, stylelint `color-no-hex` → error) and the **37 baselined
 `styleKeepComment`** blocks. Also open: D7 (§15.5), the D6 code-bg pick, and the z-index ladder (D15).
+
+## 17. Radius: one knob → TWO real tiers (2026-07-19)
+
+The single-radius collapse (§A5, DESIGN_TOKEN_STANDARD.md) over-corrected: with `--radius-default`
+(4px) as the *only* corner radius, large surfaces — dialogs, drawers, the app-shell content area —
+read as boxy as a button. Per the owner's call we reintroduced a second **real** value (not another
+same-value alias):
+
+- **`--radius-default` = 4px** → `rounded-default` — controls (buttons, inputs, chips, small icons).
+- **`--radius-surface` = 12px (0.75rem)** → `rounded-surface` — dialogs, drawers, cards/panels, the
+  app-shell content area. 12px = the historical dialog curve (`main`'s `rounded-xl`).
+- **`--radius-full`** unchanged (circles/pills).
+
+### 17.1 The fake tiers are gone (not hidden)
+`--radius-sm/md/lg/xl` were **deleted** from `base.css` + `semantic.css`, not kept as aliases. They
+were five names for one value — the exact "provide options then treat them the same" anti-pattern the
+owner flagged. Every reference (17 template `rounded-*` utilities + ~30 scoped `var(--radius-*)`
+across 21 files) was repointed by size intent: `sm`/`md` → `default`, `lg`/`xl` → `surface`. Small
+radii were 4px already, so those repoints are visual no-ops; the `lg`/`xl` → surface repoints restore
+the softer curve on cards/panels the branch had flattened.
+
+### 17.2 Adopters switched to `rounded-surface`
+`ODialog` container + `rounded-t-surface`/`rounded-b-surface` header/footer; `MainLayout` content
+shell. (Header logo is a transparent SVG with no background tile — nothing to round, left alone.)
+
+### 17.3 Guard + verification
+New CI category **`retiredRadiusAlias`** (`check-design-consistency.mjs`) matches both the class
+utility (incl. per-corner variants) and `var(--radius-{sm,md,lg,xl})`, baseline 0 — so a stray retired
+name can no longer silently fall back to Tailwind's stock 4/6/8/12px scale. Verified: repo grep-clean
+of all retired names; `lint:tokens` reports no dangling `--radius-*` refs; `lint:design` green;
+production build emits `.rounded-surface` (12px). Two spec files + two stale doc comments realigned.

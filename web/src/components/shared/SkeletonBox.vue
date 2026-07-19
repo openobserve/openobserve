@@ -44,13 +44,13 @@ const props = withDefaults(defineProps<Props>(), {
 // wins, otherwise the variant preset maps onto the sanctioned radius scale.
 const shapeClass = computed(() => {
   if (props.circle) return 'rounded-full aspect-square'
-  if (props.rounded) return 'rounded-lg'
+  if (props.rounded) return 'rounded-surface'
   switch (props.variant) {
     case 'text':   return 'rounded-default'
     case 'title':  return 'rounded-default'
-    case 'button': return 'rounded-md'
+    case 'button': return 'rounded-default'
     case 'avatar': return 'rounded-full'
-    case 'image':  return 'rounded-lg'
+    case 'image':  return 'rounded-surface'
     default:       return 'rounded-default'
   }
 })
