@@ -1,12 +1,12 @@
 <template>
   <div class="w-full h-full flex flex-col min-h-0">
-    <div v-if="!showSearchResults" class="h-full flex flex-col min-h-0">
-      <AppPageHeader
-        :title="t('search_scheduler_job.title')"
-        icon="schedule"
-        :back="{ onClick: closeSearchHistory }"
-        class="shrink-0 border-b border-border-default"
-      >
+    <PageLayout
+      v-if="!showSearchResults"
+      :title="t('search_scheduler_job.title')"
+      icon="schedule"
+      :back="{ onClick: closeSearchHistory }"
+      bleed
+    >
         <template #actions>
           <div class="flex items-center gap-1">
             <OTableColumnToggle
@@ -27,7 +27,6 @@
             </OButton>
           </div>
         </template>
-      </AppPageHeader>
       <div class="bg-card-glass-bg flex-1 min-h-0 overflow-hidden">
           <OTable
             :frame="false"
@@ -251,7 +250,7 @@
           v-model="confirmCancel"
         />
       </div>
-    </div>
+    </PageLayout>
   </div>
 
   <!-- Empty state is rendered via OEmptyState in the table #empty slot -->
@@ -303,7 +302,7 @@ import config from "@/aws-exports";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import PageLayout from "@/components/common/PageLayout.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { copyToClipboard } from "@/utils/clipboard";
@@ -331,7 +330,7 @@ export default defineComponent({
       () => import("@/components/CodeQueryEditor.vue"),
     ),
     OIcon,
-    AppPageHeader,
+    PageLayout,
 },
   props: {
     isClicked: {

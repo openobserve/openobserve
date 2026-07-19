@@ -1,11 +1,10 @@
 ﻿<template>
-  <div class="w-full h-full flex flex-col min-h-0">
-    <AppPageHeader
-      :title="t('search_history.title')"
-      icon="history"
-      :back="{ onClick: closeSearchHistory }"
-      class="shrink-0 border-b border-border-default"
-    >
+  <PageLayout
+    :title="t('search_history.title')"
+    icon="history"
+    :back="{ onClick: closeSearchHistory }"
+    bleed
+  >
       <template #actions>
           <OButton
             data-test="search-history-wrap-content-btn"
@@ -55,7 +54,6 @@
             </OButton>
           </div>
       </template>
-    </AppPageHeader>
     <div class="bg-card-glass-bg flex-1 min-h-0 overflow-hidden">
           <OTable
             :frame="false"
@@ -247,7 +245,7 @@
             </template>
           </OTable>
     </div>
-  </div>
+  </PageLayout>
 
   <!-- Show NoData component if there's no data to display -->
 </template>
@@ -280,7 +278,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import PageLayout from "@/components/common/PageLayout.vue";
 import { useShortcuts, getManager } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
@@ -309,7 +307,7 @@ export default defineComponent({
     OTooltip,
     OTable,
     OTimeCell,
-    AppPageHeader,
+    PageLayout,
 },
   props: {
     isClicked: {

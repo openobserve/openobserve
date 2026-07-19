@@ -15,12 +15,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="p-0 bg-surface-base w-full h-full flex flex-col min-h-0">
-    <AppPageHeader
-      :title="t('logs.searchJobInspector.title')"
-      :back="{ onClick: goBack, dataTest: 'inspector-close-button' }"
-      class="shrink-0 border-b border-border-default"
-    >
+  <PageLayout
+    class="bg-surface-base"
+    :title="t('logs.searchJobInspector.title')"
+    :back="{ onClick: goBack, dataTest: 'inspector-close-button' }"
+    bleed
+  >
       <template #title>
         <span data-test="inspector-title">{{ t('logs.searchJobInspector.title') }}</span>
       </template>
@@ -47,7 +47,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
       </template>
-    </AppPageHeader>
     <div class="w-full flex flex-col flex-1 min-h-0 overflow-hidden pt-2.5">
       <!-- Summary Stats Card -->
       <div v-if="!loading" class="mb-2.5 mx-2.5 shrink-0">
@@ -317,7 +316,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         ><OIcon name="content-copy" size="sm"  class="mr-1" /></OButton>
       </div>
     </ODialog>
-  </div>
+  </PageLayout>
 </template>
 
 <script lang="ts">
@@ -328,7 +327,7 @@ import { useI18n } from "vue-i18n";
 import searchService from "@/services/search";
 import { chartColor } from "@/utils/chartTheme";
 import NoData from "@/components/shared/grid/NoData.vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import PageLayout from "@/components/common/PageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
@@ -381,7 +380,7 @@ export default defineComponent({
   name: "SearchJobInspector",
   components: {
     NoData,
-    AppPageHeader,
+    PageLayout,
     OButton,
     ODrawer,
     ODialog,
