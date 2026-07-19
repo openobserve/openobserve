@@ -320,9 +320,8 @@ export default defineComponent({
       size: 112,
       minSize: 96,
       maxSize: 140,
-      // Left-align so the Edit button anchors at the same x-position on every row,
-      // regardless of how many trailing actions (delete / progress) a row shows.
-      meta: { align: "left", actionCount: 3 },
+      // Center-aligned to match every other listing table's actions column.
+      meta: { align: "center", actionCount: 3 },
     });
 
     watch(
