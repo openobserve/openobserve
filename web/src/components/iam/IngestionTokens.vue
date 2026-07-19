@@ -15,14 +15,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="p-0 h-full flex flex-col">
-    <!-- Standard section header: title + description + Create action. -->
-    <AppPageHeader
+  <PageLayout
       :title="t('ingestion.tokenManagementTitle')"
       title-data-test="ingestion-tokens-title-text"
-      icon="key"
-      class="shrink-0 border-b border-border-default"
-    >
+      icon="key" bleed>
       <!-- Full explanation lives in this info tooltip; the subtitle below is a
            truncated preview so neither overruns the Create action button. -->
       <template #title-trail>
@@ -50,7 +46,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t('ingestion.createTokenBtn') }}
         </OButton>
       </template>
-    </AppPageHeader>
 
     <div class="w-full flex-1 min-h-0 overflow-hidden">
       <div class="bg-card-glass-bg h-full">
@@ -204,7 +199,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
       </div>
     </ODialog>
-  </div>
+  </PageLayout>
 </template>
 
 <script lang="ts">
@@ -212,7 +207,7 @@ import { ref, computed, defineComponent, onBeforeMount } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import PageLayout from "@/components/common/PageLayout.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -248,7 +243,7 @@ interface Token {
 
 export default defineComponent({
   name: "IngestionTokens",
-  components: { AppPageHeader, OButton, OEmptyState, OIcon, OSearchInput, OTooltip, ODialog, OForm, OFormInput, OTable, OCodeCell, OUserCell },
+  components: { PageLayout, OButton, OEmptyState, OIcon, OSearchInput, OTooltip, ODialog, OForm, OFormInput, OTable, OCodeCell, OUserCell },
   setup() {
     const store = useStore();
     const { t } = useI18n();
