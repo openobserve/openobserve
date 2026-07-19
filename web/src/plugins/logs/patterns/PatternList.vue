@@ -20,14 +20,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div v-if="!loading && patterns?.length > 0" class="flex flex-col">
       <!-- Table Header -->
       <div
-        class="flex items-center border-b border-card-glass-border bg-theme-table-header-bg min-w-full"
+        class="flex items-center border-b border-table-header-border bg-table-header-bg min-w-full"
       >
         <!-- Pattern Column Header -->
         <div
           class="flex-1 min-w-0 px-2 relative table-head text-ellipsis text-left"
         >
           <span
-            class="font-bold text-text-label"
+            class="font-medium text-table-header-text text-xs"
           >
             {{ t("search.patternColumnHeader") }}
           </span>
@@ -38,15 +38,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="w-24 flex-shrink-0 px-2 relative table-head text-ellipsis text-right"
         >
           <span
-            class="font-bold text-text-label"
+            class="font-medium text-table-header-text text-xs"
           >
             {{ t("search.occurrenceColumnHeader") }}
           </span>
         </div>
 
-        <!-- Actions Column - No Header -->
+        <!-- Actions Column - No Header (width matches PatternCard's actions) -->
         <div
-          class="w-24 flex-shrink-0 px-2 relative table-head"
+          class="w-20 flex-shrink-0 px-2 relative table-head"
         ></div>
       </div>
 
@@ -98,7 +98,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <!-- Header skeleton -->
       <div
-        class="min-h-8 flex items-center border-b border-card-glass-border bg-theme-table-header-bg min-w-full"
+        class="min-h-8 flex items-center border-b border-table-header-border bg-table-header-bg min-w-full"
       >
         <div class="flex-1 min-w-0 px-2">
           <span class="pattern-skel-pill inline-block h-3 w-16 rounded-default" aria-hidden="true" />

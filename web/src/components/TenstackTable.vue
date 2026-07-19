@@ -161,7 +161,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               // Header-row chrome via centralized token utilities (same tokens
               // OTable uses): background band + full-width underline on the row
               // so it spans past the last column.
-              'bg-table-header-bg border-b border-border-default',
+              'bg-table-header-bg border-b border-table-header-border',
             ]"
             :style="{
               width:
@@ -252,7 +252,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       header.column.getToggleSortingHandler(),
                     )
                   "
-                  class="overflow-hidden whitespace-nowrap text-ellipsis! text-table-header-text text-xs font-medium capitalize"
+                  class="overflow-hidden whitespace-nowrap text-ellipsis! text-table-header-text text-xs font-medium"
                 >
                   <FlexRender
                     :render="header.column.columnDef.header"
@@ -277,7 +277,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       data-test-sort-state="active"
                       :data-test-sort-direction="sortOrder"
                       size="sm"
-                      class="text-accent"
+                      class="text-table-sort-icon-active"
                     />
                     <OIcon
                       v-else
