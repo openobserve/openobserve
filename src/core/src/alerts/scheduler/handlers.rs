@@ -20,7 +20,7 @@ use config::{
     cluster::LOCAL_NODE,
     get_config, ider,
     meta::{
-        alerts::TriggerCondition,
+        alerts::{TriggerCondition, alert::Alert},
         dashboards::reports::ReportFrequencyType,
         pipeline::components::NodeData,
         self_reporting::{
@@ -53,6 +53,7 @@ use crate::service::{
     alerts::{
         alert::{AlertExt, get_alert_start_end_time, get_by_id_db, get_row_column_map},
         derived_streams::DerivedStreamExt,
+        snapshots::{self, ScheduledSnapshotInput},
     },
     dashboards::reports::SendReport,
     db::{self, alerts::alert::set_without_updating_trigger},
@@ -373,6 +374,107 @@ fn _get_max_considerable_delay(frequency: i64) -> i64 {
     let considerable_delay = get_config().limit.alert_considerable_delay as f64 * 0.01;
     let max_considerable_delay = (frequency as f64 * considerable_delay) as i64;
     std::cmp::min(max_delay, max_considerable_delay)
+}
+
+fn should_create_scheduled_alert_snapshot(
+    is_realtime: bool,
+    is_silenced: bool,
+    trigger_data_rows: usize,
+) -> bool {
+    !is_realtime && !is_silenced && trigger_data_rows > 0
+}
+
+fn scheduled_alert_snapshot_input(
+    org_id: &str,
+    alert: &Alert,
+    trigger_timestamp: i64,
+    window_start: i64,
+    window_end: i64,
+    created_at: i64,
+) -> Result<ScheduledSnapshotInput, anyhow::Error> {
+    let alert_id = alert
+        .id
+        .ok_or_else(|| anyhow::anyhow!("alert snapshot requires alert id"))?;
+    Ok(ScheduledSnapshotInput {
+        org_id: org_id.to_string(),
+        alert_id,
+        alert_name: (!alert.name.is_empty()).then(|| alert.name.clone()),
+        stream_type: alert.stream_type,
+        stream_name: alert.stream_name.clone(),
+        trigger_timestamp,
+        window_start,
+        window_end,
+        created_at,
+    })
+}
+
+async fn create_scheduled_alert_snapshot_best_effort(
+    scheduler_trace_id: &str,
+    org_id: &str,
+    alert: &Alert,
+    trigger_timestamp: i64,
+    window_start: i64,
+    window_end: i64,
+) {
+    let input = match scheduled_alert_snapshot_input(
+        org_id,
+        alert,
+        trigger_timestamp,
+        window_start,
+        window_end,
+        now_micros(),
+    ) {
+        Ok(input) => input,
+        Err(e) => {
+            log::warn!(
+                "[SCHEDULER trace_id {scheduler_trace_id}] Skipping alert snapshot creation for org: {}, alert: {}: {e}",
+                org_id,
+                alert.name
+            );
+            return;
+        }
+    };
+
+    let alert_id = input.alert_id;
+    let stream_type = input.stream_type;
+    let stream_name = input.stream_name.clone();
+    let window_start = input.window_start;
+    let window_end = input.window_end;
+
+    match snapshots::build_scheduled_snapshot_manifest_from_file_list(scheduler_trace_id, input)
+        .await
+    {
+        Ok(manifest) => match snapshots::create_snapshot_manifest(manifest).await {
+            Ok(snapshot) => log::debug!(
+                "[SCHEDULER trace_id {scheduler_trace_id}] Created alert snapshot {}, org: {}, alert_id: {}, stream_type: {}, stream_name: {}, window_start: {}, window_end: {}",
+                snapshot.snapshot_id,
+                org_id,
+                alert_id,
+                stream_type,
+                stream_name,
+                window_start,
+                window_end
+            ),
+            Err(e) => log::warn!(
+                "[SCHEDULER trace_id {scheduler_trace_id}] Alert snapshot persistence failed, org: {}, alert_id: {}, stream_type: {}, stream_name: {}, window_start: {}, window_end: {}: {e}",
+                org_id,
+                alert_id,
+                stream_type,
+                stream_name,
+                window_start,
+                window_end
+            ),
+        },
+        Err(e) => log::warn!(
+            "[SCHEDULER trace_id {scheduler_trace_id}] Alert snapshot manifest creation failed, org: {}, alert_id: {}, stream_type: {}, stream_name: {}, window_start: {}, window_end: {}: {e}",
+            org_id,
+            alert_id,
+            stream_type,
+            stream_name,
+            window_start,
+            window_end
+        ),
+    }
 }
 
 async fn handle_alert_triggers(
@@ -833,6 +935,7 @@ async fn handle_alert_triggers(
     }
 
     let trigger_results = result.unwrap();
+    let mut scheduled_snapshot_after_usage = None;
     trigger_data_stream.query_took = trigger_results.query_took;
     log::debug!(
         "[SCHEDULER trace_id {scheduler_trace_id}] result of alert {} evaluation matched condition: {}",
@@ -1152,6 +1255,15 @@ async fn handle_alert_triggers(
             trigger_data_stream.dedup_suppressed = Some(false);
         }
 
+        let should_create_snapshot = should_create_scheduled_alert_snapshot(
+            new_trigger.is_realtime,
+            trigger.is_silenced,
+            data.len(),
+        );
+        let snapshot_org_id = new_trigger.org.clone();
+        let snapshot_window_start = start_time;
+        let snapshot_window_end = trigger_results.end_time;
+
         if incident_handled_notification {
             // Notification was handled (sent or suppressed) inside correlate_alert_to_incident.
             // Still advance the trigger state so the scheduler moves forward normally.
@@ -1253,6 +1365,12 @@ async fn handle_alert_triggers(
                 }
             }
         }
+
+        scheduled_snapshot_after_usage = should_create_snapshot.then_some((
+            snapshot_org_id,
+            snapshot_window_start,
+            snapshot_window_end,
+        ));
     } else {
         log::info!(
             "[SCHEDULER trace_id {scheduler_trace_id}] Alert conditions not satisfied, org: {}, module_key: {}",
@@ -1279,6 +1397,20 @@ async fn handle_alert_triggers(
     );
     // publish the triggers as stream
     publish_triggers_usage(trigger_data_stream);
+
+    if let Some((snapshot_org_id, snapshot_window_start, snapshot_window_end)) =
+        scheduled_snapshot_after_usage
+    {
+        create_scheduled_alert_snapshot_best_effort(
+            &scheduler_trace_id,
+            &snapshot_org_id,
+            &alert,
+            snapshot_window_end,
+            snapshot_window_start,
+            snapshot_window_end,
+        )
+        .await;
+    }
 
     // [ENTERPRISE] Mark alert completed and process batch if this was the last alert
     // #[cfg(feature = "enterprise")]
@@ -3747,9 +3879,90 @@ async fn check_deletion_status(job_id: &str) -> Result<String, anyhow::Error> {
 
 #[cfg(test)]
 mod tests {
-    use config::meta::stream::StreamType;
+    use config::meta::{alerts::alert::Alert, stream::StreamType};
+    use svix_ksuid::{Ksuid, KsuidLike};
 
     use super::*;
+
+    fn snapshot_test_alert(alert_id: Ksuid) -> Alert {
+        let mut alert = Alert::default();
+        alert.id = Some(alert_id);
+        alert.name = "cpu_high".to_string();
+        alert.stream_type = StreamType::Logs;
+        alert.stream_name = "default".to_string();
+        alert
+    }
+
+    #[test]
+    fn scheduled_snapshot_decision_creates_for_notify_worthy_scheduled_alert() {
+        assert!(should_create_scheduled_alert_snapshot(false, false, 1));
+    }
+
+    #[test]
+    fn scheduled_snapshot_decision_skips_unsatisfied_alert() {
+        assert!(!should_create_scheduled_alert_snapshot(false, false, 0));
+    }
+
+    #[test]
+    fn scheduled_snapshot_decision_skips_empty_trigger_data() {
+        assert!(!should_create_scheduled_alert_snapshot(false, false, 0));
+    }
+
+    #[test]
+    fn scheduled_snapshot_decision_skips_realtime_alerts() {
+        assert!(!should_create_scheduled_alert_snapshot(true, false, 1));
+    }
+
+    #[test]
+    fn scheduled_snapshot_decision_skips_silenced_alerts() {
+        assert!(!should_create_scheduled_alert_snapshot(false, true, 1));
+    }
+
+    #[test]
+    fn scheduled_snapshot_decision_is_independent_of_result_row_count() {
+        assert_eq!(
+            should_create_scheduled_alert_snapshot(false, false, 1),
+            should_create_scheduled_alert_snapshot(false, false, 25)
+        );
+    }
+
+    #[test]
+    fn scheduled_snapshot_input_uses_org_alert_stream_and_window() {
+        let alert_id = Ksuid::new(None, None);
+        let alert = snapshot_test_alert(alert_id);
+        let input = scheduled_alert_snapshot_input(
+            "org1",
+            &alert,
+            1_700_000_600_000_000,
+            1_700_000_000_000_000,
+            1_700_000_600_000_000,
+            1_700_000_601_000_000,
+        )
+        .unwrap();
+
+        assert_eq!(input.org_id, "org1");
+        assert_eq!(input.alert_id, alert_id);
+        assert_eq!(input.alert_name, Some("cpu_high".to_string()));
+        assert_eq!(input.stream_type, StreamType::Logs);
+        assert_eq!(input.stream_name, "default");
+        assert_eq!(input.trigger_timestamp, 1_700_000_600_000_000);
+        assert_eq!(input.window_start, 1_700_000_000_000_000);
+        assert_eq!(input.window_end, 1_700_000_600_000_000);
+        assert_eq!(input.created_at, 1_700_000_601_000_000);
+    }
+
+    #[test]
+    fn scheduled_snapshot_input_rejects_alert_without_id() {
+        let mut alert = Alert::default();
+        alert.id = None;
+        alert.name = "cpu_high".to_string();
+        alert.stream_type = StreamType::Logs;
+        alert.stream_name = "default".to_string();
+
+        let err = scheduled_alert_snapshot_input("org1", &alert, 20, 10, 20, 30).unwrap_err();
+
+        assert!(err.to_string().contains("alert snapshot requires alert id"));
+    }
 
     #[test]
     fn test_get_pipeline_info_from_module_key_valid_input() {
