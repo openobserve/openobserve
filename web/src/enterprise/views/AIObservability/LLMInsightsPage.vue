@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <AppPage
+  <PageLayout
     data-test="ai-llm-insights-page"
     :title="t('aiObservability.nav.llmInsights')"
     :subtitle="t('aiObservability.subtitle.llmInsights')"
@@ -60,7 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :end-time="timeRange.endTime"
       class="flex-1 min-h-0"
     />
-  </AppPage>
+  </PageLayout>
 </template>
 
 <script setup lang="ts">
@@ -69,7 +69,7 @@ import { useI18n } from "vue-i18n";
 import { useRoute, useRouter } from "vue-router";
 import DateTime from "@/components/DateTime.vue";
 import LLMInsightsDashboard from "@/plugins/traces/LLMInsightsDashboard.vue";
-import AppPage from "@/components/common/AppPage.vue";
+import PageLayout from "@/components/common/PageLayout.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import { getConsumableRelativeTime } from "@/utils/date";
 import {

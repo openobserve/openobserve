@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       ]"
       class="h-full"
     >
-      <PageLayout
+      <PageLayout bleed
         :main-panel="false"
         :header-class="
           isFullscreen || store.state.printMode === true

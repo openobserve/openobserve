@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
   <div data-test="alert-list-page" class="h-full">
-    <PageLayout    >
+    <PageLayout bleed    >
       <!-- Row 1: standard header — title + actions only. The stream-type filter
            and search live in the table's own toolbar below. -->
       <template #header>

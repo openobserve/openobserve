@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="alert-list-page"
     class="flex flex-col h-full"
   >
-    <PageLayout
+    <PageLayout bleed
       v-if="!showAddAlertDialog && !showImportAlertDialog"
       :main-panel="false"    >
       <!-- Standard header — title + actions only (Import/Add). The alert type

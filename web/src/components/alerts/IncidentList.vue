@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div data-test="incident-list" class="incident-list h-full">
-    <PageLayout    >
+    <PageLayout bleed    >
       <!-- Row 1: standard header — title + actions only. Search moved into the
            table's own toolbar below. -->
       <template #header>

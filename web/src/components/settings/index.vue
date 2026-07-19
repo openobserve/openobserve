@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <!-- Grouped left rail (prototype admin model) — same shell as IAM. The rail is
        always present; the chosen section renders to the right. -->
-  <PageLayout :sidebar-width="230">
+  <PageLayout bleed :sidebar-width="230">
     <template #sidebar>
       <SectionRail
         :groups="sectionGroups"

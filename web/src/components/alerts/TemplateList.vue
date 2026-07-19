@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="flex flex-col h-full p-0">
-    <PageLayout
+    <PageLayout bleed
       v-if="!showImportTemplate && !showTemplateEditor"
       :main-panel="false"    >
       <!-- Standard section header: title + actions only. Search moved to toolbar. -->

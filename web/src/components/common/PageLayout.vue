@@ -1,57 +1,87 @@
 <!-- Copyright 2026 OpenObserve Inc.
-//
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU Affero General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
-//
-// This program is distributed in the hope that it will be useful
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-// GNU Affero General Public License for more details.
-//
-// You should have received a copy of the GNU Affero General Public License
-// along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+-->
 
 <!--
-  PageLayout — 3-slot scaffold used by all Template-A and Template-B pages.
+  PageLayout — THE single page-structure component. Every routed view is a
+  PageLayout: it owns the full-height column, the header, an optional left rail,
+  an optional sub-nav strip, and the body's inset. You plug in data (title,
+  actions, tabs, sidebar, body); there is no place to hand-roll a padded <div>,
+  so no screen can drift off the grid.
 
-  Slots:
-    #header  — optional top header section (AppPageHeader or any content)
-    #sidebar — optional left panel (folder rail, route-tabs nav, etc.)
-    default  — main content area (table, router-view, charts, etc.)
+  Header — from props (the normal case):
+    :title :subtitle :icon :back :breadcrumb :titleDataTest
+    #actions      — right-aligned header actions (O2 buttons)
+    #header-tabs  — inline module tabs in the header row (Level-2 nav)
+    #title        — custom title node (when a string title isn't enough)
+    #header       — ESCAPE HATCH: a fully custom header the props can't express.
+                    Prefer the props; reach for this only when you must.
 
-  Props:
-    sidebarWidth    — pixel width for the sidebar (default 200)
-    resizable       — when true, uses OSplitter so the sidebar is drag-resizable
-    splitterLimits  — [min, max] px limits for OSplitter (default [0, 400])
-    mainPanel       — when false, main content fills space without an inner border panel
-                      (use for full-bleed content like the dashboard view; default true)
-    constrained     — when true (and no sidebar), the main content is centered in a
-                      max-width reading column (ConstrainedPage) instead of full width.
-                      Use for settings sections, single forms, org params, hubs, etc.
-    contentSize     — reading-column width when constrained ('sm'|'md'|'lg'|'xl'; default 'lg')
-    headerClass     — override the default header wrapper class. Prefer NOT to pass
-                      this: the default already carries the canonical page edge inset
-                      (`px-page-edge`, the --spacing-page-edge token) so every page's
-                      header lines up with tables and rails. See SPACING_AUDIT.md §7.
+  Sub-nav — a full-width tab/toolbar strip under the header:
+    #subnav       — put an <OTabs> or a filter bar here. It self-aligns to the
+                    page-edge grid and gets a full-bleed bottom divider.
 
-  v-model:sidebarWidth — bidirectional bind for the sidebar width when resizable=true,
-                         so the page can react to resize/collapse (e.g. compact mode).
+  Left rail — optional:
+    #sidebar      — FolderList / SectionRail. `sidebarWidth` (px) for a fixed
+                    rail, or `resizable` for a drag-resizable OSplitter.
+
+  Body — the default slot. Inset to the ONE `--spacing-page-edge` grid line by
+  default (so it lines up with the header, tabs and rails). Escape hatches:
+    bleed         — full-bleed body: a table/chart/canvas/router-view that owns
+                    its own edge inset (an OTable self-insets its first column).
+    constrained   — center the body in a max-width reading column (forms/settings);
+                    `contentSize` = 'sm'|'md'|'lg'|'xl'.
+    padY          — also apply the standard vertical inset.
+    scroll        — the WHOLE body scrolls (overflow-auto). Default OFF: the body
+                    is a fixed `flex flex-col` column so inner content (a table,
+                    a dashboard) scrolls internally at full height. Turn on only
+                    for a page whose entire body should scroll (a long form).
+
+  v-model:sidebarWidth — bidirectional bind for the rail width (resizable mode).
 -->
 <template>
   <div class="flex flex-col h-full">
-    <!-- ── Optional header ──────────────────────────────────────── -->
+    <!-- ── Header (props → AppPageHeader, or #header escape hatch) ── -->
     <div
-      v-if="$slots.header"
+      v-if="hasHeader"
       :class="headerClass ?? 'shrink-0 border-b border-border-default'"
     >
-      <slot name="header" />
+      <slot name="header">
+        <AppPageHeader
+          :title="title"
+          :subtitle="subtitle"
+          :icon="icon"
+          :back="back"
+          :breadcrumb="breadcrumb"
+          :title-data-test="titleDataTest"
+        >
+          <template v-if="!!slots.title" #title><slot name="title" /></template>
+          <template v-if="!!slots.actions" #actions><slot name="actions" /></template>
+          <template v-if="!!slots['header-tabs']" #tabs><slot name="header-tabs" /></template>
+        </AppPageHeader>
+      </slot>
+    </div>
+
+    <!-- ── Sub-nav strip (tab/toolbar) under the header ──────────── -->
+    <div v-if="!!slots.subnav" class="shrink-0 border-b border-border-default">
+      <slot name="subnav" />
     </div>
 
     <!-- ── Body: resizable sidebar + main (OSplitter) ───────────── -->
     <OSplitter
-      v-if="$slots.sidebar && resizable"
+      v-if="!!slots.sidebar && resizable"
       v-model="internalWidth"
       unit="px"
       :limits="splitterLimits"
@@ -67,7 +97,6 @@
         </div>
       </template>
       <template #separator>
-        <!-- Allow page to override the separator (e.g. for custom toggle placement) -->
         <slot name="separator">
           <div
             class="w-1 h-full bg-transparent transition-colors duration-300 hover:bg-[var(--color-orange-500)]"
@@ -75,15 +104,19 @@
         </slot>
       </template>
       <template #after>
-        <div class="w-full h-full flex flex-col overflow-hidden">
+        <OContent
+          :bleed="bleed"
+          :y="padY"
+          class="w-full h-full flex flex-col overflow-hidden"
+        >
           <slot />
-        </div>
+        </OContent>
       </template>
     </OSplitter>
 
     <!-- ── Body: fixed-width sidebar + main ─────────────────────── -->
     <div
-      v-else-if="$slots.sidebar"
+      v-else-if="!!slots.sidebar"
       class="flex-1 flex min-h-0"
     >
       <aside
@@ -92,11 +125,14 @@
       >
         <slot name="sidebar" />
       </aside>
-      <section
+      <OContent
+        as="section"
+        :bleed="bleed"
+        :y="padY"
         class="flex-1 min-w-0 h-full overflow-hidden"
       >
         <slot />
-      </section>
+      </OContent>
     </div>
 
     <!-- ── Body: constrained reading column (no sidebar) ────────── -->
@@ -109,37 +145,65 @@
     </ConstrainedPage>
 
     <!-- ── Body: main only (no sidebar) ─────────────────────────── -->
-    <!-- Main content is flush: the app chrome (MainLayout) already provides the
-         single bordered "content card", so inner panels would just nest borders.
-         Sections inside separate with border-soft dividers, not boxed cards. -->
-    <template v-else>
-      <div class="flex-1 flex flex-col min-h-0 overflow-hidden">
-        <slot />
-      </div>
-    </template>
+    <OContent
+      v-else
+      :bleed="bleed"
+      :y="padY"
+      :class="scroll ? 'flex-1 min-h-0 overflow-auto' : 'flex-1 min-h-0 flex flex-col overflow-hidden'"
+    >
+      <slot />
+    </OContent>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from "vue";
+import { ref, computed, watch, useSlots } from "vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import ConstrainedPage from "@/components/common/ConstrainedPage.vue";
+import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import OContent from "@/lib/core/Content/OContent.vue";
+import type { IconName } from "@/lib/core/Icon/OIcon.icons";
+import type { BreadcrumbItem } from "@/components/common/AppBreadcrumb.vue";
+
+interface BackTarget {
+  label: string;
+  to?: import("vue-router").RouteLocationRaw;
+  onClick?: () => void;
+  dataTest?: string;
+}
 
 const props = withDefaults(
   defineProps<{
+    // Header (from props)
+    title?: string;
+    subtitle?: string;
+    icon?: IconName;
+    back?: BackTarget;
+    breadcrumb?: BreadcrumbItem[];
+    titleDataTest?: string;
+    // Body
+    bleed?: boolean;
+    padY?: boolean;
+    /** Whole-body scroll (overflow-auto). Default off → fixed flex column so
+     *  inner content (table/dashboard) scrolls internally at full height. */
+    scroll?: boolean;
+    // Sidebar
     sidebarWidth?: number;
     resizable?: boolean;
     splitterLimits?: [number, number];
-    mainPanel?: boolean;
+    // Reading-column mode
     constrained?: boolean;
     contentSize?: "sm" | "md" | "lg" | "xl";
+    // Header wrapper override (rare)
     headerClass?: string;
   }>(),
   {
+    bleed: false,
+    padY: false,
+    scroll: false,
     sidebarWidth: 200,
     resizable: false,
     splitterLimits: () => [0, 400] as [number, number],
-    mainPanel: true,
     constrained: false,
     contentSize: "lg",
     headerClass: undefined,
@@ -150,8 +214,22 @@ const emit = defineEmits<{
   "update:sidebarWidth": [value: number];
 }>();
 
+const slots = useSlots();
+
+const hasHeader = computed(
+  () =>
+    !!props.title ||
+    !!props.subtitle ||
+    !!props.icon ||
+    !!props.back ||
+    !!props.breadcrumb ||
+    !!slots.header ||
+    !!slots.title ||
+    !!slots.actions ||
+    !!slots["header-tabs"],
+);
+
 const internalWidth = ref(props.sidebarWidth);
-const lastWidth = ref(props.sidebarWidth);
 
 const sidebarVisible = computed(() => internalWidth.value > 0);
 
@@ -169,14 +247,4 @@ watch(
 watch(internalWidth, (val) => {
   emit("update:sidebarWidth", val);
 });
-
-const toggleSidebar = () => {
-  if (sidebarVisible.value) {
-    lastWidth.value = internalWidth.value;
-    internalWidth.value = 0;
-  } else {
-    internalWidth.value = lastWidth.value || props.sidebarWidth;
-  }
-};
 </script>
-

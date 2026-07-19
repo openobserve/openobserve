@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <PageLayout
+  <PageLayout bleed
     :key="store.state.selectedOrganization.identifier"
     :main-panel="false"  >
     <!-- ── Page header (row 1) ──────────────────────────────────────

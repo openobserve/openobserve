@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="flex flex-col h-full p-0">
 
-    <PageLayout
+    <PageLayout bleed
       v-if="!showDestinationEditor && !showImportDestination"
       :main-panel="false"    >
       <template #header>
