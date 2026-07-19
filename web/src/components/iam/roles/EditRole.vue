@@ -15,13 +15,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="flex flex-col pb-2.5 h-full" data-test="edit-role-page">
-    <!-- Sub-page header: the listing's icon becomes a Back button (→ Roles). -->
-    <AppPageHeader
-      :title="editingRole"
-      :back="{ label: t('iam.roles'), onClick: cancelPermissionsUpdate }"
-      class="shrink-0 border-b border-border-default"
-    />
+  <PageLayout
+    class="pb-2.5"
+    data-test="edit-role-page"
+    :title="editingRole"
+    :back="{ label: t('iam.roles'), onClick: cancelPermissionsUpdate }"
+    bleed
+  >
     <!-- TODO OK : Add button to delete role in toolbar -->
     <div
       data-test="edit-role-title"
@@ -260,7 +260,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       </div>
-  </div>
+  </PageLayout>
   <ConfirmDialog
     :title="t('iam.editRole.leaveConfirm.title')"
     :message="t('iam.editRole.leaveConfirm.message')"
@@ -309,7 +309,7 @@ import useStreams from "@/composables/useStreams";
 import { getGroups, getRoles } from "@/services/iam";
 import GroupUsers from "../groups/GroupUsers.vue";
 import AppTabs from "@/components/common/AppTabs.vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import PageLayout from "@/components/common/PageLayout.vue";
 import GroupServiceAccounts from "../groups/GroupServiceAccounts.vue";
 import cipherKeysService from "@/services/cipher_keys";
 import RePatternsService from "@/services/regex_pattern";
