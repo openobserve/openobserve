@@ -15,21 +15,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="p-0 storage-settings-editor">
-    <!-- Header -->
-    <AppPageHeader
-      :back="{
-        label: t('storage_settings.title'),
-        onClick: () => emit('cancel'),
-        dataTest: 'storage-settings-editor-back-btn',
-      }"
-      :title="headerTitle"
-      class="border-b border-border-default mb-[0.675rem]"
-    >
+  <PageLayout
+    :back="{
+      label: t('storage_settings.title'),
+      onClick: () => emit('cancel'),
+      dataTest: 'storage-settings-editor-back-btn',
+    }"
+    :title="headerTitle"
+    bleed
+  >
       <template #title>
         <span data-test="storage-settings-editor-title">{{ headerTitle }}</span>
       </template>
-    </AppPageHeader>
 
     <!-- Stepper -->
     <div class="bg-card-glass-bg h-[calc(100vh-7rem)] py-2 px-3 overflow-auto">
@@ -380,7 +377,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OForm>
     </div>
     </div>
-  </div>
+  </PageLayout>
 </template>
 
 <script lang="ts" setup>
@@ -399,7 +396,7 @@ import OStepper from "@/lib/navigation/Stepper/OStepper.vue";
 import OStep from "@/lib/navigation/Stepper/OStep.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import PageLayout from "@/components/common/PageLayout.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import {
   makeOrgStorageEditorSchema,

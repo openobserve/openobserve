@@ -15,23 +15,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div
-    class="rounded-default p-0 flex flex-col min-h-0 h-full overflow-hidden"
+  <PageLayout
+    :back="{
+      label: t('modelPricing.header'),
+      onClick: goBack,
+      dataTest: 'model-pricing-editor-back-btn',
+    }"
+    :title="headerTitle"
+    bleed
   >
-    <!-- Header -->
-    <AppPageHeader
-      :back="{
-        label: t('modelPricing.header'),
-        onClick: goBack,
-        dataTest: 'model-pricing-editor-back-btn',
-      }"
-      :title="headerTitle"
-      class="shrink-0 border-b border-border-default"
-    >
       <template #title>
         <span data-test="model-pricing-editor-title">{{ headerTitle }}</span>
       </template>
-    </AppPageHeader>
 
     <!-- Form Body -->
     <OForm
@@ -504,7 +499,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OButton>
     </div>
     </OForm>
-  </div>
+  </PageLayout>
 </template>
 
 <script lang="ts" setup>
@@ -521,7 +516,7 @@ import { useOForm } from "@/lib/forms/Form/useOForm";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import PageLayout from "@/components/common/PageLayout.vue";
 import { copyToClipboard } from "@/utils/clipboard";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import {
