@@ -16,14 +16,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="flex flex-col h-full p-0">
-    <div class="flex flex-col h-full">
-      <!-- Standard section header: title only. Search moved into the table toolbar. -->
-      <AppPageHeader
-        :title="t('settings.organizationManagement')"
-        icon="lan"
-        :subtitle="t('settings.organizationManagementPage.subtitle')"
-        class="shrink-0 border-b border-border-default"
-      />
+    <PageLayout
+      :title="t('settings.organizationManagement')"
+      icon="lan"
+      :subtitle="t('settings.organizationManagementPage.subtitle')"
+      bleed
+    >
       <div class="bg-card-glass-bg flex-1 min-h-0 mt-2.5 overflow-hidden">
       <OTable
         :frame="false"
@@ -138,7 +136,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </OTable>
       </div>
-    </div>
+    </PageLayout>
 
     <!-- Extend Trial Dialog -->
     <ODialog
@@ -248,7 +246,7 @@ import { COL } from "@/lib/core/Table/OTable.types";
 import orgStorageService from "@/services/org_storage";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import PageLayout from "@/components/common/PageLayout.vue";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 import {
@@ -262,7 +260,7 @@ import {
 export default defineComponent({
   name: "PageAlerts",
   components: {
-    AppPageHeader,
+    PageLayout,
     OEmptyState,
     OButton,
     ODialog,
