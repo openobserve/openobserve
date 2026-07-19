@@ -16,17 +16,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div data-test="incident-list" class="incident-list h-full">
-    <PageLayout bleed    >
-      <!-- Row 1: standard header — title + actions only. Search moved into the
-           table's own toolbar below. -->
-      <template #header>
-        <AppPageHeader
-          :title="t('alerts.incidents.title')"
-          icon="notifications-active"
-          :subtitle="t('alerts.incidents.subtitle')"
-        >
-        </AppPageHeader>
-      </template>
+    <PageLayout
+      bleed
+      :title="t('alerts.incidents.title')"
+      icon="notifications-active"
+      :subtitle="t('alerts.incidents.subtitle')"
+    >
       <OTable
         ref="qTableRef"
         :data="visibleIncidents"
@@ -217,7 +212,6 @@ import { useRouter, useRoute } from "vue-router";
 import { formatToReadable } from "@/utils/date";
 import incidentsService, { Incident } from "@/services/incidents";
 import PageLayout from "@/components/common/PageLayout.vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -240,7 +234,6 @@ export default defineComponent({
   name: "IncidentList",
   components: {
     PageLayout,
-    AppPageHeader,
     OEmptyState,
     OButton,
     OSpinner,
