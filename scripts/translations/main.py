@@ -72,7 +72,7 @@ def main():
         pending = collect_pending_leaves(source, existing, state)
         print(f"\nTranslating: {locale} ({len(pending)} strings pending)")
 
-        translated = translate_pending(pending, locale, counters) if pending else {}
+        translated = translate_pending(pending, locale) if pending else {}
 
         target = build_locale(source, existing, state, translated, counters)
         with open(get_language_file_path(locale), "w", encoding="utf-8") as f:

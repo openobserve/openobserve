@@ -163,19 +163,29 @@ def _system_prompt(locale):
     )
 
 
-def translate_batch(texts, locale, max_retries=3):
+def translate_batch(texts, locale, max_retries=3, _depth=0):
     """
-    Translate a list of strings via DeepSeek in a single API call.
+    Translate a list of strings via DeepSeek, index-aligned to `texts`.
 
-    Returns a list aligned to `texts`; each element is the translated string, or
-    None if that item could not be translated (backend failure or the response
-    was missing/malformed for that index). A None item is left un-advanced by the
-    caller so it retries on the next run.
+    Returns a list the same length as `texts`; each element is the translated
+    string, or None if that specific item could not be translated. A None item is
+    left un-advanced by the caller so it retries on the next run.
+
+    Robustness:
+      * Length/shape mismatches do NOT discard the whole batch. If the model
+        returns the wrong number of items, the batch is split in half and each
+        half retried, isolating the single bad string as None while its neighbours
+        still translate.
+      * Retries perturb the temperature. The first request runs at temperature 0
+        for determinism; because a deterministic retry of a deterministic failure
+        is pointless, subsequent attempts raise the temperature so the model can
+        actually produce a different (valid) response.
     """
     if not texts:
         return []
 
     payload = json.dumps({"strings": texts}, ensure_ascii=False)
+    temperature = 0.0
     last_err = None
     for attempt in range(max_retries):
         try:
@@ -186,26 +196,35 @@ def translate_batch(texts, locale, max_retries=3):
                     {"role": "user", "content": payload},
                 ],
                 stream=False,
-                temperature=0,
+                temperature=temperature,
                 response_format={"type": "json_object"},
             )
             content = resp.choices[0].message.content
-            data = json.loads(content)
-            out = data.get("translations")
-            if not isinstance(out, list) or len(out) != len(texts):
-                raise TranslationError(
-                    f"expected {len(texts)} translations, got "
-                    f"{len(out) if isinstance(out, list) else type(out).__name__}"
-                )
-            return [x if isinstance(x, str) else None for x in out]
-        except (json.JSONDecodeError, TranslationError, KeyError, IndexError) as e:
-            # Malformed response — retry without backoff; the model may comply next time.
+            data = json.loads(content) if content else {}
+            out = data.get("translations") if isinstance(data, dict) else None
+            if isinstance(out, list) and len(out) == len(texts):
+                return [x if isinstance(x, str) else None for x in out]
+            raise TranslationError(
+                f"expected {len(texts)} translations, got "
+                f"{len(out) if isinstance(out, list) else type(out).__name__}"
+            )
+        except (json.JSONDecodeError, TranslationError, KeyError, IndexError, TypeError) as e:
+            # Malformed / wrong-length response — perturb temperature and retry.
             last_err = e
+            temperature = 0.3 if temperature == 0.0 else min(temperature + 0.2, 1.0)
         except Exception as e:  # noqa: BLE001 — network / API / rate-limit errors
             last_err = e
             time.sleep(2 * (attempt + 1))
 
-    print(f"  ! batch translation failed for [{locale}]: {last_err}")
+    # Retries exhausted. Split to isolate the offending element so its neighbours
+    # aren't lost with it. Bottoms out at a single string, which returns [None].
+    if len(texts) > 1 and _depth < 8:
+        mid = len(texts) // 2
+        left = translate_batch(texts[:mid], locale, max_retries, _depth + 1)
+        right = translate_batch(texts[mid:], locale, max_retries, _depth + 1)
+        return left + right
+
+    print(f"  ! translation failed for [{locale}] ({len(texts)} item(s)): {last_err}")
     return [None] * len(texts)
 
 
@@ -251,7 +270,9 @@ def collect_pending_leaves(source, existing, state, path=()):
         has_existing = key in existing and not isinstance(existing.get(key), dict)
 
         if _needs_translation(has_existing, prev_hash, cur_hash):
-            pending.append((cur_path, text))
+            # Keep the raw value (str or list) so translate_pending can handle
+            # array leaves element-wise and preserve their type.
+            pending.append((cur_path, value))
     return pending
 
 
@@ -342,32 +363,71 @@ def build_state(source, locale_targets, failed_paths, path=()):
     return state
 
 
-def translate_pending(pending, locale, counters):
+def _validate(src, out):
+    """
+    Return `out` if it safely preserves `src`'s structure, else None.
+
+    Rejects a translation that changes the interpolation-placeholder multiset
+    ({count}, %s, @:key) or the vue-i18n pluralization pipe count (`|`), since
+    either silently breaks runtime rendering.
+    """
+    if not isinstance(out, str):
+        return None
+    if _placeholders(src) != _placeholders(out):
+        return None
+    if src.count("|") != out.count("|"):
+        return None
+    return out
+
+
+def translate_pending(pending, locale):
     """
     Translate all pending leaves for a locale in batches.
 
-    Returns a dict {path_tuple: translated_text} for leaves that translated
-    successfully AND preserved every interpolation placeholder. Items that fail
-    validation or the backend are omitted (left to retry next run).
+    `pending` is a list of (path_tuple, value) where value is a string or a list
+    of strings. Returns {path_tuple: translated_value} for leaves that translated
+    successfully AND passed `_validate` for every string. String leaves map to a
+    string; array leaves map to a list (translated element-wise, type preserved).
+    A leaf with any failed/invalid string is omitted entirely (left to retry).
     """
     batch_size = int(os.environ.get("TRANSLATION_BATCH_SIZE", "50"))
-    translated = {}
-    total = len(pending)
+
+    # Flatten every translatable string across all leaves into one work list so
+    # array elements share batches with plain strings. `slots` holds the eventual
+    # per-leaf output (translated strings, kept non-str/empty elements, or None).
+    units = []  # [path, kind, slots, sources]
+    flat = []   # [(unit_idx, elem_idx, source_string)]
+    for path, value in pending:
+        if isinstance(value, list):
+            slots = [None] * len(value)
+            uidx = len(units)
+            units.append([path, "list", slots, value])
+            for i, el in enumerate(value):
+                if isinstance(el, str) and el.strip():
+                    flat.append((uidx, i, el))
+                else:
+                    slots[i] = el  # non-string / empty — keep as-is, never billed
+        else:
+            uidx = len(units)
+            units.append([path, "str", [None], [value]])
+            flat.append((uidx, 0, value))
+
+    total = len(flat)
     done = 0
     for start in range(0, total, batch_size):
-        chunk = pending[start : start + batch_size]
-        results = translate_batch([text for _, text in chunk], locale)
-        for (cur_path, src_text), out in zip(chunk, results):
-            if out is None:
-                continue
-            if _placeholders(src_text) != _placeholders(out):
-                # Placeholder set changed — unsafe, reject and retry next run.
-                print(
-                    f"  ! placeholder mismatch, skipping {'/'.join(cur_path)} "
-                    f"[{locale}]"
-                )
-                continue
-            translated[cur_path] = out
+        chunk = flat[start : start + batch_size]
+        results = translate_batch([s for _, _, s in chunk], locale)
+        for (uidx, eidx, src), out in zip(chunk, results):
+            units[uidx][2][eidx] = _validate(src, out)  # None on failure/mismatch
         done += len(chunk)
-        print(f"    {locale}: {done}/{total} translated")
+        print(f"    {locale}: {done}/{total} strings translated")
+
+    translated = {}
+    for path, kind, slots, _ in units:
+        if any(s is None for s in slots):
+            # At least one string failed or changed structure — skip the whole
+            # leaf so its state hash is not advanced and it retries next run.
+            print(f"  ! skipping {'/'.join(path)} [{locale}] — unsafe/failed translation")
+            continue
+        translated[path] = slots[0] if kind == "str" else slots
     return translated
