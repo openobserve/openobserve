@@ -871,17 +871,24 @@ export default defineComponent({
 <style scoped>
 /* keep(complex-state): span-row hover/selected ::before overlay tints plus
    parent-state child reveal chains target descendants and pseudo-overlays that
-   Tailwind utilities can't express. */
-.span-row:hover::before {
+   Tailwind utilities can't express. The overlay is always present (transparent
+   at rest) so its background-color can transition — matching OTable row hover
+   (transition-colors duration-150) instead of snapping in abruptly. */
+.span-row::before {
   content: "";
   position: absolute;
   left: 0;
   right: 0;
   top: 0;
   bottom: 0;
-  background-color: color-mix(in srgb, var(--color-accent) 20%, transparent);
+  background-color: transparent;
   pointer-events: none;
   z-index: 999;
+  transition: background-color 150ms ease;
+}
+
+.span-row:hover::before {
+  background-color: color-mix(in srgb, var(--color-accent) 20%, transparent);
 }
 
 .span-row:hover .operation-name-container {
@@ -893,15 +900,7 @@ export default defineComponent({
 }
 
 .span-row.span-row-selected::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 0;
-  bottom: 0;
   background-color: color-mix(in srgb, var(--color-accent) 35%, transparent);
-  pointer-events: none;
-  z-index: 999;
 }
 
 .span-row.span-row-selected .operation-name-container {

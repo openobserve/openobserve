@@ -653,18 +653,14 @@ class="h-5! text-xs!">
               </TenstackTable>
             </div>
           </template>
-          <div
+          <OEmptyState
             v-else
-            class="w-full text-center flex items-center justify-center pt-4 font-bold tab-content-dynamic-height"
-            :class="
-              isLLMSpan && llmMetrics && span.gen_ai_response_model
-                ? '[height:calc(100vh-312px)]'
-                : '[height:calc(100vh-276px)]'
-            "
+            size="inline"
+            variant="no-results"
+            :title="t('traces.noEventsPresent')"
+            hide-action
             data-test="trace-details-sidebar-no-events"
-          >
-            No events present for this span
-          </div>
+          />
         </OTabPanel>
         <OTabPanel name="error" class="h-full">
           <TraceErrorTab
@@ -723,18 +719,14 @@ class="h-5! text-xs!">
               </tbody>
             </table>
           </div>
-          <div
+          <OEmptyState
             v-else
-            class="w-full flex items-center justify-center text-center pt-4 font-bold tab-content-dynamic-height"
-            :class="
-              isLLMSpan && llmMetrics && span.gen_ai_response_model
-                ? '[height:calc(100vh-312px)]'
-                : '[height:calc(100vh-276px)]'
-            "
+            size="inline"
+            variant="no-results"
+            :title="t('traces.noLinksPresent')"
+            hide-action
             data-test="trace-details-sidebar-no-links"
-          >
-            No links present for this span
-          </div>
+          />
         </OTabPanel>
 
         <!-- Correlated Logs Tab Panel -->
@@ -863,6 +855,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { cloneDeep } from "lodash-es";
 import { timestampToTimezoneDate } from "@/utils/timezone";
 import { copyToClipboard } from "@/utils/clipboard";
@@ -983,6 +976,7 @@ export default defineComponent({
     OIcon,
     OTooltip,
     OCollapsible,
+    OEmptyState,
     LogsHighLighting,
     JsonPreview,
     LLMContentRenderer,

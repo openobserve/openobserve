@@ -1,6 +1,6 @@
 <template>
   <div
-    class="quality-page flex flex-col gap-3.5 p-[14px_16px_18px] min-h-0 flex-1"
+    class="quality-page flex flex-col gap-3.5 pt-3.5 pb-4 min-h-0 flex-1"
     data-test="quality-page"
   >
     <!-- Agent filter — right-aligned at the top of the content container so it
@@ -57,6 +57,7 @@
     </div>
 
     <ODrawer
+      bleed
       v-model:open="detailDrawerOpen"
       side="right"
       :width="70"

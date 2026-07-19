@@ -15,13 +15,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div
+  <OEmptyState
     v-if="!hasSpanError"
-    class="w-full flex items-center justify-center text-center pt-4 font-bold tab-content-dynamic-height h-full"
+    size="inline"
+    variant="no-results"
+    :title="t('traces.noErrorPresent')"
+    hide-action
     data-test="trace-details-sidebar-no-error"
-  >
-    {{ t("traces.noErrorPresent") }}
-  </div>
+  />
   <!-- Error Summary: HTTP / gRPC status code -->
   <div
     v-if="hasSpanError && (spanStatusCode || spanGrpcStatusCode)"
@@ -226,6 +227,7 @@ import useTraceDetails from "@/composables/traces/useTraceDetails";
 import SpanStatusCodeBadge from "./SpanStatusCodeBadge.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
