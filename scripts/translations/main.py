@@ -3,14 +3,14 @@
 """
 Translation Generator for OpenObserve.
 
-Generates translation files from en.json using DeepSeek (an LLM) via its
+Generates translation files from en-US.json using DeepSeek (an LLM) via its
 OpenAI-compatible API. Only newly added or modified English strings are
 translated; already-translated, unchanged text is never re-sent (see
 translator.py for the change-detection model).
 
 Usage:
-    python main.py                 # translate all supported languages
-    python main.py fr es de        # translate specific languages
+    python main.py                    # translate all supported languages
+    python main.py fr-FR es-ES de-DE  # translate specific languages (filename stems)
 
 Environment:
     DEEPSEEK_API_KEY   Required. API key for https://api.deepseek.com.
@@ -59,7 +59,7 @@ def main():
 
     source = load_source()
     if not source:
-        print("ERROR: en.json source is empty or missing.")
+        print("ERROR: en-US.json source is empty or missing.")
         sys.exit(1)
 
     state = load_state()

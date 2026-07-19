@@ -5,15 +5,15 @@ Incremental translation engine for OpenObserve (DeepSeek-backed).
 Cost model: translation is done by an LLM (DeepSeek) via its OpenAI-compatible
 API. To keep cost and latency minimal we only ever send a string for translation
 when it is genuinely new or its English source has changed. This is tracked with
-a committed state file (`.translation_state.json`) that mirrors en.json and stores,
-for each key, a hash of the English source that has been successfully propagated
-to every supported language.
+a committed state file (`.translation_state.json`) that mirrors en-US.json and
+stores, for each key, a hash of the English source that has been successfully
+propagated to every supported language.
 
 Decision per key (per locale):
   * source unchanged AND already translated -> keep existing value (no API call)
   * English source changed since last run    -> re-translate (label edits covered)
   * key new / missing in target              -> translate
-  * key removed from en.json                  -> pruned from the target file
+  * key removed from en-US.json               -> pruned from the target file
 
 Pending leaves are translated in batches (many strings per API call) to keep the
 request count and cost low. Each item is validated independently — a string whose
@@ -37,24 +37,31 @@ from openai import OpenAI
 
 STATE_FILENAME = ".translation_state.json"
 
-# Human-readable target names used in the translation prompt.
+# Source locale: filename stem of the English source (web/.../languages/en-US.json).
+SOURCE_LOCALE = "en-US"
+
+# Human-readable target names used in the translation prompt, keyed by the target
+# locale's filename stem (BCP-47 style, matching web/src/locales/languages/*.json).
 LANGUAGE_NAMES = {
-    "tr": "Turkish",
-    "zh": "Simplified Chinese",
-    "fr": "French",
-    "es": "Spanish",
-    "de": "German",
-    "it": "Italian",
-    "pt": "Portuguese",
-    "ja": "Japanese",
-    "ko": "Korean",
-    "nl": "Dutch",
-    "zh-Hant": "Traditional Chinese",
-    "ar": "Arabic",
-    "fa": "Persian",
-    "ru": "Russian",
-    "pl": "Polish",
-    "vi": "Vietnamese",
+    "tr-TR": "Turkish",
+    "zh-CN": "Simplified Chinese",
+    "fr-FR": "French",
+    "es-ES": "Spanish",
+    "de-DE": "German",
+    "it-IT": "Italian",
+    "pt-PT": "Portuguese",
+    "ja-JP": "Japanese",
+    "ko-KR": "Korean",
+    "nl-NL": "Dutch",
+    "zh-TW": "Traditional Chinese",
+    "ru-RU": "Russian",
+    "pl-PL": "Polish",
+    "vi-VN": "Vietnamese",
+    # NOTE: RTL languages (ar Arabic, fa Persian) are intentionally NOT listed
+    # yet — the web app has no dir="rtl" support, and the locale registry's
+    # strict on-disk/localeFileMap sync would force them to be user-selectable
+    # (and auto-served to ar/fa browsers) the moment their files are generated.
+    # Add them here together with RTL layout support and their web wiring.
 }
 
 # vue-i18n / printf style interpolation tokens that MUST survive translation
@@ -73,7 +80,7 @@ def _script_dir():
 
 
 def get_language_file_path(locale):
-    """Absolute path to a language file (e.g. fr.json)."""
+    """Absolute path to a language file (e.g. fr-FR.json)."""
     languages_dir = os.path.join(
         _script_dir(), "..", "..", "web", "src", "locales", "languages"
     )
@@ -107,8 +114,8 @@ def load_json(path, default=None):
 
 
 def load_source():
-    """Load the English source (en.json)."""
-    return load_json(get_language_file_path("en"), {})
+    """Load the English source (en-US.json)."""
+    return load_json(get_language_file_path(SOURCE_LOCALE), {})
 
 
 def load_state():
@@ -146,6 +153,10 @@ def _get_client():
         _client = OpenAI(
             api_key=api_key,
             base_url=os.environ.get("DEEPSEEK_BASE_URL", "https://api.deepseek.com"),
+            # Cap per-request time so a single hung/slow call can't stall the whole
+            # run for the SDK's 600s default. Our own retry/split loop then recovers.
+            timeout=float(os.environ.get("DEEPSEEK_TIMEOUT", "60")),
+            max_retries=2,
         )
     return _client
 

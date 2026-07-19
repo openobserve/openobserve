@@ -29,7 +29,7 @@ import OrganizationManagement from "./OrganizationManagement.vue";
 import { extendTrialSchema } from "./OrganizationManagement.schema";
 import store from "../../test/unit/helpers/store";
 import { createI18n } from "vue-i18n";
-import enLocaleFull from "@/locales/languages/en.json";
+import enLocaleFull from "@/locales/languages/en-US.json";
 import { nextTick } from "vue";
 
 // ── Mock toast ──

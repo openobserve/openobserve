@@ -5,13 +5,13 @@ OpenAI-compatible API.
 
 ## Overview
 
-This system automatically translates the English locale file (`en.json`) into multiple languages **during the build process**. It intelligently preserves existing translations and only translates new keys, making it safe to run repeatedly.
+This system automatically translates the English locale file (`en-US.json`) into multiple languages **during the build process**. It intelligently preserves existing translations and only translates new keys, making it safe to run repeatedly.
 
 ## 🚀 How It Works
 
-**Automatic workflow triggered by `en.json` changes:**
+**Automatic workflow triggered by `en-US.json` changes:**
 
-1. **Developer updates `en.json`** and pushes to any branch (main, develop, feature branches)
+1. **Developer updates `en-US.json`** and pushes to any branch (main, develop, feature branches)
 2. **GitHub Action detects the change** and automatically triggers
 3. **Translation script runs** using DeepSeek to update all language files
 4. **Changes are committed** back to the same branch automatically
@@ -34,7 +34,7 @@ This means **translations are always up-to-date** without any manual interventio
 
 ## How It Works
 
-1. **Source File**: All translations originate from `web/src/locales/languages/en.json`
+1. **Source File**: All translations originate from `web/src/locales/languages/en-US.json`
 2. **Translation**: New/changed keys are translated by DeepSeek, in batches, with
    interpolation placeholders (`{count}`, `%s`, `@:linked.key`) validated per string
 3. **Preservation**: Existing translations are never overwritten unless their English source changed
@@ -86,7 +86,7 @@ python3 main.py
 Translate specific languages:
 ```bash
 cd scripts/translations
-python3 main.py fr es de
+python3 main.py fr-FR es-ES de-DE
 ```
 
 ## GitHub Actions Workflow
@@ -95,7 +95,7 @@ python3 main.py fr es de
 
 The workflow (`.github/workflows/update-translations.yml`) automatically runs when:
 
-- **Trigger**: Any push that modifies `web/src/locales/languages/en.json`
+- **Trigger**: Any push that modifies `web/src/locales/languages/en-US.json`
 - **Branches**: **All branches** (`**`)
 - **Action**:
   1. Runs Python translation script
@@ -124,7 +124,7 @@ error if this secret is missing.
 ```mermaid
 graph TD
     A[Push Code to Branch] --> B[Update Translations Workflow]
-    B --> C{en.json Changed?}
+    B --> C{en-US.json Changed?}
     C -->|Yes| D[Run Translation Script]
     C -->|No| E[Skip Translation]
     D --> F[Commit Updated Languages]
@@ -137,15 +137,15 @@ graph TD
 **Workflow Execution Order:**
 
 1. **Push code** → `update-translations.yml` runs
-2. Checks if `en.json` changed
+2. Checks if `en-US.json` changed
    - If YES: Translates and commits back to branch
    - If NO: Skips (fast, ~10 seconds)
 3. **If translations were committed** → New push event
 4. **Build workflows trigger** on the new commit → Use updated translations
 
 **Key Features:**
-- ✅ **Always runs** - Checks every push for en.json changes
-- ✅ **Smart detection** - Only translates if en.json actually changed
+- ✅ **Always runs** - Checks every push for en-US.json changes
+- ✅ **Smart detection** - Only translates if en-US.json actually changed
 - ✅ **Non-blocking** - Quick skip if no translation needed
 - ✅ **Auto-commit** - Updates committed back to same branch
 - ✅ **Natural flow** - Translation commit triggers builds automatically
@@ -158,7 +158,7 @@ You can also run translations manually:
 1. Go to **Actions** tab in GitHub
 2. Select **Update Translations** workflow
 3. Click **Run workflow**
-4. (Optional) Specify specific languages: `fr es de`
+4. (Optional) Specify specific languages: `fr-FR es-ES de-DE`
 5. Translations will be committed to the current branch
 
 ## File Structure
@@ -171,17 +171,17 @@ scripts/translations/
 └── requirements.txt   # Python dependencies
 
 web/src/locales/languages/
-├── en.json           # Source file (English)
-├── tr.json           # Turkish translations
-├── zh.json           # Chinese translations
-├── fr.json           # French translations
-├── es.json           # Spanish translations
-├── de.json           # German translations
-├── it.json           # Italian translations
-├── pt.json           # Portuguese translations
-├── ja.json           # Japanese translations
-├── ko.json           # Korean translations
-└── nl.json           # Dutch translations
+├── en-US.json           # Source file (English)
+├── tr-TR.json           # Turkish translations
+├── zh-CN.json           # Chinese translations
+├── fr-FR.json           # French translations
+├── es-ES.json           # Spanish translations
+├── de-DE.json           # German translations
+├── it-IT.json           # Italian translations
+├── pt-PT.json           # Portuguese translations
+├── ja-JP.json           # Japanese translations
+├── ko-KR.json           # Korean translations
+└── nl-NL.json           # Dutch translations
 ```
 
 ## Adding New Languages
@@ -192,20 +192,20 @@ web/src/locales/languages/
 
 ## Troubleshooting
 
-### Workflow Not Detecting en.json Changes
+### Workflow Not Detecting en-US.json Changes
 
-**Symptom:** You changed `en.json` but workflow says "en.json not modified"
+**Symptom:** You changed `en-US.json` but workflow says "en-US.json not modified"
 
 **Solution 1 - Check workflow logs:**
 1. Go to **Actions** → **Update Translations** → Click the run
-2. Look at "Check if en.json was modified" step
+2. Look at "Check if en-US.json was modified" step
 3. It shows debug info: event type, before/after SHAs, and changed files
 
 **Solution 2 - Debug detection:**
 ```bash
 # Locally check what git sees
 git show --name-only --pretty="" HEAD
-# Should show web/src/locales/languages/en.json
+# Should show web/src/locales/languages/en-US.json
 
 # Check last push
 git diff HEAD~1 --name-only
@@ -240,7 +240,7 @@ ModuleNotFoundError: No module named 'openai'
 
 **Solution:** Check if translation workflow ran and committed:
 1. Go to **Actions** → Find the **Update Translations** run
-2. Check if it detected en.json changes and committed translations
+2. Check if it detected en-US.json changes and committed translations
 3. If translations were committed, the commit should trigger a new build
 4. The new build will have updated translations
 
@@ -248,7 +248,7 @@ ModuleNotFoundError: No module named 'openai'
 
 ### Scenario: Adding New UI Text
 
-1. **Developer adds new text to `en.json`:**
+1. **Developer adds new text to `en-US.json`:**
    ```json
    {
      "dashboard": {
@@ -257,18 +257,18 @@ ModuleNotFoundError: No module named 'openai'
    }
    ```
 
-2. **Merge the `en.json` change to `main`:**
+2. **Merge the `en-US.json` change to `main`:**
    ```bash
-   git add web/src/locales/languages/en.json
+   git add web/src/locales/languages/en-US.json
    git commit -m "feat: add new dashboard feature text"
    # open a PR and merge to main
    ```
 
 3. **Workflow automatically (on `main` only):**
-   - Triggers because `web/src/locales/languages/en.json` changed
+   - Triggers because `web/src/locales/languages/en-US.json` changed
    - Runs translation script
    - Translates only the **new or modified** keys to all 10 languages
-   - Commits updated `fr.json`, `es.json`, etc. plus `.translation_state.json`
+   - Commits updated `fr-FR.json`, `es-ES.json`, etc. plus `.translation_state.json`
 
 4. **Build workflows:**
    - Use the newly updated translation files
@@ -287,7 +287,7 @@ English source each translated value was derived from. On every run the script:
   source text changed since the last run (so editing an existing label re-translates it).
 - **Keeps** already-translated text whose source is unchanged — it is never re-sent to
   the API, and English is never "translated" to English.
-- **Prunes** keys that were removed from `en.json`.
+- **Prunes** keys that were removed from `en-US.json`.
 - **Bootstraps** safely: the first run after this file is introduced adopts existing
   translations as-is (no costly full re-translation, no overwriting manual fixes).
 
@@ -300,19 +300,19 @@ source of truth that keeps subsequent runs incremental.
 2. **Test in UI**: Verify translations display correctly in the application
 3. **Manual Fixes**: Manual edits to a key are preserved until its English source changes
 4. **Context Matters**: Some terms may need manual translation for proper context
-5. **Land on `main`**: Translations are generated when `en.json` is merged to `main`
+5. **Land on `main`**: Translations are generated when `en-US.json` is merged to `main`
 
 ## Cost Considerations
 
-Translation is billed per token by DeepSeek. The whole `en.json` is ~205k
+Translation is billed per token by DeepSeek. The whole `en-US.json` is ~205k
 characters (~8,300 strings); a full 10-language rebuild is a one-time cost, and
-day-to-day runs only translate the handful of new/changed keys per `en.json`
+day-to-day runs only translate the handful of new/changed keys per `en-US.json`
 merge.
 
 ### Cost Optimization:
 - ✅ Only **new or modified** keys are translated (unchanged text is never re-sent)
 - ✅ Strings are sent in **batches** (`TRANSLATION_BATCH_SIZE`, default 50) to cut request overhead
-- ✅ Runs on **`main` only**, and only when `en.json` changes (no per-branch re-billing)
+- ✅ Runs on **`main` only**, and only when `en-US.json` changes (no per-branch re-billing)
 - ✅ Superseded runs are cancelled (`concurrency` with `cancel-in-progress`)
 - ✅ Failed API calls / placeholder-mismatched outputs are retried next run, not silently kept
 

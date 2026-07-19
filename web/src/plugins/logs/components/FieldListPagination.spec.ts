@@ -16,7 +16,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import FieldListPagination from "./FieldListPagination.vue";
-import enLocaleFull from "@/locales/languages/en.json";
+import enLocaleFull from "@/locales/languages/en-US.json";
 
 // Resolve real locale messages so migrated i18n keys render actual text
 // (with {placeholder} interpolation) instead of the raw key path.

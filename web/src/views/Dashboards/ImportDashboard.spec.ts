@@ -5,7 +5,7 @@ import ImportDashboard from "./ImportDashboard.vue";
 import { createStore } from "vuex";
 import { createRouter, createWebHistory } from "vue-router";
 import { createI18n } from "vue-i18n";
-import enLocaleFull from "@/locales/languages/en.json";
+import enLocaleFull from "@/locales/languages/en-US.json";
 
 // Mock external dependencies
 vi.mock("@/utils/commons", () => ({

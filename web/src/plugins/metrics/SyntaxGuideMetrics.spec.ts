@@ -19,7 +19,7 @@ import SyntaxGuideMetrics from "./SyntaxGuideMetrics.vue";
 import store from "../../test/unit/helpers/store";
 import { createI18n } from "vue-i18n";
 import { nextTick } from "vue";
-import enLocale from "@/locales/languages/en.json";
+import enLocale from "@/locales/languages/en-US.json";
 
 // The REAL locale file, not a hand-written stub: the guide's copy now comes from
 // `t()`, so a stub with a couple of keys would leave every other string

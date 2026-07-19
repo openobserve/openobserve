@@ -26,7 +26,7 @@ vi.mock("../../../utils/commons", () => ({
 // their real English text (e.g. "Move"), instead of leaking the key path.
 vi.mock("vue-i18n", async () => {
   const en: Record<string, any> = (
-    (await vi.importActual("@/locales/languages/en.json")) as any
+    (await vi.importActual("@/locales/languages/en-US.json")) as any
   ).default;
   const resolve = (key: string): unknown =>
     key.split(".").reduce<any>((o, k) => (o == null ? undefined : o[k]), en);

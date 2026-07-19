@@ -71,7 +71,7 @@ vi.mock("vue-i18n", async () => {
   // Resolve keys against the real English locale so migrated t("...") calls
   // render the actual translated text (badges, caller column, "No operations
   // found", etc.), instead of the raw key paths the old identity mock returned.
-  const enLocaleFull = (await import("@/locales/languages/en.json")).default;
+  const enLocaleFull = (await import("@/locales/languages/en-US.json")).default;
   // A few tests assert on the raw i18n key (locale-independent), matching the
   // original identity-mock behavior. Keep those keys mapping to themselves so
   // those assertions still hold.

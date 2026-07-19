@@ -222,12 +222,12 @@ stay top-of-mind:
 **What.** Every string a user can read — page titles, field labels, button text,
 placeholders, tooltips, empty-state copy, toast/notification messages, and
 validation messages — comes from the i18n layer via `useI18n()`'s `t()`, keyed
-into `web/src/locales/languages/en.json`. Never write a display string literally
+into `web/src/locales/languages/en-US.json`. Never write a display string literally
 in a template or script.
 
 **Why.** The app ships in many languages; a hardcoded string is invisible to
 translation and silently serves English to every locale. Centralizing copy in
-`en.json` also keeps wording consistent and reviewable. It's the same principle as
+`en-US.json` also keeps wording consistent and reviewable. It's the same principle as
 tokens and variants — a user-facing value lives in one shared place, never
 scattered as a literal at the call site.
 
@@ -235,10 +235,10 @@ scattered as a literal at the call site.
 - `const { t } = useI18n()` in setup; `{{ t('module.key') }}` in templates,
   `t('module.key')` in script. Group keys under a sensible namespace
   (e.g. `notificationChannels.title`).
-- Add new keys **only** to `web/src/locales/languages/en.json` — the other
+- Add new keys **only** to `web/src/locales/languages/en-US.json` — the other
   language files follow from there; never hand-edit them.
 - **Validation messages** get localized too: pass `t` into the Zod schema factory
-  (`make…Schema(t)`) so rule messages come from `en.json` — see
+  (`make…Schema(t)`) so rule messages come from `en-US.json` — see
   [references/forms-validation.md](forms-validation.md).
 - **Shortcut descriptions** are i18n keys (`shortcuts.actions.*`) — see
   [references/keyboard-shortcuts.md](keyboard-shortcuts.md).

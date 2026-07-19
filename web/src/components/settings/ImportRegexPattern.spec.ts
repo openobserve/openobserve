@@ -45,7 +45,7 @@ vi.mock("axios", () => ({
 
 // Mock utils cookies
 vi.mock("@/utils/cookies", () => ({
-  getLanguage: vi.fn(() => "en-gb")
+  getLanguage: vi.fn(() => "en-us")
 }));
 
 

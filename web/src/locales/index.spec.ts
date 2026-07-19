@@ -36,7 +36,7 @@ describe("locale registry stays in sync", () => {
   //   - localeFileMap entry with no file -> loadLocaleMessages() no-ops and the
   //     UI quietly renders English
   //   - localeFileMap entry missing from APP_LOCALE_TO_BCP47 -> numbers format
-  //     as en-GB while the rest of the UI is translated
+  //     as en-US while the rest of the UI is translated
   const languagesDir = resolve(
     dirname(fileURLToPath(import.meta.url)),
     "languages",
@@ -66,7 +66,7 @@ describe("getNumberLocale (locale format unit)", () => {
 
   it("maps app language codes to valid BCP-47 tags", () => {
     const cases: Array<[string, string]> = [
-      ["en-gb", "en-GB"],
+      ["en-us", "en-US"],
       ["tr-turk", "tr-TR"],
       ["zh-cn", "zh-CN"],
       ["zh-tw", "zh-TW"],
@@ -85,9 +85,9 @@ describe("getNumberLocale (locale format unit)", () => {
     }
   });
 
-  it("falls back to en-GB for an unmapped language", () => {
+  it("falls back to en-US for an unmapped language", () => {
     (getLanguage as any).mockReturnValue("xx-unknown");
-    expect(getNumberLocale()).toBe("en-GB");
+    expect(getNumberLocale()).toBe("en-US");
   });
 
   it("produces Intl-formatted separators per locale", () => {
@@ -98,7 +98,7 @@ describe("getNumberLocale (locale format unit)", () => {
     }).format(1234567.89);
     expect(de).toBe("1.234.567,89");
 
-    (getLanguage as any).mockReturnValue("en-gb");
+    (getLanguage as any).mockReturnValue("en-us");
     const en = new Intl.NumberFormat(getNumberLocale(), {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,

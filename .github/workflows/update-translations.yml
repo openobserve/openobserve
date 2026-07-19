@@ -9,7 +9,7 @@ on:
     # of every branch) avoids re-translating the same strings on each feature
     # branch — the single largest cost driver of this job.
     paths:
-      - 'web/src/locales/languages/en.json'
+      - 'web/src/locales/languages/en-US.json'
   workflow_dispatch:
     inputs:
       languages:
@@ -113,15 +113,15 @@ jobs:
             web/src/locales/languages/*.json
             scripts/translations/.translation_state.json
           commit-message: |
-            chore: update translations from en.json
+            chore: update translations from en-US.json
 
             Auto-generated translation updates from English source file.
 
             🤖 Generated with automated translation workflow
-          title: "chore: update translations from en.json"
+          title: "chore: update translations from en-US.json"
           body: |
             Auto-generated translation updates from the English source file
-            (`web/src/locales/languages/en.json`).
+            (`web/src/locales/languages/en-US.json`).
 
             🤖 Generated with automated translation workflow
           labels: |
