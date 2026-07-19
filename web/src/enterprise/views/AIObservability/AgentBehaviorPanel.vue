@@ -32,6 +32,7 @@
         :columns="loopColumns"
         :default-columns="false"
         :frame="false"
+        @row-click="(r: any) => openDetail('loop', r)"
       />
       <OEmptyState
         v-if="!loading && loopRows.length === 0"
@@ -56,6 +57,7 @@
         :columns="failureColumns"
         :default-columns="false"
         :frame="false"
+        @row-click="(r: any) => openDetail('failure', r)"
       />
       <OEmptyState
         v-if="!loading && failureRows.length === 0"
@@ -80,6 +82,7 @@
         :columns="costColumns"
         :default-columns="false"
         :frame="false"
+        @row-click="(r: any) => openDetail('cost', r)"
       />
       <OEmptyState
         v-if="!loading && costRows.length === 0"
@@ -87,6 +90,15 @@
         :title="t('aiObservability.behavior.noCost')"
       />
     </div>
+
+    <!-- Details side panel — opens on row click, shows the underlying traces. -->
+    <AgentSignalDetailPanel
+      v-model:open="detailOpen"
+      :row="detailRow"
+      :source-stream="sourceStream"
+      :start-time="startTime"
+      :end-time="endTime"
+    />
   </div>
 </template>
 
@@ -97,6 +109,7 @@ import { useStore } from "vuex";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import AgentSignalDetailPanel from "./AgentSignalDetailPanel.vue";
 import agentSignalsService, {
   type AgentSignalRecord,
 } from "@/services/agent_signals";
@@ -112,6 +125,19 @@ const store = useStore();
 
 const signals = ref<AgentSignalRecord[]>([]);
 const loading = ref(false);
+
+// Details side panel state.
+const detailOpen = ref(false);
+const detailRow = ref<any>(null);
+
+/** Open the details panel for a clicked Behavior row (maps the table row to a signal). */
+const openDetail = (
+  signalType: "loop" | "failure" | "cost",
+  row: Record<string, any>,
+) => {
+  detailRow.value = { signalType, ...row };
+  detailOpen.value = true;
+};
 
 const orgId = computed(
   () => store.state.selectedOrganization?.identifier as string,

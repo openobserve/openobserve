@@ -7489,7 +7489,19 @@
       "colCost": "Cost ($)",
       "colTokens": "Tokens",
       "colErrors": "Errors",
-      "sectionTitle": "Agent behavior"
+      "sectionTitle": "Agent behavior",
+      "detail": {
+        "title": "Signal details",
+        "summary": "What this shows",
+        "tracesTitle": "Underlying traces",
+        "tracesHint": "Click a trace to open it",
+        "noTraces": "No traces found for this signal",
+        "colTraceId": "Trace ID",
+        "colSpans": "Spans",
+        "loopExplain": "These traces called the same tool repeatedly. A high calls-per-trace ratio usually means the agent isn't caching results or is stuck retrying.",
+        "failExplain": "These traces hit this failure class. Open one to see the exact error and where it happened.",
+        "costExplain": "These traces drove this agent's spend, tokens, and errors."
+      }
     }
   },
   "onlineEvals": {
