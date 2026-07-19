@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         // tables can still scroll sideways; the delegated element owns vertical
         // scroll + virtualization. Without `scrollEl` it stays the scroller.
         props.scrollEl
-          ? 'overflow-x-auto relative'
+          ? 'overflow-x-auto overflow-y-hidden relative'
           : 'o2-scroll-container overflow-auto rounded-default table-container flex-1 min-h-0 relative',
         { 'virtual-scroll-active will-change-scroll': useVirtualScroll },
       ]"
