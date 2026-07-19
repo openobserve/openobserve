@@ -15,21 +15,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div
+  <PageLayout
     data-test="add-enrichment-table-page"
-    class="flex flex-col px-2.5 h-[calc(100vh-var(--navbar-height)-0.875rem)]"
+    class="h-[calc(100vh-var(--navbar-height)-0.875rem)]"
+    :title="isUpdating ? t('function.updateEnrichmentTable') : t('function.addEnrichmentTable')"
+    title-data-test="add-enrichment-table-title"
+    :back="{
+      label: t('function.enrichmentTables'),
+      onClick: () => $emit('cancel:hideform'),
+      dataTest: 'add-enrichment-table-back-btn',
+    }"
   >
-    <!-- Standard app header: back tile + title (Save/Cancel stay in the footer). -->
-    <AppPageHeader
-      :title="isUpdating ? t('function.updateEnrichmentTable') : t('function.addEnrichmentTable')"
-      title-data-test="add-enrichment-table-title"
-      :back="{
-        label: t('function.enrichmentTables'),
-        onClick: () => $emit('cancel:hideform'),
-        dataTest: 'add-enrichment-table-back-btn',
-      }"
-      class="-mx-2.5 border-b border-border-default mb-2 shrink-0"
-    />
 
     <!-- Inline page form. Save lives in the footer INSIDE the <OForm>, so it is a
          native type="submit" (Enter submits) — no form-id needed. -->
@@ -203,7 +199,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
       </div>
     </OForm>
-  </div>
+  </PageLayout>
 </template>
 
 <script lang="ts">
@@ -224,7 +220,7 @@ import OFormSwitch from "@/lib/forms/Switch/OFormSwitch.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import PageLayout from "@/components/common/PageLayout.vue";
 import {
   makeAddEnrichmentTableSchema,
   type AddEnrichmentTableForm,
@@ -244,7 +240,7 @@ export const defaultValue: any = () => {
 export default defineComponent({
   name: "AddEnrichmentTable",
   components: { OSeparator, OButton, OForm, OFormInput, OFormFile, OFormOptionGroup, OFormSwitch,
-    OIcon, AppPageHeader,
+    OIcon, PageLayout,
 },
   props: {
     modelValue: {
