@@ -14,18 +14,11 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <div class="flex flex-col flex-1 min-h-0 h-full">
-    <!-- Standard page header (AppPageHeader), matching Add Panel / Import Dashboard.
-         BaseImport's built-in header is hidden (hide-header) so this single header
-         serves all three tabs. The title preserves the existing per-tab text: the
-         Built-in Patterns tab keeps t('regex_patterns.import_title') ("Import
-         Pattern") and the File / URL tabs keep "Import Regex Pattern" — no header
-         text is changed by this migration. -->
-    <AppPageHeader
-      :title="headerTitle"
-      :back="{ label: t('regex_patterns.title'), onClick: arrowBackFn, dataTest: 'regex-pattern-import-back-btn' }"
-      class="border-b border-border-default"
-    >
+  <PageLayout
+    :title="headerTitle"
+    :back="{ label: t('regex_patterns.title'), onClick: arrowBackFn, dataTest: 'regex-pattern-import-back-btn' }"
+    bleed
+  >
       <template #actions>
         <OButton
           variant="outline"
@@ -43,7 +36,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="regex-pattern-import-json-btn"
         >{{ t('dashboard.import') }}</OButton>
       </template>
-    </AppPageHeader>
 
     <base-import
       v-if="activeTab !== 'import_built_in_patterns'"
@@ -183,7 +175,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="built-in-patterns-tab"
       />
     </div>
-  </div>
+  </PageLayout>
 </template>
 
 <script lang="ts">
@@ -202,7 +194,7 @@ import { useRouter } from "vue-router";
 
 
 import AppTabs from "../common/AppTabs.vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import PageLayout from "@/components/common/PageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
@@ -553,7 +545,7 @@ export default defineComponent({
     OSeparator,
     BaseImport,
     AppTabs,
-    AppPageHeader,
+    PageLayout,
     OButton,
     OInput,
     BuiltInPatternsTab: defineAsyncComponent(
