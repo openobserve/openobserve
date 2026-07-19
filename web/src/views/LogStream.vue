@@ -18,16 +18,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
   <div data-test="alert-list-page" class="h-full">
-    <PageLayout bleed    >
-      <!-- Row 1: standard header — title + actions only. The stream-type filter
-           and search live in the table's own toolbar below. -->
-      <template #header>
-        <AppPageHeader
-          :title="t('logStream.header')"
-          title-data-test="log-stream-title-text"
-          :subtitle="t('logStream.subtitle')"
-          icon="window"
-        >
+    <PageLayout bleed
+      :title="t('logStream.header')"
+      title-data-test="log-stream-title-text"
+      :subtitle="t('logStream.subtitle')"
+      icon="window"
+    >
           <template #actions>
             <OButton
               v-if="isSchemaUDSEnabled"
@@ -39,8 +35,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t(`logStream.add`) }}
             </OButton>
           </template>
-        </AppPageHeader>
-      </template>
 
       <div class="bg-card-glass-bg h-full">
       <OTable
@@ -317,7 +311,6 @@ import { useI18n } from "vue-i18n";
 import OTable from "@/lib/core/Table/OTable.vue";
 import { COL, type OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import PageLayout from "@/components/common/PageLayout.vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import streamService from "../services/stream";
 import SchemaIndex from "../components/logstream/schema.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
@@ -350,7 +343,6 @@ export default defineComponent({
   name: "PageLogStream",
   components: {
     PageLayout,
-    AppPageHeader,
     SchemaIndex,
     OEmptyState,
     EmptyStateIngestionChip,

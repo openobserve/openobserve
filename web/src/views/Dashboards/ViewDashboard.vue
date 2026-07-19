@@ -36,21 +36,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             ? 'stickyHeader fullscreenHeader bg-surface-panel'
             : 'shrink-0'
         "
+        :subtitle="folderNameFromFolderId"
+        :icon="!isFullscreen && store.state.printMode !== true ? undefined : 'dashboard'"
+        :back="
+          !isFullscreen && store.state.printMode !== true
+            ? { label: t('dashboard.header'), onClick: goBackToDashboardList, dataTest: 'dashboard-back-btn' }
+            : undefined
+        "
       >
-        <template #header>
-          <!-- Normal mode: the icon tile is a Back button (→ dashboards list).
-               Fullscreen/print hide the chrome, so there we keep the module icon
-               as the only on-screen branding (no back affordance). -->
-          <AppPageHeader
-            :subtitle="folderNameFromFolderId"
-            :icon="!isFullscreen && store.state.printMode !== true ? undefined : 'dashboard'"
-            :back="
-              !isFullscreen && store.state.printMode !== true
-                ? { label: t('dashboard.header'), onClick: goBackToDashboardList, dataTest: 'dashboard-back-btn' }
-                : undefined
-            "
-            class="border-b border-border-default"
-          >
           <template #title>
             <span data-test="dashboard-name-title">{{ currentDashboardData.data?.title }}</span>
           </template>
@@ -230,8 +223,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </OButton>
           </template>
-          </AppPageHeader>
-        </template>
 
         <RenderDashboardCharts
         :frame="false"
@@ -360,7 +351,6 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import PageLayout from "@/components/common/PageLayout.vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import type { BreadcrumbItem } from "@/components/common/AppBreadcrumb.vue";
 import { useLoading } from "@/composables/useLoading";
 import shortURLService from "@/services/short_url";
@@ -394,7 +384,6 @@ export default defineComponent({
   emits: ["onDeletePanel"],
   components: {
     PageLayout,
-    AppPageHeader,
     OSeparator,
     DateTimePickerDashboard,
     ShareButton,

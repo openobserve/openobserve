@@ -19,16 +19,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <PageLayout bleed
     :key="store.state.selectedOrganization.identifier"
+    :title="t('dashboard.header')"
+    icon="dashboard"
+    :subtitle="t('dashboard.subtitle')"
     :main-panel="false"  >
-    <!-- ── Page header (row 1) ──────────────────────────────────────
-         The breadcrumb path now lives in the top chrome bar (published
-         below); this row carries the page title + description + actions. -->
-    <template #header>
-      <AppPageHeader
-        :title="t('dashboard.header')"
-        icon="dashboard"
-        :subtitle="t('dashboard.subtitle')"
-      >
       <template #actions>
         <!-- Org home dashboard shortcut: shows which dashboard is pinned to
              the home page and jumps straight to it. -->
@@ -95,8 +89,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t(`dashboard.add`) }}
         </OButton>
       </template>
-      </AppPageHeader>
-    </template>
 
     <!-- Folder rail + table — matches the Alerts/Reports layout. -->
     <div class="flex-1 flex min-h-0">
@@ -539,7 +531,6 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { useRoute, useRouter } from "vue-router";
 import { toRaw } from "vue";
@@ -590,7 +581,6 @@ export default defineComponent({
     OUserCell,
     OTimeCell,
     PageLayout,
-    AppPageHeader,
     OEmptyState,
     OButton,
     OIcon,
