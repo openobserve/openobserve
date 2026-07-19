@@ -19,9 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <PageLayout
       v-if="!showDestinationEditor && !showImportDestination"
-      :main-panel="false"
-      :header-class="'shrink-0 px-4 border-b border-border-default'"
-    >
+      :main-panel="false"    >
       <template #header>
       <AppPageHeader
         :title="t('alert_destinations.header')"

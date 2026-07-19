@@ -23,9 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <PageLayout
       v-if="!showAddAlertDialog && !showImportAlertDialog"
-      :main-panel="false"
-      :header-class="'shrink-0 px-4 border-b border-border-default'"
-    >
+      :main-panel="false"    >
       <!-- Standard header — title + actions only (Import/Add). The alert type
            toggle, search and folder scope live in the table toolbar. -->
       <template #header>
@@ -73,7 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="flex-1 flex min-h-0"
     >
       <!-- Left: FolderList -->
-      <div class="shrink-0 h-full w-57.5">
+      <div class="shrink-0 h-full w-rail">
         <div class="h-full">
           <FolderList
             type="alerts"

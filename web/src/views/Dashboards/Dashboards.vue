@@ -19,9 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <PageLayout
     :key="store.state.selectedOrganization.identifier"
-    :main-panel="false"
-    :header-class="'shrink-0 px-4 border-b border-border-default'"
-  >
+    :main-panel="false"  >
     <!-- ── Page header (row 1) ──────────────────────────────────────
          The breadcrumb path now lives in the top chrome bar (published
          below); this row carries the page title + description + actions. -->
@@ -103,7 +101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Folder rail + table — matches the Alerts/Reports layout. -->
     <div class="flex-1 flex min-h-0">
       <!-- Left: shared folder list (same component as Alerts/Reports) -->
-      <div class="shrink-0 h-full" :style="{ width: 230 + 'px' }">
+      <div class="shrink-0 h-full w-rail">
         <div class="h-full">
           <FolderList
             type="dashboards"

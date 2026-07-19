@@ -17,9 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div data-test="report-list-page" class="h-full">
     <PageLayout
-      :main-panel="false"
-      :header-class="'shrink-0 px-4 border-b border-border-default'"
-    >
+      :main-panel="false"    >
       <!-- Row 1: standard header — title + actions only. Tabs / search / folder
            scope moved into the table's own toolbar below. -->
       <template #header>
@@ -48,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="report-list-table flex-1 flex min-h-0"
     >
       <!-- Left: folder list -->
-      <div class="shrink-0 h-full" :style="{ width: 230 + 'px' }">
+      <div class="shrink-0 h-full w-rail">
         <div class="h-full">
           <FolderList
             type="reports"

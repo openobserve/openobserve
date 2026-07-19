@@ -28,21 +28,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div
       v-if="title"
-      class="shrink-0 px-3.5 pt-3 pb-1 text-sm font-semibold text-text-heading truncate"
+      class="shrink-0 px-page-edge pt-3 pb-1 text-sm font-semibold text-text-heading truncate"
     >
       {{ title }}
     </div>
 
-    <div class="flex-1 overflow-y-auto px-2 pt-1 pb-3">
+    <div class="flex-1 overflow-y-auto pt-1 pb-3">
       <OTabs
         :model-value="activeKey ?? ''"
         orientation="vertical"
-        class="w-full"
+        class="w-full section-rail-tabs"
         @change="onTabChange"
       >
         <template v-for="group in visibleGroups" :key="group.label">
           <div
-            class="px-2 py-1 text-xs font-semibold text-text-secondary"
+            class="px-page-edge py-1 text-xs font-semibold text-text-secondary"
           >
             {{ group.label }}
           </div>

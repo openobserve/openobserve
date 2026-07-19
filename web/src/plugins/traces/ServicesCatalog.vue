@@ -28,8 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Stream selector — same 230px width as the left rail below it. -->
       <div
         data-test="services-catalog-stream-selector"
-        class="flex-shrink-0"
-        :style="{ width: '230px' }"
+        class="flex-shrink-0 w-rail"
       >
         <OSelect
           :model-value="streamFilter"
@@ -216,8 +215,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            rails. The stream selector lives in the top toolbar alongside the
            search. -->
       <div
-        class="shrink-0 h-full bg-surface-panel border-r border-border-default flex flex-col gap-2 py-2 px-1"
-        :style="{ width: '230px' }"
+        class="w-rail shrink-0 h-full bg-surface-panel border-r border-border-default flex flex-col gap-2 py-2"
       >
         <!-- Entity-type filter: All / Services / Datastores / Queues /
              External / RPC. A vertical nav rail — same OTabs pattern as the
@@ -1173,9 +1171,10 @@ onUnmounted(() => {
   margin: 0;
 }
 
+/* Horizontal padding intentionally omitted — OTab's vertical variant derives it
+   from --spacing-page-edge so this rail lines up with the page header. */
 .catalog-type-filter :deep(.o-tabs--vertical .o-tab) {
   justify-content: flex-start;
-  padding: 0 0.5rem;
   border-radius: 0.5rem;
   font-weight: 500;
   width: 100%;

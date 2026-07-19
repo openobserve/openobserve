@@ -78,7 +78,15 @@ const baseClasses = computed<string>(() => [
   isVertical.value
     ? 'flex justify-start'
     : 'inline-flex justify-center',
-  'px-2 font-normal text-sm whitespace-nowrap',
+  // Horizontal inset. A vertical (side-rail) tab always carries a 2px left
+  // border — the active marker, transparent when inactive — so its padding
+  // subtracts that to land the LABEL exactly on the page edge grid line
+  // (--spacing-page-edge). That lets every rail line up with the page header
+  // without each one hand-rolling a :deep(.o-tab) padding override.
+  isVertical.value
+    ? 'pl-[calc(var(--spacing-page-edge)-0.125rem)] pr-2'
+    : 'px-2',
+  'font-normal text-sm whitespace-nowrap',
   isVertical.value ? 'rounded-default' : 'rounded-t-default',
   'outline-none transition-[color,background-color,border-color,text-decoration-color,fill,stroke,box-shadow] duration-150',
   'select-none',

@@ -803,7 +803,7 @@ defineExpose({
     <!-- ── Custom toolbar slot (rendered INSIDE the frame, above the table) ── -->
     <div
       v-if="slots.toolbar || slots['toolbar-trailing']"
-      class="flex items-center px-4 py-2 gap-2 border-b border-table-row-divider"
+      class="flex items-center px-page-edge py-2 gap-2 border-b border-table-row-divider"
       data-test="o2-table-toolbar"
     >
       <slot name="toolbar" />
@@ -822,7 +822,7 @@ defineExpose({
     <!-- ── Built-in global search ─────────────────────────── -->
     <div
       v-if="props.showGlobalFilter && !slots.top && !slots.toolbar"
-      class="flex items-center gap-2 px-4 py-2 border-b border-table-row-divider bg-table-header-bg"
+      class="flex items-center gap-2 px-page-edge py-2 border-b border-table-row-divider bg-table-header-bg"
       data-test="o2-table-global-filter"
     >
       <div class="relative max-w-xs flex-1">
@@ -1190,11 +1190,11 @@ defineExpose({
    already supplies the left inset itself; padding it would squish its icon. */
 .o2-table--edge-inset :deep(th[data-test^="o2-table-th-"]:first-child:not([data-test="o2-table-th-select"]):not([data-test="o2-table-th-expand"]):not([data-test="o2-table-th-drag"])),
 .o2-table--edge-inset :deep(td[data-test^="o2-table-cell-"]:first-child) {
-  padding-left: 1rem;
+  padding-left: var(--spacing-page-edge);
 }
 .o2-table--edge-inset :deep(th[data-test^="o2-table-th-"]:last-child:not([data-test="o2-table-th-__spacer__"])),
 .o2-table--edge-inset :deep(td[data-test^="o2-table-cell-"]:last-child:not([data-test="o2-table-cell-__spacer__"])) {
-  padding-right: 1rem;
+  padding-right: var(--spacing-page-edge);
 }
 
 /* keep(lib-override:o2-table-modifiers): `.o2-table` / `.o2-row-md` /

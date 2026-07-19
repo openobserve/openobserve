@@ -32,7 +32,7 @@
     <!-- CONTENT AREA: sidebar + main -->
     <div class="flex flex-1 overflow-hidden">
       <!-- LEFT SIDEBAR: folder navigation -->
-      <div class="w-[14.375rem] shrink-0 overflow-y-auto">
+      <div class="w-rail shrink-0 overflow-y-auto">
         <FolderList
           type="synthetics"
           data-test="synthetic-monitoring-folder-list"

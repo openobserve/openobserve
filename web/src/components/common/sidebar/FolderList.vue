@@ -17,9 +17,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <div class="bg-surface-panel h-full flex flex-col pb-[0.3rem] border-r border-border-default">
+  <div class="bg-surface-panel h-full flex flex-col pb-1 border-r border-border-default">
       <div class="folder-header bg-transparent">
-        <div class="font-semibold text-sm text-text-heading px-2 py-2 flex items-center justify-between gap-2">
+        <div class="font-semibold text-sm text-text-heading px-page-edge py-2 flex items-center justify-between gap-2">
           {{ t('dashboard.folders') }}
           <div>
             <OButton
@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
         <!-- Search Input -->
-        <div class="p-2">
+        <div class="px-page-edge pb-2">
           <OSearchInput
             v-model="searchQuery"
             data-test="folder-search"
@@ -44,7 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
       </div>
-      <div class="folders-tabs flex-1 px-1 overflow-y-auto">
+      <div class="folders-tabs flex-1 overflow-y-auto">
         <OTabs
           orientation="vertical"
           dense
@@ -383,9 +383,11 @@ export default defineComponent({
   margin: 0;
 }
 
+/* Horizontal padding is deliberately NOT set here — OTab's vertical variant
+   derives it from --spacing-page-edge so the rail lines up with the page
+   header. Overriding it here is what used to push these rows out of line. */
 .folders-tabs :deep(.o-tabs--vertical .o-tab) {
   justify-content: flex-start;
-  padding: 0 0.625rem;
   border-radius: 0.5rem;
   /* No forced capitalize — folder names render as authored. Weight 500
      (record-name weight), not 600, so the list reads calm. Active state is

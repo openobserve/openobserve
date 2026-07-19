@@ -31,9 +31,10 @@
                       max-width reading column (ConstrainedPage) instead of full width.
                       Use for settings sections, single forms, org params, hubs, etc.
     contentSize     — reading-column width when constrained ('sm'|'md'|'lg'|'xl'; default 'lg')
-    headerClass     — override the default header wrapper class
-                      (default: 'shrink-0 px-4 border-b border-border-default' —
-                      px-4 = 16px, the canonical page edge inset; see SPACING_AUDIT.md §7)
+    headerClass     — override the default header wrapper class. Prefer NOT to pass
+                      this: the default already carries the canonical page edge inset
+                      (`px-page-edge`, the --spacing-page-edge token) so every page's
+                      header lines up with tables and rails. See SPACING_AUDIT.md §7.
 
   v-model:sidebarWidth — bidirectional bind for the sidebar width when resizable=true,
                          so the page can react to resize/collapse (e.g. compact mode).
@@ -43,7 +44,7 @@
     <!-- ── Optional header ──────────────────────────────────────── -->
     <div
       v-if="$slots.header"
-      :class="headerClass ?? 'shrink-0 px-4 border-b border-border-default'"
+      :class="headerClass ?? 'shrink-0 px-page-edge border-b border-border-default'"
     >
       <slot name="header" />
     </div>

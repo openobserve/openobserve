@@ -244,6 +244,18 @@
   --color-dialog-close-active-bg: var(--color-surface-subtle-hover);
   --color-dialog-focus-ring:      var(--color-primary-400);
 
+  /* Page edge inset — THE single horizontal grid line of the app.
+     Everything that sits at the edge of a page derives from this one knob: the
+     AppPageHeader/PageLayout header, an OTable's first/last cell content, and
+     the left rails (folder lists, field lists). Change it here and the whole
+     app's left/right alignment moves together. See SPACING_AUDIT.md §7. */
+  --spacing-page-edge: var(--spacing-3);
+
+  /* Left rail width (folder lists, catalogs, section rails). One value so the
+     rails across Dashboards/Alerts/Reports/Traces/Synthetics are identical —
+     this was previously the same 230px written five different ways. */
+  --spacing-rail: 14.375rem;
+
   /* Spacing */
   --spacing-dialog-header-px: var(--spacing-5);
   --spacing-dialog-header-py: var(--spacing-3);
@@ -1122,6 +1134,8 @@
   --color-dialog-close-hover-bg: var(--color-dialog-close-hover-bg);
   --color-dialog-close-active-bg: var(--color-dialog-close-active-bg);
   --color-dialog-focus-ring: var(--color-dialog-focus-ring);
+  --spacing-page-edge: var(--spacing-page-edge);
+  --spacing-rail: var(--spacing-rail);
   --spacing-dialog-header-px: var(--spacing-dialog-header-px);
   --spacing-dialog-header-py: var(--spacing-dialog-header-py);
   --spacing-dialog-content-px: var(--spacing-dialog-content-px);

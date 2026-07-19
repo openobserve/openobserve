@@ -18,9 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="flex flex-col h-full p-0">
     <PageLayout
       v-if="!showImportTemplate && !showTemplateEditor"
-      :main-panel="false"
-      :header-class="'shrink-0 px-4 border-b border-border-default'"
-    >
+      :main-panel="false"    >
       <!-- Standard section header: title + actions only. Search moved to toolbar. -->
       <template #header>
       <AppPageHeader

@@ -16,9 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div data-test="incident-list" class="incident-list h-full">
-    <PageLayout
-      :header-class="'shrink-0 px-4 border-b border-border-default'"
-    >
+    <PageLayout    >
       <!-- Row 1: standard header — title + actions only. Search moved into the
            table's own toolbar below. -->
       <template #header>

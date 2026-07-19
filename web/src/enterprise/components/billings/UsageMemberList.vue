@@ -203,9 +203,11 @@ export default defineComponent({
   margin: 0.3125rem;
 }
 
+/* Vertical padding only — the horizontal inset comes from OTab's vertical
+   variant (--spacing-page-edge) so this rail aligns with the page header. */
 .members-tabs :deep(.o-tabs--vertical .o-tab) {
   justify-content: flex-start;
-  padding: 0.375rem 1rem 0.375rem 1.25rem;
+  padding-block: 0.375rem;
   border-radius: 0.5rem;
   min-height: 1.5rem;
   text-transform: none;
