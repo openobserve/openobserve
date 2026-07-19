@@ -248,7 +248,9 @@ export function useTableCore<TData>(
         enableResizing: (rigid || col.meta?.autoWidth || col.meta?.spacer) ? false : (col.resizable ?? props.enableColumnResize ?? false),
         enablePinning: col.pinnable ?? props.enableColumnPin ?? false,
         meta: {
-          align: col.meta?.align ?? "left",
+          // Action columns (pinned-right icon buttons) center by default — the
+          // app-wide convention — unless a column opts into a specific align.
+          align: col.meta?.align ?? (isActionCol ? "center" : "left"),
           headerClass: col.meta?.headerClass ?? "",
           cellClass: col.meta?.cellClass ?? "",
           isAction: col.isAction,

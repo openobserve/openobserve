@@ -32,7 +32,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          - group:     a pure flyout group with no page of its own (click toggles);
                       supported here but not currently emitted by groupNavLinks.
          `pinBottom` groups float to the foot of the rail via the flex spacer. -->
-    <div class="flex flex-col flex-1 min-h-0 gap-y-1">
+    <div class="relative flex flex-col flex-1 min-h-0 gap-y-1">
+      <!-- Single sliding-selection pill: tracks the active rail tile and slides to
+           it on navigation. Active MenuLinks defer their fill to this (see
+           RailIndicatorActiveKey). Snaps (no slide) on mount/reflow/reveal. -->
+      <div
+        ref="indicatorRef"
+        aria-hidden="true"
+        :class="indicatorClass"
+        :style="indicatorStyle"
+      />
       <template
         v-for="entry in topEntries"
         :key="
@@ -85,14 +94,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * Left sidebar navigation bar. Renders a list of MenuLink items with keyboard
  * navigation (ArrowUp/ArrowDown) and Tab trapping.
  */
-import { computed } from "vue";
+import {
+  computed,
+  provide,
+  ref,
+  watch,
+  nextTick,
+  onMounted,
+  onBeforeUnmount,
+} from "vue";
 import { useI18n } from "vue-i18n";
+import { useRouter } from "vue-router";
 import type {
   NavbarProps,
   NavbarEmits,
   NavbarSlots,
   RailEntry,
 } from "./ONavbar.types";
+import { RailIndicatorActiveKey } from "./ONavbar.types";
 import { groupNavLinks } from "./navGroups";
 import MenuLink from "@/components/MenuLink.vue";
 import ONavGroup from "./ONavGroup.vue";
@@ -125,6 +144,95 @@ const bottomEntries = computed(
     railEntries.value.filter(
       (e) => e.type === "group" && e.pinBottom,
     ) as Extract<RailEntry, { type: "group" }>[],
+);
+
+// ── Sliding-selection pill ──────────────────────────────────────────────────
+// One indicator tracks the active rail tile (.nav-menu-item--active) and slides
+// to it when the route changes. Same approach as OToggleGroup: animate only real
+// selection changes; snap on mount, reflow and reveal; skip measuring while the
+// rail is hidden so a bogus 0-position is never stored.
+const router: any = useRouter();
+
+const indicatorRef = ref<HTMLElement | null>(null);
+const indicatorStyle = ref<Record<string, string>>({});
+const indicatorVisible = ref(false);
+const hasValidPosition = ref(false);
+const transitionOn = ref(false);
+
+let resizeObserver: ResizeObserver | null = null;
+
+const measure = (animated: boolean) => {
+  const indicator = indicatorRef.value;
+  const list = indicator?.parentElement;
+  if (!indicator || !list) return;
+
+  const active = list.querySelector<HTMLElement>(".nav-menu-item--active");
+  // Skip while hidden/unlaid-out (e.g. the rail is v-show'd off) — measuring here
+  // would store a 0-position and slide the pill in from the corner on reveal.
+  if (!active || active.offsetParent === null) {
+    indicatorVisible.value = false;
+    return;
+  }
+
+  const listRect = list.getBoundingClientRect();
+  const activeRect = active.getBoundingClientRect();
+  if (activeRect.height === 0) {
+    indicatorVisible.value = false;
+    return;
+  }
+
+  transitionOn.value = animated && hasValidPosition.value;
+  hasValidPosition.value = true;
+  indicatorVisible.value = true;
+  indicatorStyle.value = {
+    width: `${activeRect.width}px`,
+    height: `${activeRect.height}px`,
+    transform: `translate(${activeRect.left - listRect.left}px, ${activeRect.top - listRect.top}px)`,
+  };
+};
+
+// Slide to the newly-active tile when the route changes …
+watch(
+  () => router.currentRoute.value.fullPath,
+  async () => {
+    await nextTick();
+    measure(true);
+  },
+);
+
+onMounted(async () => {
+  await nextTick();
+  measure(false);
+  // … but snap (not slide) when tile sizes/visibility change — reflow, the rail
+  // being revealed, labels rewrapping — none of which are user selections.
+  const list = indicatorRef.value?.parentElement;
+  if (list && typeof ResizeObserver !== "undefined") {
+    resizeObserver = new ResizeObserver(() => measure(false));
+    resizeObserver.observe(list);
+  }
+});
+
+onBeforeUnmount(() => {
+  resizeObserver?.disconnect();
+  resizeObserver = null;
+});
+
+// Theme-aware pill via `dark:` utilities (no JS theme branch, so ONavbar needs no
+// store): mirrors MenuLink's own active pill — white + primary accent in light;
+// tinted selected pill + lighter accent in dark, where a white pill would vanish
+// on the near-black rail.
+const indicatorClass = computed(() => [
+  "pointer-events-none absolute left-0 top-0 z-0 rounded-surface border-l-2",
+  "bg-surface-base border-primary-600 dark:bg-tabs-active-bg dark:border-primary-400",
+  transitionOn.value &&
+    "transition-[transform,width,height] duration-300 ease-out motion-reduce:transition-none",
+  indicatorVisible.value ? "opacity-100" : "opacity-0",
+]);
+
+// Tiles read this to know whether to defer their fill to the sliding pill.
+provide(
+  RailIndicatorActiveKey,
+  computed(() => indicatorVisible.value),
 );
 
 const NAV_KEYS = ["ArrowDown", "ArrowUp", "Tab"] as const;

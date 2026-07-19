@@ -72,11 +72,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, computed } from "vue";
+import { defineComponent, computed, inject } from "vue";
 import { useStore } from "vuex";
 import { useRouter, RouterLink } from "vue-router";
 import { useTheme } from "@/composables/useTheme";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { RailIndicatorActiveKey } from "@/lib/core/Navbar/ONavbar.types";
 
 export default defineComponent({
   name: "MenuLink",
@@ -181,11 +182,26 @@ export default defineComponent({
     // (matching the dashboard-folder selection) with white text/icon — because
     // surface-base is black in dark mode, a white pill there would vanish.
     const { isDark } = useTheme();
-    const activePillClass = computed(() =>
-      isDark.value
+
+    // When the rail draws a single sliding pill (ONavbar provides this), an active
+    // tile defers its fill (background + coloured left accent) to that pill and
+    // keeps only its active text colour — the transparent left border stays so
+    // there is no width shift between states. Falls back to the self-painted pill
+    // when the indicator isn't active (default `false` off the rail, or before it
+    // is positioned), so the nav always shows a selection.
+    const railIndicatorActive = inject(RailIndicatorActiveKey, undefined);
+    const slideActive = computed(() => Boolean(railIndicatorActive?.value));
+
+    const activePillClass = computed(() => {
+      if (slideActive.value) {
+        return isDark.value
+          ? "text-tabs-active-text border-l-2 border-transparent"
+          : "text-primary-700 border-l-2 border-transparent";
+      }
+      return isDark.value
         ? "text-tabs-active-text bg-tabs-active-bg border-l-2 border-primary-400"
-        : "text-primary-700 bg-surface-base border-l-2 border-primary-600",
-    );
+        : "text-primary-700 bg-surface-base border-l-2 border-primary-600";
+    });
     const activeIconClass = computed(() =>
       isDark.value ? "text-tabs-active-text!" : "text-primary-700!",
     );
@@ -256,6 +272,8 @@ export default defineComponent({
     const rootClass = computed(() => [
       "nav-menu-item",
       "group relative block [text-decoration:none]! text-inherit shrink-0 mx-1 px-0 py-1 min-h-0 rounded-surface transition-colors duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-1",
+      // Sit above the rail's sliding pill so icon/label stay readable.
+      slideActive.value ? "z-10" : "",
       isActive.value
         ? activePillClass.value
         : "text-tabs-inactive-text border-l-2 border-transparent bg-transparent hover:bg-tabs-hover-bg",

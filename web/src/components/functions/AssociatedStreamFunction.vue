@@ -368,7 +368,7 @@ export default defineComponent({
           header: t("user.actions"),
           isAction: true,
           size: 80,
-          meta: { align: "left", actionCount: 1 },
+          meta: { align: "center", actionCount: 1 },
         },
       ];
       if (expandedRow.value.stream_type !== "logs") {
