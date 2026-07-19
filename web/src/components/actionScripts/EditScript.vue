@@ -15,21 +15,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div data-test="add-action-script-section" class="w-full h-full flex flex-col">
-    <AppPageHeader
-      :title="isEditingActionScript ? t('actions.update') : t('actions.add')"
-      :back="{
-        onClick: () => router.back(),
-        dataTest: 'add-action-script-back-btn',
-      }"
-      class="border-b border-border-default"
-    >
+  <PageLayout
+    data-test="add-action-script-section"
+    :title="isEditingActionScript ? t('actions.update') : t('actions.add')"
+    :back="{
+      onClick: () => router.back(),
+      dataTest: 'add-action-script-back-btn',
+    }"
+    bleed
+  >
       <template #title>
         <span data-test="add-action-script-title">{{
           isEditingActionScript ? t("actions.update") : t("actions.add")
         }}</span>
       </template>
-    </AppPageHeader>
 
     <!-- Inline (full-page) form. The footer Save lives INSIDE the <OForm>, so it
          is `type="submit"` and Enter submits natively — no `form-id` needed. -->
@@ -445,7 +444,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </OForm>
-  </div>
+  </PageLayout>
 
   <ConfirmDialog
     v-model="dialog.show"
@@ -477,7 +476,7 @@ import type { Ref } from "vue";
 import { DateTime as _DateTime } from "luxon";
 import actions from "@/services/action_scripts";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import PageLayout from "@/components/common/PageLayout.vue";
 import CronExpressionParser from "cron-parser";
 import { convertDateToTimestamp } from "@/utils/date";
 import service_accounts from "@/services/service_accounts";
