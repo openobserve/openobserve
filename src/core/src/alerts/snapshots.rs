@@ -13,8 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use anyhow::{Result, bail};
-use config::meta::stream::{FileKey, StreamType};
+use std::future::Future;
+
+use anyhow::{Result, anyhow, bail};
+use config::meta::stream::{FileKey, PartitionTimeLevel, StreamType};
 use serde::{Deserialize, Serialize};
 use svix_ksuid::Ksuid;
 
@@ -93,6 +95,41 @@ pub(crate) struct ScheduledSnapshotInput {
     pub(crate) window_start: i64,
     pub(crate) window_end: i64,
     pub(crate) created_at: i64,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct FileListQueryRequest {
+    trace_id: String,
+    org_id: String,
+    stream_type: StreamType,
+    stream_name: String,
+    time_level: PartitionTimeLevel,
+    time_min: i64,
+    time_max: i64,
+}
+
+pub(crate) async fn build_scheduled_snapshot_manifest_from_file_list(
+    trace_id: &str,
+    input: ScheduledSnapshotInput,
+) -> Result<AlertSnapshotManifest> {
+    build_scheduled_snapshot_manifest_from_file_list_with_query(
+        trace_id,
+        input,
+        |request| async move {
+            crate::service::file_list::query(
+                &request.trace_id,
+                &request.org_id,
+                request.stream_type,
+                &request.stream_name,
+                request.time_level,
+                request.time_min,
+                request.time_max,
+            )
+            .await
+            .map_err(|e| anyhow!("{e}"))
+        },
+    )
+    .await
 }
 
 pub(crate) fn build_scheduled_snapshot_manifest(
@@ -196,6 +233,60 @@ fn validate_window(window_start: i64, window_end: i64) -> Result<()> {
     Ok(())
 }
 
+async fn build_scheduled_snapshot_manifest_from_file_list_with_query<F, Fut>(
+    trace_id: &str,
+    input: ScheduledSnapshotInput,
+    query: F,
+) -> Result<AlertSnapshotManifest>
+where
+    F: FnOnce(FileListQueryRequest) -> Fut,
+    Fut: Future<Output = Result<Vec<FileKey>>>,
+{
+    validate_file_list_query_window(input.window_start, input.window_end)?;
+    validate_manifest_input(&input)?;
+
+    let request = FileListQueryRequest {
+        trace_id: trace_id.to_string(),
+        org_id: input.org_id.clone(),
+        stream_type: input.stream_type,
+        stream_name: input.stream_name.clone(),
+        time_level: PartitionTimeLevel::default(),
+        time_min: input.window_start,
+        time_max: input.window_end,
+    };
+
+    let mut files = query(request.clone()).await.map_err(|e| {
+        anyhow!(
+            "alert snapshot file-list metadata lookup failed for org_id={} stream_type={} stream_name={} window_start={} window_end={}: {e}",
+            request.org_id,
+            request.stream_type,
+            request.stream_name,
+            request.time_min,
+            request.time_max,
+        )
+    })?;
+    files.retain(|file| {
+        file_key_matches_source_stream(
+            &file.key,
+            &input.org_id,
+            input.stream_type,
+            &input.stream_name,
+        )
+    });
+
+    build_scheduled_snapshot_manifest(input, files)
+}
+
+fn validate_file_list_query_window(window_start: i64, window_end: i64) -> Result<()> {
+    validate_window(window_start, window_end)?;
+    if window_start == 0 || window_end == 0 {
+        bail!(
+            "invalid alert snapshot file-list window: window_start and window_end must be non-zero"
+        );
+    }
+    Ok(())
+}
+
 fn validate_manifest_input(input: &ScheduledSnapshotInput) -> Result<()> {
     if input.org_id.is_empty() {
         bail!("invalid alert snapshot input: org_id is required");
@@ -204,6 +295,20 @@ fn validate_manifest_input(input: &ScheduledSnapshotInput) -> Result<()> {
         bail!("invalid alert snapshot input: stream_name is required");
     }
     Ok(())
+}
+
+fn file_key_matches_source_stream(
+    file_key: &str,
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+) -> bool {
+    let mut parts = file_key.split('/');
+    matches!(
+        (parts.next(), parts.next(), parts.next(), parts.next()),
+        (Some("files"), Some(org), Some(typ), Some(name))
+            if org == org_id && typ == stream_type.to_string() && name == stream_name
+    )
 }
 
 fn stable_component(label: &str, value: &str) -> String {
@@ -259,6 +364,235 @@ mod tests {
             window_end,
             created_at: window_end,
         }
+    }
+
+    #[tokio::test]
+    async fn adapter_passes_expected_scope_and_window_to_file_list_lookup() {
+        let input = snapshot_input(10, 20);
+        let manifest = build_scheduled_snapshot_manifest_from_file_list_with_query(
+            "trace-1",
+            input,
+            |request| async move {
+                assert_eq!(request.trace_id, "trace-1");
+                assert_eq!(request.org_id, "org1");
+                assert_eq!(request.stream_type, StreamType::Logs);
+                assert_eq!(request.stream_name, "app");
+                assert_eq!(request.time_level, PartitionTimeLevel::default());
+                assert_eq!(request.time_min, 10);
+                assert_eq!(request.time_max, 20);
+                Ok(Vec::new())
+            },
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(manifest.org_id, "org1");
+        assert_eq!(manifest.streams[0].stream_name, "app");
+    }
+
+    #[tokio::test]
+    async fn adapter_converts_matching_file_key_records() {
+        let manifest = build_scheduled_snapshot_manifest_from_file_list_with_query(
+            "trace-1",
+            snapshot_input(10, 20),
+            |_| async {
+                Ok(vec![file(
+                    7,
+                    "files/org1/logs/app/2024/01/01/a.parquet",
+                    10,
+                    20,
+                    false,
+                )])
+            },
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(manifest.streams[0].files.len(), 1);
+        assert_eq!(manifest.streams[0].files[0].file_id, Some(7));
+        assert_eq!(
+            manifest.streams[0].files[0].file_key,
+            "files/org1/logs/app/2024/01/01/a.parquet"
+        );
+        assert_eq!(manifest.streams[0].files[0].min_ts, 10);
+        assert_eq!(manifest.streams[0].files[0].max_ts, 20);
+    }
+
+    #[tokio::test]
+    async fn adapter_excludes_deleted_file_records() {
+        let manifest = build_scheduled_snapshot_manifest_from_file_list_with_query(
+            "trace-1",
+            snapshot_input(10, 20),
+            |_| async {
+                Ok(vec![file(
+                    7,
+                    "files/org1/logs/app/2024/01/01/a.parquet",
+                    10,
+                    20,
+                    true,
+                )])
+            },
+        )
+        .await
+        .unwrap();
+
+        assert!(manifest.streams[0].files.is_empty());
+    }
+
+    #[tokio::test]
+    async fn adapter_empty_file_list_result_produces_empty_manifest() {
+        let manifest = build_scheduled_snapshot_manifest_from_file_list_with_query(
+            "trace-1",
+            snapshot_input(10, 20),
+            |_| async { Ok(Vec::new()) },
+        )
+        .await
+        .unwrap();
+
+        assert!(manifest.streams[0].files.is_empty());
+    }
+
+    #[tokio::test]
+    async fn adapter_metadata_query_failure_is_returned_with_context() {
+        let err = build_scheduled_snapshot_manifest_from_file_list_with_query(
+            "trace-1",
+            snapshot_input(10, 20),
+            |_| async { Err(anyhow!("database unavailable")) },
+        )
+        .await
+        .unwrap_err();
+        let message = err.to_string();
+
+        assert!(message.contains("file-list metadata lookup failed"));
+        assert!(message.contains("org_id=org1"));
+        assert!(message.contains("stream_type=logs"));
+        assert!(message.contains("stream_name=app"));
+        assert!(message.contains("window_start=10"));
+        assert!(message.contains("window_end=20"));
+        assert!(message.contains("database unavailable"));
+    }
+
+    #[tokio::test]
+    async fn adapter_rejects_invalid_start_greater_than_end_before_lookup() {
+        let mut lookup_called = false;
+        let err = build_scheduled_snapshot_manifest_from_file_list_with_query(
+            "trace-1",
+            snapshot_input(20, 10),
+            |_| {
+                lookup_called = true;
+                async { Ok(Vec::new()) }
+            },
+        )
+        .await
+        .unwrap_err();
+
+        assert!(!lookup_called);
+        assert!(
+            err.to_string()
+                .contains("window_start must be <= window_end")
+        );
+    }
+
+    #[tokio::test]
+    async fn adapter_rejects_zero_range_before_lookup() {
+        let mut lookup_called = false;
+        let err = build_scheduled_snapshot_manifest_from_file_list_with_query(
+            "trace-1",
+            snapshot_input(0, 10),
+            |_| {
+                lookup_called = true;
+                async { Ok(Vec::new()) }
+            },
+        )
+        .await
+        .unwrap_err();
+
+        assert!(!lookup_called);
+        assert!(err.to_string().contains("must be non-zero"));
+    }
+
+    #[tokio::test]
+    async fn adapter_deterministic_when_metadata_input_order_changes() {
+        let files = vec![
+            file(3, "files/org1/logs/app/2024/01/01/c.parquet", 10, 20, false),
+            file(2, "files/org1/logs/app/2024/01/01/a.parquet", 10, 20, false),
+            file(1, "files/org1/logs/app/2024/01/01/b.parquet", 10, 20, false),
+        ];
+        let mut shuffled = files.clone();
+        shuffled.reverse();
+
+        let a = build_scheduled_snapshot_manifest_from_file_list_with_query(
+            "trace-1",
+            snapshot_input(10, 20),
+            |_| async move { Ok(files) },
+        )
+        .await
+        .unwrap();
+        let b = build_scheduled_snapshot_manifest_from_file_list_with_query(
+            "trace-1",
+            snapshot_input(10, 20),
+            |_| async move { Ok(shuffled) },
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(a.streams[0].files, b.streams[0].files);
+    }
+
+    #[tokio::test]
+    async fn adapter_duplicate_metadata_canonicalization_remains_stable() {
+        let manifest = build_scheduled_snapshot_manifest_from_file_list_with_query(
+            "trace-1",
+            snapshot_input(1, 30),
+            |_| async {
+                Ok(vec![
+                    file(2, "files/org1/logs/app/2024/01/01/a.parquet", 10, 20, false),
+                    file(1, "files/org1/logs/app/2024/01/01/a.parquet", 5, 25, false),
+                    file(1, "files/org1/logs/app/2024/01/01/a.parquet", 10, 20, false),
+                ])
+            },
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(manifest.streams[0].files.len(), 1);
+        assert_eq!(manifest.streams[0].files[0].file_id, Some(1));
+        assert_eq!(manifest.streams[0].files[0].min_ts, 5);
+        assert_eq!(manifest.streams[0].files[0].max_ts, 25);
+    }
+
+    #[tokio::test]
+    async fn adapter_excludes_cross_organization_file_keys() {
+        let manifest = build_scheduled_snapshot_manifest_from_file_list_with_query(
+            "trace-1",
+            snapshot_input(10, 20),
+            |_| async {
+                Ok(vec![
+                    file(
+                        1,
+                        "files/org2/logs/app/2024/01/01/cross.parquet",
+                        10,
+                        20,
+                        false,
+                    ),
+                    file(
+                        2,
+                        "files/org1/logs/app/2024/01/01/local.parquet",
+                        10,
+                        20,
+                        false,
+                    ),
+                ])
+            },
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(manifest.streams[0].files.len(), 1);
+        assert_eq!(
+            manifest.streams[0].files[0].file_key,
+            "files/org1/logs/app/2024/01/01/local.parquet"
+        );
     }
 
     #[test]
