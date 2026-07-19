@@ -1465,10 +1465,10 @@
     "updateFailed": "Failed to update the service account. Please try again.",
     "headerSubtitle": "Programmatic access tokens for APIs",
     "search": "Search Service Account",
-    "refresh": "Refresh Service Token",
+    "refresh": "Rotate Token",
     "rotate": "Rotate Token",
-    "showToken": "Show Service Token",
-    "hideToken": "Hide Service Token",
+    "showToken": "Show Token",
+    "hideToken": "Hide Token",
     "delete": "Delete",
     "deleteServiceAccount": "Delete Service Account",
     "update": "Update Service Account",
@@ -1478,7 +1478,7 @@
     "confirmDeleteHead": "Delete Service Account",
     "confirmDeleteBtn": "Delete account",
     "confirmRefreshMsg": "Are you sure you want to rotate the token for {identifier}?",
-    "confirmRefreshHead": "Rotate Service Token",
+    "confirmRefreshHead": "Rotate Token",
     "confirmRefreshBtn": "Rotate token",
     "confirmBulkDeleteHead": "Delete Service Accounts",
     "confirmBulkDeleteMsg": "Are you sure you want to delete {count} service account(s)?",
@@ -1541,10 +1541,25 @@
       "checkboxTooltip": "System-managed accounts are excluded from bulk operations"
     },
     "bulkDelete": "Delete",
-    "bulkDeleteNotice": "System-managed accounts are excluded from bulk operations"
+    "bulkDeleteNotice": "System-managed accounts are excluded from bulk operations",
+    "toast": {
+      "loading": "Loading service accounts…",
+      "created": "Service account created successfully.",
+      "updated": "Service account updated successfully.",
+      "deleted": "Service account deleted successfully.",
+      "rotated": "Token rotated successfully.",
+      "tokenCopied": "Token copied to clipboard.",
+      "deleteError": "Error while deleting service account.",
+      "rotateError": "Error while rotating token.",
+      "bulkDeleteError": "Error while deleting service accounts.",
+      "bulkDeleteSuccess": "Deleted {count} service account(s).",
+      "bulkDeletePartial": "Deleted {successful} service account(s); {failed} failed.",
+      "bulkDeleteFailed": "Failed to delete {failed} service account(s)."
+    }
   },
   "iam": {
     "users": "Users",
+    "permissions": "Permissions",
     "sectionAccess": "Access",
     "sectionPermissions": "Permissions",
     "sectionOrganization": "Organization",
@@ -1765,20 +1780,6 @@
       "top50": "Top 50",
       "resourcesSearchHint": "resources (Search to get specific resource)",
       "noResourcesPresent": "No Resources Present"
-    },
-    "serviceAccountsList": {
-      "tokenCopied": "Token Copied Successfully!",
-      "loading": "Please wait while loading service accounts...",
-      "createdSuccess": "Service Account created successfully.",
-      "updatedSuccess": "Service Account updated successfully.",
-      "deletedSuccess": "Service Account deleted successfully.",
-      "deleteError": "Error while deleting user.",
-      "bulkDeleteSuccess": "Successfully deleted {count} service account(s)",
-      "bulkDeletePartial": "Deleted {count} service account(s), but {failed} failed",
-      "bulkDeleteFailed": "Failed to delete {count} service account(s)",
-      "bulkDeleteError": "Error while deleting service accounts",
-      "tokenRefreshedSuccess": "Service token refreshed successfully.",
-      "refreshTokenError": "Error while refreshing token."
     },
     "addUser": {
       "passwordChanged": "Password Changed",

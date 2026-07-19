@@ -50,7 +50,7 @@ test.describe("Service Account for API access", () => {
         await pageManager.iamPage.iamPageAddServiceAccount();
         await pageManager.iamPage.enterNameServiceAccount(uniqueName);
         await pageManager.iamPage.clickSaveServiceAccount();
-        await pageManager.iamPage.verifySuccessMessage('Service Account created successfully.');
+        await pageManager.iamPage.verifySuccessMessage('Service account created successfully.');
 
         testLogger.info('Test completed successfully');
     });
@@ -67,7 +67,7 @@ test.describe("Service Account for API access", () => {
         await pageManager.iamPage.iamPageAddServiceAccount();
         await pageManager.iamPage.enterNameServiceAccount(uniqueName);
         await pageManager.iamPage.clickSaveServiceAccount();
-        await pageManager.iamPage.verifySuccessMessage('Service Account created successfully.');
+        await pageManager.iamPage.verifySuccessMessage('Service account created successfully.');
         await pageManager.iamPage.clickServiceAccountPopUpClosed();
 
         // Creating the same name again synthesizes the same identifier email,
@@ -109,7 +109,7 @@ test.describe("Service Account for API access", () => {
         await pageManager.iamPage.iamPageAddServiceAccount();
         await pageManager.iamPage.enterNameServiceAccount(uniqueName);
         await pageManager.iamPage.clickSaveServiceAccount();
-        await pageManager.iamPage.verifySuccessMessage('Service Account created successfully.');
+        await pageManager.iamPage.verifySuccessMessage('Service account created successfully.');
         await pageManager.iamPage.clickCopyToken();
 
         testLogger.info('Test completed successfully');
@@ -127,7 +127,7 @@ test.describe("Service Account for API access", () => {
         await pageManager.iamPage.iamPageAddServiceAccount();
         await pageManager.iamPage.enterNameServiceAccount(uniqueName);
         await pageManager.iamPage.clickSaveServiceAccount();
-        await pageManager.iamPage.verifySuccessMessage('Service Account created successfully.');
+        await pageManager.iamPage.verifySuccessMessage('Service account created successfully.');
         await pageManager.iamPage.clickServiceAccountPopUpClosed();
 
         testLogger.info('Test completed successfully');
@@ -147,13 +147,13 @@ test.describe("Service Account for API access", () => {
         await pageManager.iamPage.iamPageAddServiceAccount();
         await pageManager.iamPage.enterNameServiceAccount(uniqueName);
         await pageManager.iamPage.clickSaveServiceAccount();
-        await pageManager.iamPage.verifySuccessMessage('Service Account created successfully.');
+        await pageManager.iamPage.verifySuccessMessage('Service account created successfully.');
         await pageManager.iamPage.clickServiceAccountPopUpClosed();
         await pageManager.iamPage.reloadServiceAccountPage();
         await waitForServiceAccountsPage(page);
         await pageManager.iamPage.deletedServiceAccount(uniqueEmail);
         await pageManager.iamPage.requestServiceAccountOk();
-        await pageManager.iamPage.verifySuccessMessage('Service Account deleted successfully.');
+        await pageManager.iamPage.verifySuccessMessage('Service account deleted successfully.');
 
         testLogger.info('Test completed successfully');
     });
@@ -172,7 +172,7 @@ test.describe("Service Account for API access", () => {
         await pageManager.iamPage.iamPageAddServiceAccount();
         await pageManager.iamPage.enterNameServiceAccount(uniqueName);
         await pageManager.iamPage.clickSaveServiceAccount();
-        await pageManager.iamPage.verifySuccessMessage('Service Account created successfully.');
+        await pageManager.iamPage.verifySuccessMessage('Service account created successfully.');
         await pageManager.iamPage.clickServiceAccountPopUpClosed();
         await pageManager.iamPage.reloadServiceAccountPage();
         await waitForServiceAccountsPage(page);
@@ -196,14 +196,14 @@ test.describe("Service Account for API access", () => {
         await pageManager.iamPage.iamPageAddServiceAccount();
         await pageManager.iamPage.enterNameServiceAccount(uniqueName);
         await pageManager.iamPage.clickSaveServiceAccount();
-        await pageManager.iamPage.verifySuccessMessage('Service Account created successfully.');
+        await pageManager.iamPage.verifySuccessMessage('Service account created successfully.');
         await pageManager.iamPage.clickServiceAccountPopUpClosed();
         await pageManager.iamPage.reloadServiceAccountPage();
         await waitForServiceAccountsPage(page);
         await pageManager.iamPage.updatedServiceAccount(uniqueEmail);
         await pageManager.iamPage.enterDescriptionSA();
         await pageManager.iamPage.clickSaveServiceAccount();
-        await pageManager.iamPage.verifySuccessMessage('Service Account updated successfully.');
+        await pageManager.iamPage.verifySuccessMessage('Service account updated successfully.');
 
         testLogger.info('Test completed successfully');
     });
@@ -222,13 +222,13 @@ test.describe("Service Account for API access", () => {
         await pageManager.iamPage.iamPageAddServiceAccount();
         await pageManager.iamPage.enterNameServiceAccount(uniqueName);
         await pageManager.iamPage.clickSaveServiceAccount();
-        await pageManager.iamPage.verifySuccessMessage('Service Account created successfully.');
+        await pageManager.iamPage.verifySuccessMessage('Service account created successfully.');
         await pageManager.iamPage.clickServiceAccountPopUpClosed();
         await pageManager.iamPage.reloadServiceAccountPage();
         await waitForServiceAccountsPage(page);
         await pageManager.iamPage.refreshServiceAccount(uniqueEmail);
         await pageManager.iamPage.requestServiceAccountOk();
-        await pageManager.iamPage.verifySuccessMessage('Service token refreshed successfully.');
+        await pageManager.iamPage.verifySuccessMessage('Token rotated successfully.');
 
         testLogger.info('Test completed successfully');
     });
@@ -246,7 +246,7 @@ test.describe("Service Account for API access", () => {
         await pageManager.iamPage.iamPageAddServiceAccount();
         await pageManager.iamPage.enterNameServiceAccount(uniqueName);
         await pageManager.iamPage.clickSaveServiceAccount();
-        await pageManager.iamPage.verifySuccessMessage('Service Account created successfully.');
+        await pageManager.iamPage.verifySuccessMessage('Service account created successfully.');
 
         // The token reveal is a single screen now (access is granted in the
         // create form itself): token snippets + a grant nudge for accounts
