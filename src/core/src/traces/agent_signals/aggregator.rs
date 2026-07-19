@@ -22,6 +22,8 @@
 use config::meta::agent_signals::AgentSignalRecord;
 
 /// Convert records to ingestable JSON (mirrors the shape write_sql_aggregated_edges produces).
+/// Only used by the enterprise writer + its test; gated to keep the OSS build warning-free.
+#[cfg(feature = "enterprise")]
 pub(super) fn records_to_json(records: &[AgentSignalRecord]) -> Vec<serde_json::Value> {
     records.iter().map(|r| r.to_json()).collect()
 }
