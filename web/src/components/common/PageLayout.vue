@@ -68,6 +68,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :title-data-test="titleDataTest"
         >
           <template v-if="!!slots.title" #title><slot name="title" /></template>
+          <template v-if="!!slots['title-prefix']" #title-prefix><slot name="title-prefix" /></template>
+          <template v-if="!!slots['title-trail']" #title-trail><slot name="title-trail" /></template>
+          <template v-if="!!slots.subtitle" #subtitle><slot name="subtitle" /></template>
           <template v-if="!!slots.actions" #actions><slot name="actions" /></template>
           <template v-if="!!slots['header-tabs']" #tabs><slot name="header-tabs" /></template>
         </AppPageHeader>
@@ -225,6 +228,7 @@ const hasHeader = computed(
     !!props.breadcrumb ||
     !!slots.header ||
     !!slots.title ||
+    !!slots.subtitle ||
     !!slots.actions ||
     !!slots["header-tabs"],
 );

@@ -17,14 +17,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <div class="p-0 h-full flex flex-col">
-    <!-- Standard page header: title + actions only. -->
-    <AppPageHeader
+  <PageLayout
       :title="t('iam.basicUsers')"
       :subtitle="t('user.subtitle')"
-      icon="person"
-      class="shrink-0 border-b border-border-default"
-    >
+      icon="person" bleed>
       <template #actions>
         <member-invitation
           v-if="config.isCloud == 'true'"
@@ -42,7 +38,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t('user.add') }}
         </OButton>
       </template>
-    </AppPageHeader>
     <div class="w-full flex-1 min-h-0 overflow-hidden">
       <div class="bg-card-glass-bg h-full">
         <OTable
@@ -243,7 +238,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <p>{{ t('user.deleteUsersMsg', { count: selectedUsers.length }) }}</p>
     </ODialog>
-  </div>
+  </PageLayout>
 </template>
 
 <script lang="ts">
@@ -253,7 +248,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import PageLayout from "@/components/common/PageLayout.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { useStore } from "vuex";
@@ -287,7 +282,7 @@ import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
 export default defineComponent({
   name: "UserPageOpenSource",
   components: {
-    AppPageHeader,
+    PageLayout,
     OTable,
     UpdateUserRole,
     AddUser,

@@ -15,14 +15,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="p-0 h-full flex flex-col">
-    <!-- Standard page header: title + actions only. Search moved into the
-         table's own toolbar (built-in global filter). -->
-    <AppPageHeader
+  <PageLayout
       :title="t('iam.roles')"
-      icon="shield"
-      class="shrink-0 border-b border-border-default"
-    >
+      icon="shield" bleed>
       <template #subtitle>
         <span data-test="iam-roles-subtitle">
           {{ t('iam.rolesPage.subtitle') }}
@@ -38,7 +33,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t('iam.addRole') }}
         </OButton>
       </template>
-    </AppPageHeader>
     <div class="w-full flex-1 min-h-0 overflow-hidden">
       <div class="bg-card-glass-bg h-full">
         <RoleTable
@@ -68,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </RoleTable>
       </div>
     </div>
-  </div>
+  </PageLayout>
   <AddRole
     v-model:open="showAddGroup"
     @added:role="onRoleAdded"
@@ -96,7 +90,7 @@ import { onBeforeMount, ref } from "vue";
 import AddRole from "./AddRole.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import PageLayout from "@/components/common/PageLayout.vue";
 import { useI18n } from "vue-i18n";
 import RoleTable from "./RoleTable.vue";
 import { useRouter } from "vue-router";

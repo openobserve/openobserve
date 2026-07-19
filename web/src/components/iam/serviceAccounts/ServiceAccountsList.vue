@@ -19,15 +19,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
 <template>
-  <div class="p-0 h-full flex flex-col">
-    <!-- Standard page header: title + actions only. Search moved into the
-         table's own toolbar (built-in global filter). -->
-    <AppPageHeader
+  <PageLayout
       :title="t('serviceAccounts.header')"
       icon="manage-accounts"
-      :subtitle="t('serviceAccounts.headerSubtitle')"
-      class="shrink-0 border-b border-border-default"
-    >
+      :subtitle="t('serviceAccounts.headerSubtitle')" bleed>
       <template #actions>
         <OButton
           data-test="service-accounts-add-btn"
@@ -38,7 +33,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t('serviceAccounts.add') }}
         </OButton>
       </template>
-    </AppPageHeader>
       <div class="w-full flex-1 min-h-0 overflow-hidden">
         <div class="bg-card-glass-bg h-full">
           <OTable
@@ -405,7 +399,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </ODialog>
-  </div>
+  </PageLayout>
 </template>
 
 <script lang="ts">
@@ -414,7 +408,7 @@ import { defineComponent, ref, onBeforeMount } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import PageLayout from "@/components/common/PageLayout.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OCodeCell from "@/lib/core/Table/cells/OCodeCell.vue";
@@ -457,7 +451,7 @@ import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 export default defineComponent({
   name: "ServiceAccountsList",
-  components: { OEmptyState, AddServiceAccount, ConfirmDialog, OButton, ODialog, OIcon, AppPageHeader, OTooltip, OTable, OTag, OCodeCell, OUserCell, OSearchInput, OTabs, OTab, OTabPanels, OTabPanel, OSpinner },
+  components: { OEmptyState, AddServiceAccount, ConfirmDialog, OButton, ODialog, OIcon, PageLayout, OTooltip, OTable, OTag, OCodeCell, OUserCell, OSearchInput, OTabs, OTab, OTabPanels, OTabPanel, OSpinner },
   emits: [],
   setup(props, { emit }) {
     const store = useStore();

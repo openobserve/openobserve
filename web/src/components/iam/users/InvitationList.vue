@@ -15,14 +15,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="p-0 h-full flex flex-col">
-    <!-- Standard page header: title + icon + subtitle, matching the Users page. -->
-    <AppPageHeader
+  <PageLayout
       :title="t('invitation.pendingInvitations')"
       :subtitle="t('iam.invitationList.subtitle')"
-      icon="mail"
-      class="shrink-0 border-b border-border-default"
-    />
+      icon="mail" bleed>
     <div class="w-full flex-1 min-h-0 overflow-hidden">
       <div class="bg-card-glass-bg h-full">
         <OTable
@@ -139,7 +135,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <p>{{ t('invitation.confirmRejectMsg', { org: selectedInvitation?.org_name }) }}</p>
     </ODialog>
-  </div>
+  </PageLayout>
 </template>
 
 <script lang="ts">
@@ -157,7 +153,7 @@ import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import PageLayout from "@/components/common/PageLayout.vue";
 import usersService from "@/services/users";
 import organizationsService from "@/services/organizations";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -168,7 +164,7 @@ import { isInputFocused } from "@/utils/keyboardShortcuts";
 export default defineComponent({
   name: "InvitationList",
   components: {
-    AppPageHeader,
+    PageLayout,
     OEmptyState,
     OButton,
     OTooltip,

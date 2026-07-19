@@ -15,14 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="p-0 h-full flex flex-col">
-    <!-- Standard page header: title + actions only. Search moved into the
-         table's own toolbar (built-in global filter). -->
-    <AppPageHeader
-      :title="t('iam.groups')"
-      icon="group"
-      class="shrink-0 border-b border-border-default"
-    >
+  <PageLayout :title="t('iam.groups')" icon="group" bleed>
       <template #subtitle>
         <span data-test="iam-groups-subtitle">
           {{ t('iam.groupsPage.subtitle') }}
@@ -38,7 +31,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t('iam.addGroup') }}
         </OButton>
       </template>
-    </AppPageHeader>
     <div class="w-full flex-1 min-h-0 overflow-hidden">
       <div class="bg-card-glass-bg h-full">
         <OTable
@@ -152,7 +144,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:cancel="confirmBulkDelete = false"
       v-model="confirmBulkDelete"
     />
-  </div>
+  </PageLayout>
 </template>
 
 <script setup lang="ts">
@@ -160,7 +152,7 @@ import { ref, onBeforeMount, computed } from "vue";
 import AddGroup from "./AddGroup.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import PageLayout from "@/components/common/PageLayout.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
