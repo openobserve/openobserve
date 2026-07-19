@@ -1,14 +1,12 @@
 <template>
-  <div
+  <PageLayout
+    class="h-[calc(100vh-50px)]!"
     data-test="promql-query-builder"
-    class="h-[calc(100vh-50px)] flex flex-col overflow-hidden"
+    :title="t('metrics.queryBuilder.title')"
+    :subtitle="t('metrics.queryBuilder.subtitle')"
+    icon="query-stats"
+    bleed
   >
-    <AppPageHeader
-      :title="t('metrics.queryBuilder.title')"
-      :subtitle="t('metrics.queryBuilder.subtitle')"
-      icon="query-stats"
-      class="shrink-0 border-b border-border-default"
-    />
     <div class="flex-1 overflow-auto px-2.5">
       <div class="max-w-350 mx-auto py-2.5">
     <OCard>
@@ -87,7 +85,7 @@
     </OCard>
       </div>
     </div>
-  </div>
+  </PageLayout>
 </template>
 
 <script setup lang="ts">
@@ -102,7 +100,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import OCard from "@/lib/core/Card/OCard.vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import PageLayout from "@/components/common/PageLayout.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { copyToClipboard } from "@/utils/clipboard";

@@ -16,19 +16,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <!-- TODO: remove the store.state.theme based styling on this page; theming is centralised in app.scss -->
 <template>
-  <div class="quota-page text-left h-full flex flex-col"
-    :class="
-      isDark ? 'dark-theme-page' : 'light-theme-page'
-    "
+  <PageLayout
+    class="quota-page text-left"
+    :class="isDark ? 'dark-theme-page' : 'light-theme-page'"
+    :title="t('quota.header')"
+    title-data-test="user-title-text"
+    :subtitle="t('iam.quotaPage.subtitle')"
+    icon="speed"
+    bleed
   >
-    <!-- Standard page header: title + icon + subtitle, matching the other IAM pages. -->
-    <AppPageHeader
-      :title="t('quota.header')"
-      title-data-test="user-title-text"
-      :subtitle="t('iam.quotaPage.subtitle')"
-      icon="speed"
-      class="shrink-0 border-b border-border-default"
-    />
     <div :style="{ marginTop: 0 }" class="app-table-container flex flex-col flex-1 min-h-0">
       <div class="bg-card-glass-bg mb-2.5 mt-2.5">
         <div class="px-3 py-2">
@@ -377,7 +373,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:cancel="discardChangesTypeSwitch"
       v-model="showConfirmDialogTypeSwitch"
     />
-  </div>
+  </PageLayout>
 </template>
 
 <script lang="ts">
@@ -404,7 +400,7 @@ import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
 import organizationsService from "@/services/organizations";
 import AppTabs from "@/components/common/AppTabs.vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import PageLayout from "@/components/common/PageLayout.vue";
 import { getRoles } from "@/services/iam";
 import ratelimitService from "@/services/rate_limit";
 import { useRouter } from "vue-router";
@@ -423,7 +419,7 @@ export default defineComponent({
     OSelect,
     OSearchInput,
     AppTabs,
-    AppPageHeader,
+    PageLayout,
     ConfirmDialog,
     QueryEditor: defineAsyncComponent(
       () => import("@/components/CodeQueryEditor.vue"),
