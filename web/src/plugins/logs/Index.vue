@@ -76,12 +76,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @update:model-value="onSplitterUpdate"
             >
               <template #before>
-                <!-- 10px on top/left (matching the search bar's 4+6 above it).
+                <!-- 10px on top (matching the search bar's 4+6 above it).
                      No right/bottom gutter here: the field list runs into the
                      divider so its scrollbar sits on the panel edge, and scrolls
-                     into the panel foot. The stream selector is the exception and
-                     pads its own right edge (see IndexList) — it's a control, not
-                     a scrolling surface. -->
+                     into the panel foot. The form controls (stream selector, field
+                     search) carry their own matching px-1.5 gutter (see IndexList /
+                     OFieldList) so they line up — they're controls, not scrolling
+                     surfaces. -->
                 <div class="relative-position h-full pt-2.5 border-r border-border-default bg-surface-panel">
                   <index-list
                     v-if="searchObj.meta.showFields"

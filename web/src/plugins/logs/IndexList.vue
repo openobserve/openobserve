@@ -18,13 +18,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div
     class="flex flex-col logs-index-menu w-full h-full bg-surface-panel!"
   >
-    <!-- Stream type + stream selector. Pads its own right edge to match the
-         panel's 10px left inset: these are controls, so they sit inside the
-         gutter — as does the field search below it (via GroupedFieldList's
-         search-class). The scrolling list itself deliberately does NOT: it runs
-         flush to the divider so its scrollbar lands on the panel edge. -->
+    <!-- Stream type + stream selector. Shares the same px-1.5 gutter as the
+         field search input and the field rows below it (baked into OFieldList),
+         so all three form controls line up on one left/right edge. The scrolling
+         list itself deliberately runs flush to the divider so its scrollbar lands
+         on the panel edge — only the rows inside it carry the gutter. -->
     <div
-      class="flex items-center gap-2 pr-2.5 max-w-full overflow-hidden"
+      class="flex items-center gap-2 px-1.5 max-w-full"
     >
       <OButton
         v-if="
