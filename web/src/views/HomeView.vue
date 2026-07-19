@@ -26,8 +26,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          bottom divider reaches the card edges (like Data Sources / Pipelines) —
          a padded root insets the header and makes it read as a floating bar.
          Padding is reintroduced on the body wrapper below the header instead. -->
-    <div
-      class="h-full overflow-hidden flex flex-col min-h-0"
+    <PageLayout
+      :title="t('menu.home')"
+      :subtitle="t('home.subtitle')"
+      icon="home"
+      :tabs-below="tabOrder.length > 1"
+      bleed
     >
       <!-- Top-level page header: module icon + "Home" title, with the home tabs
            rendered as a full-width strip below (tabsBelow). The header owns its
@@ -35,17 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            exists we hand-draw the border so the header still reads as a header.
            The tab bar keeps its drag-to-reorder behavior (OTabs `reorderable`);
            OTabs draws the active underline flush with the header's divider. -->
-      <AppPageHeader
-        :title="t('menu.home')"
-        :subtitle="t('home.subtitle')"
-        icon="home"
-        :tabs-below="tabOrder.length > 1"
-        class="shrink-0"
-        :class="
-          tabOrder.length > 1 ? '' : 'border-b border-border-default'
-        "
-      >
-        <template v-if="tabOrder.length > 1" #tabs>
+        <template v-if="tabOrder.length > 1" #header-tabs>
           <OTabs
             v-model="activeHomeTab"
             align="left"
@@ -80,7 +74,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OTab>
           </OTabs>
         </template>
-      </AppPageHeader>
 
       <!-- Body: padded wrapper that holds the active tab panel. Padding lives
            here (not on the root) so the header above stays full-bleed. The
@@ -129,7 +122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
       </div>
-    </div>
+    </PageLayout>
   </div>
 </template>
 
@@ -152,7 +145,7 @@ import HomeChatHistory from "@/views/HomeChatHistory.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import PageLayout from "@/components/common/PageLayout.vue";
 import PinnedDashboardTab from "@/views/PinnedDashboardTab.vue";
 import { useHomeDashboard } from "@/composables/useHomeDashboard";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -370,7 +363,7 @@ export default defineComponent({
     OTabs,
     OTab,
     OTooltip,
-    AppPageHeader,
+    PageLayout,
     PinnedDashboardTab,
   },
 });
