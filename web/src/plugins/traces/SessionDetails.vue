@@ -18,24 +18,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div
     class="session-details-page h-[calc(100vh-2.6rem)]"
   >
-  <div
-    class="session-details bg-card-glass-bg h-full flex flex-col overflow-hidden"
+  <PageLayout
+    class="session-details bg-card-glass-bg"
+    data-test="session-detail-header"
+    :title="t('traces.sessionDetail.pageTitle')"
+    :back="{
+      label: t('rum.sessions'),
+      onClick: goBack,
+      dataTest: 'session-detail-back-btn',
+    }"
+    bleed
   >
-    <!-- Header — fixed top bar (back button + title + session identity +
-         status/turns badges, trace-explorer action pinned right). Sits above the
-         scrolling body as a flex-shrink-0 sibling, mirroring IncidentDetailDrawer.
-         The card owns no horizontal padding, so the border spans edge-to-edge and
-         the header pads its own content. -->
-    <AppPageHeader
-      data-test="session-detail-header"
-      class="border-b border-border-default"
-      :title="t('traces.sessionDetail.pageTitle')"
-      :back="{
-        label: t('rum.sessions'),
-        onClick: goBack,
-        dataTest: 'session-detail-back-btn',
-      }"
-    >
       <!-- Session id pill (primary-tinted, copyable) — shows the full id -->
       <template #title-trail>
         <span
@@ -52,7 +45,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </span>
       </template>
-    </AppPageHeader>
 
     <!-- Scrollable body — owns its own scroll so the header above stays fixed.
          Pads itself horizontally (the card has no px) so focus rings on edge
@@ -737,7 +729,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </template>
     </div>
-  </div>
+  </PageLayout>
   </div>
 </template>
 
@@ -762,7 +754,7 @@ import {
 } from "./threadView.utils";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import PageLayout from "@/components/common/PageLayout.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
