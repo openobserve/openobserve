@@ -306,15 +306,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-model="activeOuterTab"
                   dense
                   align="left"
-                  class="metric-group-tabs px-page-edge border-b border-solid border-card-glass-border"
+                  class="px-page-edge shrink-0 border-b border-solid border-card-glass-border"
                 >
                   <OTab
                     v-for="outerGroup in groupDefs"
                     :key="outerGroup.id"
                     :name="outerGroup.id"
-                    class="flex-none!"
                   >
-                    <div class="flex flex-col items-start px-1 py-0.5 min-w-0">
+                    <div class="flex flex-col items-start min-w-0">
                       <div class="flex items-center gap-1">
                         <OIcon v-if="typeof outerGroup.icon === 'string'" :name="outerGroup.icon" size="xs" />
                         <component v-else :is="outerGroup.icon" />
@@ -322,7 +321,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </div>
                       <span
                         v-if="outerTabResourceName[outerGroup.id]"
-                        class="text-xs leading-tight opacity-75 whitespace-nowrap"
+                        class="text-xs leading-tight opacity-75 truncate max-w-40"
                         :title="outerTabResourceName[outerGroup.id]"
                       >{{ outerTabResourceName[outerGroup.id] }}</span>
                     </div>
@@ -335,7 +334,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-model="activeMetricGroupTab"
                   dense
                   align="left"
-                  class="metric-group-tabs px-page-edge shrink-0 bg-surface-panel border-b border-solid border-card-glass-border"
+                  class="px-page-edge shrink-0 bg-surface-panel border-b border-solid border-card-glass-border"
                 >
                   <OTab
                     v-for="group in groupedUniqueMetricStreams.groups.filter(
@@ -343,23 +342,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     )"
                     :key="group.id"
                     :name="group.id"
-                    class="flex-none!"
                   >
-                    <div class="flex items-center gap-1 px-1">
+                    <div class="flex items-center gap-1">
                       <OIcon v-if="typeof group.icon === 'string'" :name="group.icon" size="xs" />
                       <component v-else :is="group.icon" />
                       <span>{{ group.label }}</span>
                       <OTag
                         type="tabChip"
                         :value="activeMetricGroupTab === group.id ? 'active' : 'inactive'"
-                        class="ml-0.5"
+                        class="ml-1"
+                        :class="{ 'opacity-40': (groupedSelectedMetricStreams.byGroup[group.id]?.length ?? 0) === 0 }"
                       >{{ groupedSelectedMetricStreams.byGroup[group.id]?.length ?? 0 }}</OTag>
                     </div>
                   </OTab>
                 </OTabs>
 
                 <!-- Dashboard content -->
-                <div class="flex-1 overflow-auto">
+                <div class="flex-1 min-h-0 overflow-auto">
                   <div
                     v-if="loading"
                     class="flex flex-col items-center justify-center h-full py-20 gap-3"
@@ -606,7 +605,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Tab Panels (no tabs in embedded mode, controlled by parent) -->
     <OCard
-      class="flex flex-col flex-1 min-h-0 overflow-auto"
+      :class="['flex flex-col flex-1 min-h-0', activeTab === 'metrics' ? 'overflow-hidden' : 'overflow-auto']"
     >
       <div
         v-if="activeTab == 'logs'"
@@ -809,23 +808,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-model="activeOuterTab"
                 dense
                 align="left"
-                class="metric-group-tabs border-b border-solid border-card-glass-border"
+                class="shrink-0 border-b border-solid border-card-glass-border"
               >
                 <OTab
                   v-for="outerGroup in groupDefs"
                   :key="outerGroup.id"
                   :name="outerGroup.id"
-                  class="flex-none!"
                 >
-                  <div class="flex flex-col items-start px-1 py-0.5 min-w-0">
+                  <div class="flex flex-col items-start min-w-0">
                     <div class="flex items-center gap-1">
                       <OIcon v-if="typeof outerGroup.icon === 'string'" :name="outerGroup.icon" size="xs" />
                       <component v-else :is="outerGroup.icon" />
-                      <span class="whitespace-nowrap">{{ outerGroup.label }}</span>
+                      <span class="whitespace-nowrap text-xs">{{ outerGroup.label }}</span>
                     </div>
                     <span
                       v-if="outerTabResourceName[outerGroup.id]"
-                      class="text-xs leading-tight opacity-75 whitespace-nowrap"
+                      class="text-xs leading-tight opacity-75 truncate max-w-40"
                       :title="outerTabResourceName[outerGroup.id]"
                     >{{ outerTabResourceName[outerGroup.id] }}</span>
                   </div>
@@ -838,7 +836,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-model="activeMetricGroupTab"
                 dense
                 align="left"
-                class="metric-group-tabs shrink-0 bg-surface-panel border-b border-solid border-card-glass-border"
+                class="shrink-0 bg-surface-panel border-b border-solid border-card-glass-border"
               >
                 <OTab
                   v-for="group in groupedUniqueMetricStreams.groups.filter(
@@ -846,9 +844,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   )"
                   :key="group.id"
                   :name="group.id"
-                  class="flex-none!"
                 >
-                  <div class="flex items-center gap-1 px-1">
+                  <div class="flex items-center gap-1">
                     <component
                       v-if="typeof group.icon !== 'string'"
                       :is="group.icon"
@@ -862,14 +859,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OTag
                       type="tabChip"
                       :value="activeMetricGroupTab === group.id ? 'active' : 'inactive'"
-                      class="ml-0.5"
+                      class="ml-1"
+                      :class="{ 'opacity-40': (groupedSelectedMetricStreams.byGroup[group.id]?.length ?? 0) === 0 }"
                     >{{ groupedSelectedMetricStreams.byGroup[group.id]?.length ?? 0 }}</OTag>
                   </div>
                 </OTab>
               </OTabs>
 
               <!-- Dashboard content -->
-              <div class="flex-1 overflow-auto">
+              <div class="flex-1 min-h-0 overflow-auto">
                 <div
                   v-if="loading"
                   class="flex flex-col items-center justify-center h-full py-20 gap-3"
@@ -3454,13 +3452,5 @@ watch(
 }
 .telemetry-correlation-traces :deep(.trace-combined-header-wrapper) {
   margin-bottom: 0 !important;
-}
-.metric-group-tabs :deep(.o-tab) {
-  min-height: 2rem;
-  padding: 0 0.75rem;
-  font-size: var(--text-compact);
-}
-.metric-group-tabs :deep(.o-tab__indicator) {
-  height: 0.125rem;
 }
 </style>

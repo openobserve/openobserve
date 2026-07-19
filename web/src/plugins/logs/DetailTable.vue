@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="dialog-box"
   >
     <!-- Single Tab Row -->
-    <div class="flex justify-between pt-2 items-center">
+    <div class="flex justify-between pt-2 items-center shrink-0">
       <div class="flex items-center gap-2 -mb-0.75">
         <OTabs v-model="tab" align="left">
           <OTab
@@ -74,7 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div
       :class="[
-        'flex flex-col h-full',
+        'flex flex-col flex-1 min-h-0',
         tab.startsWith('correlated-') ? 'overflow-hidden full-height-panels' : 'overflow-y-auto',
       ]"
     >
@@ -83,12 +83,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model="tab"
       keep-alive
       grow
-      class="overflow-y-auto!"
+      :class="tab.startsWith('correlated-') ? 'overflow-hidden!' : 'overflow-y-auto!'"
     >
       <OTabPanel name="json">
         <OCardSection
           data-test="log-detail-json-content"
-          class="p-0 mb-6 pt-2"
+          class="px-page-edge pt-2 mb-6"
         >
           <json-preview
             :value="rowData"
@@ -109,7 +109,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OTabPanel>
       <OTabPanel name="table">
         <OCardSection
-          class="p-[0.675rem] mb-6"
+          class="px-page-edge py-[0.675rem] mb-6"
           data-test="log-detail-table-content"
         >
           <div v-if="rowData.length == 0" class="pt-3 max-w-87.5">
@@ -274,7 +274,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :hide-search-term-actions="false"
           :hide-dimension-filters="true"
           :hide-reset-filters-button="true"
-          class="pr-3!"
           @sendToAiChat="sendToAiChat"
           @addSearchTerm="addSearchTerm"
         />
@@ -368,7 +367,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Navigation buttons for log details (show only on JSON/Table tabs) -->
     <OSeparator v-if="tab === 'json' || tab === 'table'" />
-    <OCardSection v-if="tab === 'json' || tab === 'table'" class="p-4 pb-4 sticky bottom-0 bg-dialog-bg z-10">
+    <OCardSection v-if="tab === 'json' || tab === 'table'" class="px-page-edge py-4 sticky bottom-0 bg-dialog-bg z-10">
       <div class="flex items-center flex-nowrap justify-between">
         <div class="w-1/12">
           <OButton

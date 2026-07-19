@@ -76,7 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           tag="tr"
           @start="(event) => handleDragStart(event)"
           @end="() => handleDragEnd()"
-          class="flex items-center"
+          class="flex items-center h-8"
         >
           <th
             v-for="(header, headerIndex) in headerGroup.headers"
