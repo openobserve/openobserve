@@ -221,10 +221,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <div
           v-else-if="grid.activeRail.value === 'type'"
-          class="flex flex-col min-h-0"
+          class="flex flex-col min-h-0 flex-1 py-2"
         >
           <!-- Type search — narrows the type LIST (mirrors the prefix/suffix
-               rails). px-2 matches the facet toggle's horizontal padding above. -->
+               rails). The flex-1/py-2 above match the PrefixFilterPanel wrapper
+               (class="flex-1 min-h-0 py-2") so the search box sits at the exact
+               same Y when switching Prefix / Suffix / Type. px-2 matches the
+               facet toggle's horizontal padding above. -->
           <div class="px-2 pb-2">
             <OInput
               v-model="typeSearch"
