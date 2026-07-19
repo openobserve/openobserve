@@ -156,7 +156,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="flex items-center justify-center w-full pt-8"
           >
             <div
-              class="text-sm font-medium w-fit mx-auto my-0 flex-col justify-items-center"
+              class="text-sm font-medium w-fit mx-auto my-0 flex items-center gap-1.5"
             >
               <OSpinner size="sm" />
               {{ t("traces.loadingStream") }}

@@ -89,7 +89,7 @@
         <!-- Scrollable chart area: grows to fit all rows, scrolls vertically -->
         <div
           ref="chartScrollRef"
-          class="flex-1 overflow-y-auto relative min-h-0"
+          class="flex-1 overflow-y-auto overflow-x-hidden relative min-h-0"
         >
           <div
             :style="{

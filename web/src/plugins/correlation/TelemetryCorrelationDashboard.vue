@@ -914,7 +914,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
                 <div
                   v-else
-                  class="flex flex-col items-center justify-center h-[calc(100vh-7.5rem)] py-20"
+                  class="flex flex-col items-center justify-center h-full py-20"
                 >
                   <div
                     class="text-base font-medium mb-2 opacity-90"
@@ -935,7 +935,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Loading State -->
         <div
           v-if="tracesLoading"
-          class="flex flex-col items-center justify-center h-[calc(100vh-272px)] py-20"
+          class="flex flex-col items-center justify-center h-full py-20"
         >
           <OSpinner size="xl" class="mb-4" />
           <div class="text-base">{{ t("correlation.loadingTraces") }}</div>
@@ -1050,7 +1050,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- No Traces Found State -->
         <div
           v-else-if="traceCorrelationMode !== null"
-          class="h-[calc(100vh-7.5rem)]"
+          class="h-full"
         >
           <OEmptyState
             size="hero"
