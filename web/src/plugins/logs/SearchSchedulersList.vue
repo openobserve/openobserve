@@ -5,7 +5,7 @@
         :title="t('search_scheduler_job.title')"
         icon="schedule"
         :back="{ onClick: closeSearchHistory }"
-        class="shrink-0 px-4 border-b border-border-default"
+        class="shrink-0 border-b border-border-default"
       >
         <template #actions>
           <div class="flex items-center gap-1">

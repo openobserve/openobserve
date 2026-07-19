@@ -13,7 +13,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <div class="flex flex-col gap-0 pt-2.5 pr-3.5 pb-2.5 pl-2.5 h-full overflow-y-auto text-text-body">
+  <div class="flex flex-col gap-0 pt-2.5 pb-2.5 px-page-edge h-full overflow-y-auto text-text-body">
     <!-- Header: refresh + time picker -->
     <div class="flex justify-end mb-4">
       <div class="flex items-center gap-2">

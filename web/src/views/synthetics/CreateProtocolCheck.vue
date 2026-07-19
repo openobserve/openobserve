@@ -223,7 +223,7 @@ async function saveCheck() {
     <AppPageHeader
       :title="headerTitle"
       :back="{ label: t('synthetics.newCheck.back'), to: { name: 'synthetic' }, dataTest: 'synthetics-create-back-btn' }"
-      class="shrink-0 px-4 border-b border-border-default"
+      class="shrink-0 border-b border-border-default"
     />
 
     <CreateBrowserTestSkeleton v-if="isLoadingEdit" :rows="10" />

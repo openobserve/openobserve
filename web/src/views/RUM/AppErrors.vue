@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="sessions_page flex flex-col flex-1 min-h-0 overflow-hidden">
     <div>
-      <div class="bg-card-glass-bg border-b border-border-default py-1.5 px-1.5">
+      <div class="bg-card-glass-bg border-b border-border-default py-1.5 px-page-edge">
         <div class="flex items-start gap-1">
           <!-- Query editor (flex-grow to fill available space) -->
           <div class="flex-1 min-w-0 relative">
@@ -105,7 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="h-full flex flex-col min-h-0">
           <!-- Errors-over-time chart + KPI summary -->
           <div
-            class="grid grid-cols-1 lg:grid-cols-5 gap-2 px-2 pt-1.5 h-44 shrink-0"
+            class="grid grid-cols-1 lg:grid-cols-5 gap-2 px-page-edge pt-1.5 h-44 shrink-0"
           >
             <ErrorsOverTimeChart
               class="lg:col-span-3"
@@ -123,7 +123,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Status / type / service filters -->
-          <div class="px-2 py-1.5">
+          <div class="px-page-edge py-1.5">
             <ErrorsFilterBar
               :status="statusFilter"
               :type="typeFilter"

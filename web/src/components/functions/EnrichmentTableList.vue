@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         icon="dataset"
         :subtitle="t('function.enrichmentTablesSubtitle')"
         tabs-below
-        class="shrink-0 px-page-edge"
+        class="shrink-0"
       >
         <template #tabs>
           <PipelineSectionTabs />

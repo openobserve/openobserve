@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :title="t('storage_settings.title')"
             icon="cloud"
             :subtitle="t('settings.orgStorageSettings.subtitle')"
-            class="shrink-0 px-4 border-b border-border-default"
+            class="shrink-0 border-b border-border-default"
           />
 
     <!-- Loading state -->

@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="!hideHeader"
       :title="title"
       :back="{ label: '', onClick: handleBack, dataTest: `${testPrefix}-import-back-btn` }"
-      class="-mx-2.5 px-4 border-b border-border-default"
+      class="shrink-0 border-b border-border-default"
       :class="headerContainerClass"
     >
       <template #actions>
@@ -54,7 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
     </AppPageHeader>
 
-    <div class="flex flex-1 min-h-0" :class="contentWrapperClass">
+    <div class="flex flex-1 min-h-0 px-page-edge" :class="contentWrapperClass">
       <div class="flex w-full min-h-0" :style="contentStyle">
         <OSplitter
           v-if="showSplitter"
@@ -286,7 +286,7 @@ export default defineComponent({
     // Custom classes
     containerClass: {
       type: String,
-      default: "px-2.5 mb-2.5",
+      default: "mb-2.5",
     },
     containerStyle: {
       type: String,

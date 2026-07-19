@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="rounded-default w-full h-full px-2.5 pb-2.5 pt-2.5">
+  <div class="rounded-default w-full h-full px-page-edge pb-2.5 pt-2.5">
     <div class="h-full overflow-auto">
       <div class="flex flex-col gap-4">
 

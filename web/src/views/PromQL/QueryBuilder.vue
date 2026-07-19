@@ -7,7 +7,7 @@
       :title="t('metrics.queryBuilder.title')"
       :subtitle="t('metrics.queryBuilder.subtitle')"
       icon="query-stats"
-      class="shrink-0 px-4 border-b border-border-default"
+      class="shrink-0 border-b border-border-default"
     />
     <div class="flex-1 overflow-auto px-2.5">
       <div class="max-w-350 mx-auto py-2.5">

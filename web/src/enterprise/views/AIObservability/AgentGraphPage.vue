@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :title="t('aiObservability.nav.agentGraph')"
       :subtitle="t('aiObservability.subtitle.agentGraph')"
       icon="hub"
-      class="px-4 border-b border-border-default"
+      class="border-b border-border-default"
     >
       <template #actions>
         <date-time
@@ -49,7 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          AI pages read as one product. Stream tab picks a trace stream; Agent
          tab picks a discovered agent and the graph follows its source_stream. -->
     <div
-      class="flex items-center gap-3 px-4 py-2 border-b border-border-default"
+      class="flex items-center gap-3 px-page-edge py-2 border-b border-border-default"
     >
       <OToggleGroup
         :model-value="filterMode"

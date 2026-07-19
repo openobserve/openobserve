@@ -42,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 }
               : undefined
           "
-          class="px-4"
+          class=""
         >
           <template #subtitle>
             <div

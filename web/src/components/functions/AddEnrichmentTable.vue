@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         onClick: () => $emit('cancel:hideform'),
         dataTest: 'add-enrichment-table-back-btn',
       }"
-      class="-mx-2.5 px-4 border-b border-border-default mb-2 shrink-0"
+      class="-mx-2.5 border-b border-border-default mb-2 shrink-0"
     />
 
     <!-- Inline page form. Save lives in the footer INSIDE the <OForm>, so it is a

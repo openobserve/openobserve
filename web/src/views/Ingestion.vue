@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :title="t('ingestion.header')"
       icon="data-plus-line"
       tabs-below
-      class="shrink-0 px-4"
+      class="shrink-0"
     >
       <template #actions>
         <div class="w-50 flex-none">

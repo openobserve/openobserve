@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <AppPageHeader
       icon="group-work"
       :subtitle="t('settings.correlationSettingsPage.subtitle')"
-      class="shrink-0 px-4 border-b border-border-default"
+      class="shrink-0 border-b border-border-default"
       data-test="correlation-settings-header"
     >
       <template #title>

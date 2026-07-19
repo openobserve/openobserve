@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :title="t('nodes.header')"
       icon="hub"
       :subtitle="t('settings.nodesPage.subtitle')"
-      class="shrink-0 px-4 border-b border-border-default"
+      class="shrink-0 border-b border-border-default"
     >
     </AppPageHeader>
     <OSplitter

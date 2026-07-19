@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :title="t('aiObservability.nav.sessions')"
       :subtitle="t('aiObservability.subtitle.sessions')"
       icon="forum"
-      class="px-page-edge border-b border-border-default"
+      class="border-b border-border-default"
     >
       <template #actions>
         <date-time

@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <AppPageHeader
       :back="{ label: currentDashboardData.data?.title || t('dashboard.header'), onClick: goBack, dataTest: 'dashboard-back-btn' }"
       :title="editMode ? t('panel.editPanel') : t('panel.addPanel')"
-      class="px-4 border-b border-border-default"
+      class="border-b border-border-default"
     >
           <template #tabs>
             <OForm id="add-panel-form" :form="form">

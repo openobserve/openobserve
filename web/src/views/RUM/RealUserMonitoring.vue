@@ -38,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :title="t('rum.title')"
         icon="devices"
         tabs-below
-        class="shrink-0 px-4"
+        class="shrink-0"
       >
         <template #tabs>
           <OTabs v-model="activeTab" align="left" @change="changeTab">

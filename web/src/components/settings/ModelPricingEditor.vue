@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         dataTest: 'model-pricing-editor-back-btn',
       }"
       :title="headerTitle"
-      class="shrink-0 px-4 border-b border-border-default"
+      class="shrink-0 border-b border-border-default"
     >
       <template #title>
         <span data-test="model-pricing-editor-title">{{ headerTitle }}</span>

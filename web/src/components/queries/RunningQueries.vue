@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="flex-none">
       <div class="bg-card-glass-bg">
         <div
-          class="flex flex-col px-4 py-3 border-b-[1px] sticky"
+          class="flex flex-col py-3 border-b-[1px] sticky"
           style="top: 0; z-index: 1000;"
         >
           <!-- Standard section header: title + actions only. Filters live in the
@@ -31,11 +31,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :title="t('queries.runningQueries')"
             icon="query-stats"
             :subtitle="'Inspect and cancel running queries'"
-            class="-mx-4 px-4 border-b border-border-default mb-3"
+            class="border-b border-border-default mb-3"
           />
           <div
             data-test="running-queries-filter-container"
-            class="flex justify-start items-center gap-3"
+            class="flex justify-start items-center gap-3 px-page-edge"
           >
             <OToggleGroup
               :model-value="selectedQueryTypeTab"

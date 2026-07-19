@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="bg-surface-panel h-full flex flex-col pb-1 border-r border-border-default">
       <div class="folder-header bg-transparent">
-        <div class="font-semibold text-sm text-text-heading px-1.5 py-2 flex items-center justify-between gap-2">
+        <div class="font-semibold text-sm text-text-heading pl-page-edge pr-1.5 py-2 flex items-center justify-between gap-2">
           {{ t('dashboard.folders') }}
           <div>
             <OButton

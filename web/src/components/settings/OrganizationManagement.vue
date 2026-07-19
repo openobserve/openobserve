@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :title="t('settings.organizationManagement')"
         icon="lan"
         :subtitle="t('settings.organizationManagementPage.subtitle')"
-        class="shrink-0 px-4 border-b border-border-default"
+        class="shrink-0 border-b border-border-default"
       />
       <div class="bg-card-glass-bg flex-1 min-h-0 mt-2.5 overflow-hidden">
       <OTable

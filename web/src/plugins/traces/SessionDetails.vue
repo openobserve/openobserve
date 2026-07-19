@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          the header pads its own content. -->
     <AppPageHeader
       data-test="session-detail-header"
-      class="px-4 border-b border-border-default"
+      class="border-b border-border-default"
       :title="t('traces.sessionDetail.pageTitle')"
       :back="{
         label: t('rum.sessions'),

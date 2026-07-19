@@ -166,7 +166,7 @@ const showAssertions = computed(
   <div class="flex flex-col h-full min-h-0" data-test="synthetics-protocol-run-detail">
     <AppPageHeader
       v-if="!drawerMode"
-      class="px-2!"
+      class=""
       :subtitle="run ? fmtTs(run.timestamp) : ''"
       :back="{
         label: t('synthetics.results.monitors'),

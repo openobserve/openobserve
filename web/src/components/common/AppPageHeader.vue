@@ -51,7 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
        action button. Title overflow is handled by truncate + min-w-0 on the
        title block instead. h-14 gives the header a touch more breathing room. -->
   <header
-    class="app-page-header shrink-0"
+    class="app-page-header shrink-0 px-page-edge"
     :class="[
       tabsBelow
         ? 'flex flex-col'

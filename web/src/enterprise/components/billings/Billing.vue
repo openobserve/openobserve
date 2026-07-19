@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <AppPageHeader
       :title="headerBasedOnRoute()"
       icon="paid"
-      class="shrink-0 px-4 border-b border-border-default"
+      class="shrink-0 border-b border-border-default"
     >
       <template #actions>
         <div v-if="isOrgGroupRoute" class="flex items-center gap-2">

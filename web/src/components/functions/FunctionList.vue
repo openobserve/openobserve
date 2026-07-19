@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         icon="function"
         :subtitle="t('function.subtitle')"
         tabs-below
-        class="shrink-0 px-page-edge"
+        class="shrink-0"
       >
         <template #tabs>
           <PipelineSectionTabs />

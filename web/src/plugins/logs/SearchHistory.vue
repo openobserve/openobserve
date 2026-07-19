@@ -4,7 +4,7 @@
       :title="t('search_history.title')"
       icon="history"
       :back="{ onClick: closeSearchHistory }"
-      class="shrink-0 px-4 border-b border-border-default"
+      class="shrink-0 border-b border-border-default"
     >
       <template #actions>
           <OButton

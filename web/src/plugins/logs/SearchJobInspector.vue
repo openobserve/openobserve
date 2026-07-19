@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <AppPageHeader
       :title="t('logs.searchJobInspector.title')"
       :back="{ onClick: goBack, dataTest: 'inspector-close-button' }"
-      class="shrink-0 px-4 border-b border-border-default"
+      class="shrink-0 border-b border-border-default"
     >
       <template #title>
         <span data-test="inspector-title">{{ t('logs.searchJobInspector.title') }}</span>

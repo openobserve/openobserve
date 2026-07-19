@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         onClick: goBackToExplorer,
         dataTest: 'metrics-editor-back-btn',
       }"
-      class="shrink-0 px-4 border-b border-border-default"
+      class="shrink-0 border-b border-border-default"
     >
       <template #actions>
         <syntax-guide-metrics />

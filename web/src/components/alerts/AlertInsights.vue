@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :title="t('alerts.insights.title')"
       :back="{ onClick: goBack, dataTest: 'alert-insights-back-btn' }"
       tabs-below
-      class="shrink-0 px-4"
+      class="shrink-0"
     >
       <template #actions>
         <date-time

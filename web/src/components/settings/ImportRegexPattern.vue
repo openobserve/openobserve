@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <AppPageHeader
       :title="headerTitle"
       :back="{ label: t('regex_patterns.title'), onClick: arrowBackFn, dataTest: 'regex-pattern-import-back-btn' }"
-      class="px-4 border-b border-border-default"
+      class="border-b border-border-default"
     >
       <template #actions>
         <OButton

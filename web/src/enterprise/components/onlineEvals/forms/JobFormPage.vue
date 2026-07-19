@@ -10,7 +10,7 @@
         onClick: () => $emit('cancel'),
         dataTest: 'job-form-back-btn',
       }"
-      class="px-3 border-b border-border-default shrink-0"
+      class="border-b border-border-default shrink-0"
     >
       <template #title>
         <span data-test="job-form-title">

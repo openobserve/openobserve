@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :icon="showPipelineActions ? 'lan' : undefined"
       :back="detailBack"
       :tabs-below="showPipelineActions"
-      class="px-page-edge border-b border-border-default"
+      class="border-b border-border-default"
     >
       <!-- Section switcher tabs (Stream Pipelines / Functions / …) next to the
            title on the list page; hidden on detail sub-pages (editor/history).

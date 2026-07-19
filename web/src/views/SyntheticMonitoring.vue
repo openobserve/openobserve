@@ -5,7 +5,7 @@
     <AppPageHeader
       :title="t('synthetics.pageTitle')"
       :subtitle="t('synthetics.pageSubtitle')"
-      class="px-4 border-b border-border-default"
+      class="border-b border-border-default"
       icon="radar"
     >
       <template #actions>

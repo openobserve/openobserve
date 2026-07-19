@@ -6,7 +6,7 @@
     <AppPageHeader
       :subtitle="t('settings.genAiAgentMapping.description')"
       icon="smart-toy"
-      class="shrink-0 px-4 border-b border-border-default"
+      class="shrink-0 border-b border-border-default"
       data-test="gen-ai-agent-mapping-header"
     >
       <template #title>

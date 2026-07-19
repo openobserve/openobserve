@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :title="t('ingestion.tokenManagementTitle')"
       title-data-test="ingestion-tokens-title-text"
       icon="key"
-      class="shrink-0 px-4 border-b border-border-default"
+      class="shrink-0 border-b border-border-default"
     >
       <!-- Full explanation lives in this info tooltip; the subtitle below is a
            truncated preview so neither overruns the Create action button. -->

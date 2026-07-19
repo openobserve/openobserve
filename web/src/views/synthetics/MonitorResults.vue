@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         label: t('synthetics.results.monitors'),
         to: { name: 'synthetic' },
       }"
-      class="px-4 border-b border-border-default"
+      class="border-b border-border-default"
     >
       <template #title-trail>
         <!-- <OBadge v-if="statusBadge" :variant="statusBadge.variant" size="sm" dot>

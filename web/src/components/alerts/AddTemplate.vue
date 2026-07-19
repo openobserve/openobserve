@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         label: t('alert_templates.header'),
         onClick: () => emit('cancel:hideform'),
       }"
-      class="px-3 border-b border-border-default"
+      class="border-b border-border-default"
     />
 
     <OSplitter class="h-[calc(100vh-6.625rem)]"

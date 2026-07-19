@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         label: t('pipeline_destinations.header'),
         onClick: () => emit('cancel'),
       }"
-      class="px-3 border-b border-border-default"
+      class="border-b border-border-default"
     >
       <template #title>
         <span data-test="pipeline-destination-editor-title">

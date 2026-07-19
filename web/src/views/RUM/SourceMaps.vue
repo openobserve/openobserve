@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="source-maps-container bg-card-glass-bg flex flex-col h-full overflow-hidden"
   >
     <!-- Filters Section -->
-    <div class="p-3 bg-surface-base">
+    <div class="px-page-edge py-3 bg-surface-base">
       <div class="flex justify-between items-end">
       <div class="flex gap-4 items-end">
           <!-- Version Filter -->

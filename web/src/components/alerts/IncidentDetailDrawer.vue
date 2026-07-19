@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         dataTest: 'incident-detail-back-btn',
       }"
       :subtitle="t('alerts.incidents.incident')"
-      class="shrink-0 px-4 border-b border-border-default"
+      class="shrink-0 border-b border-border-default"
     >
       <template #title>
         <!-- Incident name (inline-editable) -->
@@ -199,7 +199,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Right Column: Content -->
       <div class="flex-1 min-w-0 flex flex-col overflow-hidden order-2">
         <!-- Tab Content Area -->
-        <div class="flex-1 flex flex-col px-2 pt-4 pb-2 overflow-hidden relative">
+        <div class="flex-1 flex flex-col px-page-edge pt-4 pb-2 overflow-hidden relative">
 
         <!-- Overview Tab Content - REDESIGNED -->
         <div v-if="activeTab === 'overview'" class="flex flex-col flex-1 overflow-hidden">

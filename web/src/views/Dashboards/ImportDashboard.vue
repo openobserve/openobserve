@@ -14,11 +14,11 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <div class="mx-2 flex flex-col h-[calc(100vh-var(--navbar-height))] min-h-0 overflow-hidden">
+  <div class="flex flex-col h-[calc(100vh-var(--navbar-height))] min-h-0 overflow-hidden">
     <AppPageHeader
       :title="t('dashboard.importDashboard')"
       :back="{ label: t('dashboard.header'), onClick: goBack }"
-      class="-mx-2 px-4 border-b border-border-default"
+      class="shrink-0 border-b border-border-default"
     >
       <template #actions>
         <OButton
@@ -57,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OForm id="import-dashboard-form" :form="form" class="h-full flex flex-col min-h-0">
             <div class="w-full h-full flex flex-col min-h-0">
               <div
-                class="bg-card-glass-bg py-2.5 pl-2.5 mb-1 shrink-0"
+                class="bg-card-glass-bg py-2.5 px-page-edge mb-1 shrink-0"
               >
                 <div class="app-tabs-container h-9 w-fit">
                   <app-tabs

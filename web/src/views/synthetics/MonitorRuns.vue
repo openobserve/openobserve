@@ -57,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <!-- Status Timeline — gated on runs query -->
             <template v-if="runsLoading || !runsHasLoadedOnce">
-              <div class="px-2">
+              <div class="px-page-edge">
                 <div
                   class="card-container rounded-default flex flex-col bg-surface-base border border-border-default overflow-hidden"
                 >
@@ -94,7 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
             <!-- Status Timeline — runs query error state -->
             <template v-else-if="runsError">
-              <div class="px-2">
+              <div class="px-page-edge">
                 <div
                   class="card-container rounded-default flex flex-col bg-surface-base border border-border-default overflow-hidden"
                 >
@@ -114,7 +114,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </template>
             <template v-else>
-              <div class="px-2">
+              <div class="px-page-edge">
               <MonitorStatusTimeline
                 :segments="timelineSegments"
                 :fail-count="timelineFailCount"
@@ -128,7 +128,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- KPI Cards — gated on KPI + last-run queries -->
             <template v-if="kpiLoading || !kpiHasLoadedOnce">
-              <div class="px-2">
+              <div class="px-page-edge">
                 <div class="grid grid-cols-5 gap-2.5">
                   <div
                     v-for="n in 5"
@@ -142,7 +142,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </template>
             <template v-else>
-              <div class="px-2">
+              <div class="px-page-edge">
               <div class="grid grid-cols-5 gap-2.5">
                 <div
                   v-for="card in kpiCards"
@@ -182,7 +182,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- Charts — gated on histogram query -->
             <template v-if="histogramLoading || !histogramHasLoadedOnce">
-              <div class="px-2">
+              <div class="px-page-edge">
               <div class="grid grid-cols-2 gap-2">
                 <div
                   class="card-container rounded-default flex flex-col bg-surface-base border border-border-default overflow-hidden"
@@ -218,7 +218,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </template>
             <template v-else>
-              <div class="px-2">
+              <div class="px-page-edge">
               <div class="grid grid-cols-2 gap-2">
                 <div
                   class="card-container rounded-default flex flex-col bg-surface-base border border-border-default overflow-hidden"
@@ -294,7 +294,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- Breakdown Cards — gated on runs query -->
             <template v-if="runsLoading || !runsHasLoadedOnce">
-              <div class="px-2">
+              <div class="px-page-edge">
               <div class="grid grid-cols-3 gap-2">
                 <div
                   v-for="n in 3"
@@ -336,7 +336,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
             <!-- Breakdown Cards — runs query error state -->
             <template v-else-if="runsError">
-              <div class="px-2">
+              <div class="px-page-edge">
               <div class="grid grid-cols-3 gap-2">
                 <div
                   v-for="dim in ['Browser','Location','Device']"
@@ -362,7 +362,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </template>
             <template v-else>
-              <div class="px-2">
+              <div class="px-page-edge">
               <div class="grid grid-cols-3 gap-2">
                 <div
                   class="card-container rounded-default flex flex-col bg-surface-base border border-border-default overflow-hidden"
@@ -711,7 +711,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                 <!-- Empty state: smart — differentiates "never run" vs "no runs in window" -->
                 <template #empty>
-                  <div v-if="kpiHasLoadedOnce" class="px-2">
+                  <div v-if="kpiHasLoadedOnce" class="px-page-edge">
                     <!-- Monitor has runs elsewhere — guide to last run + optionally clear filters -->
                     <OEmptyState
                       v-if="synthetics.kpi.value.totalRuns > 0"

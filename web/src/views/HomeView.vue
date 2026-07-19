@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :subtitle="t('home.subtitle')"
         icon="home"
         :tabs-below="tabOrder.length > 1"
-        class="shrink-0 px-4"
+        class="shrink-0"
         :class="
           tabOrder.length > 1 ? '' : 'border-b border-border-default'
         "

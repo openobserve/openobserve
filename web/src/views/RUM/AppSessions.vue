@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template v-if="isSessionReplayEnabled">
       <div>
         <div
-          class="bg-card-glass-bg border-b border-border-default py-1.5 px-1.5"
+          class="bg-card-glass-bg border-b border-border-default py-1.5 px-page-edge"
         >
           <div class="flex items-start gap-1">
             <!-- Query editor (flex-grow to fill available space) -->
@@ -151,7 +151,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
 
         <!-- One actionable insight for the current window, when one exists -->
-        <div v-if="topInsight" class="px-2 pb-2">
+        <div v-if="topInsight" class="px-page-edge pb-2">
           <SessionsInsightBanner
             :insight="topInsight"
             @apply="applyInsightFilter(topInsight)"
@@ -162,7 +162,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Segment filters -->
         <div
-          class="flex flex-wrap items-center gap-4 px-2 pb-2"
+          class="flex flex-wrap items-center gap-4 px-page-edge pb-2"
           data-test="rum-app-sessions-segment-filters"
         >
           <OToggleGroup

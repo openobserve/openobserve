@@ -15,12 +15,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="w-full h-full flex flex-col min-h-0 px-2.5 bg-surface-base">
+  <div class="w-full h-full flex flex-col min-h-0 bg-surface-base">
     <!-- Top Header Bar -->
     <AppPageHeader
       title="Upload Source Maps"
       :back="{ onClick: navigateBack, dataTest: 'add-alert-back-btn' }"
-      class="px-4 border-b border-border-default"
+      class="border-b border-border-default"
     />
 
     <OForm

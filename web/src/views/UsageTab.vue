@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Main content when data exists -->
     <div
       v-if="!no_data_ingest && !isLoadingSummary"
-      class="w-full h-full flex flex-col overflow-y-auto [padding-right:0.625rem]"
+      class="w-full h-full flex flex-col overflow-y-auto px-page-edge"
     >
       <!-- Banners -->
       <div class="banners-wrapper shrink-0 flex flex-col gap-2">

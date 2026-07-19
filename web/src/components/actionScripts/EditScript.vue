@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         onClick: () => router.back(),
         dataTest: 'add-action-script-back-btn',
       }"
-      class="px-4 border-b border-border-default"
+      class="border-b border-border-default"
     >
       <template #title>
         <span data-test="add-action-script-title">{{

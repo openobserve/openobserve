@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- List View Header -->
       <!-- Standard section header: title + actions only. Tabs + search moved
            into the table toolbar below. -->
-      <AppPageHeader icon="paid" :subtitle="t('settings.modelPricingList.subtitle')" class="shrink-0 px-page-edge border-b border-border-default">
+      <AppPageHeader icon="paid" :subtitle="t('settings.modelPricingList.subtitle')" class="shrink-0 border-b border-border-default">
         <template #title>
           {{ t("modelPricing.header") }}
           <OButton

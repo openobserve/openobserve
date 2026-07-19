@@ -474,7 +474,7 @@ function onClearResults() {
       :title="headerTitle"
       :subtitle="folderName"
       :back="{ label: t('synthetics.newCheck.back'), to: { name: 'synthetic' }, dataTest: 'synthetics-create-back-btn' }"
-      class="shrink-0 px-4 border-b border-border-default"
+      class="shrink-0 border-b border-border-default"
     />
 
     <!-- ── Gate phase: URL + name ── -->

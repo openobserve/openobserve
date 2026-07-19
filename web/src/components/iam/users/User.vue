@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :title="t('iam.basicUsers')"
       :subtitle="t('user.subtitle')"
       icon="person"
-      class="shrink-0 px-4 border-b border-border-default"
+      class="shrink-0 border-b border-border-default"
     >
       <template #actions>
         <member-invitation

@@ -159,7 +159,8 @@ considering the UI done:
 - [ ] Tabular data uses `OTable` with `OTableColumnDef[]` columns (never
       `q-table`); server mode only for backend-paginated data.
 - [ ] Listing page uses the **full-height flush skeleton** (root
-      `flex flex-col h-full p-0`, header `shrink-0 px-4 border-b`, table wrapper
+      `flex flex-col h-full p-0`, header `shrink-0 border-b` — AppPageHeader bakes
+      in its own `px-page-edge`, never add a `px-*`, table wrapper
       `card-container flex-1 min-h-0 overflow-hidden`, `OTable :frame="false"`) —
       not a `p-6` padded container; table runs flush.
 - [ ] Listing page has all three toolbar affordances: **search + filters**

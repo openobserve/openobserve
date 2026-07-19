@@ -44,7 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- ── Route mode header ── -->
     <AppPageHeader
       v-if="!drawerMode"
-      class="px-2!"
+      class=""
       :subtitle="currentRun.timestamp"
       :back="{
         label: t('synthetics.results.monitors'),

@@ -89,18 +89,22 @@ Why each class matters — these are load-bearing, not decoration:
   chain: the header never scrolls, the table body does. `min-h-0` is what lets the
   flex child shrink below its content so the inner scroll area works — omit it and
   the whole page scrolls instead of the table.
-- **Header `px-4` + `border-b border-border-default`**, table wrapper **no
-  horizontal padding** → the table is **flush** (rows touch the content-area
-  edges). Don't add page padding and don't wrap the table in a padded box — that
-  inset breaks the flush alignment. The comfortable first-column inset is provided
-  by `OTable` itself, not by page padding.
+- **Header self-insets** (`AppPageHeader` bakes in `px-page-edge`, the single
+  `--spacing-page-edge` grid line) **+ `border-b border-border-default`**, table
+  wrapper **no horizontal padding** → the table is **flush** (rows touch the
+  content-area edges) but its first-column inset (also `--spacing-page-edge`)
+  lands on the *same* grid line as the header title. **Never add a `px-*` to
+  `AppPageHeader`** — it owns its inset; a consumer `px-4` would fight the baked
+  `px-page-edge` and knock the header 4px off the table. Don't add page padding and
+  don't wrap the table in a padded box — that inset breaks the flush alignment.
 - **`card-container`** is the existing app class that gives the table area its
   surface background; reuse it, don't invent a `bg-*`/border box (that would
   double-frame the borderless table).
 - **`:frame="false"`** on `OTable` keeps it borderless (its default) — the app
   frame provides the single content card. If PageLayout wraps the view instead,
-  pass the same padding via its `header-class` prop
-  (`shrink-0 px-4 border-b border-border-default`).
+  its `#header` wrapper is just `shrink-0 border-b border-border-default` — the
+  `AppPageHeader` inside still supplies the `px-page-edge` inset, so don't re-add
+  it via `header-class`.
 
 > Reserve `p-6`/`gap-6` page containers for **form / detail** views (constrained
 > content), **not** for full-bleed listing tables.
@@ -314,7 +318,8 @@ form — those go in an `ODialog`/`ODrawer`; see SKILL.md § Forms):
 ## Listing-page checklist
 
 - [ ] Full-height flex skeleton: root `flex flex-col h-full p-0`, header
-      `shrink-0 px-4 border-b border-border-default`, table wrapper
+      `shrink-0 border-b border-border-default` (AppPageHeader self-insets with
+      `px-page-edge` — no `px-*` on it), table wrapper
       `card-container flex-1 min-h-0 overflow-hidden` — **no page padding**, table
       runs **flush**.
 - [ ] `AppPageHeader` on top (description via **`subtitle`** prop); primary

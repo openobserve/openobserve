@@ -65,7 +65,7 @@ the Free Software Foundation, either version 3 of the License, or
         :title="embeddedHeader.title"
         :subtitle="embeddedHeader.subtitle"
         :icon="embeddedHeader.icon"
-        class="shrink-0 px-4 border-b border-border-default"
+        class="shrink-0 border-b border-border-default"
       >
         <template
           v-if="activeTab === 'scorers' || activeTab === 'scoreConfigs'"

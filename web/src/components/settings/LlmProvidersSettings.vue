@@ -13,7 +13,7 @@
       <AppPageHeader
         icon="smart-toy"
         :subtitle="t('settings.llmProvidersSettings.subtitle')"
-        class="shrink-0 px-4 border-b border-border-default"
+        class="shrink-0 border-b border-border-default"
       >
         <template #title>
           <span data-test="llm-providers-settings-title">{{ t("llmProviders.title") }}</span>

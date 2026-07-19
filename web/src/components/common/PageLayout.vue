@@ -44,7 +44,7 @@
     <!-- ── Optional header ──────────────────────────────────────── -->
     <div
       v-if="$slots.header"
-      :class="headerClass ?? 'shrink-0 px-page-edge border-b border-border-default'"
+      :class="headerClass ?? 'shrink-0 border-b border-border-default'"
     >
       <slot name="header" />
     </div>

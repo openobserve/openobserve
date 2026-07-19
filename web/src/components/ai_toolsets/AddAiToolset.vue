@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         onClick: () => $emit('cancel:hideform'),
         dataTest: 'ai-toolset-back-btn',
       }"
-      class="shrink-0 px-4 border-b border-border-default"
+      class="shrink-0 border-b border-border-default"
     />
 
     <!-- Inline page form. The form is created in setup() via useOForm (headless)

@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <AppPageHeader
       :title="editingRole"
       :back="{ label: t('iam.roles'), onClick: cancelPermissionsUpdate }"
-      class="shrink-0 px-4 border-b border-border-default"
+      class="shrink-0 border-b border-border-default"
     />
     <!-- TODO OK : Add button to delete role in toolbar -->
     <div

@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         dataTest: 'storage-settings-editor-back-btn',
       }"
       :title="headerTitle"
-      class="px-4 border-b border-border-default mb-[0.675rem]"
+      class="border-b border-border-default mb-[0.675rem]"
     >
       <template #title>
         <span data-test="storage-settings-editor-title">{{ headerTitle }}</span>
