@@ -16,3 +16,5 @@
 pub mod aggregator;
 pub mod processor;
 pub use aggregator::write_agent_signals;
+#[cfg(feature = "enterprise")]
+pub use processor::process_agent_signals_stream;

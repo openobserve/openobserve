@@ -62,6 +62,56 @@ pub(super) fn build_cost_sql(stream: &str, start: i64, end: i64) -> String {
 }
 
 use config::meta::agent_signals::AgentSignalRecord;
+use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
+
+/// Run the three bounded passes for one stream+window and self-ingest the results.
+/// Early-returns Ok when the feature is disabled (no query issued).
+pub async fn process_agent_signals_stream(
+    org_id: &str,
+    stream_name: &str,
+    start_time: i64,
+    end_time: i64,
+) -> Result<(), anyhow::Error> {
+    if !get_o2_config().agent_signals.enabled {
+        return Ok(());
+    }
+    let ts = end_time; // stamp records at window end
+
+    let mut records = Vec::new();
+
+    // R1 failure taxonomy
+    let sql = build_failure_sql(stream_name, start_time, end_time);
+    match crate::service::traces::service_graph::run_graph_search(
+        org_id, sql, start_time, end_time,
+    )
+    .await
+    {
+        Ok(hits) => records.extend(map_failure_hits(org_id, stream_name, ts, &hits)),
+        Err(e) => log::warn!("[AgentSignals] failure pass failed for {org_id}/{stream_name}: {e}"),
+    }
+    // R2 loop ratio
+    let sql = build_loop_ratio_sql(stream_name, start_time, end_time);
+    match crate::service::traces::service_graph::run_graph_search(
+        org_id, sql, start_time, end_time,
+    )
+    .await
+    {
+        Ok(hits) => records.extend(map_loop_hits(org_id, stream_name, ts, &hits)),
+        Err(e) => log::warn!("[AgentSignals] loop pass failed for {org_id}/{stream_name}: {e}"),
+    }
+    // R4 cost/diagnosis
+    let sql = build_cost_sql(stream_name, start_time, end_time);
+    match crate::service::traces::service_graph::run_graph_search(
+        org_id, sql, start_time, end_time,
+    )
+    .await
+    {
+        Ok(hits) => records.extend(map_cost_hits(org_id, stream_name, ts, &hits)),
+        Err(e) => log::warn!("[AgentSignals] cost pass failed for {org_id}/{stream_name}: {e}"),
+    }
+
+    super::aggregator::write_agent_signals(org_id, records).await
+}
 
 fn get_str(v: &serde_json::Value, k: &str) -> Option<String> {
     v.get(k).and_then(|x| x.as_str()).map(|s| s.to_string())
@@ -189,5 +239,13 @@ mod test {
         assert_eq!(recs[0].tool_name.as_deref(), Some("cli_kubectl"));
         assert_eq!(recs[0].calls, Some(1646));
         assert_eq!(recs[0].distinct_traces, Some(71));
+    }
+
+    // process_agent_signals_stream must early-return Ok when disabled — no panic, no query.
+    #[tokio::test]
+    async fn test_process_stream_noop_when_disabled() {
+        // enabled defaults to false; the fn must return Ok without attempting a search.
+        let r = super::process_agent_signals_stream("default", "nostream", 0, 1).await;
+        assert!(r.is_ok());
     }
 }
