@@ -7467,6 +7467,29 @@
         "title": "Recent errors",
         "subtitle": "last 10 failed spans"
       }
+    },
+    "behavior": {
+      "loopsTitle": "Looping agents",
+      "loopsHint": "Agents re-running the same tool many times per trace",
+      "failuresTitle": "Failure taxonomy",
+      "failuresHint": "Errors grouped by kind, per agent",
+      "costTitle": "Cost & failures by agent",
+      "costHint": "Which agents drive spend and errors",
+      "noLoops": "No looping behavior detected in this range",
+      "noFailures": "No agent failures in this range",
+      "noCost": "No agent cost recorded in this range",
+      "unknownAgent": "(unknown agent)",
+      "colAgent": "Agent",
+      "colTool": "Tool",
+      "colRatio": "Calls / trace",
+      "colCalls": "Calls",
+      "colTraces": "Traces",
+      "colFailClass": "Failure class",
+      "colCount": "Count",
+      "colCost": "Cost ($)",
+      "colTokens": "Tokens",
+      "colErrors": "Errors",
+      "sectionTitle": "Agent behavior"
     }
   },
   "onlineEvals": {
