@@ -889,11 +889,12 @@ defineExpose({
           props.horizontalScroll || props.defaultColumns ? 'table-auto' : 'table-fixed',
           (props.bordered && !props.columns.some((c) => c.pinned || c.isAction)) ? '' : 'border-separate border-spacing-0',
           // Symmetric edge inset (SPACING_AUDIT.md §7): the first and last cell
-          // content sit 16px (1rem) from the table edges on EVERY table, while the
-          // per-cell row dividers still span the full width (full-bleed). Applied
-          // unconditionally so all tables align identically; the compact `.o2-table`
-          // modifier still overrides it via !important, and a leading checkbox/
-          // expand/drag gutter supplies the left inset on its own (see the CSS).
+          // content sit --spacing-table-edge (14px) from the table edges on EVERY
+          // table, while the per-cell row dividers still span the full width
+          // (full-bleed). Applied unconditionally so all tables align identically;
+          // the compact `.o2-table` modifier still overrides it via !important, and
+          // a leading checkbox/expand/drag gutter supplies the left inset on its
+          // own (same token — see the CSS).
           'o2-table--edge-inset',
         ]"
         :style="{
@@ -1191,11 +1192,11 @@ defineExpose({
    already supplies the left inset itself; padding it would squish its icon. */
 .o2-table--edge-inset :deep(th[data-test^="o2-table-th-"]:first-child:not([data-test="o2-table-th-select"]):not([data-test="o2-table-th-expand"]):not([data-test="o2-table-th-drag"])),
 .o2-table--edge-inset :deep(td[data-test^="o2-table-cell-"]:first-child) {
-  padding-left: var(--spacing-page-edge);
+  padding-left: var(--spacing-table-edge);
 }
 .o2-table--edge-inset :deep(th[data-test^="o2-table-th-"]:last-child:not([data-test="o2-table-th-__spacer__"])),
 .o2-table--edge-inset :deep(td[data-test^="o2-table-cell-"]:last-child:not([data-test="o2-table-cell-__spacer__"])) {
-  padding-right: var(--spacing-page-edge);
+  padding-right: var(--spacing-table-edge);
 }
 
 /* keep(lib-override:o2-table-modifiers): `.o2-table` / `.o2-row-md` /

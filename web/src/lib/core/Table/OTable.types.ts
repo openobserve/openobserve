@@ -5,11 +5,11 @@ import type { ColumnDef, Row, Table } from "@tanstack/vue-table";
 
 // ─── Shared column size constants ────────────────────────────────
 /**
- * Fixed width (px) of the auto-rendered selection-checkbox column. Includes the
- * left padding (TABLE_CHECKBOX_COL_PAD_LEFT) that insets the box from the table
- * edge. Imported by OTableHeader/OTableBodyRow so the three stay in sync.
+ * Fixed width (px) of the auto-rendered selection-checkbox column. Imported by
+ * OTableHeader/OTableBodyRow/OTableLoading so the three stay in sync. The box's
+ * left inset is the shared `--spacing-table-edge` token (applied in inline
+ * style), the same edge line the first data column and toolbar search bar use.
  */
-export const TABLE_CHECKBOX_COL_PAD_LEFT = 18;
 export const TABLE_CHECKBOX_COL_SIZE = 44;
 /**
  * Fixed width (px) of the row-index ("#") column. Wide enough to fit a

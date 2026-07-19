@@ -8,7 +8,7 @@ import { VueDraggableNext as VueDraggable } from "vue-draggable-next";
 import OTableSelectCheckbox from "./OTableSelectCheckbox.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { PIVOT_TABLE_TOTAL_COLUMN_WIDTH } from "@/utils/dashboard/constants";
-import { TABLE_CHECKBOX_COL_SIZE as TABLE_CHECKBOX_COL_WIDTH, TABLE_CHECKBOX_COL_PAD_LEFT } from "../OTable.types";
+import { TABLE_CHECKBOX_COL_SIZE as TABLE_CHECKBOX_COL_WIDTH } from "../OTable.types";
 
 const props = defineProps<{
   headerGroups: HeaderGroup<any>[];
@@ -276,7 +276,7 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
       <th
         v-if="selectionMultiple"
         class="text-left border-b border-table-header-border"
-        :style="{ width: TABLE_CHECKBOX_COL_WIDTH + 'px', minWidth: TABLE_CHECKBOX_COL_WIDTH + 'px', maxWidth: TABLE_CHECKBOX_COL_WIDTH + 'px', paddingLeft: TABLE_CHECKBOX_COL_PAD_LEFT + 'px' }"
+        :style="{ width: TABLE_CHECKBOX_COL_WIDTH + 'px', minWidth: TABLE_CHECKBOX_COL_WIDTH + 'px', maxWidth: TABLE_CHECKBOX_COL_WIDTH + 'px', paddingLeft: 'var(--spacing-table-edge)' }"
         data-test="o2-table-th-select"
       >
         <OTableSelectCheckbox
@@ -439,7 +439,7 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
       <th
         v-if="selectionMultiple"
         class="text-left border-b border-table-header-border"
-        :style="{ width: TABLE_CHECKBOX_COL_WIDTH + 'px', minWidth: TABLE_CHECKBOX_COL_WIDTH + 'px', maxWidth: TABLE_CHECKBOX_COL_WIDTH + 'px', paddingLeft: TABLE_CHECKBOX_COL_PAD_LEFT + 'px' }"
+        :style="{ width: TABLE_CHECKBOX_COL_WIDTH + 'px', minWidth: TABLE_CHECKBOX_COL_WIDTH + 'px', maxWidth: TABLE_CHECKBOX_COL_WIDTH + 'px', paddingLeft: 'var(--spacing-table-edge)' }"
         data-test="o2-table-th-select"
       >
         <OTableSelectCheckbox

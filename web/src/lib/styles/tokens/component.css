@@ -246,10 +246,19 @@
 
   /* Page edge inset — THE single horizontal grid line of the app.
      Everything that sits at the edge of a page derives from this one knob: the
-     AppPageHeader/PageLayout header, an OTable's first/last cell content, and
-     the left rails (folder lists, field lists). Change it here and the whole
-     app's left/right alignment moves together. See SPACING_AUDIT.md §7. */
+     AppPageHeader/PageLayout header, an OTable's first/last cell content (via
+     --spacing-table-edge below), and the left rails (folder lists, field lists).
+     Change it here and the whole app's left/right alignment moves together.
+     See SPACING_AUDIT.md §7. */
   --spacing-page-edge: var(--spacing-3);
+
+  /* Table content edge inset. The page grid line plus a 2px optical nudge: a
+     table's first/last cell content (a 14px checkbox box, index digits, short
+     text) is small and reads as cramped sitting exactly on the edge, so tables
+     inset 2px more than the page header while still tracking the knob above.
+     Drives BOTH the OTable first/last-cell edge-inset rule AND the leading
+     selection-checkbox gutter, so they always share one value. */
+  --spacing-table-edge: calc(var(--spacing-page-edge) + 0.125rem);
 
   /* Left rail width (folder lists, catalogs, section rails). One value so the
      rails across Dashboards/Alerts/Reports/Traces/Synthetics are identical —

@@ -3,7 +3,7 @@
 <script setup lang="ts">
 import { computed, inject } from "vue";
 import type { Column } from "@tanstack/vue-table";
-import { TABLE_CHECKBOX_COL_SIZE, TABLE_CHECKBOX_COL_PAD_LEFT, type OTableColumnDef } from "../OTable.types";
+import { TABLE_CHECKBOX_COL_SIZE, type OTableColumnDef } from "../OTable.types";
 
 const props = defineProps<{
   /** Number of skeleton rows. Default: 10 */
@@ -156,7 +156,7 @@ const alignClassFor = (col: Column<any, any>): string => {
       <td
         v-if="selectionEnabled"
         class="text-left align-middle"
-        :style="{ width: TABLE_CHECKBOX_COL_SIZE + 'px', minWidth: TABLE_CHECKBOX_COL_SIZE + 'px', maxWidth: TABLE_CHECKBOX_COL_SIZE + 'px', paddingLeft: TABLE_CHECKBOX_COL_PAD_LEFT + 'px' }"
+        :style="{ width: TABLE_CHECKBOX_COL_SIZE + 'px', minWidth: TABLE_CHECKBOX_COL_SIZE + 'px', maxWidth: TABLE_CHECKBOX_COL_SIZE + 'px', paddingLeft: 'var(--spacing-table-edge)' }"
       >
         <span
           class="inline-block h-3.5 w-3.5 rounded-default border border-skeleton-base"

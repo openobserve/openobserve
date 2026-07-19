@@ -22,10 +22,7 @@ import OTableSelectCheckbox from "./OTableSelectCheckbox.vue";
 import OTableExpandButton from "./OTableExpandButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { OTableTreeContextKey } from "../composables/useTableTree";
-import {
-  TABLE_CHECKBOX_COL_SIZE as TABLE_CHECKBOX_COL_WIDTH,
-  TABLE_CHECKBOX_COL_PAD_LEFT,
-} from "../OTable.types";
+import { TABLE_CHECKBOX_COL_SIZE as TABLE_CHECKBOX_COL_WIDTH } from "../OTable.types";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 
 const props = defineProps<{
@@ -313,7 +310,7 @@ function onRowBlur() {
         width: TABLE_CHECKBOX_COL_WIDTH + 'px',
         minWidth: TABLE_CHECKBOX_COL_WIDTH + 'px',
         maxWidth: TABLE_CHECKBOX_COL_WIDTH + 'px',
-        paddingLeft: TABLE_CHECKBOX_COL_PAD_LEFT + 'px',
+        paddingLeft: 'var(--spacing-table-edge)',
       }"
       data-test="o2-table-select-cell"
     >
