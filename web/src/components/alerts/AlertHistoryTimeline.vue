@@ -84,9 +84,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @mouseenter="hoveredIndex = i"
           @mouseleave="hoveredIndex = null"
         >
+          <!-- Render ABOVE the strip (like the flapping pill) so the tooltip
+               never collides with — or gets clipped by — the history table that
+               sits directly below the timeline. -->
           <div
             v-if="hoveredIndex === i"
-            class="absolute top-full mt-1.5 left-1/2 -translate-x-1/2 z-50 whitespace-nowrap rounded-default px-2.5 py-1.5 text-2xs leading-[1.4] pointer-events-none shadow-md bg-surface-overlay border border-border-default text-text-body"
+            class="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 z-50 whitespace-nowrap rounded-default px-2.5 py-1.5 text-2xs leading-[1.4] pointer-events-none shadow-md bg-surface-overlay border border-border-default text-text-body"
           >
             <div class="font-semibold capitalize flex items-center gap-1.5">
               <span

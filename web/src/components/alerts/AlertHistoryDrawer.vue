@@ -114,7 +114,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
 
     <!-- Content -->
-    <div class="flex flex-col h-[calc(100vh-4rem)]" v-if="alertDetails">
+    <div class="flex flex-col h-full min-h-0" v-if="alertDetails">
       <!-- Tab Panels -->
       <OTabPanels
         v-model="activeTab"
