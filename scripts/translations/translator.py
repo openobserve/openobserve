@@ -49,6 +49,12 @@ LANGUAGE_NAMES = {
     "ja": "Japanese",
     "ko": "Korean",
     "nl": "Dutch",
+    "zh-Hant": "Traditional Chinese",
+    "ar": "Arabic",
+    "fa": "Persian",
+    "ru": "Russian",
+    "pl": "Polish",
+    "vi": "Vietnamese",
 }
 
 # vue-i18n / printf style interpolation tokens that MUST survive translation
