@@ -39,7 +39,7 @@
       size="icon"
       data-test="panel-limit-number-of-series-warning"
     >
-      <template #icon-left><OIcon name="data-info-alert" size="sm"
+      <template #icon-left><OIcon name="data-info-alert" size="sm"
       /></template>
       <OTooltip side="bottom" align="end" hoverable>
         <template #content><div class="whitespace-pre-wrap">{{ limitNumberOfSeriesWarningMessage }}</div></template>
@@ -64,7 +64,7 @@
       size="icon"
       data-test="panel-is-cached-data-differ-with-current-time-range-warning"
     >
-      <template #icon-left><OIcon name="running-with-errors" size="sm"
+      <template #icon-left><OIcon name="running-with-errors" size="sm"
       /></template>
       <OTooltip side="bottom" align="end" hoverable content="The data shown is cached and is different from the selected time range." />
     </OButton>
@@ -74,7 +74,7 @@
       size="icon"
       data-test="panel-partial-data-warning"
     >
-      <template #icon-left><OIcon name="clock-loader-20" size="sm"
+      <template #icon-left><OIcon name="clock-loader-20" size="sm"
       /></template>
       <OTooltip side="bottom" align="end" hoverable content="The data shown is incomplete because the loading was interrupted. Refresh to load complete data." />
     </OButton>

@@ -162,7 +162,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="printDashboard"
               data-test="dashboard-print-btn"
             >
-              <template #icon-left><OIcon
+              <template #icon-left><OIcon
                   :name="store.state.printMode === true ? 'close' : 'print'" size="sm"
               /></template>
               <OTooltip :content="store.state.printMode === true ? t('common.close') : t('dashboard.print')" />
@@ -174,7 +174,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="toggleFullscreen"
               data-test="dashboard-fullscreen-btn"
             >
-              <template #icon-left><OIcon
+              <template #icon-left><OIcon
                   :name="
                     isFullscreen ? 'fullscreen-exit' : 'fullscreen'
                   " size="sm"
@@ -189,7 +189,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="openScheduledReports"
               data-test="view-dashboard-scheduled-reports"
             >
-              <template #icon-left><OIcon name="description" size="sm"
+              <template #icon-left><OIcon name="description" size="sm"
               /></template>
               <OTooltip :content="t('dashboard.scheduledDashboards')" />
             </OButton>

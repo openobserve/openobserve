@@ -54,7 +54,7 @@
             <!-- Original Query -->
             <div v-if="query.originalQuery">
               <div class="flex items-center justify-between">
-                <label class="text-xs font-bold tracking-wider">Original Query</label
+                <label class="text-xs font-bold tracking-wider">Original Query</label
                 >
                 <OButton
                   variant="ghost-primary"
@@ -83,7 +83,7 @@
             <!-- Executed Query -->
             <div>
               <div class="flex items-center justify-between">
-                <label class="text-xs font-bold tracking-wider">Executed Query</label
+                <label class="text-xs font-bold tracking-wider">Executed Query</label
                 >
                 <OButton
                   variant="ghost-primary"
@@ -115,7 +115,7 @@
               <div class="space-y-1"
                 :data-test="`dashboard-query-inspector-start-time-${index}`"
               >
-                <label class="text-xs font-bold tracking-wider">Start Time</label
+                <label class="text-xs font-bold tracking-wider">Start Time</label
                 >
                 <div
                   class="text-xs text-text-secondary font-medium flex items-center gap-2"
@@ -131,7 +131,7 @@
               <div class="space-y-1"
                 :data-test="`dashboard-query-inspector-end-time-${index}`"
               >
-                <label class="text-xs font-bold tracking-wider">End Time</label
+                <label class="text-xs font-bold tracking-wider">End Time</label
                 >
                 <div
                   class="text-xs text-text-secondary font-medium flex items-center gap-2"
@@ -152,7 +152,7 @@
             >
               <!-- Standard Variables -->
               <div class="pt-2">
-                <label class="text-xs font-bold tracking-wider">Variable(s)</label
+                <label class="text-xs font-bold tracking-wider">Variable(s)</label
                 >
                 <div class="flex flex-wrap gap-2 mt-1">
                   <template v-if="getVariablesByType(query, 'variable').length">
@@ -172,14 +172,14 @@
                       >
                     </div>
                   </template>
-                  <span v-else class="text-xs text-text-muted">-</span
+                  <span v-else class="text-xs text-text-muted">-</span
                   >
                 </div>
               </div>
 
               <!-- Fixed Variables -->
               <div>
-                <label class="text-xs font-bold tracking-wider">Fixed Variable(s)</label
+                <label class="text-xs font-bold tracking-wider">Fixed Variable(s)</label
                 >
                 <div class="flex flex-wrap gap-2 mt-1">
                   <template v-if="getVariablesByType(query, 'fixed').length">
@@ -199,14 +199,14 @@
                       >
                     </div>
                   </template>
-                  <span v-else class="text-xs text-text-muted">-</span
+                  <span v-else class="text-xs text-text-muted">-</span
                   >
                 </div>
               </div>
 
               <!-- Dynamic Variables -->
               <div>
-                <label class="text-xs font-bold tracking-wider">Dynamic Variable(s)</label
+                <label class="text-xs font-bold tracking-wider">Dynamic Variable(s)</label
                 >
                 <div class="flex flex-wrap gap-2 mt-1">
                   <template
@@ -230,7 +230,7 @@
                       >
                     </div>
                   </template>
-                  <span v-else class="text-xs text-text-muted">-</span
+                  <span v-else class="text-xs text-text-muted">-</span
                   >
                 </div>
               </div>
