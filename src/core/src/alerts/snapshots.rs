@@ -1,0 +1,586 @@
+// Copyright 2026 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+use anyhow::{Result, bail};
+use config::meta::stream::{FileKey, StreamType};
+use serde::{Deserialize, Serialize};
+use svix_ksuid::Ksuid;
+
+pub(crate) const ALERT_SNAPSHOT_SCHEMA_VERSION: i16 = 1;
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub(crate) struct AlertSnapshotOccurrence {
+    pub(crate) org_id: String,
+    pub(crate) alert_id: Ksuid,
+    pub(crate) window_start: i64,
+    pub(crate) window_end: i64,
+}
+
+impl AlertSnapshotOccurrence {
+    pub(crate) fn new(
+        org_id: impl Into<String>,
+        alert_id: Ksuid,
+        window_start: i64,
+        window_end: i64,
+    ) -> Self {
+        Self {
+            org_id: org_id.into(),
+            alert_id,
+            window_start,
+            window_end,
+        }
+    }
+
+    pub(crate) fn key(&self) -> String {
+        [
+            stable_component("org", &self.org_id),
+            stable_component("alert", &self.alert_id.to_string()),
+            stable_component("window_start", &self.window_start.to_string()),
+            stable_component("window_end", &self.window_end.to_string()),
+        ]
+        .join("|")
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub(crate) struct AlertSnapshotManifest {
+    pub(crate) org_id: String,
+    pub(crate) alert_id: Ksuid,
+    pub(crate) alert_name: Option<String>,
+    pub(crate) trigger_timestamp: i64,
+    pub(crate) window_start: i64,
+    pub(crate) window_end: i64,
+    pub(crate) created_at: i64,
+    pub(crate) schema_version: i16,
+    pub(crate) streams: Vec<AlertSnapshotStream>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub(crate) struct AlertSnapshotStream {
+    pub(crate) stream_type: StreamType,
+    pub(crate) stream_name: String,
+    pub(crate) files: Vec<AlertSnapshotFileRef>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub(crate) struct AlertSnapshotFileRef {
+    pub(crate) file_id: Option<i64>,
+    pub(crate) file_key: String,
+    pub(crate) min_ts: i64,
+    pub(crate) max_ts: i64,
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct ScheduledSnapshotInput {
+    pub(crate) org_id: String,
+    pub(crate) alert_id: Ksuid,
+    pub(crate) alert_name: Option<String>,
+    pub(crate) stream_type: StreamType,
+    pub(crate) stream_name: String,
+    pub(crate) trigger_timestamp: i64,
+    pub(crate) window_start: i64,
+    pub(crate) window_end: i64,
+    pub(crate) created_at: i64,
+}
+
+pub(crate) fn build_scheduled_snapshot_manifest(
+    input: ScheduledSnapshotInput,
+    files: Vec<FileKey>,
+) -> Result<AlertSnapshotManifest> {
+    validate_window(input.window_start, input.window_end)?;
+    validate_manifest_input(&input)?;
+    let occurrence = AlertSnapshotOccurrence::new(
+        input.org_id.clone(),
+        input.alert_id,
+        input.window_start,
+        input.window_end,
+    );
+    let file_refs = select_file_refs_for_window(files, input.window_start, input.window_end)?;
+    let mut streams = vec![AlertSnapshotStream {
+        stream_type: input.stream_type,
+        stream_name: input.stream_name.clone(),
+        files: file_refs,
+    }];
+    sort_streams(&mut streams);
+
+    Ok(AlertSnapshotManifest {
+        org_id: input.org_id,
+        alert_id: occurrence.alert_id,
+        alert_name: input.alert_name,
+        trigger_timestamp: input.trigger_timestamp,
+        window_start: occurrence.window_start,
+        window_end: occurrence.window_end,
+        created_at: input.created_at,
+        schema_version: ALERT_SNAPSHOT_SCHEMA_VERSION,
+        streams,
+    })
+}
+
+pub(crate) fn select_file_refs_for_window(
+    files: Vec<FileKey>,
+    window_start: i64,
+    window_end: i64,
+) -> Result<Vec<AlertSnapshotFileRef>> {
+    validate_window(window_start, window_end)?;
+    let mut refs = files
+        .into_iter()
+        .filter(|file| !file.deleted)
+        .filter(|file| {
+            file_overlaps_window(file.meta.min_ts, file.meta.max_ts, window_start, window_end)
+        })
+        .map(AlertSnapshotFileRef::from)
+        .collect::<Vec<_>>();
+
+    refs.sort_by(|a, b| a.canonical_tuple().cmp(&b.canonical_tuple()));
+    refs.dedup_by(|a, b| a.file_key == b.file_key);
+    Ok(refs)
+}
+
+pub(crate) fn file_overlaps_window(
+    file_min_timestamp: i64,
+    file_max_timestamp: i64,
+    window_start: i64,
+    window_end: i64,
+) -> bool {
+    file_min_timestamp <= window_end && file_max_timestamp >= window_start
+}
+
+pub(crate) fn sort_streams(streams: &mut [AlertSnapshotStream]) {
+    streams.sort_by(|a, b| {
+        a.stream_type
+            .to_string()
+            .cmp(&b.stream_type.to_string())
+            .then(a.stream_name.cmp(&b.stream_name))
+    });
+}
+
+impl AlertSnapshotFileRef {
+    fn canonical_tuple(&self) -> (&str, bool, i64, i64, i64) {
+        (
+            self.file_key.as_str(),
+            self.file_id.is_none(),
+            self.file_id.unwrap_or_default(),
+            self.min_ts,
+            self.max_ts,
+        )
+    }
+}
+
+impl From<FileKey> for AlertSnapshotFileRef {
+    fn from(file: FileKey) -> Self {
+        Self {
+            file_id: (file.id > 0).then_some(file.id),
+            file_key: file.key,
+            min_ts: file.meta.min_ts,
+            max_ts: file.meta.max_ts,
+        }
+    }
+}
+
+fn validate_window(window_start: i64, window_end: i64) -> Result<()> {
+    if window_start > window_end {
+        bail!("invalid alert snapshot window: window_start must be <= window_end");
+    }
+    Ok(())
+}
+
+fn validate_manifest_input(input: &ScheduledSnapshotInput) -> Result<()> {
+    if input.org_id.is_empty() {
+        bail!("invalid alert snapshot input: org_id is required");
+    }
+    if input.stream_name.is_empty() {
+        bail!("invalid alert snapshot input: stream_name is required");
+    }
+    Ok(())
+}
+
+fn stable_component(label: &str, value: &str) -> String {
+    format!("{label}:{}:{value}", value.len())
+}
+
+#[cfg(test)]
+mod tests {
+    use config::meta::stream::{FileMeta, StreamType};
+    use svix_ksuid::{Ksuid, KsuidLike};
+
+    use super::*;
+
+    fn file(id: i64, key: &str, min_ts: i64, max_ts: i64, deleted: bool) -> FileKey {
+        FileKey {
+            id,
+            account: String::new(),
+            key: key.to_string(),
+            meta: FileMeta {
+                min_ts,
+                max_ts,
+                records: 10,
+                original_size: 100,
+                compressed_size: 50,
+                index_size: 0,
+                bloom_ver: 0,
+                flattened: false,
+            },
+            deleted,
+            selection: None,
+            row_group_size: None,
+        }
+    }
+
+    fn occurrence(
+        org_id: &str,
+        alert_id: Ksuid,
+        window_start: i64,
+        window_end: i64,
+    ) -> AlertSnapshotOccurrence {
+        AlertSnapshotOccurrence::new(org_id, alert_id, window_start, window_end)
+    }
+
+    fn snapshot_input(window_start: i64, window_end: i64) -> ScheduledSnapshotInput {
+        ScheduledSnapshotInput {
+            org_id: "org1".to_string(),
+            alert_id: Ksuid::new(None, None),
+            alert_name: Some("cpu_high".to_string()),
+            stream_type: StreamType::Logs,
+            stream_name: "app".to_string(),
+            trigger_timestamp: window_end,
+            window_start,
+            window_end,
+            created_at: window_end,
+        }
+    }
+
+    #[test]
+    fn file_fully_inside_alert_window_overlaps() {
+        assert!(file_overlaps_window(20, 30, 10, 40));
+    }
+
+    #[test]
+    fn alert_window_fully_inside_file_range_overlaps() {
+        assert!(file_overlaps_window(10, 40, 20, 30));
+    }
+
+    #[test]
+    fn overlap_at_window_beginning_is_included() {
+        assert!(file_overlaps_window(1, 10, 10, 20));
+    }
+
+    #[test]
+    fn overlap_at_window_end_is_included() {
+        assert!(file_overlaps_window(20, 30, 10, 20));
+    }
+
+    #[test]
+    fn file_completely_before_window_is_excluded() {
+        assert!(!file_overlaps_window(1, 9, 10, 20));
+    }
+
+    #[test]
+    fn file_completely_after_window_is_excluded() {
+        assert!(!file_overlaps_window(21, 30, 10, 20));
+    }
+
+    #[test]
+    fn exact_timestamp_boundary_is_included() {
+        assert!(file_overlaps_window(10, 10, 10, 10));
+    }
+
+    #[test]
+    fn window_start_greater_than_window_end_is_rejected() {
+        assert!(select_file_refs_for_window(Vec::new(), 20, 10).is_err());
+        assert!(build_scheduled_snapshot_manifest(snapshot_input(20, 10), Vec::new()).is_err());
+    }
+
+    #[test]
+    fn empty_organization_id_is_rejected_by_manifest_builder() {
+        let mut input = snapshot_input(10, 20);
+        input.org_id.clear();
+
+        assert!(build_scheduled_snapshot_manifest(input, Vec::new()).is_err());
+    }
+
+    #[test]
+    fn empty_stream_name_is_rejected_by_manifest_builder() {
+        let mut input = snapshot_input(10, 20);
+        input.stream_name.clear();
+
+        assert!(build_scheduled_snapshot_manifest(input, Vec::new()).is_err());
+    }
+
+    #[test]
+    fn window_start_equal_to_window_end_is_allowed() {
+        let refs = select_file_refs_for_window(
+            vec![file(1, "files/org/logs/a/1.parquet", 10, 10, false)],
+            10,
+            10,
+        )
+        .unwrap();
+
+        assert_eq!(refs.len(), 1);
+        assert!(build_scheduled_snapshot_manifest(snapshot_input(10, 10), Vec::new()).is_ok());
+    }
+
+    #[test]
+    fn negative_timestamps_are_allowed_when_window_is_ordered() {
+        let refs = select_file_refs_for_window(
+            vec![file(1, "files/org/logs/a/1.parquet", -20, -10, false)],
+            -15,
+            -15,
+        )
+        .unwrap();
+
+        assert_eq!(refs.len(), 1);
+    }
+
+    #[test]
+    fn zero_timestamps_are_allowed_when_window_is_ordered() {
+        let refs = select_file_refs_for_window(
+            vec![file(1, "files/org/logs/a/1.parquet", 0, 0, false)],
+            0,
+            0,
+        )
+        .unwrap();
+
+        assert_eq!(refs.len(), 1);
+    }
+
+    #[test]
+    fn deleted_file_is_excluded() {
+        let refs = select_file_refs_for_window(
+            vec![file(1, "files/org/logs/a/1.parquet", 10, 20, true)],
+            10,
+            20,
+        )
+        .unwrap();
+        assert!(refs.is_empty());
+    }
+
+    #[test]
+    fn empty_file_collection_returns_empty_refs() {
+        let refs = select_file_refs_for_window(Vec::new(), 10, 20).unwrap();
+        assert!(refs.is_empty());
+    }
+
+    #[test]
+    fn file_ordering_is_deterministic_by_key_then_id() {
+        let refs = select_file_refs_for_window(
+            vec![
+                file(3, "files/org/logs/s/2024/01/01/c.parquet", 10, 20, false),
+                file(2, "files/org/logs/s/2024/01/01/a.parquet", 10, 20, false),
+                file(1, "files/org/logs/s/2024/01/01/b.parquet", 10, 20, false),
+            ],
+            10,
+            20,
+        )
+        .unwrap();
+
+        assert_eq!(
+            refs.iter().map(|f| f.file_key.as_str()).collect::<Vec<_>>(),
+            vec![
+                "files/org/logs/s/2024/01/01/a.parquet",
+                "files/org/logs/s/2024/01/01/b.parquet",
+                "files/org/logs/s/2024/01/01/c.parquet",
+            ]
+        );
+    }
+
+    #[test]
+    fn exact_duplicate_file_records_are_canonicalized() {
+        let refs = select_file_refs_for_window(
+            vec![
+                file(1, "files/org/logs/s/2024/01/01/a.parquet", 10, 20, false),
+                file(1, "files/org/logs/s/2024/01/01/a.parquet", 10, 20, false),
+            ],
+            10,
+            20,
+        )
+        .unwrap();
+
+        assert_eq!(refs.len(), 1);
+        assert_eq!(refs[0].file_id, Some(1));
+        assert_eq!(refs[0].min_ts, 10);
+        assert_eq!(refs[0].max_ts, 20);
+    }
+
+    #[test]
+    fn same_file_key_with_different_file_ids_uses_lowest_positive_id() {
+        let refs = select_file_refs_for_window(
+            vec![
+                file(2, "files/org/logs/s/2024/01/01/a.parquet", 10, 20, false),
+                file(1, "files/org/logs/s/2024/01/01/a.parquet", 10, 20, false),
+            ],
+            10,
+            20,
+        )
+        .unwrap();
+
+        assert_eq!(refs.len(), 1);
+        assert_eq!(refs[0].file_id, Some(1));
+    }
+
+    #[test]
+    fn same_file_key_and_id_with_differing_timestamps_uses_lowest_time_tuple() {
+        let refs = select_file_refs_for_window(
+            vec![
+                file(1, "files/org/logs/s/2024/01/01/a.parquet", 10, 20, false),
+                file(1, "files/org/logs/s/2024/01/01/a.parquet", 5, 25, false),
+            ],
+            1,
+            30,
+        )
+        .unwrap();
+
+        assert_eq!(refs.len(), 1);
+        assert_eq!(refs[0].min_ts, 5);
+        assert_eq!(refs[0].max_ts, 25);
+    }
+
+    #[test]
+    fn shuffled_duplicate_input_produces_same_canonical_output() {
+        let files = vec![
+            file(2, "files/org/logs/s/2024/01/01/a.parquet", 10, 20, false),
+            file(1, "files/org/logs/s/2024/01/01/a.parquet", 5, 25, false),
+            file(1, "files/org/logs/s/2024/01/01/a.parquet", 10, 20, false),
+        ];
+        let mut shuffled = files.clone();
+        shuffled.reverse();
+
+        assert_eq!(
+            select_file_refs_for_window(files, 1, 30).unwrap(),
+            select_file_refs_for_window(shuffled, 1, 30).unwrap()
+        );
+    }
+
+    #[test]
+    fn deleted_duplicate_records_are_excluded_before_canonicalization() {
+        let refs = select_file_refs_for_window(
+            vec![
+                file(1, "files/org/logs/s/2024/01/01/a.parquet", 5, 25, true),
+                file(2, "files/org/logs/s/2024/01/01/a.parquet", 10, 20, false),
+            ],
+            1,
+            30,
+        )
+        .unwrap();
+
+        assert_eq!(refs.len(), 1);
+        assert_eq!(refs[0].file_id, Some(2));
+        assert_eq!(refs[0].min_ts, 10);
+        assert_eq!(refs[0].max_ts, 20);
+    }
+
+    #[test]
+    fn stream_ordering_is_deterministic_by_type_then_name() {
+        let mut streams = vec![
+            AlertSnapshotStream {
+                stream_type: StreamType::Metrics,
+                stream_name: "z".to_string(),
+                files: vec![],
+            },
+            AlertSnapshotStream {
+                stream_type: StreamType::Logs,
+                stream_name: "b".to_string(),
+                files: vec![],
+            },
+            AlertSnapshotStream {
+                stream_type: StreamType::Logs,
+                stream_name: "a".to_string(),
+                files: vec![],
+            },
+        ];
+
+        sort_streams(&mut streams);
+
+        assert_eq!(
+            streams
+                .iter()
+                .map(|s| (s.stream_type, s.stream_name.as_str()))
+                .collect::<Vec<_>>(),
+            vec![
+                (StreamType::Logs, "a"),
+                (StreamType::Logs, "b"),
+                (StreamType::Metrics, "z"),
+            ]
+        );
+    }
+
+    #[test]
+    fn occurrence_identity_is_stable() {
+        let alert_id = Ksuid::new(None, None);
+        let a = occurrence("org1", alert_id, 10, 20);
+        let b = occurrence("org1", alert_id, 10, 20);
+
+        assert_eq!(a.key(), b.key());
+    }
+
+    #[test]
+    fn different_alert_windows_create_different_identities() {
+        let alert_id = Ksuid::new(None, None);
+        let a = occurrence("org1", alert_id, 10, 20);
+        let b = occurrence("org1", alert_id, 10, 21);
+
+        assert_ne!(a.key(), b.key());
+    }
+
+    #[test]
+    fn different_organizations_cannot_produce_same_occurrence_identity() {
+        let alert_id = Ksuid::new(None, None);
+        let a = occurrence("org1", alert_id, 10, 20);
+        let b = occurrence("org2", alert_id, 10, 20);
+
+        assert_ne!(a.key(), b.key());
+    }
+
+    #[test]
+    fn different_alert_ids_cannot_produce_same_occurrence_identity() {
+        let a = occurrence("org1", Ksuid::new(None, None), 10, 20);
+        let b = occurrence("org1", Ksuid::new(None, None), 10, 20);
+
+        assert_ne!(a.key(), b.key());
+    }
+
+    #[test]
+    fn scheduled_manifest_uses_one_source_stream_for_mvp() {
+        let alert_id = Ksuid::new(None, None);
+        let manifest = build_scheduled_snapshot_manifest(
+            ScheduledSnapshotInput {
+                org_id: "org1".to_string(),
+                alert_id,
+                alert_name: Some("cpu_high".to_string()),
+                stream_type: StreamType::Logs,
+                stream_name: "app".to_string(),
+                trigger_timestamp: 30,
+                window_start: 10,
+                window_end: 20,
+                created_at: 31,
+            },
+            vec![file(
+                1,
+                "files/org1/logs/app/2024/01/01/a.parquet",
+                10,
+                20,
+                false,
+            )],
+        )
+        .unwrap();
+
+        assert_eq!(manifest.schema_version, ALERT_SNAPSHOT_SCHEMA_VERSION);
+        assert_eq!(manifest.org_id, "org1");
+        assert_eq!(manifest.alert_id, alert_id);
+        assert_eq!(manifest.streams.len(), 1);
+        assert_eq!(manifest.streams[0].stream_type, StreamType::Logs);
+        assert_eq!(manifest.streams[0].stream_name, "app");
+        assert_eq!(manifest.streams[0].files.len(), 1);
+    }
+}

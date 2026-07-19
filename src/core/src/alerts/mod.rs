@@ -56,6 +56,7 @@ pub mod incidents;
 #[cfg(feature = "enterprise")]
 pub mod org_config;
 pub mod scheduler;
+pub(crate) mod snapshots;
 pub mod templates;
 
 #[async_trait]
