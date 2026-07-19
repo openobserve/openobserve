@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       store.state.printMode ? '' : 'h-full overflow-y-auto',
     ]"
   >
-    <div class="px-2.5 render-dashboard-charts-container">
+    <div class="px-page-edge render-dashboard-charts-container">
       <!-- flag to check if dashboardVariablesAndPanelsDataLoaded which is used while print mode-->
       <span class="hidden"
         v-if="isDashboardVariablesAndPanelsDataLoadedDebouncedValue"

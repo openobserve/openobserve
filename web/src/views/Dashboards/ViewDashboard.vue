@@ -49,7 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 ? { label: t('dashboard.header'), onClick: goBackToDashboardList, dataTest: 'dashboard-back-btn' }
                 : undefined
             "
-            class="px-4 border-b border-border-default"
+            class="px-page-edge border-b border-border-default"
           >
           <template #title>
             <span data-test="dashboard-name-title">{{ currentDashboardData.data?.title }}</span>

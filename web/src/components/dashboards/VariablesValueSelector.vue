@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     v-if="variablesData.values?.length > 0"
-    class="flex flex-wrap mt-1 ml-1"
+    class="flex flex-wrap mt-1"
   >
     <div
       v-for="(item, index) in variablesData.values"
