@@ -15,13 +15,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="w-full h-full flex flex-col min-h-0">
-    <AppPageHeader
-      :title="t('alerts.insights.title')"
-      :back="{ onClick: goBack, dataTest: 'alert-insights-back-btn' }"
-      tabs-below
-      class="shrink-0"
-    >
+  <PageLayout
+    :title="t('alerts.insights.title')"
+    :back="{ onClick: goBack, dataTest: 'alert-insights-back-btn' }"
+    tabs-below
+    bleed
+  >
       <template #actions>
         <date-time
           ref="dateTimeRef"
@@ -49,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
       </template>
 
-      <template #tabs>
+      <template #header-tabs>
         <OTabs
           v-model="currentTab"
           dense
@@ -72,7 +71,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTab name="quality" :label="t('alerts.insights.tabs.quality')" data-test="tab-quality" />
         </OTabs>
       </template>
-    </AppPageHeader>
 
     <!-- Filters Section -->
     <div
@@ -252,14 +250,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @edit-alert="handleEditAlert"
       @view-history="handleViewHistory"
     />
-  </div>
+  </PageLayout>
 </template>
 
 <script setup lang="ts">
 import OTabs from '@/lib/navigation/Tabs/OTabs.vue'
 import OTab from '@/lib/navigation/Tabs/OTab.vue'
 import OButton from '@/lib/core/Button/OButton.vue';
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import PageLayout from "@/components/common/PageLayout.vue";
 import { ref, computed, onMounted, watch, nextTick, reactive, provide } from "vue";
 import { useRouter, useRoute } from "vue-router";
 import { useStore } from "vuex";

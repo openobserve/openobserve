@@ -69,6 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :back="back"
           :breadcrumb="breadcrumb"
           :title-data-test="titleDataTest"
+          :tabs-below="tabsBelow"
         >
           <template v-if="!!slots.title" #title><slot name="title" /></template>
           <template v-if="!!slots['title-prefix']" #title-prefix><slot name="title-prefix" /></template>
@@ -187,6 +188,8 @@ const props = withDefaults(
     back?: BackTarget;
     breadcrumb?: BreadcrumbItem[];
     titleDataTest?: string;
+    /** Render #header-tabs on a second row below the title (Level-2 module nav). */
+    tabsBelow?: boolean;
     // Body
     bleed?: boolean;
     padY?: boolean;
@@ -204,6 +207,7 @@ const props = withDefaults(
     headerClass?: string;
   }>(),
   {
+    tabsBelow: false,
     bleed: false,
     padY: false,
     scroll: false,

@@ -15,16 +15,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div
+  <PageLayout
     data-test="alert-history-page"
-    class="w-full h-full flex flex-col min-h-0"
+    :title="t('alerts.history')"
+    title-data-test="alerts-history-title"
+    :back="{ onClick: goBack, dataTest: 'alert-history-back-btn' }"
+    bleed
   >
-    <AppPageHeader
-      :title="t('alerts.history')"
-      title-data-test="alerts-history-title"
-      :back="{ onClick: goBack, dataTest: 'alert-history-back-btn' }"
-      class="shrink-0 border-b border-border-default"
-    >
       <template #actions>
         <DateTime
           ref="dateTimeRef"
@@ -83,7 +80,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTooltip :content="t('common.refresh') || 'Refresh'" />
         </OButton>
       </template>
-    </AppPageHeader>
     <div class="flex-1 min-h-0 px-2.5 pt-2">
       <div class="bg-card-glass-bg h-full">
         <OTable
@@ -436,7 +432,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </ODialog>
-  </div>
+  </PageLayout>
 </template>
 
 <script setup lang="ts">
@@ -452,7 +448,7 @@ import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import alertsService from "@/services/alerts";
 import NoData from "@/components/shared/grid/NoData.vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import PageLayout from "@/components/common/PageLayout.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from '@/lib/core/Button/OButton.vue';
