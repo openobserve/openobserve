@@ -24,10 +24,8 @@
  *   Index 1  : by_expires (expiresAt)  — used by evictExpired for TTL sweeps
  *   Index 2  : by_updated (updatedAt)  — used by trimToMaxFields to evict LRU
  *
- * Why two indexes?
- *   evictExpired needs records sorted by expiry time (delete the expired ones).
- *   trimToMaxFields needs records sorted by last-used time (delete the oldest).
- *   These are different orderings so they require separate indexes.
+ * Two indexes because the orderings differ: by expiry time (TTL) vs by
+ * last-used time (LRU).
  */
 
 const DB_NAME = "o2FieldValues";
@@ -50,22 +48,13 @@ let _db: IDBDatabase | null = null;
 
 /**
  * Opens the database lazily — returns the cached connection on subsequent calls.
+ * Lazy open avoids the ~5–10ms IDB open cost for users who never trigger
+ * autocomplete; the cached connection is reused so all operations share one
+ * transaction queue.
  *
- * Why lazy (open on first use, not at app startup)?
- * IDB open is async and costs ~5–10ms. Opening eagerly would always pay that
- * cost even if the user never uses the query editor or never triggers
- * autocomplete. Lazy open means zero cost for users who don't need it.
- *
- * Why cache the connection in _db?
- * IDBDatabase.open() creates a new connection object each time. Connections
- * are cheap but not free. More importantly, reusing one connection means all
- * operations share the same transaction queue, which is correct IDB behaviour.
- *
- * onclose / onversionchange handlers:
- * If another tab opens a newer version of this DB (DB_VERSION bumped in a
- * future release), the browser fires versionchange on existing connections and
- * then closes them. We close and null out _db so the next call to openDB()
- * reopens cleanly with the new version.
+ * onclose / onversionchange: if another tab opens a newer DB version, the
+ * browser closes existing connections — we null out _db so the next openDB()
+ * reopens cleanly.
  */
 export const openDB = (): Promise<IDBDatabase> => {
   if (_db) return Promise.resolve(_db);
@@ -103,19 +92,13 @@ export const openDB = (): Promise<IDBDatabase> => {
  * Used by captureFromValuesApi (Values API path — one field at a time).
  *
  * Merge strategy:
- *   existing values + incoming values → deduplicate via Set → cap to maxValues
- *   If total > maxValues, keep the LAST maxValues (most recently seen / freshest).
+ *   existing values + incoming values → deduplicate via Set → cap to maxValues,
+ *   keeping the LAST maxValues (freshest).
  *
- * Why sliding TTL (reset expiresAt on every write)?
- *   Fields from streams you query frequently stay fresh forever — every new
- *   search resets their 7-day clock. Fields from streams you stop using expire
- *   naturally after 7 days of inactivity without any manual cleanup.
+ * Sliding TTL: expiresAt is reset on every write, so frequently-queried fields
+ * stay fresh and streams you stop using expire naturally after the TTL.
  *
- * Why track source ("values_api" | "search_hits" | "mixed")?
- *   Purely for debugging. In DevTools → Application → IndexedDB you can see
- *   whether a field's values came from explicit field expansion (values_api),
- *   passively from search results (search_hits), or both (mixed). Helps when
- *   investigating why certain values appear or don't appear in autocomplete.
+ * `source` ("values_api" | "search_hits" | "mixed") is tracked for debugging only.
  */
 export const mergeValues = async (
   key: string,
@@ -132,13 +115,10 @@ export const mergeValues = async (
     getReq.onsuccess = () => {
       const existing: FieldValueRecord | undefined = getReq.result;
       // Combine existing + incoming into a Set for automatic deduplication.
-      // No need to manually check "have I seen this value before?".
       const valueSet = new Set(existing?.values ?? []);
       for (const v of incoming) valueSet.add(String(v));
       const merged = Array.from(valueSet);
-      // Keep the last maxValues entries — the most recently added values are
-      // at the end of the array and are most likely to be relevant to the
-      // user's current query context.
+      // Keep the last maxValues entries (most recently added, at the array's end).
       const values =
         merged.length > maxValues
           ? merged.slice(merged.length - maxValues)
@@ -166,14 +146,9 @@ export const mergeValues = async (
  * Merge values for multiple fields in a single IDB transaction.
  * Used by captureFromSearchHits — the hot path after every Run Query.
  *
- * Why one transaction instead of N mergeValues calls?
- * IDB transactions have a fixed cost: acquire the store lock, execute
- * operations, commit. If a stream has 40 fields, calling mergeValues 40 times
- * = 40 separate transactions = 40× that fixed cost. One transaction with 40
- * get+put operations = 1× that cost. On a wide schema this is ~40× cheaper.
- *
- * The merge logic per field is identical to mergeValues above — the only
- * difference is that all operations share one tx.oncomplete callback.
+ * One transaction instead of N mergeValues calls: IDB transactions have a fixed
+ * per-tx cost, so batching 40 fields into one tx is ~40× cheaper than 40 txs.
+ * Per-field merge logic is identical to mergeValues.
  */
 export const mergeMultipleValues = async (
   entries: Array<{
@@ -217,8 +192,7 @@ export const mergeMultipleValues = async (
       };
     }
 
-    // All get+put operations for every field complete before this fires.
-    // Resolving here means the caller knows the full batch is safely written.
+    // Resolves once every field's get+put has completed — the full batch is written.
     tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error);
   });
@@ -228,11 +202,8 @@ export const mergeMultipleValues = async (
  * Fast point-read for a single field's values.
  * Returns empty array if record is missing or expired.
  *
- * Why check expiresAt at read time (not just rely on evictExpired)?
- * evictExpired only runs on ~5% of searches — a record can be expired but not
- * yet swept from the DB. Without this check, we could serve stale values to
- * autocomplete for up to several searches after the TTL has passed.
- * This makes the read authoritative regardless of when cleanup last ran.
+ * Checks expiresAt at read time (not just via evictExpired, which runs on ~5%
+ * of searches) so an expired-but-not-yet-swept record never serves stale values.
  */
 export const getValues = async (key: string): Promise<string[]> => {
   let db: IDBDatabase;
@@ -268,16 +239,9 @@ export const getValues = async (key: string): Promise<string[]> => {
  * Evict all records whose expiresAt < now (TTL cleanup).
  * Called opportunistically on ~5% of searches to amortize the scan cost.
  *
- * Why use the by_expires index instead of a full store scan?
- * A full scan would read every record regardless of expiry status.
- * IDBKeyRange.upperBound(now, true) on the by_expires index reads ONLY records
- * with expiresAt < now — exactly the ones we want to delete. On 5000 records
- * with 10 expired, this reads 10 records instead of 5000. O(expired) not O(total).
- *
- * Why "opportunistic" (5% chance) instead of every search?
- * When nothing has expired (the common case), this scan still costs ~5–10ms.
- * Running it on every search wastes that time for zero benefit. 1-in-20 gives
- * periodic cleanup while spreading the cost across many searches.
+ * Uses the by_expires index so the cursor reads ONLY expired records —
+ * O(expired), not O(total). Opportunistic rather than every-search because the
+ * scan costs ~5–10ms even when nothing has expired.
  */
 export const evictExpired = async (): Promise<number> => {
   const db = await openDB();
@@ -308,15 +272,9 @@ export const evictExpired = async (): Promise<number> => {
  * Trim total record count to maxFields — evict least-recently-used fields first.
  * Called opportunistically alongside evictExpired (~5% of searches).
  *
- * Why trim by updatedAt (oldest first)?
- * Fields with the oldest updatedAt are the ones the user hasn't queried in the
- * longest time — least likely to be useful in autocomplete. Evicting them
- * preserves the most relevant, recently-used field values.
- *
- * Why is this a last-resort guard?
- * In practice, 5000 fields = ~100 streams × 50 fields each, which is far more
- * than most users will encounter. This function is mainly here to prevent
- * unbounded growth in edge cases (many orgs, many streams, very long sessions).
+ * Trims by updatedAt (oldest first): the least-recently-queried fields are least
+ * useful in autocomplete. A last-resort guard against unbounded growth in edge
+ * cases (many orgs/streams, very long sessions).
  */
 export const trimToMaxFields = async (maxFields: number): Promise<void> => {
   const db = await openDB();

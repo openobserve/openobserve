@@ -23,23 +23,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <div class="flex flex-col h-full min-h-0 w-full" data-test="metrics-explorer">
-    <!-- No page title. Metrics is an EXPLORE surface, like Logs and Traces:
-         you arrive to look at data, so the data starts at the top of the frame.
-         An H1 saying "Metrics" above a nav item already saying "Metrics" bought
-         nothing and cost ~68px of chart. AppPageHeader stays where it earns its
-         keep — settings, billing, list and detail pages.
-
-         So the first row IS the toolbar, and it carries both clusters the way
-         the Logs toolbar does: scope on the left (what you are looking at),
-         time on the right (which window, and how often it reloads). -->
-    <!-- items-center: every control on this row (mode toggle, filter label +
-         button, time picker, refresh) sits on one centred line. LabelFilterBar
-         wraps its OWN chips internally (flex-wrap), so the row does not need
-         items-start to let chips grow — that only left the controls top-aligned
-         and visibly out of line with each other. -->
+    <!-- No page title: Metrics is an EXPLORE surface like Logs and Traces, so the
+         first row is the toolbar — scope on the left, time on the right, like the
+         Logs toolbar. -->
+    <!-- items-center: LabelFilterBar wraps its own chips internally (flex-wrap),
+         so the row keeps every control on one centred line rather than items-start. -->
     <!-- `p-1.5`, the SAME padding the Logs and Traces toolbars use
-         (SearchBar.vue:23 / traces SearchBar.vue:19). The toolbars are the same
-         object; they must share geometry. -->
+         (SearchBar.vue:23 / traces SearchBar.vue:19), so the toolbars share geometry. -->
     <div
       class="flex items-center gap-2 shrink-0 p-1.5 border-b border-border-default"
       data-test="metrics-explorer-filter-bar"
@@ -83,13 +73,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="sm"
           data-test="metrics-explorer-mode-workspace"
         >
-          <!-- The SAME ♥ the card's button carries: the icon the user clicks to
-               fill this tab is the icon that names it.
-
-               `favorite-border` (outline), not the filled `favorite`: a filled
-               heart is the card's ON state — on a tab it reads as "already
-               favourited" rather than "your favourites live here". The tab names
-               a place; it is not itself a toggle. -->
+          <!-- `favorite-border` (outline), not the filled `favorite`: a filled
+               heart is the card's ON state and on a tab would read as "already
+               favourited" rather than "your favourites live here". -->
           <template #icon-left>
             <OIcon name="favorite-border" size="sm" class="shrink-0" />
           </template>
@@ -130,23 +116,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!--
-      The filter row.
+      The filter row. Its own line, not a slot in the toolbar: a matcher's width
+      is unbounded (a regex value, any number of them), so it needs the full width.
 
-      Its own line, not a slot in the toolbar: filters are the one control here
-      whose width is UNBOUNDED (a matcher is `label=value`, the value can be a
-      regex, and there can be any number of them), and sharing a line with the
-      fixed-width mode toggle and time cluster meant they were permanently
-      squeezed. Given the full width, the chips simply fit.
-
-      ALWAYS present in grid mode, never `v-if="labelFilters.length"`. A row that
-      appears with the first filter would push the whole grid down at the exact
-      moment the user is reading it — the same shift we removed from the facet
-      panel's Clear control. The picker is the row's resting state, so the height
-      is identical at zero filters and at ten.
+      ALWAYS present in grid mode, never `v-if="labelFilters.length"` — a row that
+      appeared with the first filter would push the grid down as the user reads it.
 
       Explore + Workspace only: in Visualize the PromQL query carries its own
-      matchers, so a filter bar would be a second, conflicting way to say the
-      same thing — the same split Logs' visualize uses.
+      matchers, so a filter bar would conflict with it.
     -->
     <div
       v-if="isGridMode"
@@ -376,11 +353,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </OToggleGroup>
 
-          <!-- Convert to dashboard — the bridge from ephemeral Favourites to a
-               durable Dashboard: each favourite becomes a panel. FAVOURITES only,
-               where they are what's on screen, so "convert what I'm looking at"
-               is unambiguous. This is why Favourites needs no save of its own —
-               you promote it to a real Dashboard instead. -->
+          <!-- Convert to dashboard: each favourite becomes a panel. FAVOURITES
+               only, where they are what's on screen. -->
           <OButton
             v-if="isWorkspace && grid.favorites.value.length"
             variant="outline"

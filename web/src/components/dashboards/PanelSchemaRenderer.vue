@@ -505,11 +505,6 @@ export default defineComponent({
     // - PreviewAlert.vue (no page key) - doesn't need it
     // - PanelContainer.vue (no page key) - doesn't need it
     // - PreviewPromqlQuery.vue (no page key) - doesn't need it
-    //
-    // To avoid breaking these other contexts, we:
-    // 1. Inject with null default to detect if page key was explicitly provided
-    // 2. Only call useDashboardPanelData if a page key exists
-    // 3. Return empty array [] if no hiddenQueries (no filtering applied)
     // ============================================================================
 
     const dashboardPanelDataPageKey: any = inject(
@@ -532,7 +527,6 @@ export default defineComponent({
       return dashboardPanelDataForHiding?.layout?.hiddenQueries || [];
     });
 
-    // stores the converted data which can be directly used for rendering different types of panels
     const panelData: any = shallowRef({}); // holds the data to render the panel after getting data from the api based on panel config
     const chartPanelRef: any = ref(null); // holds the ref to the whole div
     const chartRendererRef: any = ref(null); // holds the ref to the ChartRenderer component

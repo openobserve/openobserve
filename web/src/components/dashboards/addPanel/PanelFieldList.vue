@@ -508,33 +508,25 @@ const hideAllFieldsSelection = computed(() => props.hideAllFieldsSelection ?? fa
 
 /**
  * The badge is the type's INITIAL — `C`ounter, `G`auge, `H`istogram, `S`ummary,
- * `O`ther — not the whole word: it sits beside metric names that are already
- * long, and a full word pushed them into truncation. A letter is still learnable
- * in a way the old per-type icons (a hash, bars, a speedometer) were not.
+ * `O`ther — not the whole word, which pushed already-long metric names into
+ * truncation.
  */
 const initialOf = (label: string) => label.charAt(0).toUpperCase();
 
 /**
  * Stream name -> type-filter BUCKET id (`counter`, `gauge`, …), not its label.
- *
- * The bucket id is what both the label and the colour are keyed on, so it is
- * what gets carried around. Mapping to the label here and recovering the id
- * later with `label.toLowerCase()` worked only for as long as every label stayed
- * the capitalized spelling of its id — the day one reads "Gauge (native)", or is
- * translated, the lookup misses and the badge silently turns grey. Deriving the
- * label from the id is safe; deriving the id from the label is not.
+ * The bucket id keys both the label and the colour, so it is what gets carried
+ * around. Deriving the label from the id is safe; deriving the id from the label
+ * is not — a translated or decorated label misses the lookup and turns grey.
  */
 const metricTypeBuckets = computed<Record<string, string>>(() => {
   if (currentStreamType.value !== "metrics") return {};
   const streams = (dashboardPanelData.meta.stream.streamResults ?? []) as any[];
 
   // `buildTypeFilterBuckets`, not `buildMetricCards`: a badge needs one word per
-  // stream, and building the whole rule set — every variant, expression, legend
-  // and unit for every metric in the org — to get it was a heavy pass on a list
-  // that can run to thousands. This one runs the family model and the card-kind
-  // dispatch and stops. It also answers for the metadata-only family bases that
-  // `buildMetricCards` suppresses but the dropdown still lists, so the declared-
-  // type fallback that used to patch those up is gone.
+  // stream, and building the whole rule set for every metric would be a heavy
+  // pass on a list that can run to thousands. It also answers for the metadata-
+  // only family bases that `buildMetricCards` suppresses but the dropdown lists.
   return buildTypeFilterBuckets(streams);
 });
 
@@ -671,15 +663,12 @@ const streamOptions = computed(() =>
     const type = bucket ? (BADGE_LABELS[bucket] ?? "Other") : undefined;
     return {
       ...s,
-      // The chip is the initial; hovering it spells the type out. `C` alone is
-      // compact but ambiguous (Counter? Count?) — the title is what resolves it.
+      // The chip is the initial; hovering it (the title) spells the type out.
       badge: type ? initialOf(type) : undefined,
       badgeTitle: type,
       // Colour-coded from the SAME palette the Metrics Explorer badges use —
       // Counter blue, Gauge green, Histogram purple, Summary orange, Other grey —
-      // so a type looks the same wherever you meet it. A badge that classifies
-      // must be colour-coded to be worth anything; the default green-on-every-row
-      // outline carried no information at all.
+      // so a type looks the same wherever you meet it.
       badgeStyle: bucket
         ? getBadgeStyle(bucket, isDark.value)
         : undefined,
@@ -1048,16 +1037,10 @@ function onDragEnd(_row: FieldItem, _event: DragEvent) {
 
 // ── Sort ───────────────────────────────────────────────────────────────
 
-// We intentionally return 0 (no-op) here.
-//
-// `flattenGroupedFields` already produces the correct order:
-//   [customQueryFields…, vrlFunctionFields…, group_A_header, A_fields…, group_B_header, B_fields…]
-//
-// A naive sort that says "group headers come first" (the previous logic)
-// hoists every group header to the very top of the flat array — which is
-// what caused both stream headers (`_anomalies`, `default`) to stack at
-// the top with all fields jammed underneath the *second* group. Returning
-// 0 preserves the natural section-by-section order from flattenGroupedFields.
+// Intentional no-op: `flattenGroupedFields` already emits rows in section order
+// (query/vrl fields, then each group header followed by its fields). A real sort
+// that hoisted group headers first stacked every header at the top with the
+// fields jammed under the wrong group, so preserve the given order.
 function sortFieldsFn(_a: FieldItem, _b: FieldItem): number {
   return 0;
 }

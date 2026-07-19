@@ -915,11 +915,8 @@ export default defineComponent({
      * Returns the correct SQL field name for the service name column in WHERE clauses.
      *
      * Inferred services (those discovered from span attributes rather than instrumented
-     * SDKs) use `infer_service_name`, while regular instrumented services use `service_name`.
-     * The distinction is driven by `props.selectedNode.service_type`:
-     * - When `service_type` is set (e.g. "database", "queue", "rpc", "http"), the node
-     *   represents an inferred service → `infer_service_name`.
-     * - When `service_type` is absent, the node represents an instrumented service → `service_name`.
+     * SDKs, i.e. nodes carrying a `service_type`) use `infer_service_name`, while regular
+     * instrumented services use `service_name`.
      */
     const serviceNameField = computed(() =>
       props.selectedNode?.service_type ? "infer_service_name" : "service_name",

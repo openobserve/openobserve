@@ -67,21 +67,12 @@ type NormalizedOption = {
   colorPalette?: string[];
   /** Optional badge/chip text rendered inline next to the label (e.g. "recommended"). */
   badge?: string;
-  /**
-   * Tooltip for the badge. Use when the badge is abbreviated — a one-letter chip
-   * is compact but not self-explanatory, and this is what tells you `C` is
-   * "Counter" without costing a row of width.
-   */
+  /** Tooltip for the badge. Use when the badge is abbreviated (e.g. `C` → "Counter"). */
   badgeTitle?: string;
   /**
-   * Per-option badge colours, e.g. `{ color, background }`. Without it the badge
-   * is a green outline — fine for a one-off "recommended" tag, wrong for a badge
-   * that CLASSIFIES (every option green says nothing). Supplying a style turns it
-   * into a filled pill in that option's own colour, right-aligned so the chips
-   * form a single scannable column instead of ragging along the label ends.
-   *
-   * The right-align applies only to STYLED badges: a bare "recommended" tag reads
-   * as part of the label and belongs next to it, so those are left where they are.
+   * Per-option badge colours, e.g. `{ color, background }`. A styled badge renders
+   * as a filled pill in that option's own colour, right-aligned into a single
+   * column; a bare (unstyled) badge stays inline next to the label.
    */
   badgeStyle?: Record<string, string>;
 };

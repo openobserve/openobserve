@@ -1702,13 +1702,6 @@ export function useMetricsExplorerGrid() {
     queue.clearCache();
   };
 
-  /**
-   * Runs one query for a ⚙-dialog tile.
-   *
-   * Deliberately shares the grid's scheduler and cache: dialog tiles outrank
-   * background grid work while the dialog is open, and a tile whose query the
-   * grid already ran is a cache hit rather than a second request.
-   */
   /** Distinguishes dialog interest from card interest on the same query. */
   const DIALOG_OWNER = "\u0000dialog";
 

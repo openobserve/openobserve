@@ -19,28 +19,16 @@ import { useTypewriterPlaceholder } from "@/components/ai-assistant/welcome/useT
 /**
  * The typewriter hint on the empty filter row.
  *
- * Prefers the org's REAL label names — the way the Logs editor's placeholder is
- * generated from real stream fields rather than invented copy — and falls back to
- * static examples until they exist.
- *
- * The fallback is the common case, and deliberately so: label names are fetched
- * lazily, on the first click of `+ Filter` (`@focus-picker`), because the call
- * walks up to three widening time windows against a backend that already times
- * out on heavy metrics. Firing that on every page load to animate a hint would
- * be a bad trade. So the row teaches the SHAPE of a filter for free, and sharpens
- * itself into real names once the user has opened the picker once.
+ * Prefers the org's real label names, falling back to static examples until they
+ * exist. Label names are fetched lazily on the first click of `+ Filter`
+ * (`@focus-picker`) — that call walks up to three widening time windows against a
+ * backend that already times out on heavy metrics, so it must not fire on page load.
  */
 
 /**
- * Matcher shapes, not real labels — examples of syntax, so they do not pretend
- * to be this org's data.
- *
- * Two of the four demonstrate ALTERNATION (`a|b`) rather than just regex,
- * because that is the one thing the UI cannot otherwise teach: chips are ANDed,
- * PromQL has no selector-level OR, and this engine rejects `or` matchers — so
- * `=~ "500|503"` is the ONLY way to say "either of these", and nothing else on
- * screen would ever show a user that. A bare `5..` proves regex works but leaves
- * the question they actually have unanswered.
+ * Matcher shapes, not real labels — examples of syntax. Two of the four show
+ * ALTERNATION (`a|b`): chips are ANDed and this engine has no OR matcher, so
+ * `=~ "500|503"` is the only way to say "either of these".
  */
 const EXAMPLES = [
   'pod = "api-1"',

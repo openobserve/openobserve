@@ -202,11 +202,8 @@ export const calculateRotatedLabelBottomSpace = (
     // Only add if totalNeeded exceeds a reasonable base (e.g., 40px)
     return Math.max(0, Math.ceil(totalNeededSpace - 40));
   } else {
-    // Without axis name, containLabel: true in grid config handles the space automatically
-    // for rotated labels. No additional bottom spacing is needed because:
-    // 1. containLabel: true makes ECharts automatically expand grid to fit labels
-    // 2. The grid.bottom value already provides base spacing
-    // 3. Adding extra space here causes unnecessary whitespace
+    // Without an axis name, grid's containLabel: true expands the grid to fit
+    // rotated labels, so no extra bottom spacing is needed.
     return 10; // Let ECharts handle it with containLabel
   }
 };

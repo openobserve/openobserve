@@ -36,8 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          Pin / Open. -->
     <!-- Matches the dashboard panel bar's box (PanelContainer's
          dashboard-panel-bar): same min-height, padding and bottom border, no
-         tint. Identical in both views: rows view is grid view with a single,
-         wider column, not a different card. -->
+         tint. -->
     <div
       class="relative flex items-center gap-2 min-w-0 min-h-7 py-1 px-2 border-b border-border-default"
     >
@@ -45,8 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            footer, where it cannot truncate the name it describes. -->
       <div class="flex items-center gap-1.5 min-w-0">
         <!-- Matches the dashboard panel title's classes (PanelContainer's
-             dashboard-panel-header): same size, weight, tracking and token, so
-             a card's title and the panel it becomes read identically. -->
+             dashboard-panel-header): same size, weight, tracking and token. -->
         <span
           class="whitespace-nowrap overflow-hidden text-ellipsis text-compact font-medium text-text-heading tracking-[0.02em]"
           :title="card.name"
@@ -59,18 +57,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="flex-1" />
 
       <!-- The action row: `size="icon"` buttons sitting adjacent (no gap).
-           Order (left→right): Help → Configure → Open → Pin → 🕑 clock → Refresh.
-           Secondary/info actions (Help, Config) group on the left; the primary
-           card actions (Open, Pin) in the middle; the freshness cluster (clock +
-           Refresh) sits rightmost, matching how the dashboard bar keeps refresh
-           and the last-refreshed stamp together at the edge. -->
+           Order (left→right): Help → Configure → Open → Pin → 🕑 clock → Refresh. -->
       <div class="flex flex-nowrap items-center shrink-0">
         <!-- Help — the SAME element the dashboard panel bar uses for its panel
              description (PanelContainer `dashboard-panel-description-info`): an
              info-outline icon with a width-capped, pre-wrapped OTooltip. NOT a
              dropdown item — a full help sentence in an unbounded menu item blew
-             the menu out to full-page width. This keeps the long text in a
-             bounded floating tooltip where it reads in full. -->
+             the menu out to full-page width. -->
         <OButton
           v-if="card.help"
           variant="ghost"
@@ -108,8 +101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
 
         <!-- The drill-in. The ONLY thing that navigates; the chart and card are
-             not click targets, so the metric name stays selectable. It is the
-             primary action on the card.
+             not click targets, so the metric name stays selectable.
 
              `edit`, not `open-in-new`: this opens the metric in the in-page
              Visualize workspace to CHANGE it (query, chart type, functions), and

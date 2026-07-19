@@ -50,8 +50,6 @@ export const processData = (
   const { top_results, top_results_others } = panelSchema.config;
 
   // get the limit series from the config
-  // if top_results is enabled then use the top_results value
-  // otherwise use the max_dashboard_series value
   let limitSeries = top_results
     ? (Math.min(
         top_results,
@@ -61,7 +59,6 @@ export const processData = (
 
   // For multi y-axis charts, divide the limit by number of y-axes
   // to keep total series count at or below max_dashboard_series
-  // This applies when there are multiple y-axes AND breakdown fields
   if (yAxisKeys.length > 1 && breakDownKeys.length > 0) {
     limitSeries = Math.floor(limitSeries / yAxisKeys.length);
   }

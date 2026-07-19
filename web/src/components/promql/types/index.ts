@@ -78,12 +78,8 @@ export interface PromqlBuilderQuery {
 }
 
 /**
- * How the step picker groups the catalog.
- *
- * Grouping is ours to choose — PromQL has no notion of it. We cut it by what a
- * step DOES to the data, which is the question someone building a query is
- * actually asking: turn a counter into a rate, collapse series together, do
- * arithmetic, ask about the clock.
+ * How the step picker groups the catalog. Grouping is ours to choose — PromQL
+ * has no notion of it; we group by what a step DOES to the data.
  */
 export enum PromqlStepGroup {
   /** Counter -> per-second rate, and anything else that reads over a window. */

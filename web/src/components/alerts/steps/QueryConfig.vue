@@ -1954,18 +1954,12 @@ export default defineComponent({
 
     // Emit trigger condition update (for non-aggregation mode).
     //
-    // Emit the CURRENT FORM value, never `props.triggerCondition`. The prop is
-    // `formData.trigger_condition` — a `form.useStore` read-view that only
-    // refreshes on the next render. Every caller here is a handler that JUST
-    // wrote fields via setFV in the same tick, so the prop still holds the
-    // PRE-write snapshot. The parent's `update:triggerCondition` handler does
-    // `setFieldValue("trigger_condition", value)` — a WHOLE-OBJECT write — so
-    // emitting the stale prop round-tripped it back and CLOBBERED those writes.
-    // That is what silently ate the cron seed: onFrequencyUnitChange wrote
-    // frequency_type='cron' + cron='0 */10 * * * *', then this emit put
-    // {frequency_type:'minutes', cron:''} straight back, leaving the cron input
-    // empty with "Cron expression and timezone are required".
-    // `fv` is form.getFieldValue — a synchronous, always-fresh read.
+    // Emit the CURRENT FORM value (`fv` = form.getFieldValue, a synchronous
+    // always-fresh read), never `props.triggerCondition` — the prop is a
+    // `form.useStore` read-view that only refreshes next render, so it still
+    // holds the PRE-write snapshot in a same-tick handler, and the parent's
+    // whole-object `setFieldValue("trigger_condition", value)` would round-trip
+    // that stale value back and clobber the writes.
     // `overrides` mirrors emitAggregationUpdate: a consumer @update:model-value
     // handler runs BEFORE field.handleChange commits, so `fv("trigger_condition")`
     // still holds the OLD value there. Callers that have the new value in hand must

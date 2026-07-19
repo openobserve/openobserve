@@ -23,12 +23,6 @@
  * 1. Add a new entry to features.json
  * 2. Add corresponding i18n translation keys to all locale files
  * 3. The feature will automatically appear in the UI
- *
- * Benefits of JSON-based configuration:
- * - Non-developers (product managers) can easily update features
- * - No TypeScript knowledge required
- * - Changes are validated by JSON schema
- * - Bundled with UI build automatically
  */
 
 import featuresData from './features.json';

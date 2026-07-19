@@ -36,22 +36,12 @@ import { z } from "zod";
 import type { Translator } from "./QueryConfig.schema";
 
 // Validation messages are i18n-driven — `alerts.validation.*` locale keys,
-// resolved via the injected `t`. Message map:
-//   silence ≥ 0          → alerts.validation.silenceNonNegative
-//   period ≥ 1           → alerts.validation.periodPositive
-//   destinations ≥ 1     → alerts.validation.destinationRequired
+// resolved via the injected `t`.
 
 // ── Composable field FRAGMENTS (factories over the injected `t`) ─────────────
 // Exposed so the AddAlert orchestrator schema can compose the SAME rules into
 // its (bigger) alert schema — call these instead of re-declaring the rules, so
 // the step and the orchestrator can never drift.
-//
-//   import {
-//     makeSilenceSchema,
-//     makePeriodSchema,
-//     makeDestinationsSchema,
-//     alertSettingsCreatesIncidentSchema,
-//   } from "./steps/AlertSettings.schema";
 //
 // The orchestrator applies the period rule MODE-CONDITIONALLY (scheduled only)
 // via `createAlertSettingsSchema(t, isRealTime)`.

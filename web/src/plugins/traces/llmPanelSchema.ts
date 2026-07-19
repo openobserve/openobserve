@@ -98,11 +98,8 @@ export function buildLLMPanelSchema(opts: {
     description: "",
     type: chartType,
     config: {
-      // A legend only earns its space when there's more than one series.
-      // Single-series panels (bars by model, single-series area) are already
-      // labelled by their axis + title, so the legend is pure redundancy.
-      // Multi-series panels keep it — a breakdown (stacked-area by model) or
-      // multiple value series (grouped percentile bars: p50/p90/p95/p99).
+      // Legend only when there's more than one series; single-series panels are
+      // already labelled by their axis + title.
       show_legends: !!breakdownName || (panel.series?.length ?? 0) > 1,
       legends_position: "bottom",
       // "numbers" → compact K/M/B/T suffixes (3.5M); "milliseconds" → ms/s/m
@@ -124,12 +121,10 @@ export function buildLLMPanelSchema(opts: {
       // draw a lone point (it'd be invisible). Symbols make single-bucket
       // windows show up as a dot. (`show_symbol` → echarts `showSymbol`.)
       show_symbol: true,
-      // Rounded (smooth) connectors between points — the trend area charts read
-      // cleaner as smooth curves than the default sharp/linear zig-zag. Only
-      // affects line/area panels; bar panels ignore it.
+      // Smooth connectors between points. Only affects line/area panels; bar
+      // panels ignore it.
       line_interpolation: "smooth",
-      // Slightly thicker line for a more solid, polished trend curve (default is
-      // 1.5). Keeps the per-point dots but makes the connecting line read cleaner.
+      // Slightly thicker line than the 1.5 default.
       line_thickness: 2.5,
       axis_border_show: true,
       wrap_table_cells: false,

@@ -274,14 +274,11 @@
   });
 
   // Bare-mode consumers (e.g. pipeline's NodeForm/Condition.vue) edit props.group's
-  // leaf conditions IN PLACE via v-model. That never changes props.group's
-  // reference, so the intentionally non-deep sync watch above does not fire and
-  // `groups` (the working clone) goes STALE — missing the typed column/operator/
-  // value. The structural handlers below run only on explicit button clicks
-  // (add / remove / toggle / reorder), so refreshing the clone from the live prop
-  // at that point is cheap and captures those in-place edits BEFORE we mutate and
-  // emit. Without it, emitting the stale clone makes the ancestor replace the whole
-  // group and wipe the user's typed values on every structural change.
+  // leaf conditions IN PLACE via v-model, which never changes props.group's
+  // reference, so the non-deep watch above doesn't fire and `groups` goes STALE.
+  // The structural handlers below run only on explicit button clicks, so refresh
+  // the clone from the live prop there — otherwise emitting the stale clone makes
+  // the ancestor wipe the user's typed values on every structural change.
   const syncWorkingCopyFromProp = () => {
     groups.value = cloneDeep(props.group);
   };
@@ -317,11 +314,8 @@
     return false;
   }
   
-  // NOTE: `groups` is a MUTABLE deep clone of `props.group` (which is the READONLY
-  // form read-view in alerts mode). The handlers mutate the clone in place and
-  // emit it; the ancestor writes it back through the form (setFieldValue), which
-  // re-syncs `props.group` → the clone via the watch below. Mutating the readonly
-  // prop directly silently fails ("target is readonly") so add/remove did nothing.
+  // Handlers mutate the clone `groups` (never the readonly `props.group`) and emit
+  // it; the ancestor writes it back through the form, re-syncing via the watch above.
   const addCondition = (groupId: string) => {
     // Capture any in-place bare-mode leaf edits before mutating + emitting.
     syncWorkingCopyFromProp();

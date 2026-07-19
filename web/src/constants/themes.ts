@@ -66,14 +66,8 @@ export const THEME_STORAGE_KEYS = {
   },
 } as const;
 
-/**
- * Predefined themes with both light and dark mode colors.
- * Update a theme's color codes here and every user who selected it by name
- * (or who is on the default) will pick up the change on next load.
- */
+/** Predefined themes with both light and dark mode colors. */
 export const PREDEFINED_THEMES: PredefinedTheme[] = [
-  // Theme names are intentionally color-agnostic (observability/product terms),
-  // so a theme's accent colors can change in any release without the name going stale.
   {
     id: 10,
     name: "O2 Signature",

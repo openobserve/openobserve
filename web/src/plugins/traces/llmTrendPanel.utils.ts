@@ -59,12 +59,6 @@ export function intervalToMs(interval: string): number {
  *   ≥ 100   → "456"  (no decimal — panel is already wide enough)
  *   ≥ 1     → "1.5"  (1 decimal, helps distinguish 1.0 from 1.5)
  *   < 1     → toString() — keeps small values readable
- *
- * @example formatCompact(2_500_000) // "2.5M"
- * @example formatCompact(12_345)    // "12.3K"
- * @example formatCompact(456)       // "456"
- * @example formatCompact(1.5)       // "1.5"
- * @example formatCompact(0.1)       // "0.1"
  */
 export function formatCompact(n: number): string {
   if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + "M";
@@ -77,10 +71,6 @@ export function formatCompact(n: number): string {
 /**
  * Format a latency in milliseconds for axis labels / threshold lines.
  * Switches to seconds beyond 1000ms for readability.
- *
- * @example formatLatencyMs(450)    // "450ms"
- * @example formatLatencyMs(1500)   // "1.5s"
- * @example formatLatencyMs(123.7)  // "124ms" (rounded)
  */
 export function formatLatencyMs(ms: number): string {
   if (ms >= 1000) return (ms / 1000).toFixed(1) + "s";
@@ -123,13 +113,6 @@ export function formatTimeCell(ts: any, timezone: string = "UTC"): string {
 /**
  * Format a cost cell. Adapts precision so very small values still
  * show non-zero (4 decimals for sub-cent, 3 for sub-dollar, 2 above).
- *
- * @example formatCostCell({ cost: 12.34 }) // "$12.34"
- * @example formatCostCell({ cost: 0.05 })  // "$0.050"
- * @example formatCostCell({ cost: 0.001 }) // "$0.0010"
- * @example formatCostCell({ cost: 0 })     // "$0"
- * @example formatCostCell({ cost: NaN })   // "—"
- * @example formatCostCell({})              // "—"
  */
 export function formatCostCell(row: any): string {
   const c = Number(row?.cost);
@@ -156,11 +139,6 @@ const CHIP_PALETTE = [
  * Pick a stable color for a service-name chip from the palette. Uses
  * a simple string hash so the same value always gets the same color
  * (visual continuity across renders).
- *
- * @example chipColor("api")     // a fixed color from the palette
- * @example chipColor("api")     // ...same color on every call
- * @example chipColor("worker")  // different color
- * @example chipColor(null)      // first palette entry
  */
 export function chipColor(value: any): string {
   const s = String(value || "");
