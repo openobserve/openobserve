@@ -14,20 +14,19 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <div class="p-0" style="min-height: inherit;">
-    <AppPageHeader
-      :back="{
-        label: t('cipherKey.header'),
-        onClick: () => emit('cancel:hideform'),
-      }"
-      class="border-b border-border-default"
-    >
+  <PageLayout
+    class="min-h-[inherit]"
+    :back="{
+      label: t('cipherKey.header'),
+      onClick: () => emit('cancel:hideform'),
+    }"
+    bleed
+  >
       <template #title>
         <span data-test="add-template-title">
           {{ isUpdatingCipherKey ? t("cipherKey.update") : t("cipherKey.add") }}
         </span>
       </template>
-    </AppPageHeader>
     <div class="create-cipher-form">
       <!-- One OForm owns every field across the stepper (the children render
            OForm* controls connected by name); a single Zod schema gates the
@@ -163,7 +162,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:ok="dialog.okCallback"
       @update:cancel="dialog.show = false"
     />
-  </div>
+  </PageLayout>
 </template>
 <script lang="ts" setup>
 import { ref, computed, onMounted, onActivated } from "vue";
@@ -183,7 +182,7 @@ import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OStepper from "@/lib/navigation/Stepper/OStepper.vue";
 import OStep from "@/lib/navigation/Stepper/OStep.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import PageLayout from "@/components/common/PageLayout.vue";
 import {
   makeAddCipherKeySchema,
   addCipherKeyDefaults,
