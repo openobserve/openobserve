@@ -1,6 +1,7 @@
 # Translation Management
 
-Automated translation system for OpenObserve using AWS Translate.
+Automated translation system for OpenObserve using DeepSeek (an LLM) via its
+OpenAI-compatible API.
 
 ## Overview
 
@@ -12,7 +13,7 @@ This system automatically translates the English locale file (`en.json`) into mu
 
 1. **Developer updates `en.json`** and pushes to any branch (main, develop, feature branches)
 2. **GitHub Action detects the change** and automatically triggers
-3. **Translation script runs** using AWS Translate to update all language files
+3. **Translation script runs** using DeepSeek to update all language files
 4. **Changes are committed** back to the same branch automatically
 5. **Build workflows use updated files** - all subsequent builds have fresh translations
 
@@ -34,8 +35,9 @@ This means **translations are always up-to-date** without any manual interventio
 ## How It Works
 
 1. **Source File**: All translations originate from `web/src/locales/languages/en.json`
-2. **Translation**: New keys are automatically translated using AWS Translate
-3. **Preservation**: Existing translations are never overwritten
+2. **Translation**: New/changed keys are translated by DeepSeek, in batches, with
+   interpolation placeholders (`{count}`, `%s`, `@:linked.key`) validated per string
+3. **Preservation**: Existing translations are never overwritten unless their English source changed
 4. **Nested Support**: Handles nested JSON structures correctly
 
 ## Local Development
@@ -43,8 +45,7 @@ This means **translations are always up-to-date** without any manual interventio
 ### Prerequisites
 
 1. **Python 3.11+**
-2. **AWS Credentials** with access to AWS Translate service
-3. **AWS CLI configured** or environment variables set
+2. **DeepSeek API key** exported as `DEEPSEEK_API_KEY`
 
 ### Setup
 
@@ -60,36 +61,15 @@ cd scripts/translations
 pip3 install -r requirements.txt
 ```
 
-### Configure AWS Credentials for Local Development
+### Configure the API key for Local Development
 
-**Option 1 - AWS CLI (recommended):**
 ```bash
-aws configure
+export DEEPSEEK_API_KEY=your_api_key
+# optional overrides:
+export DEEPSEEK_MODEL=deepseek-v4-flash        # model id
+export DEEPSEEK_BASE_URL=https://api.deepseek.com
+export TRANSLATION_BATCH_SIZE=50               # strings per API call
 ```
-
-**Option 2 - IAM Role (if running on EC2/ECS):**
-```bash
-# Uses instance profile automatically
-# No configuration needed
-```
-
-**Option 3 - Environment variables:**
-```bash
-export AWS_ACCESS_KEY_ID=your_access_key
-export AWS_SECRET_ACCESS_KEY=your_secret_key
-export AWS_DEFAULT_REGION=us-east-1
-```
-
-**Option 4 - Assume IAM Role locally:**
-```bash
-aws sts assume-role \
-  --role-arn arn:aws:iam::ACCOUNT_ID:role/GitHubActions-TranslationRole \
-  --role-session-name local-translation
-
-# Then export the credentials from the output
-```
-
-> **Note:** GitHub Actions uses OIDC and assumes the IAM role automatically. Local development can use any of the above methods.
 
 ### Running Translations
 
@@ -125,53 +105,19 @@ The workflow (`.github/workflows/update-translations.yml`) automatically runs wh
 
 ### Setup Requirements
 
-The workflow uses **IAM Role with OIDC** for secure, credential-less authentication.
-
-#### IAM Role Configuration
-
-The workflow assumes an IAM role via OIDC. The role ARN is **not hardcoded** — it
-is read from the `AWS_TRANSLATE_ROLE_ARN` repository secret so the AWS account ID
-is not exposed in source control:
-- **IAM Role**: stored in the `AWS_TRANSLATE_ROLE_ARN` secret
-- **Region**: `us-east-1`
-
-You can point this secret at the same role used by other OpenObserve workflows
-(e.g., `build-pr-image.yml`).
-
-#### Required IAM Permissions
-
-Ensure the `GitHubActionsRole` has the following permission for AWS Translate:
-
-```json
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Effect": "Allow",
-      "Action": [
-        "translate:TranslateText"
-      ],
-      "Resource": "*"
-    }
-  ]
-}
-```
-
-> **Note:** If you need to add this permission, attach a policy to the existing `GitHubActionsRole` in AWS IAM Console.
+The workflow authenticates to DeepSeek with an API key stored as a repository secret.
 
 #### GitHub Repository Setup
 
-Add one repository secret so the workflow can authenticate via OIDC without
-exposing the AWS account ID:
+Add one repository secret:
 
 | Secret | Value |
 |--------|-------|
-| `AWS_TRANSLATE_ROLE_ARN` | `arn:aws:iam::<ACCOUNT_ID>:role/<RoleName>` |
+| `DEEPSEEK_API_KEY` | Your DeepSeek API key |
 
 Set it under **Settings → Secrets and variables → Actions → New repository secret**
-(or via `gh secret set AWS_TRANSLATE_ROLE_ARN`). The workflow fails fast with a
-clear error if this secret is missing. No long-lived AWS keys are stored — only
-the role ARN, which is assumed via GitHub's OIDC provider.
+(or via `gh secret set DEEPSEEK_API_KEY`). The workflow fails fast with a clear
+error if this secret is missing.
 
 ### Workflow Behavior
 
@@ -255,13 +201,7 @@ web/src/locales/languages/
 2. Look at "Check if en.json was modified" step
 3. It shows debug info: event type, before/after SHAs, and changed files
 
-**Solution 2 - Use force flag:**
-1. Go to **Actions** → **Update Translations**
-2. Click **Run workflow**
-3. Check **"Force translation even if en.json not detected as changed"**
-4. Click **Run workflow**
-
-**Solution 3 - Debug detection:**
+**Solution 2 - Debug detection:**
 ```bash
 # Locally check what git sees
 git show --name-only --pretty="" HEAD
@@ -276,18 +216,15 @@ git diff HEAD~1 --name-only
 - First commit on branch → Uses `git show HEAD`
 - Manual trigger → Uses `git show HEAD`
 
-### AWS Credentials Error
+### API Key Error
 ```
-ERROR: No credentials for the translation service.
+DEEPSEEK_API_KEY is not set — cannot reach the translation service.
 ```
-**Solution**: IAM role should be automatically assumed via OIDC. Check:
-1. Workflow has `permissions: id-token: write`
-2. The `AWS_TRANSLATE_ROLE_ARN` secret is set and points to a valid role
-3. Role has `translate:TranslateText` permission
+**Solution**: Set the `DEEPSEEK_API_KEY` secret (CI) or environment variable (local).
 
 ### Import Error
 ```
-ModuleNotFoundError: No module named 'boto3'
+ModuleNotFoundError: No module named 'openai'
 ```
 **Solution**: Run `npm run translate:setup` or `pip3 install -r requirements.txt`
 
@@ -337,9 +274,9 @@ ModuleNotFoundError: No module named 'boto3'
    - Use the newly updated translation files
    - No additional steps needed
 
-> **Why `main` only?** Running on every feature branch made AWS Translate bill for
-> the same strings repeatedly (per branch, per rebase, again on merge). Gating to
-> `main` translates each string once, when it actually lands.
+> **Why `main` only?** Running on every feature branch re-translated the same
+> strings repeatedly (per branch, per rebase, again on merge). Gating to `main`
+> translates each string once, when it actually lands.
 
 ## Change detection (`.translation_state.json`)
 
@@ -349,7 +286,7 @@ English source each translated value was derived from. On every run the script:
 - **Translates** a key only when it is new, missing in a target file, or its English
   source text changed since the last run (so editing an existing label re-translates it).
 - **Keeps** already-translated text whose source is unchanged — it is never re-sent to
-  AWS, and English is never "translated" to English.
+  the API, and English is never "translated" to English.
 - **Prunes** keys that were removed from `en.json`.
 - **Bootstraps** safely: the first run after this file is introduced adopts existing
   translations as-is (no costly full re-translation, no overwriting manual fixes).
@@ -367,47 +304,24 @@ source of truth that keeps subsequent runs incremental.
 
 ## Cost Considerations
 
-AWS Translate pricing (as of 2024):
-- **$15 per million characters**
-
-### Cost Per Workflow Run:
-
-| Update Type | Characters | Languages | Total Chars | Cost |
-|-------------|-----------|-----------|-------------|------|
-| Small (10 strings) | 500 | 10 | 5,000 | $0.08 |
-| Medium (50 strings) | 2,500 | 10 | 25,000 | $0.38 |
-| Large (200 strings) | 10,000 | 10 | 100,000 | $1.50 |
-| Full translation | 60,000 | 10 | 600,000 | $9.00 |
-
-### Monthly Estimates:
-
-**Active Development:**
-- 10-15 `en.json` updates/month
-- Average 20 new strings per update
-- **Monthly cost: $0.80 - $1.20**
-
-**Production:**
-- 5-8 `en.json` updates/month
-- Average 15 new strings per update
-- **Monthly cost: $0.40 - $0.80**
-
-**First-time full translation:** ~$9 (one-time)
+Translation is billed per token by DeepSeek. The whole `en.json` is ~205k
+characters (~8,300 strings); a full 10-language rebuild is a one-time cost, and
+day-to-day runs only translate the handful of new/changed keys per `en.json`
+merge.
 
 ### Cost Optimization:
 - ✅ Only **new or modified** keys are translated (unchanged text is never re-sent)
+- ✅ Strings are sent in **batches** (`TRANSLATION_BATCH_SIZE`, default 50) to cut request overhead
 - ✅ Runs on **`main` only**, and only when `en.json` changes (no per-branch re-billing)
 - ✅ Superseded runs are cancelled (`concurrency` with `cancel-in-progress`)
-- ✅ Safety cap (`TRANSLATION_MAX_KEYS`, default 5000) blocks accidental mass re-translation
-- ✅ Failed AWS calls are retried next run, not silently billed as English
-- ✅ Typical monthly cost: **Under $2**
+- ✅ Failed API calls / placeholder-mismatched outputs are retried next run, not silently kept
 
 ## Alternative Translation Services
 
-To use a different service, modify `translator.py`:
-- Google Cloud Translate
-- DeepL API
-- Azure Translator
-- OpenAI GPT-4 (for context-aware translations)
+To use a different backend, modify `translate_batch()` in `translator.py`. It uses
+the OpenAI-compatible chat-completions API, so any provider exposing that interface
+(OpenAI, DeepSeek, or a self-hosted model) drops in by changing `DEEPSEEK_BASE_URL`
+and `DEEPSEEK_MODEL`.
 
 ## Support
 
