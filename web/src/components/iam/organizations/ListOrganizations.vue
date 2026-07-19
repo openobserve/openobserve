@@ -256,7 +256,7 @@ export default defineComponent({
         size: TABLE_INDEX_COL_SIZE,
         minSize: 32,
         maxSize: 40,
-        meta: { align: "left", compactPadding: true, cellClass: 'pl-4!', headerClass: 'pl-4!' },
+        meta: { align: "left", compactPadding: true },
       },
       {
         id: "name",

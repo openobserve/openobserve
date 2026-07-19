@@ -531,7 +531,7 @@ export default defineComponent({
           hideable: true,
           size: COL.name,
           minSize: 160,
-          meta: { align: "left", flex: true, cellClass: 'pl-4!', headerClass: 'pl-4!' },
+          meta: { align: "left", flex: true },
         },
         {
           id: "list",

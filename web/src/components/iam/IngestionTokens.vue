@@ -283,7 +283,7 @@ export default defineComponent({
         hideable: true,
         size: COL.name,
         minSize: 160,
-        meta: { align: "left", cellClass: 'pl-4!', headerClass: 'pl-4!', flex: true },
+        meta: { align: "left", flex: true },
       },
       {
         id: "token",
