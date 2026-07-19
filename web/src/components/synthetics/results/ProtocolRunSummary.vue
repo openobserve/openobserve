@@ -190,7 +190,7 @@ const showAssertions = computed(
     </AppPageHeader>
     </template>
 
-    <div class="flex-1 min-h-0 overflow-y-auto p-4">
+    <div class="flex-1 min-h-0 overflow-y-auto px-page-edge py-4">
       <OSkeleton v-if="loading" class="h-80 w-full" />
 
       <OEmptyState

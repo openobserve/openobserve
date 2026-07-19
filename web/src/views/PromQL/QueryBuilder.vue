@@ -5,10 +5,9 @@
     :title="t('metrics.queryBuilder.title')"
     :subtitle="t('metrics.queryBuilder.subtitle')"
     icon="query-stats"
-    bleed
+    scroll
   >
-    <div class="flex-1 overflow-auto px-2.5">
-      <div class="max-w-350 mx-auto py-2.5">
+    <div class="max-w-350 mx-auto py-2.5">
     <OCard>
       <OCardSection role="body">
         <!-- Query Builder Section -->
@@ -83,7 +82,6 @@
         </OCard>
       </OCardSection>
     </OCard>
-      </div>
     </div>
   </PageLayout>
 </template>

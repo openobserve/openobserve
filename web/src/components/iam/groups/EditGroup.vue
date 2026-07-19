@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div
       data-test="edit-group-section-title"
-      class="px-2.5 pt-2.5 pb-2.5 flex-shrink-0"
+      class="px-page-edge pt-2.5 pb-2.5 flex-shrink-0"
     >
     <div class="bg-card-glass-bg py-3">
     <AppTabs
@@ -65,7 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="flex justify-end w-full flex-shrink-0"
       style="z-index: 2"
     >
-      <div class="bg-card-glass-bg w-full py-2 px-3 justify-end flex gap-2 border-t border-border-default">
+      <div class="bg-card-glass-bg w-full py-2 px-page-edge justify-end flex gap-2 border-t border-border-default">
       <OButton
         data-test="edit-group-cancel-btn"
         variant="outline"

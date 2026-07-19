@@ -22,7 +22,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       dataTest: 'storage-settings-editor-back-btn',
     }"
     :title="headerTitle"
-    bleed
   >
       <template #title>
         <span data-test="storage-settings-editor-title">{{ headerTitle }}</span>

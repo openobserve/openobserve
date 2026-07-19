@@ -11,7 +11,7 @@
         onClick: () => $emit('cancel'),
         dataTest: 'provider-form-back-btn',
       }"
-      bleed
+      scroll
     >
       <template #title>
         <span data-test="provider-form-title">
@@ -31,7 +31,7 @@
         />
       </template>
 
-    <div class="flex-1 min-h-0 overflow-auto px-6 py-4.5 [&_textarea]:max-h-55 [&_textarea]:overflow-y-auto [&_textarea]:font-mono">
+    <div class="py-4.5 [&_textarea]:max-h-55 [&_textarea]:overflow-y-auto [&_textarea]:font-mono">
       <section class="mb-6">
         <div class="flex items-center gap-2.5 pb-2.5 border-b border-dialog-header-border mb-3">
           <span class="inline-flex items-center justify-center w-5.5 h-5.5 rounded-full bg-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] text-text-secondary font-bold text-2xs font-mono">01</span>

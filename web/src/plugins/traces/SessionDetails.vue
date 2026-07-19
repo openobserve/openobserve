@@ -49,7 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Scrollable body — owns its own scroll so the header above stays fixed.
          Pads itself horizontally (the card has no px) so focus rings on edge
          controls aren't clipped by the scroll container's overflow. -->
-    <div class="flex-1 flex flex-col min-h-0 overflow-y-auto px-2.5 pt-2.5">
+    <div class="flex-1 flex flex-col min-h-0 overflow-y-auto px-page-edge pt-2.5">
     <!-- Loading — full-page skeleton mirroring the real layout (standard O2 wave
          shimmer) so nothing jumps when data lands. -->
     <div
