@@ -26,12 +26,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       ref="parentRef"
       :class="[
-        'o2-scroll-container overflow-auto rounded-default',
-        'table-container',
-        'flex-1',
-        'min-h-0',
-        'overflow-auto',
-        'relative',
+        // When a parent scroll container is delegated via `scrollEl`, this
+        // wrapper must NOT create its own vertical scroll (that produced a
+        // second, nested scrollbar). It only keeps horizontal overflow so wide
+        // tables can still scroll sideways; the delegated element owns vertical
+        // scroll + virtualization. Without `scrollEl` it stays the scroller.
+        props.scrollEl
+          ? 'overflow-x-auto relative'
+          : 'o2-scroll-container overflow-auto rounded-default table-container flex-1 min-h-0 relative',
         { 'virtual-scroll-active will-change-scroll': useVirtualScroll },
       ]"
     >
@@ -1376,6 +1378,19 @@ const props = defineProps({
     type: Number,
     default: TABLE_ROWS_PER_PAGE_DEFAULT_VALUE,
   },
+  /** Parent element that owns vertical scroll + virtualization. When set, this
+   *  component does not create its own vertical scrollbar — it delegates to this
+   *  element so content above the table (e.g. charts) scrolls as one region. */
+  scrollEl: {
+    type: Object as PropType<HTMLElement | null>,
+    default: null,
+  },
+  /** Pixels of content above the virtual list inside the delegated `scrollEl`
+   *  (e.g. a histogram). Offsets the virtualizer so row positions stay correct. */
+  scrollMargin: {
+    type: Number,
+    default: 0,
+  },
 });
 
 const { t } = useI18n();
@@ -2179,7 +2194,12 @@ const rowVirtualizerOptions = computed(() => {
   const isNonLogs = !props.useVirtualScroll;
   return {
     count: rowCount.value,
-    getScrollElement: () => parentRef.value,
+    // Delegate to a parent scroll container when provided (unified scroll with
+    // content above the table, e.g. the traces RED-metrics charts); otherwise
+    // this component's own wrapper is the scroller.
+    getScrollElement: () =>
+      (props.scrollEl as HTMLElement | null) ?? parentRef.value,
+    scrollMargin: props.scrollMargin,
     estimateSize: (index: number) => {
       // Dashboard virtual scroll: always use 28px regardless of rowHeight prop.
       // The rowHeight prop (default 22) is the *cell content* height and does not

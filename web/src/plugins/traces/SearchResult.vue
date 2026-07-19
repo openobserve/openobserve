@@ -122,8 +122,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </div>
 
-      <!-- Combined scroll area: RED metrics + trace list scroll together -->
-      <div class="flex-1 overflow-y-auto bg-card-glass-solid">
+      <!-- Combined scroll area: RED metrics + trace list scroll together.
+           This is the single vertical scroller — the trace table delegates its
+           virtualizer here (via :scroll-el) so it doesn't add a nested one. -->
+      <div ref="scrollContainerRef" class="flex-1 overflow-y-auto bg-card-glass-solid">
         <!-- ════════════════════ RED Metrics Section ════════════════════ -->
         <transition
           enter-active-class="transition-all duration-300 ease-in-out"
@@ -158,6 +160,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <TracesSearchResultList
           :hits="hits"
+          :scroll-el="scrollContainerRef"
           :loading="searchObj.loading"
           :search-performed="searchPerformed"
           :total="searchObj.data.queryResults.total"
@@ -296,6 +299,11 @@ export default defineComponent({
     const { searchObj, updatedLocalLogFilterField } = useTraces();
 
     const metricsDashboardRef: any = ref(null);
+
+    // Single vertical scroll container for the results area. Delegated to the
+    // trace table's virtualizer (:scroll-el) so the table doesn't render its own
+    // nested scrollbar — fixes the double-scrollbar on the traces page.
+    const scrollContainerRef = ref<HTMLElement | null>(null);
 
     const sectionHeaderRef = ref<HTMLElement | null>(null);
     const containerWidth = ref(9999);
@@ -441,6 +449,7 @@ export default defineComponent({
       searchObj,
       updatedLocalLogFilterField,
       metricsDashboardRef,
+      scrollContainerRef,
       sectionHeaderRef,
       showActionLabels,
       expandRowDetail,

@@ -52,6 +52,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :sort-order="props.sortOrder"
           :sort-field-map="sortFieldMap"
           :row-height="28"
+          :scroll-el="scrollEl"
+          :scroll-margin="0"
           :enable-column-reorder="true"
           :enable-row-expand="false"
           :enable-text-highlight="false"
@@ -232,6 +234,10 @@ interface Props {
   streamDocTimeRange?: { min: number; max: number };
   /** Resolved query window (µs) for empty-state overlap detection. */
   queryWindowUs?: { start: number; end: number };
+  /** Parent scroll container that owns vertical scroll (unified with the RED
+   *  metrics charts above). Delegated to the table's virtualizer so the table
+   *  doesn't create a second, nested scrollbar. */
+  scrollEl?: HTMLElement | null;
 }
 
 const { t } = useI18n();
@@ -252,6 +258,7 @@ const props = withDefaults(defineProps<Props>(), {
   aiEnabled: false,
   streamDocTimeRange: undefined,
   queryWindowUs: undefined,
+  scrollEl: null,
 });
 
 const emit = defineEmits<{
