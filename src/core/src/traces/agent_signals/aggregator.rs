@@ -17,16 +17,11 @@
 //!
 //! Self-ingests `AgentSignalRecord`s into the `_agent_signals` stream via the
 //! existing `IngestionRequest` gRPC path, mirroring
-//! `traces::service_graph::aggregator::write_sql_aggregated_edges`.
+//! `traces::service_graph::aggregator::write_sql_aggregated_edges`. The
+//! record→JSON transform (`records_to_json`) is a pure helper that lives in the
+//! enterprise crate; this OSS layer owns only the self-ingest I/O.
 
 use config::meta::agent_signals::AgentSignalRecord;
-
-/// Convert records to ingestable JSON (mirrors the shape write_sql_aggregated_edges produces).
-/// Only used by the enterprise writer + its test; gated to keep the OSS build warning-free.
-#[cfg(feature = "enterprise")]
-pub(super) fn records_to_json(records: &[AgentSignalRecord]) -> Vec<serde_json::Value> {
-    records.iter().map(|r| r.to_json()).collect()
-}
 
 /// Write agent-signal records to the `_agent_signals` stream.
 ///
@@ -44,7 +39,7 @@ pub async fn write_agent_signals(
         return Ok(());
     }
     let record_count = records.len();
-    let enriched = records_to_json(&records);
+    let enriched = o2_enterprise::enterprise::agent_signals::records_to_json(&records);
     let req = cluster_rpc::IngestionRequest {
         org_id: org_id.to_string(),
         // Reuse ServiceGraph stream_type; the stream *name* separates the data.
@@ -76,34 +71,4 @@ pub async fn write_agent_signals(
     _records: Vec<AgentSignalRecord>,
 ) -> Result<(), anyhow::Error> {
     Ok(())
-}
-
-#[cfg(all(test, feature = "enterprise"))]
-mod test {
-    use config::meta::agent_signals::AgentSignalRecord;
-
-    #[test]
-    fn test_records_serialize_to_ingestable_json() {
-        let rec = AgentSignalRecord {
-            timestamp: 42,
-            org_id: "default".into(),
-            source_stream: "s".into(),
-            signal_type: "loop".into(),
-            agent_name: Some("a".into()),
-            tool_name: Some("t".into()),
-            fail_class: None,
-            count: 5,
-            calls: Some(5),
-            distinct_traces: Some(1),
-            cost: None,
-            tokens: None,
-            errors: None,
-            p95_latency_ns: None,
-        };
-        let payload = super::records_to_json(&[rec]);
-        assert_eq!(payload.len(), 1);
-        assert_eq!(payload[0]["_timestamp"], 42_i64);
-        assert_eq!(payload[0]["signal_type"], "loop");
-        assert!(payload[0].get("fail_class").is_none());
-    }
 }

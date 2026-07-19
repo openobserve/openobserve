@@ -13,73 +13,23 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+//! OSS orchestrator for agent-behavior signals.
+//!
+//! This layer owns only the I/O: it runs the bounded-key SQL (built in
+//! `o2_enterprise::enterprise::agent_signals`) via the shared search path and
+//! self-ingests the mapped records. All pure transforms (SQL construction,
+//! hit→record mapping) live in the enterprise crate — mirroring how the
+//! service-graph feature splits compute (enterprise) from I/O (OSS).
+
 #![cfg(feature = "enterprise")]
 
-/// R1 — failure taxonomy per (agent, class). Classifies from existing error columns; no marker.
-pub(super) fn build_failure_sql(stream: &str, start: i64, end: i64) -> String {
-    format!(
-        r#"SELECT gen_ai_agent_name,
-            CASE
-              WHEN error_message LIKE 'Invalid arguments%' THEN 'malformed_tool_call'
-              WHEN error_message LIKE '%Validation failed%' THEN 'validation_error'
-              WHEN error_message LIKE '%timeout%' THEN 'tool_timeout'
-              WHEN error_type = 'McpError' THEN 'mcp_error'
-              WHEN error_type IS NOT NULL AND error_type != '' THEN 'provider_error'
-              ELSE 'unclassified'
-            END AS fail_class,
-            COUNT(*) AS count
-        FROM "{stream}"
-        WHERE _timestamp >= {start} AND _timestamp < {end} AND span_status = 'ERROR'
-        GROUP BY gen_ai_agent_name, fail_class"#
-    )
-}
-
-/// R2 — loop ratio per (agent, tool) using an HLL distinct-trace count. Bounded memory.
-pub(super) fn build_loop_ratio_sql(stream: &str, start: i64, end: i64) -> String {
-    format!(
-        r#"SELECT gen_ai_agent_name, gen_ai_tool_name,
-            COUNT(*) AS calls,
-            approx_distinct(trace_id) AS distinct_traces
-        FROM "{stream}"
-        WHERE _timestamp >= {start} AND _timestamp < {end}
-          AND gen_ai_operation_name = 'execute_tool' AND gen_ai_tool_name IS NOT NULL
-        GROUP BY gen_ai_agent_name, gen_ai_tool_name"#
-    )
-}
-
-/// R4 — cost / failure / p95 per agent. Bounded by number of agents.
-pub(super) fn build_cost_sql(stream: &str, start: i64, end: i64) -> String {
-    format!(
-        r#"SELECT gen_ai_agent_name,
-            SUM(gen_ai_usage_cost) AS cost,
-            SUM(gen_ai_usage_total_tokens) AS tokens,
-            COUNT(*) FILTER (WHERE span_status = 'ERROR') AS errors,
-            CAST(approx_percentile_cont(end_time - start_time, 0.95) AS BIGINT) AS p95
-        FROM "{stream}"
-        WHERE _timestamp >= {start} AND _timestamp < {end}
-        GROUP BY gen_ai_agent_name"#
-    )
-}
-
-/// R3 — per-trace loop attribution. GATED: call ONLY for an (agent,tool) pair that R2
-/// already flagged, with a `threshold` relative to that pair's norm. This is the single
-/// controlled `GROUP BY trace_id` exception (design §3.2) — it is output-bounded ONLY
-/// because R2 restricts it to one flagged tool. NOT yet wired into the orchestrator.
-#[allow(dead_code)]
-pub(super) fn build_loop_attribution_sql(
-    stream: &str, flagged_tool: &str, threshold: u64, start: i64, end: i64,
-) -> String {
-    format!(
-        r#"SELECT trace_id, COUNT(*) AS repeats
-        FROM "{stream}"
-        WHERE _timestamp >= {start} AND _timestamp < {end}
-          AND gen_ai_tool_name = '{flagged_tool}' AND gen_ai_operation_name = 'execute_tool'
-        GROUP BY trace_id HAVING COUNT(*) >= {threshold}"#
-    )
-}
-
-use config::meta::agent_signals::AgentSignalRecord;
-use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
+use o2_enterprise::enterprise::{
+    agent_signals::{
+        build_cost_sql, build_failure_sql, build_loop_ratio_sql, map_cost_hits, map_failure_hits,
+        map_loop_hits,
+    },
+    common::config::get_config as get_o2_config,
+};
 
 /// Run the three bounded passes for one stream+window and self-ingest the results.
 /// Early-returns Ok when the feature is disabled (no query issued).
@@ -98,30 +48,24 @@ pub async fn process_agent_signals_stream(
 
     // R1 failure taxonomy
     let sql = build_failure_sql(stream_name, start_time, end_time);
-    match crate::service::traces::service_graph::run_graph_search(
-        org_id, sql, start_time, end_time,
-    )
-    .await
+    match crate::service::traces::service_graph::run_graph_search(org_id, sql, start_time, end_time)
+        .await
     {
         Ok(hits) => records.extend(map_failure_hits(org_id, stream_name, ts, &hits)),
         Err(e) => log::warn!("[AgentSignals] failure pass failed for {org_id}/{stream_name}: {e}"),
     }
     // R2 loop ratio
     let sql = build_loop_ratio_sql(stream_name, start_time, end_time);
-    match crate::service::traces::service_graph::run_graph_search(
-        org_id, sql, start_time, end_time,
-    )
-    .await
+    match crate::service::traces::service_graph::run_graph_search(org_id, sql, start_time, end_time)
+        .await
     {
         Ok(hits) => records.extend(map_loop_hits(org_id, stream_name, ts, &hits)),
         Err(e) => log::warn!("[AgentSignals] loop pass failed for {org_id}/{stream_name}: {e}"),
     }
     // R4 cost/diagnosis
     let sql = build_cost_sql(stream_name, start_time, end_time);
-    match crate::service::traces::service_graph::run_graph_search(
-        org_id, sql, start_time, end_time,
-    )
-    .await
+    match crate::service::traces::service_graph::run_graph_search(org_id, sql, start_time, end_time)
+        .await
     {
         Ok(hits) => records.extend(map_cost_hits(org_id, stream_name, ts, &hits)),
         Err(e) => log::warn!("[AgentSignals] cost pass failed for {org_id}/{stream_name}: {e}"),
@@ -130,149 +74,13 @@ pub async fn process_agent_signals_stream(
     super::aggregator::write_agent_signals(org_id, records).await
 }
 
-fn get_str(v: &serde_json::Value, k: &str) -> Option<String> {
-    v.get(k).and_then(|x| x.as_str()).map(|s| s.to_string())
-}
-fn get_u64(v: &serde_json::Value, k: &str) -> Option<u64> {
-    v.get(k).and_then(|x| x.as_u64())
-}
-fn get_f64(v: &serde_json::Value, k: &str) -> Option<f64> {
-    v.get(k).and_then(|x| x.as_f64())
-}
-
-pub(super) fn map_failure_hits(
-    org: &str, stream: &str, ts: i64, hits: &[serde_json::Value],
-) -> Vec<AgentSignalRecord> {
-    hits.iter().map(|h| AgentSignalRecord {
-        timestamp: ts,
-        org_id: org.to_string(),
-        source_stream: stream.to_string(),
-        signal_type: "failure".to_string(),
-        agent_name: get_str(h, "gen_ai_agent_name"),
-        tool_name: None,
-        fail_class: get_str(h, "fail_class"),
-        count: get_u64(h, "count").unwrap_or(0),
-        calls: None, distinct_traces: None, cost: None, tokens: None, errors: None, p95_latency_ns: None,
-    }).collect()
-}
-
-pub(super) fn map_loop_hits(
-    org: &str, stream: &str, ts: i64, hits: &[serde_json::Value],
-) -> Vec<AgentSignalRecord> {
-    hits.iter().map(|h| AgentSignalRecord {
-        timestamp: ts,
-        org_id: org.to_string(),
-        source_stream: stream.to_string(),
-        signal_type: "loop".to_string(),
-        agent_name: get_str(h, "gen_ai_agent_name"),
-        tool_name: get_str(h, "gen_ai_tool_name"),
-        fail_class: None,
-        count: get_u64(h, "calls").unwrap_or(0),
-        calls: get_u64(h, "calls"),
-        distinct_traces: get_u64(h, "distinct_traces"),
-        cost: None, tokens: None, errors: None, p95_latency_ns: None,
-    }).collect()
-}
-
-pub(super) fn map_cost_hits(
-    org: &str, stream: &str, ts: i64, hits: &[serde_json::Value],
-) -> Vec<AgentSignalRecord> {
-    hits.iter().map(|h| AgentSignalRecord {
-        timestamp: ts,
-        org_id: org.to_string(),
-        source_stream: stream.to_string(),
-        signal_type: "cost".to_string(),
-        agent_name: get_str(h, "gen_ai_agent_name"),
-        tool_name: None,
-        fail_class: None,
-        count: get_u64(h, "errors").unwrap_or(0),
-        calls: None, distinct_traces: None,
-        cost: get_f64(h, "cost"),
-        tokens: get_u64(h, "tokens"),
-        errors: get_u64(h, "errors"),
-        p95_latency_ns: get_u64(h, "p95"),
-    }).collect()
-}
-
 #[cfg(all(test, feature = "enterprise"))]
 mod test {
-    #[test]
-    fn test_failure_sql_groups_on_bounded_keys_only() {
-        let sql = super::build_failure_sql("mystream", 100, 200);
-        // must group by agent + class, never by trace_id
-        assert!(sql.contains("GROUP BY gen_ai_agent_name"));
-        assert!(sql.contains("fail_class"));
-        assert!(!sql.to_lowercase().contains("group by trace_id"));
-        // window-bounded
-        assert!(sql.contains("_timestamp >= 100"));
-        assert!(sql.contains("_timestamp < 200"));
-        // classifies from existing columns (no marker)
-        assert!(sql.contains("error_message"));
-        assert!(sql.contains("'malformed_tool_call'"));
-    }
-
-    #[test]
-    fn test_loop_ratio_sql_uses_hll_and_bounded_keys() {
-        let sql = super::build_loop_ratio_sql("mystream", 100, 200);
-        assert!(sql.contains("approx_distinct(trace_id)"));
-        assert!(sql.contains("GROUP BY gen_ai_agent_name, gen_ai_tool_name"));
-        assert!(!sql.to_lowercase().contains("group by trace_id"));
-        assert!(sql.contains("execute_tool"));
-    }
-
-    #[test]
-    fn test_cost_sql_groups_by_agent_only() {
-        let sql = super::build_cost_sql("mystream", 100, 200);
-        assert!(sql.contains("SUM(gen_ai_usage_cost)"));
-        assert!(sql.contains("approx_percentile_cont(end_time - start_time, 0.95)"));
-        assert!(sql.contains("GROUP BY gen_ai_agent_name"));
-        assert!(!sql.to_lowercase().contains("group by trace_id"));
-    }
-
-    #[test]
-    fn test_map_failure_hits_builds_records() {
-        let hits = vec![serde_json::json!({
-            "gen_ai_agent_name": "sre_rca_agent",
-            "fail_class": "malformed_tool_call",
-            "count": 161
-        })];
-        let recs = super::map_failure_hits("default", "s1", 1_000, &hits);
-        assert_eq!(recs.len(), 1);
-        assert_eq!(recs[0].signal_type, "failure");
-        assert_eq!(recs[0].fail_class.as_deref(), Some("malformed_tool_call"));
-        assert_eq!(recs[0].count, 161);
-        assert_eq!(recs[0].tool_name, None);
-        assert_eq!(recs[0].timestamp, 1_000);
-    }
-
-    #[test]
-    fn test_map_loop_hits_carries_calls_and_traces() {
-        let hits = vec![serde_json::json!({
-            "gen_ai_agent_name": "a", "gen_ai_tool_name": "cli_kubectl",
-            "calls": 1646, "distinct_traces": 71
-        })];
-        let recs = super::map_loop_hits("default", "s1", 1_000, &hits);
-        assert_eq!(recs[0].signal_type, "loop");
-        assert_eq!(recs[0].tool_name.as_deref(), Some("cli_kubectl"));
-        assert_eq!(recs[0].calls, Some(1646));
-        assert_eq!(recs[0].distinct_traces, Some(71));
-    }
-
     // process_agent_signals_stream must early-return Ok when disabled — no panic, no query.
     #[tokio::test]
     async fn test_process_stream_noop_when_disabled() {
         // enabled defaults to false; the fn must return Ok without attempting a search.
         let r = super::process_agent_signals_stream("default", "nostream", 0, 1).await;
         assert!(r.is_ok());
-    }
-
-    #[test]
-    fn test_loop_attribution_sql_is_gated_and_thresholded() {
-        let sql = super::build_loop_attribution_sql("s1", "cli_kubectl", 20, 100, 200);
-        // input restricted to ONE flagged tool (gated), threshold applied via HAVING
-        assert!(sql.contains("gen_ai_tool_name = 'cli_kubectl'"));
-        assert!(sql.contains("HAVING COUNT(*) >= 20"));
-        // this is the ONLY place a trace_id group-by is allowed — and only because it's gated
-        assert!(sql.contains("GROUP BY trace_id"));
     }
 }
