@@ -17,17 +17,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <div
+  <PageLayout
     :key="store.state.selectedOrganization.identifier"
     data-test="rum-performance-page"
-    class="w-full h-full flex flex-col min-h-0"
+    :title="t('rum.performanceSummaryLabel')"
+    title-data-test="rum-performance-title"
+    icon="speed"
+    bleed
   >
-    <AppPageHeader
-      :title="t('rum.performanceSummaryLabel')"
-      title-data-test="rum-performance-title"
-      icon="speed"
-      class="shrink-0 border-b border-border-default"
-    >
       <template #actions>
         <DateTimePickerDashboard
           class="rum-date-time-picker"
@@ -54,8 +51,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTooltip :content="isVariablesChanged ? t('dashboard.refreshToApplyVariableChanges') : t('dashboard.refresh')" />
         </OButton>
       </template>
-    </AppPageHeader>
-
     <OTabs
       class="shrink-0 px-page-edge border-b border-border-default"
       v-model="activePerformanceTab"
@@ -88,7 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </keep-alive>
     </router-view>
-  </div>
+  </PageLayout>
 </template>
 
 <script lang="ts">
@@ -118,7 +113,7 @@ import usePerformance from "@/composables/rum/usePerformance";
 import useRum from "@/composables/rum/useRum";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import PageLayout from "@/components/common/PageLayout.vue";
 
 export default defineComponent({
   name: "AppPerformance",
@@ -129,7 +124,7 @@ export default defineComponent({
     DateTimePickerDashboard,
     OButton,
     OTooltip,
-    AppPageHeader,
+    PageLayout,
   },
   setup() {
     const { t } = useI18n();

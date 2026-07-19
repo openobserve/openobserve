@@ -1,13 +1,11 @@
 <template>
-  <div class="flex flex-col h-full overflow-hidden relative">
-
-    <!-- PAGE HEADER -->
-    <AppPageHeader
-      :title="t('synthetics.pageTitle')"
-      :subtitle="t('synthetics.pageSubtitle')"
-      class="border-b border-border-default"
-      icon="radar"
-    >
+  <PageLayout
+    class="relative"
+    :title="t('synthetics.pageTitle')"
+    :subtitle="t('synthetics.pageSubtitle')"
+    icon="radar"
+    bleed
+  >
       <template #actions>
         <ODropdown align="end">
           <template #trigger>
@@ -27,8 +25,6 @@
           </ODropdownItem>
         </ODropdown>
       </template>
-    </AppPageHeader>
-
     <!-- CONTENT AREA: sidebar + main -->
     <div class="flex flex-1 overflow-hidden">
       <!-- LEFT SIDEBAR: folder navigation -->
@@ -194,14 +190,14 @@
       @updated="onMoveUpdated"
       @update:open="showMoveDialog = $event"
     />
-  </div>
+  </PageLayout>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import PageLayout from "@/components/common/PageLayout.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
