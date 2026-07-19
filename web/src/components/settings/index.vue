@@ -48,9 +48,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <router-view title="" />
       </ConstrainedPage>
     </div>
-    <!-- Table/list sections render their own AppPageHeader inside. -->
+    <!-- Table/list sections render their own header (PageLayout) inside. Do NOT
+         pass a `title` attr here: these children are PageLayout-rooted, so a
+         fallthrough `title` would clobber their own `:title` prop and blank the
+         header (regression seen on Query Management / Nodes). -->
     <section v-else class="h-full min-w-0 min-h-0 overflow-y-auto overflow-x-hidden">
-      <router-view title="" />
+      <router-view />
     </section>
   </PageLayout>
 </template>
