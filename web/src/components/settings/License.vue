@@ -586,7 +586,7 @@ export default defineComponent({
           message:
             t("about.failed_to_update_license") +
             " : " +
-            (error?.response?.data?.message || "unexpected error"),
+            (error?.response?.data?.message || t("settings.licensePage.unexpectedError")),
         });
       }
     };
@@ -617,7 +617,7 @@ export default defineComponent({
           message:
             t("about.failed_to_refresh_license") +
             " : " +
-            (error?.response?.data?.message || "unexpected error"),
+            (error?.response?.data?.message || t("settings.licensePage.unexpectedError")),
         }); 
       }
     }
@@ -746,11 +746,11 @@ export default defineComponent({
       );
 
       if (daysUntilExpiry > 1) {
-        return `${daysUntilExpiry} days remaining until your license expires`;
+        return t("settings.licensePage.daysRemaining", { days: daysUntilExpiry });
       } else if (daysUntilExpiry === 1) {
-        return `1 day remaining until your license expires`;
+        return t("settings.licensePage.oneDayRemaining");
       } else {
-        return "Your license has expired";
+        return t("settings.licensePage.licenseExpired");
       }
     };
 

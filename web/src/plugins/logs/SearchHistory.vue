@@ -106,7 +106,7 @@
                 <div class="text-left mb-2 px-4 py-0 w-[calc(95vw-2.5rem)] min-w-[calc(90vw-1.25rem)] max-h-screen overflow-hidden">
                   <div class="flex items-center py-2 gap-2">
                     <strong
-                      >SQL Query :
+                      >{{ t('logs.searchHistory.sqlQueryLabel') }}
                       <span>
                         <!-- Copy is a neutral action in both sections; the SQL/VRL
                              accent lives on the block's left border, which marks
@@ -117,7 +117,7 @@
                           size="icon-chip"
                           class="ml-2"
                           @click.stop="
-                            copyToClipboard(row.sql, { successMessage: 'SQL Query Copied Successfully!', timeout: 5000 })
+                            copyToClipboard(row.sql, { successMessage: t('logs.searchHistory.sqlQueryCopied'), timeout: 5000 })
                           "
                         >
                           <OIcon name="content-copy" size="xs" /> </OButton></span
@@ -135,7 +135,7 @@
                       <template #icon-left
                         ><OIcon name="search" size="xs"
                       /></template>
-                      Logs
+                      {{ t('logs.searchHistory.logs') }}
                     </OButton>
                     <OButton
                       v-if="
@@ -151,7 +151,7 @@
                       <template #icon-left
                         ><OIcon name="analytics" size="xs"
                       /></template>
-                      Inspect
+                      {{ t('logs.searchHistory.inspect') }}
                     </OButton>
                   </div>
                   <div class="flex items-start justify-center">
@@ -178,7 +178,7 @@
                 >
                   <div class="flex items-center py-2">
                     <strong
-                      >Function Definition :
+                      >{{ t('logs.searchHistory.functionDefinitionLabel') }}
                       <span>
                         <!-- Same neutral copy affordance as the SQL block above. -->
                         <OButton
@@ -189,7 +189,7 @@
                           @click.stop="
                             copyToClipboard(
                               row.function,
-                              { successMessage: 'Function Defination Copied Successfully!', timeout: 5000 },
+                              { successMessage: t('logs.searchHistory.functionDefinitionCopied'), timeout: 5000 },
                             )
                           "
                         >
@@ -242,7 +242,7 @@
                 >
                   {{ resultTotal }} {{ t("search_history.results") }}
                 </div>
-                <div class="ml-auto mr-2">Max Limit : <b>1000</b></div>
+                <div class="ml-auto mr-2">{{ t('logs.searchHistory.maxLimit') }} <b>1000</b></div>
               </div>
             </template>
           </OTable>
@@ -349,12 +349,12 @@ export default defineComponent({
     const activeTab = ref("query");
     const tabs = ref([
       {
-        label: "Query / Function",
+        label: t("logs.searchHistory.queryFunctionTab"),
         value: "query",
         icon: "code",
       },
       {
-        label: "More Details",
+        label: t("logs.searchHistory.moreDetailsTab"),
         value: "more_details",
         icon: "info",
       },
@@ -411,8 +411,7 @@ export default defineComponent({
         if (!startTime) {
           toast({
             variant: "error",
-            message:
-              "The selected start time is  invalid. Please choose a valid time",
+            message: t("logs.searchHistory.invalidStartTime"),
             timeout: 5000,
           });
           isLoading.value = false;
@@ -421,8 +420,7 @@ export default defineComponent({
         if (!endTime) {
           toast({
             variant: "error",
-            message:
-              "The selected end time is  invalid. Please choose a valid time",
+            message: t("logs.searchHistory.invalidEndTime"),
             timeout: 5000,
           });
           isLoading.value = false;
@@ -487,7 +485,7 @@ export default defineComponent({
       } catch (error) {
         toast({
           variant: "error",
-          message: "Failed to fetch search history. Please try again later.",
+          message: t("logs.searchHistory.fetchFailed"),
           timeout: 5000,
         });
         console.log(error, "error");
@@ -499,10 +497,10 @@ export default defineComponent({
     const delayMessage = computed(() => {
       const delay = store.state.zoConfig.usage_publish_interval;
       if (delay <= 60) {
-        return "60 seconds";
+        return t("logs.searchHistory.sixtySeconds");
       } else {
         const minutes = Math.floor(delay / 60);
-        return `${minutes} minute(s)`;
+        return t("logs.searchHistory.minutes", { minutes });
       }
     });
 

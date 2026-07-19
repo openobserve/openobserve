@@ -493,7 +493,7 @@ export default defineComponent({
         [variant.id]: {
           status: "error",
           results: [],
-          error: String(error || "Failed to render chart"),
+          error: String(error || t("metrics.functionConfigDialog.failedToRenderChart")),
         },
       };
     };

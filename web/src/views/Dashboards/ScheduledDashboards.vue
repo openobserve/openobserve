@@ -87,7 +87,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             unit="us"
             mode="absolute"
             :timezone="store.state.timezone"
-            empty-label="Never"
+            :empty-label="t('dashboard.scheduledDashboardsPage.never')"
           />
         </span>
       </template>
@@ -361,27 +361,37 @@ const openReport = (row: any) => {
 
 const getFrequencyValue = (frequency: any) => {
   if (frequency.type === "cron") {
-    return `Cron ${frequency.cron}`;
+    return t("dashboard.scheduledDashboardsPage.cronFrequency", {
+      cron: frequency.cron,
+    });
   } else {
     switch (frequency.type) {
       case "once":
-        return `Once`;
+        return t("dashboard.scheduledDashboardsPage.once");
       case "hours":
-        return `Every ${frequency.interval > 1 ? frequency.interval : ""} ${
-          frequency.interval > 1 ? "Hours" : "Hour"
-        }`;
+        return frequency.interval > 1
+          ? t("dashboard.scheduledDashboardsPage.everyHours", {
+              interval: frequency.interval,
+            })
+          : t("dashboard.scheduledDashboardsPage.everyHour");
       case "weeks":
-        return `Every ${frequency.interval > 1 ? frequency.interval : ""} ${
-          frequency.interval > 1 ? "Weeks" : "Week"
-        }`;
+        return frequency.interval > 1
+          ? t("dashboard.scheduledDashboardsPage.everyWeeks", {
+              interval: frequency.interval,
+            })
+          : t("dashboard.scheduledDashboardsPage.everyWeek");
       case "months":
-        return `Every ${frequency.interval > 1 ? frequency.interval : ""} ${
-          frequency.interval > 1 ? "Months" : "Month"
-        }`;
+        return frequency.interval > 1
+          ? t("dashboard.scheduledDashboardsPage.everyMonths", {
+              interval: frequency.interval,
+            })
+          : t("dashboard.scheduledDashboardsPage.everyMonth");
       case "days":
-        return `Every ${frequency.interval > 1 ? frequency.interval : ""} ${
-          frequency.interval > 1 ? "Days" : "Day"
-        }`;
+        return frequency.interval > 1
+          ? t("dashboard.scheduledDashboardsPage.everyDays", {
+              interval: frequency.interval,
+            })
+          : t("dashboard.scheduledDashboardsPage.everyDay");
       default:
         return "";
     }
@@ -390,7 +400,7 @@ const getFrequencyValue = (frequency: any) => {
 
 const getTimeRangeValue = (dateTime: any) => {
   if (dateTime.type === "relative") {
-    return `Past ${dateTime.period}`;
+    return t("dashboard.scheduledDashboardsPage.past", { period: dateTime.period });
   } else {
     const startDateTime = convertUnixToDateFormat(dateTime.from);
     const endDateTime = convertUnixToDateFormat(dateTime.to);

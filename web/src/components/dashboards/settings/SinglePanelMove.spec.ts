@@ -22,11 +22,23 @@ vi.mock("../../../utils/commons", () => ({
   getDashboard: vi.fn(),
 }));
 
-vi.mock("vue-i18n", () => ({
-  useI18n: () => ({
-    t: (key: string) => key,
-  }),
-}));
+// Resolve keys against the REAL app messages so migrated i18n keys render
+// their real English text (e.g. "Move"), instead of leaking the key path.
+vi.mock("vue-i18n", async () => {
+  const en: Record<string, any> = (
+    (await vi.importActual("@/locales/languages/en-US.json")) as any
+  ).default;
+  const resolve = (key: string): unknown =>
+    key.split(".").reduce<any>((o, k) => (o == null ? undefined : o[k]), en);
+  return {
+    useI18n: () => ({
+      t: (key: string) => {
+        const value = resolve(key);
+        return typeof value === "string" ? value : key;
+      },
+    }),
+  };
+});
 
 vi.mock("vue-router", () => ({
   useRoute: () => ({
@@ -216,7 +228,7 @@ describe("SinglePanelMove", () => {
     it("renders i18n label on the secondary (cancel) button", () => {
       wrapper = createWrapper();
       const dialog = wrapper.findComponent(ODialogStub);
-      expect(dialog.props("secondaryButtonLabel")).toBe("confirmDialog.cancel");
+      expect(dialog.props("secondaryButtonLabel")).toBe("Cancel");
     });
 
     it("renders the literal 'Move' label on the primary (confirm) button", () => {

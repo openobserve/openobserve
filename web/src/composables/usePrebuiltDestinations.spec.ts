@@ -26,7 +26,7 @@ vi.mock("@/lib/feedback/Toast/useToast", () => ({
 // Resolve against the real en.json rather than echoing the key, so these tests
 // also prove the keys exist and interpolate.
 vi.mock("vue-i18n", async () => {
-  const en: any = (await import("@/locales/languages/en.json")).default;
+  const en: any = (await import("@/locales/languages/en-US.json")).default;
   return {
     useI18n: vi.fn(() => ({
       t: (key: string, named?: Record<string, unknown>) => {

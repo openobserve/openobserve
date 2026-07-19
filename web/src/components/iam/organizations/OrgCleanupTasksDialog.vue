@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <ODialog
     :open="open"
-    :title="`Deletion progress — ${orgName}`"
+    :title="t('iam.orgCleanupTasksDialog.deletionProgress', { orgName })"
     size="md"
     data-test="org-cleanup-tasks-dialog"
     @update:open="$emit('update:open', $event)"
@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div v-if="tasks.length" class="mb-4">
         <div class="flex items-center justify-between mb-2">
           <span class="text-sm font-medium text-text-body">
-            {{ doneCount }} of {{ tasks.length }} steps complete
+            {{ t('iam.orgCleanupTasksDialog.stepsComplete', { done: doneCount, total: tasks.length }) }}
           </span>
           <OBadge
             :variant="overallStatus === 'completed' ? 'success-soft' : overallStatus === 'failed' ? 'error-soft' : 'primary-soft'"
@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="xs"
               class="mr-1 animate-spin"
             />
-            {{ overallStatus === 'completed' ? 'Completed' : overallStatus === 'failed' ? 'Failed' : 'In progress' }}
+            {{ overallStatus === 'completed' ? t('iam.orgCleanupTasksDialog.completed') : overallStatus === 'failed' ? t('iam.orgCleanupTasksDialog.failed') : t('iam.orgCleanupTasksDialog.inProgress') }}
           </OBadge>
         </div>
         <OProgressBar :value="progressValue" :variant="progressBarVariant" size="sm" />
@@ -48,12 +48,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Loading -->
       <div v-if="loading && !tasks.length" class="py-8 text-center text-text-secondary text-sm">
-        Loading…
+        {{ t('iam.orgCleanupTasksDialog.loading') }}
       </div>
 
       <!-- Empty -->
       <div v-else-if="!tasks.length" class="py-8 text-center text-text-secondary text-sm">
-        No cleanup tasks found for this organization.
+        {{ t('iam.orgCleanupTasksDialog.noTasks') }}
       </div>
 
       <!-- Task rows -->
@@ -134,7 +134,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <span
                     v-if="child.attempts > 0"
                     class="text-text-secondary text-xs tabular-nums whitespace-nowrap"
-                    :title="`${child.attempts} attempt(s)`"
+                    :title="t('iam.orgCleanupTasksDialog.attempts', { n: child.attempts })"
                   >
                     {{ child.attempts }}×
                   </span>
@@ -180,7 +180,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span
                 v-if="row.task.attempts > 0"
                 class="text-text-secondary text-xs tabular-nums whitespace-nowrap"
-                :title="`${row.task.attempts} attempt(s)`"
+                :title="t('iam.orgCleanupTasksDialog.attempts', { n: row.task.attempts })"
               >
                 {{ row.task.attempts }}×
               </span>
@@ -208,23 +208,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="mt-3 text-xs text-text-secondary flex items-center gap-1.5"
       >
         <OIcon name="autorenew" size="xs" class="animate-spin" />
-        <span>Refreshing every 5s…</span>
+        <span>{{ t('iam.orgCleanupTasksDialog.refreshingEvery5s') }}</span>
       </div>
       <div
         v-else-if="tasks.length && overallStatus === 'failed'"
         class="mt-3 text-xs text-error"
       >
-        {{ failedCount }} step(s) failed permanently — deletion is blocked until resolved.
+        {{ t('iam.orgCleanupTasksDialog.stepsFailedPermanently', { n: failedCount }) }}
       </div>
     </div>
 
     <template #footer>
       <OButton variant="outline" size="sm" @click="$emit('update:open', false)">
-        Close
+        {{ t('iam.orgCleanupTasksDialog.close') }}
       </OButton>
       <OButton variant="ghost" size="sm" :disabled="loading" @click="fetchTasks">
         <OIcon name="refresh" size="sm" />
-        Refresh
+        {{ t('iam.orgCleanupTasksDialog.refresh') }}
       </OButton>
     </template>
   </ODialog>
@@ -232,6 +232,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, ref, computed, watch, onUnmounted } from "vue";
+import { useI18n } from "vue-i18n";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
@@ -263,6 +264,7 @@ export default defineComponent({
   },
   emits: ["update:open"],
   setup(props) {
+    const { t } = useI18n();
     const tasks = ref<CleanupTask[]>([]);
     const loading = ref(false);
     let pollTimer: ReturnType<typeof setInterval> | null = null;
@@ -304,7 +306,7 @@ export default defineComponent({
             rows.push({
               type: "group",
               key: "delete_streams_group",
-              label: "Delete Streams",
+              label: t("iam.orgCleanupTasksDialog.deleteStreams"),
               children: streamChildren,
               status: aggregateStatus(streamChildren),
               doneCount: streamChildren.filter((c) => c.status === "done").length,
@@ -452,6 +454,7 @@ export default defineComponent({
     };
 
     return {
+      t,
       tasks,
       loading,
       sortedTasks,

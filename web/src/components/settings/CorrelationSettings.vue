@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="flex flex-col h-full min-h-0">
     <AppPageHeader
       icon="group-work"
-      subtitle="Telemetry correlation configuration"
+      :subtitle="t('settings.correlationSettingsPage.subtitle')"
       class="shrink-0 px-4 border-b border-border-default"
       data-test="correlation-settings-header"
     >

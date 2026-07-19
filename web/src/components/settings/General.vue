@@ -461,7 +461,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @update:open="(v) => !v && onColorPickerClose()"
     size="xs"
     :title="t('settings.pickCustomColor')"
-    primary-button-label="Close"
+    :primary-button-label="t('settings.general.close')"
     @click:primary="showColorPicker = false"
   >
     <OColor v-model="tempColor" @update:model-value="updateCustomColor" />
@@ -1332,7 +1332,11 @@ export default defineComponent({
       filesDark,
       logoThemeToDelete,
       counterLabelFn(CounterLabelParams: { filesNumber: any; totalSize: any }) {
-        return `${t("settings.fileFormatConstraint")} ${CounterLabelParams.filesNumber} file | ${CounterLabelParams.totalSize}`;
+        return t("settings.general.fileCounterLabel", {
+          constraint: t("settings.fileFormatConstraint"),
+          filesNumber: CounterLabelParams.filesNumber,
+          totalSize: CounterLabelParams.totalSize,
+        });
       },
       filesImages: ref(null),
       filesMaxSize: ref(null),

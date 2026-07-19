@@ -64,7 +64,7 @@ const ODialogStub = defineComponent({
 
 // Mock cookies module
 vi.mock("@/utils/cookies", () => ({
-  getLanguage: vi.fn(() => "en-gb"),
+  getLanguage: vi.fn(() => "en-us"),
   setLanguage: vi.fn(),
   getSidebarStatus: vi.fn(),
   setSidebarStatus: vi.fn(),
@@ -243,14 +243,14 @@ describe("MainLayout Methods and Functions", () => {
     });
 
     it("should retrieve and use current language from cookies", () => {
-      // Mock returns "en-gb" by default
+      // Mock returns "en-us" by default
       const currentLang = cookies.getLanguage();
 
       // Verify the cookie function was called
       expect(cookies.getLanguage).toHaveBeenCalled();
 
       // Verify we can use the retrieved language
-      expect(currentLang).toBe("en-gb");
+      expect(currentLang).toBe("en-us");
       expect(typeof currentLang).toBe("string");
       expect(currentLang.length).toBeGreaterThan(0);
     });
@@ -791,7 +791,7 @@ describe("MainLayout Methods and Functions", () => {
   describe("Language Configuration", () => {
     it("should have correct language list", () => {
       const langList = [
-        { code: "en-gb", label: "English" },
+        { code: "en-us", label: "English" },
         { code: "tr-turk", label: "Türkçe" },
         { code: "zh-cn", label: "简体中文" },
         { code: "zh-tw", label: "繁體中文" },
@@ -803,10 +803,13 @@ describe("MainLayout Methods and Functions", () => {
         { code: "ko", label: "한국어" },
         { code: "nl", label: "Nederlands" },
         { code: "pt", label: "Português" },
+        { code: "ru", label: "Русский" },
+        { code: "pl", label: "Polski" },
+        { code: "vi", label: "Tiếng Việt" },
       ];
 
-      expect(langList).toHaveLength(12);
-      expect(langList[0].code).toBe("en-gb");
+      expect(langList).toHaveLength(15);
+      expect(langList[0].code).toBe("en-us");
       expect(langList[0].label).toBe("English");
     });
   });

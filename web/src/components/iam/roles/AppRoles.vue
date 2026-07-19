@@ -74,16 +74,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @added:role="onRoleAdded"
   />
   <ConfirmDialog
-    title="Delete Role"
-    :message="`Are you sure you want to delete '${deleteConformDialog?.data?.role_name as string}' role?`"
+    :title="t('iam.appRoles.deleteRole')"
+    :message="t('iam.appRoles.deleteConfirm', { roleName: deleteConformDialog?.data?.role_name })"
     :warning-message="deleteImpactMessage"
     @update:ok="_deleteRole"
     @update:cancel="deleteConformDialog.show = false"
     v-model="deleteConformDialog.show"
   />
   <ConfirmDialog
-    title="Bulk Delete Roles"
-    :message="`Are you sure you want to delete ${selectedRoleNames.length} role(s)?`"
+    :title="t('iam.appRoles.bulkDeleteRoles')"
+    :message="t('iam.appRoles.bulkDeleteConfirm', { count: selectedRoleNames.length })"
     :warning-message="bulkDeleteImpactMessage"
     @update:ok="bulkDeleteUserRoles"
     @update:cancel="confirmBulkDelete = false"
@@ -220,7 +220,7 @@ const deleteUserRole = (role: any) => {
   deleteRole(role.role_name, store.state.selectedOrganization.identifier)
     .then(() => {
       toast({
-        message: "Role deleted successfully!",
+        message: t("iam.appRoles.roleDeletedSuccess"),
         variant: "success",
       });
       setupRoles();
@@ -228,7 +228,7 @@ const deleteUserRole = (role: any) => {
     .catch((error: any) => {
       if (error.response.status != 403) {
         toast({
-          message: "Error while deleting role!",
+          message: t("iam.appRoles.roleDeleteError"),
           variant: "error",
         });
       }
@@ -312,17 +312,17 @@ const bulkDeleteUserRoles = async () => {
 
     if (successful.length > 0 && unsuccessful.length === 0) {
       toast({
-        message: `Successfully deleted ${successful.length} role(s)`,
+        message: t("iam.appRoles.bulkDeleteSuccess", { count: successful.length }),
         variant: "success",
       });
     } else if (successful.length > 0 && unsuccessful.length > 0) {
       toast({
-        message: `Deleted ${successful.length} role(s). Failed to delete ${unsuccessful.length} role(s)`,
+        message: t("iam.appRoles.bulkDeletePartial", { successful: successful.length, unsuccessful: unsuccessful.length }),
         variant: "warning",
       });
     } else if (unsuccessful.length > 0) {
       toast({
-        message: `Failed to delete ${unsuccessful.length} role(s)`,
+        message: t("iam.appRoles.bulkDeleteFailed", { count: unsuccessful.length }),
         variant: "error",
       });
     }
@@ -333,7 +333,7 @@ const bulkDeleteUserRoles = async () => {
   } catch (error: any) {
     if (error.response?.status != 403 || error?.status != 403) {
       toast({
-        message: error.response?.data?.message || error?.message || "Error while deleting roles",
+        message: error.response?.data?.message || error?.message || t("iam.appRoles.bulkDeleteRolesError"),
         variant: "error",
       });
     }

@@ -952,7 +952,9 @@ export default defineComponent({
           )?.value;
 
           if (!firstFieldTypeArg) {
-            showErrorNotification("Without field, not able to drag");
+            showErrorNotification(
+              t("dashboard.dashboardQueryBuilder.withoutFieldDragError"),
+            );
             cleanupDraggingFields();
             return;
           }
@@ -1004,7 +1006,13 @@ export default defineComponent({
                   break;
               }
 
-              const errorMessage = `Max ${maxAllowedAxisFields} field(s) in ${targetAxis.toUpperCase()}-Axis is allowed.`;
+              const errorMessage = t(
+                "dashboard.dashboardQueryBuilder.maxFieldsAllowed",
+                {
+                  count: maxAllowedAxisFields,
+                  axis: targetAxis.toUpperCase(),
+                },
+              );
 
               showErrorNotification(errorMessage);
               cleanupDraggingFields();
@@ -1157,7 +1165,7 @@ export default defineComponent({
         case "heatmap":
           return t("dashboard.oneFieldMessage");
         case "gauge":
-          return "Add 0 or 1 label field here";
+          return t("dashboard.dashboardQueryBuilder.addZeroOrOneLabelField");
         default:
           return t("dashboard.maxtwofieldMessage");
       }
@@ -1192,9 +1200,9 @@ export default defineComponent({
     const zAxisHint = computed((e: any) => {
       switch (dashboardPanelData.data.type) {
         case "heatmap":
-          return "Add 1 field here";
+          return t("dashboard.dashboardQueryBuilder.addOneField");
         default:
-          return "Add one or more fields here";
+          return t("dashboard.dashboardQueryBuilder.addOneOrMoreFields");
       }
     });
     const commonBtnLabel = (field: any) => {

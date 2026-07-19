@@ -49,9 +49,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <OFormSelect
                 name="selectedTabs"
-                help-text="Variables will be available only in the selected tabs."
+                :help-text="t('dashboard.addSettingVariable.helpTextTabs')"
                 :options="tabsOptions"
-                label="Select tabs"
+                :label="t('dashboard.addSettingVariable.selectTabs')"
                 multiple
                 searchable
                 @update:model-value="updatePanels()"
@@ -69,9 +69,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <OFormSelect
                 name="selectedPanels"
-                help-text="Variables will be available only in the selected panels."
+                :help-text="t('dashboard.addSettingVariable.helpTextPanels')"
                 :options="groupedPanelsOptions"
-                label="Select panels"
+                :label="t('dashboard.addSettingVariable.selectPanels')"
                 multiple
                 searchable
                 class="mb-3"
@@ -193,7 +193,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="dashboard-query-values-filter"
                     class="text-base font-bold"
                   >
-                    Filters
+                    {{ t('dashboard.addSettingVariable.filters') }}
                   </div>
                   <OTooltip max-width="250px">
                     <OIcon
@@ -220,7 +220,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       labelKey="name"
                       valueKey="name"
                       searchable
-                      :placeholder="filter.name ? '' : 'Select Field'"
+                      :placeholder="filter.name ? '' : t('dashboard.addSettingVariable.selectFieldPlaceholder')"
                       :title="filter.name || undefined"
                       @update:model-value="filterUpdated(index, $event)"
                       data-test="dashboard-query-values-filter-name-selector"
@@ -267,7 +267,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       search-regex="(?:^|[^$])\$?(\w+)"
                       :debounce="1000"
                       class="flex-2 min-w-0"
-                      placeholder="Enter Value"
+                      :placeholder="t('dashboard.addSettingVariable.enterValueCap')"
                       :data-test="`dashboard-query-values-filter-value-selector-${index}`"
                     />
                     <!-- Fixed input-height wrapper keeps the delete button
@@ -330,7 +330,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ t('common.value') }}
               </div>
               <div class="w-12 flex items-center justify-center">
-                <span v-if="!variableData.multiSelect"> Default </span>
+                <span v-if="!variableData.multiSelect"> {{ t('dashboard.addSettingVariable.default') }} </span>
                 <OCheckbox
                   v-if="variableData.multiSelect"
                   v-model="customSelectAllModel"
@@ -354,13 +354,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :name="`options[${index}].label`"
                 class="flex-1 mr-2"
                 :data-test="`dashboard-custom-variable-${index}-label`"
-                :placeholder="'Label ' + (index + 1)"
+                :placeholder="t('dashboard.addSettingVariable.labelPlaceholder', { n: index + 1 })"
               />
               <OFormInput
                 :name="`options[${index}].value`"
                 class="flex-1 mr-2"
                 :data-test="`dashboard-custom-variable-${index}-value`"
-                :placeholder="'Value ' + (index + 1)"
+                :placeholder="t('dashboard.addSettingVariable.valuePlaceholder', { n: index + 1 })"
               />
               <div class="flex w-12 item-center justify-center">
                 <OFormCheckbox
@@ -449,7 +449,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="flex mr-2 w-1/2">
                   <OFormInput
                     :name="`customMultiSelectValue[${index}]`"
-                    placeholder="Enter value"
+                    :placeholder="t('dashboard.addSettingVariable.enterValue')"
                     :data-test="`dashboard-variable-custom-value-${index}`"
                   />
                   <OButton
@@ -732,7 +732,7 @@ export default defineComponent({
       ) {
         return [
           {
-            label: "Current Panel",
+            label: t("dashboard.addSettingVariable.currentPanel"),
             value: "current_panel",
             isCurrentPanel: true,
           },
@@ -749,7 +749,7 @@ export default defineComponent({
           // But only if NOT editing an existing panel
           if (props.isFromAddPanel && !isEditingPanel) {
             panelOptions.push({
-              label: "Current Panel",
+              label: t("dashboard.addSettingVariable.currentPanel"),
               value: "current_panel",
               isCurrentPanel: true,
             });
@@ -818,9 +818,9 @@ export default defineComponent({
     const customSelectAllModel: any = ref(false);
 
     const scopeOptions = computed(() => [
-      { label: "Global", value: "global" },
-      { label: "Selected Tabs", value: "tabs" },
-      { label: "Selected Panels", value: "panels" },
+      { label: t("dashboard.addSettingVariable.scopeGlobal"), value: "global" },
+      { label: t("dashboard.addSettingVariable.scopeSelectedTabs"), value: "tabs" },
+      { label: t("dashboard.addSettingVariable.scopeSelectedPanels"), value: "panels" },
     ]);
 
     const streamTypeOptions = computed(() =>
@@ -981,7 +981,7 @@ export default defineComponent({
           }
         }
       } catch (error) {
-        showErrorNotification("Failed to load dashboard data");
+        showErrorNotification(t("dashboard.addSettingVariable.failedToLoadDashboard"));
       }
     });
 
@@ -1091,7 +1091,7 @@ export default defineComponent({
 
             if (!isVariableReference) {
               // Only show error if it's NOT a variable reference
-              showErrorNotification(error ?? "Failed to get stream fields", {
+              showErrorNotification(error ?? t("dashboard.addSettingVariable.failedToGetStreamFields"), {
                 timeout: 2000,
               });
             }
@@ -1203,10 +1203,10 @@ export default defineComponent({
             showConfictErrorNotificationWithRefreshBtn(
               error?.response?.data?.message ??
                 error?.message ??
-                "Variable update failed",
+                t("dashboard.addSettingVariable.variableUpdateFailed"),
             );
           } else {
-            showErrorNotification(error.message ?? "Variable update failed", {
+            showErrorNotification(error.message ?? t("dashboard.addSettingVariable.variableUpdateFailed"), {
               timeout: 2000,
             });
           }
@@ -1225,10 +1225,10 @@ export default defineComponent({
             showConfictErrorNotificationWithRefreshBtn(
               error?.response?.data?.message ??
                 error?.message ??
-                "Variable creation failed",
+                t("dashboard.addSettingVariable.variableCreationFailed"),
             );
           } else {
-            showErrorNotification(error.message ?? "Variable creation failed", {
+            showErrorNotification(error.message ?? t("dashboard.addSettingVariable.variableCreationFailed"), {
               timeout: 2000,
             });
           }
@@ -1282,9 +1282,10 @@ export default defineComponent({
         const hasCycle = isGraphHasCycle(variablesDependencyGraph);
         if (hasCycle) {
           // filter has cycle, so show error and return
-          filterCycleError.value = `Variables has cycle: ${hasCycle.join(
-            "->",
-          )} -> ${hasCycle[0]}`;
+          filterCycleError.value = t(
+            "dashboard.addSettingVariable.variablesHasCycle",
+            { path: `${hasCycle.join("->")} -> ${hasCycle[0]}` },
+          );
           return true;
         }
 
@@ -1295,8 +1296,8 @@ export default defineComponent({
         showErrorNotification(
           err?.message ??
             (editMode.value
-              ? "Variable update failed"
-              : "Variable creation failed"),
+              ? t("dashboard.addSettingVariable.variableUpdateFailed")
+              : t("dashboard.addSettingVariable.variableCreationFailed")),
         );
         return true;
       }
@@ -1318,7 +1319,7 @@ export default defineComponent({
           (v: any) => v.name === value.name && v.name !== props.variableName,
         );
         if (isDuplicate) {
-          showErrorNotification(`Variable with same name already exists.`);
+          showErrorNotification(t("dashboard.addSettingVariable.variableNameExists"));
           return;
         }
       }
@@ -1334,7 +1335,7 @@ export default defineComponent({
         value.type === "custom" &&
         (value.options ?? []).every((option: any) => !option.selected)
       ) {
-        showErrorNotification("Select at least one default option");
+        showErrorNotification(t("dashboard.addSettingVariable.selectAtLeastOneOption"));
         return;
       }
 
@@ -1347,8 +1348,8 @@ export default defineComponent({
         showErrorNotification(
           err?.message ??
             (editMode.value
-              ? "Variable update failed"
-              : "Variable creation failed"),
+              ? t("dashboard.addSettingVariable.variableUpdateFailed")
+              : t("dashboard.addSettingVariable.variableCreationFailed")),
         );
       });
     };
@@ -1433,7 +1434,7 @@ export default defineComponent({
           stream?.includes("$") || stream?.includes("{{");
 
         if (!isVariableReference) {
-          showErrorNotification(error ?? "Failed to get stream fields", {
+          showErrorNotification(error ?? t("dashboard.addSettingVariable.failedToGetStreamFields"), {
             timeout: 2000,
           });
         }
@@ -1527,7 +1528,7 @@ export default defineComponent({
         ...o,
         _displayLabel:
           o.name?.startsWith("$") || o.name?.startsWith("{{")
-            ? `${o.name} (variable)`
+            ? t("dashboard.addSettingVariable.variableSuffix", { name: o.name })
             : o.name,
       })),
     );
@@ -1545,7 +1546,7 @@ export default defineComponent({
         ...o,
         _displayLabel:
           o.name?.startsWith("$") || o.name?.startsWith("{{")
-            ? `${o.name} (variable)`
+            ? t("dashboard.addSettingVariable.variableSuffix", { name: o.name })
             : o.name,
       })),
     );

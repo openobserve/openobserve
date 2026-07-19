@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <span
           class="wcp__title text-compact font-semibold text-text-heading truncate"
-        >Variable slot · {{ tokenType }}</span>
+        >{{ t('logs.wildcardValuePopover.variableSlot', { type: tokenType }) }}</span>
       </div>
       <div
         class="wcp__header-right flex items-baseline gap-1 shrink-0"
@@ -50,7 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >{{ displayValues.length }}</span>
         <span
           class="wcp__unique-label text-2xs text-text-secondary"
-        >unique</span>
+        >{{ t('logs.wildcardValuePopover.unique') }}</span>
       </div>
     </div>
 
@@ -71,7 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <span
             class="wcp__row-value text-xs font-semibold font-mono text-text-body truncate flex-1 min-w-0"
-          >{{ item.value || "(empty)" }}</span>
+          >{{ item.value || t('logs.wildcardValuePopover.empty') }}</span>
           <span
             class="wcp__row-count text-compact font-bold text-text-body [font-variant-numeric:tabular-nums] shrink-0"
           >{{ item.count.toLocaleString() }}</span>
@@ -109,7 +109,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <span
         class="wcp__occurrences text-2xs font-semibold text-text-secondary [font-variant-numeric:tabular-nums]"
-      >{{ totalOccurrences.toLocaleString() }} occurrences</span>
+      >{{ t('logs.wildcardValuePopover.occurrences', { count: totalOccurrences.toLocaleString() }) }}</span>
     </div>
   </div>
 </template>

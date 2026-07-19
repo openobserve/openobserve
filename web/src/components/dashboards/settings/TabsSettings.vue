@@ -298,16 +298,18 @@ export default defineComponent({
 
         emit("refresh");
 
-        showPositiveNotification("Dashboard updated successfully.");
+        showPositiveNotification(t("dashboard.tabsSettings.dashboardUpdated"));
       } catch (error: any) {
         if (error?.response?.status === 409) {
           showConfictErrorNotificationWithRefreshBtn(
             error?.response?.data?.message ??
               error?.message ??
-              "Tab reorder failed",
+              t("dashboard.tabsSettings.tabReorderFailed"),
           );
         } else {
-          showErrorNotification(error?.message ?? "Tab reorder failed");
+          showErrorNotification(
+            error?.message ?? t("dashboard.tabsSettings.tabReorderFailed"),
+          );
         }
         emit("refresh");
         await getDashboardData();
@@ -340,7 +342,8 @@ export default defineComponent({
           emit("refresh");
           await getDashboardData();
 
-          showPositiveNotification("Tab updated successfully");
+          showPositiveNotification(t("dashboard.tabsSettings.tabUpdated"));
+          // reset edit mode
           editTabId.value = null;
           editTabObj.data = {};
         }
@@ -349,10 +352,12 @@ export default defineComponent({
           showConfictErrorNotificationWithRefreshBtn(
             error?.response?.data?.message ??
               error?.message ??
-              "Tab updation failed",
+              t("dashboard.tabsSettings.tabUpdationFailed"),
           );
         } else {
-          showErrorNotification(error?.message ?? "Tab updation failed");
+          showErrorNotification(
+            error?.message ?? t("dashboard.tabsSettings.tabUpdationFailed"),
+          );
         }
 
         emit("refresh");
@@ -393,16 +398,18 @@ export default defineComponent({
         tabIdToBeDeleted.value = null;
         deletePopupVisible.value = false;
 
-        showPositiveNotification("Tab deleted successfully");
+        showPositiveNotification(t("dashboard.tabsSettings.tabDeleted"));
       } catch (error: any) {
         if (error?.response?.status === 409) {
           showConfictErrorNotificationWithRefreshBtn(
             error?.response?.data?.message ??
               error?.message ??
-              "Tab deletion failed",
+              t("dashboard.tabsSettings.tabDeletionFailed"),
           );
         } else {
-          showErrorNotification(error?.message ?? "Tab deletion failed", {
+          showErrorNotification(
+            error?.message ?? t("dashboard.tabsSettings.tabDeletionFailed"),
+            {
             timeout: 2000,
           });
         }

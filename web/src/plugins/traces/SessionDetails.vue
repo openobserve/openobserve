@@ -1491,7 +1491,7 @@ function turnRowClass(trace: SessionTraceRow): string {
 
 async function load() {
   if (!sessionId.value || !streamName.value) {
-    error.value = "Missing session id or stream in URL";
+    error.value = t("traces.sessionDetails.missingSessionInfo");
     return;
   }
   loading.value = true;
@@ -1510,7 +1510,7 @@ async function load() {
     // usable from `traces` alone).
     loadSessionSpans();
   } catch (e: any) {
-    error.value = e?.message || "Failed to load session";
+    error.value = e?.message || t("traces.sessionDetails.failedToLoadSession");
     // Log both the parsed message and the raw envelope so we can see
     // DataFusion's actual complaint (e.g. unknown column, bad GROUP BY)
     // instead of the generic wrapper.
@@ -1553,7 +1553,7 @@ function copySessionId() {
 
 function copyText(text: string | null | undefined) {
   if (!text) return;
-  copyToClipboard(text, { successMessage: "Copied", timeout: 1000 });
+  copyToClipboard(text, { successMessage: t("traces.sessionDetails.copied"), timeout: 1000 });
 }
 
 function usd4(v: number): string {

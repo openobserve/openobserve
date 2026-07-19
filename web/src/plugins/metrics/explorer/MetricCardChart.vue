@@ -46,6 +46,7 @@ import {
   type PropType,
 } from "vue";
 import { useStore } from "vuex";
+import { useI18n } from "vue-i18n";
 import * as echarts from "echarts/core";
 import { toZonedTime } from "date-fns-tz";
 import ChartRenderer from "@/components/dashboards/panels/ChartRenderer.vue";
@@ -90,6 +91,7 @@ export default defineComponent({
   emits: ["error", "zoom", "contextmenu"],
   setup(props, { emit }) {
     const store = useStore();
+    const { t } = useI18n();
     const chartPanelRef = ref(null);
     const chartData = ref<any>({ options: null });
 
@@ -287,7 +289,7 @@ export default defineComponent({
       } catch (error: any) {
         if (seq !== renderSeq) return;
         chartData.value = { options: null };
-        emit("error", error?.message ?? "Failed to render chart");
+        emit("error", error?.message ?? t("metrics.metricCardChart.failedToRenderChart"));
       }
     };
 

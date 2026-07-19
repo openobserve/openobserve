@@ -869,7 +869,7 @@ export default defineComponent({
       }
 
       if (!filtered.length) {
-        return [{ name: "No matching fields found", label: true, group: "__none__" }];
+        return [{ name: t("logs.indexList.noMatchingFields"), label: true, group: "__none__" }];
       }
       return filtered;
     };
@@ -1112,7 +1112,7 @@ export default defineComponent({
           if (!validationFlag) {
             fieldValues.value[name]["isLoading"] = false;
             fieldValues.value[name]["errMsg"] =
-              "Filter is not valid for selected streams.";
+              t("logs.indexList.filterNotValidForStreams");
             return;
           }
           if (searchObj.data.stream.missingStreamMultiStreamFilter.length > 0) {
@@ -1205,7 +1205,7 @@ export default defineComponent({
         console.log(err);
         toast({
           variant: "error",
-          message: "Error while fetching field values",
+          message: t("logs.indexList.errorFetchingFieldValues"),
         });
       }
     };
@@ -1226,7 +1226,7 @@ export default defineComponent({
       } else {
         toast({
           variant: "error",
-          message: "Failed to generate filter expression",
+          message: t("logs.indexList.failedToGenerateFilterExpression"),
         });
       }
     };
@@ -1245,7 +1245,7 @@ export default defineComponent({
       if (!expressions.length) {
         toast({
           variant: "error",
-          message: "Failed to generate filter expressions",
+          message: t("logs.indexList.failedToGenerateFilterExpressions"),
         });
         return;
       }
@@ -1720,8 +1720,7 @@ export default defineComponent({
       if (errorCodes.includes(response.code)) {
         handleSearchError(payload, {
           content: {
-            message:
-              "WebSocket connection terminated unexpectedly. Please check your network and try again",
+            message: t("logs.indexList.websocketTerminated"),
             trace_id: payload.traceId,
             code: response.code,
             error_detail: "",
@@ -1737,7 +1736,7 @@ export default defineComponent({
       if (fieldValues.value[request.queryReq?.fields[0]]) {
         fieldValues.value[request.queryReq.fields[0]].isLoading = false;
         fieldValues.value[request.queryReq.fields[0]].errMsg =
-          "Failed to fetch field values";
+          t("logs.indexList.failedToFetchFieldValues");
       }
 
       removeTraceId(request.queryReq.fields[0], request.traceId);
@@ -1861,7 +1860,7 @@ export default defineComponent({
         fieldValues.value[fieldName].isLoading = false;
       } catch (error) {
         console.error("Failed to fetch field values:", error);
-        fieldValues.value[fieldName].errMsg = "Failed to fetch field values";
+        fieldValues.value[fieldName].errMsg = t("logs.indexList.failedToFetchFieldValues");
         fieldValues.value[fieldName].isLoading = false;
       }
     };
@@ -1971,7 +1970,7 @@ export default defineComponent({
         return res;
       } catch (err) {
         console.error("Failed to fetch field values:", err);
-        fieldValues.value[name].errMsg = "Failed to fetch field values";
+        fieldValues.value[name].errMsg = t("logs.indexList.failedToFetchFieldValues");
       }
     };
 

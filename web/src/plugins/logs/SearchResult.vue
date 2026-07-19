@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="sm"
           />
           <OTooltip
-            :content="searchObj.meta.showFields ? 'Collapse Fields' : 'Open Fields'"
+            :content="searchObj.meta.showFields ? t('logs.searchResult.collapseFields') : t('logs.searchResult.openFields')"
             side="bottom"
             shortcut-id="logsToggleSidebar"
           />
@@ -89,12 +89,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 type="logsResultChip"
                 value="neutral"
                 data-test="logs-result-events-chip"
-              >{{ patternChips.events }} events</OTag>
+              >{{ patternChips.events }} {{ t('logs.searchResult.events') }}</OTag>
               <OTag
                 type="logsResultChip"
                 value="neutral"
                 data-test="logs-result-patterns-chip"
-              >{{ patternChips.patterns }} patterns</OTag>
+              >{{ patternChips.patterns }} {{ t('logs.searchResult.patterns') }}</OTag>
               <OTag
                 type="logsResultChip"
                 value="info"
@@ -348,7 +348,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
             size="inline"
             icon="bar-chart"
-            title="No Data"
+            :title="t('logs.searchResult.noData')"
             :backdrop="false"
             data-test="logs-search-no-data-histogram"
             class="histogram-empty !min-h-0 !p-2"
@@ -389,8 +389,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               searchObj.data.histogram.errorCode != -1
             "
           >
-            <OIcon name="warning" size="xs"></OIcon> Error
-            while fetching histogram data.
+            <OIcon name="warning" size="xs"></OIcon> {{ t('logs.searchResult.histogramFetchError') }}
             <OButton
               variant="secondary"
               size="sm"
@@ -452,13 +451,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span class="oo-pin-tooltip__row-actions">
                 <span
                   class="oo-pin-tooltip__action oo-pin-tooltip__action--include"
-                  title="include"
+                  :title="t('logs.searchResult.include')"
                   @click.stop="applyPinnedFilter(row.rawValue, 'include')"
                   >=</span
                 >
                 <span
                   class="oo-pin-tooltip__action oo-pin-tooltip__action--exclude"
-                  title="exclude"
+                  :title="t('logs.searchResult.exclude')"
                   @click.stop="applyPinnedFilter(row.rawValue, 'exclude')"
                   >≠</span
                 >
@@ -874,8 +873,7 @@ export default defineComponent({
         ) {
           toast({
             variant: "error",
-            message:
-              "Page number is out of range. Please provide valid page number.",
+            message: this.t("logs.searchResult.pageOutOfRange"),
             timeout: 1000,
           });
           this.pageNumberInput = this.searchObj.data.resultGrid.currentPage;
@@ -1456,13 +1454,13 @@ export default defineComponent({
 
         if (!result) {
           console.warn("[SearchResult] No correlation result returned");
-          correlationError.value = "No matching service found for correlation";
+          correlationError.value = t("logs.searchResult.noMatchingService");
           return;
         }
 
         if (!result.correlationData) {
           console.warn("[SearchResult] No correlation data in result");
-          correlationError.value = "Unable to retrieve correlation data";
+          correlationError.value = t("logs.searchResult.unableToRetrieveCorrelation");
           return;
         }
 
@@ -1546,7 +1544,9 @@ export default defineComponent({
           );
           toast({
             variant: "info",
-            message: `No metric streams found for service "${result.correlationData.service_name}"`,
+            message: t("logs.searchResult.noMetricStreams", {
+              service: result.correlationData.service_name,
+            }),
           });
         }
 
@@ -1557,7 +1557,9 @@ export default defineComponent({
         }
       } catch (err: any) {
         console.error("[SearchResult] Error in openCorrelationFromLog:", err);
-        correlationError.value = `Correlation error: ${err.message || err}`;
+        correlationError.value = t("logs.searchResult.correlationError", {
+          error: err.message || err,
+        });
         correlationDashboardProps.value = null;
       } finally {
         correlationLoading.value = false;
@@ -1641,7 +1643,7 @@ export default defineComponent({
     const copyLogToClipboard = (log: any, copyAsJson: boolean = true) => {
       const copyData = copyAsJson ? JSON.stringify(log) : log;
       copyToClipboard(copyData, {
-        successMessage: "Content Copied Successfully!",
+        successMessage: t("logs.searchResult.contentCopied"),
         timeout: 1000,
       });
     };
@@ -1752,7 +1754,7 @@ export default defineComponent({
       if (!traceId) {
         toast({
           variant: "warning",
-          message: "No trace ID available for inspection",
+          message: t("logs.searchResult.noTraceIdForInspection"),
         });
         return;
       }

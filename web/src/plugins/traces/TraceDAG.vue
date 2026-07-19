@@ -22,12 +22,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <div v-else-if="error" data-test="traces-trace-dag-error-message" class="p-3">
-      <OBanner variant="error" icon="error" :content="`Failed to load DAG: ${error}`" />
+      <OBanner variant="error" icon="error" :content="t('traces.traceDAG.failedToLoad', { error })" />
     </div>
 
     <div v-else-if="!dagData || !dagData.nodes || dagData.nodes.length === 0" data-test="traces-trace-dag-empty-container" class="flex items-center justify-center flex-col p-6 h-125">
       <OIcon name="info" style="width: 48px; height: 48px;" />
-      <div class="mt-3 text-text-muted">No DAG data available</div>
+      <div class="mt-3 text-text-muted">{{ t('traces.traceDAG.noData') }}</div>
     </div>
 
     <div v-else data-test="traces-trace-dag-wrapper" class="w-full h-full min-h-150 border border-border-default rounded-default relative">
@@ -387,7 +387,7 @@ export default defineComponent({
         dagData.value = response.data;
       } catch (err: any) {
         console.error("[TraceDAG] Failed to fetch DAG:", err);
-        error.value = err.response?.data?.message || err.message || "Unknown error occurred";
+        error.value = err.response?.data?.message || err.message || t("traces.traceDAG.unknownError");
       } finally {
         isLoading.value = false;
       }
@@ -407,7 +407,7 @@ export default defineComponent({
           typeof endTime !== 'number' ||
           startTime >= endTime
         ) {
-          error.value = "Invalid parameters for DAG fetch";
+          error.value = t("traces.traceDAG.invalidParameters");
           isLoading.value = false;
           return;
         }

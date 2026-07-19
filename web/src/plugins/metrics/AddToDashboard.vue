@@ -3,7 +3,7 @@
     :open="open"
     size="md"
     :title="t('dashboard.addDashboard')"
-    secondary-button-label="Cancel"
+    :secondary-button-label="t('metrics.addToDashboardPage.cancel')"
     :primary-button-label="t('metrics.add')"
     form-id="add-to-dashboard-form"
     data-test="add-to-dashboard-dialog"
@@ -149,8 +149,8 @@ export default defineComponent({
       try {
         dismiss = toast({
           message: multi
-            ? "Please wait while we add the panels to the dashboard"
-            : "Please wait while we add the panel to the dashboard",
+            ? t("metrics.addToDashboardPage.addingPanels")
+            : t("metrics.addToDashboardPage.addingPanel"),
           variant: "loading",
           timeout: 0,
         });
@@ -180,8 +180,8 @@ export default defineComponent({
         }
         toast({
           message: multi
-            ? "Panels added to dashboard"
-            : "Panel added to dashboard",
+            ? t("metrics.addToDashboardPage.panelsAdded")
+            : t("metrics.addToDashboardPage.panelAdded"),
           variant: "success",
         });
         router.push({
@@ -193,10 +193,10 @@ export default defineComponent({
           showConfictErrorNotificationWithRefreshBtn(
             error?.response?.data?.message ??
               error?.message ??
-              "Error while adding panel",
+              t("metrics.addToDashboardPage.errorAddingPanel"),
           );
         } else {
-          showErrorNotification(error?.message ?? "Error while adding panel");
+          showErrorNotification(error?.message ?? t("metrics.addToDashboardPage.errorAddingPanel"));
         }
       } finally {
         dismiss();
@@ -211,12 +211,12 @@ export default defineComponent({
       // if selected dashoboard is null
       if (selectedDashboard.value == null) {
         toast({
-          message: "Please select a dashboard",
+          message: t("metrics.addToDashboardPage.selectDashboard"),
           variant: "error",
         });
       } else if (activeTabId.value == null) {
         toast({
-          message: "Please select a tab",
+          message: t("metrics.addToDashboardPage.selectTab"),
           variant: "error",
         });
       } else {

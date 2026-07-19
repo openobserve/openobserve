@@ -10,7 +10,7 @@
         variant="ghost"
         size="icon-xs-circle"
         @click.prevent.stop="copyLogToClipboard(row[column.id])"
-        title="Copy"
+        :title="t('logs.cellActions.copy')"
       >
         <OIcon name="content-copy" size="xs" />
       </OButton>
@@ -23,7 +23,7 @@
           addSearchTerm(column.id, row[column.id], 'include')
         "
         :data-test="`log-details-include-field-${row[column.id]}`"
-        title="Include Term"
+        :title="t('logs.cellActions.includeTerm')"
       >
         <OIcon style="height: 8px; width: 8px">
           <EqualIcon class="size-full" />
@@ -37,7 +37,7 @@
         @click.prevent.stop="
           addSearchTerm(column.id, row[column.id], 'exclude')
         "
-        title="Exclude Term"
+        :title="t('logs.cellActions.excludeTerm')"
         :data-test="`log-details-exclude-field-${row[column.id]}`"
       >
         <OIcon style="height: 8px; width: 8px">
@@ -61,6 +61,7 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import type { PropType } from "vue";
+import { useI18n } from "vue-i18n";
 import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
 import O2AIContextAddBtn from "@/components/common/O2AIContextAddBtn.vue";
@@ -90,6 +91,8 @@ const props = defineProps({
     default: false,
   },
 });
+
+const { t } = useI18n();
 
 const emit = defineEmits([
   "copy",

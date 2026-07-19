@@ -2,8 +2,8 @@
   <ODialog data-test="query-inspector"
     :open="open"
     @update:open="$emit('update:open', $event)"
-    title="Query Inspector"
-    :sub-title="`Panel : ${dataTitle}  ·  Total Queries: ${totalQueries}`"
+    :title="t('dashboard.queryInspector.title')"
+    :sub-title="t('dashboard.queryInspector.subTitle', { dataTitle, totalQueries })"
     :width="50"
   >
     <!-- search input: sits left of the close button via #header-right -->
@@ -11,7 +11,7 @@
       <div class="flex">
         <OSearchInput
           v-model="searchQuery"
-          placeholder="Search keywords..."
+          :placeholder="t('dashboard.queryInspector.searchKeywords')"
           data-test="query-inspector-search"
           size="xs"
         />
@@ -24,7 +24,7 @@
         class="flex flex-col items-center justify-center h-64 text-text-muted"
       >
         <OIcon class="w-12 h-12" name="info" />
-        <p class="mt-2">No queries executed for this panel.</p>
+        <p class="mt-2">{{ t('dashboard.queryInspector.noQueries') }}</p>
       </div>
 
       <div v-else class="space-y-4">
@@ -40,7 +40,7 @@
             <span class="text-sm font-bold rounded-default"
                 :data-test="`query-inspector-query-name-${index}`"
             >
-              {{ query.tabName || ('Query ' + (index + 1)) }}
+              {{ query.tabName || t('dashboard.queryInspector.queryN', { n: index + 1 }) }}
             </span>
             <span
               class="bg-theme-body-bg-primary border border-card-glass-border text-text-secondary text-3xs font-bold px-2 py-0.5 rounded-default"
@@ -54,7 +54,8 @@
             <!-- Original Query -->
             <div v-if="query.originalQuery">
               <div class="flex items-center justify-between">
-                <label class="text-xs font-bold tracking-wider">Original Query</label
+                <label class="text-xs font-bold tracking-wider"
+                  >{{ t('dashboard.queryInspector.originalQuery') }}</label
                 >
                 <OButton
                   variant="ghost-primary"
@@ -62,7 +63,7 @@
                   @click="copyText(query.originalQuery)"
                   icon-left="content-copy"
                 >
-                  Copy
+                  {{ t('dashboard.queryInspector.copy') }}
                 </OButton>
               </div>
               <div class="relative group mt-1">
@@ -83,7 +84,8 @@
             <!-- Executed Query -->
             <div>
               <div class="flex items-center justify-between">
-                <label class="text-xs font-bold tracking-wider">Executed Query</label
+                <label class="text-xs font-bold tracking-wider"
+                  >{{ t('dashboard.queryInspector.executedQuery') }}</label
                 >
                 <OButton
                   variant="ghost-primary"
@@ -91,7 +93,7 @@
                   @click="copyText(query.query)"
                   icon-left="content-copy"
                 >
-                  Copy
+                  {{ t('dashboard.queryInspector.copy') }}
                 </OButton>
               </div>
               <div class="relative group mt-1">
@@ -115,7 +117,8 @@
               <div class="space-y-1"
                 :data-test="`dashboard-query-inspector-start-time-${index}`"
               >
-                <label class="text-xs font-bold tracking-wider">Start Time</label
+                <label class="text-xs font-bold tracking-wider"
+                  >{{ t('dashboard.queryInspector.startTime') }}</label
                 >
                 <div
                   class="text-xs text-text-secondary font-medium flex items-center gap-2"
@@ -131,7 +134,8 @@
               <div class="space-y-1"
                 :data-test="`dashboard-query-inspector-end-time-${index}`"
               >
-                <label class="text-xs font-bold tracking-wider">End Time</label
+                <label class="text-xs font-bold tracking-wider"
+                  >{{ t('dashboard.queryInspector.endTime') }}</label
                 >
                 <div
                   class="text-xs text-text-secondary font-medium flex items-center gap-2"
@@ -152,7 +156,8 @@
             >
               <!-- Standard Variables -->
               <div class="pt-2">
-                <label class="text-xs font-bold tracking-wider">Variable(s)</label
+                <label class="text-xs font-bold tracking-wider"
+                  >{{ t('dashboard.queryInspector.variables') }}</label
                 >
                 <div class="flex flex-wrap gap-2 mt-1">
                   <template v-if="getVariablesByType(query, 'variable').length">
@@ -179,7 +184,8 @@
 
               <!-- Fixed Variables -->
               <div>
-                <label class="text-xs font-bold tracking-wider">Fixed Variable(s)</label
+                <label class="text-xs font-bold tracking-wider"
+                  >{{ t('dashboard.queryInspector.fixedVariables') }}</label
                 >
                 <div class="flex flex-wrap gap-2 mt-1">
                   <template v-if="getVariablesByType(query, 'fixed').length">
@@ -206,7 +212,8 @@
 
               <!-- Dynamic Variables -->
               <div>
-                <label class="text-xs font-bold tracking-wider">Dynamic Variable(s)</label
+                <label class="text-xs font-bold tracking-wider"
+                  >{{ t('dashboard.queryInspector.dynamicVariables') }}</label
                 >
                 <div class="flex flex-wrap gap-2 mt-1">
                   <template
@@ -243,6 +250,7 @@
 
 <script lang="ts">
 import { computed, defineComponent, ref, watch, onMounted } from "vue";
+import { useI18n } from "vue-i18n";
 import { timestampToTimezoneDate } from "@/utils/zincutils";
 import { useStore } from "vuex";
 import { colorizeQuery } from "@/utils/query/colorizeQuery";
@@ -274,6 +282,7 @@ export default defineComponent({
     },
   },
   setup(props: any) {
+    const { t } = useI18n();
     const store = useStore();
     const queryData = computed(() => props.metaData?.queries || []);
     const searchQuery = ref("");
@@ -371,6 +380,7 @@ export default defineComponent({
     });
 
     return {
+      t,
       store,
       queryData,
       totalQueries,

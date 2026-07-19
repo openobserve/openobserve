@@ -15,7 +15,7 @@ description: >-
   .body--dark block — migrate any --o2-* you touch to its --color-* equivalent),
   (6) no hardcoded user-facing text — every label, title, placeholder, and
   message comes from i18n (useI18n t()) with keys added to
-  web/src/locales/languages/en.json. It also settles the recurring
+  web/src/locales/languages/en-US.json. It also settles the recurring
   structural decisions: use OTable for any tabular data, follow the
   view → service → Vuex/local-ref layering for fetching list data, choose the
   right form container (ConfirmDialog vs ODialog vs ODrawer vs a full in-page
@@ -105,7 +105,7 @@ read it once, it is the backbone of everything below.
    [references/design-tokens.md](references/design-tokens.md).
 6. **No hardcoded user-facing text** — every label, title, placeholder, tooltip,
    empty-state, toast, and validation message comes from `useI18n()`'s `t()`, with
-   keys added to `web/src/locales/languages/en.json` (other locales follow from
+   keys added to `web/src/locales/languages/en-US.json` (other locales follow from
    there — never hand-edit them).
 
 ## Structural decisions
@@ -200,7 +200,7 @@ considering the UI done:
       `:root` + `@theme inline` + dark under `.dark`) before use.
 - [ ] No hardcoded user-facing text — every label, title, placeholder, message,
       and validation string uses `t()` with keys added to
-      `web/src/locales/languages/en.json`.
+      `web/src/locales/languages/en-US.json`.
 - [ ] `data-test` on every interactive and key output element, pattern
       `<module>-<filename>-<descriptor>` (see the project FE rules).
 - [ ] New component uses `<script setup lang="ts">`, no `// @ts-nocheck`.

@@ -172,7 +172,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="dashboard-import-error-container"
               class="bg-card-glass-bg h-full flex flex-col min-h-0 border-l border-border-default"
             >
-              <div class="text-center text-sm font-semibold text-text-heading py-3 shrink-0">Error Validations</div>
+              <div class="text-center text-sm font-semibold text-text-heading py-3 shrink-0">{{ t('dashboard.importDashboardPage.errorValidations') }}</div>
               <OSeparator class="mt-1 shrink-0" />
               <div
                 class="error-section p-2.5 mb-2.5 flex-1 min-h-0 overflow-auto"
@@ -201,7 +201,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <OInput
                           data-test="dashboard-import-error-title-control"
                           v-model="dashboardTitles[errorIndex]"
-                          label="Dashboard Title"
+                          :label="t('dashboard.importDashboardPage.dashboardTitle')"
                           @update:model-value="
                             updateDashboardTitle(
                               dashboardTitles[errorIndex],
@@ -220,7 +220,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <OSelect
                           v-model="streamTypes[errorIndex]"
                           :options="streamTypeSelectOptions"
-                          label="Stream Type"
+                          :label="t('dashboard.importDashboardPage.streamType')"
                           @update:model-value="
                             updateStreamType(
                               streamTypes[errorIndex],
@@ -329,12 +329,12 @@ export default defineComponent({
 
     const tabs = reactive([
       {
-        label: "File Upload / JSON",
+        label: t("dashboard.importDashboardPage.fileUploadJson"),
         value: "import_json_file",
         icon: "upload",
       },
       {
-        label: "URL Import",
+        label: t("dashboard.importDashboardPage.urlImport"),
         value: "import_json_url",
         icon: "link",
       },
@@ -431,7 +431,7 @@ export default defineComponent({
             jsonStr.value = JSON.stringify(jsonObject, null, 2);
           }
         } catch (error) {
-          showErrorNotification("Invalid JSON format");
+          showErrorNotification(t("dashboard.importDashboardPage.invalidJsonFormat"));
         }
       }
       if (newVal == "") {
@@ -462,15 +462,15 @@ export default defineComponent({
             ) {
               jsonStr.value = JSON.stringify(response.data, null, 2);
             } else {
-              showErrorNotification("Invalid JSON format in the URL");
+              showErrorNotification(t("dashboard.importDashboardPage.invalidJsonFormatUrl"));
             }
           } catch (parseError) {
             // If parsing fails, display an error message
-            showErrorNotification("Invalid JSON format");
+            showErrorNotification(t("dashboard.importDashboardPage.invalidJsonFormat"));
           }
         }
       } catch (error) {
-        showErrorNotification("Error fetching data");
+        showErrorNotification(t("dashboard.importDashboardPage.errorFetchingData"));
       }
     });
 
@@ -507,7 +507,7 @@ export default defineComponent({
     // import multiple files
     const importFiles = async () => {
       if (!jsonStr.value || !jsonStr.value.length) {
-        showErrorNotification("No JSON file(s) selected for import");
+        showErrorNotification(t("dashboard.importDashboardPage.noJsonFilesSelected"));
         isLoading.value = false;
         return;
       }
@@ -517,7 +517,7 @@ export default defineComponent({
       try {
         jsonStr.value = JSON.parse(jsonStr.value);
       } catch (e) {
-        showErrorNotification("Invalid JSON content");
+        showErrorNotification(t("dashboard.importDashboardPage.invalidJsonContent"));
         isLoading.value = false;
         return;
       }
@@ -525,7 +525,8 @@ export default defineComponent({
       const data = jsonStr.value.map((parsedContent, fileIndex) => {
         return new Promise(async (resolve, reject) => {
           const fileName =
-            jsonFiles.value[fileIndex]?.name || `File ${fileIndex + 1}`;
+            jsonFiles.value[fileIndex]?.name ||
+            t("dashboard.importDashboardPage.fileFallback", { n: fileIndex + 1 });
 
           try {
             //this is done because if the user uploads a single dashboard, it will be an object and if the user uploads multiple dashboards, it will be an array of objects
@@ -573,14 +574,14 @@ export default defineComponent({
 
             if (failedMessages.length) {
               reject({
-                file: `JSON ${fileIndex + 1}`,
+                file: t("dashboard.importDashboardPage.jsonFileLabel", { n: fileIndex + 1 }),
                 error: failedMessages.join("; "),
               });
             } else {
               resolve({ file: fileName, results });
             }
           } catch (e) {
-            reject({ file: fileName, error: "Error processing file" });
+            reject({ file: fileName, error: t("dashboard.importDashboardPage.errorProcessingFile") });
           }
         });
       });
@@ -598,13 +599,13 @@ export default defineComponent({
 
         if (successfulImports) {
           showPositiveNotification(
-            `${successfulImports} File(s) Imported Successfully`,
+            t("dashboard.importDashboardPage.filesImportedSuccessfully", { n: successfulImports }),
           );
         }
 
         const failedImports = results.length - successfulImports;
         if (failedImports) {
-          showErrorNotification(`${failedImports} File(s) Failed to Import`);
+          showErrorNotification(t("dashboard.importDashboardPage.filesFailedToImport", { n: failedImports }));
         }
 
         isLoading.value = false;
@@ -647,7 +648,7 @@ export default defineComponent({
         const urlData = url.value.trim();
 
         if (!urlData && !jsonStr.value) {
-          showErrorNotification("Please Enter a URL for import");
+          showErrorNotification(t("dashboard.importDashboardPage.pleaseEnterUrl"));
           return;
         }
 
@@ -684,17 +685,17 @@ export default defineComponent({
         if (successCount > 0) {
           await resetAndRefresh(ImportType.URL, selectedFolder.value);
           showPositiveNotification(
-            `${successCount} Dashboard(s) Imported Successfully`,
+            t("dashboard.importDashboardPage.dashboardsImportedSuccessfully", { n: successCount }),
           );
         }
 
         if (failedCount > 0) {
-          showErrorNotification(`${failedCount} Dashboard(s) Failed to Import`);
+          showErrorNotification(t("dashboard.importDashboardPage.dashboardsFailedToImport", { n: failedCount }));
         }
 
         filesImportResults.value = results;
       } catch (error) {
-        showErrorNotification("Failed to Import Dashboard");
+        showErrorNotification(t("dashboard.importDashboardPage.failedToImportDashboard"));
       } finally {
         if (jsonStr.value && typeof jsonStr.value !== "string") {
           jsonStr.value = "";
@@ -717,7 +718,7 @@ export default defineComponent({
         const validationErrors = validateDashboardJson(convertedSchema);
         if (validationErrors.length > 0) {
           const errorMessage = validationErrors.join("; ");
-          showErrorNotification(`Validation failed: ${errorMessage}`);
+          showErrorNotification(t("dashboard.importDashboardPage.validationFailed", { error: errorMessage }));
           return;
         }
 
@@ -729,10 +730,10 @@ export default defineComponent({
           filesImportResults.value = [];
           jsonStr.value = "";
 
-          showPositiveNotification(`Dashboard Imported Successfully`);
+          showPositiveNotification(t("dashboard.importDashboardPage.dashboardImportedSuccessfully"));
         });
       } catch (error) {
-        showErrorNotification("Please Enter a JSON object for import");
+        showErrorNotification(t("dashboard.importDashboardPage.pleaseEnterJsonObject"));
       } finally {
         isLoading.value = false;
       }
@@ -786,14 +787,14 @@ export default defineComponent({
           importFromUrl();
         }
       } catch (e) {
-        showErrorNotification("Failed to Import Dashboard");
+        showErrorNotification(t("dashboard.importDashboardPage.failedToImportDashboard"));
       }
     };
     const validateBasicInputs = (input, index = 0) => {
       // Basic title validation
       if (input.title === "" || typeof input.title !== "string") {
         dashboardErrorsToDisplay.value.push({
-          message: `Title is required for dashboard - ${index ? index + 1 : 1}  and should be a string`,
+          message: t("dashboard.importDashboardPage.titleRequired", { index: index ? index + 1 : 1 }),
           field: "dashboard_title",
           dashboardIndex: index,
         });
@@ -804,7 +805,7 @@ export default defineComponent({
       if (validationErrors.length > 0) {
         validationErrors.forEach((error) => {
           dashboardErrorsToDisplay.value.push({
-            message: `Dashboard ${index ? index + 1 : 1}: ${error}`,
+            message: t("dashboard.importDashboardPage.dashboardValidationError", { index: index ? index + 1 : 1, error }),
             field: "dashboard_validation",
             dashboardIndex: index,
           });

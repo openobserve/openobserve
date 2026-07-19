@@ -49,15 +49,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Step 1: Choose Provider -->
           <OStep
             :name="1"
-            title="Choose Type"
+            :title="t('settings.orgStorageEditor.chooseTypeTitle')"
             icon="cloud"
             :done="step > 1"
             :navigable="step > 1 && !isEditMode"
           >
             <div class="text-sm text-text-secondary mb-3">
               {{ t("storage_settings.selectProviderDesc") }}
-              once configured, all new data for this org will be written to your
-              own storage infrastructure.
+              {{ t("settings.orgStorageEditor.selectProviderDescCont") }}
             </div>
             <div
               v-if="!isEditMode"
@@ -65,7 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <OIcon name="warning" size="sm" class="flex-shrink-0 mt-px" />
               <div class="text-compact leading-[1.55] text-text-body">
-                This action is <strong>irreversible</strong>. Once set, you cannot switch to a different storage provider or delete this configuration. To use a different provider, you must create a new organization.
+                {{ t("settings.orgStorageEditor.irreversibleWarnPre") }}<strong>{{ t("settings.orgStorageEditor.irreversibleWarnEmphasis") }}</strong>{{ t("settings.orgStorageEditor.irreversibleWarnPost") }}
               </div>
             </div>
             <div
@@ -74,11 +73,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <OIcon name="info" size="sm" class="flex-shrink-0 mt-px" />
               <div class="text-compact leading-[1.55] text-text-body">
-                Once configured, only credential fields can be updated. All other fields will be locked.
+                {{ t("settings.orgStorageEditor.credentialsOnlyInfo") }}
               </div>
             </div>
             <div class="text-sm font-medium mb-2">
-              Select Storage Provider <span class="text-status-negative">*</span>
+              {{ t("settings.orgStorageEditor.selectStorageProviderLabel") }}<span class="text-status-negative">*</span>
             </div>
             <div class="destination-type-grid grid gap-3 grid-cols-[repeat(auto-fill,minmax(8.75rem,1fr))]">
               <div
@@ -119,7 +118,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Step 2: Connection Details -->
           <OStep
             :name="2"
-            title="Connection"
+            :title="t('settings.orgStorageEditor.connectionTitle')"
             icon="lan"
             :done="step > 2"
             :navigable="step > 2"
@@ -132,7 +131,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-if="!isCloud"
                     data-test="storage-settings-server-url-input"
                     name="server_url"
-                    label="Server URL"
+                    :label="t('settings.orgStorageEditor.serverUrlLabel')"
                     class="no-border showLabelOnTop"
                     flat
                     :disabled="isEditMode"
@@ -140,7 +139,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OFormInput
                     data-test="storage-settings-region-input"
                     name="region"
-                    label="Region"
+                    :label="t('settings.orgStorageEditor.regionLabel')"
                     class="no-border showLabelOnTop"
                     flat
                     :disabled="isEditMode || !!cloudRegion"
@@ -148,7 +147,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OFormInput
                     data-test="storage-settings-bucket-name-input"
                     name="bucket_name"
-                    label="Bucket Name"
+                    :label="t('settings.orgStorageEditor.bucketNameLabel')"
                     required
                     class="no-border showLabelOnTop"
                     flat
@@ -157,7 +156,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OFormInput
                     data-test="storage-settings-access-key-input"
                     name="access_key"
-                    label="Access Key"
+                    :label="t('settings.orgStorageEditor.accessKeyLabel')"
                     required
                     class="no-border showLabelOnTop"
                     flat
@@ -165,7 +164,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OFormInput
                     data-test="storage-settings-secret-key-input"
                     name="secret_key"
-                    label="Secret Key"
+                    :label="t('settings.orgStorageEditor.secretKeyLabel')"
                     required
                     class="no-border showLabelOnTop"
                     flat
@@ -180,7 +179,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OFormInput
                     data-test="storage-settings-access-key-input"
                     name="storage_account"
-                    label="Storage Account Name"
+                    :label="t('settings.orgStorageEditor.storageAccountNameLabel')"
                     required
                     class="no-border showLabelOnTop"
                     flat
@@ -189,7 +188,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OFormInput
                     data-test="storage-settings-bucket-name-input"
                     name="bucket_name"
-                    label="Bucket Name"
+                    :label="t('settings.orgStorageEditor.bucketNameLabel')"
                     required
                     class="no-border showLabelOnTop"
                     flat
@@ -198,7 +197,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OFormInput
                     data-test="storage-settings-secret-key-input"
                     name="secret_key"
-                    label="Secret Key"
+                    :label="t('settings.orgStorageEditor.secretKeyLabel')"
                     required
                     class="no-border showLabelOnTop"
                     flat
@@ -208,7 +207,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-if="!isCloud"
                     data-test="storage-settings-server-url-input"
                     name="server_url"
-                    label="Server URL"
+                    :label="t('settings.orgStorageEditor.serverUrlLabel')"
                     class="no-border showLabelOnTop"
                     flat
                     :disabled="isEditMode"
@@ -222,7 +221,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OFormInput
                     data-test="storage-settings-bucket-name-input"
                     name="bucket_name"
-                    label="Bucket Name"
+                    :label="t('settings.orgStorageEditor.bucketNameLabel')"
                     required
                     class="no-border showLabelOnTop"
                     flat
@@ -231,7 +230,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OFormInput
                     data-test="storage-settings-access-key-input"
                     name="access_key"
-                    label="Access Key"
+                    :label="t('settings.orgStorageEditor.accessKeyLabel')"
                     required
                     class="no-border showLabelOnTop"
                     flat
@@ -240,7 +239,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-if="!isCloud"
                     data-test="storage-settings-server-url-input"
                     name="server_url"
-                    label="Server URL"
+                    :label="t('settings.orgStorageEditor.serverUrlLabel')"
                     class="no-border showLabelOnTop"
                     flat
                     :disabled="isEditMode"
@@ -267,7 +266,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OFormInput
                     data-test="storage-settings-bucket-name-input"
                     name="bucket_name"
-                    label="Bucket Name"
+                    :label="t('settings.orgStorageEditor.bucketNameLabel')"
                     required
                     class="no-border showLabelOnTop"
                     flat
@@ -276,7 +275,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OFormInput
                     data-test="storage-settings-region-input"
                     name="region"
-                    label="Region"
+                    :label="t('settings.orgStorageEditor.regionLabel')"
                     required
                     class="no-border showLabelOnTop"
                     flat
@@ -285,7 +284,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OFormInput
                     data-test="storage-settings-role-arn-input"
                     name="role_arn"
-                    label="Role ARN"
+                    :label="t('settings.orgStorageEditor.roleArnLabel')"
                     required
                     class="no-border showLabelOnTop"
                     flat
@@ -293,7 +292,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OFormInput
                     data-test="storage-settings-role-external-id-input"
                     name="external_id"
-                    label="External Id"
+                    :label="t('settings.orgStorageEditor.externalIdLabel')"
                     required
                     class="no-border showLabelOnTop"
                     flat
@@ -555,7 +554,7 @@ function buildDataPayload(value: OrgStorageEditorForm) {
 async function submitStorage(value: OrgStorageEditorForm) {
   const dismiss = toast({
     variant: "loading",
-    message: "Please wait...",
+    message: t("settings.orgStorageEditor.pleaseWaitMessage"),
       timeout: 0,
 });
 
@@ -571,14 +570,14 @@ async function submitStorage(value: OrgStorageEditorForm) {
       dismiss();
       toast({
         variant: "success",
-        message: "Credentials updated successfully",
+        message: t("settings.orgStorageEditor.credentialsUpdatedSuccess"),
       });
     } else {
       await orgStorageService.create(orgId, payload);
       dismiss();
       toast({
         variant: "success",
-        message: "Storage config created successfully",
+        message: t("settings.orgStorageEditor.storageConfigCreatedSuccess"),
       });
     }
     emit("saved");
@@ -590,7 +589,7 @@ async function submitStorage(value: OrgStorageEditorForm) {
       message:
         err.response?.data?.error ||
         err.response?.data?.message ||
-        "Failed to save storage config",
+        t("settings.orgStorageEditor.saveStorageConfigError"),
     });
   }
 }
@@ -627,7 +626,7 @@ onMounted(async () => {
     } catch {
       toast({
         variant: "error",
-        message: "Failed to load existing storage config",
+        message: t("settings.orgStorageEditor.loadStorageConfigError"),
       });
     }
   }

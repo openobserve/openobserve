@@ -30,7 +30,12 @@ export const akeylessLdapUsernameRegex = /^[a-zA-Z0-9._-]+$/;
 const HTML_TAG_REGEX = /<[^>]*>/;
 
 // Built via a factory so every validation message is i18n-driven (pass useI18n's
-// `t`). Messages live in the `cipherKey.*` keys (web/src/locales/languages/en.json).
+// `t`), matching the other migrated form schemas. The English wording is preserved
+// verbatim in the `cipherKey.*` keys (web/src/locales/languages/en-US.json): the
+// `providerTypeRequired` / `algorithmRequired` / `secretRequired` keys were already
+// i18n before the migration; the name/store/akeyless messages were hardcoded English
+// in the pre-migration code (validateName / validateAkeylessFields) and are now keyed
+// too — same text, no behavioral change.
 export const makeAddCipherKeySchema = (t: (_key: string) => string) =>
   z
   .object({

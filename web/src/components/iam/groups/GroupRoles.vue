@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="iam-roles-selection-show-text"
             style="font-size: var(--text-sm)"
           >
-            Show
+            {{ t('iam.groupRoles.show') }}
           </span>
           <OToggleGroup
             class="ml-1"
@@ -55,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="alert-list-search-input"
           v-model="userSearchKey"
           class="h-9 w-50"
-          placeholder="Search Roles"
+          :placeholder="t('iam.groupRoles.searchRoles')"
         />
       </div>
     </div>
@@ -153,18 +153,18 @@ const userSearchKey = ref("");
 
 const usersDisplay = ref("selected");
 
+const { t } = useI18n();
+
 const usersDisplayOptions = [
   {
-    label: "All",
+    label: t("iam.groupRoles.all"),
     value: "all",
   },
   {
-    label: "Selected",
+    label: t("iam.groupRoles.selected"),
     value: "selected",
   },
 ];
-
-const { t } = useI18n();
 
 const hasFetchedOrgUsers = ref(false);
 

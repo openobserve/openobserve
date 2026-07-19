@@ -36,68 +36,72 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <span class="tt-pill">
         <span class="tt-count">
           {{ toolCalls.length }}
-          {{ toolCalls.length === 1 ? "tool call" : "tool calls" }}
+          {{
+            toolCalls.length === 1
+              ? t('traces.threadToolCalls.toolCall')
+              : t('traces.threadToolCalls.toolCalls')
+          }}
           · {{ formatDuration(totalToolDuration(toolCalls)) }}
         </span>
-        <span class="tt-link">Show calls</span>
+        <span class="tt-link">{{ t('traces.threadToolCalls.showCalls') }}</span>
       </span>
       <span class="tt-zz"></span>
     </button>
 
     <div v-else class="tt-body">
       <div
-        v-for="t in toolCalls"
-        :key="t.span_id"
+        v-for="tool in toolCalls"
+        :key="tool.span_id"
         class="thread-tool"
-        :class="{ 'thread-tool--open': expandedTools.has(t.span_id) }"
+        :class="{ 'thread-tool--open': expandedTools.has(tool.span_id) }"
       >
-        <div class="thread-tool-row" @click="toggleTool(t.span_id)">
+        <div class="thread-tool-row" @click="toggleTool(tool.span_id)">
           <span class="thread-tool-row__caret">{{
-            expandedTools.has(t.span_id) ? "▾" : "▸"
+            expandedTools.has(tool.span_id) ? "▾" : "▸"
           }}</span>
           <OIcon name="build" size="xs" class="thread-tool-row__icon" />
           <span class="thread-tool-row__name">{{
-            t.tool_name || t.gen_ai_tool_name || t.operation_name
+            tool.tool_name || tool.gen_ai_tool_name || tool.operation_name
           }}</span>
           <span class="flex-1" />
           <span
             class="thread-pill"
             :class="
-              t.span_status === 'ERROR'
+              tool.span_status === 'ERROR'
                 ? 'thread-pill--error'
                 : 'thread-pill--ok'
             "
           >
-            {{ t.span_status === "ERROR" ? "ERROR" : "OK" }}
-            · {{ formatDuration(t.duration) }}
+            {{ tool.span_status === "ERROR" ? "ERROR" : "OK" }}
+            · {{ formatDuration(tool.duration) }}
           </span>
           <button
             class="thread-tool-row__view"
-            @click.stop="emit('span-selected', t.span_id)"
-            title="Open span details"
+            @click.stop="emit('span-selected', tool.span_id)"
+            :title="t('traces.threadToolCalls.openSpanDetails')"
           >
             <OIcon name="open-in-new" size="xs" />
           </button>
         </div>
 
-        <div v-if="expandedTools.has(t.span_id)" class="thread-tool-body">
+        <div v-if="expandedTools.has(tool.span_id)" class="thread-tool-body">
           <div class="thread-tool-body__section">
-            <div class="thread-tool-body__label">Arguments</div>
+            <div class="thread-tool-body__label">{{ t('traces.threadToolCalls.arguments') }}</div>
             <pre class="thread-tool-body__pre">{{
-              formatToolPayload(getInputRaw(t) || t.tool_args)
+              formatToolPayload(getInputRaw(tool) || tool.tool_args)
             }}</pre>
           </div>
           <div class="thread-tool-body__section">
             <div class="thread-tool-body__label">
-              Result
-              <span v-if="t.span_status === 'ERROR'" class="text-error-600">
+              {{ t('traces.threadToolCalls.result') }}
+              <span v-if="tool.span_status === 'ERROR'" class="text-error-600">
                 · ERROR
               </span>
             </div>
             <pre class="thread-tool-body__pre">{{
-              formatToolPayload(getOutputRaw(t)) ||
-              t.status_message ||
-              "(empty)"
+              formatToolPayload(getOutputRaw(tool)) ||
+              tool.status_message ||
+              t('traces.threadToolCalls.empty')
             }}</pre>
           </div>
         </div>
@@ -109,6 +113,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { ref } from "vue";
 import { useStore } from "vuex";
+import { useI18n } from "vue-i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { getInputRaw, getOutputRaw } from "./threadView.utils";
 
@@ -119,6 +124,7 @@ defineProps<{
 const emit = defineEmits<{ (e: "span-selected", spanId: string): void }>();
 
 const store = useStore();
+const { t } = useI18n();
 
 // One-way reveal for the whole group; per-tool rows expand independently.
 const shown = ref(false);

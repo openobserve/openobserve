@@ -80,7 +80,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 alt=""
               />
             </template>
-            <span class="text-3xs font-medium mr-0.75 text-text-secondary">Service</span>
+            <span class="text-3xs font-medium mr-0.75 text-text-secondary">{{ t('traces.traceDetailsSidebar.service') }}</span>
             <span
               class="text-3xs font-semibold text-text-body"
               data-test="trace-details-sidebar-header-toolbar-service-name"
@@ -97,7 +97,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="trace-details-sidebar-header-toolbar-duration"
           >
             <template #icon><OIcon name="schedule" size="xs" /></template>
-            <span class="text-3xs font-medium mr-0.75 text-text-secondary">Duration</span>
+            <span class="text-3xs font-medium mr-0.75 text-text-secondary">{{ t('traces.traceDetailsSidebar.duration') }}</span>
             <span class="text-3xs font-semibold text-text-body">{{ getDuration }}</span>
           </OTag>
 
@@ -122,7 +122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="trace-details-sidebar-header-toolbar-start-time"
           >
             <template #icon><OIcon name="access-time" size="xs" /></template>
-            <span class="text-3xs font-medium mr-0.75 text-text-secondary">Start</span>
+            <span class="text-3xs font-medium mr-0.75 text-text-secondary">{{ t('traces.traceDetailsSidebar.start') }}</span>
             <span class="text-3xs font-semibold text-text-body">{{ getStartTime }}</span>
           </OTag>
 
@@ -131,11 +131,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="spanHttpResendCount"
             type="metricChip"
             class="text-2xs h-5.5 px-1.5 mr-[0.325rem] bg-surface-base border border-solid border-border-default shrink-0 transition-all duration-200 hover:-translate-y-px hover:bg-surface-panel"
-            :title="`Request resent ${spanHttpResendCount} time(s)`"
+            :title="t('traces.traceDetailsSidebar.requestResent', { count: spanHttpResendCount })"
             data-test="trace-details-sidebar-header-toolbar-resend-count"
           >
             <template #icon><OIcon name="replay" size="xs" /></template>
-            <span class="text-3xs font-medium mr-0.75 text-text-secondary">Resends</span>
+            <span class="text-3xs font-medium mr-0.75 text-text-secondary">{{ t('traces.traceDetailsSidebar.resends') }}</span>
             <span class="text-3xs font-semibold text-text-body">{{ spanHttpResendCount }}</span>
           </OTag>
         </div>
@@ -146,7 +146,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             type="metricChip"
             clickable
             class="group text-2xs h-5.5 px-1.5 mr-[0.325rem] bg-surface-base border border-solid border-border-default border-l-[0.1875rem] border-l-badge-teal-ol-border shrink-0 cursor-pointer transition-all duration-200 hover:-translate-y-px hover:bg-surface-panel"
-            :title="`Span ID: ${span.span_id}`"
+            :title="t('traces.traceDetailsSidebar.spanIdTitle', { id: span.span_id })"
             @click="copySpanId"
             data-test="trace-details-sidebar-header-toolbar-span-id"
           >
@@ -206,10 +206,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OTag
               type="metricChip"
               class="text-3xs h-5 px-1.5 min-w-15 justify-center bg-surface-base border border-solid border-border-default border-l-[0.1875rem] border-l-badge-blue-ol-border text-badge-blue-ol-text shrink-0 transition-all duration-200 hover:-translate-y-px"
-              title="Input Tokens"
+              :title="t('traces.traceDetailsSidebar.inputTokens')"
             >
               <template #icon><OIcon name="arrow-upward" size="xs" /></template>
-              <span class="text-3xs font-medium mr-0.5">In</span>
+              <span class="text-3xs font-medium mr-0.5">{{ t('traces.traceDetailsSidebar.in') }}</span>
               <span class="text-3xs font-medium">{{ llmMetrics.usage.input }}</span>
             </OTag>
 
@@ -217,10 +217,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OTag
               type="metricChip"
               class="text-3xs h-5 px-1.5 min-w-15 justify-center bg-surface-base border border-solid border-border-default border-l-[0.1875rem] border-l-badge-success-ol-border text-badge-success-ol-text shrink-0 transition-all duration-200 hover:-translate-y-px"
-              title="Output Tokens"
+              :title="t('traces.traceDetailsSidebar.outputTokens')"
             >
               <template #icon><OIcon name="arrow-downward" size="xs" /></template>
-              <span class="text-3xs font-medium mr-0.5">Out</span>
+              <span class="text-3xs font-medium mr-0.5">{{ t('traces.traceDetailsSidebar.out') }}</span>
               <span class="text-3xs font-medium">{{ llmMetrics.usage.output }}</span>
             </OTag>
           </div>
@@ -230,7 +230,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             type="metricChip"
             icon="attach-money"
             class="text-3xs h-5 px-1.5 bg-surface-base border border-solid border-border-default border-l-[0.1875rem] border-l-badge-orange-ol-border shrink-0 transition-all duration-200 hover:-translate-y-px"
-            title="Total Cost"
+            :title="t('traces.traceDetailsSidebar.totalCost')"
           >
             <span class="text-3xs font-semibold text-badge-orange-ol-text"
               >${{ Number(llmMetrics.cost.total).toFixed(5) }}</span
@@ -260,7 +260,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OTab
           v-if="isLLMSpan"
           name="preview"
-          label="Preview"
+          :label="t('traces.traceDetailsSidebar.preview')"
           data-test="trace-details-sidebar-tabs-preview"
                     class="font-normal! capitalize"
 
@@ -347,13 +347,13 @@ class="h-full overflow-y-auto">
                 <div
                   class="section-label font-bold mb-2 flex items-center justify-between text-text-heading text-sm"
                 >
-                  <div>Input</div>
+                  <div>{{ t('traces.traceDetailsSidebar.input') }}</div>
                   <div class="flex items-center gap-1">
                     <OButton
                       variant="outline"
                       size="icon"
                       :title="
-                        isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'
+                        isFullscreen ? t('traces.traceDetailsSidebar.exitFullscreen') : t('traces.traceDetailsSidebar.enterFullscreen')
                       "
                       @click="toggleFullscreen"
                     >
@@ -365,7 +365,7 @@ class="h-full overflow-y-auto">
                     <OButton
                       variant="outline"
                       size="icon"
-                      title="Copy input"
+                      :title="t('traces.traceDetailsSidebar.copyInput')"
                       @click="copyContent(span.gen_ai_input_messages, 'input')"
                       :disabled="!hasContent(span.gen_ai_input_messages)"
                     >
@@ -379,7 +379,7 @@ class="h-full overflow-y-auto">
                     <OCollapsible
                       v-model="sysInstrOpen"
                       icon="settings"
-                      label="System Instructions"
+                      :label="t('traces.traceDetailsSidebar.systemInstructions')"
                     >
                       <div class="p-2 bg-code-bg">
                         <LLMContentRenderer
@@ -395,8 +395,8 @@ class="h-full overflow-y-auto">
                     v-if="!hasContent(span.gen_ai_input_messages) && !parsedSystemInstructions"
                     class="text-text-secondary italic text-center p-8 text-sm"
                   >
-                    No data available
-                  </div>
+                    {{ t('traces.traceDetailsSidebar.noDataAvailable') }}
+</div>
                   <LLMContentRenderer
                     v-if="hasContent(span.gen_ai_input_messages)"
                     :content="span.gen_ai_input_messages"
@@ -414,13 +414,13 @@ class="h-full overflow-y-auto">
                 <div
                   class="section-label font-bold mb-2 flex items-center justify-between text-text-heading text-sm"
                 >
-                  <div>Output</div>
+                  <div>{{ t('traces.traceDetailsSidebar.output') }}</div>
                   <div class="flex items-center gap-1">
                     <OButton
                       variant="outline"
                       size="icon"
                       :title="
-                        isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'
+                        isFullscreen ? t('traces.traceDetailsSidebar.exitFullscreen') : t('traces.traceDetailsSidebar.enterFullscreen')
                       "
                       @click="toggleFullscreen"
                     >
@@ -432,7 +432,7 @@ class="h-full overflow-y-auto">
                     <OButton
                       variant="outline"
                       size="icon"
-                      title="Copy output"
+                      :title="t('traces.traceDetailsSidebar.copyOutput')"
                       @click="copyContent(span.gen_ai_output_messages, 'output')"
                       :disabled="!hasContent(span.gen_ai_output_messages)"
                     >
@@ -445,8 +445,8 @@ class="h-full overflow-y-auto">
                     v-if="!hasContent(span.gen_ai_output_messages)"
                     class="text-text-secondary italic text-center p-8 text-sm"
                   >
-                    No data available
-                  </div>
+                    {{ t('traces.traceDetailsSidebar.noDataAvailable') }}
+</div>
                   <LLMContentRenderer
                     v-else
                     :content="span.gen_ai_output_messages"
@@ -464,7 +464,7 @@ class="h-full overflow-y-auto">
             <OCollapsible
               v-if="span.llm_request_parameters"
               v-model="modelParamsOpen"
-              label="Model Parameters"
+              :label="t('traces.traceDetailsSidebar.modelParameters')"
               class="mt-3"
             >
               <pre class="bg-code-bg p-4 rounded-default overflow-x-auto font-mono text-xs m-0">{{
@@ -495,7 +495,7 @@ class="h-5! text-xs!">
                 <template #icon-left
                   ><OIcon name="table-chart" size="xs" class="shrink-0"
                 /></template>
-                Table
+                {{ t('traces.traceDetailsSidebar.table') }}
               </OToggleGroupItem>
             </OToggleGroup>
           </div>
@@ -1163,7 +1163,7 @@ export default defineComponent({
       {
         accessorKey: "field",
         id: "field",
-        header: "Field",
+        header: t("traces.traceDetailsSidebar.field"),
         size: 200,
         meta: {
           headerClass:
@@ -1175,7 +1175,7 @@ export default defineComponent({
       {
         accessorKey: "value",
         id: "value",
-        header: "Value",
+        header: t("traces.traceDetailsSidebar.value"),
         size: 400,
         meta: {
           slot: true,
@@ -1351,7 +1351,7 @@ export default defineComponent({
         cols.push({
           accessorKey: tsCol,
           id: tsCol,
-          header: "Timestamp",
+          header: t("traces.traceDetailsSidebar.timestamp"),
           size: eventsColSizes.value[tsCol] ?? 220,
           accessorFn: (row: any) =>
             timestampToTimezoneDate(
@@ -1535,7 +1535,7 @@ export default defineComponent({
 
     const copySpanId = () => {
       copyToClipboard(props.span?.span_id || "", {
-        successMessage: "Span ID copied to clipboard",
+        successMessage: t("traces.traceDetailsSidebar.spanIdCopied"),
       });
     };
 
@@ -1544,7 +1544,7 @@ export default defineComponent({
       const attributesText = JSON.stringify(attributes, null, 2);
 
       copyToClipboard(attributesText, {
-        successMessage: "Attributes copied to clipboard",
+        successMessage: t("traces.traceDetailsSidebar.attributesCopied"),
       });
     };
 
@@ -1720,7 +1720,7 @@ export default defineComponent({
       // Gate correlation feature behind enterprise check to avoid 403 errors
       if (config.isEnterprise !== "true") {
         correlationError.value =
-          "Correlation feature requires enterprise license";
+          t("traces.traceDetailsSidebar.enterpriseLicenseRequired");
         return;
       }
 
@@ -1728,7 +1728,7 @@ export default defineComponent({
         console.warn(
           "[TraceDetailsSidebar] Cannot load correlation: missing span or stream name",
         );
-        correlationError.value = "Missing span or stream name";
+        correlationError.value = t("traces.traceDetailsSidebar.missingSpanOrStream");
         return;
       }
 
@@ -1897,13 +1897,13 @@ export default defineComponent({
 
         // Copy to clipboard
         copyToClipboard(textToCopy, {
-          successMessage: `${type.charAt(0).toUpperCase() + type.slice(1)} copied to clipboard`,
-          errorMessage: "Failed to copy to clipboard",
+          successMessage: t("traces.traceDetailsSidebar.copiedToClipboard", { type: type.charAt(0).toUpperCase() + type.slice(1) }),
+          errorMessage: t("traces.traceDetailsSidebar.failedToCopyClipboard"),
         });
       } catch (error) {
         toast({
           variant: "error",
-          message: "Failed to copy content",
+          message: t("traces.traceDetailsSidebar.failedToCopyContent"),
         });
       }
     };
@@ -2040,7 +2040,7 @@ export default defineComponent({
 
     const copyContentToClipboard = (log: any) => {
       copyToClipboard(JSON.stringify(log), {
-        successMessage: "Content Copied Successfully!",
+        successMessage: t("traces.traceDetailsSidebar.contentCopied"),
         timeout: 1000,
       });
     };

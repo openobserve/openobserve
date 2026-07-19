@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <AppPageHeader
       :title="t('nodes.header')"
       icon="hub"
-      :subtitle="'Cluster nodes and their health'"
+      :subtitle="t('settings.nodesPage.subtitle')"
       class="shrink-0 px-4 border-b border-border-default"
     >
     </AppPageHeader>
@@ -200,7 +200,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         max="100"
                         v-model="cpuUsage.min"
                       />
-                      <span class="px-1 text-center">to</span>
+                      <span class="px-1 text-center">{{ t('settings.nodesPage.to') }}</span>
                       <OInput
                         data-test="nodes-filter-cpuusage-max"
                         type="number"
@@ -242,7 +242,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         max="100"
                         v-model="memoryUsage.min"
                       />
-                      <span class="px-1 text-center">to</span>
+                      <span class="px-1 text-center">{{ t('settings.nodesPage.to') }}</span>
                       <OInput
                         data-test="nodes-filter-memoryusage-max"
                         type="number"
@@ -290,7 +290,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :max="maxEstablished"
                         v-model="establishedUsage.min"
                       />
-                      <span class="px-1 text-center">to</span>
+                      <span class="px-1 text-center">{{ t('settings.nodesPage.to') }}</span>
                       <OInput
                         :disable="!establishedToggle"
                         data-test="nodes-filter-established-max"
@@ -331,7 +331,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :max="maxClosewait"
                         v-model="closewaitUsage.min"
                       />
-                      <span class="px-1 text-center">to</span>
+                      <span class="px-1 text-center">{{ t('settings.nodesPage.to') }}</span>
                       <OInput
                         :disable="!closewaitToggle"
                         data-test="nodes-filter-closewait-max"
@@ -372,7 +372,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :max="maxWaittime"
                         v-model="waittimeUsage.min"
                       />
-                      <span class="px-1 text-center">to</span>
+                      <span class="px-1 text-center">{{ t('settings.nodesPage.to') }}</span>
                       <OInput
                         :disable="!waittimeToggle"
                         data-test="nodes-filter-waittime-max"
@@ -598,7 +598,7 @@ export default defineComponent({
     const filterOTableColumns: OTableColumnDef[] = [
       {
         id: "name",
-        header: "Name",
+        header: t("settings.nodesPage.name"),
         accessorKey: "name",
         meta: { align: "left" },
       },
@@ -851,7 +851,7 @@ export default defineComponent({
       loading.value = true;
       const dismiss = toast({
         variant: "loading",
-        message: "Please wait while loading data...",
+        message: t("settings.nodesPage.loadingData"),
               timeout: 0,
 });
 
@@ -890,7 +890,7 @@ export default defineComponent({
               variant: "error",
               message:
                 error.response?.data?.message ||
-                "Failed to fetch nodes. Please try again.",
+                t("settings.nodesPage.fetchFailed"),
               timeout: 5000,
             });
           }

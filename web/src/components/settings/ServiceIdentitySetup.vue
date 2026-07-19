@@ -53,9 +53,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
               <div class="flex-1 min-w-0 text-compact leading-tight">
                 <template v-if="serviceNameDetected">
-                  Service name detected from
+                  {{ t("settings.serviceIdentitySetup.serviceNameDetectedFrom") }}
                   <span class="font-bold text-primary">Service</span>
-                  field alias
+                  {{ t("settings.serviceIdentitySetup.fieldAlias") }}
                   <span class="text-xs opacity-60"
                     >({{
                       detectedServiceFields.length + unseenServiceFields.length
@@ -274,7 +274,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   'text-text-secondary'
                 "
               >
-                No fields configured yet
+                {{ t("settings.serviceIdentitySetup.noFieldsConfiguredYet") }}
               </span>
               <OButton
                 variant="outline"
@@ -529,7 +529,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          
         >
           <OIcon name="radar" size="sm" class="text-teal-6" />
-          <span class="font-bold text-sm">Workload Detection</span>
+          <span class="font-bold text-sm">{{ t("settings.serviceIdentitySetup.workloadDetection") }}</span>
         </div>
 
         <!-- Collapsible: Workload detected using fields (N) -->
@@ -545,7 +545,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <OIcon name="check-circle" size="sm" />
             <div class="flex-1 min-w-0 text-compact leading-tight">
-              Workload detected using fields
+              {{ t("settings.serviceIdentitySetup.workloadDetectedUsingFields") }}
               <span class="text-xs opacity-60"
                 >({{ trackedAliasIds.length }})</span
               >
@@ -580,15 +580,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   'text-text-secondary'
                 "
               >
-                Only these field alias groups are used for workload detection
-                and recommendations. Fields not in this list will not influence
-                service discovery results. Cannot be empty.
+                {{ t("settings.serviceIdentitySetup.workloadTrackedHelp") }}
                 <a
                   class="config-link-btn cursor-pointer inline-block mx-1 px-2 py-0.5 rounded-default text-xs font-semibold no-underline align-middle border border-text-link text-text-link bg-badge-blue-soft-bg transition-[background] hover:bg-[color-mix(in_srgb,var(--color-badge-blue-ol-border)_18%,transparent)]"
                   @click.prevent="emit('navigate-to-aliases', 'service')"
-                  >Go to Field Aliases</a
+                  >{{ t("settings.serviceIdentitySetup.goToFieldAliases") }}</a
                 >
-                to configure individual field mappings.
+                {{ t("settings.serviceIdentitySetup.toConfigureFieldMappings") }}
               </div>
               <div class="flex flex-wrap items-center gap-2">
                 <!-- Pills for tracked aliases -->
@@ -637,7 +635,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     labelKey="label"
                     valueKey="value"
                     searchable
-                    placeholder="Select alias group"
+                    :placeholder="t('settings.serviceIdentitySetup.selectAliasGroup')"
                     style="width: 13.75rem"
                     :dropdown-style="{ minWidth: '18.75rem' }"
                     @update:model-value="onAddTrackedAlias($event)"
@@ -675,7 +673,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @click="addingTrackedAlias = true"
                   icon-left="add"
                 >
-                  Add field
+                  {{ t("settings.correlation.addField") }}
                 </OButton>
               </div>
               <div class="flex justify-end mt-3">
@@ -700,14 +698,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               'text-text-secondary'
             "
           >
-            We discovered these deployment patterns in your streams. Use them to
-            configure service correlation.
+            {{ t("settings.serviceIdentitySetup.discoveredPatternsHelp") }}
             <a
               class="config-link-btn cursor-pointer inline-block mx-1 px-2 py-0.5 rounded-default text-xs font-semibold no-underline align-middle border border-text-link text-text-link bg-badge-blue-soft-bg transition-[background] hover:bg-[color-mix(in_srgb,var(--color-badge-blue-ol-border)_18%,transparent)]"
               @click.prevent="emit('navigate-to-services')"
-              >Go to Services</a
+              >{{ t("settings.serviceIdentitySetup.goToServices") }}</a
             >
-            <span>to see the actual discovered services.</span>
+            <span>{{ t("settings.serviceIdentitySetup.toSeeDiscoveredServices") }}</span>
           </div>
         </div>
 
@@ -738,7 +735,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 (setDistinguishBy[env.key] ?? []).filter(Boolean).length > 0
               "
               class="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-badge-success-solid-bg"
-              :title="`${(setDistinguishBy[env.key] ?? []).filter(Boolean).length} field(s) configured`"
+              :title="t('settings.serviceIdentitySetup.fieldsConfigured', { n: (setDistinguishBy[env.key] ?? []).filter(Boolean).length })"
             />
           </div>
         </div>
@@ -872,7 +869,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span
                 class="w-1.5 h-1.5 rounded-full inline-block bg-badge-blue-solid-bg"
               />
-              <span>Found in Logs</span>
+              <span>{{ t("settings.correlation.foundInLogs") }}</span>
             </div>
             <div
               class="flex items-center gap-1 text-3xs"
@@ -883,7 +880,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span
                 class="w-1.5 h-1.5 rounded-full inline-block bg-badge-orange-solid-bg"
               />
-              <span>Found in Traces</span>
+              <span>{{ t("settings.correlation.foundInTraces") }}</span>
             </div>
             <div
               class="flex items-center gap-1 text-3xs"
@@ -894,7 +891,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span
                 class="w-1.5 h-1.5 rounded-full inline-block bg-badge-success-solid-bg"
               />
-              <span>Found in Metrics</span>
+              <span>{{ t("settings.correlation.foundInMetrics") }}</span>
             </div>
           </div>
         </div>
@@ -923,19 +920,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :class="
                 'text-text-body'
               "
-              >Recommended:</span
+              >{{ t("settings.serviceIdentitySetup.recommended") }}</span
             >
-            {{ " " }}Use
+            {{ " " }}{{ t("settings.serviceIdentitySetup.recommendedUse") }}
             <span class="font-semibold">{{
               suggestedConfig.distinguish_by
                 .map((id) => getGroupByValue(id)?.display ?? id)
                 .join(" + ")
             }}</span>
-            — covers {{ activeEnvCoverage ?? "–" }}% of your telemetry.
+            {{ t("settings.serviceIdentitySetup.coversTelemetry", { coverage: activeEnvCoverage ?? "–" }) }}
           </div>
           <div class="shrink-0 flex items-center gap-1">
             <OButton variant="outline" size="sm" @click="applySuggestion">
-              Apply
+              {{ t("settings.serviceIdentitySetup.apply") }}
             </OButton>
             <OButton
               variant="ghost"
@@ -987,7 +984,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <OIcon name="verified" size="xs" class="text-status-positive" />
                 <span
-                  >{{ insightData.coverage }}% of services
+                  >{{ t("settings.serviceIdentitySetup.percentOfServices", { coverage: insightData.coverage }) }}
                   <span
                     v-if="
                       insightData.count !== null && insightData.total !== null
@@ -1011,7 +1008,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="text-2xs tracking-wide font-medium mb-2 text-text-label"
                
               >
-                Stream Sources
+                {{ t("settings.serviceIdentitySetup.streamSources") }}
               </div>
               <div style="height: 40vh; min-height: 180px">
                 <CustomChartRenderer :data="insightChartData.options" />
@@ -1060,7 +1057,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 'text-text-secondary'
               "
             >
-              All values ({{ insightData.children.length }})
+              {{ t("settings.serviceIdentitySetup.allValues", { count: insightData.children.length }) }}
             </div>
             <div class="flex flex-col gap-2.5">
               <div
@@ -1122,11 +1119,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <OIcon name="info" size="xs" />
               <span
-                >These are the related
+                >{{ t("settings.serviceIdentitySetup.relatedValuesPre") }}
                 <strong>{{
                   formatDimLabels((insightData as any).relatedDimensions)
                 }}</strong>
-                values co-occurring with
+                {{ t("settings.serviceIdentitySetup.valuesCoOccurringWith") }}
                 <strong>{{ insightData.title }}</strong
                 >.</span
               >
@@ -1178,7 +1175,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :class="
                       'text-text-secondary'
                     "
-                    >No values</span
+                    >{{ t("settings.serviceIdentitySetup.noValues") }}</span
                   >
                 </div>
               </div>
@@ -1223,7 +1220,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OCardSection class="flex flex-col gap-4 p-0 border-t">
           <!-- Header section with cardinality details -->
           <div class="flex items-center gap-3 p-4 border-b">
-            <span class="font-medium">Cardinality:</span>
+            <span class="font-medium">{{ t("settings.serviceIdentitySetup.cardinality") }}</span>
             <OTag
               type="cardinalityClass"
               :value="
@@ -1231,8 +1228,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 'Unknown'
               "
             >
-              {{ dimensionAnalytics[primaryDim?.group_id]?.cardinality || 0 }}
-              unique values
+              {{ t("settings.serviceIdentitySetup.uniqueValues", { n: dimensionAnalytics[primaryDim?.group_id]?.cardinality || 0 }) }}
             </OTag>
             <OTag
               type="cardinalityClass"
@@ -1265,7 +1261,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     (t) => selectedFieldAnalytics.sample_values[t],
                   )
                 }}</span>
-                <span class="text-text-label">Streams</span>
+                <span class="text-text-label">{{ t("settings.serviceIdentitySetup.streams") }}</span>
               </div>
 
               <!-- Scrollable content -->
@@ -1365,7 +1361,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-if="getPopupColumnValues(colIdx).length === 0"
                     class="text-text-muted text-xs italic p-2"
                   >
-                    No values
+                    {{ t("settings.serviceIdentitySetup.noValues") }}
                   </div>
                 </div>
               </div>
@@ -1374,13 +1370,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-if="popupColumns.length === 0"
                 class="flex items-center justify-center flex-1 text-text-muted text-sm italic"
               >
-                No additional dimensions detected.
+                {{ t("settings.serviceIdentitySetup.noAdditionalDimensions") }}
               </div>
             </div>
           </div>
 
           <div v-else class="text-text-muted italic p-4 text-center">
-            No sample data available for this field.
+            {{ t("settings.serviceIdentitySetup.noSampleData") }}
           </div>
         </OCardSection>
       </ODialog>
@@ -2030,7 +2026,7 @@ const insightData = computed(() => {
       children.sort((a, b) => b.count - a.count);
       return {
         title: workloadSummary.value.primaryLabel,
-        subtitle: `${allValues.length} unique values detected`,
+        subtitle: t("settings.serviceIdentitySetup.uniqueValuesDetected", { n: allValues.length }),
         coverage: null,
         count: null,
         total: dim?.service_count ?? null,
@@ -2139,7 +2135,7 @@ const insightData = computed(() => {
       children.sort((a, b) => b.count - a.count);
       return {
         title: workloadSummary.value.secondaryLabel,
-        subtitle: `${allVals.length} unique values detected`,
+        subtitle: t("settings.serviceIdentitySetup.uniqueValuesDetected", { n: allVals.length }),
         coverage: null,
         count: null,
         total: dim?.service_count ?? null,
@@ -2231,12 +2227,12 @@ const insightData = computed(() => {
     children.sort((a, b) => b.count - a.count);
     return {
       title: workloadSummary.value.tertiaryLabel,
-      subtitle: `${allVals.length} unique values detected`,
+      subtitle: t("settings.serviceIdentitySetup.uniqueValuesDetected", { n: allVals.length }),
       coverage: null,
       count: null,
       total: dim?.service_count ?? null,
       childLabel: "",
-      childCountLabel: "locations",
+      childCountLabel: t("settings.serviceIdentitySetup.locations"),
       children,
       maxChildCount: Math.max(...children.map((c) => c.count), 1),
       isCardLevel: true,
@@ -3152,8 +3148,15 @@ function getFieldCardinalityTooltip(fieldId: string): string | null {
   const formatted = cardClass
     ? cardClass.replace(/([a-z])([A-Z])/g, "$1 $2")
     : "";
-  const classLabel = formatted ? ` (${formatted} cardinality)` : "";
-  return `${count} unique values${classLabel} — fewer values = better for grouping`;
+  const classLabel = formatted
+    ? t("settings.serviceIdentitySetup.cardinalityClassLabel", {
+        cardinality: formatted,
+      })
+    : "";
+  return t("settings.serviceIdentitySetup.fieldCardinalityTooltip", {
+    count,
+    classLabel,
+  });
 }
 
 /**
@@ -3213,8 +3216,7 @@ function applySuggestion() {
   suggestionDismissed.value = true;
   toast({
     variant: "success",
-    message:
-      'Recommended configuration applied. Click "Save Configuration" to save.',
+    message: t("settings.serviceIdentitySetup.recommendedConfigApplied"),
   });
 }
 
@@ -3474,7 +3476,7 @@ async function saveConfig() {
     if (trackedAliasIds.value.length === 0) {
       toast({
         variant: "warning",
-        message: "Select at least one tracked alias group.",
+        message: t("settings.serviceIdentitySetup.selectAtLeastOneTrackedAlias"),
       });
       return;
     }

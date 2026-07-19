@@ -18,10 +18,10 @@
             class="text-xs font-bold text-text-secondary"
           >
             <span class="text-text-body">{{ totalSpans }}</span>
-            spans
+            {{ t('traces.flameGraphView.spans') }}
             <span class="mx-2">•</span>
             <span class="text-text-body">{{ maxDepth }}</span>
-            depth
+            {{ t('traces.flameGraphView.depth') }}
           </div>
         </div>
       </div>
@@ -126,7 +126,7 @@
         style="top: 60px"
       >
         <div class="text-center text-text-secondary">
-          <div class="text-sm">No spans to display</div>
+          <div class="text-sm">{{ t('traces.flameGraphView.noSpansToDisplay') }}</div>
         </div>
       </div>
     </div>
@@ -169,6 +169,7 @@
 
 <script setup lang="ts">
 import { ref, computed, defineAsyncComponent, nextTick, watch } from "vue";
+import { useI18n } from "vue-i18n";
 import useResizer from "@/composables/useResizer";
 import { type EnrichedSpan } from "@/ts/interfaces/traces/span.types";
 import { formatDuration } from "@/composables/traces/useTraceProcessing";
@@ -219,6 +220,7 @@ const emit = defineEmits<{
 }>();
 
 // Composables
+const { t } = useI18n();
 
 // State
 const cursorVisible = ref(false);
@@ -421,18 +423,18 @@ const chartOptions = computed(() => {
             <div style="font-weight: bold; margin-bottom: 6px;">${escapeHtml(span.operationName)}</div>
             <div style="font-size: var(--text-2xs); line-height: 1.6;">
               <div style="display: flex; justify-content: space-between; gap: 16px;">
-                <span style="color: var(--color-flame-tooltip-label);">Service:</span>
+                <span style="color: var(--color-flame-tooltip-label);">${t('traces.flameGraphView.service')}</span>
                 <span>${escapeHtml(span.serviceName)}</span>
               </div>
               <div style="display: flex; justify-content: space-between; gap: 16px;">
-                <span style="color: var(--color-flame-tooltip-label);">Duration:</span>
+                <span style="color: var(--color-flame-tooltip-label);">${t('traces.flameGraphView.duration')}</span>
                 <span>${formatDuration(span.durationMs)}</span>
               </div>
               <div style="display: flex; justify-content: space-between; gap: 16px;">
-                <span style="color: var(--color-flame-tooltip-label);">% of trace:</span>
+                <span style="color: var(--color-flame-tooltip-label);">${t('traces.flameGraphView.percentOfTrace')}</span>
                 <span>${percentage}%</span>
               </div>
-              ${span.hasError ? '<div style="color: var(--color-flame-tooltip-error); margin-top: 4px;">⚠ Has errors</div>' : ""}
+              ${span.hasError ? `<div style="color: var(--color-flame-tooltip-error); margin-top: 4px;">${t('traces.flameGraphView.hasErrors')}</div>` : ""}
             </div>
           </div>
         `;

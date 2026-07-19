@@ -25,10 +25,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <OSpinner variant="dots" size="lg" />
       <div class="mt-3 text-text-secondary font-medium" style="font-size: var(--text-sm);">
-        Translating stack trace with source maps...
+        {{ t("rum.translatingStackTrace") }}
       </div>
       <div class="mt-1 text-text-secondary" style="font-size: var(--text-xs);">
-        This may take a few moments
+        {{ t("rum.translatingStackTraceHint") }}
       </div>
     </div>
 
@@ -41,24 +41,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <OIcon name="code-off" size="lg" class="mb-2" />
       <div class="text-base font-medium text-text-secondary mb-1">
-        Source Maps Not Available
+        {{ t("rum.sourceMapsNotAvailable") }}
       </div>
       <div class="text-sm text-text-secondary" style="max-width: 500px; margin: 0 auto; font-size: var(--text-compact);">
-        To view detailed stack traces with original source code and line numbers, please upload source maps for this application.
+        {{ t("rum.sourceMapsNotAvailableBody") }}
       </div>
       <div v-if="props.error.service || props.error.version" class="flex items-center justify-center gap-2 mt-2 mb-2">
         <span
           v-if="props.error.service"
           class="service-version-badge service-badge inline-flex items-center gap-1 py-1 px-2.5 rounded-default text-xs font-medium bg-badge-purple-soft-bg text-badge-purple-soft-text"
         >
-          <span class="badge-label opacity-80">Service:</span>
+          <span class="badge-label opacity-80">{{ t("rum.serviceBadge") }}</span>
           <span class="badge-value font-semibold">{{ props.error.service }}</span>
         </span>
         <span
           v-if="props.error.version"
           class="service-version-badge version-badge inline-flex items-center gap-1 py-1 px-2.5 rounded-default text-xs font-medium bg-badge-blue-soft-bg text-badge-blue-soft-text"
         >
-          <span class="badge-label opacity-80">Version:</span>
+          <span class="badge-label opacity-80">{{ t("rum.versionBadge") }}</span>
           <span class="badge-value font-semibold">{{ props.error.version }}</span>
         </span>
       </div>
@@ -69,7 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="my-2"
         @click="navigateToUpload"
       >
-        Upload Source Maps
+        {{ t("rum.uploadSourceMaps") }}
       </OButton>
     </div>
 
@@ -136,9 +136,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <!-- File location -->
             <div class="source-location-header text-text-secondary text-xs !mb-2.5 text-2xs font-semibold [letter-spacing:0.02em] opacity-80">
-              Line {{ stackTrace.stack[0].source_info.stack_line }}:{{ stackTrace.stack[0].source_info.stack_col }}
+              {{ t("rum.stackLine") }} {{ stackTrace.stack[0].source_info.stack_line }}:{{ stackTrace.stack[0].source_info.stack_col }}
               <span class="ml-1">
-                (Lines {{ stackTrace.stack[0].source_info.source_line_start }}-{{ stackTrace.stack[0].source_info.source_line_end }})
+                ({{ t("rum.stackLines") }} {{ stackTrace.stack[0].source_info.source_line_start }}-{{ stackTrace.stack[0].source_info.source_line_end }})
               </span>
             </div>
 
@@ -181,7 +181,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="mr-1"
             />
             <span class="text-xs text-text-secondary">
-              Show {{ stackTrace.stack.length - 1 }} more frame{{ stackTrace.stack.length - 1 > 1 ? 's' : '' }}
+              {{
+                stackTrace.stack.length - 1 > 1
+                  ? t("rum.showMoreFrames", { count: stackTrace.stack.length - 1 })
+                  : t("rum.showMoreFrame", { count: stackTrace.stack.length - 1 })
+              }}
             </span>
           </div>
 
@@ -222,9 +226,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="source-context !px-4 !pb-4 !pt-0 bg-code-block-bg"
               >
                 <div class="source-location-header text-text-secondary text-xs !mb-2.5 ml-4 text-2xs font-semibold [letter-spacing:0.02em] opacity-80">
-                  Line {{ frame.source_info.stack_line }}:{{ frame.source_info.stack_col }}
+                  {{ t("rum.stackLine") }} {{ frame.source_info.stack_line }}:{{ frame.source_info.stack_col }}
                   <span class="ml-1">
-                    (Lines {{ frame.source_info.source_line_start }}-{{ frame.source_info.source_line_end }})
+                    ({{ t("rum.stackLines") }} {{ frame.source_info.source_line_start }}-{{ frame.source_info.source_line_end }})
                   </span>
                 </div>
 
@@ -251,7 +255,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ translationError }}
       </div>
       <div v-else>
-        Unable to translate stack trace. Source maps may not be available.
+        {{ t("rum.unableToTranslateStackTrace") }}
       </div>
     </div>
   </div>
@@ -261,6 +265,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { ref, watch, onMounted, nextTick, computed } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
+import { useI18n } from "vue-i18n";
 import sourcemapsService from "@/services/sourcemaps";
 import CodeQueryEditor from "@/components/CodeQueryEditor.vue";
 import OButton from '@/lib/core/Button/OButton.vue';
@@ -275,6 +280,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 const store = useStore();
 const router = useRouter();
+const { t } = useI18n();
 
 // Theme-reactive colors as CSS custom properties — the browser resolves them per
 // theme (light/dark) via dark.css, so no JS theme read is needed here.
@@ -513,7 +519,7 @@ const translateStackTrace = async () => {
     translationError.value =
       error?.response?.data?.message ||
       error?.message ||
-      "Failed to translate stack trace. Source maps may not be available.";
+      t("rum.failedToTranslateStackTrace");
   } finally {
     isLoadingTranslation.value = false;
   }

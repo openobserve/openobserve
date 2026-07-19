@@ -41,8 +41,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="llm-insights-filter-mode"
         @update:model-value="onFilterModeChange"
       >
-        <OToggleGroupItem value="stream" size="sm">Stream</OToggleGroupItem>
-        <OToggleGroupItem value="agent" size="sm">Agent</OToggleGroupItem>
+        <OToggleGroupItem value="stream" size="sm">{{ t('traces.lLMInsightsDashboard.stream') }}</OToggleGroupItem>
+        <OToggleGroupItem value="agent" size="sm">{{ t('traces.lLMInsightsDashboard.agent') }}</OToggleGroupItem>
       </OToggleGroup>
 
       <!-- Picker: Stream tab → stream picker; Agent tab → agent picker. -->
@@ -74,7 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OSelect
           v-else
           v-model="activeAgent"
-          label="Agent"
+          :label="t('traces.lLMInsightsDashboard.agent')"
           label-position="inside"
           :options="agentSelectOptions"
           labelKey="label"
@@ -104,9 +104,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       illustration="broken-panel"
       variant="error"
       data-test="llm-insights-empty-error"
-      title="Failed to load LLM Insights"
+      :title="t('traces.lLMInsightsDashboard.failedToLoad')"
       :description="error || ''"
-      action-label="Retry"
+      :action-label="t('traces.lLMInsightsDashboard.retry')"
       action-icon="refresh"
       @action="loadInsights()"
     />
@@ -140,9 +140,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OEmptyState
         size="hero"
         illustration="constellation"
-        title="No Agents In This Range"
-        description="No GenAI agents were detected for the selected time window. Try a wider range, switch to the Stream tab, or configure agent mapping in settings."
-        action-label="View by Stream"
+        :title="t('traces.lLMInsightsDashboard.noAgentsInRange')"
+        :description="t('traces.lLMInsightsDashboard.noAgentsDescription')"
+        :action-label="t('traces.lLMInsightsDashboard.viewByStream')"
         @action="onFilterModeChange('stream')"
       />
     </div>
@@ -651,7 +651,7 @@ const kpiCards = computed<KpiCard[]>(() => {
   // If it's 0, either there are no LLM spans in the window or the SDK
   // isn't emitting cost; either way we render "$0".
   const costCard: KpiCard = {
-    label: "Total Cost",
+    label: t('traces.lLMInsightsDashboard.totalCost'),
     icon: "payments",
     ...splitCost(kpi.value.totalCost),
     sparkData: sparklines.value.cost,
@@ -661,7 +661,7 @@ const kpiCards = computed<KpiCard[]>(() => {
   return [
     costCard,
     {
-      label: "Total Tokens",
+      label: t('traces.lLMInsightsDashboard.totalTokens'),
       icon: "tag",
       value: tokens.value,
       unit: tokens.unit,
@@ -669,7 +669,7 @@ const kpiCards = computed<KpiCard[]>(() => {
       sparkColor: "#a855f7",
     },
     {
-      label: "Total Traces",
+      label: t('traces.lLMInsightsDashboard.totalTraces'),
       icon: "account-tree",
       value: traces.value,
       unit: traces.unit,
@@ -677,7 +677,7 @@ const kpiCards = computed<KpiCard[]>(() => {
       sparkColor: "#3b82f6",
     },
     {
-      label: "P95 Latency",
+      label: t('traces.lLMInsightsDashboard.p95Latency'),
       icon: "schedule",
       value: p95.value,
       unit: p95.unit,
@@ -686,7 +686,7 @@ const kpiCards = computed<KpiCard[]>(() => {
       loading: p95Loading.value,
     },
     {
-      label: "Error Rate",
+      label: t('traces.lLMInsightsDashboard.errorRate'),
       icon: "error",
       value: errorRate.toFixed(1),
       unit: "%",

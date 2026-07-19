@@ -77,7 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template v-if="sessionId">
                 <div class="bg-text-label py-0 w-px h-4" />
                 <span class="mr-1">
-                  Session ID:
+                  {{ t("traces.traceDetails.sessionId") }}:
                   <span
                     data-test="trace-details-session-id"
                     class="text-text-body font-mono"
@@ -91,7 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   name="content-copy"
                   size="xs"
                   class="cursor-pointer hover:text-text-body"
-                  title="Copy Session ID"
+                  :title="t('traces.traceDetails.copySessionId')"
                   @click="copySessionId"
                 />
               </template>
@@ -253,7 +253,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="bg-text-label py-0 w-px h-4"
                   />
                   <span class="mr-1">
-                    Session ID:
+                    {{ t("traces.traceDetails.sessionId") }}:
                     <span
                       data-test="trace-details-session-id"
                       class="text-text-body font-mono"
@@ -267,7 +267,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     name="content-copy"
                     size="xs"
                     class="cursor-pointer hover:text-text-body"
-                    title="Copy Session ID"
+                    :title="t('traces.traceDetails.copySessionId')"
                     @click="copySessionId"
                   />
                 </template>
@@ -1274,7 +1274,7 @@ export default defineComponent({
 
       toast({
         variant: "success",
-        message: `Filter added: ${field} ${operator} '${value}'`,
+        message: t("traces.traceDetails.filterAdded", { field, operator, value }),
       });
     };
 
@@ -1304,8 +1304,8 @@ export default defineComponent({
     // ─────────────────────────────────────────────────────────────────────────
 
     const traceVisuals = [
-      { label: "Timeline", value: "timeline", icon: TraceTimelineIcon },
-      { label: "Service Map", value: "service_map", icon: ServiceMapIcon },
+      { label: t("traces.traceDetails.timeline"), value: "timeline", icon: TraceTimelineIcon },
+      { label: t("traces.traceDetails.serviceMap"), value: "service_map", icon: ServiceMapIcon },
     ];
 
     const activeVisual = ref("timeline");
@@ -2061,7 +2061,9 @@ export default defineComponent({
 
     const showTraceDetailsError = () => {
       showErrorNotification(
-        `Trace ${router.currentRoute.value.query.trace_id} not found`,
+        t("traces.traceDetails.traceNotFound", {
+          traceId: router.currentRoute.value.query.trace_id,
+        }),
       );
       const query = cloneDeep(router.currentRoute.value.query);
       delete query.trace_id;
@@ -2209,7 +2211,9 @@ export default defineComponent({
       if (selectedSpanId.value) {
         if (!spanMap.value[selectedSpanId.value]) {
           showErrorNotification(
-            `Span ${selectedSpanId.value} not found in trace`,
+            t("traces.traceDetails.spanNotFound", {
+              spanId: selectedSpanId.value,
+            }),
           );
           searchObj.data.traceDetails.selectedSpanId = "";
           searchObj.data.traceDetails.showSpanDetails = false;
@@ -2377,8 +2381,8 @@ export default defineComponent({
         idleMs: span.idle_ns ? convertTime(span.idle_ns) : 0,
         busyMs: span.busy_ns ? convertTime(span.busy_ns) : 0,
         spanId: span.span_id || `generated_${Date.now()}_${Math.random()}`,
-        operationName: span.operation_name || "Unknown Operation",
-        serviceName: span.service_name || "Unknown Service",
+        operationName: span.operation_name || t("traces.traceDetails.unknownOperation"),
+        serviceName: span.service_name || t("traces.traceDetails.unknownService"),
         spanStatus: span.span_status || "UNSET",
         spanKind: getSpanKind(span.span_kind),
         parentId: span.reference_parent_span_id || "",
@@ -2501,7 +2505,7 @@ export default defineComponent({
 
     const copyTraceId = () => {
       copyToClipboard(spanList.value[0]["trace_id"], {
-        successMessage: "Trace ID copied to clipboard",
+        successMessage: t("traces.traceDetails.traceIdCopied"),
       });
     };
 
@@ -2512,7 +2516,7 @@ export default defineComponent({
     const copySessionId = () => {
       if (!sessionId.value) return;
       copyToClipboard(sessionId.value, {
-        successMessage: "Session ID copied to clipboard",
+        successMessage: t("traces.traceDetails.sessionIdCopied"),
       });
     };
 

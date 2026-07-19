@@ -4,8 +4,8 @@
     class="h-[calc(100vh-50px)] flex flex-col overflow-hidden"
   >
     <AppPageHeader
-      title="PromQL Query Builder"
-      subtitle="Build and test PromQL queries visually"
+      :title="t('metrics.queryBuilder.title')"
+      :subtitle="t('metrics.queryBuilder.subtitle')"
       icon="query-stats"
       class="shrink-0 px-4 border-b border-border-default"
     />
@@ -38,10 +38,10 @@
 
       <!-- Generated Query Display -->
       <OCardSection>
-        <div class="text-base font-medium mb-2">Generated PromQL Query:</div>
+        <div class="text-base font-medium mb-2">{{ t('metrics.queryBuilder.generatedQuery') }}</div>
         <OCard class="bg-surface-panel">
           <OCardSection>
-            <pre class="m-0 p-3 font-mono text-sm leading-relaxed whitespace-pre-wrap wrap-break-word text-text-link font-medium">{{ generatedQuery || "No query built yet" }}</pre>
+            <pre class="m-0 p-3 font-mono text-sm leading-relaxed whitespace-pre-wrap wrap-break-word text-text-link font-medium">{{ generatedQuery || t('metrics.queryBuilder.noQueryBuilt') }}</pre>
           </OCardSection>
         </OCard>
 
@@ -53,7 +53,7 @@
             :disabled="!generatedQuery"
           >
             <OIcon name="content-copy" size="xs" class="mr-1" />
-            Copy Query
+            {{ t('metrics.queryBuilder.copyQuery') }}
           </OButton>
           <OButton
             variant="outline"
@@ -61,7 +61,7 @@
             @click="clearQuery"
           >
             <OIcon name="close" size="xs" class="mr-1" />
-            Clear All
+            {{ t('metrics.queryBuilder.clearAll') }}
           </OButton>
           <OButton
             variant="outline"
@@ -70,14 +70,14 @@
             :disabled="!generatedQuery"
           >
             <OIcon name="play-arrow" size="xs" class="mr-1" />
-            Test Query
+            {{ t('metrics.queryBuilder.testQuery') }}
           </OButton>
         </div>
       </OCardSection>
 
       <!-- Query Result Preview -->
       <OCardSection v-if="queryResult">
-        <div class="text-base font-medium mb-2">Query Result Preview:</div>
+        <div class="text-base font-medium mb-2">{{ t('metrics.queryBuilder.queryResultPreview') }}</div>
         <OCard class="bg-surface-panel">
           <OCardSection>
             <pre class="m-0 p-3 font-mono text-sm leading-relaxed whitespace-pre-wrap wrap-break-word text-text-body max-h-100 overflow-y-auto">{{ queryResult }}</pre>
@@ -92,6 +92,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch } from "vue";
+import { useI18n } from "vue-i18n";
 import { PromqlBuilderQuery } from "@/components/promql/types";
 import { promqlRenderer } from "@/components/promql/operations/queryModeller";
 import MetricSelector from "@/components/promql/components/MetricSelector.vue";
@@ -106,6 +107,8 @@ import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { copyToClipboard } from "@/utils/clipboard";
 
+
+const { t } = useI18n();
 
 // State
 const visualQuery = ref<PromqlBuilderQuery>({
@@ -135,7 +138,7 @@ const generatedQuery = computed(() => {
 const copyQuery = () => {
   if (generatedQuery.value) {
     copyToClipboard(generatedQuery.value, {
-      successMessage: "Query copied to clipboard!",
+      successMessage: t('metrics.queryBuilder.queryCopied'),
     });
   }
 };
@@ -149,20 +152,20 @@ const clearQuery = () => {
   queryResult.value = null;
   toast({
     variant: "info",
-    message: "Query cleared",  });
+    message: t('metrics.queryBuilder.queryCleared'),  });
 };
 
 const testQuery = () => {
   // TODO: Implement actual query execution
   toast({
     variant: "info",
-    message: "Query testing will be implemented soon",  });
+    message: t('metrics.queryBuilder.testingSoon'),  });
 
   // Mock result for now
   queryResult.value = JSON.stringify(
     {
       status: "success",
-      message: "Query execution will be implemented in the next phase",
+      message: t('metrics.queryBuilder.executionSoon'),
     },
     null,
     2

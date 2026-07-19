@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <AppPageHeader
       :title="t('quota.header')"
       title-data-test="user-title-text"
-      :subtitle="'Usage limits applied per role'"
+      :subtitle="t('iam.quotaPage.subtitle')"
       icon="speed"
       class="shrink-0 px-4 border-b border-border-default"
     />
@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :model-value="selectedOrganization?.value"
                 :options="organizationToDisplay"
                 searchable
-                placeholder="Select Organization"
+                :placeholder="t('iam.quotaPage.selectOrganization')"
                 class="py-2 no-case mr-3 w-75 input-width org-select"
                 labelKey="label"
                 valueKey="value"
@@ -64,7 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :disabled="activeTab == 'role-limits' && !expandedRow"
                 @click="editTableWithInput"
               >
-                Edit Quota
+                {{ t('iam.quotaPage.editQuota') }}
                 <template #icon-right>
                   <OIcon name="edit" size="sm" class="opacity-70" style="font-weight: 200" />
                 </template>
@@ -94,7 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :options="apiCategories"
                 searchable
                 clearable
-                placeholder="Select API Category"
+                :placeholder="t('iam.quotaPage.selectApiCategory')"
                 class="no-case mr-3 w-75 input-width ml-3 category-select p-0"
                 labelKey="label"
                 valueKey="value"
@@ -322,7 +322,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="sm-action"
           @click="cancelChanges"
         >
-          Cancel
+          {{ t('iam.quotaPage.cancel') }}
         </OButton>
         <OButton
           variant="primary"
@@ -330,7 +330,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :disabled="Object.keys(changedValues).length === 0"
           @click="saveChanges"
         >
-          Save
+          {{ t('iam.quotaPage.save') }}
         </OButton>
       </div>
       <div
@@ -343,7 +343,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="cancelJsonChanges"
           :disabled="isSavingJson"
         >
-          Cancel
+          {{ t('iam.quotaPage.cancel') }}
         </OButton>
         <OButton
           variant="primary"
@@ -351,28 +351,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="saveJsonChanges"
           :disabled="isSavingJson"
         >
-          {{ isSavingJson ? 'Saving Changes...' : 'Save Changes' }}
+          {{ isSavingJson ? t('iam.quotaPage.savingChanges') : t('iam.quotaPage.saveChanges') }}
         </OButton>
       </div>
     </div>
 
     <ConfirmDialog
-      title="UnSaved Changes Detected"
-      message="save changes before switching tabs"
+      :title="t('iam.quotaPage.unsavedChangesDetected')"
+      :message="t('iam.quotaPage.saveBeforeSwitchingTabs')"
       @update:ok="saveChangesAndTabSwitch"
       @update:cancel="discardChangesTabSwitch"
       v-model="showConfirmDialogTabSwitch"
     />
     <ConfirmDialog
-      title="UnSaved Changes Detected"
-      message="save changes before expanding another row"
+      :title="t('iam.quotaPage.unsavedChangesDetected')"
+      :message="t('iam.quotaPage.saveBeforeExpandingRow')"
       @update:ok="saveChangesAndRoleSwitch"
       @update:cancel="discardChangesRoleSwitch"
       v-model="showConfirmDialogRowSwitch"
     />
     <ConfirmDialog
-      title="UnSaved Changes Detected"
-      message="save changes before switching Type"
+      :title="t('iam.quotaPage.unsavedChangesDetected')"
+      :message="t('iam.quotaPage.saveBeforeSwitchingType')"
       @update:ok="saveChangesAndTypeSwitch"
       @update:cancel="discardChangesTypeSwitch"
       v-model="showConfirmDialogTypeSwitch"
@@ -455,12 +455,12 @@ export default defineComponent({
 
     const tabs = ref<any[]>([
       {
-        label: "API Limits",
+        label: t("iam.quotaPage.apiLimits"),
         value: "api-limits",
         icon: "speed",
       },
       {
-        label: "Role Limits",
+        label: t("iam.quotaPage.roleLimits"),
         value: "role-limits",
         icon: "shield",
       },
@@ -468,17 +468,17 @@ export default defineComponent({
 
     const timeUnitTabs = ref<any[]>([
       {
-        label: "Per Second",
+        label: t("iam.quotaPage.perSecond"),
         value: "second",
         icon: "timer",
       },
       {
-        label: "Per Minute",
+        label: t("iam.quotaPage.perMinute"),
         value: "minute",
         icon: "schedule",
       },
       {
-        label: "Per Hour",
+        label: t("iam.quotaPage.perHour"),
         value: "hour",
         icon: "hourglass-empty",
       },
@@ -486,7 +486,7 @@ export default defineComponent({
 
     const typeTabs = computed(() => [
       {
-        label: "Table",
+        label: t("iam.quotaPage.table"),
         value: "table",
         icon: "table-chart",
       },
@@ -761,7 +761,7 @@ export default defineComponent({
       if (activeTab.value === "api-limits") {
         const newArray = [...organizations.value];
         newArray.unshift({
-          label: "global rules",
+          label: t("iam.quotaPage.globalRules"),
           value: "global_rules",
         });
         return newArray;
@@ -1031,7 +1031,7 @@ export default defineComponent({
           variant: "error",
           message:
             error.response.data.message ||
-            "Error while updating rate limits rule",
+            t("iam.quotaPage.errorUpdatingRateLimits"),
         });
         console.error("Error saving changes:", error);
       }
@@ -1104,7 +1104,7 @@ export default defineComponent({
           variant: "error",
           message:
             error.response.data.message ||
-            "Error while updating rate limits rule",
+            t("iam.quotaPage.errorUpdatingRateLimits"),
         });
         console.error("Error saving changes:", error);
       }
@@ -1153,7 +1153,7 @@ export default defineComponent({
       try {
         const dismiss = toast({
           variant: "loading",
-          message: "Please wait while uploading rules...",
+          message: t("iam.quotaPage.uploadingRules"),
           timeout: 0,
         });
         uploadingRules.value = true;
@@ -1174,7 +1174,7 @@ export default defineComponent({
         dismiss();
       } catch (error) {
         uploadingRules.value = false;
-        uploadError.value = "Error while uploading rules";
+        uploadError.value = t("iam.quotaPage.errorUploadingRules");
       } finally {
         uploadingRules.value = false;
       }
@@ -1197,7 +1197,7 @@ export default defineComponent({
                 resolve(jsonArray);
               } catch (error) {
                 toast({
-                  message: `Error parsing JSON from file ${file.name}`,
+                  message: t("iam.quotaPage.errorParsingJson", { name: file.name }),
                   variant: "error",
                 });
                 resolve([]);
@@ -1295,7 +1295,7 @@ export default defineComponent({
           if (changedValues[moduleName][operation] === "") {
             toast({
               variant: "error",
-              message: "some values are empty please check",
+              message: t("iam.quotaPage.someValuesEmpty"),
             });
             isEmpty = true;
           }
@@ -1488,7 +1488,7 @@ export default defineComponent({
       if (isChanged) {
         toast({
           variant: "warning",
-          message: "Please save or cancel your changes before switching time units",
+          message: t("iam.quotaPage.saveBeforeSwitchingTimeUnits"),
         });
         // Revert back to previous time unit
         activeTimeUnit.value = activeTimeUnit.value;

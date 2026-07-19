@@ -745,7 +745,9 @@ describe("AddToDashboard — ODrawer surface", () => {
     const wrapper = createWrapper();
     await flushPromises();
     const drawer = wrapper.findComponent(ODialogStub);
-    expect(drawer.props("secondaryButtonLabel")).toBe("Cancel");
+    expect(drawer.props("secondaryButtonLabel")).toBe(
+      "metrics.addToDashboardPage.cancel",
+    );
   });
 
   it("passes the configured size (md) to ODialog", async () => {

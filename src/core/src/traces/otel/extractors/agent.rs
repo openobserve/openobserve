@@ -69,7 +69,19 @@ impl AgentExtractor {
     }
 }
 
-const BUILT_IN_AGENT_NAME_FIELDS: &[&str] = &["agent.name", "llm.agent.name"];
+// Built-in agent-name keys across the tracing conventions OpenObserve documents,
+// so agent nodes render out-of-the-box regardless of framework:
+//  - Gen-AI / OpenInference: agent.name, llm.agent.name
+//  - Google ADK (Vertex):    gcp.vertex.agent.name
+//  - CrewAI (traceloop):     crewai.task.agent
+// service.name is deliberately NOT here — it is the app tier, not agent identity
+// (guarded by test_service_name_is_not_span_agent_fallback).
+const BUILT_IN_AGENT_NAME_FIELDS: &[&str] = &[
+    "agent.name",
+    "llm.agent.name",
+    "gcp.vertex.agent.name",
+    "crewai.task.agent",
+];
 
 const BUILT_IN_AGENT_ID_FIELDS: &[&str] = &["agent.id", "agent_id", "llm.agent.id", "llm.agent_id"];
 

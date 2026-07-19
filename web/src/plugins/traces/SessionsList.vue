@@ -66,8 +66,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="sessions-list-filter-mode"
             @update:model-value="onFilterModeChange"
           >
-            <OToggleGroupItem value="stream" size="sm">Stream</OToggleGroupItem>
-            <OToggleGroupItem value="agent" size="sm">Agent</OToggleGroupItem>
+            <OToggleGroupItem value="stream" size="sm">{{ t('traces.sessionsList.stream') }}</OToggleGroupItem>
+            <OToggleGroupItem value="agent" size="sm">{{ t('traces.sessionsList.agent') }}</OToggleGroupItem>
           </OToggleGroup>
 
           <div class="flex items-center justify-end gap-2 min-w-0">
@@ -103,7 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OSelect
                 v-else
                 v-model="activeAgent"
-                label="Agent"
+                :label="t('traces.sessionsList.agent')"
                 label-position="inside"
                 :options="agentSelectOptions"
                 labelKey="label"
@@ -149,9 +149,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="hero"
           illustration="constellation"
           data-test="sessions-empty-no-agents"
-          title="No Agents In This Range"
-          description="No GenAI agents were detected for the selected time window. Try a wider range or switch back to stream view."
-          action-label="View by Stream"
+          :title="t('traces.sessionsList.noAgentsTitle')"
+          :description="t('traces.sessionsList.noAgentsDescription')"
+          :action-label="t('traces.sessionsList.viewByStream')"
           @action="onFilterModeChange('stream')"
         />
         <div

@@ -1,10 +1,13 @@
 <!-- Copyright 2026 OpenObserve Inc. -->
 <script setup lang="ts">
 import { computed, ref } from "vue";
+import { useI18n } from "vue-i18n";
 import CodeQueryEditor from "@/components/CodeQueryEditor.vue";
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
+
+const { t } = useI18n();
 
 const performanceOpen = ref(false);
 
@@ -60,29 +63,29 @@ const hasPerformanceData = computed(
 const metadataRows = computed(() =>
   [
     {
-      label: "DB System",
+      label: t("traces.dbSpanDetails.dbSystem"),
       value: String(dbSystem.value || ""),
       key: "db-system",
     },
     {
-      label: "Operation",
+      label: t("traces.dbSpanDetails.operation"),
       value: String(props.span.db_operation_name ?? ""),
       key: "operation",
     },
     {
-      label: "Database",
+      label: t("traces.dbSpanDetails.database"),
       value: String(props.span.db_namespace ?? props.span.db_name ?? ""),
       key: "namespace",
     },
     {
-      label: "Table / Collection",
+      label: t("traces.dbSpanDetails.tableCollection"),
       value: String(tableDisplay.value || ""),
       key: "table",
     },
-    { label: "Host", value: hostDisplay.value, key: "host" },
-    { label: "User", value: String(props.span.db_user ?? ""), key: "user" },
+    { label: t("traces.dbSpanDetails.host"), value: hostDisplay.value, key: "host" },
+    { label: t("traces.dbSpanDetails.user"), value: String(props.span.db_user ?? ""), key: "user" },
     {
-      label: "Stored Procedure",
+      label: t("traces.dbSpanDetails.storedProcedure"),
       value: String(props.span.db_stored_procedure_name ?? ""),
       key: "stored-proc",
     },
@@ -137,7 +140,7 @@ const metadataRows = computed(() =>
           data-test="traces-db-span-details-no-query"
           class="p-4 text-sm text-text-secondary"
         >
-          No query text recorded for this span.
+          {{ t("traces.dbSpanDetails.noQueryText") }}
         </div>
       </OCardSection>
     </OCard>
@@ -145,32 +148,32 @@ const metadataRows = computed(() =>
     <OCollapsible
       v-if="hasPerformanceData"
       v-model="performanceOpen"
-      label="Performance"
+      :label="t('traces.dbSpanDetails.performance')"
       data-test="traces-db-span-details-performance"
     >
       <div class="py-2 px-3">
           <div class="grid grid-cols-2 gap-x-4 gap-y-1">
             <template v-if="span.db_response_returned_rows">
               <div class="text-xs text-text-secondary">
-                Rows Returned
+                {{ t("traces.dbSpanDetails.rowsReturned") }}
               </div>
               <div class="text-xs">{{ span.db_response_returned_rows }}</div>
             </template>
             <template v-if="span.db_operation_batch_size">
               <div class="text-xs text-text-secondary">
-                Batch Size
+                {{ t("traces.dbSpanDetails.batchSize") }}
               </div>
               <div class="text-xs">{{ span.db_operation_batch_size }}</div>
             </template>
             <template v-if="span.db_query_summary">
               <div class="text-xs text-text-secondary">
-                Query Summary
+                {{ t("traces.dbSpanDetails.querySummary") }}
               </div>
               <div class="text-xs">{{ span.db_query_summary }}</div>
             </template>
             <template v-if="span.db_response_status_code">
               <div class="text-xs text-text-secondary">
-                Response Status
+                {{ t("traces.dbSpanDetails.responseStatus") }}
               </div>
               <div
                 class="text-xs text-status-error-text"

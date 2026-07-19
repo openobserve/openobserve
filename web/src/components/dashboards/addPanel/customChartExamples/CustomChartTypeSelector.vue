@@ -22,10 +22,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OCardSection role="header">
       <div class="flex items-center gap-3 w-full">
         <OIcon name="bar-chart" size="sm" />
-        <span class="text-xl font-semibold whitespace-nowrap">Example of custom charts</span>
+        <span class="text-xl font-semibold whitespace-nowrap">{{ t('dashboard.customChartTypeSelector.exampleOfCustomCharts') }}</span>
         <OSearchInput
           v-model="searchQuery"
-          placeholder="Search charts..."
+          :placeholder="t('dashboard.customChartTypeSelector.searchCharts')"
           clearable
           class="w-70 flex-[0_0_17.5rem] ml-4"
           @clear="searchQuery = ''"
@@ -53,7 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OCard
           class="p-4 w-40 h-full shrink-0 overflow-y-auto"
         >
-          <div class="text-sm font-medium mb-3 font-bold">Chart Types</div>
+          <div class="text-sm font-medium mb-3 font-bold">{{ t('dashboard.customChartTypeSelector.chartTypes') }}</div>
           <ul class="flex flex-col list-none p-0 m-0">
             <li
               v-for="(category, index) in chartCategories"
@@ -83,9 +83,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <div class="text-center">
               <OIcon class="w-16 h-16" name="search-off" />
-              <div class="text-xl font-semibold text-text-muted mt-3">No results found</div>
+              <div class="text-xl font-semibold text-text-muted mt-3">{{ t('dashboard.customChartTypeSelector.noResultsFound') }}</div>
               <div class="text-sm text-text-muted mt-2">
-                Try searching with different keywords
+                {{ t('dashboard.customChartTypeSelector.trySearchingDifferentKeywords') }}
               </div>
             </div>
           </div>
@@ -140,8 +140,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Confirm Chart Selection Dialog -->
     <CustomChartConfirmDialog
-      title="Confirm Chart Type Selection"
-      message="By selecting this chart type, the existing chart code will be replaced by the selected chart type's code. Do you want to continue?"
+      :title="t('dashboard.customChartTypeSelector.confirmChartTypeSelection')"
+      :message="t('dashboard.customChartTypeSelector.confirmChartTypeSelectionMessage')"
       :currentQuery="currentQuery"
       @update:ok="confirmChartSelection"
       @update:cancel="cancelChartSelection"

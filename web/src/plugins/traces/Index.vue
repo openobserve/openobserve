@@ -215,7 +215,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             searchObj.data.stream.selectedStream.label
                           "
                           as="RouterLink"
-                          >Click here</OButton
+                          >{{ t('traces.index.clickHere') }}</OButton
                         >
                         {{ t("traces.configureFullTextSearch") }}
                       </div>
@@ -296,14 +296,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <ODialog
       v-model:open="streamChangeDialog.show"
-      title="Change stream?"
+      :title="t('traces.index.changeStreamTitle')"
       size="sm"
-      primary-button-label="Switch stream"
-      secondary-button-label="Cancel"
+      :primary-button-label="t('traces.index.switchStream')"
+      :secondary-button-label="t('traces.index.cancel')"
       @click:primary="applyStreamChange(streamChangeDialog.pendingStream)"
       @click:secondary="streamChangeDialog.show = false"
     >
-      <p>This will also update the stream in the Traces/Spans tab and reset existing query.</p>
+      <p>{{ t('traces.index.changeStreamMessage') }}</p>
     </ODialog>
   </div>
 </template>
@@ -522,7 +522,7 @@ function getQueryTransform() {
     return;
   } catch (e) {
     searchObj.loading = false;
-    showErrorNotification("Error while getting functions");
+    showErrorNotification(t("traces.index.errorGettingFunctions"));
   }
 }
 
@@ -571,8 +571,7 @@ async function getStreamList() {
         searchObj.loadingStream = false;
         toast({
           variant: "error",
-          message:
-            "Error while pulling index for selected organization" + e.message,
+          message: t("traces.index.errorPullingIndex", { message: e.message }),
         });
       })
       .finally(() => {
@@ -581,7 +580,7 @@ async function getStreamList() {
   } catch (e) {
     searchObj.loadingStream = false;
     console.error("Error while getting streams", e);
-    showErrorNotification("Error while getting streams");
+    showErrorNotification(t("traces.index.errorGettingStreams"));
   }
 }
 
@@ -646,7 +645,7 @@ function loadStreamLists() {
     }
   } catch (e) {
     searchObj.loading = false;
-    showErrorNotification("Error while loading streams");
+    showErrorNotification(t("traces.index.errorLoadingStreams"));
   }
 }
 
@@ -818,9 +817,7 @@ function buildSearch() {
   } catch (e) {
     console.error("Error while constructing the search query", e);
     searchObj.loading = false;
-    showErrorNotification(
-      "An error occurred while constructing the search query.",
-    );
+    showErrorNotification(t("traces.index.errorConstructingQuery"));
   }
 }
 
@@ -888,7 +885,9 @@ function fetchTracesCount() {
 
 const showTraceDetailsError = () => {
   showErrorNotification(
-    `Trace ${router.currentRoute.value.query.trace_id} not found`,
+    t("traces.index.traceNotFound", {
+      traceId: router.currentRoute.value.query.trace_id,
+    }),
   );
   const query = cloneDeep(router.currentRoute.value.query);
   delete query.trace_id;
@@ -1178,7 +1177,7 @@ async function getQueryData(
           const { message, trace_id, code, error_detail } = errData ?? {};
 
           let errorMsg =
-            message || err?.message || "Error while processing request";
+            message || err?.message || t("traces.index.errorProcessingRequest");
           if (code) {
             searchObj.data.errorCode = code;
             const customMessage = logsErrorMessage(code);
@@ -1226,7 +1225,7 @@ async function getQueryData(
   } catch (e: any) {
     console.error("Error while fetching traces", e?.message);
     searchObj.loading = false;
-    searchObj.data.errorMsg = e?.message || "Search request failed";
+    searchObj.data.errorMsg = e?.message || t("traces.index.searchRequestFailed");
     searchObj.data.errorDetail = "";
   }
 }
