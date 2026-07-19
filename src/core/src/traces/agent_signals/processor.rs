@@ -55,15 +55,18 @@ pub async fn process_agent_signals_stream(
             .map(|s| s.field_with_name(name).is_ok())
             .unwrap_or(false)
     };
-    let has_failure_cols = has_field("error_message") || has_field("error_type");
+    // Failure classification reads whichever error-detail columns the operator
+    // configured (config-driven, not hardcoded). Run the pass if ANY of them exist.
+    let detail_fields = get_o2_config().agent_signals.error_detail_fields_list();
+    let has_failure_cols = detail_fields.iter().any(|f| has_field(f));
     let has_tool = has_field("gen_ai_tool_name");
     let has_cost = has_field("gen_ai_usage_cost");
 
     let mut records = Vec::new();
 
-    // R1 failure taxonomy — needs error_message/error_type.
+    // R1 failure taxonomy — classify from the configured error-detail columns.
     if has_failure_cols {
-        let sql = build_failure_sql(stream_name, start_time, end_time);
+        let sql = build_failure_sql(stream_name, start_time, end_time, &detail_fields);
         match crate::service::traces::service_graph::run_graph_search(
             org_id, sql, start_time, end_time,
         )
