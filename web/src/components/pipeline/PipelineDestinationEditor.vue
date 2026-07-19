@@ -15,15 +15,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="p-0"
+  <PageLayout
+    :back="{
+      label: t('pipeline_destinations.header'),
+      onClick: () => emit('cancel'),
+    }"
+    bleed
   >
-    <AppPageHeader
-      :back="{
-        label: t('pipeline_destinations.header'),
-        onClick: () => emit('cancel'),
-      }"
-      class="border-b border-border-default"
-    >
       <template #title>
         <span data-test="pipeline-destination-editor-title">
           <template v-if="destination"
@@ -33,7 +31,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template v-else>{{ t("alert_destinations.addTitle") }}</template>
         </span>
       </template>
-    </AppPageHeader>
 
     <div class="rounded-default py-2 px-3 overflow-auto">
       <div class="w-full">
@@ -45,14 +42,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
     </div>
-  </div>
+  </PageLayout>
 </template>
 
 <script lang="ts" setup>
 import { defineProps, defineEmits } from "vue";
 import { useI18n } from "vue-i18n";
 import CreateDestinationForm from "./NodeForm/CreateDestinationForm.vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import PageLayout from "@/components/common/PageLayout.vue";
 
 const { t } = useI18n();
 
