@@ -12,7 +12,7 @@
          the page header instead of each panel supplying its own gutter — that's
          how this drifted to four different values. `searchClass` remains as an
          escape hatch for a panel that genuinely needs to differ. -->
-    <div v-if="showSearch" class="shrink-0 py-1.5 px-page-edge" :class="searchClass">
+    <div v-if="showSearch" class="shrink-0 py-1.5 px-1.5" :class="searchClass">
       <OInput
         :model-value="searchModel"
         data-test="o-field-list-search"
@@ -53,7 +53,7 @@
         <!-- Group header -->
         <div
           v-if="row.isGroup"
-          class="o-field-list__group-header h-7 px-page-edge flex items-center justify-between text-2xs font-semibold text-field-list-group-text cursor-default select-none tracking-[0.01em] sticky top-0 z-[2] bg-transparent"
+          class="o-field-list__group-header h-7 px-1.5 flex items-center justify-between text-2xs font-semibold text-field-list-group-text cursor-default select-none tracking-[0.01em] sticky top-0 z-[2] bg-transparent"
           :data-test="`o-field-list-group-${row.groupName}`"
         >
           <slot name="group-header" :row="row" :group-name="row.groupName">
@@ -66,7 +66,7 @@
         <!-- Field row -->
         <div
           v-else
-          class="o-field-list__row group mt-1 flex items-center w-full min-h-6 p-0 relative cursor-pointer rounded-default text-xs leading-[0.8rem]"
+          class="o-field-list__row group mt-1 flex items-center w-full min-h-6 px-1.5 relative cursor-pointer rounded-default text-xs leading-[0.8rem]"
           :class="{ 'o-field-list__row--draggable': draggable }"
           :data-test="`o-field-list-row-${row.name}`"
           :draggable="draggable && isDragEnabled(row, row._index ?? 0)"

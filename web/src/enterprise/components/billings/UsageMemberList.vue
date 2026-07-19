@@ -69,7 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
 
-      <div class="members-tabs flex-1 overflow-y-auto">
+      <div class="members-tabs flex-1 overflow-y-auto px-1.5">
         <OTabs
           orientation="vertical"
           v-model="activeMember"

@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="bg-surface-panel h-full flex flex-col pb-1 border-r border-border-default">
       <div class="folder-header bg-transparent">
-        <div class="font-semibold text-sm text-text-heading px-page-edge py-2 flex items-center justify-between gap-2">
+        <div class="font-semibold text-sm text-text-heading px-1.5 py-2 flex items-center justify-between gap-2">
           {{ t('dashboard.folders') }}
           <div>
             <OButton
@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
         <!-- Search Input -->
-        <div class="px-page-edge pb-2">
+        <div class="px-1.5 pb-2">
           <OSearchInput
             v-model="searchQuery"
             data-test="folder-search"
@@ -44,7 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
       </div>
-      <div class="folders-tabs flex-1 overflow-y-auto">
+      <div class="folders-tabs flex-1 overflow-y-auto px-1.5">
         <OTabs
           orientation="vertical"
           dense

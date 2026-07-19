@@ -28,21 +28,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div
       v-if="title"
-      class="shrink-0 px-page-edge pt-3 pb-1 text-sm font-semibold text-text-heading truncate"
+      class="shrink-0 px-1.5 pt-3 pb-1 text-sm font-semibold text-text-heading truncate"
     >
       {{ title }}
     </div>
 
-    <div class="flex-1 overflow-y-auto pt-1 pb-3">
+    <div class="flex-1 overflow-y-auto px-1.5 pt-1 pb-3">
       <OTabs
         :model-value="activeKey ?? ''"
         orientation="vertical"
         class="w-full section-rail-tabs"
         @change="onTabChange"
       >
-        <template v-for="group in visibleGroups" :key="group.label">
+        <template v-for="(group, idx) in visibleGroups" :key="group.label">
+          <!-- Section label. Each group after the first gets top spacing so the
+               sub-sections read as separate blocks rather than one merged list. -->
           <div
-            class="px-page-edge py-1 text-xs font-semibold text-text-secondary"
+            class="py-1 text-xs font-semibold text-text-secondary"
+            :class="{ 'mt-3': idx > 0 }"
           >
             {{ group.label }}
           </div>
