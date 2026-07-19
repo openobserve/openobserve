@@ -24,6 +24,7 @@ use crate::{
 
 pub mod action_scripts;
 pub mod alert_incidents;
+pub mod alert_snapshots;
 pub mod alerts;
 pub mod anomaly_detection;
 pub mod backfill_jobs;

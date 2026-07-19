@@ -6,6 +6,8 @@ pub mod action_scripts;
 pub mod alert_dedup_state;
 pub mod alert_incident_alerts;
 pub mod alert_incidents;
+pub mod alert_snapshot_files;
+pub mod alert_snapshots;
 pub mod alerts;
 pub mod anomaly_detection_config;
 pub mod anomaly_detection_models;

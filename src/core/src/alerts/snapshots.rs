@@ -13,10 +13,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::future::Future;
+#![allow(dead_code)]
+
+use std::{collections::BTreeMap, future::Future, str::FromStr};
 
 use anyhow::{Result, anyhow, bail};
 use config::meta::stream::{FileKey, PartitionTimeLevel, StreamType};
+use infra::table::alert_snapshots as snapshot_table;
 use serde::{Deserialize, Serialize};
 use svix_ksuid::Ksuid;
 
@@ -67,6 +70,12 @@ pub(crate) struct AlertSnapshotManifest {
     pub(crate) created_at: i64,
     pub(crate) schema_version: i16,
     pub(crate) streams: Vec<AlertSnapshotStream>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub(crate) struct PersistedAlertSnapshotManifest {
+    pub(crate) snapshot_id: Ksuid,
+    pub(crate) manifest: AlertSnapshotManifest,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -130,6 +139,43 @@ pub(crate) async fn build_scheduled_snapshot_manifest_from_file_list(
         },
     )
     .await
+}
+
+pub(crate) async fn create_snapshot_manifest(
+    manifest: AlertSnapshotManifest,
+) -> Result<PersistedAlertSnapshotManifest> {
+    let record = snapshot_table::create_snapshot_manifest(to_persistence_manifest(manifest))
+        .await
+        .map_err(|e| anyhow!("alert snapshot manifest persistence failed: {e}"))?;
+    from_persistence_record(record)
+}
+
+pub(crate) async fn get_snapshot_manifest(
+    org_id: &str,
+    snapshot_id: Ksuid,
+) -> Result<Option<PersistedAlertSnapshotManifest>> {
+    let record = snapshot_table::get_snapshot_manifest(org_id, &snapshot_id.to_string())
+        .await
+        .map_err(|e| anyhow!("alert snapshot manifest lookup failed: {e}"))?;
+    record.map(from_persistence_record).transpose()
+}
+
+pub(crate) async fn find_snapshot_by_occurrence(
+    org_id: &str,
+    alert_id: Ksuid,
+    window_start: i64,
+    window_end: i64,
+) -> Result<Option<PersistedAlertSnapshotManifest>> {
+    validate_window(window_start, window_end)?;
+    let record = snapshot_table::find_snapshot_by_occurrence(
+        org_id,
+        &alert_id.to_string(),
+        window_start,
+        window_end,
+    )
+    .await
+    .map_err(|e| anyhow!("alert snapshot occurrence lookup failed: {e}"))?;
+    record.map(from_persistence_record).transpose()
 }
 
 pub(crate) fn build_scheduled_snapshot_manifest(
@@ -226,6 +272,95 @@ impl From<FileKey> for AlertSnapshotFileRef {
     }
 }
 
+fn to_persistence_manifest(
+    manifest: AlertSnapshotManifest,
+) -> snapshot_table::NewAlertSnapshotManifest {
+    let files = manifest
+        .streams
+        .iter()
+        .flat_map(|stream| {
+            stream
+                .files
+                .iter()
+                .map(|file| snapshot_table::NewAlertSnapshotFile {
+                    stream_type: stream.stream_type.to_string(),
+                    stream_name: stream.stream_name.clone(),
+                    file_id: file.file_id,
+                    file_key: file.file_key.clone(),
+                    min_ts: file.min_ts,
+                    max_ts: file.max_ts,
+                })
+        })
+        .collect();
+
+    snapshot_table::NewAlertSnapshotManifest {
+        org_id: manifest.org_id,
+        alert_id: manifest.alert_id.to_string(),
+        alert_name: manifest.alert_name,
+        trigger_timestamp: manifest.trigger_timestamp,
+        window_start: manifest.window_start,
+        window_end: manifest.window_end,
+        created_at: manifest.created_at,
+        schema_version: manifest.schema_version,
+        files,
+    }
+}
+
+fn from_persistence_record(
+    record: snapshot_table::AlertSnapshotManifestRecord,
+) -> Result<PersistedAlertSnapshotManifest> {
+    let snapshot_id = Ksuid::from_str(&record.snapshot.snapshot_id)
+        .map_err(|e| anyhow!("invalid alert snapshot_id in database: {e}"))?;
+    let alert_id = Ksuid::from_str(&record.snapshot.alert_id)
+        .map_err(|e| anyhow!("invalid alert_id in alert snapshot database row: {e}"))?;
+    let mut streams = BTreeMap::<(String, String), Vec<AlertSnapshotFileRef>>::new();
+    for file in record.files {
+        streams
+            .entry((file.stream_type, file.stream_name))
+            .or_default()
+            .push(AlertSnapshotFileRef {
+                file_id: file.file_id,
+                file_key: file.file_key,
+                min_ts: file.min_ts,
+                max_ts: file.max_ts,
+            });
+    }
+
+    let streams = streams
+        .into_iter()
+        .map(|((stream_type, stream_name), files)| {
+            Ok(AlertSnapshotStream {
+                stream_type: parse_persisted_stream_type(&stream_type)?,
+                stream_name,
+                files,
+            })
+        })
+        .collect::<Result<Vec<_>>>()?;
+
+    Ok(PersistedAlertSnapshotManifest {
+        snapshot_id,
+        manifest: AlertSnapshotManifest {
+            org_id: record.snapshot.org_id,
+            alert_id,
+            alert_name: record.snapshot.alert_name,
+            trigger_timestamp: record.snapshot.trigger_timestamp,
+            window_start: record.snapshot.window_start,
+            window_end: record.snapshot.window_end,
+            created_at: record.snapshot.created_at,
+            schema_version: record.snapshot.schema_version,
+            streams,
+        },
+    })
+}
+
+fn parse_persisted_stream_type(value: &str) -> Result<StreamType> {
+    let stream_type = StreamType::from(value);
+    if stream_type.to_string() != value {
+        bail!("invalid stream_type in alert snapshot database row: {value}");
+    }
+    Ok(stream_type)
+}
+
 fn validate_window(window_start: i64, window_end: i64) -> Result<()> {
     if window_start > window_end {
         bail!("invalid alert snapshot window: window_start must be <= window_end");
@@ -318,6 +453,7 @@ fn stable_component(label: &str, value: &str) -> String {
 #[cfg(test)]
 mod tests {
     use config::meta::stream::{FileMeta, StreamType};
+    use infra::table::entity::{alert_snapshot_files, alert_snapshots};
     use svix_ksuid::{Ksuid, KsuidLike};
 
     use super::*;
@@ -916,5 +1052,65 @@ mod tests {
         assert_eq!(manifest.streams[0].stream_type, StreamType::Logs);
         assert_eq!(manifest.streams[0].stream_name, "app");
         assert_eq!(manifest.streams[0].files.len(), 1);
+    }
+
+    #[test]
+    fn persisted_record_reconstructs_multiple_streams_deterministically() {
+        let snapshot_id = Ksuid::new(None, None);
+        let alert_id = Ksuid::new(None, None);
+        let persisted = from_persistence_record(snapshot_table::AlertSnapshotManifestRecord {
+            snapshot: alert_snapshots::Model {
+                snapshot_id: snapshot_id.to_string(),
+                org_id: "org1".to_string(),
+                alert_id: alert_id.to_string(),
+                alert_name: Some("cpu_high".to_string()),
+                trigger_timestamp: 30,
+                window_start: 10,
+                window_end: 20,
+                created_at: 31,
+                schema_version: ALERT_SNAPSHOT_SCHEMA_VERSION,
+            },
+            files: vec![
+                alert_snapshot_files::Model {
+                    snapshot_id: snapshot_id.to_string(),
+                    file_key: "files/org1/metrics/cpu/a.parquet".to_string(),
+                    stream_type: "metrics".to_string(),
+                    stream_name: "cpu".to_string(),
+                    file_id: Some(2),
+                    min_ts: 10,
+                    max_ts: 20,
+                },
+                alert_snapshot_files::Model {
+                    snapshot_id: snapshot_id.to_string(),
+                    file_key: "files/org1/logs/app/a.parquet".to_string(),
+                    stream_type: "logs".to_string(),
+                    stream_name: "app".to_string(),
+                    file_id: Some(1),
+                    min_ts: 10,
+                    max_ts: 20,
+                },
+            ],
+        })
+        .unwrap();
+
+        assert_eq!(persisted.snapshot_id, snapshot_id);
+        assert_eq!(persisted.manifest.alert_id, alert_id);
+        assert_eq!(
+            persisted
+                .manifest
+                .streams
+                .iter()
+                .map(|stream| (stream.stream_type, stream.stream_name.as_str()))
+                .collect::<Vec<_>>(),
+            vec![(StreamType::Logs, "app"), (StreamType::Metrics, "cpu")]
+        );
+        assert_eq!(
+            persisted.manifest.streams[0].files[0].file_key,
+            "files/org1/logs/app/a.parquet"
+        );
+        assert_eq!(
+            persisted.manifest.streams[1].files[0].file_key,
+            "files/org1/metrics/cpu/a.parquet"
+        );
     }
 }
