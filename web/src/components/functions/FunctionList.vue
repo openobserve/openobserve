@@ -21,16 +21,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="function-list-page"
     class="flex flex-col h-full min-h-0"
   >
-    <div v-if="!showAddJSTransformDialog" class="flex flex-col h-full min-h-0">
-      <!-- Standard section header: title + actions only. Search lives in the toolbar. -->
-      <AppPageHeader
-        :title="t('function.header')"
-        icon="function"
-        :subtitle="t('function.subtitle')"
-        tabs-below
-        class="shrink-0"
-      >
-        <template #tabs>
+    <PageLayout
+      v-if="!showAddJSTransformDialog"
+      :title="t('function.header')"
+      icon="function"
+      :subtitle="t('function.subtitle')"
+      tabs-below
+      bleed
+    >
+        <template #header-tabs>
           <PipelineSectionTabs />
         </template>
         <template #actions>
@@ -43,7 +42,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t(`function.add`) }}
           </OButton>
         </template>
-      </AppPageHeader>
       <div class="w-full flex-1 min-h-0 overflow-hidden">
         <div class="h-full">
           <OTable
@@ -148,7 +146,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OTable>
           </div>
         </div>
-    </div>
+    </PageLayout>
     <div v-else class="flex-1 min-h-0">
       <AddFunction
         v-model="formData"
@@ -231,7 +229,7 @@ import searchState from "@/composables/useLogs/searchState";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import PageLayout from "@/components/common/PageLayout.vue";
 import PipelineSectionTabs from "@/components/pipeline/PipelineSectionTabs.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
@@ -243,7 +241,7 @@ export default defineComponent({
   name: "functionList",
   components: {
     OEmptyState,
-    AppPageHeader,
+    PageLayout,
     PipelineSectionTabs,
     OTable,
     AddFunction: defineAsyncComponent(() => import("./AddFunction.vue")),

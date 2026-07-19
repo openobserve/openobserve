@@ -21,17 +21,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="enrichment-tables-list-page"
     class="flex flex-col h-full min-h-0"
   >
-    <div v-if="!showAddJSTransformDialog" class="flex flex-col h-full min-h-0">
-      <!-- Standard section header: title + actions only; type filter + search
-           live in the table toolbar below. -->
-      <AppPageHeader
-        :title="t('function.enrichmentTables')"
-        icon="dataset"
-        :subtitle="t('function.enrichmentTablesSubtitle')"
-        tabs-below
-        class="shrink-0"
-      >
-        <template #tabs>
+    <PageLayout
+      v-if="!showAddJSTransformDialog"
+      :title="t('function.enrichmentTables')"
+      icon="dataset"
+      :subtitle="t('function.enrichmentTablesSubtitle')"
+      tabs-below
+      bleed
+    >
+        <template #header-tabs>
           <PipelineSectionTabs />
         </template>
         <template #actions>
@@ -44,7 +42,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t(`function.addEnrichmentTable`) }}
           </OButton>
         </template>
-      </AppPageHeader>
       <div class="w-full flex-1 min-h-0 overflow-hidden">
         <div class="bg-card-glass-bg h-full">
             <OTable
@@ -287,7 +284,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OTable>
           </div>
         </div>
-    </div>
+    </PageLayout>
     <div v-else>
       <add-enrichment-table
         v-model="formData"
@@ -386,7 +383,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import PageLayout from "@/components/common/PageLayout.vue";
 import PipelineSectionTabs from "@/components/pipeline/PipelineSectionTabs.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
@@ -401,7 +398,7 @@ import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
 export default defineComponent({
   name: "EnrichmentTableList",
   components: {
-    AppPageHeader,
+    PageLayout,
     PipelineSectionTabs,
     AddEnrichmentTable,
     OEmptyState,
