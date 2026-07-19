@@ -396,17 +396,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
         </div>
 
-        <div v-else-if="!grid.cards.value.length" class="flex flex-col items-center justify-center gap-2.5 h-3/5 opacity-80">
-          <OIcon name="show-chart" size="lg" />
-          <span>{{ t("metrics.explorer.noMetrics") }}</span>
-          <a
-            class="text-primary underline"
-            href="https://openobserve.ai/docs/user-guide/metrics/"
-            target="_blank"
-            rel="noopener"
-            >{{ t("metrics.explorer.learnIngest") }}</a
-          >
-        </div>
+        <OEmptyState
+          v-else-if="!grid.cards.value.length"
+          size="hero"
+          illustration="wave-bars"
+          variant="create"
+          :title="t('metrics.explorer.noMetrics')"
+          :action-label="t('metrics.explorer.learnIngest')"
+          action-icon="cloud-upload"
+          data-test="metrics-explorer-no-metrics"
+          @action="openMetricsDocs"
+        />
 
         <!-- FAVOURITES with none added yet — the reason is not "filters hid
              everything", so show the right guidance (add one in Explore) and NO
@@ -981,6 +981,16 @@ export default defineComponent({
         default:
           onClearAllFilters();
       }
+    };
+
+    // First-run empty state (org has no metrics): the single CTA opens the
+    // metrics-ingestion docs in a new tab.
+    const openMetricsDocs = () => {
+      window.open(
+        "https://openobserve.ai/docs/user-guide/metrics/",
+        "_blank",
+        "noopener",
+      );
     };
 
     // The type facet uses OCheckboxGroup, which speaks arrays; selectedTypes is a
@@ -1659,6 +1669,7 @@ export default defineComponent({
       noMatchDescription,
       noMatchActions,
       onEmptyStateAction,
+      openMetricsDocs,
       showMoreLabel,
       badgeLabels: BADGE_LABELS,
       queriesFor,
