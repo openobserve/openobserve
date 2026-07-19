@@ -7,13 +7,13 @@
     <!-- Shared page header (same as JobFormPage) so the two eval forms read
          identically: Back pill in the module-icon slot, title, and the
          scorer-type badge + close button in #actions. -->
-    <AppPageHeader
+    <PageLayout
       :back="{
         label: t('onlineEvals.scorer.backTo'),
         onClick: () => $emit('cancel'),
         dataTest: 'scorer-form-back-btn',
       }"
-      class="border-b border-border-default shrink-0"
+      bleed
     >
       <template #title>
         <span data-test="scorer-form-title">{{ titleText }}</span>
@@ -38,7 +38,6 @@
           @click="$emit('cancel')"
         />
       </template>
-    </AppPageHeader>
 
     <div class="flex-1 min-h-0 overflow-hidden grid grid-cols-[minmax(0,1.6fr)_minmax(320px,0.9fr)] max-[1100px]:grid-cols-1 gap-2.5">
       <div class="scorer-form__main min-w-0 overflow-auto p-[18px_24px_24px] bg-surface-base rounded-default border border-border-default">
@@ -670,6 +669,7 @@
         </div>
       </template>
     </ODialog>
+    </PageLayout>
   </OForm>
 </template>
 
@@ -685,7 +685,7 @@ import OFormTextarea from "@/lib/forms/Input/OFormTextarea.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OFormCheckbox from "@/lib/forms/Checkbox/OFormCheckbox.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import PageLayout from "@/components/common/PageLayout.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import onlineEvalsService, {

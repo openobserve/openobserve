@@ -4,13 +4,13 @@
     :form="form"
     v-slot="{ isSubmitting }"
   >
-    <AppPageHeader
+    <PageLayout
       :back="{
         label: t('onlineEvals.job.backTo'),
         onClick: () => $emit('cancel'),
         dataTest: 'job-form-back-btn',
       }"
-      class="border-b border-border-default shrink-0"
+      bleed
     >
       <template #title>
         <span data-test="job-form-title">
@@ -29,7 +29,6 @@
           @click="$emit('cancel')"
         />
       </template>
-    </AppPageHeader>
 
     <div class="job-form__body flex-1 min-h-0 overflow-hidden flex gap-2 max-[68.75rem]:flex-col">
       <div class="job-form__main flex-[6.5] min-w-0 min-h-0 overflow-auto flex flex-col gap-2 p-2 max-[68.75rem]:flex-auto">
@@ -210,6 +209,7 @@
         {{ t("onlineEvals.buttons.save") }}
       </OButton>
     </footer>
+    </PageLayout>
   </OForm>
 </template>
 
@@ -223,7 +223,7 @@ import { useOForm } from "@/lib/forms/Form/useOForm";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormTextarea from "@/lib/forms/Input/OFormTextarea.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import PageLayout from "@/components/common/PageLayout.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import useStreams from "@/composables/useStreams";
 import onlineEvalsService, {

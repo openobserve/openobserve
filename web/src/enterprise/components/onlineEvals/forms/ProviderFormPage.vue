@@ -4,14 +4,14 @@
     :form="form"
     v-slot="{ isSubmitting }"
   >
-    <AppPageHeader
+    <PageLayout
       :subtitle="t('onlineEvals.provider.subtitle')"
       :back="{
         label: t('onlineEvals.provider.backTo'),
         onClick: () => $emit('cancel'),
         dataTest: 'provider-form-back-btn',
       }"
-      class="border-b border-border-default shrink-0"
+      bleed
     >
       <template #title>
         <span data-test="provider-form-title">
@@ -30,7 +30,6 @@
           @click="$emit('cancel')"
         />
       </template>
-    </AppPageHeader>
 
     <div class="flex-1 min-h-0 overflow-auto px-6 py-4.5 [&_textarea]:max-h-55 [&_textarea]:overflow-y-auto [&_textarea]:font-mono">
       <section class="mb-6">
@@ -161,6 +160,7 @@
         {{ mode === "create" ? t("onlineEvals.buttons.create") : t("onlineEvals.buttons.save") }}
       </OButton>
     </footer>
+    </PageLayout>
   </OForm>
 </template>
 
@@ -173,7 +173,7 @@ import OForm from "@/lib/forms/Form/OForm.vue";
 import { useOForm } from "@/lib/forms/Form/useOForm";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import PageLayout from "@/components/common/PageLayout.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import onlineEvalsService, { type Provider } from "@/services/online-evals.service";
 import {
