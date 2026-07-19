@@ -16,11 +16,9 @@
 /**
  * The explorer's rule set, applied to a *panel editor* query slot.
  *
- * Picking a metrics stream in the Add Panel page used to seed the bare selector
- * `metric{}` — a raw cumulative counter, which is almost never what anyone wants
- * to look at. The explorer already knows the right default function, unit and
- * chart type for every metric (§6–§7 of the PRD); this hands the same answer to
- * the panel editor, so a metric charts sensibly wherever you pick it.
+ * The explorer knows the right default function, unit and chart type for every
+ * metric; this hands the same answer to the panel editor, so a metric charts
+ * sensibly wherever you pick it.
  *
  * Pure: takes the streams list it is given and returns a description of what to
  * write. The call sites do the writing, because two of them must also update the
@@ -85,7 +83,7 @@ export const DEFAULT_NEW_PANEL_TYPE = "bar";
 export const isUntouchedPanelType = (type: string | undefined): boolean =>
   type === DEFAULT_NEW_PANEL_TYPE;
 
-/** What the editor seeded before this module existed. */
+/** The bare `metric{}` selector — the fallback seed. */
 const bareSeed = (metricName: string): PromqlSeed => ({
   query: `${metricName}{}`,
   customQuery: false,
@@ -267,12 +265,6 @@ export function isAutoSeededQuery(
  * both. The moment the user picks a chart type of their own, the query we seeded
  * no longer matches the variant that type implies, this returns false, and their
  * choice is never overridden.
- *
- * This replaces a module-level memo of "the type we last seeded". That memo was
- * keyed on the panel-data object, which `useDashboardPanel` holds as a SINGLETON
- * per page key and merely `Object.assign`s on reset — so it leaked across every
- * panel edited in the session and could override the saved chart type of a panel
- * it had never seeded. The panel already tells us what we need; no global state.
  */
 export function seedOwnsChartType(
   query: string | undefined | null,

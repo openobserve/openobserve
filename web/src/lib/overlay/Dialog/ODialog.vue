@@ -22,7 +22,7 @@ defineOptions({ inheritAttrs: false });
 const $attrs = useAttrs();
 // Forward the consumer's `data-test` from <ODialog data-test="…"> onto the
 // rendered panel so e2e selectors can scope to the specific dialog instance
-// using the audit pattern: [data-test="<parent>"] [data-test="o-dialog-*-btn"].
+// using the pattern: [data-test="<parent>"] [data-test="o-dialog-*-btn"].
 // (DialogRoot is renderless, so default attribute inheritance would lose it.)
 const parentDataTest = computed(() => $attrs["data-test"] as string | undefined);
 

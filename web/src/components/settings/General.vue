@@ -617,8 +617,6 @@ export default defineComponent({
     const { isDark } = useTheme();
     const router: any = useRouter();
 
-    // Schema-driven validation replaces the manual scrapeIntervalError /
-    // maxSeriesError refs + the imperative if-checks in onSubmit.
     // Built once from the component's `t` so the messages are localized.
     const generalSettingsSchema = makeGeneralSettingsSchema(t);
     // Dynamic defaults (edit-prefill from the store) → a typed computed.
@@ -673,8 +671,6 @@ export default defineComponent({
      * Priority: Vuex store tempThemeColors > organizationSettings > defaults
      */
     const updateFromStore = () => {
-      // (scrape_interval is now form-owned via :default-values — no ref to sync.)
-
       // Get theme colors from store with priority order
       // 1. Check Vuex store for temporary preview colors (highest priority)
       // 2. Check organization settings for backend defaults

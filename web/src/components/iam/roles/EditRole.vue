@@ -715,8 +715,8 @@ const modifyResourcePermissions = (resource: Resource) => {
 };
 
 const getResourcePermissions = () => {
-  // Single request returns the role's permissions across all resource types,
-  // replacing one request per resource. Backend returns a flat Permission[].
+  // Single request returns the role's permissions across all resource types.
+  // Backend returns a flat Permission[].
   return new Promise((resolve, reject) => {
     getAllRolePermissions({
       role_name: editingRole.value,

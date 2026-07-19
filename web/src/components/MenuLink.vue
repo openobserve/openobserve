@@ -122,7 +122,6 @@ export default defineComponent({
       default: false,
     },
 
-    // Phase 4: Badge support
     badge: {
       type: Number,
       default: 0,
@@ -196,7 +195,7 @@ export default defineComponent({
         : "font-semibold text-primary-600!",
     );
 
-    // Phase 5: Accessibility - compute ARIA label with fallback
+    // Compute ARIA label with fallback
     const ariaLabel = computed(() => {
       let label = props.title || "Navigation link";
       if (props.badge && props.badge > 0) {

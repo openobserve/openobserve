@@ -360,11 +360,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :done="step > 4"
                   class="mt-3"
                 >
-                  <!-- Env vars are a dynamic key/value array (DEFERRED per the
-                       migration brief): they carry no validation today and the
-                       form-array pattern is not yet live, so these stay bare
-                       OInput bound to the component-owned `environmentalVariables`
-                       and are NOT part of the form schema. -->
+                  <!-- Env vars are a dynamic key/value array bound to the
+                       component-owned `environmentalVariables`, not part of the
+                       form schema (no validation today). -->
                   <div
                     v-for="(header, index) in environmentalVariables"
                     :key="header.uuid"

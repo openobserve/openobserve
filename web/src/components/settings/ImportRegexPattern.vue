@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          BaseImport's built-in header is hidden (hide-header) so this single header
          serves all three tabs. The title preserves the existing per-tab text: the
          Built-in Patterns tab keeps t('regex_patterns.import_title') ("Import
-         Pattern") and the File / URL tabs keep "Import Regex Pattern" â€” no header
+         Pattern") and the File / URL tabs keep "Import Regex Pattern" — no header
          text is changed by this migration. -->
     <AppPageHeader
       :title="headerTitle"

@@ -55,10 +55,9 @@
     <div v-show="activeTab === 'unflattened'" class="pl-3">
       <OSpinner size="md" />
       <div v-if="!loading">
-        <!-- Editor sizing is inlined here because it was originally scoped to this
-             component via <style scoped>; keeping it inline prevents it from
-             leaking onto every .monaco-editor app-wide. (The focus-border is left
-             off so this editor stays borderless like the others.) -->
+        <!-- Editor sizing is inlined (not scoped CSS) so it doesn't leak onto
+             every .monaco-editor app-wide. The focus-border is left off so this
+             editor stays borderless like the others. -->
         <code-query-editor
           v-model:query="unflattendData"
           ref="queryEditorRef"
@@ -621,9 +620,6 @@ export default {
       //because when user clicks on the log content with right click, the context menu is shown and when user clicks outside the log content, the context menu is closed
       const handleOutsideClick = (e: MouseEvent) => {
         // Guard on the menu itself: its items close it via their own handlers.
-        // This used to test `.closest(".q-btn")` — post-Quasar that is always
-        // null, so the menu was being closed by *every* click, including clicks
-        // on its own items.
         if (!(e.target as HTMLElement).closest(".context-menu")) {
           showMenu.value = false;
         }

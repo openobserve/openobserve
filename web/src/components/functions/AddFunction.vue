@@ -290,15 +290,13 @@ export default defineComponent({
 
     const beingUpdated = computed(() => props.isUpdated);
 
-    // OWNER pattern (Rule ③): AddFunction OWNS the <OForm>, but it also needs to
-    // READ form state (transType drives the Monaco editor language + placeholder)
-    // and WRITE it (the editor's language toggle). The owner cannot inject the
-    // form it renders, so it CREATES the form here with useOForm, reads it
-    // reactively with form.useStore (the ONE source of truth — NO mirror, NO
-    // copy), and hands it to <OForm :form="addFunctionForm">. Defaults are seeded
-    // from modelValue (edit-prefill); the VRL/JS body + `params` stay in
-    // `formData` (the bare Monaco editor lives OUTSIDE the form and is merged in
-    // at @submit).
+    // AddFunction OWNS the <OForm> but also reads form state (transType drives
+    // the Monaco editor language + placeholder) and writes it (the editor's
+    // language toggle). The owner cannot inject the form it renders, so it
+    // creates the form here with useOForm, reads it reactively via form.useStore,
+    // and hands it to <OForm :form="addFunctionForm">. Defaults are seeded from
+    // modelValue (edit-prefill); the VRL/JS body + `params` stay in `formData`
+    // (the bare Monaco editor lives outside the form and is merged in at @submit).
     const addFunctionForm = useOForm<AddFunctionForm>({
       defaultValues: {
         name: props.modelValue?.name ?? "",
@@ -527,8 +525,8 @@ export default defineComponent({
 
     // Unified Query Editor: Handle language change
     const handleLanguageChange = (newLanguage: 'vrl' | 'javascript') => {
-      // transType is form-owned — write it straight to the ONE form; the
-      // useStore reads above make the editor + tooltip react (no mirror).
+      // transType is form-owned — write it straight to the form; the useStore
+      // reads above make the editor + tooltip react.
       const tt = newLanguage === 'javascript' ? '1' : '0';
       addFunctionForm.setFieldValue('transType', tt);
     };

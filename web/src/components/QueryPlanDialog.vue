@@ -227,7 +227,7 @@ export default defineComponent({
     const activeTab = ref("logical");
     const isAnalyzing = ref(false);
     const showAnalyzeResults = ref(false);
-    const splitterPosition = ref(50); // Split at 50%
+    const splitterPosition = ref(50);
 
     let { searchObj } = searchState();
 
@@ -236,7 +236,6 @@ export default defineComponent({
       set: (val) => emit("update:modelValue", val),
     });
 
-    // Get SQL query from searchObj
     const sqlQuery = computed(() => {
       return props.searchObj?.data?.query || "";
     });

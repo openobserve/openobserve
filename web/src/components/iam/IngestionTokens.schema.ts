@@ -1,11 +1,7 @@
 // Copyright 2026 OpenObserve Inc.
 //
 // Validation schema for the "Create Token" dialog in IngestionTokens.vue. Built
-// via a factory so the required message stays i18n-driven (pass useI18n's `t`).
-//
-// Before migration the name was "required" only via a disabled-Save gate
-// (`:primary-button-disabled="!newTokenName.trim()"`) plus a `maxlength=256` on
-// the input — there was no field-level validation rule. This encodes that intent into Zod:
+// via a factory so the required message stays i18n-driven (pass useI18n's `t`):
 // name is required + max 256; description is optional.
 
 import { z } from "zod";

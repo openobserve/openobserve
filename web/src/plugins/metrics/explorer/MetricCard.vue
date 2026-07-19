@@ -34,24 +34,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          text stays selectable. Still fully keyboard reachable: the action bar
          reveals on `focus-within`, so tabbing lands on Refresh / Configure /
          Pin / Open. -->
-    <!-- EXACTLY the dashboard panel bar's box (PanelContainer's
+    <!-- Matches the dashboard panel bar's box (PanelContainer's
          dashboard-panel-bar): same min-height, padding and bottom border, no
-         tint — measured side by side, a card header and a panel header are now
-         indistinguishable.
-
-         Identical in both views: rows view is grid view with a single, wider
-         column, not a different card. -->
+         tint. Identical in both views: rows view is grid view with a single,
+         wider column, not a different card. -->
     <div
       class="relative flex items-center gap-2 min-w-0 min-h-7 py-1 px-2 border-b border-border-default"
     >
       <!-- The name gets the full header width; the type badge sits in the
            footer, where it cannot truncate the name it describes. -->
       <div class="flex items-center gap-1.5 min-w-0">
-        <!-- EXACTLY the dashboard panel title's classes (PanelContainer's
+        <!-- Matches the dashboard panel title's classes (PanelContainer's
              dashboard-panel-header): same size, weight, tracking and token, so
-             a card's title and the panel it becomes read identically. Mono
-             semibold looked like a different COLOR at this size — denser
-             glyphs, same grey-900. -->
+             a card's title and the panel it becomes read identically. -->
         <span
           class="whitespace-nowrap overflow-hidden text-ellipsis text-compact font-medium text-text-heading tracking-[0.02em]"
           :title="card.name"
@@ -97,10 +92,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OTooltip>
         </OButton>
 
-        <!-- Configure — visible icon button (only when the card is configurable).
-             Was in a ⋮ menu; promoted out because the menu was down to a single
-             item once refresh became a first-class button and help became an
-             info tooltip. -->
+        <!-- Configure — visible icon button (only when the card is configurable). -->
         <OButton
           v-if="card.configurable"
           variant="ghost"
@@ -115,10 +107,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTooltip :content="t('metrics.explorer.card.configureTooltip')" />
         </OButton>
 
-        <!-- The drill-in. Deliberately the ONLY thing that navigates; the chart
-             and card are not click targets, so the metric name stays selectable.
-             Kept as a discrete tinted icon (not buried in ⋮) — it is the primary
-             action on the card.
+        <!-- The drill-in. The ONLY thing that navigates; the chart and card are
+             not click targets, so the metric name stays selectable. It is the
+             primary action on the card.
 
              `edit`, not `open-in-new`: this opens the metric in the in-page
              Visualize workspace to CHANGE it (query, chart type, functions), and
@@ -135,8 +126,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTooltip :content="t('metrics.explorer.card.openTooltip')" />
         </OButton>
 
-        <!-- Pin (star). Always visible — this is the affordance users could not
-             find when it was hover-gated. -->
+        <!-- Pin (star). Always visible. -->
         <OButton
           variant="ghost"
           size="icon"
@@ -230,9 +220,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Understood, but the chosen variant is not something a card can draw —
            an info metric's label table renders through a component the card does
-           not use. Previously this was a silent no-preview, so the card sat on
-           the loading skeleton below forever and read as a chart that had failed
-           to load. The drill-in works: the editor renders the table properly. -->
+           not use. The drill-in works: the editor renders the table properly. -->
       <div
         v-else-if="preview?.status === 'unavailable'"
         class="flex flex-col items-center justify-center gap-1.5 h-full text-2xs opacity-65 text-text-secondary"
@@ -320,12 +308,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Has data, but `rate()` could not make a point out of it — fewer than two
            samples in its window. Deliberately NOT the "No data" tile: the metric
-           is populated, and saying otherwise is what used to hide it from the grid
-           entirely. The hint carries the actual remedy, which is the user's to
+           is populated. The hint carries the actual remedy, which is the user's to
            choose (a wider range, or a shorter scrape interval). -->
       <!-- The same inline OEmptyState a dashboard panel shows for no data
-           (PanelSchemaRenderer) — same component, same icon, same i18n key.
-           The old hatched grey band read as a different design language. -->
+           (PanelSchemaRenderer) — same component, same icon, same i18n key. -->
       <OEmptyState
         v-else-if="isSparse"
         size="inline"
@@ -358,9 +344,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
 
       <!-- The CONVERSION failed — the query succeeded, so the preview is
-           status "done" and none of the error branches above catch it. Without
-           this tile the emit fell on the floor and the card was a blank white
-           region with no message and no way out. -->
+           status "done" and none of the error branches above catch it. -->
       <div
         v-else-if="renderError"
         class="flex flex-col items-center justify-center gap-1.5 h-full text-2xs text-text-secondary"
@@ -604,14 +588,11 @@ export default defineComponent({
     "toggle-favorite",
     "visible",
     "hidden",
-    // "refresh", not "retry". Both the header button and the no-data card's
+    // `refresh`, not `retry`: both the header button and the no-data card's
     // retry button emit `refresh` (the parent listens for `@refresh` and calls
-    // `grid.refreshCard`) — "retry" was declared here and emitted nowhere, while
-    // the event the component actually fires went undeclared. Undeclared emits
-    // fall through to $attrs and get bound to the root ELEMENT as a DOM
-    // listener, which is how a component ends up with a handler that silently
-    // never fires the day someone renames the event to something a DOM element
-    // also emits.
+    // `grid.refreshCard`). Declare it here — an undeclared emit falls through to
+    // $attrs and binds to the root ELEMENT as a DOM listener, so a handler can
+    // silently never fire when the event name matches a DOM event.
     "refresh",
     // A drag-select on the card's chart, as `{start, end}` epoch ms. Forwarded
     // straight from MetricCardChart — the card takes no action of its own,
@@ -723,8 +704,7 @@ export default defineComponent({
      * asked for when they report the failure, so they go below the message
      * rather than into it. One preformatted string rather than a rich slot —
      * OTooltip renders its content in a portal that only mounts while open, so a
-     * slot's contents cannot be asserted in a test, and this must not regress
-     * quietly again.
+     * slot's contents cannot be asserted in a test.
      */
     const errorTooltip = computed(() => {
       const preview = props.preview;

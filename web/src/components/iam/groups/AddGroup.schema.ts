@@ -1,11 +1,8 @@
 // Copyright 2026 OpenObserve Inc.
 //
 // Validation schema for AddGroup.vue. Built via a factory so the required
-// message stays i18n-driven (pass useI18n's `t`).
-//
-// Restores the full pre-migration validation rule for `name`
-// (`!!v ? isValidGroupName : nameRequired`) per the truthy→Zod inversion: it is
-// BOTH required (min(1)) AND the alphanumeric/underscore regex — not regex-only.
+// message stays i18n-driven (pass useI18n's `t`). `name` is both required
+// (min(1)) and constrained to the alphanumeric/underscore regex.
 
 import { z } from "zod";
 

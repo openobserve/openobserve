@@ -837,7 +837,6 @@ const categoryUnhealthyCounts = computed<Record<TypeFilter, number>>(() => {
   return counts;
 });
 
-// Tailwind text-color class for a tab's worst status; empty when healthy.
 // CSS color (var reference) for a tab's worst-status badge fill; empty when
 // healthy. Used as the filled-circle background for the unhealthy count.
 function tabStatusColorVar(filter: TypeFilter): string {

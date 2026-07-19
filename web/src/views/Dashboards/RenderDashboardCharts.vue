@@ -483,8 +483,6 @@ export default defineComponent({
     // This makes RenderDashboardCharts self-contained and reusable
     const variablesManager = useVariablesManager();
 
-    // Removed committedVersion and getAllVariablesFlat - no longer needed after cleanup
-
     // Provide to child components (VariablesValueSelector, etc.)
     provide("variablesManager", variablesManager);
 
@@ -1778,9 +1776,9 @@ export default defineComponent({
     break-inside: avoid;
   }
 
-  /* Drop the previous `overflow: hidden` — it was clipping each panel to
-   * its grid-cell rectangle for the on-screen layout but, paired with
-   * print pagination, prevents browsers from honouring panel heights. */
+  /* Overflow must stay visible here: `hidden` clips each panel to its
+   * grid-cell rectangle which, paired with print pagination, prevents
+   * browsers from honouring panel heights. */
   .grid-stack-item-content {
     overflow: visible !important;
   }

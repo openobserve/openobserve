@@ -607,7 +607,7 @@ export default defineComponent({
     // Store dashboard data
     const dashboardData = ref<any>({ tabs: [] });
 
-    // ── OForm owner wiring (rule ②/③: the form is the SOLE source, no mirror) ──
+    // ── OForm owner wiring: the form is the SOLE source, no mirror ──
     // Every field is name=-owned inside <OForm>, but the v-if/v-for live in THIS
     // component's render scope (the owner), so it creates the form with useOForm
     // and reads it reactively with form.useStore — ONE source of truth, no copy.
@@ -655,13 +655,13 @@ export default defineComponent({
     const formRemove = (name: string, index: number) =>
       form.removeFieldValue(name, index);
 
-    // Reactive READS of the form values (rule ③: form.useStore, NOT a local copy).
+    // Reactive READS of the form values (form.useStore, NOT a local copy).
     const formValues = form.useStore((s: any) => s.values);
     const selectedTabs = form.useStore((s: any) => s.values?.selectedTabs ?? []);
     const selectedPanels = form.useStore(
       (s: any) => s.values?.selectedPanels ?? [],
     );
-    // Two-way FACADE over the form (rule ③: NO stored copy) — every existing
+    // Two-way FACADE over the form (no stored copy) — every existing
     // `variableData.x` read delegates to form.useStore and every top-level write
     // delegates to form.setFieldValue, so the form stays the single source of
     // truth. (Nested writes must use setFormField with a dotted path.)
@@ -944,8 +944,8 @@ export default defineComponent({
           );
 
           if (variable) {
-            // Edit-prefill arrives async — seed the form via reset (rule ②:
-            // form is the source; the read-only projection picks it up).
+            // Edit-prefill arrives async — seed the form via reset; the
+            // read-only projection picks it up.
             await nextTick();
             form.reset(mapVariableToForm(variable));
 
@@ -985,7 +985,7 @@ export default defineComponent({
       }
     });
 
-    // Modify the watch on scope — reset tab/panel selections via the form.
+    // Watch on scope — reset tab/panel selections via the form.
     watch(
       () => variableData.scope,
       (newScope) => {
@@ -1002,7 +1002,7 @@ export default defineComponent({
       },
     );
 
-    // Modify updatePanels function — prune the panel selection via the form.
+    // updatePanels — prune the panel selection via the form.
     const updatePanels = () => {
       if (variableData.scope === "panels" && selectedTabs.value.length > 0) {
         const validPanelIds = dashboardData.value.tabs
@@ -1125,7 +1125,7 @@ export default defineComponent({
     // The validated @submit payload, captured for the useLoading save wrapper.
     let submitValue: AddSettingVariableForm | null = null;
 
-    // Build the saved variable from the validated form value (rule ②): map
+    // Build the saved variable from the validated form value: map
     // selectedTabs/selectedPanels → tabs/panels, drop query_data for non-query
     // types, reset multi-select config for non-list types.
     const buildVariablePayload = (value: AddSettingVariableForm): any => {
@@ -1304,11 +1304,11 @@ export default defineComponent({
 
     // @submit fires ONLY after the Zod schema passes — including the per-row
     // rules for the form-owned filter[]/options[] arrays (name/operator/value
-    // and label/value, restoring §4 #6/#7). Here we only run the cross-field
-    // checks that can't be expressed in Zod, then save.
+    // and label/value). Here we only run the cross-field checks that can't be
+    // expressed in Zod, then save.
     const onSubmit = async (value: AddSettingVariableForm) => {
-      // The validated value is the source of truth (rule ②); stash it for the
-      // save wrapper.
+      // The validated value is the source of truth; stash it for the save
+      // wrapper.
       submitValue = value;
 
       // When in AddPanel mode, check for duplicate variable names client-side

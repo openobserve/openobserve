@@ -16,35 +16,24 @@
 // Validation schema for AnomalyDetectionConfig.vue (the "Detection Config" step
 // of the anomaly-detection wizard inside AddAlert).
 //
-// Mode-conditional rules live in the `superRefine` keyed on `query_mode`
-// (START-HERE Rule ④ / brief §4):
-// - custom_sql mode: `custom_sql` required (bare-Monaco value bridged into the
-//   form via form.setFieldValue — the sanctioned Rule-② bridge) + the
-//   timestamp-column alias ban (kept from the live hand-rolled validate()).
-// - filters mode: `detection_function` required (**§4 RESTORE** — the original
-//   Quasar rule `!!v || 'Detection function is required'` was silently dropped)
-//   and `detection_function_field` required when the function is not `count`
-//   (kept from the live validate()).
+// Mode-conditional rules live in the `superRefine` keyed on `query_mode`:
+// - custom_sql mode: `custom_sql` required + the timestamp-column alias ban.
+// - filters mode: `detection_function` required, and `detection_function_field`
+//   required when the function is not `count`.
 //
-// Base (both modes — these controls render in BOTH query modes, so their rules
-// apply in both; that matches the pre-O-migration Quasar rules which sat on the
-// always-rendered inputs):
-// - histogram/schedule/detection-window interval values ≥ 1 (kept from the live
-//   validate() + inline "Field is required!" divs).
-// - `training_window_days` ≥ 1 (**§4 RESTORE** — original Quasar rule
-//   `v >= 1 || 'Minimum 1 day'` was dropped; only the HTML min=1 remained).
-// - `retrain_interval_days` / units / filter rows carry NO value rules — the
-//   live form never validated them (Rule ④: no added/tightened rules).
+// Base rules (both modes — these controls render in BOTH query modes):
+// - histogram/schedule/detection-window interval values ≥ 1.
+// - `training_window_days` ≥ 1.
+// - `retrain_interval_days` / units / filter rows carry NO value rules.
 //
-// Number inputs come out of OFormInput as STRINGS → `z.coerce.number()`
-// (per the playbook §2 recipe; the component's write-back to props.config
-// re-coerces so the parent payload keeps number types).
+// Number inputs come out of OFormInput as STRINGS → `z.coerce.number()`; the
+// component's write-back to props.config re-coerces so the parent payload keeps
+// number types.
 
 import { z } from "zod";
 
-/** One row of the filters[] field-array (Rule ① — indexed names, `:key` = index).
- * No per-field rules: the pre-migration form never validated filter rows
- * (incomplete rows are simply skipped when the SQL is built). */
+/** One row of the filters[] field-array. No per-field rules — incomplete rows
+ * are simply skipped when the SQL is built. */
 export const anomalyFilterRowSchema = z.object({
   field: z.string(),
   operator: z.string(),
@@ -53,7 +42,7 @@ export const anomalyFilterRowSchema = z.object({
 
 export type AnomalyFilterRow = z.infer<typeof anomalyFilterRowSchema>;
 
-/** Factory for a blank filter row (same shape the old addFilter() pushed). */
+/** Factory for a blank filter row. */
 export const makeAnomalyFilterRow = (): AnomalyFilterRow => ({
   field: "",
   operator: "=",
@@ -62,16 +51,15 @@ export const makeAnomalyFilterRow = (): AnomalyFilterRow => ({
 
 /** i18n translator injected by the component: `(key, namedParams?) => string`.
  *  Validation messages resolve through this against the `alerts.validation.*`
- *  (and `alerts.anomaly.sqlRequired`) locale keys — English values are
- *  byte-for-byte the pre-migration strings (parity). */
+ *  (and `alerts.anomaly.sqlRequired`) locale keys. */
 type Translator = (key: string, named?: Record<string, unknown>) => string;
 
 const makeAnomalyDetectionConfigBase = (t: Translator) =>
   z.object({
     query_mode: z.enum(["filters", "custom_sql"]),
     filters: z.array(anomalyFilterRowSchema),
-    // Bare-Monaco value, bridged in via form.setFieldValue (Rule ② sanctioned
-    // bridge). Required-ness is mode-conditional → superRefine below.
+    // Bare-Monaco value, bridged in via form.setFieldValue. Required-ness is
+    // mode-conditional → superRefine below.
     custom_sql: z.string(),
     // Required-ness is mode-conditional (filters mode only) → superRefine below.
     detection_function: z.string(),
@@ -88,14 +76,12 @@ const makeAnomalyDetectionConfigBase = (t: Translator) =>
       .number()
       .min(1, t("alerts.validation.fieldRequired")),
     detection_window_unit: z.string(),
-    // §4 RESTORE — original Quasar rule: v >= 1 || 'Minimum 1 day'.
     training_window_days: z.coerce
       .number()
       .min(1, t("alerts.validation.minimumOneDay")),
-    // Never validated pre-migration (fixed OSelect options) — type-only.
+    // Type-only (fixed OSelect options).
     retrain_interval_days: z.coerce.number(),
     // ORange dual-handle value; written back to config.threshold_min/threshold.
-    // Never validated pre-migration — type-only.
     threshold_range: z.object({ min: z.coerce.number(), max: z.coerce.number() }),
   });
 
@@ -104,8 +90,7 @@ export type AnomalyDetectionConfigForm = z.infer<
 >;
 
 /** True when the SQL aliases a column as the timestamp column (banned — the
- * anomaly query must alias its time column as `time_bucket`). Same regex the
- * live component used. */
+ * anomaly query must alias its time column as `time_bucket`). */
 export const hasTimestampAliasInSql = (
   sql: string,
   timestampColumn: string,
@@ -129,7 +114,7 @@ export const createAnomalyDetectionConfigSchema = (
 ) =>
   makeAnomalyDetectionConfigBase(t).superRefine((value, ctx) => {
     if (value.query_mode === "custom_sql") {
-      // Kept from the live validate(): SQL required in custom SQL mode.
+      // SQL required in custom SQL mode.
       if (!value.custom_sql || !value.custom_sql.trim()) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
@@ -139,7 +124,7 @@ export const createAnomalyDetectionConfigSchema = (
       } else if (
         hasTimestampAliasInSql(value.custom_sql, getTimestampColumn())
       ) {
-        // Kept from the live validate(): timestamp column can't be an alias.
+        // Timestamp column can't be an alias.
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["custom_sql"],
@@ -151,7 +136,7 @@ export const createAnomalyDetectionConfigSchema = (
     }
 
     if (value.query_mode === "filters") {
-      // §4 RESTORE — required, only where the control renders (filters mode).
+      // Required, only where the control renders (filters mode).
       if (!value.detection_function) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
@@ -162,8 +147,6 @@ export const createAnomalyDetectionConfigSchema = (
         value.detection_function !== "count" &&
         !value.detection_function_field
       ) {
-        // Kept from the live validate() (which blocked silently); message from
-        // the pre-O-migration Quasar rule `!!v || 'Field is required'`.
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["detection_function_field"],
@@ -175,11 +158,9 @@ export const createAnomalyDetectionConfigSchema = (
 
 /**
  * Typed defaults, projected from the parent-owned config object
- * (useAlertForm's `anomalyConfig` — passed in as props.config). Dynamic/edit
- * prefill → typed factory over the runtime record, NOT an inline literal.
- * The parent replaces the whole config object on async edit-load; the
- * component re-seeds via form.reset(anomalyDetectionConfigDefaults(cfg)).
- * Fallbacks mirror useAlertForm's defaultAnomalyConfig().
+ * (useAlertForm's `anomalyConfig` — passed in as props.config). The parent
+ * replaces the whole config object on async edit-load; the component re-seeds
+ * via form.reset(anomalyDetectionConfigDefaults(cfg)).
  */
 export const anomalyDetectionConfigDefaults = (
   cfg: Record<string, any> | null | undefined,

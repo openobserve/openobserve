@@ -26,8 +26,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :main-panel="false"
       :header-class="'shrink-0 px-4 border-b border-border-default'"
     >
-      <!-- Row 1: standard header — title + actions only (Import/Add). The alert
-           type toggle, search and folder scope moved into the table toolbar. -->
+      <!-- Standard header — title + actions only (Import/Add). The alert type
+           toggle, search and folder scope live in the table toolbar. -->
       <template #header>
         <AppPageHeader :title="t('alerts.header')" :subtitle="t('alerts.subtitle')" icon="shield-alert-outline">
           <template #actions>
@@ -428,7 +428,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           Re-train
                         </ODropdownItem>
                       </template>
-                      <!-- Regular alerts: existing Trigger Alert item -->
+                      <!-- Regular alerts: Trigger Alert item -->
                       <ODropdownItem
                         v-else
                         :data-test="`alert-list-${row.name}-trigger-alert`"
@@ -893,9 +893,6 @@ export default defineComponent({
     // ESC and click-outside dismissal are handled by ODrawer itself (reka-ui
     // DismissableLayer → @escape-key-down / @interact-outside), which also knows
     // to ignore clicks inside portaled dropdowns opened from within the drawer.
-    // The hand-rolled handlers that used to live here targeted Quasar DOM
-    // (.q-drawer__backdrop / .q-drawer__content) and matched nothing after the
-    // Quasar exit, so click-outside was silently dead.
 
     onMounted(() => {
       window.addEventListener("resize", onWindowResize);

@@ -352,14 +352,14 @@ export default defineComponent({
           )
         : getDefaultDrilldownData();
 
-    // ── OForm wiring (rule ②/③: form is the SOLE source, no mirror) ───────────
-    // Every scalar control is `name=`-only (no v-model). `data.variables[]` is a
-    // FORM-OWNED field-array (indexed OFormCombobox names). `type`/`logsMode` are
+    // OForm wiring: the form is the sole source (no mirror). Every scalar
+    // control is `name=`-only (no v-model). `data.variables[]` is a form-owned
+    // field-array (indexed OFormCombobox names). `type`/`logsMode` are
     // OFormToggleGroup (name=-owned); only `logsQuery` (Monaco) is a non-OForm*
-    // widget bridged into the schema via setFieldValue. This component OWNS
-    // <OForm>, so it creates the form with useOForm and reads it reactively via
-    // form.useStore to drive the v-if (type/logsMode/folder/dashboard), the
-    // cascades, and the async loaders — ONE source of truth, no mirror (rule ③).
+    // widget bridged into the schema via setFieldValue. This component creates
+    // the form with useOForm and reads it reactively via form.useStore to drive
+    // the v-if (type/logsMode/folder/dashboard), the cascades, and the async
+    // loaders.
     const drilldownPopUpSchema = makeDrilldownPopUpSchema(t);
     const form = useOForm<DrilldownPopUpForm>({
       defaultValues: getRecordData(),
@@ -378,9 +378,8 @@ export default defineComponent({
     const removeVariableRow = (index: number) =>
       form.removeFieldValue("data.variables", index);
 
-    // Reactive READ of the form values (rule ③: form.useStore, NOT a local copy)
-    // — drives the v-if (type/logsMode/folder/dashboard), the cascades, and the
-    // async loaders.
+    // Reactive read of the form values (form.useStore) — drives the v-if
+    // (type/logsMode/folder/dashboard), the cascades, and the async loaders.
     const drilldownData = form.useStore((s: any) => s.values);
     const dashboardList: any = ref([]);
     const tabList: any = ref([]);
@@ -544,8 +543,8 @@ export default defineComponent({
 
     // @submit fires only after the Zod schema passes (name required +
     // type-conditional url/logsQuery/folder/dashboard/tab rules). The validated
-    // `value` is the sole source of truth (rule ②) — it carries every field,
-    // including the form-owned `data.variables[]` rows.
+    // `value` carries every field, including the form-owned `data.variables[]`
+    // rows.
     const onSubmit = async (value: DrilldownPopUpForm) => {
       const record = JSON.parse(JSON.stringify(value));
       // if editmode then made changes
@@ -741,9 +740,9 @@ export default defineComponent({
         form.reset(getRecordData());
 
         // NOTE: dependent lists are loaded in onMounted + refreshed by the
-        // folder / dashboard / drilldownData watches — do NOT re-fetch them here.
-        // Refreshing on every open reset the selected org when navigating away
-        // (#12932), so that on-open refresh was removed.
+        // folder / dashboard / drilldownData watches — do NOT re-fetch them
+        // here. Refreshing on every open resets the selected org when
+        // navigating away.
       },
     );
 

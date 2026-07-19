@@ -93,8 +93,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <div class="flex flex-col gap-4">
             <!-- Name is the destination's identifier — it can't be changed once
-                 created, so lock it in edit mode (parity with the pre-migration
-                 AddDestination form, which rendered it readonly + disabled). -->
+                 created, so lock it in edit mode. -->
             <OFormInput
               data-test="add-destination-name-input"
               name="name"
@@ -465,7 +464,6 @@ const store = useStore();
 const { t } = useI18n();
 
 // Co-located Zod schema (factory keeps the required message i18n-driven).
-// Named after the form per the playbook house style.
 const destinationSchema = makeDestinationSchema(t);
 
 const isEditMode = computed(() => !!props.destination);
@@ -531,7 +529,7 @@ const step = ref(1);
 
 // A single Headers row. Matches the schema's `headerRowSchema` ({ key, value }).
 // No `uuid` — the dynamic array-field keys rows by index and add/remove operate
-// on the form's `headers` array by index (playbook §2).
+// on the form's `headers` array by index.
 type HeaderRow = { key: string; value: string };
 
 // Helper function to get default headers for each destination type
@@ -597,7 +595,7 @@ const endpointForType = (type: string): string => {
   }
 };
 
-// ── Rule ③ OWNER pattern: single source of truth = the TanStack form ──────────
+// ── OWNER pattern: single source of truth = the TanStack form ─────────────────
 // This component OWNS <OForm> and drives all conditional rendering (the
 // destination-type card grid, the per-type/per-output_format v-ifs) off the
 // form's own state. It creates the form here with useOForm, reads it reactively
@@ -664,20 +662,17 @@ const apiHeaders = form.useStore(
   (s: any) => (s.values.headers ?? []) as HeaderRow[],
 );
 
-// ── Preserved cross-field side effect: defaulting on a REAL destination_type
-//    change ──────────────────────────────────────────────────────────────────
-// What the old destination_type watch did (set method/output_format/esbulk_index
-// /url_endpoint + reset headers), now reading + writing the SAME form. Guard
+// ── Cross-field side effect: defaulting on a REAL destination_type change ──────
+// Sets method/output_format/esbulk_index/url_endpoint + resets headers. Guard
 // `prev !== undefined` so the initial seed does NOT clobber edit-prefill, and
-// skip in edit mode (the old watch did the same). `{ flush: "sync" }` matches the
-// old store-subscription timing so the cross-field resets land before any
-// subsequent same-tick write (both Stream and StreamSelection needed it).
+// skip in edit mode. `{ flush: "sync" }` so the cross-field resets land before
+// any subsequent same-tick write.
 watch(
   form.useStore((s: any) => s.values.destination_type),
   (newType, prev) => {
     if (prev === undefined || newType === prev) return;
-    // Skip while seeding an edit record (prefill) or in edit mode (the old watch
-    // also skipped edit mode) — the reset already carries the correct values.
+    // Skip while seeding an edit record (prefill) or in edit mode — the reset
+    // already carries the correct values.
     if (isPrefilling || isEditMode.value) return;
 
     if (newType !== "custom") {
@@ -732,9 +727,8 @@ watch(
   { flush: "sync" },
 );
 
-// Function to populate the form when editing an existing destination. Builds the
-// full edit record and seeds it onto the form via `form.reset(record)` — NOT a
-// per-field mirror loop (Rule ③).
+// Populate the form when editing an existing destination. Builds the full edit
+// record and seeds it onto the form via `form.reset(record)`.
 const populateFormForEdit = (destination: any) => {
   const record: DestinationForm = {
     name: destination.name || "",
@@ -1152,8 +1146,7 @@ const createDestination = (value?: DestinationForm) => {
     // `template` is an alert-destination-model field this pipeline form never
     // edits (there is no template input). Round-trip the existing value from the
     // edit record so editing a destination that carries a template does not wipe
-    // it — exact parity with the pre-migration payload (`destination.template ||
-    // ""`). In create mode `props.destination` is undefined → "".
+    // it. In create mode `props.destination` is undefined → "".
     template: props.destination?.template || "",
     headers: headers,
     name: name,
@@ -1254,7 +1247,7 @@ const resetForm = () => {
 
 // Expose functions for testing. `form` is the single source of truth — tests
 // read field values via `form.state.values` and set them via
-// `form.setFieldValue` (there is NO `formData` mirror anymore).
+// `form.setFieldValue`.
 defineExpose({
   getUUID,
   createDestination,

@@ -176,7 +176,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
         </AppPageHeader>
 
-        <!-- Embedded (logs) header: existing inline header, kept as-is -->
+        <!-- Embedded (logs) header -->
         <header
           v-else
           class="h-auto py-0.5 flex! items-center justify-between bg-surface-base pl-1"
@@ -1516,7 +1516,7 @@ export default defineComponent({
       return Math.min(...spans.map((span: any) => span.start_time));
     });
 
-    // Tabs configuration matching TraceDetailsV2 — inlined into template
+    // Tabs configuration
     const traceTabs = computed(() => {
       const tabs = [
         { label: "Waterfall", value: "waterfall" },
@@ -2493,7 +2493,7 @@ export default defineComponent({
       updateHeight();
     };
 
-    // Resizers are now handled by useResizer composable
+    // Resizers are handled by useResizer composable
 
     const toggleTimeline = () => {
       isTimelineExpanded.value = !isTimelineExpanded.value;
@@ -2899,9 +2899,9 @@ export default defineComponent({
 </script>
 
 <style scoped>
-/* keep(complex-state): body/html :has() overflow lock reaches ancestor DOM the
-   component doesn't own, and the dark-only unified-search-group color states
-   can't be tokenized as utilities (rule 6 bars dark: color variants). */
+/* keep(complex-state): body/html :has() overflow lock reaches ancestor DOM the component doesn't own,
+   and the dark-only unified-search-group color states can't be tokenized as
+   utilities. */
 :global(body:has(.trace-details)),
 :global(html:has(.trace-details)) {
   overflow: hidden !important;

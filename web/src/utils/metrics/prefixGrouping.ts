@@ -126,14 +126,6 @@ function candidatePrefixes(name: string, maxDepth: number): string[] {
  * once the other two claim the deeper `envoy_cluster`. A final pass folds such under-sized
  * groups into `misc`, so no rendered group is ever smaller than `minGroupSize`.
  *
- * The assignment comes OUT of the algorithm; it is never reconstructed from the
- * groups. "The deepest candidate that survived as a group" is a different
- * question from the one pass 2 answered — a name whose group was folded into
- * `misc` would be handed back to a shallower group that is still standing, and
- * the counts on the rail would stop agreeing with what the grid filters. That is
- * why there is one entry point returning both halves, rather than a groups-only
- * function that invites the caller to guess the other.
- *
  * Results are sorted by `count` descending, then `label` ascending. The `misc` group is
  * always sorted last regardless of its count.
  *
@@ -197,10 +189,8 @@ export function computePrefixAssignment(
   }
 
   // Pass 3: a prefix can qualify on coverage yet keep fewer than `minGroupSize`
-  // names once deeper groups have taken their share. Fold those into `misc` so
-  // the option actually holds for every group the user sees — and move their
-  // members with them, which is what keeps the counts and the assignment the
-  // same statement about the same names.
+  // names once deeper groups have taken their share. Fold those into `misc` (and
+  // move their members with them) so the minimum holds for every rendered group.
   for (const [id, members] of [...namesByGroup]) {
     if (id === MISC_GROUP_ID || members.length >= minGroupSize) continue;
 

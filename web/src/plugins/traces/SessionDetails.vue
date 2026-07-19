@@ -1046,8 +1046,7 @@ const kpiCards = computed<
   ];
 });
 
-// ── Conversation: filters, sort, expand (logic restored from the pre-redesign
-// page; markup is rebuilt to the new design). All client-side over `traces`. ──
+// ── Conversation: filters, sort, expand. All client-side over `traces`. ──
 const searchText = ref("");
 const statusFilter = ref<"all" | "ok" | "error">("all");
 const modelFilter = ref<string>("all");
@@ -1109,10 +1108,8 @@ const expandedTurns = reactive<Record<string, boolean>>({});
 // Per-turn detail is DERIVED from the session spans we already fetch eagerly
 // (`sessionSpans`) — the SAME single source that powers the Pretty view and the
 // Tool Hotspots. This guarantees the collapsed turn body, the tool hotspots, and
-// the transcript can never disagree. (Previously a separate per-turn query could
-// come back empty while the spans clearly contained tools — so clicking a tool
-// hotspot jumped to a turn that reported "0 tool calls".) Spans are grouped by
-// `trace_id` and classified exactly like ThreadView / the old fetchTurnDetail.
+// the transcript can never disagree. Spans are grouped by `trace_id` and
+// classified exactly like ThreadView.
 const LLM_OPS = new Set([
   "chat",
   "text_completion",
@@ -1319,7 +1316,7 @@ function onSpanSelected(spanId: string) {
 // ── Right-rail hotspots ────────────────────────────────────────────────────
 // Slowest turns + cost hotspots come from `traces`. Tool hotspots come from the
 // session spans (ranked by total duration + calls — tool spans carry no cost,
-// pending a backend per-tool attribution; see redesign doc §3).
+// pending a backend per-tool attribution).
 const slowestTurns = computed(() =>
   traces.value
     .map((t, i) => ({ n: i + 1, lat: t.durationNanos, status: t.status }))

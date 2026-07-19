@@ -137,7 +137,7 @@ export const LLM_INSIGHTS_PANELS: LLMPanelDef[] = [
     query: {
       // Cost field populated by the backend extractor from
       // gen_ai.usage.cost / Langfuse cost_details — same source the Traces
-      // tab uses. Falls back to the legacy llm_usage_cost_total column.
+      // tab uses.
       sql: `
         SELECT
           histogram(_timestamp, '{{interval}}') as ts,
@@ -337,14 +337,11 @@ export const LLM_INSIGHTS_PANELS: LLMPanelDef[] = [
     query: {
       // No baseFilter for the same reason as errors-over-time. Operation
       // label uses `operation_name` (the actual OO traces column) — `span_name`
-      // does not exist in the schema and would fail at SQL parse time, which
-      // was producing the "Failed to fetch query data" error.
+      // does not exist in the schema and would fail at SQL parse time.
       //
-      // We deliberately don't surface model/cost here: the failure usually
-      // lives on a deep child span (e.g. `tool.<name>`) which doesn't carry
-      // those attributes — the LLM call that triggered the tool does, but
-      // joining back up the trace is out of scope for this panel. The
-      // dedicated Cost / Tokens panels handle attribution.
+      // Model/cost are not surfaced here: the failure usually lives on a deep
+      // child span (e.g. `tool.<name>`) which doesn't carry those attributes.
+      // The dedicated Cost / Tokens panels handle attribution.
       sql: `
         SELECT
           _timestamp,
@@ -405,8 +402,8 @@ export function renderPanelSql(
 
   if (!ctx.agentFilter) return compactSql(rendered);
 
-  // Append the agent predicate to the query's WHERE clause (Agent Filtering
-  // spec §6.6). Every panel has exactly one flat WHERE, so we splice ` AND
+  // Append the agent predicate to the query's WHERE clause. Every panel has
+  // exactly one flat WHERE, so we splice ` AND
   // <agentFilter>` in just before the first GROUP BY / ORDER BY / LIMIT (or at
   // the end if none). Panel templates carry no subqueries of their own, so the
   // first such keyword always belongs to the main query, not the agent
@@ -424,14 +421,11 @@ export function renderPanelSql(
 /**
  * Collapse a multi-line SQL template into a single clean line.
  *
- * Our panel/KPI/sparkline SQL is authored as indented template literals for
- * readability, which means every query carried its source indentation and
- * blank-line gaps onto the wire (and into the network tab / debug logs). This
- * flattens all runs of whitespace — newlines, tabs, the leading indentation —
- * down to a single space and trims the ends. The result is byte-for-byte
- * equivalent SQL: none of these queries embed intentional multi-space string
- * literals (`'1 hour'`, `'5 minutes'` etc. keep their single space), so
- * collapsing whitespace can't alter any value.
+ * Flattens all runs of whitespace — newlines, tabs, leading indentation — down
+ * to a single space and trims the ends. The result is byte-for-byte equivalent
+ * SQL: none of these queries embed intentional multi-space string literals
+ * (`'1 hour'`, `'5 minutes'` etc. keep their single space), so collapsing
+ * whitespace can't alter any value.
  *
  * @example
  *   compactSql(`

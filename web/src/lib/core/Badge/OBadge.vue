@@ -211,8 +211,6 @@ const trailingSizeClasses = computed(() =>
 // ── Root element classes ──────────────────────────────────────────────────
 const classes = computed(() => [
   // Base — layout + typography + shape.
-  // Weight 600 per the design-system weight scale (HANDOFF §2.2: badges = 600).
-  // Pill shape (rounded-full) per HANDOFF §11 + this component's own contract.
   "inline-flex items-center whitespace-nowrap",
   "font-medium leading-none",
   "transition-colors duration-150",

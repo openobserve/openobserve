@@ -1,18 +1,15 @@
 // Copyright 2026 OpenObserve Inc.
 //
 // Validation schema for UploadSourceMaps.vue (RUM source-map upload page).
-// Built via a factory so messages stay i18n-driven (pass useI18n's `t`),
-// matching the t()-factory style used by the other migrated schemas.
+// Built via a factory so messages stay i18n-driven (pass useI18n's `t`).
 //
 // Field rules:
-//   service — `!!v || 'Service is required'` → z.string().trim().min(1, …)
-//   version — `!!v || 'Version is required'` → z.string().trim().min(1, …)
-// The `.zip` file rule lived in a manual toast (`validateAndSetFile`) — it is
-// now re-encoded here as a schema refine, and the required-file check (a second
-// manual toast) becomes the `instanceof(File)` refine. Both surface INLINE.
+//   service — required (non-empty).
+//   version — required (non-empty).
+//   file    — required, and must be a `.zip`. Errors surface inline.
 //
-// `environment` is unvalidated but is part of the submitted payload and lives
-// inside the OForm → R1-strict makes it a form field, `.optional()`.
+// `environment` is unvalidated but is part of the submitted payload, so it is
+// an optional form field.
 
 import { z } from "zod";
 

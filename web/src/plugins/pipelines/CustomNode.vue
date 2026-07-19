@@ -945,10 +945,7 @@ function getIcon(data, ioType) {
 /* keep(lib-override:vue-flow): styles vue-flow Handle DOM (classes are built dynamically as `handle_${io_type}`, also targeted by PipelineView's tooltip preview) and the vue-flow-generated .vue-flow__node-custom wrapper; !important is required to beat vue-flow core CSS */
 /* Node-TYPE colours use the SAME status tokens PipelineView's read-only tooltip
    preview already applies to these exact classes (see its :deep(.handle_input)
-   rules): input = info, output = positive/success, transform = warning. The raw
-   hexes these replace were the un-migrated originals of those three roles, so the
-   live canvas and its own preview actually disagreed on colour until now; they
-   also had no dark step, while the tokens are theme-paired. */
+   rules): input = info, output = positive/success, transform = warning. */
 .node_handle_custom {
   width: 1rem !important;
   height: 1rem !important;

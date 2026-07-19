@@ -2536,8 +2536,8 @@ const totalServices = computed(() => {
 });
 
 /**
- * Logic previously on backend: Detect environment and suggest fields based on available data.
- * Now dynamic based on the active environment tab.
+ * Detect environment and suggest fields based on available data, driven by the
+ * active environment tab.
  */
 const detectedEnvironment = computed<DetectedEnvironment | null>(() => {
   if (!activeEnvironment.value) return null;
@@ -2584,8 +2584,8 @@ const detectedEnvironment = computed<DetectedEnvironment | null>(() => {
 });
 
 /**
- * Logic previously on backend: Detect environment and suggest fields based on available data.
- * Now dynamic based on the active environment tab.
+ * Detect environment and suggest fields based on available data, driven by the
+ * active environment tab.
  */
 const suggestedConfig = computed<SuggestedConfig | null>(() => {
   if (!activeEnvironment.value || suggestionDismissed.value) return null;

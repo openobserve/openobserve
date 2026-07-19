@@ -18,7 +18,6 @@ import * as acorn from "acorn";
 import * as walk from "acorn-walk";
 import { ref } from 'vue';
 
-// Add at the top of the file
 export const panelIdToBeRefreshed = ref<string | null>(null);
 
 /**

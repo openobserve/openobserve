@@ -209,10 +209,9 @@ watch(
 );
 
 // ── Styles ─────────────────────────────────────────────────────────────────
-// md was h-10 (40px); reduced to h-8 (32px) for compact config panel density.
-// Height applied to the wrapper (so border is included in the box, matching OSelect).
-// The inner input fills the wrapper via h-full.
-// 34px control height per the design system (HANDOFF §11: input height 34px).
+// Height applied to the wrapper (so border is included in the box, matching
+// OSelect); the inner input fills it via h-full. 34px control height per the
+// design system.
 const heightClasses: Record<NonNullable<InputProps["size"]>, string> = {
   sm: "h-[2.125rem]",
   md: "h-[2.125rem]",
@@ -234,9 +233,8 @@ const wrapperClasses = computed(() => [
   hasError.value
     ? "border-input-border-error focus-within:ring-[0.125rem] focus-within:ring-input-border-error/30"
     : "border-input-border hover:border-input-border-hover focus-within:border-input-border-focus focus-within:ring-[0.125rem] focus-within:ring-primary-500/25",
-  /* Disabled inputs were almost indistinguishable from enabled ones — same
-     near-white bg, same border. Added opacity-60 + dashed border so they
-     read as obviously inactive at a glance. */
+  /* Disabled inputs get a muted bg + dashed border so they read as obviously
+     inactive at a glance. */
   props.disabled
     ? "bg-input-disabled-bg border-input-disabled-border cursor-not-allowed border-dashed"
     : "",

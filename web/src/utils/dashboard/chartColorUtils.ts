@@ -99,7 +99,6 @@ export const isColorDark = (hex: string): boolean => {
   return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255 < 0.5;
 };
 
-// Modify the getContrastColor function to consider theme
 export const getContrastColor = (
   backgroundColor: string,
   isDarkTheme: boolean,

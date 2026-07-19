@@ -582,11 +582,10 @@ export default defineComponent({
     const variablesDataUpdated = (data: any) => {
       // ONLY update the live variables data - DO NOT update URL
       // URL updates should happen ONLY after commitAll() is called (on refresh button click)
-      // This follows the __global mechanism from the main branch design
       Object.assign(variablesData, data);
 
-      // NOTE: URL sync has been moved to refreshData() after commitAll()
-      // This ensures URL only reflects COMMITTED variable values, not live changes
+      // URL sync happens in refreshData() after commitAll(), so the URL reflects
+      // only COMMITTED variable values, not live changes
     };
 
     const refreshedVariablesDataUpdated = (variablesData: any) => {
@@ -688,7 +687,7 @@ export default defineComponent({
       contextRegistry.register("dashboards", dashboardProvider);
       contextRegistry.setActive("dashboards");
 
-      // NEW: Compute panel times after dashboard loads
+      // Compute panel times after dashboard loads
       // Wait for next tick to ensure dateTimePicker is initialized
       await nextTick();
       if (dateTimePicker.value) {
@@ -883,7 +882,7 @@ export default defineComponent({
       await renderDashboardChartsRef?.value?.saveDashboardData?.execute?.();
     };
 
-    // ===== Panel Time Configuration (NEW FEATURE) =====
+    // ===== Panel Time Configuration =====
 
     // Helper: Convert picker format to time object
     const convertPickerToTimeObj = (pickerValue: any) => {
@@ -912,7 +911,7 @@ export default defineComponent({
       return null;
     };
 
-    // Compute effective time for a specific panel (v4.0)
+    // Compute effective time for a specific panel
     // Priority: 1. URL params (highest) → 2. panel_time_range → 3. global time AS-IS
     const computePanelTime = (panel: any, globalTime: any) => {
       if (!panel) return globalTime;

@@ -315,7 +315,7 @@ export function usePanelEditor(options: UsePanelEditorOptions) {
    */
   const runQuery = (withoutCache = false): void => {
     try {
-      // Validate panel fields before running query (matches main branch AddPanel.vue behavior)
+      // Validate panel fields before running query.
       // Uses validatePanel from useDashboardPanelData which checks all field requirements
       if (validatePanel) {
         const errors = errorData.errors;
@@ -757,7 +757,6 @@ export function usePanelEditor(options: UsePanelEditorOptions) {
   /**
    * Initialize chartData from dashboardPanelData.
    * Called by parent component (e.g., AddPanel) after loading panel data in onMounted.
-   * This replaces the watcher approach and follows main branch pattern.
    *
    * @param data - Optional data to initialize with. If not provided, uses dashboardPanelData.data
    */

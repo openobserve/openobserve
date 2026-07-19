@@ -493,7 +493,7 @@ export function buildTypeFilterBuckets(
  * metadata. The dropdown lists it, so it needs an honest badge.
  *
  * Deliberately narrow. `gaugehistogram` is absent because v1 really does treat it as
- * Other (PRD 6.1), and `_created`/info cards keep "other" because their card kinds
+ * Other, and `_created`/info cards keep "other" because their card kinds
  * are `timestamp`/`info`, not `other`, so they never reach this.
  */
 function declaredBucketOf(type: string | undefined): string | null {

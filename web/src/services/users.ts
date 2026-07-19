@@ -72,7 +72,7 @@ const users = {
     return http().get(`api/${orgId}/users/${userEmail}/roles`);
   },
   // Roles for every user in the org in a single request. Returns a map of
-  // user email -> role list, replacing one getUserRoles call per user.
+  // user email -> role list.
   getAllUserRoles: (orgId: string) => {
     return http().get(`api/${orgId}/users/roles/all`);
   },

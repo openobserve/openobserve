@@ -722,7 +722,7 @@ watch(
   (fields) => {
     if (fields.length === 0) return;
     
-    // Added check for <=1 as _timestamp is also stored in localstorage, which is a bydefault column
+    // Check for <=1 since _timestamp is also stored in localStorage as a default column
     if(visibleColumns.value.size <= 1) initializeVisibleColumns(fields);
 
     // Initialize column order if not set

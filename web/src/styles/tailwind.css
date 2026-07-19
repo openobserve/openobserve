@@ -1,19 +1,17 @@
 @import "tailwindcss";
 @import "tw-animate-css";
-/* Phase G — clear Tailwind's built-in colour palette BEFORE our tokens load, so
-   only registered design tokens generate colour utilities (see the file header). */
+/* Clear Tailwind's built-in colour palette BEFORE our tokens load, so only
+   registered design tokens generate colour utilities (see the file header). */
 @import "./palette-reset.css";
-/* Design tokens — all SCSS files removed; these 4 CSS files are the sole source. */
+/* Design tokens — these 4 CSS files are the sole source. */
 @import "../lib/styles/tokens/base.css";
 @import "../lib/styles/tokens/semantic.css";
 @import "../lib/styles/tokens/component.css";
-/* Element reset/typography layer. Imported at component.css's position so the
-   rules W1 evacuates out of component.css keep their cascade order (risk R10). */
+/* Element reset/typography layer. Imported here so its cascade order is kept. */
 @import "./base-elements.css";
 @import "../lib/styles/tokens/dark.css";
 /* App-wide @keyframes referenced from template `[animation:…]` arbitrary
-   utilities, which Vue's scoped rewriter cannot follow (§3 — a component-local
-   unscoped <style> is not a sanctioned global home). */
+   utilities — must be global, as Vue's scoped rewriter can't follow them. */
 @import "./keyframes.css";
 
 @plugin "@tailwindcss/typography";
@@ -23,16 +21,6 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 @source "../**/*.{vue,js,ts}";
-
-/*
- * text-sm / text-base line-height pin — REMOVED.
- *
- * The whole `--text-*` ladder is now registered in the `@theme inline` block in
- * tokens/component.css, with paired `--text-*--line-height` keys reproducing the
- * exact line-heights this hand-pin used to lock. So `text-sm`/`text-base` (and the
- * `!` variants) derive both size and leading from the tokens, `leading-*` overrides
- * still win via `--tw-leading`, and the font-size is no longer hand-duplicated.
- */
 
 /*
  * Light↔dark mode switch — soft curtain sweep (View Transitions API, started
@@ -136,9 +124,9 @@ html.theme-switching *::after {
 }
 
 @layer base {
-  /* Tailwind's v3-compat default border colour. Token-backed so it follows the
-     theme — the previous raw #e5e7eb painted light-grey borders in dark mode on
-     any element that sets a border-width without a colour. */
+  /* Tailwind's v3-compat default border colour, token-backed so it follows the
+     theme (a raw hex would paint light-grey borders in dark mode on any element
+     that sets a border-width without a colour). */
   *, :before, :after {
     border-color: var(--color-border-default);
   }

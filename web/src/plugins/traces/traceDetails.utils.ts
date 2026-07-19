@@ -14,10 +14,8 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Pure helpers for `TraceDetails.vue`. Extracted so we can unit-test
- * the small derivations (session ID resolution, etc.) without mounting
- * the SFC, which has a heavy dependency footprint (echarts, monaco,
- * vuex, several composables).
+ * Pure helpers for `TraceDetails.vue`, unit-testable without mounting the
+ * SFC (heavy dependency footprint: echarts, monaco, vuex, several composables).
  */
 
 /**
@@ -26,8 +24,7 @@
  * Looks through the span list for the first span with either:
  *   - `gen_ai_conversation_id` (OTEL Gen-AI semantic convention,
  *     preferred), or
- *   - `session_id` (legacy OO field, kept for backward compatibility
- *     with traces ingested before the rename).
+ *   - `session_id` (legacy OO field).
  *
  * Returns an empty string when no span carries either field — the
  * header template uses `v-if="sessionId"` to hide the chip in that

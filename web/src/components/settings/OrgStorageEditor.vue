@@ -427,8 +427,7 @@ const selectedProvider = ref("");
 // provider-change reset, and async edit-prefill (form.reset).
 const storageForm = ref<any>(null);
 
-// Schema-driven validation replaces the manual fieldErrors map +
-// validateStorageForm(). Provider-discriminated via superRefine on the bridged
+// Provider-discriminated validation via superRefine on the bridged
 // `selectedProvider` field.
 const orgStorageEditorSchema = makeOrgStorageEditorSchema(t);
 
@@ -550,10 +549,9 @@ function buildDataPayload(value: OrgStorageEditorForm) {
   return data;
 }
 
-// @submit handler — fires only once the provider-discriminated schema passes,
-// so the manual validateStorageForm()/fieldErrors are gone. The Save button is
-// inline (type=submit inside <OForm>) so Enter works natively; OForm awaits this
-// so the spinner spans the POST.
+// @submit handler — fires only once the provider-discriminated schema passes.
+// The Save button is inline (type=submit inside <OForm>) so Enter works
+// natively; OForm awaits this so the spinner spans the POST.
 async function submitStorage(value: OrgStorageEditorForm) {
   const dismiss = toast({
     variant: "loading",
@@ -610,11 +608,10 @@ onMounted(async () => {
         step.value = 2;
         // data is already a parsed object from the API
         const parsed = res.data.data || {};
-        // Prefill the form once the (async) config arrives — form.reset, not a
-        // per-field loop (the documented "data arrives after mount" pattern).
-        // Non-credential fields are disabled in the form; credentials must be
-        // entered fresh — never prefill with masked values. external_id is a
-        // credential but not masked, so it IS prefilled.
+        // Prefill the form once the (async) config arrives. Non-credential
+        // fields are disabled in the form; credentials must be entered fresh —
+        // never prefill with masked values. external_id is a credential but not
+        // masked, so it IS prefilled.
         storageForm.value?.form?.reset({
           selectedProvider: res.data.provider,
           bucket_name: parsed.bucket_name || "",
@@ -636,9 +633,9 @@ onMounted(async () => {
   }
 });
 
-// Bridge the provider card grid into the form (the documented sanctioned
-// discriminator bridge) so superRefine can branch on it. On a create-mode
-// provider change, reset the credential fields fresh for the new provider.
+// Bridge the provider card grid into the form so superRefine can branch on it.
+// On a create-mode provider change, reset the credential fields fresh for the
+// new provider.
 watch(selectedProvider, (newProvider) => {
   storageForm.value?.form?.setFieldValue("selectedProvider", newProvider);
   if (newProvider && !isEditMode.value) {

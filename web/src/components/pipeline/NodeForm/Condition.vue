@@ -453,16 +453,13 @@ watch(
   },
 );
 
-// ── OForm wiring (Rule ③ OWNER pattern) ──────────────────────────────────────
-// This component OWNS <OForm> and needs to read the form-level `conditions`
-// error to surface it under the FilterGroup, so it creates the form here with
-// useOForm and reads it reactively via form.useStore — a SINGLE source of truth
-// (no mirror ref, no store.subscribe). The composite FilterGroup has no OForm*
-// equivalent, so its model (`conditionGroup`) is bridged INTO the form as the
-// `conditions` field via a DIRECT form.setFieldValue from the FilterGroup's own
-// change handlers (updateGroup / removeConditionGroup / onInputUpdate) — NOT a
-// watch on a local-ref mirror (Rule ③). The schema's superRefine
-// ("at least one condition") then gates submit (R3/R4).
+// This component reads the form-level `conditions` error to surface it under
+// the FilterGroup, so it creates the form here with useOForm and reads it
+// reactively via form.useStore. The composite FilterGroup has no OForm*
+// equivalent, so its model (`conditionGroup`) is bridged into the form as the
+// `conditions` field via a direct form.setFieldValue from the FilterGroup's own
+// change handlers (updateGroup / removeConditionGroup / onInputUpdate). The
+// schema's superRefine ("at least one condition") then gates submit.
 const conditionDefaults = computed((): ConditionForm => ({
   conditions: conditionGroup.value,
 }));
@@ -481,8 +478,7 @@ const syncConditionsToForm = () => {
   });
 };
 
-// Surface the form-level `conditions` error (no OForm* field renders it) — a
-// reactive view of the SAME form, no mirror.
+// Surface the form-level `conditions` error (no OForm* field renders it).
 const conditionsErrors = form.useStore(
   (s: any) => s.fieldMeta?.conditions?.errors ?? [],
 );
@@ -671,7 +667,7 @@ const removeConditionGroup = (targetGroupId: string) => {
 const onInputUpdate = (_name?: string, _field?: any) => {
   // FilterGroup mutates the passed `conditionGroup` in place and emits this on
   // every field edit — bridge the live model into the form so the schema's
-  // superRefine sees column/operator changes (Rule ③ direct-handler bridge).
+  // superRefine sees column/operator changes.
   syncConditionsToForm();
 };
 
@@ -711,8 +707,7 @@ const openCancelDialog = () => {
 
 // @submit handler — OForm only calls it once the schema passes (at least one
 // condition via superRefine over the bridged `conditions` field), so the schema
-// gates the save (the old imperative hasValidConditions toast is gone). Reads
-// the live `conditionGroup` (the bridged source of truth).
+// gates the save. Reads the live `conditionGroup` (the bridged source of truth).
 const saveCondition = async () => {
   try {
     // V2: Send directly to backend (no transformation needed)

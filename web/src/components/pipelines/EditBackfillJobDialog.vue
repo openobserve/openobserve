@@ -199,9 +199,9 @@ const blankDefaults = (): BackfillForm => ({
   deleteBeforeBackfill: false,
 });
 
-// Rule â‘¢ OWNER pattern: this component OWNS <OForm> and needs the live values
+// Rule ③ OWNER pattern: this component OWNS <OForm> and needs the live values
 // for the delete-warning `v-if` + the update payload, so it creates the form
-// here with useOForm and reads it reactively via form.useStore â€” a SINGLE
+// here with useOForm and reads it reactively via form.useStore — a SINGLE
 // source of truth (no mirror, no store.subscribe).
 const form = useOForm<BackfillForm>({
   defaultValues: backfillDefaults.value,
@@ -249,7 +249,7 @@ const onCancel = () => {
   show.value = false;
 };
 
-// @submit handler â€” OForm only calls it once the schema passes (the time-range
+// @submit handler — OForm only calls it once the schema passes (the time-range
 // cross-field guard + chunk/delay numeric ranges live in the schema). `value`
 // is the validated, single-source-of-truth payload.
 const onSubmit = async (value: BackfillForm) => {

@@ -2080,15 +2080,12 @@ export default defineComponent({
 
 
 <style lang="scss" scoped>
-/* keep(generated-content): pin-breakdown tooltip. Moved out of the token layer
-   (W1.a, F11) — SearchResult.vue is its only consumer. The rows are built from
-   data via v-for with per-row inline colours, and the whole tooltip is
+/* keep(generated-content): pin-breakdown tooltip. The rows are built from data
+   via v-for with per-row inline colours, and the whole tooltip is
    <Teleport to="body">; Vue still stamps the scope id onto teleported nodes, so
-   `scoped` reaches it. Tokenised in W2.c per the recorded mapping: surfaces/
-   borders/text use the theme-flipping tokens (the old `:root:not(.dark)` /
-   `.dark` twins collapsed), include/exclude actions use --color-status-info-* /
-   --color-status-error-* with color-mix tints. Flagged for the §7.4 eyeball pass:
-   include-action blue moved from material blue-700 to the app's status-info hue. */
+   `scoped` reaches it. Surfaces/borders/text use the theme-flipping tokens;
+   include/exclude actions use --color-status-info-* / --color-status-error-*
+   with color-mix tints. */
 .oo-pin-backdrop {
   position: fixed;
   inset: 0;
@@ -2233,8 +2230,7 @@ export default defineComponent({
 }
 /* keep(keyframes): the histogram skeleton's shimmer @keyframes and the
    animation: that references it must stay in the same scoped block so Vue
-   renames both consistently. Migrated from styles/utilities.css — all of this
-   DOM is this template's own. */
+   renames both consistently. */
 .histogram-container {
   border-radius: 0.5rem;
   position: relative;

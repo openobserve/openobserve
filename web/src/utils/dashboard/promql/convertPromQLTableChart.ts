@@ -237,8 +237,6 @@ export class TableConverter implements PromQLChartConverter {
       columns.push(makeValueColumn(columnName, columnLabel));
     });
 
-    // Timestamp column removed as per user request
-
     return columns;
   }
 

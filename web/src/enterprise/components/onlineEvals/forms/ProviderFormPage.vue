@@ -201,7 +201,7 @@ const emit = defineEmits<{
 const { t } = useI18n();
 
 // Co-located Zod schema (factory keeps messages i18n-driven). apiKey is optional
-// in both modes, so the schema no longer branches on `mode`.
+// in both modes.
 const providerFormSchema = makeProviderFormSchema(t);
 
 // Headless OForm instance (matches ScorerFormPage): created here so the endpoint
@@ -270,9 +270,9 @@ function initForm(row: Provider | null): ProviderForm {
 
 // @submit handler — OForm only calls this once the whole schema passes, so the
 // schema (not a manual guard) gates the save. `value` carries the RAW field
-// values (the schema validates but does not transform), so trim/split here just
-// as the old `v-model.trim` did. OForm awaits this promise → the Save button
-// spinner spans the whole save (no manual `isSaving` ref).
+// values (the schema validates but does not transform), so trim/split here.
+// OForm awaits this promise → the Save button spinner spans the whole save
+// (no manual `isSaving` ref).
 async function save(value: ProviderForm) {
   if (!props.orgId) return;
   try {
@@ -284,11 +284,10 @@ async function save(value: ProviderForm) {
       availableModels: splitCsv(value.availableModels),
       // Backend expects an authConfig object; the form only collects an
       // API key, which is the only auth secret the supported providers
-      // need today. Wrap it as { api_key: <value> }. Trim to match the
-      // pre-migration `v-model.trim` (a pasted key with trailing
-      // whitespace/newline must not be sent verbatim).
+      // need today. Wrap it as { api_key: <value> }. Trim it — a pasted key
+      // with trailing whitespace/newline must not be sent verbatim.
       authConfig: { api_key: value.apiKey.trim() },
-      // `isDefault` is no longer surfaced in the form. Always send false;
+      // `isDefault` is not surfaced in the form. Always send false;
       // backend defaults to non-default and the user manages default-ness
       // (if ever needed) outside this create/edit flow.
       isDefault: false,

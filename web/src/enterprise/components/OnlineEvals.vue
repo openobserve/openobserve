@@ -589,10 +589,10 @@ const importI18nKey = computed<"scorer" | "scoreConfig">(() =>
 );
 
 // ── Quality tab: date picker + refresh state ─────────────────────────────
-// Lifted out of QualityPage so the picker + refresh button live in the
-// embedded AppPageHeader's #actions slot (matching LLM Insights / Sessions).
-// QualityPage consumes `qualityDateWindow` as a prop and exposes
-// `refreshAll` + `isAnyLoading` for the Refresh button below.
+// The picker + refresh button live in the embedded AppPageHeader's #actions
+// slot (matching LLM Insights / Sessions). QualityPage consumes
+// `qualityDateWindow` as a prop and exposes `refreshAll` + `isAnyLoading` for
+// the Refresh button below.
 //
 // Date state is the shared `useAiDateRange()` ref — the same singleton
 // driving LLM Insights and Sessions — so picking a window on one page
@@ -601,11 +601,8 @@ const { state: qualitySelectedDate } = useAiDateRange();
 
 // Seed the window from the *persisted* AI date range (relative or absolute),
 // resolved synchronously, so QualityPage's initial onMounted refresh queries
-// the correct window from the very first paint. Previously this was a hardcoded
-// 15-minute placeholder, so the first KPI query ran against 15m (e.g. "2
-// evaluated") and then the picker-mount sync re-queried the real range (e.g.
-// "36"), causing a visible flash. Fall back to the 15m default only if the
-// persisted state can't be resolved.
+// the correct window from the very first paint. Fall back to the 15m default
+// only if the persisted state can't be resolved.
 const initialQualityWindow = resolveAiDateWindow(qualitySelectedDate.value);
 const qualityDateWindow = ref<DateWindow>(
   initialQualityWindow

@@ -183,7 +183,6 @@ export default defineComponent({
     const { t } = useI18n();
     const { showErrorNotification } = useNotifications();
     const editorRef: any = ref();
-    // editor object is used to interact with the monaco editor instance
     let editorObj: any = null;
     // Emits the editor's content immediately instead of waiting out the change
     // debounce. Assigned when the editor is created; see `commitModelChange`.
@@ -430,7 +429,6 @@ export default defineComponent({
       const currentLanguage = props.language?.toLowerCase() || "sql";
 
       try {
-        // Get organization ID from store
         const orgId = store.state.selectedOrganization?.identifier || "default";
 
         // Create language-appropriate prompt
@@ -1229,11 +1227,9 @@ export default defineComponent({
   --vscode-focusBorder: transparent !important;
 }
 
-/* Migrated from styles/utilities.css (W2.b). This file is the only place
-   `.logs-query-editor` is applied, so the safety net documented in
-   lib/styles/tokens/component.css can live here: neutralise monaco's stray focus
-   outline / focus-border on the mount, the real inner editor, the overflow guard
-   and the hidden focus textarea. The last three are monaco-generated DOM. */
+/* Neutralise monaco's stray focus outline / focus-border on the mount, the real
+   inner editor, the overflow guard and the hidden focus textarea. The last three
+   are monaco-generated DOM. */
 .logs-query-editor,
 .logs-query-editor :deep(.monaco-editor),
 .logs-query-editor :deep(.overflow-guard),

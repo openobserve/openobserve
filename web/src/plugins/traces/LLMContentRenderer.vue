@@ -640,7 +640,7 @@ const previewMessages = computed(() => {
   return preview;
 });
 
-// Message item helpers (was previously in MessageItem render function)
+// Message item helpers
 const roleColor = (role: string) => {
   const colors: Record<string, string> = {
     user: "rgba(25, 118, 210, 0.1)",

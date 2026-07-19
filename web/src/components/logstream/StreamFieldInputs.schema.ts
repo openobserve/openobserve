@@ -5,10 +5,7 @@
 // a single row lives here and both parents compose it into their own form
 // schema as `z.array(makeStreamFieldRowSchema(t))`.
 //
-// Restored from the component's legacy `validate()` (prop-mode), with the
-// required messages now i18n-driven (pass useI18n's `t`) to match every other
-// schema in this migration AND PR #13077's `logStream.fieldRequired` /
-// `logStream.dataTypeRequired` keys:
+// Required messages are i18n-driven (pass useI18n's `t`):
 //   • name → required (`logStream.fieldRequired`) + `/^[a-zA-Z0-9_:]+$/` on the
 //            RAW value (no schema `.trim()` — see the field note below).
 //   • type → required (`logStream.dataTypeRequired`; the data-type select,
@@ -31,7 +28,7 @@ export const streamFieldNameRegex = /^[a-zA-Z0-9_:]+$/;
  * Build the single-row schema.
  *
  * @param t useI18n's `t`, so required messages resolve from the shared
- *   `logStream.*` keys (also used by PR #13077).
+ *   `logStream.*` keys.
  */
 export const makeStreamFieldRowSchema = (t: (_key: string) => string) =>
   z.object({
@@ -40,10 +37,8 @@ export const makeStreamFieldRowSchema = (t: (_key: string) => string) =>
     uuid: z.string().optional(),
     // NO schema `.trim()`: OForm/TanStack VALIDATES with the schema but saves the
     // RAW row value. A `.trim()` would let " my_field " pass (regex judges the
-    // trimmed copy) and diverge from `main`, which rejected any surrounding
-    // whitespace via the regex on the raw value. Validating the raw value keeps
-    // `streamFieldNameRegex` rejecting ANY whitespace, mirroring the scalar
-    // `name` fix in AddStream.schema.ts.
+    // trimmed copy); validating the raw value keeps `streamFieldNameRegex`
+    // rejecting ANY whitespace.
     name: z
       .string()
       .min(1, t("logStream.fieldRequired"))

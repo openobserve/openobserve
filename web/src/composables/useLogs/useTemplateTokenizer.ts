@@ -291,7 +291,7 @@ export function inferTypeFromValues(rawValues: any[]): string {
 
 /**
  * Generate a human-readable explanation of why a pattern is flagged as an
- * anomaly, using the statistical fields the backend now provides.
+ * anomaly, using the statistical fields the backend provides.
  */
 export function anomalyExplanation(
   pattern: {

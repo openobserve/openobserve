@@ -5,9 +5,9 @@
 // org id is read at validation time through a getter (it can change between
 // opens).
 //
-// Encodes the behaviour that was previously a disabled-button gate + a toast:
-//   • inviteOrgId required (was `:primary-button-disabled="!inviteOrgId"`);
-//   • cannot invite your own org (was an imperative `inviteSameOrg` toast).
+// Two rules:
+//   • inviteOrgId required;
+//   • cannot invite your own org.
 
 import { z } from "zod";
 

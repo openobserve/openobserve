@@ -1,30 +1,22 @@
 /*
  * keyframes.css — the app-wide home for @keyframes with MORE THAN ONE consumer.
+ * A keyframe with a single consumer belongs in that component's own
+ * `<style scoped>` block.
  *
- * WHEN A KEYFRAME BELONGS HERE
- * Only when it is genuinely shared by two or more components that cannot be
- * collapsed into one. A keyframe with a single consumer belongs in that
- * component's own `<style scoped>` block — that is the default, and every
- * single-consumer keyframe that used to live here has moved back.
- *
- * THE SCOPING RULE THAT MAKES THAT WORK
+ * THE SCOPING RULE
  * Vue's `scoped` compiler renames `@keyframes NAME` to `NAME-<hash>` and rewrites
  * the `animation:` / `animation-name:` declarations *inside the same style block*
  * to match — but it never looks at class strings in the template. So a scoped
  * keyframe cannot be driven from a template `[animation:NAME_1s_linear]`
  * arbitrary utility: the keyframe gets renamed, the template reference does not,
- * and the animation silently dies.
- * The fix, applied throughout: declare the `animation:` in the component's scoped
- * block (targeting the element's own class) instead of in the template. Then the
- * keyframe and its reference are renamed together and stay consistent.
+ * and the animation silently dies. Declare the `animation:` in the component's
+ * scoped block (targeting the element's own class) instead of in the template.
  *
  * RULES FOR THIS FILE
  * - Two or more real consumers, or it does not belong here.
  * - Every name is namespaced with an owning-feature prefix. Never add a generic
  *   name (`pulse`, `rotate`, `wave`, `fadeIn`, `shimmer`, `spin`) — it is global
  *   here and will collide with Tailwind's built-ins or with another component.
- *   A real bug this caused: four components each defined a global `pulse`, and
- *   whichever loaded last hijacked Tailwind's own `animate-pulse` everywhere.
  *   (Scoped blocks may use short names — the hash makes them collision-proof.)
  * - Prefer Tailwind's own built-ins over a copy: `animate-spin` is already
  *   `spin 1s linear infinite`, so a hand-rolled rotate keyframe is dead weight.
@@ -32,13 +24,12 @@
  * - Colours via `var(--color-*)` / `color-mix()` only. Sizes in rem.
  */
 
-/* ── Table skeletons — SHARED by TenstackTable.vue, OTableLoading.vue and
-      OTablePagination.vue. All three previously carried byte-identical copies
-      (OTablePagination's under the alias `o2-pag-shimmer`); merged here.
-      These three cannot be collapsed into one component: OTableLoading renders a
-      <tbody> of <td>s driven by Tanstack column sizing/pinning, TenstackTable's
-      skeleton is a flex row grid on the log-table tokens at a different row
-      height, and OTablePagination's is two inline pills in a footer bar. ───── */
+/* ── Table skeletons — shared by TenstackTable.vue, OTableLoading.vue and
+      OTablePagination.vue. These three cannot be collapsed into one component:
+      OTableLoading renders a <tbody> of <td>s driven by Tanstack column
+      sizing/pinning, TenstackTable's skeleton is a flex row grid on the
+      log-table tokens at a different row height, and OTablePagination's is two
+      inline pills in a footer bar. ───── */
 @keyframes o2-skel-shimmer {
   0% {
     background-position: 200% 0;

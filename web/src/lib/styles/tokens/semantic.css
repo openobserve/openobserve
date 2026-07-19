@@ -1,5 +1,5 @@
 ﻿/* ============================================================
-   SEMANTIC TOKENS â€” maps base palette to intent/meaning
+   SEMANTIC TOKENS — maps base palette to intent/meaning
    Used directly in components for shared design decisions.
    ============================================================
    ARCHITECTURE (required for dark-mode + Tailwind prefix):
@@ -9,21 +9,20 @@
       unprefixed, so dark.css overrides apply correctly.
    ============================================================ */
 
-/* â”€â”€ Light-mode defaults â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Light-mode defaults ─────────────────────────────────── */
 :root {
-  /* Text â€” grey-based semantic hierarchy */
+  /* Text — grey-based semantic hierarchy */
   --color-text-heading:     var(--color-grey-900);  /* h1-h6, modal titles, page/panel titles */
   --color-text-body:        var(--color-grey-800);  /* paragraphs, default body */
   --color-text-secondary:   var(--color-grey-500);  /* supporting text, descriptions, captions */
   --color-text-label:       var(--color-grey-400);  /* form labels, metadata, badges */
   --color-text-muted:       var(--color-grey-300);  /* disabled, placeholder, de-emphasized */
   /* label / disabled / placeholder (+ border-strong, scrollbar-thumb-hover) are
-     intentionally-equal-for-now: all route through the grey-400 primitive rather
-     than a copied literal, so any one can diverge later without hunting hex (C.3).
-     Different intents kept as distinct tokens on purpose — NOT aliases. */
+     intentionally equal for now: all route through the grey-400 primitive so any one
+     can diverge later. Distinct intents kept as distinct tokens on purpose, NOT aliases. */
   --color-text-disabled:    var(--color-grey-400);
   --color-text-placeholder: var(--color-grey-400);
-  --color-text-soft:        rgba(0, 0, 0, 0.75);   /* black at 75% â€” readable but not harsh */
+  --color-text-soft:        rgba(0, 0, 0, 0.75);   /* black at 75% — readable but not harsh */
   --color-text-link:        var(--color-primary-600);  /* clickable links */
   --color-text-link-hover:  var(--color-primary-700);  /* link hover state */
   --color-text-code:        var(--color-grey-700);     /* inline code, monospace */
@@ -35,48 +34,30 @@
   --color-surface-overlay: var(--color-white);
   --color-surface-subtle:       var(--color-grey-100);
   --color-surface-subtle-hover: var(--color-grey-200);
-  /* Accent-tinted interaction surfaces (§6). The ONE place the "hover/active on an
+  /* Accent-tinted interaction surfaces. The ONE place the "hover/active on an
      accent-tinted control" treatment lives, so buttons, menu items, tabs, selected
-     rows etc. share it — change it here and every accent hover/active surface moves.
-     Value-preserving repoint of the primary-50/100 (light) + primary-900/800 (dark)
-     cluster in component.css/dark.css. */
+     rows etc. share it — change it here and every accent hover/active surface moves. */
   --color-surface-accent-hover:  var(--color-primary-50);
   --color-surface-accent-active: var(--color-primary-100);
-  /* App chrome (top bar + side rail + the gutter behind the content card) â€” a
-     BARELY-tinted near-white (prototype --g-100 â‰ˆ #F5F6F9), just a whisper of
-     brand hue so the white content card floats on a calm backdrop. A strong
-     tint reads as "too bright". */
+  /* App chrome (top bar + side rail + the gutter behind the content card) — a
+     barely-tinted near-white, just a whisper of brand hue so the white content
+     card floats on a calm backdrop. A strong tint reads as "too bright". */
   --color-surface-chrome:  color-mix(in srgb, var(--color-primary-50) 55%, var(--color-grey-50));
   --color-surface-chrome-deeper: var(--color-primary-100);
 
   /* Borders */
   --color-border-default: var(--color-grey-200);
   --color-border-strong:  var(--color-grey-400);
-  /* Soft divider â€” lighter than the structural border. Use for in-list row
-     dividers and intra-card section splits (HANDOFF.md Â§1.3 --border-soft). */
+  /* Soft divider — lighter than the structural border. Use for in-list row
+     dividers and intra-card section splits. */
   --color-border-subtle:  var(--color-grey-150);
 
-  /* Overlay scrim â€” semi-transparent backdrop */
+  /* Overlay scrim — semi-transparent backdrop */
   --color-overlay-scrim: color-mix(in srgb, var(--color-grey-950) 50%, transparent);
 
-  /* ── Accent = THE single brand colour, app-facing handle ──────────────────
-     This is NOT a second colour. It is the SAME brand hue as the primary ramp
-     (light: primary-600 / #3F7994) — just the one shade, exposed as a semantic
-     knob for feature code so pages never hardcode `primary-600`.
-
-     Two different exposures of ONE brand colour, by role:
-       • primary-* ramp   → BUTTON FILLS & large controls that need multiple
-                            shades (600 bg, 700 hover, 800 active, 300 disabled).
-                            Stays at 600 in dark — a big filled block reads fine.
-       • --color-accent   → SMALL brand marks: accent text, 1px borders, icons,
-                            rings, underlines, small badge dots.
-                            Flips to primary-400 (lighter) in dark mode (dark.css)
-                            because a thin/small mark in primary-600 is too dark
-                            to read on a dark surface. THIS DARK FLIP is why accent
-                            exists and cannot be replaced by raw `bg-primary-600`.
-
-     Use `text-accent` / `bg-accent` / `border-accent`. Rebrand = change the one
-     line below. Keep it a single colour — do not introduce a second accent hue. */
+  /* Accent — the single brand colour, exposed as a semantic knob so feature code
+     never hardcodes `primary-600`. It flips to primary-400 in dark mode (dark.css)
+     so thin small marks stay readable — that dark flip is why it can't be raw primary-600. */
   --color-accent: var(--color-primary-600);
 
   /* Favorite (filled heart) — a rose/pink-leaning red, deliberately warmer
@@ -86,11 +67,9 @@
   --color-favorite: #F43F5E;
 }
 
-/* â”€â”€ Register ALL semantic tokens for Tailwind utilities â”€â”€ */
+/* ── Register ALL semantic tokens for Tailwind utilities ── */
 @theme inline {
-  /* Text — `-primary` (alias of heading) and `-caption` (alias of secondary)
-     retired in Tier 1; feature code + component tokens repointed to the canonical
-     heading/secondary tokens so those two knobs now reach every consumer. */
+  /* Text */
   --color-text-heading:     var(--color-text-heading);
   --color-text-body:        var(--color-text-body);
   --color-text-secondary:   var(--color-text-secondary);
@@ -114,11 +93,10 @@
   --color-surface-chrome:        var(--color-surface-chrome);
   --color-surface-chrome-deeper: var(--color-surface-chrome-deeper);
 
-  /* Borders — only `default` is an app-facing utility (A3). `strong`/`subtle`
-     are library-internal: defined in :root above and consumed by component
-     tokens (checkbox, table row-divider, tooltip, …) via var(), but NOT
-     registered here, so no `border-border-strong/subtle` utility exists for
-     feature code. Feature code uses `border-border-default` only. */
+  /* Borders — only `default` is registered as an app-facing utility. `strong`/`subtle`
+     are library-internal: defined in :root above and consumed by component tokens
+     (checkbox, table row-divider, tooltip, …) via var(), but NOT registered here, so
+     no `border-border-strong/subtle` utility exists. Feature code uses `default` only. */
   --color-border-default: var(--color-border-default);
 
   /* Overlay scrim */
@@ -128,23 +106,19 @@
   --color-accent: var(--color-accent);
 
   /* White / black / transparent / current / inherit — Tailwind ships these as
-     --color-* theme keys, so the Phase-G `--color-*: initial` reset (palette-reset.css)
-     wipes them too. Re-register here so bg-white/text-black/bg-transparent/
-     border-transparent/text-current/text-inherit keep compiling (119 bg-transparent,
-     59 text-white, 33 border-transparent, 14 text-inherit … in use). */
+     --color-* theme keys, so the `--color-*: initial` reset (palette-reset.css) wipes
+     them too. Re-register here so bg-white/text-black/bg-transparent/border-transparent/
+     text-current/text-inherit keep compiling. */
   --color-white: var(--color-white);
   --color-black: var(--color-black);
   --color-transparent: transparent;
   --color-current: currentColor;
   --color-inherit: inherit;
 
-  /* Brand neutral scale (re-exports from base.css).
-     Registered to close a documented trap: these were defined but never
-     registered, so `text-grey-500` compiled to NOTHING. A developer would then
-     reach for `text-gray-500` and silently get Tailwind's *different*, un-themed
-     gray (#6b7280 vs our #737373). The brand scale was effectively unreachable
-     from templates. Note the British spelling — `grey-*` is ours, `gray-*` is
-     Tailwind's and is banned by the rawPalette guard. */
+  /* Brand neutral scale (re-exports from base.css). Registered so `text-grey-500`
+     etc. compile as utilities. Note the British spelling — `grey-*` is ours; `gray-*`
+     is Tailwind's un-themed gray (#6b7280 vs our #737373) and is banned by the
+     rawPalette guard. */
   --color-grey-0:   var(--color-grey-0);
   --color-grey-50:  var(--color-grey-50);
   --color-grey-100: var(--color-grey-100);
@@ -160,8 +134,7 @@
   --color-grey-900: var(--color-grey-900);
   --color-grey-950: var(--color-grey-950);
 
-  /* Favorite (self-reference so `text-favorite` utility exists + dark override
-     applies) */
+  /* Favorite */
   --color-favorite: var(--color-favorite);
 
   /* Brand / Primary (re-exports from base.css) */
@@ -186,7 +159,7 @@
   --color-error-600: var(--color-error-600);
   --color-error-700: var(--color-error-700);
 
-  /* Success (re-exports from base.css) â€” registered so text-success-* / bg-success-* compile */
+  /* Success (re-exports from base.css) */
   --color-success-50:  var(--color-success-50);
   --color-success-100: var(--color-success-100);
   --color-success-400: var(--color-success-400);
@@ -203,8 +176,8 @@
   --color-warning-700: var(--color-warning-700);
 
   /* Radius / Shadow (re-exports from base.css) */
-  /* --radius-default is the app knob; sm/md/lg/xl are legacy aliases (same 4px
-     value) kept only for library internals + scoped var() refs (A5). */
+  /* --radius-default is the app knob; sm/md/lg/xl are same-value aliases for
+     library internals + scoped var() refs. */
   --radius-default: var(--radius-default);
   --radius-sm:   var(--radius-sm);
   --radius-md:   var(--radius-md);
@@ -215,9 +188,8 @@
   --shadow-md: var(--shadow-md);
   --shadow-lg: var(--shadow-lg);
 
-  /* Code-syntax family (D6). Registered so bg-syntax-bg / text-syntax-keyword
-     compile: these were defined in :root but never registered, so components
-     had to reach for var() in a style block instead of using a utility. */
+  /* Code-syntax family. Registered so bg-syntax-bg / text-syntax-keyword etc.
+     compile as utilities. */
   --color-syntax-bg:          var(--color-syntax-bg);
   --color-syntax-text:        var(--color-syntax-text);
   --color-syntax-keyword:     var(--color-syntax-keyword);
@@ -233,20 +205,15 @@
   --color-syntax-deletion-fg: var(--color-syntax-deletion-fg);
   --color-syntax-deletion-bg: var(--color-syntax-deletion-bg);
 
-  /* NOTE — the --color-gradient-* family is deliberately NOT registered here.
-     Registering it would generate `bg-gradient-ai`, which emits
-     `background-color: <a linear-gradient()>` — invalid CSS that the browser
-     drops, i.e. a utility that compiles but renders nothing. Gradients must be
-     consumed as `bg-[image:var(--color-gradient-ai)]` (background-image), which
-     is the established form across the codebase. */
+  /* The --color-gradient-* family is deliberately NOT registered here: it would
+     generate `bg-gradient-ai` as `background-color: <linear-gradient()>` — invalid
+     CSS the browser drops. Consume gradients as
+     `bg-[image:var(--color-gradient-ai)]` (background-image) instead. */
 }
 
-/* â”€â”€ Theme-driven runtime tokens (set inline by utils/theme.ts) â”€â”€
-   Static values below are the light-mode DEFAULT theme; theme.ts
-   overrides these via inline style when a custom accent color is
-   picked or dark mode is active. Consolidates the legacy
-   light + dark theme-color tokens (theme.ts already set
-   both to the same live value in dark mode) into one source. */
+/* ── Theme-driven runtime tokens (set inline by utils/theme.ts) ──
+   Static values below are the light-mode DEFAULT theme; theme.ts overrides
+   them via inline style when a custom accent color is picked or dark mode is active. */
 :root {
   --color-theme-accent: #3F7994;
   --color-theme-table-header-bg: color-mix(in srgb, var(--color-theme-accent) 20%, white);
@@ -259,7 +226,7 @@
   --color-theme-body-bg-secondary: rgba(89, 155, 174, 0.4);
   --color-theme-header-menu-bg: rgba(255, 255, 255, 0.5);
 
-  /* Shared hover + surface accent (shared hover/surface accent formula) */
+  /* Shared hover + surface accent formula */
   --color-interactive-hover-bg: color-mix(in srgb, var(--color-theme-accent) 15%, white);
 
   /* Status/semantic colors driven by utils/theme.ts (O2 Signature default
@@ -273,12 +240,10 @@
 }
 
 /* ── Domain / data-viz / brand literal tokens ──
-   Moved to base.css (raw values live with the palette, not the semantic
-   intent layer). Their @theme registrations stay in semantic.css /
-   component.css; only the :root literal definitions relocated. */
+   Defined in base.css (raw values live with the palette); their @theme
+   registrations live in semantic.css / component.css. */
 
-/* â”€â”€ Layout aliases â”€â”€ */
+/* ── Layout aliases ── */
 :root {
   --navbar-height: 36px;
 }
-

@@ -116,13 +116,12 @@ import {
   makeStreamFieldRow,
 } from "./StreamFieldInputs.schema";
 
-// FORM-ONLY (migrated 2026-07-01). The rows are now owned by the parent's
-// TanStack form: this component `inject`s that form, reads the array reactively
-// via form.useStore, renders indexed OForm* fields (`${formFieldName}[i].name`),
-// and mutates rows with form.pushFieldValue / form.removeFieldValue. Per-row
-// validation lives in the parent schema (see StreamFieldInputs.schema.ts) — this
-// component no longer carries its own validate()/error refs. It MUST be rendered
-// inside an <OForm> whose schema has an array field named `formFieldName`.
+// FORM-ONLY. The rows are owned by the parent's TanStack form: this component
+// `inject`s that form, reads the array reactively via form.useStore, renders
+// indexed OForm* fields (`${formFieldName}[i].name`), and mutates rows with
+// form.pushFieldValue / form.removeFieldValue. Per-row validation lives in the
+// parent schema (see StreamFieldInputs.schema.ts). It MUST be rendered inside an
+// <OForm> whose schema has an array field named `formFieldName`.
 const props = defineProps({
   /** Dot-path of the array field on the parent form (e.g. "fields"). */
   formFieldName: {

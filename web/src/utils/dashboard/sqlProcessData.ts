@@ -21,40 +21,9 @@ import { getDataValue } from "./aliasUtils";
  *
  * This function takes in the raw data returned from the SQL query and the
  * panel schema, and returns a processed data array that can be fed into the
- * echarts library.
- *
- * Here's a step-by-step breakdown of what this function does:
- *
- * 1. It checks if the data is empty or if the first item in the array is not
- * an object. If either condition is true, it returns an empty array.
- *
- * 2. It extracts the top_results and top_results_others values from the
- * panel schema config.
- *
- * 3. If top_results is not enabled, it simply returns the inner data array
- * without any modifications.
- *
- * 4. It extracts the breakdown key, y-axis key, and x-axis key from the
- * panel schema.
- *
- * 5. It aggregates the y-axis values by breakdown, ignoring items without a
- * breakdown key. This is done using the reduce() method.
- *
- * 6. It sorts the breakdown object by value in descending order and extracts
- * the top keys based on the configured number of top results. This is done
- * using the Object.entries() and sort() methods.
- *
- * 7. It initializes an empty result array and an empty others object.
- *
- * 8. It loops through the inner data array and checks if the breakdown value
- * is in the top keys. If it is, it adds the item to the result array. If it's
- * not, and top_results_others is enabled, it adds the item to the others
- * object.
- *
- * 9. If top_results_others is enabled, it loops through the others object and
- * adds the aggregated values to the result array.
- *
- * 10. Finally, it returns the result array.
+ * echarts library. When top_results is enabled it aggregates y-axis values by
+ * breakdown, keeps the top-N breakdown keys, and optionally folds the rest into
+ * an "others" bucket.
  *
  * @param {any[]} data - The data returned from the SQL query.
  * @param {any} panelSchema - The schema of the panel.

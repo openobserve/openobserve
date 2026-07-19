@@ -7,10 +7,7 @@
  *
  * `getSpanColorHex(i, theme)` returns a raw hex from the two arrays below, for the
  * canvas/ECharts call sites that cannot consume a CSS var. NOTE: these arrays hold
- * 35 entries and do NOT currently match the 50 --color-span-* token values — a
- * known divergence. The single-source-of-truth fix (resolve the tokens via the
- * chartColor() seam and delete these arrays) is deferred because it changes rendered
- * trace colours and needs a visual pass; see O2_TOKEN_SYSTEM_AUDIT.md §10.
+ * 35 entries and do NOT match the 50 --color-span-* token values.
  */
 
 /**
@@ -188,7 +185,7 @@ export const getAllSpanColors = (
   theme: "light" | "dark" = "light",
 ): string[] => {
   const colors = theme === "dark" ? DARK_SPAN_COLORS : LIGHT_SPAN_COLORS;
-  // Return reversed order to maintain existing behavior (was 50-i)
+  // Return reversed order to maintain existing behavior
   return [...colors].reverse();
 };
 

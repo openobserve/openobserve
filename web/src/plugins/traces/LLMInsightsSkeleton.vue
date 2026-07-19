@@ -111,18 +111,10 @@ defineProps<{ kpiOnly?: boolean; hideToolbar?: boolean }>();
 </script>
 
 <style scoped>
-/* keep(keyframes): `line-pulse` below is this component's alone, so it is
-   declared here. Its `animation` moved out of the template `[animation:…]`
-   utilities on the two <path>s and into the rules below — the scoped compiler
-   renames a keyframe and its `animation:` together only within this block, and
-   never rewrites class strings in the template.
-   `.tile-content` publishes the --tile-* contract for this component's own
-   tiles; it is scoped now because the other `.tile-content` users
-   (HomeViewSkeleton, logstream/schema) set their own bg/border/text utilities
-   and never depended on these values.
-   The per-theme `.skeleton-box` gradient re-skins that used to live here are
-   gone: OSkeleton owns its own theme-aware shimmer, so re-skinning a child
-   primitive's internals from the outside is no longer needed (or possible). */
+/* keep(keyframes): The `line-pulse` keyframe and its `animation:` must both live in this scoped
+   block: the scoped compiler renames a keyframe and its `animation:` together
+   only within the same block, and never rewrites class strings in the template.
+   `.tile-content` publishes the --tile-* contract for this component's tiles. */
 .tile-content {
   --tile-bg: var(--color-surface-base);
   --tile-border: var(--color-border-default);
@@ -130,8 +122,7 @@ defineProps<{ kpiOnly?: boolean; hideToolbar?: boolean }>();
 }
 
 /* Breathing sparkline placeholder — the area fill and the line stroke pulse in
-   step. Only the `animation` moved here; the fill/stroke colours stay as
-   utilities on the <path>s. */
+   step; the fill/stroke colours stay as utilities on the <path>s. */
 .panel-tile__area-fill,
 .panel-tile__line-stroke {
   animation: line-pulse 1.6s ease-in-out infinite;

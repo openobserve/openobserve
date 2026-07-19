@@ -6,15 +6,9 @@
 //   • Link card  — a single "selectedOrg" select (required; holds the org
 //                  identifier, mirroring OSelect's value-key="identifier").
 //
-// Built via factories so messages stay i18n-driven (pass useI18n's `t`),
-// matching the t()-factory style used by the other migrated schemas.
+// Built via factories so messages stay i18n-driven (pass useI18n's `t`).
 //
-// Field rules:
-//   newOrgName — `!!v || 'Organization name is required'`
-//             → z.string().min(1, t("validation.organizationNameRequired")).
-// selectedOrg was enforced imperatively (a toast) → encoded as min(1).
-//
-// Kept structurally identical to AzureMarketplaceSetup.schema.ts (coupled pair).
+// Structurally identical to AzureMarketplaceSetup.schema.ts (coupled pair).
 
 import { z } from "zod";
 

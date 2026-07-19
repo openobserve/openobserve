@@ -558,7 +558,7 @@ async function getStreamList() {
 
         // Restore filter chips from the editor value. The single mount search is
         // owned by loadPageData() (after getStreamList resolves), so we do NOT
-        // trigger a search here — that previously produced a duplicate on load.
+        // trigger a search here.
         if (
           searchObj.data.editorValue &&
           searchObj.data.stream.selectedStreamFields.length
@@ -2261,10 +2261,9 @@ watch(
   { immediate: true },
 );
 
-// NOTE: auto-run in live mode is driven by explicit triggers at each user-intent
-// handler (filter add/remove, manual date change, redirect, metrics brush) — not
-// by watching `searchObj.data.query`. A query watcher duplicated those explicit
-// triggers (every writer of `data.query` also runs a search), so it was removed.
+// Auto-run in live mode is driven by explicit triggers at each user-intent
+// handler (filter add/remove, manual date change, redirect, metrics brush), not
+// by watching `searchObj.data.query`.
 
 // Handler for service graph view traces event
 const handleServiceGraphViewTraces = (data: any) => {

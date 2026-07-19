@@ -2,26 +2,19 @@
 //
 // Validation schema for AddEnrichmentTable.vue (Add/Update Enrichment Table).
 //
-// Migration notes (per the form-migration-playbook):
-//   • name   — required (trim) → form-owned OFormInput.
-//   • source — "file" | "url" discriminator → form-owned OFormOptionGroup.
+//   • name   — required (trim).
+//   • source — "file" | "url" discriminator.
 //   • file   — required ONLY when source === "file" (the CSV upload) → enforced
-//              in `superRefine`. Backed by an OFormFile (a single field collapses
-//              the old new-mode + update-mode <q-file> blocks).
+//              in `superRefine`.
 //   • url    — required + http(s):// prefix ONLY when source === "url" AND it is
 //              not a reload-only update (in reload mode the URL field is hidden,
-//              so no URL is needed). The conditional mirrors the old onSubmit
-//              guard `source === 'url' && (!isUpdating || updateMode !== 'reload')`.
-//   • append / updateMode — form-owned (OFormSwitch / OFormOptionGroup), no
-//              strict rule.
+//              so no URL is needed).
+//   • append / updateMode — form-owned, no strict rule.
 //
 // `isUpdating` is a prop (not a form field), so the schema takes a getter and
 // reads it lazily inside `superRefine` (it runs at validation time).
 //
-// Validation TIMING is owned by OForm (submit-then-change via revalidateLogic);
-// this file only describes WHAT is valid. The truthy→Zod inversions restore the
-// Quasar BEFORE rules (name required, CSV file required, URL required +
-// http(s):// prefix) verbatim.
+// Validation TIMING is owned by OForm; this file only describes WHAT is valid.
 
 import { z } from "zod";
 
@@ -31,7 +24,6 @@ export const makeAddEnrichmentTableSchema = (
 ) =>
   z
     .object({
-      // Restores the Quasar `!!v || 'Field is required!'` rule (+ trim).
       name: z.string().trim().min(1, t("function.nameRequired")),
       source: z.enum(["file", "url"]).default("file"),
       // A File object (or "" when empty). Required-ness is conditional → checked
@@ -42,8 +34,7 @@ export const makeAddEnrichmentTableSchema = (
       url: z.string().optional().default(""),
     })
     .superRefine((val, ctx) => {
-      // CSV file required when uploading from file. Restores the two
-      // `!!v || 'CSV File is required!'` <q-file> rules.
+      // CSV file required when uploading from file.
       if (val.source === "file" && !val.file) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
@@ -54,7 +45,7 @@ export const makeAddEnrichmentTableSchema = (
 
       // URL required + http(s):// prefix when sourcing from a URL — but NOT for a
       // reload-only update (that mode reprocesses the existing URLs, so the URL
-      // input is hidden). Mirrors the old onSubmit guard.
+      // input is hidden).
       if (val.source === "url" && (!isUpdating() || val.updateMode !== "reload")) {
         const url = String(val.url ?? "");
         if (!url) {

@@ -491,17 +491,10 @@ export default defineComponent({
 
     /**
      * The label as of the last APPLY, which is what the trigger button shows.
-     *
-     * `getDisplayValue` reads the picker's *pending* selection — the refs that
-     * clicking "Past 6 Hours" mutates on the spot. With `autoApply` that is also
-     * the applied range, so the two never disagree. WITHOUT it (dashboards, the
-     * metrics explorer) a selection only takes effect when the user presses
-     * Apply, so binding the trigger to the pending label made the button
-     * advertise a window that nothing was querying yet: pick "Past 6 Hours",
-     * don't apply, and the button reads 6h while the panels are still on 15m.
-     *
-     * So the trigger renders this instead: the range that is actually in force.
-     * Every path that genuinely applies a range stamps it via `markApplied`.
+     * With `autoApply` off, a selection only takes effect when the user presses
+     * Apply, so the trigger renders the range actually in force rather than the
+     * pending selection in `getDisplayValue`. Every path that applies a range
+     * stamps it via `markApplied`.
      */
     const appliedDisplayValue = ref("");
 
@@ -717,10 +710,8 @@ export default defineComponent({
      * Promote the pending selection to the applied one, so the trigger button
      * starts advertising it. Called from every path that actually puts a range
      * into force — Apply, `refresh()`, mount, and the parent-invoked setters.
-     * Deliberately NOT called from `setRelativeDate` / `onCustomPeriodSelect` /
-     * the popup's absolute inputs when `autoApply` is off: those are pending
-     * until the user presses Apply, and that is exactly the gap the trigger was
-     * lying about.
+     * NOT called from `setRelativeDate` / `onCustomPeriodSelect` / the popup's
+     * absolute inputs when `autoApply` is off: those stay pending until Apply.
      */
     const markApplied = () => {
       appliedDisplayValue.value = getDisplayValue.value;
@@ -770,8 +761,6 @@ export default defineComponent({
 
       selectedType.value = dateType;
       markProgrammaticDateChange();
-      // A parent-invoked range (chart brush-zoom, saved view) is applied by the
-      // act of setting it — not left pending on an Apply the user never sees.
       markApplied();
     };
 

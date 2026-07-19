@@ -1,5 +1,5 @@
 /* ============================================================
-   PHASE G — the structural lock (DESIGN_TOKEN_STANDARD §F.5)
+   Structural lock on the --color-* theme namespace.
    ============================================================
    Tailwind v4 ships a full built-in colour palette (--color-red-500,
    --color-gray-400, --color-blue-100, …). Those generate utilities
@@ -15,13 +15,6 @@
    not merely lint-discouraged. `bg-surface-base`, `text-text-heading`,
    `bg-primary-600`, `bg-grey-500`, `bg-transparent`, `text-white` etc. are all
    re-registered downstream and keep working.
-
-   Prerequisite handled before flipping this on: the only production file that
-   used Tailwind-default palette utilities (useEventFormatters.ts) was migrated
-   to project tokens, and white/black/transparent/current/inherit +
-   the RUM-badge categorical shades were explicitly re-registered.
-
-   REVERT: delete this file and its @import in styles/tailwind.css.
    ============================================================ */
 @theme {
   --color-*: initial;

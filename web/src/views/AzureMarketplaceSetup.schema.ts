@@ -6,15 +6,8 @@
 //   • Link card  — a single "selectedOrg" select (required; holds the org
 //                  identifier, mirroring OSelect's value-key="identifier").
 //
-// Built via factories so messages stay i18n-driven (pass useI18n's `t`),
-// matching the t()-factory style used by the other migrated schemas.
-//
-// Field rules:
-//   newOrgName — `!!v || 'Organization name is required'`
-//             → z.string().min(1, t("validation.organizationNameRequired")).
-// selectedOrg was enforced imperatively (a toast) → encoded as min(1).
-//
-// Kept structurally identical to AwsMarketplaceSetup.schema.ts (coupled pair).
+// Built via factories so messages stay i18n-driven (pass useI18n's `t`).
+// Coupled with AwsMarketplaceSetup.schema.ts — keep the two structurally aligned.
 
 import { z } from "zod";
 

@@ -15,7 +15,7 @@ export interface SummarySegment {
  * @param formData - The alert form data
  * @param destinations - Array of destination objects
  * @param t - Translation function (optional, for i18n support)
- * @param wizardStep - Deprecated: no longer gates content; kept for backward compatibility
+ * @param wizardStep - Deprecated; unused.
  * @param previewQuery - The formatted preview query string
  * @param generatedSqlQuery - The generated SQL query for custom conditions (computed property)
  */
@@ -30,7 +30,7 @@ export function generateAlertSummary(formData: any, destinations: any[], t?: (ke
     return '';
   }
 
-  // Default translation function if not provided (fallback for backward compatibility)
+  // Default translation function if not provided.
   const translate = t || ((key: string) => {
     const fallbacks: Record<string, string> = {
       'alerts.summary.monitors': 'Monitors',

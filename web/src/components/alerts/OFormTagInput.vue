@@ -1,17 +1,15 @@
 <script setup lang="ts">
 // Copyright 2026 OpenObserve Inc.
 //
-// Form-aware wrapper around TagInput (alerts-owned) — the OForm* variant for a
-// `string[]` tag input. Modeled on OFormSelect / OFormToggleGroup: inject the
-// OForm context, render `form.Field` by `name`, bind model-value ←
-// field.state.value and route changes → field.handleChange.
+// Form-aware wrapper around TagInput (alerts-owned): the OForm* variant for a
+// `string[]` tag input. Injects the OForm context, renders `form.Field` by
+// `name`, binds model-value ← field.state.value and routes changes →
+// field.handleChange.
 //
 // Notes specific to TagInput:
-//  • TagInput emits no `blur`, and the `fields` field carries no required rule,
-//    so there is no blur/error wiring to do today. A form-level error div is
-//    still included (shows only when errors.length > 0) so the wrapper behaves
-//    correctly if a rule is ever added — it renders nothing in the common case,
-//    keeping the DOM identical to a bare TagInput.
+//  • TagInput emits no `blur` and the `fields` field carries no required rule,
+//    so there is no blur/error wiring today. The form-level error div renders
+//    nothing unless a rule is added, keeping the DOM identical to a bare TagInput.
 //  • `field.state.value` may be undefined (the field is optional) — coerce to
 //    `[]` because TagInput requires a non-null `string[]`.
 

@@ -2,7 +2,7 @@
 // Copyright 2026 OpenObserve Inc.
 //
 // OCodeCell — monospace rendering for identifiers / SQL / tokens with an
-// optional copy-on-hover affordance (audit §3). Truncates with ellipsis and
+// optional copy-on-hover affordance. Truncates with ellipsis and
 // exposes the full value via a native title tooltip.
 //
 //   <OCodeCell :value="row.trace_id" />

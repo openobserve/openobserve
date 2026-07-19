@@ -640,7 +640,7 @@ export default defineComponent({
               globalVar.value = passedVar.value;
               globalVar.isVariablePartialLoaded = true;
               globalVar.isLoading = false;
-              // KEY FIX: Set pending to false to prevent API call
+              // Set pending to false to prevent API call
               globalVar.isVariableLoadingPending = false;
             }
           });
@@ -677,7 +677,7 @@ export default defineComponent({
     watch(selectedDate, () => {
       updateDateTime(selectedDate.value);
 
-      // CRITICAL FIX: When date time changes (user clicked Apply), also commit any pending variable changes
+      // CRITICAL: When date time changes (user clicked Apply), also commit any pending variable changes
       // This ensures that if user changed both variables and date time,
       // both changes are applied to the chart when Apply is clicked
       Object.assign(

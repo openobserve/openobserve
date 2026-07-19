@@ -491,15 +491,12 @@ export function createTreeVisualizationEngine() {
 }
 
 /**
- * Legacy wrapper for backward compatibility with existing ServiceGraph.vue
- * This ensures zero breaking changes during the migration
+ * Placeholder tree-options API for ServiceGraph.vue — not yet implemented.
  */
 export const createLegacyTreeOptions = (
   graphData: { nodes: any[]; edges: any[] },
   layoutType: string = "horizontal",
   isDarkMode: boolean = true
 ) => {
-  // This will be implemented when we migrate ServiceGraph.vue
-  // For now, this is a placeholder to maintain the existing API
   throw new Error('Legacy tree options not yet implemented - use convertServiceGraphToTree for now')
 }

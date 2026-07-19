@@ -276,9 +276,9 @@ const { t } = useI18n();
 // mounted fresh per create/edit action, so building it once is safe.
 const jobFormSchema = makeJobFormSchema(t);
 
-// OWNER pattern (Rule ③): this component owns <OForm>, so it creates the form
-// with useOForm and reads it reactively via form.useStore — a SINGLE source of
-// truth, NO mirror ref. `formValues` drives the parent-side reads a parent can't
+// This component owns <OForm>, so it creates the form with useOForm and reads
+// it reactively via form.useStore (single source of truth, no mirror ref).
+// `formValues` drives the parent-side reads a parent can't
 // get from form context: JobPreviewPanel (name/streamType), the stream-option
 // list (stream), selectedScorers + the mapping sync (scorerIds), and the
 // sampling `v-if`/disabled (samplingMode). Writes go through form.setFieldValue
@@ -426,8 +426,7 @@ function syncMappings() {
 async function onSubmit(value: JobForm) {
   if (!props.orgId) return;
   // Scorer selection is validated here, not in the schema: surface the empty
-  // case as a toast (matching the pre-migration guard) since JobScorerPicker
-  // renders no inline error.
+  // case as a toast since JobScorerPicker renders no inline error.
   if (!value.scorerIds.length) {
     showError(new Error(t("onlineEvals.job.selectAtLeastOne")), t("onlineEvals.job.saveError"));
     return;

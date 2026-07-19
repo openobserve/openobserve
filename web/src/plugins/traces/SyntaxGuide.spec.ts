@@ -284,7 +284,7 @@ describe("SyntaxGuide", () => {
     });
   });
 
-  // â”€â”€â”€ New tests covering functionality added after Dec 29 2025 â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ─── New tests covering functionality added after Dec 29 2025 ───────────────
 
   // Theming contract: `.dark` on <html> + --color-* tokens that flip
   // automatically. The menu no longer carries a per-theme root class; it is

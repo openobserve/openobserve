@@ -1,6 +1,6 @@
 // Copyright 2026 OpenObserve Inc.
 //
-// LLM Observability Phase 2 — Agent Filtering (Stream Contract v1.0, §6.4/§6.6).
+// Agent filtering for the LLM Insights dashboard.
 //
 // When an agent is selected on the LLM Insights dashboard, every query against
 // the agent's source trace stream can be scoped directly to that agent. Ingest
@@ -14,8 +14,8 @@ export const ALL_AGENTS_VALUE = "__all__";
 
 /**
  * Stable identity key for an agent option. The same agent name/id can appear in
- * multiple streams, so the key is scoped by stream + identity (spec §8). Agent
- * id is preferred over name (§6.3) because names are display labels.
+ * multiple streams, so the key is scoped by stream + identity. Agent id is
+ * preferred over name because names are display labels.
  */
 export function agentOptionKey(agent: GenAiAgentListItem): string {
   return `${agent.source_stream_type}/${agent.source_stream}/${

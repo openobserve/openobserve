@@ -385,7 +385,7 @@ async function createModelPricing(jsonObj: any, index: number) {
     const errorMessage =
       error?.response?.data?.message || "Unknown error";
 
-    // Skip bottom snackbar for 403 â€” global interceptor already shows persistent top banner.
+    // Skip bottom snackbar for 403 — global interceptor already shows persistent top banner.
     if (error?.response?.status !== 403) {
       toast({
         message: `Failed to import "${jsonObj.name}": ${errorMessage}`,

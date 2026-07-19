@@ -16,24 +16,17 @@
 /**
  * Build a **dashboard panel schema** (version 2) from an LLM Insights panel
  * definition, so the panel can render through the shared
- * `PanelSchemaRenderer` (the same engine dashboards use) instead of our
- * hand-rolled echarts in `LLMTrendPanel.vue`.
- *
- * Why: `PanelSchemaRenderer` already owns timezone conversion (via
- * `applyCustomSQLTimeSeries` → `toZonedTime(store.state.timezone)`),
- * tooltips, axes, legends, units, lazy-loading and error states. Rendering
- * through it gives the LLM Insights trends the exact same behaviour as
- * dashboards — including correct, user-selected timezone — for free.
+ * `PanelSchemaRenderer` (the same engine dashboards use). This gives the LLM
+ * Insights trends the same behaviour as dashboards — timezone conversion,
+ * tooltips, axes, legends, units, lazy-loading and error states.
  *
  * The query is passed as a fully-rendered **custom SQL** string
  * (`customQuery: true`); the renderer fetches its own data. Column→axis
  * mapping is derived from the panel def's `query.timeField` / `seriesField`
- * / `valueField` (the same fields the legacy renderer used), so the SQL
- * output aliases (`ts`, `model`, `cost`, …) line up with `fields.x/y/breakdown`.
+ * / `valueField`, so the SQL output aliases (`ts`, `model`, `cost`, …) line
+ * up with `fields.x/y/breakdown`.
  *
- * Migration is incremental: only panel types present in `TYPE_MAP` are
- * convertible today (start with stacked-area). Others keep using
- * `LLMTrendPanel` until added here.
+ * Only panel types present in `TYPE_MAP` are convertible.
  */
 
 import type { LLMPanelDef } from "./config/llmInsightsPanels";
@@ -123,8 +116,7 @@ export function buildLLMPanelSchema(opts: {
             : "numbers",
       unit_custom: "",
       decimals: 2,
-      // Bucket gaps read as a continued line rather than a hole — mirrors the
-      // legacy renderer, which filled missing (bucket, series) cells with 0.
+      // Bucket gaps read as a continued line rather than a hole.
       connect_nulls: true,
       no_value_replacement: "",
       // Render a dot at each data point. LLM traffic is often sparse — a window

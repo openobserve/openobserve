@@ -19,8 +19,8 @@ import { FORM_SUBMIT_STATE_KEY } from "@/lib/forms/Form/OForm.types";
 defineOptions({ inheritAttrs: false });
 const $attrs = useAttrs();
 // Forward the consumer's `data-test` from <ODrawer data-test="…"> onto the
-// rendered panel so e2e selectors can scope to the specific drawer instance
-// using the audit pattern: [data-test="<parent>"] [data-test="o-drawer-*-btn"].
+// rendered panel so e2e selectors can scope to the specific drawer instance via
+// [data-test="<parent>"] [data-test="o-drawer-*-btn"].
 // (DialogRoot is renderless, so default attribute inheritance would lose it.)
 const parentDataTest = computed(() => $attrs["data-test"] as string | undefined);
 

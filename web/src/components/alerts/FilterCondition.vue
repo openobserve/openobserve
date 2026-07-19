@@ -1,6 +1,6 @@
 ﻿<template>
     <div class="flex items-start gap-1 flex-no-wrap">
-      <!-- V2: Fixed-width left column for alignment -->
+      <!-- Fixed-width left column for alignment -->
       <!-- All conditions have the same width for the operator/label section -->
       <div class="flex items-center justify-center mt-1 min-w-15">
         <!-- First condition in root group -->
@@ -35,11 +35,8 @@
           </OButton>
         </template>
       </div>
-        <!-- FORM MODE (namePrefix + an injected OForm context): the three
-             controls are name=-owned by the TanStack form — no v-model, no
-             manual error refs; schema errors surface post-submit via the
-             OForm* wrappers (R3). Bare mode below stays byte-compatible
-             (pipeline's NodeForm consumes these bare — permanent, sanctioned). -->
+        <!-- FORM MODE: controls are name-bound to the injected OForm (no
+             v-model); schema errors surface via the OForm* wrappers. -->
         <template v-if="formMode">
           <div class="ml-0">
             <OFormSelect
@@ -83,8 +80,8 @@
             <OTooltip v-if="condition.value && store.state.isAiChatEnabled" :content="condition.value" />
           </div>
         </template>
-        <!-- BARE MODE (no namePrefix / no OForm context) — today's markup,
-             unchanged. Do NOT degrade: pipeline consumes it permanently. -->
+        <!-- BARE MODE (no namePrefix / no OForm context): pipeline consumes
+             these controls bare, with v-model and inline error refs. -->
         <template v-else>
           <div class="ml-0">
             <OSelect
@@ -196,12 +193,10 @@
         validator: (value: string) => ['alerts', 'pipelines'].includes(value),
     },
     /**
-     * Dual-mode switch (alerts-migration.md §A). When set AND an OForm context
-     * is injectable, the three controls render as OForm* fields name=-bound to
-     * `${namePrefix}.column` / `.operator` / `.value` — the TanStack form owns
-     * their values (no v-model, no manual error refs). When empty (default)
-     * the component renders today's BARE markup unchanged (pipeline's
-     * NodeForm/Condition.vue consumes it bare — a permanent, sanctioned mode).
+     * Dual-mode switch. When set AND an OForm context is injectable, the three
+     * controls render as OForm* fields name-bound to `${namePrefix}.column` /
+     * `.operator` / `.value` (the form owns their values, no v-model). When
+     * empty (default) the component renders bare markup with v-model.
      */
     namePrefix: {
         type: String,
@@ -247,7 +242,7 @@ const form = inject(FORM_CONTEXT_KEY, null);
 const formMode = computed(() => !!(props.namePrefix && form));
 
 // Inline error state — BARE MODE ONLY. In form mode the schema owns validation
-// and the OForm* wrappers surface errors (R3).
+// and the OForm* wrappers surface errors.
 const columnError = ref('');
 const operatorError = ref('');
 const valueError = ref('');
@@ -285,12 +280,12 @@ const addGroupApiHeader = (groupId: string) => {
 };
 
 const computedLabel = computed(() => {
-  // V2: First condition in any group should not show AND/OR operator
-  // Only subsequent conditions show the operator
+  // First condition in any group should not show AND/OR operator;
+  // only subsequent conditions show the operator
   if (props.isFirstInGroup) {
     return '';  // No operator for first condition in group
   }
-  // V2: Use condition's logicalOperator if available
+  // Use condition's logicalOperator if available
   if (props.condition.logicalOperator) {
     return props.condition.logicalOperator;
   }
@@ -313,12 +308,10 @@ const toggleOperator = () => {
 };
 
 const computedInputWidth = computed(() => {
-  // If custom width is provided, use it; otherwise use default responsive width
   return props.inputWidth || (store.state.isAiChatEnabled ? '' : 'xl:min-w-50 lg:min-w-22.5 lg:w-fit');
 });
 
 const computedValueWidth = computed(() => {
-  // If custom width is provided, use it; otherwise use default responsive width
   return props.inputWidth || (store.state.isAiChatEnabled ? 'w-27.5' : 'xl:min-w-50 lg:w-fit lg:min-w-20');
 });
 

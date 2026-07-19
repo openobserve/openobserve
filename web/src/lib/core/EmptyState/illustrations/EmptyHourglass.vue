@@ -70,7 +70,7 @@ withDefaults(
 </script>
 
 <style scoped>
-/* keep(keyframes): SVG illustration animation. Scoped on purpose (W2.b): the
+/* keep(keyframes): SVG illustration animation. Scoped on purpose: the
    20 illustrations reused generic keyframe names (es-pulse, es-twinkle, …) with
    DIFFERENT bodies from unscoped blocks — a global name collision where the
    last-loaded illustration hijacked the others' animations. Vue rewrites scoped

@@ -2395,12 +2395,10 @@ export default defineComponent({
         if (open) savedFunctionForm.reset(savedFunctionDefaults.value);
       },
     );
-    // Parity with the pre-migration toggle handler (main cleared the name on
-    // every mode switch: `isSavedFunctionAction = $event; savedFunctionName = ''`).
     // Clear ONLY the create-mode name field when the mode changes so toggling
     // update→create shows a blank input, not a stale name (the update select is
-    // untouched). `dontUpdateMeta`/`dontValidate` mirror the old naked assignment
-    // — no touched/dirty marking, no premature "required" flash.
+    // untouched). `dontUpdateMeta`/`dontValidate` avoid touched/dirty marking
+    // and a premature "required" flash.
     watch(savedFunctionMode, () => {
       savedFunctionForm.setFieldValue("savedFunctionName", "", {
         dontUpdateMeta: true,
@@ -2676,7 +2674,7 @@ export default defineComponent({
     });
 
     const showFunctionEditor = computed(() => {
-      // IF actions are disabled, we are reverting to the old behavior of function editor
+      // When actions are disabled, fall back to the transform-editor toggle
       if (!isActionsEnabled.value) return searchObj.meta.showTransformEditor;
 
       return searchObj.data.transformType === "function";
@@ -3361,7 +3359,7 @@ export default defineComponent({
     });
 
     // @submit handler — the schema already gated the name/select per mode
-    // (required + the restored alphanumeric regexes), so there is no imperative
+    // (required + alphanumeric regexes), so there is no imperative
     // field validation here. The content check is a NON-form guard (about the
     // function-editor content). Loading is form-driven (OForm awaits this).
     // Declared as a hoisted function so useOForm (above) can reference it.
@@ -4112,7 +4110,7 @@ export default defineComponent({
     };
 
     // @submit handler — the schema already gated the name (required + the
-    // restored `/^[A-Za-z0-9 _-]+$/` alphanumeric rule) in create mode and the
+    // `/^[A-Za-z0-9 _-]+$/` alphanumeric rule) in create mode and the
     // selected view in update mode, so there is no imperative validation here.
     // Loading is form-driven (OForm awaits createSavedViews).
     const handleSavedView = async (value: SavedViewForm) => {
@@ -4120,8 +4118,8 @@ export default defineComponent({
         await createSavedViews(value.savedViewName);
       }
       // The update branch is intentionally a no-op: updating from this dialog
-      // was disabled (the legacy logic was commented out); the schema still
-      // requires a selected view so this path can't run with an empty select.
+      // is disabled; the schema still requires a selected view so this path
+      // can't run with an empty select.
     };
 
     const deleteSavedViews = async () => {

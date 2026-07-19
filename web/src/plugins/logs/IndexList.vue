@@ -663,11 +663,10 @@ export default defineComponent({
       return result;
     });
 
-    // `immediate` seeds streamOptions on every (re)mount. The old q-select
-    // re-seeded via its `@filter` handler on each open; that was lost in the
-    // OSelect migration, so without `immediate` the lazy watcher never fired
-    // after a v-if remount (streamList itself is unchanged) and the list stayed
-    // empty. OSelect handles search filtering internally over these options.
+    // `immediate` seeds streamOptions on every (re)mount — without it the lazy
+    // watcher never fires after a v-if remount (streamList itself is unchanged)
+    // and the list stays empty. OSelect handles search filtering internally over
+    // these options.
     watch(
       () => streamList.value,
       () => {
@@ -820,7 +819,6 @@ export default defineComponent({
 
     // if interesting field is enabled, then set default tab as interesting fields
     // otherwise set default tab as user defined schema
-    // store.state.zoConfig.interesting_field_enabled was set as interesting fields was getting set by default with _timestamp field
     function setDefaultFieldTab() {
       if (store.state.zoConfig.log_page_default_field_list === "uds") {
         // reset pagination only if tab has changed

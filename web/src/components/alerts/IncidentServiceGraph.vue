@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div
     class="incident-service-graph relative h-[calc(100vh-12.625rem)] min-h-100 flex flex-col m-3 p-5 rounded-default overflow-hidden transition-all duration-200 bg-[linear-gradient(135deg,#f9fafb_0%,#ffffff_100%)] border border-border-default shadow-[0_1px_3px_0_rgba(0,0,0,0.08),0_1px_2px_0_rgba(0,0,0,0.04),inset_0_0_0_1px_rgba(255,255,255,0.5)] hover:shadow-[0_4px_6px_-1px_rgba(0,0,0,0.1),0_2px_4px_-1px_rgba(0,0,0,0.06),inset_0_0_0_1px_rgba(255,255,255,0.5)] dark:bg-[linear-gradient(135deg,var(--color-grey-800)_0%,var(--color-grey-900)_100%)] dark:border-grey-700 dark:shadow-[0_1px_3px_0_color-mix(in_srgb,var(--color-black)_30%,transparent),0_1px_2px_0_color-mix(in_srgb,var(--color-black)_20%,transparent),inset_0_0_0_1px_color-mix(in_srgb,var(--color-grey-700)_30%,transparent)] dark:hover:shadow-[0_4px_6px_-1px_color-mix(in_srgb,var(--color-black)_40%,transparent),0_2px_4px_-1px_color-mix(in_srgb,var(--color-black)_30%,transparent),inset_0_0_0_1px_color-mix(in_srgb,var(--color-grey-700)_30%,transparent)]"
   >
-    <!-- Info Icon → Graph Legend popover (hover to show, like the previous behavior) -->
+    <!-- Info Icon → Graph Legend popover (hover to show) -->
     <span
       v-if="!loading && graphData && graphData.nodes && graphData.nodes.length > 0"
       class="info-icon-btn group absolute top-4 right-4 z-10"
@@ -217,7 +217,7 @@ export default defineComponent({
       return simulation.nodes().map(n => ({ ...n }));
     };
 
-    // No longer need to load graph via API - data comes from props
+    // Data comes from props.
     const loadGraph = () => {
       // Increment chartKey to force re-render if topology_context changes
       chartKey.value++;
@@ -244,13 +244,9 @@ export default defineComponent({
     };
 
     // Above this raw-node count the graph is bucketed by time to stay legible;
-    // at or below it every firing is shown 1:1 (preserving the clean timeline).
-    // Kept low because the backend already caps nodes well below the alert count
-    // (e.g. 434 alerts -> 42 nodes), and the force layout blobs past ~15 nodes.
+    // at or below it every firing is shown 1:1. The force layout blobs past ~15 nodes.
     const NODE_CAP = 15;
     // Pick the smallest time unit that yields no more than this many windows.
-    // Kept low so dense incidents collapse into a coarse, readable timeline
-    // rather than dozens of overlapping nodes.
     const BUCKET_TARGET_MAX = 24;
     // Bucket-unit ladder in microseconds (backend timestamps are microseconds).
     const US = 1000; // microseconds per millisecond

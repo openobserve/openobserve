@@ -20,10 +20,10 @@ import { resolveSetId } from "@/composables/useMetricSubjectButtons";
 /**
  * Intent-based metric organization.
  *
- * Replaces the legacy Network/Infra/Others taxonomy with question-shaped pills
- * (Essentials, Compute, Memory, Storage, Network, All). Each pill except
- * Essentials and All is a pattern filter on the metric stream name; Essentials
- * is a workload-specific curated whitelist; All is pass-through.
+ * Question-shaped metric pills (Essentials, Compute, Memory, Storage, Network,
+ * All). Each pill except Essentials and All is a pattern filter on the metric
+ * stream name; Essentials is a workload-specific curated whitelist; All is
+ * pass-through.
  *
  * Scope filtering (Pod / Node) is handled by `useMetricSubjectButtons` and
  * applied to the stream pool *before* an intent filter is applied.

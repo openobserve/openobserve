@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Token-driven chart palette (O2_TOKEN_MIGRATION_PLAN §3.A / §3.D shape 4).
+ * Token-driven chart palette.
  *
  * Charting libraries (ECharts / Plotly) need *resolved* color strings, not CSS
  * `var()` references. `chartColor()` reads the computed value of a design token

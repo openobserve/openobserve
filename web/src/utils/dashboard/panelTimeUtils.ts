@@ -164,7 +164,7 @@ export const hasPanelTime = (
 };
 
 /**
- * Check if panel should use its own time (v4.0 simplified)
+ * Check if panel should use its own time.
  * Panel has its own time when panel_time_range is explicitly set (not null/undefined)
  */
 export const shouldUsePanelTime = (panel: any): boolean => {

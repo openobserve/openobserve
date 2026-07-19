@@ -6,18 +6,9 @@
 // lists + radios are display, and the save-time "domain needs emails" check
 // stays a submit-level guard in saveChanges().
 //
-// Restores the original BEFORE rules (truthy→Zod inversion):
-//   • newDomain: `isValidDomain(v) || invalidDomain` → required + domain regex
-//     (the audit adds ≤253 + reject-malicious, already enforced by isValidDomain).
-//   • domain.newEmail: REQUIRED for the Add-Email action — the email must be
-//     present, valid, and belong to the domain (clicking "Add Email" with an
-//     empty box shows "Email is required" on first submit). The add-email form is
-//     its OWN OForm, so requiring it does NOT affect the domain-level
-//     "Save Changes" button. (Deliberate UX choice over the old empty-passes rule.)
-//
 // The pure validators live here so they are shared by the schema AND re-exposed
-// from the component (the spec exercises them directly). Validation TIMING is
-// owned by OForm (submit-then-change); these schemas only describe what is valid.
+// from the component. Validation timing is owned by OForm (submit-then-change);
+// these schemas only describe what is valid.
 
 import { z } from "zod";
 
@@ -118,9 +109,7 @@ export const makeAddDomainSchema = (t: (_key: string) => string) =>
 
 export type AddDomainForm = z.infer<ReturnType<typeof makeAddDomainSchema>>;
 
-// Typed default-values factory (matches the pattern used by every other
-// settings form: licenseDefaults / extendTrialDefaults / generalSettingsDefaults
-// …) instead of an inline `{ newDomain: '' }` literal in the template.
+// Typed default-values factory for the add-domain row.
 export const addDomainDefaults = (): AddDomainForm => ({ newDomain: "" });
 
 // ── Add-email row (per-domain): REQUIRED + valid + belongs to the domain.

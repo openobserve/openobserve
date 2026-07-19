@@ -30,9 +30,6 @@ import { invalidateChartTheme } from "@/utils/chartTheme";
  *   second startViewTransition would cancel the fade already running;
  * - the View Transitions API is unavailable;
  * - the user prefers reduced motion.
- *
- * REVERT: to drop the cross-fade entirely, reduce the body of this function
- * to just `applyChanges();`.
  */
 export const switchThemeMode = (
   mode: "light" | "dark",
@@ -154,9 +151,8 @@ const generatePrimaryPalette = (baseHex: string): Record<string, string> => {
     '800': mixColors(baseHex, '#000000', 60),
     '900': mixColors(baseHex, '#000000', 40),
     // 950 continues the linear −20 step (700:80 → 800:60 → 900:40 → 950:20).
-    // dark.css consumes --color-primary-950 for two surfaces; without this a
-    // custom theme in dark mode kept the stock O2 teal (#0d181e). For the default
-    // #3F7994 base, 20% reproduces that exact stock value (13/63 ≈ 0.20).
+    // dark.css consumes --color-primary-950 for two surfaces. For the default
+    // #3F7994 base, 20% reproduces the stock teal #0d181e (13/63 ≈ 0.20).
     '950': mixColors(baseHex, '#000000', 20),
   };
 };
@@ -182,10 +178,8 @@ const syncO2LibraryTokens = (themeColor: string): void => {
 export const applyThemeColors = (themeColor: string, mode: "light" | "dark", isDefault: boolean = false, semanticColors?: SemanticColors) => {
   const darkModeActive = mode === "dark";
 
-  // Toggle .dark class on <html> for the O2 component library (Tailwind dark variant)
-  // `.dark` on <html> is the SINGLE dark-mode signal (O2_TOKEN_MIGRATION_PLAN §3.R).
-  // The legacy `body.body--dark` / `body.body--light` compat classes were removed once
-  // all selectors migrated to `.dark` and JS reads to useTheme()/documentElement.
+  // Toggle .dark class on <html> for the O2 component library (Tailwind dark
+  // variant). `.dark` on <html> is the single dark-mode signal.
   document.documentElement.classList.toggle('dark', darkModeActive);
 
   // Sync O2 library tokens with the custom theme color.
@@ -201,8 +195,7 @@ export const applyThemeColors = (themeColor: string, mode: "light" | "dark", isD
   }
 
   if (darkModeActive) {
-    // Apply dark mode theme color (single source — the light + dark theme-color
-    // tokens were consolidated into one --color-theme-accent, so one write covers both)
+    // Apply dark mode theme color
     const rgbaColor = hexToRgba(themeColor, 10);
     document.body.style.setProperty('--color-theme-accent', rgbaColor);
 
@@ -273,7 +266,7 @@ export const applyThemeColors = (themeColor: string, mode: "light" | "dark", isD
     // Page background = a single, subtle primary tint (no gradient) so the muted
     // area around the white content card reads as one calm color — matching the
     // page chrome (surface-chrome = primary-100).
-    const bodyBg = hexToRgba(themeColor, 0.5); // ~0.05 alpha — a calm, barely-tinted backdrop (was 0.10, read as too bright)
+    const bodyBg = hexToRgba(themeColor, 0.5); // ~0.05 alpha — a calm, barely-tinted backdrop
     document.body.style.setProperty('background', bodyBg, 'important');
 
     // Apply table header background color (80% theme color mixed with 20% white)

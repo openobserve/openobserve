@@ -126,7 +126,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           icon-left="add"
         >
         </OButton>
-        <!-- D5: Warning for restricted chart types with multiple queries.
+        <!-- Warning for restricted chart types with multiple queries.
              Outlined soft-background chip (warning-soft variant + ring),
              height-aligned (h-8) with the toolbar's size="sm" buttons. -->
         <OTag
@@ -525,7 +525,7 @@ export default defineComponent({
           0,
     );
 
-    // D5: Warning banner for restricted chart types with multiple queries
+    // Warning banner for restricted chart types with multiple queries
     const multiQueryWarning = computed(() => {
       if (dashboardPanelData.data.queries.length <= 1) return null;
       if (promqlMode.value) return null;
@@ -690,7 +690,7 @@ export default defineComponent({
     };
 
     const toggleQueryVisibility = (index) => {
-      // Lazy-init for layouts loaded from saved dashboards that predate the multi-SQL feature.
+      // Lazy-init for older saved dashboard layouts that lack this array.
       if (!Array.isArray(dashboardPanelData.layout.hiddenQueries)) {
         dashboardPanelData.layout.hiddenQueries = [];
       }

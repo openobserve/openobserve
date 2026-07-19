@@ -123,7 +123,7 @@ export const emailConfig: PrebuiltConfig = {
         };
       }
     }
-    // CC and Subject fields removed - not supported by backend Email struct
+    // CC and Subject are not supported by the backend Email struct
     // {
     //   key: 'ccRecipients',
     //   label: 'CC Recipients (optional)',

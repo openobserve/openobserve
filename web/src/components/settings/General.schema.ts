@@ -5,11 +5,10 @@
 // chips are pure-UI controls with their own inline actions and are decoupled
 // OUTSIDE the form, so they are NOT in this schema.
 //
-// Restores the original BEFORE rules (truthy→Zod inversion):
-//   • scrapeInterval: `!!v || scrapeIntervalRequired` (+ HTML min=0)
-//       → required AND ≥ 0 (0 is a valid value).
-//   • maxSeriesPerQuery: empty→pass; else `v>=1000 && v<=1000000`
-//       → OPTIONAL, only range-checked when present (NOT required).
+// Rules:
+//   • scrape_interval: required AND ≥ 0 (0 is a valid value).
+//   • max_series_per_query: OPTIONAL, only range-checked (1000..1000000) when
+//     present.
 //
 // The <input type="number"> emits a string, so the rules read the raw value via
 // Number(); the submit handler coerces at use.
@@ -21,8 +20,7 @@ import { z } from "zod";
 
 const isEmpty = (v: unknown) => v === "" || v === null || v === undefined;
 
-// Factory (takes `t`) so the messages are localized like makeLicenseSchema /
-// makeAddEmailSchema, rather than hardcoded English. The component owns the
+// Factory (takes `t`) so the messages are localized. The component owns the
 // `t` instance and builds the schema once in setup().
 export const makeGeneralSettingsSchema = (t: (_key: string) => string) =>
   z.object({

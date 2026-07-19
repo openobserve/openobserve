@@ -753,7 +753,7 @@ export default defineComponent({
       return filtered;
     });
 
-    // E2: Also filter panelSchema.queries in sync with filteredData
+    // Also filter panelSchema.queries in sync with filteredData
     // to keep data[i] aligned with queries[i] in convertMultiSQLData
     const filteredPanelSchema = computed(() => {
       if (

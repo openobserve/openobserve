@@ -53,7 +53,7 @@ export function useTableCore<TData>(
   // ── Effective columns ───────────────────────────────────────────
   // When `showIndex` is set (and the caller hasn't already declared a `#`
   // column), prepend an auto-rendered, auto-numbered row-index column. Its
-  // value is derived from the row's position so pages no longer hand-roll a
+  // value is derived from the row's position so pages need not hand-roll a
   // `"#"` field in their data. Under server pagination we add the page offset
   // so numbering stays continuous across pages.
   const indexColumn = computed<OTableColumnDef<TData> | null>(() => {

@@ -14,9 +14,9 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Pure helpers for the traces SearchBar. Extracted so the change-
- * detection logic (mount-replay filter) can be unit-tested without
- * mounting the full SFC, which pulls in monaco / vuex.
+ * Pure helpers for the traces SearchBar change-detection logic
+ * (mount-replay filter), kept separate so they can be unit-tested without
+ * mounting the full SFC (which pulls in monaco / vuex).
  */
 
 /** Subset of `searchObj.data.datetime` that the comparison cares about. */

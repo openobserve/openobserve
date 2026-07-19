@@ -6,10 +6,6 @@
 // crossLinks composite (CrossLinkManager) has no OForm* equivalent so it stays
 // bare and is merged at submit (declared optional here for documentation).
 //
-// Restores the original BEFORE rule (truthy→Zod inversion):
-//   `!!v ? isValidTraceField || 'Use alphanumeric…' : nameRequired`
-//   → required (min 1) + regex(/^[a-zA-Z0-9+=,.@_-]+$/).
-//
 // Validation TIMING is owned by OForm (submit-then-change via revalidateLogic);
 // this file only describes WHAT is valid.
 
@@ -33,11 +29,11 @@ export const makeOrganizationSettingsSchema = (t: (_key: string) => string) =>
       .string()
       .min(1, t("common.nameRequired"))
       .regex(orgSettingsFieldNameRegex, FIELD_FORMAT_MESSAGE),
-    // Non-validated form state (R1-strict: still form-owned via OFormSwitch).
+    // Non-validated form state (still form-owned via OFormSwitch).
     toggleIngestionLogs: z.boolean().optional().default(false),
     usageStreamEnabled: z.boolean().optional().default(false),
-    // CrossLinkManager is a composite custom control (documented no-OForm*
-    // exception) — kept bare and merged at submit; optional so it never blocks.
+    // CrossLinkManager is a composite custom control — kept bare and merged at
+    // submit; optional so it never blocks.
     crossLinks: z.array(z.any()).optional(),
   });
 

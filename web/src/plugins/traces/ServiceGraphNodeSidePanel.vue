@@ -1377,7 +1377,7 @@ export default defineComponent({
     });
     const loadingOperations = ref(false);
 
-    // Dynamic resource tabs state (replaces per-resource recentNodes/recentPods/loadingNodes/loadingPods)
+    // Dynamic resource tabs state
     const resourceTabData = ref<Record<string, ResourceRow[]>>({});
     const resourceTabLoading = ref<Record<string, boolean>>({});
     // Resource groups from getDimensionAnalytics that match the current stream schema
@@ -2400,15 +2400,9 @@ export default defineComponent({
 
 <style scoped>
 /* keep(scrollbar): ::-webkit-scrollbar pseudo-elements have no utility form.
-
-   THEME NOTE (D7 is still an OPEN decision): this panel renders as a dark
-   indigo-tinted "glass" surface over the graph canvas in dark mode, but it has
-   always had a light treatment too (the panel body was white and the scrollbar
-   light). That light behaviour is preserved here — the light values are the
-   default and the dark-only values sit under `.dark &`, per the sanctioned
-   mechanism. Do NOT drop the light rules to make it always-dark until D7 is
-   actually answered; the previous description of it as "always-dark" did not
-   match what the code did. */
+   This panel has both a light treatment (default values) and a dark
+   indigo-tinted "glass" treatment (under `.dark &`). Keep the light rules — do
+   not make it always-dark. */
 .panel-content::-webkit-scrollbar {
   width: 0.5rem;
 }

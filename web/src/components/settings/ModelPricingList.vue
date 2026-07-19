@@ -32,8 +32,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Main List View -->
     <div v-if="!showImportModelPricingPage" class="flex flex-col h-full">
       <!-- List View Header -->
-      <!-- Standard section header: title + actions only. Tabs + search moved
-           into the table toolbar below. -->
+      <!-- Standard section header: title + actions only. Tabs + search live
+           in the table toolbar below. -->
       <AppPageHeader icon="paid" :subtitle="'LLM model cost configuration'" class="shrink-0 px-4 border-b border-border-default">
         <template #title>
           {{ t("modelPricing.header") }}

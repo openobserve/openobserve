@@ -22,7 +22,7 @@ defineOptions({ inheritAttrs: false });
 // tests target the actual interactive element via [data-test="…"] without
 // relying on element-tag/class selectors. Mirrors OInput / OFile patterns.
 // Also forward `data-test-value` so consumers that render N radios from a
-// list can target each option by its value (audit pattern shared with OSelect).
+// list can target each option by its value.
 const $attrs = useAttrs();
 const parentDataTest = computed(() => $attrs["data-test"] as string | undefined);
 const parentDataTestValue = computed(() => $attrs["data-test-value"] as string | undefined);

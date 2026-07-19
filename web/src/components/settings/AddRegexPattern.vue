@@ -368,7 +368,7 @@ export default defineComponent({
     // EDIT-prefill defaults as a typed computed. OForm reads `:default-values`
     // once at mount and the ODrawer (reka-ui `lazy`) unmounts/remounts its body
     // on close/open — so this re-seeds the form each time the drawer opens
-    // (edit → the loaded pattern, create → blank). No `formKey` remount hack.
+    // (edit → the loaded pattern, create → blank).
     const addRegexPatternDefaults = computed((): AddRegexPatternForm => {
       // "from logs" flow prefills the (non-saved) test string from the store.
       const testString =
@@ -467,15 +467,11 @@ export default defineComponent({
     // (the schema already gated it). `description` is the non-form local. OForm
     // awaits this handler → the ODrawer Save spinner is automatic (no isSaving).
     const saveRegexPattern = async (value: AddRegexPatternForm) => {
-      //payload for create and update regex pattern
-      // we need to send the name , pattern , description
       const payload = {
         name: value.name,
         pattern: value.pattern,
         description: value.description ?? "",
       };
-      //here we are emitting close and update:list to the parent component
-      //this is used to close the dialog and update the regex pattern list
       try {
         const response = props.isEdit
           ? await regexPatternService.update(

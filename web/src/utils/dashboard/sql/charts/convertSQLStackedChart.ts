@@ -20,7 +20,7 @@ import { type SQLContext } from "../shared/types";
 /**
  * Applies chart-specific options for: stacked
  *
- * Mutates `ctx.options` in place, exactly as the original switch case did.
+ * Mutates `ctx.options` in place.
  */
 export function applyStackedChart(ctx: SQLContext): void {
   const {

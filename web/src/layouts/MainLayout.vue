@@ -1366,12 +1366,12 @@ export default defineComponent({
 </script>
 
 <style scoped>
-/* keep(print): print/report-capture mode. This layout's root is the ONLY writer of
-   `.printMode` (store.state.printMode, above), so the rule can only ever fire on
-   descendants of that root — but `.hideOnPrintMode` is placed by other components
-   (VariableAdHocValueSelector, pipeline/PipelineEditor, Dashboards/ViewDashboard)
-   that render through <router-view> and so do not carry this scope id. :deep()
-   pierces to them while keeping the ancestor condition scoped to the owner. */
+/* keep(print): This layout's root is the ONLY writer of `.printMode` (store.state.printMode,
+   above), so the rule can only ever fire on descendants of that root — but
+   `.hideOnPrintMode` is placed by other components (VariableAdHocValueSelector,
+   pipeline/PipelineEditor, Dashboards/ViewDashboard) that render through
+   <router-view> and so do not carry this scope id. :deep() pierces to them while
+   keeping the ancestor condition scoped to the owner. */
 .printMode :deep(.hideOnPrintMode) {
   display: none;
 }

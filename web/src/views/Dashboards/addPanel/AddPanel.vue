@@ -325,15 +325,14 @@ export default defineComponent({
     });
 
     // ── Panel title OForm (header #tabs slot) ────────────────────────────────
-    // OWNER pattern (rule ③): this component renders <OForm> in the header slot
-    // and needs the form's state, so it creates the form with useOForm and reads
-    // it via form.useStore — ONE source, no projection mirror. `title` is
-    // entangled with the editor's dashboardPanelData.data.title (read by the save
-    // flow + width preview + QueryInspector), so it's a name=-owned field synced
-    // both ways with guards: form → editor below (so the editor sees typing), and
-    // editor → form (external-source sync for async edit-prefill / import;
-    // dontUpdateMeta avoids a post-submit "required" flash). The header Save
-    // submits via `form="add-panel-form"` (R4); loading is form-driven.
+    // This component renders <OForm> in the header slot and reads the form's
+    // state via form.useStore. `title` is entangled with the editor's
+    // dashboardPanelData.data.title (read by the save flow + width preview +
+    // QueryInspector), so it's a name=-owned field synced both ways with guards:
+    // form → editor below (so the editor sees typing), and editor → form
+    // (external-source sync for async edit-prefill / import; dontUpdateMeta
+    // avoids a post-submit "required" flash). The header Save submits via
+    // `form="add-panel-form"`; loading is form-driven.
     const addPanelSchema = makeAddPanelSchema(t);
     const form = useOForm<AddPanelForm>({
       defaultValues: { title: dashboardPanelData.data.title ?? "" },
@@ -552,11 +551,11 @@ export default defineComponent({
     let isPanelConfigWatcherActivated = false;
     const isPanelConfigChanged = ref(false);
 
-    // @submit fires only after the schema passes (title required+trim). The
-    // validated `value` is the source of truth (rule ②) — write it into the
-    // editor state, then run the existing save (which reads dashboardPanelData +
-    // does the deeper validatePanel checks). OForm awaits this → the header Save
-    // button shows its spinner from the form's isSubmitting (no useLoading).
+    // @submit fires only after the schema passes (title required+trim). Write
+    // the validated `value` into the editor state, then run the existing save
+    // (which reads dashboardPanelData + does the deeper validatePanel checks).
+    // OForm awaits this → the header Save button shows its spinner from the
+    // form's isSubmitting.
     const onSave = async (value: AddPanelForm) => {
       dashboardPanelData.data.title = value.title;
       const dashboardId = route.query.dashboard + "";
@@ -604,8 +603,8 @@ export default defineComponent({
             JSON.parse(JSON.stringify(panelData ?? {})),
           );
 
-          // FIX: For custom_chart panels, ensure customQuery flag is always true
-          // This prevents the query from being lost due to watchers that fire during mount
+          // For custom_chart panels, ensure customQuery flag is always true.
+          // This prevents the query from being lost due to watchers that fire during mount.
           if (dashboardPanelData.data.type === "custom_chart") {
             dashboardPanelData.data.queries.forEach((query: any) => {
               if (query.query) {
@@ -822,8 +821,8 @@ export default defineComponent({
         selectedDate.value = getSelectedDateFromQueryParams(route.query);
       }
 
-      // v4.0: In edit mode, if panel has panel-specific time, pre-populate
-      // the date picker so the user sees the same time context as view mode
+      // In edit mode, if panel has panel-specific time, pre-populate the date
+      // picker so the user sees the same time context as view mode.
       // Priority: URL panel params > saved panel_time_range > global (already set above)
       if (editMode.value) {
         const panelId = route.query.panelId as string;
@@ -1104,9 +1103,9 @@ export default defineComponent({
         // In add/edit panel mode, when time changes, this panel should always refresh
         panelIdToBeRefreshed.value = null;
 
-        // v4.0: In add/edit panel mode, ALWAYS use global date time picker for chart rendering
-        // Config date time (panel_time_range) is ONLY saved for view mode default
-        // Never use panel_time_range for chart rendering in edit mode
+        // In add/edit panel mode, ALWAYS use global date time picker for chart rendering.
+        // Config date time (panel_time_range) is ONLY saved for view mode default.
+        // Never use panel_time_range for chart rendering in edit mode.
         const date = dateTimePickerRef.value?.getConsumableDateTime();
         const effectiveTime = {
           start_time: new Date(date.startTime),
@@ -1551,11 +1550,10 @@ export default defineComponent({
       }
 
       // Grow with the title, but clamp to a 200px floor so the inside label
-      // ("Name of Panel *") always fits. The floor/ceiling used to come from
-      // the scoped `.dynamic-input` class, but that rule's `data-v-*` selector
-      // no longer matches OInput through the OFormInput → Field wrapper layers,
-      // so enforce the bounds inline — inline styles fall through via $attrs and
-      // DO reach the input.
+      // ("Name of Panel *") always fits. Bounds are enforced inline because the
+      // scoped `.dynamic-input` selector doesn't match OInput through the
+      // OFormInput → Field wrapper layers; inline styles fall through via $attrs
+      // and DO reach the input.
       const contentWidth = Math.min(
         Math.max(dashboardPanelData.data.title.length * 8 + 60, 200),
         400,

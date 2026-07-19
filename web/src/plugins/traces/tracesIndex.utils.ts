@@ -14,9 +14,8 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Pure helpers for the traces page (`Index.vue`). Extracted so we can
- * unit-test the LLM Insights time-range resolution without mounting
- * the entire SFC.
+ * Pure helpers for the traces page (`Index.vue`), kept separate so the LLM
+ * Insights time-range resolution can be unit-tested without mounting the SFC.
  */
 
 export interface TraceDatetime {

@@ -54,7 +54,7 @@ export function escapeHtml(str: string): string {
   const s = typeof str === "string" ? str : String(str);
   return s
     .replace(/&/g, "&amp;") // Must be first: & → &amp;
-    .replace(/</g, "&lt;") // Less than: < → &lt;
-    .replace(/>/g, "&gt;") // Greater than: > → &gt;
-    .replace(/"/g, "&quot;"); // Double quote: " → &quot;
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
 }

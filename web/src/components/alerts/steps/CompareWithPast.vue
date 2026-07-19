@@ -74,12 +74,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- Reference Windows List -->
-      <!-- Rule ① note: `:key` stays the row UUID (NOT the array index) BECAUSE
-           the only per-row control is CustomDateTimePicker — a genuine non-form
-           widget bound by OBJECT reference (`v-model="picker.offSet"`), not by an
-           index-based OForm* `name=`. The mid-list-delete index bug that forces
-           `:key="index"` on OForm* field-arrays therefore does not apply here.
-           The multi_time_range array is bridged into the ONE form via
+      <!-- `:key` is the row UUID (NOT the array index) because the only per-row
+           control is CustomDateTimePicker — a non-form widget bound by object
+           reference (`v-model="picker.offSet"`), not by an index-based OForm*
+           `name=`. The multi_time_range array is bridged into the form via
            setFieldValue (descendant) / emit (bare) — see commit(). -->
       <div
         v-for="(picker, index) in localMultiTimeRange"
@@ -235,14 +233,13 @@ export default defineComponent({
     const { t } = useI18n();
     const store = useStore();
 
-    // ── inject-or-own (Rule ③) ─────────────────────────────────────────────
-    // CompareWithPast has NO OForm* fields — its only per-row control is the
-    // CustomDateTimePicker, a genuine NON-form widget (a relative/absolute
-    // date-time dropdown, NOT a plain input). Per Rule ② it stays BARE and its
-    // value is BRIDGED into the form. When a parent OForm exists (DESCENDANT
-    // mode) we write the multi_time_range array straight into that ONE form via
-    // setFieldValue; otherwise we keep the pre-migration emit (bare) so the
-    // parent's @update:multiTimeRange→setF bridge stays the write path.
+    // CompareWithPast has no OForm* fields — its only per-row control is the
+    // CustomDateTimePicker, a non-form widget (a relative/absolute date-time
+    // dropdown, not a plain input). It stays bare and its value is bridged into
+    // the form: when a parent OForm exists (descendant mode) we write the
+    // multi_time_range array straight into that form via setFieldValue;
+    // otherwise we emit (bare) so the parent's @update:multiTimeRange→setF
+    // bridge stays the write path.
     const injectedForm = inject(FORM_CONTEXT_KEY, null);
     const hasParentForm = !!injectedForm;
 
@@ -335,11 +332,9 @@ export default defineComponent({
       return value;
     };
 
-    // Counted nouns → real vue-i18n plural forms ("{n} Minute | {n} Minutes"),
-    // called as t(key, n). This replaces the hand-rolled `+ 's'` English
-    // pluralization; output is byte-identical for every n the UI can produce
-    // (vue-i18n picks the singular form only for n === 1, matching the old
-    // `n !== 1 ? 's' : ''`, including n === 0 → "0 Minutes").
+    // Counted nouns → vue-i18n plural forms ("{n} Minute | {n} Minutes"),
+    // called as t(key, n). vue-i18n picks the singular form only for n === 1
+    // (n === 0 → "0 Minutes").
     const convertMinutesToDisplayValue = (minutes: number) => {
       if (minutes < 60) {
         return t("alerts.compareWithPast.minuteCount", minutes);

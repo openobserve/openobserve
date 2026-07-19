@@ -22,12 +22,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="section-header-accent w-0.75 h-4 rounded-default mr-2 shrink-0 bg-theme-accent" />
         <span class="section-header-title text-compact font-semibold tracking-[0.01em] text-text-heading">{{ t('alerts.queryConfig.sectionTitle') }}</span>
       </div>
-      <!-- DESCENDANT step (Rule ③): the AddAlert orchestrator owns the ONE
-           <OForm> and provides FORM_CONTEXT_KEY. The OForm* fields below bind by
-           nested `name=` (trigger_condition.*, query_condition.*, logGroupBy[])
-           into that form; the composed schema in AddAlert.schema.ts (which
-           reuses makeQueryConfigSchema) validates them on save. Non-form widgets
-           (tabs / editors / VRL / FilterGroup) live inside and are bridged. -->
+      <!-- Descendant step: the AddAlert orchestrator owns the ONE <OForm> and
+           provides FORM_CONTEXT_KEY. The OForm* fields below bind by nested
+           `name=` (trigger_condition.*, query_condition.*, logGroupBy[]) into that
+           form; the composed schema in AddAlert.schema.ts validates them on save.
+           Non-form widgets (tabs / editors / VRL / FilterGroup) are bridged. -->
       <div class="px-3 py-2 min-w-0 w-full box-border">
       <!-- Query Mode Tabs (hidden for real-time alerts) -->
       <div v-if="shouldShowTabs" class="mb-2 flex items-center justify-between">
@@ -1116,15 +1115,13 @@ export default defineComponent({
     const { t } = useI18n();
     const store = useStore();
 
-    // DESCENDANT step (Rule ③): the AddAlert orchestrator owns the ONE form and
-    // provides FORM_CONTEXT_KEY. All field reads/writes below go through it; the
-    // composed AddAlert schema (which reuses makeQueryConfigSchema) validates on
-    // save.
+    // Descendant step: the AddAlert orchestrator owns the ONE form and provides
+    // FORM_CONTEXT_KEY. All field reads/writes below go through it; the composed
+    // AddAlert schema validates on save.
     const form: any = inject(FORM_CONTEXT_KEY, null);
 
-    // ── Initial values for the discriminator refs below (the form itself is
-    // seeded by useAlertForm's defaults; `_meta` is kept fresh by the syncMeta
-    // watcher). Mirrors the pre-migration ref initializers verbatim. ──────────
+    // Initial values for the discriminator refs below (the form itself is seeded
+    // by useAlertForm's defaults; `_meta` is kept fresh by the syncMeta watcher).
     const isEventBasedInit = props.streamType !== "metrics";
     const initialSelectedFunction = isEventBasedInit
       ? (props.isAggregationEnabled && props.inputData.aggregation?.function
@@ -1146,19 +1143,14 @@ export default defineComponent({
       ).length > 0;
 
     // Field get/set helpers — the form is the single source of truth for the
-    // validated scalars; props.* stay a write-through copy for the SQL-gen path
-    // (mutated in place at each handler + emitted, unchanged from pre-migration).
+    // validated scalars; props.* stay a write-through copy for the SQL-gen path.
     //
     // `fv` must be BOTH fresh AND reactive:
     //  • `getFieldValue` is a synchronous read straight off TanStack's store, so a
     //    handler that just wrote a field reads its own write back in the same tick.
     //  • but `getFieldValue` is NOT a Vue reactive source. A `computed()` whose
-    //    getter only calls it therefore tracks NO dependency, so Vue caches the
-    //    FIRST result and never re-evaluates it. That silently broke every
-    //    fv-backed computed below: `cronExpression` cached "" at mount, so
-    //    `validateCron()` always saw an empty expression and pinned "Cron
-    //    expression and timezone are required" on screen — and `cronDescription`
-    //    stayed blank — even though the form held the seeded `0 */10 * * * *`.
+    //    getter only calls it tracks NO dependency, so Vue caches the FIRST result
+    //    and never re-evaluates it.
     // Touching the reactive values snapshot registers the dependency (so the
     // computeds invalidate on any form write); the value still comes from the
     // fresh synchronous read, so same-tick read-after-write stays correct.
@@ -1172,12 +1164,9 @@ export default defineComponent({
     };
 
     // Build a fresh aggregation object off the CURRENT form value (NEVER the
-    // readonly `props.inputData`), apply `mutate`, and write it back through the
-    // form. The pre-migration handlers mutated `props.inputData.aggregation` in
-    // place — that silently fails now the prop is the readonly form read-view
-    // ("Set operation … target is readonly"), so aggregation edits were lost and
-    // the stale object got re-seeded. Cloning + setFV keeps the form the single
-    // source of truth.
+    // readonly `props.inputData`, which is the readonly form read-view), apply
+    // `mutate`, and write it back through the form. Cloning + setFV keeps the form
+    // the single source of truth.
     const writeAggregation = (mutate: (agg: any) => void): any => {
       const current = fv("query_condition.aggregation");
       const next = current
@@ -1391,10 +1380,10 @@ export default defineComponent({
     // schema). Seeded from the shared initial const.
     const selectedFunction = ref(initialSelectedFunction);
 
-    // ── Form-backed scalar accessors (Rule ②: the form is the single source of
-    // truth; these writable computeds let the pre-migration handlers/watchers and
-    // the specs read/write the field values without a parallel ref). The `.vue`
-    // controls are name=-owned OForm* — these never drive a v-model. ──────────
+    // Form-backed scalar accessors: the form is the single source of truth; these
+    // writable computeds let handlers/watchers read/write the field values without
+    // a parallel ref. The `.vue` controls are name=-owned OForm* — these never
+    // drive a v-model.
     // Log/metric MEASURE column → aggregation.having.column.
     const logMeasureColumn = computed<any>({
       get: () => fv("query_condition.aggregation.having.column") ?? "",

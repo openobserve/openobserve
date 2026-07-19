@@ -3,20 +3,15 @@
 // Validation schemas for the two self-owned dialogs in OrganizationManagement.vue
 // (meta-org admin): the External Contract dialog and the Extend-Trial dialog.
 //
-// Both dialogs previously gated their POST on imperative JS guards inside the
-// @click:primary handlers (a toast + early-return for a missing contract end
-// date). Those guards are replaced here by Zod rules wired to <OForm>, so the
-// footer Save + Enter submit through `form-id` and validation is schema-driven.
-//
-// Validation TIMING is owned by OForm (submit-then-change via revalidateLogic);
-// these schemas only describe WHAT is valid.
+// Validation timing is owned by OForm (submit-then-change via revalidateLogic);
+// these schemas only describe what is valid.
 
 import { z } from "zod";
 
 // ── External Contract dialog ─────────────────────────────────────────────────
 // The single date field is required. The message is mode-aware so it reads
 // "End date is required." when creating a new contract and "New end date is
-// required." when extending an existing one (mirrors the old toast guards).
+// required." when extending an existing one.
 export const makeContractSchema = (mode: "create" | "extend") =>
   z.object({
     contractEndDate: z

@@ -27,7 +27,7 @@ withDefaults(
     value: string | number;
     /** Optional display override for the key segment (e.g. a shortened key). */
     keyLabel?: string;
-    /** Show a `key=value` hover tooltip. Default false (main had none). */
+    /** Show a `key=value` hover tooltip. Default false. */
     tooltip?: boolean;
   }>(),
   { tooltip: false },

@@ -211,18 +211,17 @@
         validator: (value: string) => ['alerts', 'pipelines'].includes(value),
     },
     /**
-     * Dual-mode switch (alerts-migration.md §A). When set, this group passes
-     * the prefix down recursively — the child at index i (leaf condition OR
-     * nested group) gets `${namePrefix}.conditions[${i}]` — so every
-     * FilterCondition binds its OForm* fields into the injected TanStack form
-     * at the exact nested path. When empty (default): today's BARE behavior,
-     * unchanged (pipeline's NodeForm/Condition.vue consumes it bare —
-     * a permanent, sanctioned mode).
+     * Dual-mode switch. When set, this group passes the prefix down
+     * recursively — the child at index i (leaf condition OR nested group) gets
+     * `${namePrefix}.conditions[${i}]` — so every FilterCondition binds its
+     * OForm* fields into the injected TanStack form at the exact nested path.
+     * When empty (default): bare behavior (pipeline's NodeForm/Condition.vue
+     * consumes it bare).
      *
-     * 🔑 The v-for `:key` MUST stay the array INDEX: the OForm* fields bind by
-     * index-based name and do NOT re-bind when the name changes — a stable-id
-     * key would leave rendered inputs shifted/blank after a mid-list delete
-     * (START-HERE Rule ①).
+     * GOTCHA: the v-for `:key` MUST stay the array INDEX — the OForm* fields
+     * bind by index-based name and do NOT re-bind when the name changes; a
+     * stable-id key would leave rendered inputs shifted/blank after a mid-list
+     * delete.
      */
     namePrefix: {
         type: String,
@@ -250,7 +249,6 @@
   const { isDark } = useTheme();
   const { t } = useI18n();
 
-  // V2: Use logicalOperator (AND/OR) instead of label (and/or)
   const label = ref(props.group.logicalOperator?.toLowerCase() || 'and');
 
   const confirmDialog = ref({
@@ -266,18 +264,12 @@
   // `groups` in place (performRemoveCondition et al) — assigning it raw makes
   // those writes silently fail ("target is readonly").
   //
-  // NOT deep. `deep: true` was correct pre-migration, when formData was a plain
-  // `ref()` mutated IN PLACE — the object identity never changed, so a deep watch
-  // was the only way to see an edit. The form store replaces values IMMUTABLY on
-  // every change, so props.group already arrives as a new reference and a
-  // reference watch sees every edit.
-  //
-  // Keeping both was the worst of the two models: deep fired on every nested
-  // mutation, and each firing cloneDeep'd the whole subtree — once per nested
-  // FilterGroup. That is what put ~213ms of scripting into a single click.
+  // Intentionally NOT deep: the form store replaces values immutably on every
+  // change, so props.group arrives as a new reference and a reference watch
+  // sees every edit. A deep watch would cloneDeep the whole subtree on every
+  // nested mutation, once per nested FilterGroup.
   watch(() => props.group, (newGroup) => {
     groups.value = cloneDeep(newGroup);
-    // V2: Use logicalOperator instead of label
     label.value = newGroup.logicalOperator?.toLowerCase() || 'and';
   });
 
@@ -375,7 +367,6 @@
   const toggleLabel = (newLabel?: string) => {
     // Capture any in-place bare-mode leaf edits before mutating + emitting.
     syncWorkingCopyFromProp();
-    // V2: Use logicalOperator instead of label
     // If newLabel is provided, use it; otherwise toggle
     if (newLabel) {
       groups.value.logicalOperator = newLabel.toUpperCase();
@@ -389,7 +380,6 @@
   const removeCondition = (id: string) => {
     // Capture any in-place bare-mode leaf edits before reading/mutating + emitting.
     syncWorkingCopyFromProp();
-    // V2: Use conditions array instead of items
     // First, check what will happen after removing this condition
     const itemsAfterRemoval = groups.value.conditions.filter((item: any) => item.id !== id);
     const hasConditionsAfterRemoval = itemsAfterRemoval.some((item: any) => !isGroup(item));
@@ -406,8 +396,7 @@
         message: t('alerts.filters.deleteConditionMessage'),
         // Pluralized by vue-i18n (`one | other`). This branch is guarded by
         // `subGroupCount > 0`, so n is always >= 1 and vue-i18n's default rule
-        // (1 -> one, >=2 -> other) reproduces the previous hand-rolled
-        // `subGroupCount > 1 ? 's' : ''` output exactly.
+        // (1 -> one, >=2 -> other) applies.
         warningMessage: t(
           'alerts.filters.deleteConditionSubGroupWarning',
           { count: subGroupCount },
@@ -429,7 +418,6 @@
     // Capture any in-place bare-mode leaf edits before mutating + emitting (this
     // may run deferred from the confirm-dialog okCallback).
     syncWorkingCopyFromProp();
-    // V2: Use conditions array instead of items
     groups.value.conditions = groups.value.conditions.filter((item: any) => item.id !== id);
 
     // Check if there are any conditions left (not sub-groups)
@@ -451,7 +439,6 @@
   const reorderItems = () => {
     // Capture any in-place bare-mode leaf edits before mutating + emitting.
     syncWorkingCopyFromProp();
-    // V2: Use conditions array instead of items
     // Separate conditions and groups
     const conditions = groups.value.conditions.filter((item: any) => !isGroup(item));
     const subGroups = groups.value.conditions.filter((item: any) => isGroup(item));

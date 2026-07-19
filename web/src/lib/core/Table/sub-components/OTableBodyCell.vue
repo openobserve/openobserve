@@ -54,8 +54,8 @@ const emit = defineEmits<{
 const meta = computed(() => props.cell.column.columnDef.meta as any);
 const align = computed(() => meta.value?.align ?? "left");
 
-// Record-name column → weight 500 (HANDOFF §8.2). Metadata columns stay 400.
-// Only the default-rendered text path uses this; custom cells style their own.
+// Record-name column weight. Only the default-rendered text path uses this;
+// custom cells style their own.
 const defaultTextClass = computed(() => [
   "text-text-body",
 ]);

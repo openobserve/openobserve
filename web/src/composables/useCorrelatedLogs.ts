@@ -125,16 +125,6 @@ export function useCorrelatedLogs(props: CorrelatedLogsProps) {
   // Number of correlated log streams available
   const logStreamsCount = computed(() => props.logStreams.length);
 
-  // REMOVED: getDefaultSemanticPatterns() function
-  // No longer needed - we use exact field names from StreamInfo.filters
-
-  // REMOVED: loadSemanticPatterns() function
-  // No longer needed - we use exact field names from StreamInfo.filters
-
-  // REMOVED: getSemanticToFieldMapping() function
-  // No longer needed - we use exact field names from StreamInfo.filters
-  // The /_correlate API (or fallback) provides the correct field names for each stream
-
   /**
    * Build SQL queries for ALL correlated log streams.
    * Each stream gets its own independent query using its exact field names from StreamInfo.filters.

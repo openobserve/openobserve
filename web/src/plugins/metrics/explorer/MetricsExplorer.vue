@@ -38,10 +38,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          items-start to let chips grow — that only left the controls top-aligned
          and visibly out of line with each other. -->
     <!-- `p-1.5`, the SAME padding the Logs and Traces toolbars use
-         (SearchBar.vue:23 / traces SearchBar.vue:19). It was `px-4 py-2`, which
-         put the mode toggle 10px further right than the Logs one — switching
-         Logs -> Metrics visibly jumped the control that is in the same place on
-         both pages. The toolbars are the same object; they must share geometry. -->
+         (SearchBar.vue:23 / traces SearchBar.vue:19). The toolbars are the same
+         object; they must share geometry. -->
     <div
       class="flex items-center gap-2 shrink-0 p-1.5 border-b border-border-default"
       data-test="metrics-explorer-filter-bar"
@@ -86,8 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="metrics-explorer-mode-workspace"
         >
           <!-- The SAME ♥ the card's button carries: the icon the user clicks to
-               fill this tab is the icon that names it. `workspaces` was left over
-               from when this was called Scratchpad.
+               fill this tab is the icon that names it.
 
                `favorite-border` (outline), not the filled `favorite`: a filled
                heart is the card's ON state — on a tab it reads as "already
@@ -642,10 +639,7 @@ const ROW_GAP = 12;
 const CARD_HEIGHT = 224;
 /**
  * Card height + the gap. The row box is sized to exactly this.
- *
- * The same in both views: rows view used to squeeze the card into 76px, which
- * left the chart a 56px strip — too short to read, which defeats the point of
- * the wider layout. One constant rather than two, so they cannot drift.
+ * The same in both views (one constant rather than two, so they cannot drift).
  */
 const ROW_HEIGHT = CARD_HEIGHT + ROW_GAP;
 
@@ -697,11 +691,8 @@ export default defineComponent({
     // prefix of the full sorted set, so colours stay stable as pages are added.
     const visibleCards = computed(() => grid.pagedCards.value);
 
-    // Just the count. It used to append "· N no-data hidden", but the checkbox
-    // sitting right beside it already says the no-data cards are hidden — the
-    // suffix restated the control next to it and wrapped onto two lines doing
-    // it. The exact number still appears where it is actually needed: the empty
-    // state, where it explains why the grid has nothing in it.
+    // Just the count. The exact number still appears where it is actually
+    // needed: the empty state, where it explains why the grid has nothing in it.
     const resultCountLabel = computed(() => {
       const shown = visibleCards.value.length;
       const total = grid.cards.value.length;
@@ -712,9 +703,6 @@ export default defineComponent({
 
     /* ---------------------------------------------------------- toolbar */
 
-    // No "Recent". It ranked by what you had opened, which in practice is a
-    // handful of metrics out of thousands — so the option mostly reordered
-    // nothing, and it made the sort control a three-way choice to say it.
     const sortOptions = computed(() => [
       { value: "a-z", label: t("metrics.explorer.sortAsc") },
       { value: "z-a", label: t("metrics.explorer.sortDesc") },
@@ -1553,9 +1541,7 @@ export default defineComponent({
           // it was hidden can never come back otherwise (hidden ⇒ not rendered ⇒
           // not queried ⇒ still hidden). The sweep re-queries them WHERE THEY ARE,
           // still hidden, and they return to the grid only if they now have
-          // samples. Un-hiding them first (which is what this used to do) put
-          // every no-data card back on screen and left the ones nobody scrolled
-          // to sitting there.
+          // samples.
           //
           // An auto-refresh tick sweeps too, but without `skipCache` — it picks
           // up cards the user has not reached yet and leaves the known-empty ones

@@ -296,7 +296,6 @@ export default defineComponent({
           route.query.folder ?? "default",
         );
 
-        // emit refresh to rerender
         emit("refresh");
 
         showPositiveNotification("Dashboard updated successfully.");
@@ -310,7 +309,6 @@ export default defineComponent({
         } else {
           showErrorNotification(error?.message ?? "Tab reorder failed");
         }
-        // emit refresh to rerender
         emit("refresh");
         await getDashboardData();
       }
@@ -339,12 +337,10 @@ export default defineComponent({
             editTabObj.data,
           );
 
-          // emit refresh to rerender
           emit("refresh");
           await getDashboardData();
 
           showPositiveNotification("Tab updated successfully");
-          // reset edit mode
           editTabId.value = null;
           editTabObj.data = {};
         }
@@ -359,14 +355,12 @@ export default defineComponent({
           showErrorNotification(error?.message ?? "Tab updation failed");
         }
 
-        // emit refresh to rerender
         emit("refresh");
         await getDashboardData();
       }
     };
 
     const cancelEdit = () => {
-      // reset edit mode
       editTabId.value = null;
       editTabObj.data = {};
     };
@@ -379,7 +373,6 @@ export default defineComponent({
     const deleteItem = async (tabId: any) => {
       tabIdToBeDeleted.value = tabId;
       await nextTick();
-      // call cancelEdit to reset edit mode
       cancelEdit();
       deletePopupVisible.value = true;
     };
@@ -395,7 +388,6 @@ export default defineComponent({
         );
         await getDashboardData();
 
-        // emit event
         emit("refresh");
 
         tabIdToBeDeleted.value = null;

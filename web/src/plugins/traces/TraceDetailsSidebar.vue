@@ -1810,7 +1810,7 @@ export default defineComponent({
           // Use filters from logStreams[0] as matchedDimensions — these contain
           // the correct field names for the log stream (e.g., k8s_namespace_name)
           // instead of semantic IDs (k8s-namespace) or trace field names
-          // (service_k8s_namespace_name). Same fix as 9127b6172 for incidents.
+          // (service_k8s_namespace_name).
           const logFilters =
             correlationData.related_streams.logs?.[0]?.filters || {};
           const actualMatchedDimensions =
@@ -2120,10 +2120,9 @@ export default defineComponent({
 </script>
 
 <style lang="scss" scoped>
-/* keep: everything below is deliberate CSS — generated content the template
-   can't class up, child-component internals reached with :deep(), :fullscreen
-   chains, and scrollbar rails. Anything expressible as a utility already
-   moved into the template. */
+/* keep(complex-state): Deliberate CSS — generated content the template can't class up,
+   child-component internals reached with :deep(), :fullscreen chains, and
+   scrollbar rails. */
 
 /* generated-content — highlightedJSON()/highlightTextMatch() build these spans
    as HTML strings, so scoped classes can't reach them; colours come from the
@@ -2316,10 +2315,9 @@ export default defineComponent({
 .traces-events-table-container :deep(.table-container) {
   border-radius: 0 !important;
 }
-/* keep(complex-state): sticky header cells for the links table — position:sticky
-   must sit on the cells (tr > *), not the <thead>, so it cannot be a utility on
-   the thead element this template owns. Migrated from styles/utilities.css;
-   the former .tfoot-sticky twin was deleted (no consumer). */
+/* sticky header cells for the links table — position:sticky must sit on the
+   cells (tr > *), not the <thead>, so it cannot be a utility on the thead
+   element this template owns. */
 .thead-sticky tr > * {
   position: sticky;
   opacity: 1;

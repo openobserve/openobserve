@@ -174,14 +174,14 @@ onMounted(async () => {
     const json = await res.json();
     webinarData.value = json?.data ?? null;
   } catch {
-    // silently ignore â€” banner simply won't show
+    // silently ignore — banner simply won't show
   }
 });
 </script>
 
 <style scoped>
 /* keep(keyframes): the "live" badge dot pulse is used only by this banner. The
-   `animation` is declared here, not as a template `[animation:â€¦]` utility, so
+   `animation` is declared here, not as a template `[animation:…]` utility, so
    Vue's scoped compiler renames the keyframe and this reference together. */
 .webinar-home-badge-dot {
   animation: badge-pulse 1.8s ease-in-out infinite;

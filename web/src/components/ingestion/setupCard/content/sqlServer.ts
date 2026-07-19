@@ -45,9 +45,8 @@ const applyGrants = (connect: string) => `${connect} -Q "
 ${GRANT_SQL}
 "`;
 
-// Verified single-receiver config (the blog's redundant `sqlserver/1` is dropped).
-// Only the exporter endpoint + token are substituted per-org; {server}/{port} are
-// filled live from the configure step's inputs.
+// Single-receiver config. Only the exporter endpoint + token are substituted
+// per-org; {server}/{port} are filled live from the configure step's inputs.
 const CONFIG_YAML = `receivers:
   sqlserver:
     collection_interval: 10s

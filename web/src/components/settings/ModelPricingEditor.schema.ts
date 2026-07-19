@@ -1,26 +1,19 @@
 // Copyright 2026 OpenObserve Inc.
 //
-// Full validation schema for ModelPricingEditor.vue — scalars (name +
-// match_pattern) AND the dynamic tiers/prices array.
+// Validation schema for ModelPricingEditor.vue — scalars (name +
+// match_pattern) and the dynamic tiers/prices array.
 //
 // The API model stores prices as a `{ key: perTokenPrice }` MAP; TanStack
 // field-arrays operate on ARRAYS, so the form models prices as an array of
 // `{ key, value }` rows (value held as PER-MILLION for display). The component
 // converts map↔rows at edit-prefill and submit.
 //
-// Restores the manual-`:error` BEFORE rules (inventory §6b) AND the imperative
-// save() guards as schema rules:
-//   • name:          required + max 256
-//   • match_pattern: required + max 512 + valid RegExp (Rust inline flags stripped)
-//   • price-row key:        not a pure integer, no spaces  (per row)
-//   • condition.usage_key:  not a pure integer  (non-default tiers)
-//
 // Two structural rules with no single field to attach to — "default tier needs
 // ≥1 non-zero price" and "a draft price has a value but no key" — stay as
 // submit-handler guards (toasts), since they don't map to one OForm* field.
 //
-// Validation TIMING is owned by OForm (submit-then-change via revalidateLogic);
-// this file only describes WHAT is valid.
+// Validation timing is owned by OForm (submit-then-change via revalidateLogic);
+// this file only describes what is valid.
 
 import { z } from "zod";
 

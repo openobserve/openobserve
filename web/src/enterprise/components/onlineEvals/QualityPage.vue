@@ -42,10 +42,9 @@
       />
     </section>
 
-    <!-- Tier 2: the configs table is now the persistent view; selecting a
-         row opens the detail in a right-side ODrawer (70% width) instead
-         of replacing the whole page. The user keeps full context of the
-         list behind the drawer. -->
+    <!-- Tier 2: the configs table is the persistent view; selecting a
+         row opens the detail in a right-side ODrawer (70% width). The user
+         keeps full context of the list behind the drawer. -->
     <div class="quality-page__tier2 grid gap-3 min-h-0 flex-1"
       style="grid-template-columns: minmax(0, 1fr)"
     >
@@ -174,12 +173,8 @@ const { isLoading, kpis, deltaByKpi, refresh } = useQualityData(
   agentFilterRef,
 );
 
-// Evaluation cost is intentionally hidden until the backend writes cost data.
-// To restore it, remove this filter and re-add `kpis` to the v-for.
-// Now that `gen_ai_usage_cost` on `_evaluator` is populated, the
-// Evaluation Cost card is sourced live (see useQualityData) — no longer
-// hidden. Keep the set in place so future placeholder KPIs can be
-// hidden the same way without touching the render loop.
+// Placeholder KPIs can be hidden here without touching the render loop — add
+// their ids to this set to filter them out of the v-for.
 const HIDDEN_KPI_IDS = new Set<string>();
 const visibleKpis = computed(() =>
   kpis.value.filter((k) => !HIDDEN_KPI_IDS.has(k.id)),

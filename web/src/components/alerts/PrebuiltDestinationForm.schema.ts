@@ -3,13 +3,12 @@
 // Validation schema for PrebuiltDestinationForm.vue (config-driven credentials).
 //
 // The schema is built DYNAMICALLY from `getPrebuiltConfig(type).credentialFields`
-// for the ACTIVE destination type — preserving that config as the SINGLE SOURCE
-// OF TRUTH for the per-type required + validator rules (exactly mirroring the old
-// hand-rolled `validate()` loop this migration removes). The parent remounts this
-// form (its `:key` includes destination_type) whenever the type changes, so the
-// schema is always rebuilt for the active type at setup.
+// for the ACTIVE destination type — that config is the SINGLE SOURCE OF TRUTH for
+// the per-type required + validator rules. The parent remounts this form (its
+// `:key` includes destination_type) whenever the type changes, so the schema is
+// always rebuilt for the active type at setup.
 //
-// Per credential field (byte-for-byte the pre-migration `validate()` semantics):
+// Per credential field:
 //   • required + empty            → `${label} is required`   (validator NOT run)
 //   • required/optional + present → run `field.validator` (if any); its returned
 //                                    i18n message becomes the field's error
@@ -58,9 +57,8 @@ const toggleSchema = () =>
 /**
  * Build the Zod schema for one destination type from its `credentialFields`.
  * Toggle fields → boolean; every other field → string. The required + custom
- * validator rules are enforced in a single object-level `superRefine` that
- * reproduces the old `validate()` loop exactly (so TanStack routes each issue to
- * the field whose `name` matches the credential key).
+ * validator rules are enforced in a single object-level `superRefine` (so
+ * TanStack routes each issue to the field whose `name` matches the credential key).
  */
 export const makePrebuiltDestinationSchema = (
   t: (_key: string, _named?: Record<string, unknown>) => string,

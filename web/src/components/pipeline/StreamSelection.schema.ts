@@ -4,17 +4,15 @@
 // Built via a factory so the name-required message stays i18n-driven (pass
 // useI18n's `t`).
 //
-// Field ownership (R1-strict — every editable control is form-owned):
-//   • name        — required + character regex. RESTORED conditional req+regex
-//                   from the BEFORE baseline (truthy→Zod inversion): empty → the
-//                   name-required message; non-empty → the alphanumeric regex.
+// Fields:
+//   • name        — required + character regex: empty → the name-required
+//                   message; non-empty → the alphanumeric regex.
 //   • description — optional.
 //   • stream_type — required ('Field is required!').
 //   • stream_name — required ('Field is required!').
 
 import { z } from "zod";
 
-// Same character set the old `isValidName` computed enforced.
 export const streamSelectionNameRegex = /^[a-zA-Z0-9+=,.@_-]+$/;
 
 export const makeAddPipelineSchema = (t: (_key: string) => string) =>

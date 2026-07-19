@@ -321,8 +321,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                          middle delete, but each field's `form.Field` binds to its
                          `name` at creation and does NOT re-bind when the name
                          shifts — so reused rows would show stale (shifted) values.
-                         Index keys keep each position's name fixed. (Same pattern
-                         as CreateDestinationForm's headers.) -->
+                         Index keys keep each position's name fixed. -->
                     <div
                       v-for="(_entry, entryIdx) in tier.prices"
                       :key="entryIdx"
@@ -563,9 +562,7 @@ const orgIdentifier = computed(
   () => store.state.selectedOrganization?.identifier || "",
 );
 
-// Scalar validation is now schema-driven (name + match_pattern). The manual
-// nameError/regexError computeds + nameTouched/patternTouched refs + the
-// :disabled Save gate are gone (R3).
+// Scalar validation is schema-driven (name + match_pattern).
 const modelPricingSchema = makeModelPricingSchema(t);
 
 const isEdit = computed(
@@ -585,11 +582,10 @@ const modelPricingDefaults = computed(
   (): ModelPricingForm => modelToForm(model.value),
 );
 
-// Rule ③ OWNER pattern: this component OWNS <OForm> and must read the form-owned
-// `tiers` array reactively to drive the v-for rows, so it creates the form here
-// with useOForm and hands it to <OForm :form="form"> — ONE source of truth, no
-// mirror ref / store.subscribe copy. `save` is the awaited submit handler (auto
-// Save spinner). Async edit-prefill re-seeds via form.reset() once data loads.
+// This component reads the form-owned `tiers` array reactively to drive the
+// v-for rows, so it creates the form here with useOForm and hands it to
+// <OForm :form="form">. `save` is the awaited submit handler (auto Save
+// spinner). Async edit-prefill re-seeds via form.reset() once data loads.
 const form = useOForm<ModelPricingForm>({
   defaultValues: modelPricingDefaults.value,
   schema: modelPricingSchema,
@@ -679,9 +675,8 @@ function formToModelTiers(tiers: any[]): any[] {
   });
 }
 
-// Replace the whole form-owned tiers array (the safe field-array mutation, as
-// CreateDestinationForm does for `headers`); `formTiers` (form.useStore) re-syncs
-// reactively and the template re-renders.
+// Replace the whole form-owned tiers array; `formTiers` (form.useStore)
+// re-syncs reactively and the template re-renders.
 function setTiers(next: any[]) {
   form.setFieldValue("tiers", next, { dontUpdateMeta: true });
 }
@@ -871,16 +866,16 @@ function notifyError(prefix: string, e: any) {
 }
 
 // @submit handler. The schema validates name/match_pattern + per-row key
-// validity + condition.usage_key before @submit fires (R3). Two STRUCTURAL
-// rules that don't map to a single field stay here as guards (toasts): a draft
-// row with a value but no key, and "the default tier needs ≥1 non-zero price".
+// validity + condition.usage_key before @submit fires. Two STRUCTURAL rules
+// that don't map to a single field stay here as guards (toasts): a draft row
+// with a value but no key, and "the default tier needs ≥1 non-zero price".
 // `value` is the raw form value (per-million ROW shape); convert to the API
 // (per-token MAP) shape for the payload.
 async function save(value?: ModelPricingForm) {
   const tiers = (value?.tiers ?? formTiers.value) as any[];
 
   // Draft-row guards: a non-empty draft key must be a valid usage key; a draft
-  // with a value but no key is an error (mirrors the old addPrice/save guards).
+  // with a value but no key is an error.
   for (const tier of tiers) {
     const dk = String(tier.draftKey ?? "").trim();
     if (dk) {
@@ -1001,9 +996,8 @@ onBeforeMount(async () => {
           }
         }
         // Data arrived after mount → re-seed the whole form (scalars + the
-        // converted tier/price rows) once (the documented "async edit-prefill"
-        // pattern; not a per-keystroke watch). formTiers (form.useStore) updates
-        // reactively from the reset — no manual re-sync.
+        // converted tier/price rows) once. formTiers (form.useStore) updates
+        // reactively from the reset.
         form.reset(modelToForm(model.value));
       }
     } catch (e: any) {

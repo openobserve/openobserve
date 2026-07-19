@@ -309,7 +309,7 @@ export default defineComponent({
       },
     ];
 
-    // Zero-padded position label ("01", "02", …) matching the previous design.
+    // Zero-padded position label ("01", "02", …).
     const formatIndex = (variable: any) => {
       const index = dashboardVariablesList.value.indexOf(variable);
       return index < 9 ? `0${index + 1}` : `${index + 1}`;

@@ -59,7 +59,7 @@ export const calculateMetricFontSize = (
 /**
  * Applies chart-specific options for: metric
  *
- * Mutates `ctx.options` in place, exactly as the original switch case did.
+ * Mutates `ctx.options` in place.
  */
 export function applyMetricChart(ctx: SQLContext): void {
   const {

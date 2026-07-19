@@ -14,14 +14,14 @@
 //        <OTag value="whatever" />                       → generic semantic map
 //
 //   2. Manual (OBadge passthrough) — no `type`; drive it with `variant`, slots,
-//      `count`, etc. exactly like the old OBadge:
+//      `count`, etc.:
 //        <OTag variant="default-soft">Steps</OTag>
 //        <OTag variant="primary-soft" :count="12" />
 //        <OTag variant="teal-soft"><template #icon>…</template> Label </OTag>
 //
 // Per-call props (`label`, `variant`, `icon`, `dot`, `size`, `shape`) win over
 // the registry. Default size is "sm" for semantic (typed) badges and "md" for
-// manual badges, matching the legacy OBadge default.
+// manual badges.
 //
 // Label precedence (most → least specific):
 //   1. default slot      — arbitrary child content (spinner, tooltip, …)
@@ -95,19 +95,16 @@ const isEmpty = computed(
 
 const variant = computed<BadgeVariant>(() => {
   if (props.variant) return props.variant;
-  // Manual badge with neither a registry type nor a value → match the legacy
-  // OBadge default ("default") so a plain passthrough doesn't shift colour.
+  // Manual badge with neither a registry type nor a value → "default" variant so
+  // a plain passthrough doesn't shift colour.
   if (!props.type && normalizeKey(props.value) === "") return "default";
   return resolved.value.variant;
 });
-// Size precedence: prop → registry → "sm". `main`'s OTag defaulted every badge
-// to sm, so typed and untyped badges match height (e.g. builtin vs custom roles).
+// Size precedence: prop → registry → "sm".
 const size = computed<BadgeSize>(
   () => props.size ?? resolved.value.size ?? "sm",
 );
-// Shape precedence: prop → registry group → "pill". `main`'s OBadge was always
-// rounded-full (pill); only a few chips (logs/traces counts, status codes) were
-// rounded, and those groups set `shape:"rounded-sm"` explicitly.
+// Shape precedence: prop → registry group → "pill".
 const shape = computed<BadgeShape>(
   () => props.shape ?? resolved.value.shape ?? "pill",
 );

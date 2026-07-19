@@ -230,9 +230,8 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { buildUsageCombinedLinePanelSchema } from "./usageDailyPanelSchema";
 
-  let currentDate = new Date(); // Get the current date and time
+  let currentDate = new Date();
 
-  // Subtract 30 days from the current date
   let thirtyDaysAgo = new Date(currentDate.getTime() - 30 * 24 * 60 * 60 * 1000);
 
   export default defineComponent({

@@ -637,7 +637,7 @@ const fetchQuerySchema = async () => {
     clearFieldLabels(chartData.value);
     selectedTimeObj.value = { ...dashboardPanelData.meta.dateTime };
 
-    // Note: Alert status evaluation now happens via handleChartDataUpdate event from PanelSchemaRenderer
+    // Alert status evaluation happens via handleChartDataUpdate event from PanelSchemaRenderer
   } catch (error) {
     // Discard stale error fallback if a newer request has started.
     if (requestId !== schemaRequestId.value) return;

@@ -126,16 +126,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 icon="edit"
                 :done="step > 1"
               >
-                <!-- Dashboard field-array. One fixed row today (no add/remove
-                     UI), iterated so the array structure is preserved and the
-                     controls bind by their `dashboards[i].*` form name. Row
-                     content + per-row report_type read come from the form via the
-                     reactive `dashboardRows` mirror.
-                     KEY: index (stable for the single, non-reorderable row). A
-                     value-derived key (folder + dashboard) remounts the whole row
-                     whenever the folder/dashboard changes, and remounting wipes
-                     each field's TanStack error meta — so picking a folder used to
-                     clear the still-empty dashboard/tab validation with it. -->
+                <!-- Dashboard field-array: one fixed row, iterated so the array
+                     structure is preserved and controls bind by their
+                     `dashboards[i].*` form name.
+                     KEY must be the index (stable): a value-derived key
+                     (folder + dashboard) would remount the row on folder/dashboard
+                     change, wiping each field's TanStack error meta. -->
                 <template
                   v-for="(dashboard, index) in dashboardRows"
                   :key="index"
@@ -144,12 +140,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :data-test="`add-report-dashboard-${index}`"
                     class="my-2 px-2 flex flex-col"
                   >
-                    <!-- items-start (not items-center): each OFormSelect cell is a
-                         column (label → select → error). When a validation error
-                         appears under one select, items-center would re-center the
-                         taller cell and shift its select out of line with the
-                         others; items-start keeps all selects top-aligned and lets
-                         the error text flow downward. -->
+                    <!-- items-start (not items-center): keeps all selects
+                         top-aligned when a validation error appears under one and
+                         grows its cell taller. -->
                     <div class="flex items-start justify-start">
                       <div
                         data-test="add-report-folder-select"
@@ -527,11 +520,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </div>
                     </div>
 
-                    <!-- items-start (not items-center): when a Date/Time
-                         validation error appears below its cell, items-center
-                         would re-center the taller cell and drop the Timezone
-                         select out of line with the date/time inputs;
-                         items-start keeps all three top-aligned. -->
+                    <!-- items-start (not items-center): keeps the Date, Time and
+                         Timezone cells top-aligned when a validation error grows
+                         one of them taller. -->
                     <div
                       data-test="add-report-schedule-send-later-section"
                       v-if="selectedTimeTab === 'scheduleLater'"
@@ -773,11 +764,8 @@ const props = defineProps({
 // Payload skeleton — the non-form server fields (destinations, frequency shape,
 // timezone, timestamps, owner/lastEditedBy, ...) that aren't OForm-owned. It is
 // the save base in saveReport(): the validated @submit value overwrites the
-// form-owned parts on top of it. The dashboard row (folder/dashboard/tabs/
-// timerange/report_type/attachment dimensions) is now FORM-OWNED via the
-// `dashboards[i].*` field-array; only the dashboard `variables` stay
-// component-owned (the VariablesInput composite has no OForm* wrapper) and are
-// merged in at save time.
+// form-owned parts on top of it. Only the dashboard `variables` stay
+// component-owned (VariablesInput has no OForm* wrapper) and are merged in at save.
 const defaultReport = {
   dashboards: [
     {
@@ -830,17 +818,12 @@ const { t } = useI18n();
 const router = useRouter();
 const store = useStore();
 
-// ── OForm wiring (Rule ③ OWNER pattern) ──────────────────────────────────────
-// This page OWNS the <OForm> and must read form state to drive the OStepper /
-// v-if / v-for conditional rendering, so it creates the form here with useOForm
-// and hands it down via <OForm :form="form">. State is read reactively with
-// `form.useStore(selector)` (single source of truth — no mirror, no store
-// subscribe copy) and written with `form.setFieldValue(...)`. The save is wired
-// through useOForm({ onSubmit }); `formId` ties the page footer's Save (which
-// lives OUTSIDE the <form>) to the OForm via the native `form="<id>"` association
-// so footer-Save + Enter submit.
+// This page OWNS the <OForm> and reads form state to drive the OStepper /
+// v-if / v-for conditional rendering. State is read reactively with
+// `form.useStore(selector)` and written with `form.setFieldValue(...)`. `formId`
+// ties the page footer's Save (which lives OUTSIDE the <form>) to the OForm via
+// the native `form="<id>"` association so footer-Save + Enter submit.
 const formId = "create-report-form";
-// Co-located Zod schema (factory keeps cron min-interval + name messages live).
 const createReportSchema = makeCreateReportSchema(t, store.state?.zoConfig);
 const form = useOForm<CreateReportForm>({
   defaultValues: createReportDefaults(),
@@ -886,24 +869,19 @@ const frequencyTabs = [
   { label: "Custom", value: "custom" },
 ];
 
-// frequencyType + selectedTimeTab (OFormToggleGroup) and the dashboards rows are
-// FORM-OWNED. Read them REACTIVELY from the one form with form.useStore (single
-// source of truth — no mirror, no store-subscribe copy) so the template
-// conditionals (v-if / v-for / OStepper) update on every change, including async
-// edit prefill.
+// frequencyType, selectedTimeTab and the dashboards rows are form-owned; read
+// reactively via form.useStore so the template conditionals (v-if / v-for /
+// OStepper) update on every change, including async edit prefill.
 const frequencyType = form.useStore(
   (s: any) => s.values?.frequencyType ?? "once",
 );
 const selectedTimeTab = form.useStore(
   (s: any) => s.values?.selectedTimeTab ?? "scheduleNow",
 );
-// The dashboards field-array — the row v-for + per-row conditionals render from
-// this reactive view; the controls bind by `dashboards[i].*` name.
 const dashboardRows = form.useStore((s: any) => s.values?.dashboards ?? []);
 
-// The dashboard's `variables` stay component-owned (VariablesInput is a composite
-// with no OForm* equivalent + carries no validation); merged into the payload at
-// save.
+// The dashboard's `variables` stay component-owned (VariablesInput has no OForm*
+// equivalent and carries no validation); merged into the payload at save.
 const dashboardVariables = ref<{ key: string; value: string; id: string }[]>([]);
 
 const filteredTimezone: any = ref([]);
@@ -928,21 +906,17 @@ const isFetchingReport = ref(false);
 const isFetchingFolders = ref(false);
 const isFetchingDashboard = ref(false);
 
-// ── Form-driven Save loading (R3): the footer Save shows its spinner from the
-// form's awaited isSubmitting; Save itself stays enabled. Read reactively via
-// form.useStore (NOT a form.state snapshot, which a computed won't track). ─────
+// The footer Save shows its spinner from the form's awaited isSubmitting. Read
+// reactively via form.useStore (NOT a form.state snapshot, which a computed
+// won't track).
 const isSaving = form.useStore((s: any) => !!s.isSubmitting);
 
-// Read the form-owned `isCachedReport` reactively (single source of truth) for
-// the template conditionals that depend on it.
 const isCachedReportValue = form.useStore(
   (s: any) => !!s.values?.isCachedReport,
 );
 
 // Build a full form value from the typed defaults, with overrides for the seeded
-// values (used to reset the form for query/edit prefill). Everything is
-// form-owned now, so this no longer reads component state — callers pass the
-// dashboards row + scalars they want seeded.
+// values (used to reset the form for query/edit prefill).
 const buildFormValues = (
   overrides: Partial<CreateReportForm> = {},
 ): CreateReportForm => ({
@@ -950,9 +924,8 @@ const buildFormValues = (
   ...overrides,
 });
 
-// Seed the form's values (create-query / edit prefill). The form is created at
-// setup, so async-arriving data is applied with `form.reset(values)` (the
-// foundation reset rule — not a per-field setFieldValue loop).
+// Seed the form's values (create-query / edit prefill). Async-arriving data is
+// applied with `form.reset(values)`, not a per-field setFieldValue loop.
 const seedForm = async (values: CreateReportForm) => {
   await nextTick();
   form.reset(values);
@@ -994,9 +967,8 @@ onBeforeMount(async () => {
       })
       .catch((err) => {
         // Optional chaining throughout: this catch also receives non-HTTP
-        // rejections — a TypeError from malformed report data or the literal
-        // `true` that setDashboardOptions rejects with — so `err.response` may
-        // be undefined. (Mirrors the saveReport catch handler.)
+        // rejections (a TypeError from malformed data, or the literal `true`
+        // setDashboardOptions rejects with), so `err.response` may be undefined.
         if (err?.response?.status != 403) {
           toast({
             variant: "error",

@@ -257,7 +257,7 @@
               v-if="centeredStart"
               @select-prompt="selectWelcomePrompt"
             />
-            <!-- Sidepanel: minimal logo + title (unchanged) -->
+            <!-- Sidepanel: minimal logo + title -->
             <div
               v-else
               class="flex flex-col items-center justify-center h-full w-full"

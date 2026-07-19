@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
   <div class="p-0 h-full flex flex-col">
-    <!-- Standard page header: title + actions only. Search moved into the
+    <!-- Standard page header: title + actions only. Search lives in the
          table's own toolbar (built-in global filter). -->
     <AppPageHeader
       :title="t('organization.header')"

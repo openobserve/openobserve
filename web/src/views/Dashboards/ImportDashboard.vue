@@ -361,9 +361,9 @@ export default defineComponent({
     // store the results of the import (for files)
     const filesImportResults = ref([]);
 
-    // OWNER pattern (rule â‘¢): the page owns <OForm> (url + jsonFiles) and the
+    // OWNER pattern: the page owns <OForm> (url + jsonFiles) and the
     // fetch/parse watchers + import logic read those values, so it creates the
-    // form with useOForm and reads it via form.useStore â€” ONE source, no mirror.
+    // form with useOForm and reads it via form.useStore — ONE source, no mirror.
     // url/jsonFiles are name=-owned; every write goes through setFormField. The
     // deep JSON validation + recovery inputs + the Monaco editor stay outside the
     // form (documented no-OForm* exceptions).

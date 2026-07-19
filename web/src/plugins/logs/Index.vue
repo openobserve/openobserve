@@ -80,7 +80,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                      No right/bottom gutter here: the field list runs into the
                      divider so its scrollbar sits on the panel edge, and scrolls
                      into the panel foot. The stream selector is the exception and
-                     pads its own right edge (see IndexList) â€” it's a control, not
+                     pads its own right edge (see IndexList) — it's a control, not
                      a scrolling surface. -->
                 <div class="relative-position h-full pt-2.5 pl-2.5 border-r border-border-default bg-surface-panel">
                   <index-list
@@ -111,14 +111,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       />
                     </div>
                     <!--
-                      No stream selected â€” the org has streams but none is
+                      No stream selected — the org has streams but none is
                       chosen. This is more fundamental than any error / loading /
                       no-events state (all meaningless without a stream), so it is
                       checked first and is NOT gated on errorMsg/loading/
                       loadingStream flags. Those could be stale (e.g. a stuck
                       loadingStream after an early-return in extractFields, or a
-                      leftover errorMsg after resetSearchObj) and previously left
-                      the center blank by falling through to the results branch.
+                      leftover errorMsg after resetSearchObj), which would
+                      otherwise fall through to the results branch and leave the
+                      center blank.
                     -->
                     <div
                       v-else-if="
@@ -1429,7 +1430,7 @@ export default defineComponent({
                 );
               }
             } else {
-              // Schema not yet loaded â€” fall back to SELECT * to avoid leaving
+              // Schema not yet loaded — fall back to SELECT * to avoid leaving
               // the [FIELD_LIST] placeholder literal in the query
               searchObj.data.query = searchObj.data.query.replace(
                 /\[FIELD_LIST\]/g,
@@ -1568,8 +1569,8 @@ export default defineComponent({
     const onJumpToStreamData = (fromUs: number, toUs: number) => {
       // We fire the search directly via runQuery below. setAbsoluteTime is only
       // needed to sync the picker UI, but it also mutates the picker's selectedDate/
-      // selectedTime, which fires DateTime.vue's deep auto-apply watcher â†’ on:date-change
-      // â†’ updateDateTime. In live mode that path schedules a SECOND search via a 2.5s
+      // selectedTime, which fires DateTime.vue's deep auto-apply watcher → on:date-change
+      // → updateDateTime. In live mode that path schedules a SECOND search via a 2.5s
       // debounce. The programmatic-change flag that would normally mark that emit as
       // userChangedValue=false is defeated here because runQuery kicks off an async
       // search that flushes the flag's nextTick reset before the emit lands.
@@ -1583,7 +1584,7 @@ export default defineComponent({
       searchObj.data.datetime.type = "absolute";
       // The `runQuery` flag only drives the logs table search. Patterns are
       // extracted through handleRunQueryFn (the same path as the Run query
-      // button), so a jump from the patterns empty state must route there â€”
+      // button), so a jump from the patterns empty state must route there —
       // otherwise the new window is set but patterns never re-extract.
       if (searchObj.meta.logsVisualizeToggle === "patterns") {
         handleRunQueryFn();
@@ -1616,7 +1617,7 @@ export default defineComponent({
         : "";
       const modeContext = sqlMode
         ? `I am using SQL mode. Full query: ${queryContext || "(none)"}.`
-        : `I am using filter mode (not SQL). The filter expression is: ${queryContext || "(none)"}. This is a WHERE-clause filter â€” not a full SQL query.`;
+        : `I am using filter mode (not SQL). The filter expression is: ${queryContext || "(none)"}. This is a WHERE-clause filter — not a full SQL query.`;
       const outcome = errorContext
         ? `The query produced an error.${errorContext}`
         : `The query ran successfully but returned no results.`;
@@ -2178,7 +2179,7 @@ export default defineComponent({
 
             // Use customDownloadQueryObj time only when reusing cached results
             // (the time must match the data). Otherwise use the user's current
-            // datetime selection â€” e.g. when navigating back to the page the
+            // datetime selection — e.g. when navigating back to the page the
             // user may have selected a different time range on the visualize tab
             // than the last logs query used.
             const hasReusableData =
@@ -2390,8 +2391,8 @@ export default defineComponent({
 
     // Watch for SQL mode changes while in build mode.
     // When SQL mode is toggled, re-sync the search bar query:
-    //   ON  â†’ show the builder's full generated SQL
-    //   OFF â†’ show only the WHERE clause (filter text)
+    //   ON  → show the builder's full generated SQL
+    //   OFF → show only the WHERE clause (filter text)
     watch(
       () => searchObj.meta.sqlMode,
       async () => {
@@ -2702,7 +2703,7 @@ export default defineComponent({
       if (buildDashboardPanelData.data.queries[0]) {
         buildDashboardPanelData.data.queries[0].customQuery = isCustomMode;
 
-        // Builder â†’ Custom: show the generated SQL in the editor for editing
+        // Builder → Custom: show the generated SQL in the editor for editing
         if (isCustomMode) {
           const generatedQuery =
             buildDashboardPanelData.data.queries[0]?.query || "";
@@ -2718,7 +2719,7 @@ export default defineComponent({
           return;
         }
 
-        // Custom â†’ Builder: clear fields and query
+        // Custom → Builder: clear fields and query
         await nextTick();
         buildRemoveXYFilters();
         buildUpdateXYFieldsForCustomQueryMode();
@@ -2780,7 +2781,7 @@ export default defineComponent({
 
     /**
      * Waits for `FIELD_EXTRACTION_DEBOUNCE_TIME` ms unless the provided
-     * `signal` is aborted â€“ mirrors the debounce utility in
+     * `signal` is aborted – mirrors the debounce utility in
      * `usePanelDataLoader.ts`.
      */
     const waitForFieldExtractionTimeout = (signal: AbortSignal) => {
@@ -2870,7 +2871,7 @@ export default defineComponent({
       fieldsExtractionAbortController = new AbortController();
       const signal = fieldsExtractionAbortController.signal;
 
-      // Debounce â€“ wait briefly before starting expensive operations.
+      // Debounce – wait briefly before starting expensive operations.
       // If the call is aborted during the wait window, simply exit.
       try {
         await waitForFieldExtractionTimeout(signal);
@@ -2966,7 +2967,6 @@ export default defineComponent({
         if (schemaCache?.value && schemaCache?.value?.key === logsPageQuery) {
           extractedFields = schemaCache?.value?.response?.data;
         } else {
-          // Use the refactored getResultSchema function
           extractedFields = await getResultSchema(
             logsPageQuery,
             signal,
@@ -3039,7 +3039,6 @@ export default defineComponent({
           };
         }
 
-        // Use the refactored functions
         await setCustomQueryFields(
           fieldsForVisualization,
           shouldAutoSelectChartTypeForFields,
@@ -3250,13 +3249,13 @@ export default defineComponent({
       }
     };
 
-    // â”€â”€ Keyboard shortcuts â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Keyboard shortcuts ────────────────────────────────────────────────
     useShortcuts([
       {
         id: "logsRunQuery",
         handler: () => {
           // In normal logs mode `handleRunQueryFn` only handles
-          // visualize/patterns/build â€” trigger the logs search the same way the
+          // visualize/patterns/build — trigger the logs search the same way the
           // refresh shortcut and the run button do (via the runQuery watcher).
           const mode = searchObj.meta.logsVisualizeToggle;
           if (!mode || mode === "logs") {
@@ -3275,7 +3274,7 @@ export default defineComponent({
       {
         id: "logsFocusQuery",
         handler: () => {
-          // The logs query editor is Monaco â€” focus its inner textarea
+          // The logs query editor is Monaco — focus its inner textarea
           // (`.monaco-editor textarea`), not a CodeMirror `.cm-editor`.
           const el = document.querySelector<HTMLElement>(
             '[data-test="logs-search-bar-query-editor"] textarea, [data-test="logs-search-bar"] .monaco-editor textarea, [data-test="logs-search-bar"] .cm-editor',
@@ -3601,7 +3600,7 @@ export default defineComponent({
         this.searchObj.meta.sqlMode = false;
 
         if (this.searchObj.meta.sqlModeEditTransition) {
-          // Mode turned off because user edited away the SELECT prefix â€” keep
+          // Mode turned off because user edited away the SELECT prefix — keep
           // whatever they typed so it becomes a filter expression in non-SQL mode.
           this.searchObj.meta.sqlModeEditTransition = false;
         } else if (!this.searchObj.meta.nlpMode) {

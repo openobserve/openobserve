@@ -44,8 +44,7 @@ const props = defineProps<{
    * and does NOT create its own — this lets the component that OWNS <OForm>
    * read the form reactively (form.useStore) to drive parent-side conditional
    * rendering. When absent, OForm creates its own form from
-   * `defaultValues`/`schema`/`onSubmit` (the ~60 existing simple forms are
-   * untouched). See START-HERE.md (Rule ③).
+   * `defaultValues`/`schema`/`onSubmit`.
    */
   form?: OFormInstance;
 }>();
@@ -101,9 +100,8 @@ async function handleSubmit(e: Event) {
 }
 
 // ── q-form compatibility surface ──────────────────────────────────────────
-// q-form exposes these methods on its ref. The 50 existing q-form refs in
-// the codebase rely on them — keep names identical to avoid touching every
-// call site during migration.
+// These methods mirror q-form's ref API — keep the names identical so existing
+// call sites keep working.
 
 /**
  * All registered fields by dot-notation path.

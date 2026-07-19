@@ -8,18 +8,14 @@
 //   • alert_fingerprint_groups — the selected semantic-group ids, modelled as a
 //     string[] driven by an OFormCheckboxGroup (each per-group OCheckbox is a
 //     group member keyed by its id).
-//   • time_window_minutes — the correlation window. The pre-migration form had
-//     NO validation rule on it (only an HTML `min="1"` hint) and sanitised
-//     empty/NaN → null at save. Kept permissive + nullable so a blank / cleared
-//     field still saves (as null); z.coerce.number() only validates that a typed
-//     value is numeric (the number <input> can emit a numeric string or "").
-//     The @submit handler does the empty/NaN → null conversion for payload
-//     parity, so the schema itself never blocks this field.
+//   • time_window_minutes — the correlation window. Permissive + nullable so a
+//     blank / cleared field still saves (as null); z.coerce.number() only
+//     validates that a typed value is numeric (the number <input> can emit a
+//     numeric string or ""). The @submit handler does the empty/NaN → null
+//     conversion, so the schema itself never blocks this field.
 //
-// Restores the pre-migration cross-alert guard (the imperative saveSettings
-// toast + the inline `fingerprintGroupsRequired` error) as a superRefine rule:
-// when org-level dedup AND cross-alert dedup are both on, at least one
-// fingerprint group must be selected.
+// superRefine rule: when org-level dedup AND cross-alert dedup are both on, at
+// least one fingerprint group must be selected.
 //
 // Validation TIMING is owned by OForm (submit-then-change via revalidateLogic);
 // this file only describes WHAT is valid.
@@ -40,7 +36,7 @@ export const makeOrgDedupSettingsSchema = (t: (_key: string) => string) =>
       enabled: z.boolean(),
       alert_dedup_enabled: z.boolean(),
       alert_fingerprint_groups: z.array(z.string()).default([]),
-      // No pre-migration rule (see file header) — permissive + nullable.
+      // Permissive + nullable.
       time_window_minutes: z.coerce.number().nullish(),
     })
     .superRefine((val, ctx) => {
@@ -63,9 +59,7 @@ export type OrgDedupSettingsForm = z.infer<
 >;
 
 /**
- * Typed defaults, mapped from an optional persisted config. Mirrors the
- * pre-migration localConfig mapping used by init / loadConfig / the props.config
- * watch — one place, so all three code paths stay in sync. A null config yields
+ * Typed defaults, mapped from an optional persisted config. A null config yields
  * the create-time defaults (enabled on, everything else empty).
  */
 export const orgDedupSettingsDefaults = (

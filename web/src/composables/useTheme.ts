@@ -17,7 +17,7 @@ import { computed } from "vue";
 import { useStore } from "vuex";
 
 /**
- * The single sanctioned JS seam for reading dark mode (O2_TOKEN_MIGRATION_PLAN §3.R).
+ * The single sanctioned JS seam for reading dark mode.
  *
  * This is the ONLY file (besides `utils/chartTheme.ts`) permitted to string-compare
  * `store.state.theme`. Everywhere else, use a design token (dark handled automatically

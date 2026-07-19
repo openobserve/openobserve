@@ -72,8 +72,8 @@ if (form) {
   );
 }
 
-// Mirror the old updateDateTime() translation: DateTime's event shape →
-// the form's { type, from, to, period } timerange object.
+// Translate DateTime's event shape → the form's { type, from, to, period }
+// timerange object.
 const toTimerange = (dt: any): DateTimeRangeValue => ({
   type: dt.valueType === "relative-custom" ? "relative" : dt.valueType,
   from: dt.startTime,

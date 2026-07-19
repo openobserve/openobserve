@@ -21,8 +21,6 @@
    passed in through `props.class` by plugins/logs/TenstackTable.vue and
    components/TenstackTable.vue, and every element it styles (the OButton root and
    the <img class="ai-icon"> above) is rendered HERE, so this is the owning scope.
-   Migrated from styles/utilities.css (W2.b), where it had been parked as
-   "cross-file" because two call sites apply it.
    Why the !important: OButton's own base `relative` outranks the positioning
    passed via props. `translate` (not `transform`) is the property to override —
    Tailwind v4 emits -translate-y-1/2 through the CSS `translate` shorthand. */

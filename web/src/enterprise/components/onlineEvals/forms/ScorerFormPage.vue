@@ -737,10 +737,9 @@ const { t } = useI18n();
 // mounted fresh for each create/edit action, so building it once is safe.
 const scorerFormSchema = makeScorerFormSchema(t);
 
-// OWNER pattern (Rule ③): this component owns <OForm>, so it creates the form
-// with useOForm and reads it reactively via form.useStore — a SINGLE source of
-// truth, NO mirror ref and NO store.subscribe array sync. `formValues` drives
-// the parent-side reads a parent can't get from form context: the
+// This component owns <OForm>, so it creates the form with useOForm and reads it
+// reactively via form.useStore. `formValues` drives the template reads that need
+// live form state: the
 // `scorerType`/`authType` `v-if` sections, the previews
 // (selectedScoreConfig/selectedProvider), the duplicate-field highlight, the
 // repeatable-row arrays (extraMetadataFields/customHeaders), and the live Scorer
@@ -912,7 +911,6 @@ function buildAuthPayload(src: ScorerForm): Record<string, any> | null {
   }
   if (kind === "basic") {
     const username = src.authBasicUsername.trim();
-    // Trim parity with the pre-migration `v-model.trim` on the password field.
     const password = src.authBasicPassword.trim();
     if (!username || !password) return null;
     return { type: "basic", username, password };
@@ -928,8 +926,7 @@ function buildAuthPayload(src: ScorerForm): Record<string, any> | null {
 
 function buildRemoteParams(src: ScorerForm): Record<string, any> {
   const params: Record<string, any> = {
-    // Trim parity with the pre-migration `v-model.trim` (stray whitespace around
-    // a pasted URL should never reach the payload).
+    // Trim stray whitespace around a pasted URL so it never reaches the payload.
     endpoint: src.remoteEndpoint.trim(),
     http_method: src.httpMethod || DEFAULT_HTTP_METHOD,
     timeout_ms: Number(src.timeoutMs) || DEFAULT_TIMEOUT_MS,
@@ -1281,9 +1278,8 @@ async function prepareSelectedScoreConfigVersion(keepSelectedVersion: boolean) {
 
 // @submit handler — OForm only calls this once the whole schema passes (incl.
 // the conditional auth/provider/endpoint requireds + extra-field uniqueness), so
-// the schema (not a manual guard) gates the save. The entangled `form` mirror is
-// schema-synced, so the existing build helpers read from it unchanged; OForm
-// awaits this promise → the Save spinner spans the save (no manual `isSaving`).
+// the schema (not a manual guard) gates the save. OForm awaits this promise → the
+// Save spinner spans the save.
 async function save(value: ScorerForm) {
   if (!props.orgId) return;
   try {

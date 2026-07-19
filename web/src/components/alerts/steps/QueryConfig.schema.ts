@@ -2,17 +2,7 @@
 //
 // Schema pieces for QueryConfig.vue.
 //
-// ⚠️ SCOPE NOTE (conditions-tree phase): this file currently exports ONLY the
-// alert-conditions-tree pieces that back FilterGroup.vue / FilterCondition.vue
-// form mode (alerts-migration.md §A). The FULL QueryConfig form schema — the
-// mode-discriminated scalars (threshold / operator / period …), `group_by[]`,
-// the promql_condition restores, aggregation, etc. — will be ADDED to this file
-// by a later phase (alerts-migration.md §C), which also wires
-// `name-prefix="query_condition.conditions"` onto QueryConfig's two
-// <FilterGroup> usages and calls `refineConditionsTree` from BOTH the
-// QueryConfig and AddAlert superRefines under `query.type === 'custom'`.
-//
-// ── The live tree shape (read from FilterGroup.vue / FilterCondition.vue) ──
+// ── The tree shape (from FilterGroup.vue / FilterCondition.vue) ──
 // The alert-conditions tree saved at `query_condition.conditions` is a single
 // ROOT GROUP node whose `conditions[]` mixes two node kinds:
 //   • condition leaf: { filterType: "condition", column, operator, value,
@@ -23,26 +13,23 @@
 // (`items[]` + `groupId`); form mode renders only V2 `conditions[]` children,
 // and the walker below mirrors that exactly.
 //
-// Validation TIMING is owned by OForm (submit-then-change via revalidateLogic);
-// this file only describes WHAT is valid. Requiredness is enforced by the
-// `refineConditionsTree` walker — NOT by the structural node schemas — so the
-// issue paths land on the exact nested field the OForm* wrapper is bound to
-// (e.g. ["tree", "conditions", 1, "conditions", 0, "column"] →
-// `tree.conditions[1].conditions[0].column`).
+// Validation timing is owned by OForm; this file only describes WHAT is valid.
+// Requiredness is enforced by the `refineConditionsTree` walker — NOT by the
+// structural node schemas — so the issue paths land on the exact nested field
+// the OForm* wrapper is bound to (e.g. ["tree", "conditions", 1, "conditions",
+// 0, "column"] → `tree.conditions[1].conditions[0].column`).
 
 import { z } from "zod";
 
 /** i18n translator injected by the component: `(key, namedParams?) => string`.
  *  Every user-facing validation message resolves through this against the
- *  `alerts.validation.*` locale keys (parity: the English values are byte-for-byte
- *  the pre-migration strings). */
+ *  `alerts.validation.*` locale keys. */
 export type Translator = (key: string, named?: Record<string, unknown>) => string;
 
 // ── Structural node schemas (deliberately loose) ────────────────────────────
 // These describe SHAPE only. All per-field requiredness lives in
 // `refineConditionsTree` so rules stay path-addressed and zero-safe; keeping
-// the node schemas permissive guarantees no accidental rule-tightening
-// (Rule ④) and that an empty/absent tree parses clean.
+// the node schemas permissive guarantees an empty/absent tree parses clean.
 
 /** One condition leaf (a FilterCondition row). */
 export const conditionNodeSchema = z.looseObject({
@@ -80,8 +67,7 @@ export function isConditionGroupNode(item: unknown): boolean {
   }
   // V1 compatibility (legacy `items[]` + groupId) — recognised as a group so
   // it is never mis-validated as a condition leaf. It carries no V2
-  // `conditions[]` rows, so the walker recurses into it and finds nothing —
-  // exactly what FilterGroup's form mode renders for it.
+  // `conditions[]` rows, so the walker recurses into it and finds nothing.
   if (node && Array.isArray(node.items) && node.groupId) {
     return true;
   }
@@ -96,15 +82,15 @@ export function isConditionGroupNode(item: unknown): boolean {
  * `["query_condition", "conditions"]` — or `["tree"]` in specs).
  *
  * Per condition leaf:
- *   • `column`   — truthy-required (pre-migration blur rule: `!column`)
- *   • `operator` — truthy-required (pre-migration blur rule: `!operator`)
+ *   • `column`   — truthy-required
+ *   • `operator` — truthy-required
  *   • `value`    — required but ZERO-SAFE: fails ONLY on undefined/null/""
  *     (numeric 0 PASSES — never `.min(1)` on a number)
  * Message is the caller-supplied `requiredMessage` (i18n
- * `alerts.validation.fieldRequired` → "Field is required!", the pre-migration hint).
+ * `alerts.validation.fieldRequired` → "Field is required!").
  *
  * An EMPTY tree (no root / no conditions / empty array) adds NO issues —
- * alerts save with zero conditions today and must keep doing so.
+ * alerts save with zero conditions today.
  */
 export function refineConditionsTree(
   root: unknown,
@@ -166,21 +152,18 @@ export const makeConditionsTreeSchema = (t: Translator) =>
 export type ConditionsTree = z.infer<typeof conditionGroupNodeSchema>;
 
 // ════════════════════════════════════════════════════════════════════════════
-//  FULL QueryConfig form schema (alerts-migration.md §C — QueryConfig scalars,
-//  group_by[], PromQL §4 restores, and the AlertSettings CROSS-STEP checks
-//  REHOMED here). Everything above (the conditions-tree pieces) is unchanged and
-//  still exported for FilterGroup/FilterCondition + AddAlert.
+//  FULL QueryConfig form schema — QueryConfig scalars, group_by[], PromQL
+//  conditions, aggregation, and the AlertSettings cross-step checks.
 //
 //  DESIGN — a SINGLE schema with a `_meta` discriminator object. QueryConfig's
 //  mode (query tab, event-based vs metrics, realtime vs scheduled, the selected
 //  function, the frequency unit, whether group-by / conditions exist,
 //  aggregation on/off) is NOT itself form data — those are bare mode-selectors
 //  (tabs, function dropdown, …). They are BRIDGED into the form as `_meta.*` via
-//  the sanctioned `watch → setFieldValue` for a non-input discriminator, and the
-//  superRefine reads `_meta` to fire each rule ONLY in the branch where the
-//  pre-migration form enforced it. This lets ONE static schema cover every mode
-//  (OForm reads `:schema` once at creation — a per-mode schema swap would not
-//  re-wire the validators).
+//  `watch → setFieldValue`, and the superRefine reads `_meta` to fire each rule
+//  ONLY in its branch. This lets ONE static schema cover every mode (OForm reads
+//  `:schema` once at creation — a per-mode schema swap would not re-wire the
+//  validators).
 //
 //  ⚠️ Numbers come out of OFormInput as STRINGS. Requiredness / min checks are
 //  done in the superRefine on the RAW value so we control empty-vs-0 exactly
@@ -189,7 +172,7 @@ export type ConditionsTree = z.infer<typeof conditionGroupNodeSchema>;
 // ════════════════════════════════════════════════════════════════════════════
 
 // ── Validation messages are i18n-driven (`alerts.validation.*` locale keys),
-//    resolved via the injected `t` inside `makeQueryConfigSchema`. Parity map:
+//    resolved via the injected `t` inside `makeQueryConfigSchema`:
 //      threshold ≥ 1   → alerts.validation.thresholdPositive
 //      frequency ≥ 1   → alerts.validation.frequencyPositive
 //      org min-freq    → alerts.validation.minimumFrequency ({minutes} = the
@@ -198,9 +181,7 @@ export type ConditionsTree = z.infer<typeof conditionGroupNodeSchema>;
 //      promql operator → alerts.validation.fieldRequired
 //      promql value    → alerts.validation.fieldRequired
 //      blank group-by  → alerts.validation.fieldRequired (per offending row;
-//                        an EMPTY group_by is VALID — see the parity note in
-//                        the custom+measure branch below)
-//    (English values are byte-for-byte the pre-migration strings.)
+//                        an EMPTY group_by is VALID)
 
 /** The mode discriminators bridged into the form (NOT part of the alert
  *  payload — they gate the superRefine only). */
@@ -240,8 +221,7 @@ const isBelowOne = (v: unknown): boolean => {
  * The full QueryConfig form schema. `looseObject` throughout so the many bridged
  * runtime keys (aggregation.function, conditions ids, values[], etc.) pass
  * through untouched — requiredness lives entirely in the superRefine, keyed on
- * `_meta`, so nothing tightens by accident (Rule ④) and an untouched form parses
- * clean.
+ * `_meta`, so an untouched form parses clean.
  */
 export const makeQueryConfigSchema = (t: Translator) =>
   z
@@ -280,7 +260,7 @@ export const makeQueryConfigSchema = (t: Translator) =>
       })
       .optional(),
     /** Logs/traces group-by lives on its own field (metrics group-by lives on
-     *  query_condition.aggregation.group_by). Both are Rule-① field arrays. */
+     *  query_condition.aggregation.group_by). */
     logGroupBy: z.array(z.string()).optional(),
     /** DISPLAY-ONLY form state — never sent to the backend (stripped by
      *  getAlertPayload alongside `_meta`/`logGroupBy`). `checkEvery` holds the
@@ -318,8 +298,7 @@ export const makeQueryConfigSchema = (t: Translator) =>
     const qc = (val.query_condition ?? {}) as Record<string, any>;
 
     // ── Conditions tree (custom mode, realtime + scheduled) ──────────────────
-    // Blocks save on partially-filled rows — a §4-style RESTORE (pre-migration
-    // the "Field is required!" hints were blur-only and never gated save).
+    // Blocks save on partially-filled rows.
     if (isCustom && qc.conditions) {
       refineConditionsTree(
         qc.conditions,
@@ -330,10 +309,10 @@ export const makeQueryConfigSchema = (t: Translator) =>
     }
 
     // Everything below is SCHEDULED-only (realtime alerts show filters only —
-    // no threshold sentence / "Check every" — so none of these rules applied).
+    // no threshold sentence / "Check every").
     if (!scheduled) return;
 
-    // ── Threshold ≥ 1 (REHOMED) ──────────────────────────────────────────────
+    // ── Threshold ≥ 1 ────────────────────────────────────────────────────────
     // Shown+required in every scheduled branch: custom (count OR the measure
     // "having groups" — forced to 1 when no group-by, so ≥1 always holds), SQL
     // ("no. of events"), PromQL ("having series"). One rule covers them all.
@@ -345,13 +324,12 @@ export const makeQueryConfigSchema = (t: Translator) =>
       });
     }
 
-    // ── Frequency ≥ 1 (REHOMED + QueryConfig's own checkEveryFrequencyError) ──
+    // ── Frequency ≥ 1 ────────────────────────────────────────────────────────
     // Only when NOT in cron mode (cron is validated separately — the component
     // renders `cronError`, useAlertForm.runImperativeQueryChecks gates save).
     // Keyed on the DISPLAY value (`_ui.checkEvery`) because that is the path the
     // visible "Check every" input binds, so the message renders inline. Display
-    // ≥ 1 ⇔ stored ≥ 1 in both modes (hours multiplies by 60), so this is the
-    // same rule pre-migration applied to its local display ref.
+    // ≥ 1 ⇔ stored ≥ 1 in both modes (hours multiplies by 60).
     const ui = (val._ui ?? {}) as Record<string, unknown>;
     const display = ui.checkEvery;
     if (meta.frequencyMode !== "cron") {
@@ -362,11 +340,10 @@ export const makeQueryConfigSchema = (t: Translator) =>
           message: t("alerts.validation.frequencyPositive"),
         });
       } else {
-        // ── Org min-frequency floor (R5 RESTORE) ────────────────────────────
-        // Pre-migration: AlertSettings.validateFrequency compared the STORED
-        // minutes against ceil(min_auto_refresh_interval / 60) and blocked save.
-        // Compare in MINUTES: convert the display value the same way
-        // onCheckEveryChange does. Skipped entirely when the org sets no floor.
+        // ── Org min-frequency floor ─────────────────────────────────────────
+        // Compare the frequency in MINUTES against ceil(min_auto_refresh_interval
+        // / 60): convert the display value the same way onCheckEveryChange does.
+        // Skipped entirely when the org sets no floor.
         const floorSecs = Number(meta.minAutoRefreshInterval) || 0;
         if (floorSecs > 0) {
           const freqMins =
@@ -387,7 +364,7 @@ export const makeQueryConfigSchema = (t: Translator) =>
       }
     }
 
-    // ── PromQL branch (§4 RESTORES — dead bindings pre-migration) ─────────────
+    // ── PromQL branch ────────────────────────────────────────────────────────
     if (isPromql) {
       const pc = (qc.promql_condition ?? {}) as Record<string, unknown>;
       if (!pc.operator) {
@@ -407,38 +384,25 @@ export const makeQueryConfigSchema = (t: Translator) =>
       }
     }
 
-    // ── Custom + measure aggregation (REHOMED aggregation checks + QueryConfig
-    // conditionValueError) ────────────────────────────────────────────────────
+    // ── Custom + measure aggregation ─────────────────────────────────────────
     if (isCustom && isMeasure) {
       const having = (qc.aggregation?.having ?? {}) as Record<string, unknown>;
 
-      // ── Measure column — required (RESTORE of main's red highlight) ─────────
-      // Pre-migration BOTH halves of this rule lived in QueryConfig.validate():
-      // it set a local `columnSelectError` ref (which fed `:error` on a bare
-      // <OSelect> and drew the red border) AND toasted. The migration re-homed
-      // only the toast, into useAlertForm.runImperativeQueryChecks, and dropped
-      // the ref — so save was still blocked but the field stayed grey.
-      //
-      // It has to live HERE, not in an imperative gate: the two selects are now
+      // ── Measure column — required ───────────────────────────────────────────
+      // Must live in form state, not an imperative gate: the two selects are
       // name-bound <OFormSelect>, which derives `:error` from
-      // `field.state.meta.errors` and OMITS `error` from its props (a
-      // parent-passed `:error` is clobbered by the field-driven binding). Form
-      // state is the ONLY thing that can paint the field.
+      // `field.state.meta.errors` and OMITS a parent-passed `:error`. Form state
+      // is the ONLY thing that can paint the field.
       //
       // ONE path covers BOTH branches — the logs select and the metrics select
       // bind the same `query_condition.aggregation.having.column` name.
       //
-      // The predicate mirrors the imperative gate verbatim (aggregation ON + an
-      // aggregation object carrying a non-count function) so nothing tightens
-      // (Rule ④). `aggregation.function` is re-checked against `total_events`
-      // even though `isMeasure` already read `_meta.selectedFunction`: they are
-      // two views of the same choice, and requiring both means a stale bridge
-      // can only ever under-fire, never block a save that used to pass.
+      // Predicate: aggregation ON + an aggregation object carrying a non-count
+      // function.
       const aggregation = qc.aggregation;
       const fn = aggregation?.function;
       if (meta.aggregationEnabled && aggregation && fn && fn !== "total_events") {
-        // Trim-aware (the old check was `!col || col.trim() === ''`) — a
-        // whitespace-only column is not a column.
+        // Trim-aware — a whitespace-only column is not a column.
         const column = having.column;
         if (column == null || String(column).trim() === "") {
           ctx.addIssue({

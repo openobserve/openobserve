@@ -150,7 +150,7 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
-    // New props for scoped variables
+    // Props for scoped variables
     scope: {
       type: String as PropType<"global" | "tabs" | "panels">,
       default: "global",
@@ -188,8 +188,6 @@ export default defineComponent({
   setup(props: any, { emit }) {
     const store = useStore();
     const { t } = useI18n();
-    // Try to inject variablesManager from parent (for backward compatibility)
-
     // Try to inject variablesManager from parent (for backward compatibility)
     const injectedManager = inject<any>("variablesManager", undefined);
     const manager = props.variablesManager || injectedManager;
@@ -1264,7 +1262,6 @@ export default defineComponent({
     };
 
     // it is used to change/update initial variables values from outside the component
-    // NOTE: right now, it is not used after variables in variables feature
     const changeInitialVariableValues = async (
       newInitialVariableValues: any,
     ) => {

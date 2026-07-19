@@ -108,11 +108,9 @@
                     <strong
                       >SQL Query :
                       <span>
-                        <!-- Copy is the same neutral action in both sections; the
-                             SQL/VRL accent stays on the block's left border, which
-                             is what actually marks which language you're looking
-                             at. Tinting the button too made the two copies read as
-                             different actions. -->
+                        <!-- Copy is a neutral action in both sections; the SQL/VRL
+                             accent lives on the block's left border, which marks
+                             which language you're looking at. -->
                         <OButton
                           data-test="search-history-copy-sql-btn"
                           variant="outline"
@@ -125,9 +123,7 @@
                           <OIcon name="content-copy" size="xs" /> </OButton></span
                     ></strong>
                     <!-- Logs and Inspect are both navigations, so they share one
-                         variant and size. Logs was outline-destructive (red reads
-                         as "delete") and Inspect was ghost (no affordance at all),
-                         at two different sizes. -->
+                         variant and size. -->
                     <!-- No mx-2: the row is already `gap-2`, so a margin here
                          stacked on top of it and doubled the spacing to 16px. -->
                     <OButton

@@ -17,13 +17,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!--
   Thread view — chat-style projection of an LLM trace.
 
-  Phase A scope (this commit):
     - Classify spans by `gen_ai_operation_name`
     - Render the trace summary chip-bar (turn count, total duration, cost,
       model, tool calls, errors)
     - Empty + skeleton states
-
-  Phase B+ will add the actual conversation rendering.
 -->
 <template>
   <div

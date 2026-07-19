@@ -1274,16 +1274,13 @@ export default defineComponent({
      * under, and writes the upgrade back into the panel.
      *
      * The write-back has to happen HERE rather than being left to the deep
-     * watcher that copies builder state into the schema. That watcher is
-     * registered after this one runs `immediate`, so on the very load that
-     * matters it has not been set up yet and never fires — the builder would
-     * hold the new ids while the panel kept the old ones forever, and the
-     * compatibility table could never be retired.
+     * watcher that copies builder state into the schema: that watcher is
+     * registered after this one runs `immediate`, so on the load that matters it
+     * has not been set up yet and never fires.
      *
      * `normalizeSteps` hands back the array it was given when nothing needed
-     * upgrading, so a changed reference is exactly the signal that this panel
-     * was saved under old ids. A modern panel is not touched, and does not look
-     * dirty for having been opened.
+     * upgrading, so a changed reference is the signal that this panel was saved
+     * under old ids. A modern panel is not touched.
      */
     const loadSavedSteps = (currentQuery: any) => {
       const stored = currentQuery?.fields?.promql_operations || [];
@@ -1301,9 +1298,7 @@ export default defineComponent({
      *
      * A panel can hold several queries behind tabs, and the builder only ever
      * loads the tab you are looking at. Migrating just that one would leave a
-     * two-tab panel half-upgraded — saved with tab 2 still on the old ids — and
-     * the compatibility table could never actually be retired, because whether a
-     * panel migrated would depend on which tabs its author happened to click.
+     * two-tab panel half-upgraded — saved with tab 2 still on the old ids.
      */
     const migrateAllSavedSteps = () => {
       for (const slot of dashboardPanelData.data.queries ?? []) {
@@ -1411,11 +1406,11 @@ export default defineComponent({
      * written from OUTSIDE — which is what `applyDefaultPanelFields` does when it
      * seeds the metrics rule set's default on a query-type toggle.
      *
-     * Ordering made this necessary: the builder-mode watcher above reads the
-     * schema when the mode flips, but the seed lands a microtask later. The
-     * result was a panel whose QUERY was `sum(rate(x{}[4m]))` while the builder
-     * showed no operations at all — and since the builder is the sole writer of
-     * the query string, the user's very first click rewrote it to a bare `x{}`.
+     * The builder-mode watcher above reads the schema when the mode flips, but
+     * the seed lands a microtask later, so without this the builder would show no
+     * operations while the query already held the seeded value — and since the
+     * builder is the sole writer of the query string, the user's first click
+     * would rewrite it to a bare `x{}`.
      *
      * The equality guards matter: the deep watcher below writes these same
      * references straight back, so without them the two watchers would ping-pong.
@@ -1511,9 +1506,8 @@ export default defineComponent({
      * rather than seeding the local state and trusting the deep watcher above to
      * render it into the schema. That indirection does not survive here: this fires
      * `immediate`, i.e. during setup, and a mutation made then never reaches the deep
-     * watcher. The symptom was precise and baffling: the builder's chips were right
-     * while the query stayed empty. Writing both ends is idempotent anyway, since the
-     * deep watcher renders the same query back out of the same state.
+     * watcher. Writing both ends is idempotent anyway, since the deep watcher
+     * renders the same query back out of the same state.
      *
      * Deliberately only seeds an EMPTY slot: switching between existing tabs must
      * never rewrite a query that is already there.

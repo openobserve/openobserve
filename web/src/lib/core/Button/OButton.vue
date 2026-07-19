@@ -227,8 +227,8 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
 
 const sizeClasses: Record<NonNullable<ButtonProps["size"]>, string> = {
   xs: "h-7 ps-2.5 pe-2.5 text-xs gap-1.5 rounded-default",
-  // 34px control height per HANDOFF §11 — the workhorse compact button that
-  // pairs with 34px inputs in toolbars/headers. (radius 8 = rounded-default per §11.)
+  // 34px control height — the workhorse compact button that pairs with 34px
+  // inputs in toolbars/headers. (radius 8 = rounded-default.)
   sm: "h-[2.125rem] ps-3 pe-3 text-sm gap-2 rounded-default",
   // 30px labeled — matches icon-toolbar height for labeled outline buttons in toolbars
   "sm-toolbar":

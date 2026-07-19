@@ -1,6 +1,5 @@
 /**
  * Static content for the O2 Assistant home-tab welcome screen.
- * Keeping this colocated keeps prompts editable without touching templates.
  */
 
 export interface CapabilityCard {

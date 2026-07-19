@@ -30,7 +30,7 @@ import {
 /**
  * Applies chart-specific options for: heatmap
  *
- * Mutates `ctx.options` in place, exactly as the original switch case did.
+ * Mutates `ctx.options` in place.
  */
 export function applyHeatmapChart(ctx: SQLContext): void {
   const {
@@ -68,7 +68,7 @@ export function applyHeatmapChart(ctx: SQLContext): void {
     const xAxisValue = getDataValue(row, key0);
     const compositeKey = `${yAxisValue}||${xAxisValue}`;
 
-    // Only set if NOT already present (keeps FIRST occurrence, matching original nested .find() behavior)
+    // Only set if NOT already present (keeps FIRST occurrence)
     if (!heatmapLookupMap.has(compositeKey)) {
       heatmapLookupMap.set(compositeKey, row);
     }

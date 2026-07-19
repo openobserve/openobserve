@@ -22,8 +22,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="flex flex-col h-full min-h-0"
   >
     <div v-if="!showAddJSTransformDialog" class="flex flex-col h-full min-h-0">
-      <!-- Standard section header: title + actions only. Type filter + search
-           moved into the table's own toolbar below. -->
+      <!-- Standard section header: title + actions only; type filter + search
+           live in the table toolbar below. -->
       <AppPageHeader
         :title="t('function.enrichmentTables')"
         icon="dataset"
@@ -829,8 +829,7 @@ export default defineComponent({
               streamResponse.stats.doc_time_min &&
               streamResponse.stats.doc_time_max
             ) {
-              //reducing the doc_time_min by 1000000 to get the exact time range
-              //previously we were subtracting 60000000 which might confuse some users so we are using 1000000 (1sec)
+              //reducing the doc_time_min by 1000000 (1sec) to get the exact time range
               dateTime["from"] = streamResponse.stats.doc_time_min - 1000000;
               //adding 60000000(1min)
               dateTime["to"] = streamResponse.stats.doc_time_max + 60000000;

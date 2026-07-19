@@ -1,8 +1,7 @@
 // Copyright 2026 OpenObserve Inc.
 //
 // Validation schema for AddRegexPattern.vue. `name` and `pattern` are the
-// validated fields — both required (mirroring the old per-field `:validators`
-// that just enforced "required"). Built via a factory so the required messages
+// validated fields — both required. Built via a factory so the required messages
 // stay i18n-driven (pass useI18n's `t`).
 //
 // Every control inside the OForm is form-owned (no bare base components): the

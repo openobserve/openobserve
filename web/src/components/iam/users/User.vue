@@ -18,8 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
   <div class="p-0 h-full flex flex-col">
-    <!-- Standard page header: title + actions only. The user search moved into
-         the table's own toolbar (built-in global filter) per the layout system. -->
+    <!-- Standard page header: title + actions only. -->
     <AppPageHeader
       :title="t('iam.basicUsers')"
       :subtitle="t('user.subtitle')"
@@ -674,13 +673,12 @@ export default defineComponent({
                 rawEmail: data.email,
                 first_name: data.first_name,
                 last_name: data.last_name,
-                // Store the display-cased role (e.g. "Admin", "Admin (Invited)") so
-                // the edit/update payloads stay byte-identical to pre-migration, which
-                // sent the capitalized value. The role options from getRoles use the
-                // lowercase value ("admin"), so this seeded "Admin" doesn't match an
-                // option — but OSelect renders the raw value as a fallback, so the
-                // field still displays "Admin" correctly. The only cosmetic quirk is
-                // that the open dropdown won't highlight the lowercase option as active.
+                // Store the display-cased role (e.g. "Admin", "Admin (Invited)").
+                // The role options from getRoles use the lowercase value ("admin"),
+                // so this seeded "Admin" doesn't match an option — but OSelect renders
+                // the raw value as a fallback, so the field still displays "Admin"
+                // correctly. The only cosmetic quirk is that the open dropdown won't
+                // highlight the lowercase option as active.
                 role:
                   data?.status == "pending"
                     ? toCamelCase(data.role) + " (Invited)"
@@ -711,11 +709,10 @@ export default defineComponent({
             // Enterprise/cloud: the org-members API only returns a single
             // `role` per user, so users with multiple role assignments
             // (e.g. Viewer + custom "nmcdev") look incomplete. Fetch the
-            // full role list for *all* users in a single request — fire-and-
-            // forget — and re-render the rows when it resolves. This replaces
-            // the previous one-request-per-user pattern (N auth checks + N
-            // OpenFGA reads) with a single batched call, and keeps the table
-            // responsive instead of blocking the whole UI on the role API.
+            // full role list for *all* users in a single batched request —
+            // fire-and-forget — and re-render the rows when it resolves,
+            // keeping the table responsive instead of blocking the whole UI
+            // on the role API.
             if (isEnterpriseOrCloud) {
               const orgId = store.state.selectedOrganization.identifier;
               // Don't await — let the batched role fetch run in the background.
@@ -790,8 +787,7 @@ export default defineComponent({
     // Refresh handler for the toolbar refresh button. getOrgMembers() only seeds
     // default action flags on each row — the real per-row permissions are
     // computed by updateUserActions(), so it must run after every reload (this
-    // mirrors the onBeforeMount sequence). Binding refresh straight to
-    // getOrgMembers skipped this step and blanked out all row actions.
+    // mirrors the onBeforeMount sequence).
     const refreshUsers = async () => {
       try {
         await getOrgMembers();

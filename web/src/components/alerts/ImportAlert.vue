@@ -592,7 +592,7 @@ export default defineComponent({
         return true;
       } catch (e: any) {
         alertCreators.value.push({
-          message: `Anomaly Detection - ${index}: "${jsonObj.name}" import failed â€” ${e?.response?.data?.message || "Unknown Error"}`,
+          message: `Anomaly Detection - ${index}: "${jsonObj.name}" import failed — ${e?.response?.data?.message || "Unknown Error"}`,
           success: false,
         });
         return false;
@@ -601,7 +601,7 @@ export default defineComponent({
 
     const processJsonObject = async (jsonObj: any, index: number) => {
       try {
-        // Anomaly detection configs have anomaly_id â€” route to separate import path.
+        // Anomaly detection configs have anomaly_id — route to separate import path.
         // Regular alert flow is completely unchanged.
         if (jsonObj.anomaly_id !== undefined) {
           return await importAnomalyConfig(jsonObj, index);

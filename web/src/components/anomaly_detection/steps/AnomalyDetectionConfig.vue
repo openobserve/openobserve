@@ -14,27 +14,6 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-<!--
-  OForm migration (Rule ③ OWNER pattern): this step OWNS its <OForm> and needs
-  form state (query_mode) for parent-side conditional rendering, so the form is
-  created in setup() with useOForm({ defaultValues, schema, onSubmit }) and
-  handed down via <OForm :form="form">; all reads go through form.useStore.
-
-  Egress (OPEN DESIGN DECISION 4): the parent (useAlertForm) reads props.config
-  DIRECTLY — continuously (anomalyPreviewSql computed, AnomalySummary) and at
-  save time (saveAnomalyDetection builds the payload from anomalyConfig).
-  Emit-based egress would require rewiring AddAlert.vue/useAlertForm.ts (out of
-  scope for this step migration), so this uses the documented WRITE-BACK deep
-  watch (form → props.config) — egress only, never the banned into-form mirror.
-  Ingress is form.reset(defaults(config)) when the parent REPLACES the config
-  object (async edit-prefill).
-
-  custom_sql stays bare Monaco (sanctioned Rule-② exception) and is bridged
-  into the form via form.setFieldValue from the editor's own change handler;
-  its bare error divs are gated on showSqlErrors (submissionAttempts > 0) so
-  nothing renders pre-submit (R3).
--->
-
 <template>
   <div
     class="step-anomaly-config h-full"
@@ -69,9 +48,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("alerts.anomaly.filters") }}
           </div>
           <div style="width: calc(100% - 190px)">
-            <!-- 🔑 Rule ① field-array: indexed names + :key = array INDEX (the
-                 fields bind by index-based name and do not re-bind, so a
-                 stable-id key would leave inputs shifted on a mid-list delete). -->
+            <!-- :key must be the array INDEX — the fields bind by index-based
+                 name and do not re-bind, so a stable-id key would leave inputs
+                 shifted on a mid-list delete. -->
             <div
               v-for="(filter, idx) in filterRows"
               :key="idx"
@@ -144,8 +123,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="custom-sql-editor-wrapper h-35 rounded-default overflow-hidden border"
               :class="hasSqlError ? 'border-input-border-error' : 'border-border-default'"
             >
-              <!-- Bare Monaco (sanctioned): value bridged into the form from
-                   the editor's own change handler so the schema covers it. -->
+              <!-- Bare Monaco: value bridged into the form from the editor's
+                   own change handler so the schema covers it. -->
               <QueryEditor
                 data-test-prefix="anomaly-custom-sql"
                 :query="customSql || ''"
@@ -162,13 +141,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @update:query="onCustomSqlChange"
               />
             </div>
-            <!-- Bare-editor errors: submission-gated (R3 — nothing pre-submit).
-                 `custom_sql` is a bare editor bridged in via setFieldValue with no
-                 name= binding, so the schema's issue has no field to route to and
-                 THIS div is the only surface. It must therefore mirror the schema's
-                 condition exactly — schema rejects on `!custom_sql.trim()`, so a
-                 whitespace-only query must light this up too. Gating on `!customSql`
-                 alone let " " reject the save while rendering nothing at all. -->
+            <!-- `custom_sql` is a bare editor bridged in via setFieldValue with
+                 no name= binding, so the schema's issue has no field to route to
+                 and THIS div is the only surface. It must mirror the schema's
+                 condition exactly — the schema rejects on `!custom_sql.trim()`,
+                 so a whitespace-only query must light this up too. -->
             <div
               v-if="showSqlErrors && !customSql?.trim()"
               class="text-xs text-input-error-text pt-1"
@@ -181,10 +158,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="text-xs text-input-error-text pt-1"
               data-test="anomaly-custom-sql-timestamp-alias-error"
             >
-              <!-- The literal `<code>` spans are why this can't reuse
-                   alerts.validation.timestampAliasBanned (which bakes
-                   `time_bucket` into its text): the slotted variant needs both
-                   the column AND time_bucket as params. Same rendered English. -->
+              <!-- Can't reuse alerts.validation.timestampAliasBanned (which
+                   bakes `time_bucket` into its text): the slotted variant needs
+                   both the column AND time_bucket as params. -->
               <i18n-t keypath="alerts.anomaly.timestampAliasBanned" tag="span">
                 <template #column>
                   <code>{{
@@ -222,8 +198,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- items-start, not items-center: the field select renders its
                  validation message inside its own column (OSelect's root is
                  flex-col), so on error that column grows and centering would
-                 shove the function select down out of line with it. Matches the
-                 "Alert if" rows in QueryConfig.vue. -->
+                 shove the function select down out of line with it. -->
             <div class="flex items-start gap-2">
               <OFormSelect
                 name="detection_function"
@@ -461,10 +436,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="anomaly-detection-window-unit"
                 />
               </div>
-              <!-- Keeps the pre-migration e2e data-test (never delete a
-                   data-test). It used to duplicate the OFormInput's own inline
-                   message with a hand-rolled copy; now it IS the single message
-                   for this field, reading the same R3-timed schema error. -->
+              <!-- This is the single error message for this field. -->
               <div
                 v-if="detectionWindowError"
                 class="text-xs text-input-error-text pt-1"
@@ -490,8 +462,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="ml-1 cursor-pointer text-icon-color"
               >
                 <OTooltip side="right" align="center" max-width="300px">
-                  <!-- Kept as a #content slot (not :content) so the 14px span
-                       survives; only the text moves to i18n. -->
+                  <!-- Uses a #content slot (not :content) so the font-size
+                       span survives. -->
                   <template #content><span style="font-size: var(--text-sm)">{{
                     t("alerts.anomaly.trainingWindowTooltip")
                   }}</span></template>
@@ -773,7 +745,6 @@ export default defineComponent({
     const getTimestampColumn = () =>
       store.state.zoConfig.timestamp_column || "_timestamp";
 
-    // ── The form (Rule ③ OWNER pattern) ────────────────────────────────────
     // The parent (useAlertForm.saveAnomalyDetection) owns the save + payload;
     // this step's submit exists purely to run the schema (the exposed
     // validate() drives form.handleSubmit()), so onSubmit is a no-op.
@@ -786,7 +757,7 @@ export default defineComponent({
       onSubmit: () => {},
     });
 
-    // Reactive reads — form.useStore, never a mirror (Rule ③).
+    // Reactive reads via form.useStore.
     const queryMode = form.useStore((s: any) => s.values.query_mode);
     const customSql = form.useStore((s: any) => s.values.custom_sql);
     const filterRows = form.useStore((s: any) => s.values.filters ?? []);
@@ -811,8 +782,8 @@ export default defineComponent({
     const thresholdRange = form.useStore(
       (s: any) => s.values.threshold_range ?? { min: 0, max: 100 },
     );
-    // Bare-widget errors (Monaco custom_sql + the kept data-test div) render
-    // only after the first submit attempt — R3, same timing as the wrappers.
+    // Bare-widget errors (Monaco custom_sql + the data-test div) render only
+    // after the first submit attempt, same timing as the wrappers.
     const showSqlErrors = form.useStore(
       (s: any) => s.submissionAttempts > 0,
     );
@@ -820,11 +791,9 @@ export default defineComponent({
     // The interval controls are composite "number + unit" fields: a ~5.5rem
     // OFormInput glued to a unit OFormSelect. OFormInput renders its message
     // INSIDE the number field's own width, which wraps it into a ragged column
-    // and grows the field, pushing the unit select out of line. Same fix as
-    // ScheduledPipeline's composite fields: an empty #error slot suppresses the
-    // built-in message and we render it in a full-width sibling below the pair.
-    // These read the same R3-timed field errors OFormInput would have surfaced —
-    // single source of truth, just displayed at column width.
+    // and grows the field, pushing the unit select out of line. An empty #error
+    // slot suppresses the built-in message and we render it in a full-width
+    // sibling below the pair, reading the same field errors OFormInput surfaces.
     const fieldError = (path: string) =>
       form.useStore((s: any) =>
         firstFieldError(s.fieldMeta?.[path]?.errors ?? []),
@@ -833,14 +802,10 @@ export default defineComponent({
     const scheduleIntervalError = fieldError("schedule_interval_value");
     const detectionWindowError = fieldError("detection_window_value");
 
-    // ── Egress: write-back deep watch (form → props.config) ────────────────
-    // OPEN DESIGN DECISION 4: the parent reads props.config directly (live
-    // anomalyPreviewSql computed + saveAnomalyDetection payload), and AddAlert/
-    // useAlertForm are out of scope to rewire — so the form writes back into
-    // the parent-owned object. This is EGRESS ONLY (the banned pattern is a
-    // watch→setFieldValue mirror INTO the form). Numeric fields are re-coerced
-    // so the parent payload keeps number types (the old template used
-    // v-model.number).
+    // Write-back watch (form → props.config): the parent reads props.config
+    // directly (live anomalyPreviewSql computed + saveAnomalyDetection payload),
+    // so the form writes back into the parent-owned object. Numeric fields are
+    // re-coerced so the parent payload keeps number types.
     const toModelNumber = (v: unknown) => {
       if (v === "" || v === null || v === undefined) return v;
       const n = Number(v);
@@ -880,10 +845,8 @@ export default defineComponent({
       { deep: true },
     );
 
-    // ── Ingress: async edit-prefill replaces the whole config object ───────
-    // (useAlertForm: `anomalyConfig.value = { ...defaultAnomalyConfig(), ...data }`)
-    // → re-seed via form.reset(record). NEVER a per-field setFieldValue loop,
-    // and NEVER a deep watch INTO the form.
+    // Async edit-prefill replaces the whole config object → re-seed via
+    // form.reset(record).
     watch(
       () => props.config,
       (cfg) => {
@@ -899,12 +862,9 @@ export default defineComponent({
         hasTimestampAliasInSql(customSql.value || "", getTimestampColumn()),
     );
 
-    // Bare Monaco has no field binding, so it never gets the red border OForm*
-    // wrappers paint from field state. Without it a rejected save highlighted
-    // nothing: the two error divs below the editor were the only surface, and
-    // they sit directly above a same-size hint line, so they read as more hint
-    // text. Mirror the wrappers' R3 timing (post-submit only) over the same
-    // conditions those two divs render on.
+    // Bare Monaco has no field binding, so it never gets the red border the
+    // OForm* wrappers paint from field state. This drives that border, post-
+    // submit only, over the same conditions the two error divs render on.
     const hasSqlError = computed(
       () =>
         showSqlErrors.value &&
@@ -912,7 +872,7 @@ export default defineComponent({
     );
 
     // Bridge the bare Monaco editor's value into the form so the schema
-    // covers it (the ONLY sanctioned setFieldValue bridge — Rule ②).
+    // covers it.
     const onCustomSqlChange = (sql: string) => {
       form.setFieldValue("custom_sql", sql);
     };
@@ -1096,7 +1056,7 @@ export default defineComponent({
       );
     });
 
-    // Structural mutations go through the form (Rule ① — the single source).
+    // Structural mutations go through the form.
     const addFilter = () => {
       form.pushFieldValue("filters", makeAnomalyFilterRow());
     };
@@ -1106,12 +1066,9 @@ export default defineComponent({
     };
 
     // The parent (AddAlert wizard via useAlertForm) still calls
-    // anomalyStep2Ref.validate() to gate Next/Save — keep that surface, but
-    // drive it through form.handleSubmit() (runs the schema — never TanStack
-    // formRef.validate(), which skips form-level validators — and flips
-    // submissionAttempts so the post-submit errors render).
-    // Orchestrator-phase hand-off: when AddAlert (row 3) is migrated, replace
-    // this parent-calls-child validate() with aggregated child-form validity.
+    // anomalyStep2Ref.validate() to gate Next/Save — drive it through
+    // form.handleSubmit() so it runs the schema and flips submissionAttempts
+    // so the post-submit errors render.
     const validate = async (): Promise<boolean> => {
       await form.handleSubmit();
       return form.state.isValid;

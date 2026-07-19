@@ -70,10 +70,10 @@ export interface OTableColumnMeta {
   /** Additional class applied to the <td> */
   cellClass?: string;
   /**
-   * Mark this as the primary "name" column. Per the design system (HANDOFF §8.2)
-   * the record-name column renders at weight 500 — enough to separate it from
-   * metadata columns (which stay 400 / --text-3) without the "wall of bold".
-   * Only affects default-rendered cells; custom `cell` renderers style their own.
+   * Mark this as the primary "name" column. The record-name column renders at
+   * weight 500 — enough to separate it from metadata columns (which stay 400 /
+   * --text-3) without the "wall of bold". Only affects default-rendered cells;
+   * custom `cell` renderers style their own.
    */
   isName?: boolean;
   /** Format function applied to cell value before rendering */

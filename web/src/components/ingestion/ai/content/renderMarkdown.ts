@@ -25,9 +25,8 @@ import { Marked } from "marked";
 import DOMPurify from "dompurify";
 import type { CardSubstitutions } from "@/components/ingestion/setupCard/types";
 
-// CardSubstitutions and safeHttpUrl now live in the shared setup-card module.
-// Re-exported here so the many existing `from ".../renderMarkdown"` importers
-// (traces, chat, AI cards) keep working unchanged.
+// Re-exported from the shared setup-card module so existing
+// `from ".../renderMarkdown"` importers (traces, chat, AI cards) keep working.
 export type { CardSubstitutions } from "@/components/ingestion/setupCard/types";
 export { safeHttpUrl } from "@/components/ingestion/setupCard/subs";
 

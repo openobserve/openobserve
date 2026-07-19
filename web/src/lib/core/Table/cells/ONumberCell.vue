@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // Copyright 2026 OpenObserve Inc.
 //
-// ONumberCell — consistent numeric rendering for tables (audit §2.4):
+// ONumberCell — consistent numeric rendering for tables:
 // tabular-nums so digits stack, one set of shared formatters, muted dash for
 // empty. Pair the column with `meta.align: "right"` for proper alignment.
 //

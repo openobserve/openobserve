@@ -462,11 +462,10 @@ export function useSessions() {
     }
     const safeId = traceId.replace(/'/g, "''");
 
-    // Fetch all gen_ai spans for this trace in one query. The
-    // gen_ai_input_messages IS NOT NULL filter was previously applied here
-    // but that meant a second parallel COUNT query was needed for LLM/tool
-    // call badge counts. Removing the filter lets us compute the counts
-    // client-side from the same result set, halving the number of API calls.
+    // Fetch all gen_ai spans for this trace in one query. No
+    // gen_ai_input_messages IS NOT NULL filter, so the LLM/tool call badge
+    // counts can be computed client-side from the same result set rather than
+    // via a second parallel COUNT query.
     const sql = compactSql(`
       SELECT
         gen_ai_input_messages,

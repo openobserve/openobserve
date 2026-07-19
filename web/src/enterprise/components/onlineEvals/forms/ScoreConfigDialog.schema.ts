@@ -2,42 +2,33 @@
 //
 // Validation schema for ScoreConfigDialog.vue (online-evals score-config drawer).
 // Client-side validation: (1) name — required + a create-only lowercase-slug
-// pattern (matching origin/main); (2) min/max — each must be a non-empty number,
-// but ONLY when the data type is numeric (the inputs are hidden and the values are
-// dropped from the payload for categorical/boolean, so a blank must not block Save
-// there — the check is gated on dataType in superRefine). There is NO min<max
-// ordering rule and NO "≥1 category" rule — main allowed both, so those stay
-// deliberately absent (online-evals-migration.md row 68).
+// pattern; (2) min/max — each must be a non-empty number, but ONLY when the data
+// type is numeric (the inputs are hidden and the values are dropped from the
+// payload for categorical/boolean, so a blank must not block Save there — the
+// check is gated on dataType in superRefine). There is NO min<max ordering rule
+// and NO "≥1 category" rule.
 //
-// The component OWNS <OForm> via the Rule-③ owner pattern: it creates the form
-// with `useOForm` and reads it reactively through `form.useStore` — a SINGLE
-// source of truth, NO mirror ref, NO `v-model`, NO `watch → setFieldValue` sync.
-// That read view (`formValues`) drives the `dataType`/`healthyDirection`/
-// `categories` `v-if` branches; the @submit payload builders read the validated
-// `value`; `isDirty` comes from the form store (a save-affordance, not a
-// validation gate). The real text/number inputs (name/description/min/max/healthy
-// values) are plain form-owned `name=` fields. The bespoke choice grids (the
-// dataType radio-cards, the healthy-threshold radios/checkboxes — several of which
-// embed inline number inputs, so they have NO OForm* representation) plus the
-// categories tag-entry write DIRECTLY into the one form via `form.setFieldValue`
-// from each control's own `@change`/`@click` handler (the sanctioned custom-grid
-// bridge — NOT a watch on a local mirror). Every field thus lives in the schema —
-// validated or `.optional()`. Validation TIMING is owned by OForm.
+// The component owns <OForm>: it creates the form with `useOForm` and reads it
+// reactively through `form.useStore` (single source of truth, no mirror ref, no
+// `v-model`). That read view (`formValues`) drives the `dataType`/
+// `healthyDirection`/`categories` `v-if` branches. The real text/number inputs
+// (name/description/min/max/healthy values) are plain form-owned `name=` fields.
+// The bespoke choice grids (dataType radio-cards, healthy-threshold
+// radios/checkboxes — several embed inline number inputs, so they have no OForm*
+// representation) plus the categories tag-entry write directly into the form via
+// `form.setFieldValue` from each control's own `@change`/`@click` handler.
 
 import { z } from "zod";
 import type { ScoreDataType } from "@/services/online-evals.service";
 
-// Stable-identifier rule (letters, digits, underscores), restored from the
-// pre-migration `validateName()`: the name is a lowercase slug. Only enforced on
-// create — in edit the name is immutable (the input is disabled), so a legacy
-// config whose name predates this rule must still be editable (description-only).
+// Stable-identifier rule (lowercase letters, digits, underscores). Only enforced
+// on create — in edit the name is immutable (the input is disabled).
 const NAME_PATTERN = /^[a-z0-9_]+$/;
 
-// True when a number <input>'s RAW store value is not a usable number — "" (the
+// True when a number <input>'s raw store value is not a usable number — "" (the
 // cleared state), null / undefined, or non-numeric. Used to require min/max, but
 // ONLY for the numeric data type (see superRefine). `z.coerce.number()` can't do
-// this: it would silently turn "" into 0. The payload builder in the component
-// re-coerces the raw store value on submit.
+// this: it would silently turn "" into 0.
 const isBlankNumber = (v: unknown) =>
   v === "" || v === null || v === undefined || Number.isNaN(Number(v));
 
@@ -104,12 +95,8 @@ export const makeScoreConfigSchema = (
         });
       }
     });
-    // NOTE: matching pre-migration (origin/main) behavior, there is intentionally
-    // NO numeric `min < max` ordering rule and NO categorical "≥1 category" rule —
-    // main allowed both (min≥max ranges, and empty categorical → `categories:
-    // null`). The only validation the migration restores is name required + the
-    // create-only slug pattern above (plus the numeric-only min/max requirement).
-    // See ScoreConfigDialog.vue save().
+    // Intentionally NO numeric `min < max` ordering rule and NO categorical
+    // "≥1 category" rule — both min≥max ranges and empty categorical are allowed.
 
 export type ScoreConfigForm = z.infer<ReturnType<typeof makeScoreConfigSchema>>;
 

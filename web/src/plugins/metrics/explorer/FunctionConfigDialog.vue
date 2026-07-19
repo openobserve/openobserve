@@ -139,8 +139,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- @error: a conversion throw lands the tile in the SAME error state
-               a failed query does — without it the emit fell on the floor and
-               the tile was a blank region with no message. -->
+               a failed query does — without it the tile is a blank region with
+               no message. -->
           <MetricCardChart
             v-else-if="previewOf(variant).results.length"
             :results="previewOf(variant).results"
@@ -432,11 +432,8 @@ export default defineComponent({
     const isEmpty = (variant: any) => {
       const preview = previewOf(variant);
       if (preview.status !== "done") return false;
-      // The same reader the cards use. This was open-coded, which meant two
-      // answers to "what counts as empty" that would drift the first time one
-      // was amended — and the hand-rolled copy also unwrapped a `{data:{result}}`
-      // envelope that never reaches here (the chunk processor already returns
-      // `{resultType, result}`; if it did not, every CARD would report empty).
+      // The same reader the cards use, so "empty" means the same thing on a
+      // tile as on the card behind it.
       return !preview.results.some(hasSamples);
     };
 
@@ -477,10 +474,8 @@ export default defineComponent({
           [variant.id]: {
             status: "error",
             results: [],
-            // Through the same reader the cards use. Hand-picking fields off the
-            // payload put the backend's raw envelope ("Error during planning:
-            // ErrorCode# {…}") on a tile while the card behind it showed the
-            // sentence inside it ("Search query timed out") for the same failure.
+            // Through the same reader the cards use, so a tile shows the same
+            // message as the card behind it.
             error: parseSearchError(error).message,
           },
         };

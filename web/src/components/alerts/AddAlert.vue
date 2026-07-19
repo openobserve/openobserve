@@ -15,10 +15,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <!-- AddAlert OWNS the ONE form (Rule ③ owner pattern): `form` is created in
-       setup() via useAlertForm's useOForm and handed to <OForm :form> so the
-       topbar OForm* fields and the already-migrated descendant steps
-       (QueryConfig / AlertSettings) bind by nested `name=` into it. -->
+  <!-- AddAlert owns the single OForm: `form` is created in setup() via
+       useAlertForm's useOForm and handed to <OForm :form> so the topbar OForm*
+       fields and the descendant steps (QueryConfig / AlertSettings) bind by
+       nested `name=` into it. -->
   <OForm :form="form" class="w-full h-full">
 
     <!-- ═══════════════════════════════════════════════════════════════════ -->

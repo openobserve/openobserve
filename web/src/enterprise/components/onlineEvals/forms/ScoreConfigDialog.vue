@@ -1,9 +1,8 @@
 <template>
-  <!-- Standard shared drawer (main's ux-revamp): the drawer owns the header
-       (title + ×), the scrim, and the footer buttons. The body is an <OForm>
-       tied to the footer's primary button via `form-id`, so Save (and Enter)
-       route through the schema-validated submit; the Save spinner is auto-driven
-       by the nested OForm's isSubmitting (no manual `isSaving`). -->
+  <!-- The drawer owns the header (title + ×), the scrim, and the footer buttons.
+       The body is an <OForm> tied to the footer's primary button via `form-id`,
+       so Save (and Enter) route through the schema-validated submit; the Save
+       spinner is auto-driven by the nested OForm's isSubmitting. -->
   <ODrawer
     :open="open"
     side="right"
@@ -396,19 +395,16 @@ const drawerTitle = computed(() =>
 const DATA_TYPES = ["numeric", "categorical", "boolean"] as const;
 
 // Co-located Zod schema (factory keeps messages i18n-driven and branches the
-// create-only name-slug rule on `mode`, matching main's validateName).
+// create-only name-slug rule on `mode`).
 const scoreConfigSchema = makeScoreConfigSchema(t, props.mode);
 
-// OWNER pattern (Rule ③): this component owns <OForm>, so it creates the form
-// with useOForm and reads it reactively via form.useStore — a SINGLE source of
-// truth, NO mirror ref. `formValues` drives the parent-side reads: the
-// `dataType`/`categories` `v-if` branches and the `defaultGte/LteValue`
-// computeds. The bespoke choice controls (the dataType ORadioGroup, the
-// healthy-threshold radios/checkboxes) and the categories TagInput are genuine
-// non-`OForm*` widgets, so they bridge into the one form via `form.setFieldValue`
-// and read back through `formValues` (the sanctioned non-input bridge); the
-// scalar inputs are plain `name=` fields. The @submit handler reads the
-// validated `value`.
+// This component owns <OForm> and reads it reactively via form.useStore — a
+// single source of truth, no mirror ref. `formValues` drives the `dataType`/
+// `categories` `v-if` branches and the `defaultGte/LteValue` computeds. The
+// bespoke choice controls (the dataType ORadioGroup, the healthy-threshold
+// radios/checkboxes) and the categories TagInput are non-`OForm*` widgets, so
+// they bridge into the form via `form.setFieldValue` and read back through
+// `formValues`; the scalar inputs are plain `name=` fields.
 const form = useOForm<ScoreConfigForm>({
   defaultValues: initForm(props.row),
   schema: scoreConfigSchema,
@@ -421,9 +417,9 @@ const nextVersionLabel = computed(() => {
   return `v${v + 1}`;
 });
 
-// Dirty affordance (a save-affordance, NOT a validation gate — R3). TanStack
-// tracks per-field dirtiness against the seeded defaults, so editing any field
-// (incl. the bridged choice controls) flips this true.
+// Dirty affordance (a save-affordance, not a validation gate). TanStack tracks
+// per-field dirtiness against the seeded defaults, so editing any field (incl.
+// the bridged choice controls) flips this true.
 const isDirty = form.useStore((s: any) => s.isDirty);
 
 const defaultGteValue = computed(() => {
@@ -513,7 +509,7 @@ function buildNumericRange(v: ScoreConfigForm) {
   if (v.dataType !== "numeric") return null;
   // A number <input> emits a STRING and the @submit value is TanStack's RAW store
   // value (the schema's z.coerce.number coerces for validation only, not the
-  // stored value) — so coerce here, exactly as the old `v-model.number` did.
+  // stored value) — so coerce to a number here.
   const min = Number(v.min);
   const max = Number(v.max);
   if (Number.isNaN(min) || Number.isNaN(max)) return null;
@@ -544,11 +540,10 @@ function buildHealthyThreshold(v: ScoreConfigForm) {
 }
 
 // @submit handler — OForm only calls this once the schema passes (name required
-// + the create-only slug pattern; matching main, there is NO min<max ordering
-// rule). A categorical config with zero categories is also allowed (pre-migration
-// behavior: buildCategories() just sends `categories: null`). The handler builds
-// the payload from the validated `value` ONLY. OForm awaits this → the ODrawer
-// Save spinner spans the save (no manual `isSaving`).
+// + the create-only slug pattern; there is no min<max ordering rule). A
+// categorical config with zero categories is allowed (buildCategories() just
+// sends `categories: null`). The handler builds the payload from the validated
+// `value` only. OForm awaits this, so the ODrawer Save spinner spans the save.
 async function save(value: ScoreConfigForm) {
   if (!props.orgId) return;
   try {

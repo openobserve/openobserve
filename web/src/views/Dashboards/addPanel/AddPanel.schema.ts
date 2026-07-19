@@ -1,9 +1,7 @@
 // Copyright 2026 OpenObserve Inc.
 //
 // Validation schema for AddPanel.vue. The only OForm-validated field is the
-// panel `title` (rendered in the page-header `#tabs` slot). It was previously
-// gated by a manual `panelNameError` ref set inside the save flow
-// (`isValid` → "Panel name is required."). Migrated here as a required+trim
+// panel `title` (rendered in the page-header `#tabs` slot) — a required+trim
 // Zod rule. The deeper chart/query validation (`validatePanel`) cannot be
 // expressed per-field in Zod and stays in the imperative `isValid()` guard that
 // the OForm `@submit` handler still runs.

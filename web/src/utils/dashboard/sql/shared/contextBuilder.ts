@@ -54,11 +54,9 @@ export const largestLabel = (data: any) => {
 };
 
 /**
- * Builds the complete SQLContext for a given set of raw inputs.
- *
- * This function replicates all the work that `convertSQLData` used to do
- * *before* the chart-type switch statement ΓÇö axis-key extraction, data
- * processing, base-options construction, and helper-function creation.
+ * Builds the complete SQLContext for a given set of raw inputs — axis-key
+ * extraction, data processing, base-options construction, and helper-function
+ * creation.
  *
  * @returns The fully populated SQLContext, or `null` if the input is invalid.
  */

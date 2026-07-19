@@ -368,16 +368,11 @@ const {
 
 const isVirtual = computed(() => props.virtualScroll && displayRows.value.length > 0);
 
-// ── Actions column content-measurement ──────────────────────────
-// The actions column has no fixed semantic width — it's "as wide as its
-// buttons, no more". We can't know that from the column def (buttons live in a
-// slot), so after each render we measure the rendered action cells and pin the
-// column's CSS size var to the widest content. These vars override the nominal
-// sizes computed in useTableCore.
-// Per-column CSS size-var overrides. The actions column is NO LONGER measured
-// from the DOM at runtime (it's sized deterministically from its icon count in
-// useTableCore, so the skeleton and loaded table match) — this stays empty for
-// now but is kept as the override channel the table style/sums read from.
+// ── Per-column CSS size-var overrides ──────────────────────────
+// Override channel the table style/sums read from, overriding the nominal sizes
+// computed in useTableCore. The actions column is sized deterministically from
+// its icon count in useTableCore (so the skeleton and loaded table match), so
+// this currently stays empty.
 const measuredColumnSizeVars = ref<Record<string, string>>({});
 
 // ── Flex-fill measurement ───────────────────────────────────────
@@ -662,9 +657,8 @@ function freezeFlexColumns(): void {
   // Pin each flex column to its ACTUAL rendered width so TanStack's resize
   // starts from exactly where the column is — no jump. The DOM is current at
   // mousedown, so getBoundingClientRect is reliable; the arithmetic fill is a
-  // fallback for when the element isn't found / has no layout (tests). (The
-  // arithmetic alone was off on some pages where a column's rendered width
-  // differs from its nominal size.)
+  // fallback for when the element isn't found / has no layout (tests). (Arithmetic
+  // alone can be off where a column's rendered width differs from its nominal size.)
   const fills = fillWidths();
   const sizing = { ...columnSizing.value };
   for (const id of ids) {
@@ -1218,9 +1212,7 @@ defineExpose({
 
 /* keep(lib-override:o2-table-hide-header): public modifier, same shape as the
    block above — `thead` is this component's own render, and the class is passed
-   in by components/queries/QueryList.vue and plugins/logs/SearchBar.vue (x2).
-   Migrated here from styles/utilities.css (W2.b); it had been duplicated
-   identically in both of those files before W2.a hoisted it. */
+   in by components/queries/QueryList.vue and plugins/logs/SearchBar.vue (x2). */
 .o2-table-hide-header :deep(thead) {
   display: none;
 }

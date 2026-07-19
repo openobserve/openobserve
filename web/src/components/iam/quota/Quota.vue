@@ -14,7 +14,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 -->
-<!-- TODO: we need to completely remove the store.state.theme based styling on this page as we have moved it to central place app.scss -->
+<!-- TODO: remove the store.state.theme based styling on this page; theming is centralised in app.scss -->
 <template>
   <div class="quota-page text-left h-full flex flex-col"
     :class="

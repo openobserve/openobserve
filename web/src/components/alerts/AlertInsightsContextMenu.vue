@@ -101,7 +101,6 @@ const emit = defineEmits<{
 const isAlertNameContext = computed(() => {
 
   // Check if we're clicking on a panel that shows alert names
-  // Use panelId for more reliable identification instead of panelTitle
   const alertNamePanels = [
     "Panel_Alert_Frequency",
     "Panel_Dedup_Impact",
@@ -192,15 +191,7 @@ onUnmounted(() => {
 
 <style scoped>
 /* keep(complex-state): `.menu-item` hover/active are state pseudo-classes on this
-   file's own rows; kept as CSS so the two states stay declared together.
-   NOTE (W2.b): this element used to silently inherit an UNLAYERED global
-   `.context-menu` rule (min-width / vertical padding / font-size) from
-   styles/utilities.css that was authored for plugins/logs/JsonPreview.vue — a
-   name collision, not a shared design. Being unlayered it outranked the layered
-   `min-w-55` here, so the menu really rendered at the narrower min-w-50 width.
-   That global is now gone; `min-w-50` + `py-1` on the root above reproduce the
-   computed result exactly. Its inherited font-size was a no-op — every text node
-   below carries its own text-xs / text-sm. */
+   component's own elements, with no utility equivalent. */
 .context-menu .menu-item:hover {
   background-color: var(--color-dropdown-item-hover-bg);
 }

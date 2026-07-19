@@ -1,34 +1,14 @@
 // Copyright 2026 OpenObserve Inc.
 //
-// Validation schema for CreateDestinationForm.vue (the most complex form in the
-// codebase: a multi-step OStepper with a custom card-grid type picker and many
-// conditionally-shown fields). Built via a factory so messages stay i18n-driven
-// (pass useI18n's `t`).
+// Validation schema for CreateDestinationForm.vue, a multi-step OStepper with a
+// custom card-grid type picker and many conditionally-shown fields. Built via a
+// factory so messages stay i18n-driven (pass useI18n's `t`).
 //
-// Migration status (per the form-migration-playbook): every editable value the
-// form collects is now form-owned and validated by this schema —
-//   • `name`, `url`: genuinely user-typed → form-owned OForm fields whose rules
-//     live here as plain object-level Zod rules.
-//   • `skip_tls_verify`: form-owned OFormSwitch (boolean).
-//   • `metadata.*` (Splunk source/sourcetype/hostname, Datadog
-//     service/hostname/ddsource/ddtags): all nested under a single `metadata`
-//     object so every metadata input is form-owned. The Datadog `ddsource` /
-//     `ddtags` requireds are enforced in `superRefine`, keyed off the bridged
-//     `destination_type` discriminator.
-//   • `headers`: a dynamic array-field (`headers[i].key` / `headers[i].value`),
-//     each row form-owned (see the §2 array-field pattern in the playbook).
-//   • The auto-prefilled / conditionally-editable fields (url_endpoint/method/
-//     output_format/esbulk_index/separator/org/stream) are also form-owned OForm
-//     fields; the component keeps them in sync when destination_type changes via
-//     direct `form.setFieldValue(...)` calls — there is NO `formData` mirror.
-//     Their conditional rules live here in `superRefine`.
-//   • `destination_type` is NOT an <input> — it is a custom card grid. The card
-//     @click writes it with a DIRECT `form.setFieldValue("destination_type", …)`
-//     and the template reads it back via `form.useStore`, so `superRefine` can
-//     branch on it (no watch, no mirror — the Rule-③ headless owner pattern).
+// `destination_type` is not an <input> — it is a custom card grid whose @click
+// writes it via form.setFieldValue; superRefine branches on it to enforce the
+// conditional requirements of the entangled prefilled fields.
 //
-// Validation TIMING is owned by OForm (submit-then-change via revalidateLogic);
-// this file only describes WHAT is valid.
+// Validation TIMING is owned by OForm; this file only describes WHAT is valid.
 
 import { z } from "zod";
 import { isValidResourceName } from "@/utils/zincutils";
@@ -43,7 +23,7 @@ export const headerRowSchema = z.object({
 export const makeDestinationSchema = (t: (_key: string) => string) =>
   z
     .object({
-      // ── Form-owned, genuinely user-typed fields ──────────────────────────
+      // ── User-typed fields ────────────────────────────────────────────────
       name: z
         .string()
         .min(1, t("common.nameRequired"))
@@ -59,15 +39,13 @@ export const makeDestinationSchema = (t: (_key: string) => string) =>
           message: t("pipeline.urlTrailingSlash"),
         }),
 
-      // ── Form-owned toggle ────────────────────────────────────────────────
       skip_tls_verify: z.boolean().optional().default(false),
 
-      // ── Form-owned dynamic Headers rows ──────────────────────────────────
+      // ── Dynamic Headers rows ─────────────────────────────────────────────
       headers: z.array(headerRowSchema).default([]),
 
-      // ── Form-owned metadata (all Splunk + Datadog metadata inputs nest
-      //    here). Optional at the object level; the Datadog conditional
-      //    requireds are enforced in `superRefine` below. ───────────────────
+      // ── Splunk + Datadog metadata inputs. Optional at the object level; the
+      //    Datadog conditional requireds are enforced in `superRefine` below. ─
       metadata: z
         .object({
           source: z.string().optional(),
@@ -79,10 +57,9 @@ export const makeDestinationSchema = (t: (_key: string) => string) =>
         })
         .optional(),
 
-      // ── Discriminator (written from the card grid via form.setFieldValue) +
-      //    the auto-prefilled entangled fields. Kept loose at the object level;
-      //    the real conditional requirements are enforced in `superRefine` below
-      //    so they only apply for the relevant destination_type / output_format. ─
+      // ── Discriminator + the auto-prefilled entangled fields. Kept loose at
+      //    the object level; the conditional requirements are enforced in
+      //    `superRefine` below, per destination_type / output_format. ─────────
       destination_type: z.string().default("openobserve"),
       url_endpoint: z.string().optional().default(""),
       method: z.string().optional().default("post"),
@@ -159,7 +136,7 @@ export const makeDestinationSchema = (t: (_key: string) => string) =>
 
       // separator required when the StringSeparated output format is chosen.
       // Note: a single space IS a valid separator, so check for "" specifically
-      // (do NOT trim) — mirrors the old separator :validators rule.
+      // (do NOT trim).
       if (
         val.output_format === "stringseparated" &&
         (val.separator === null ||

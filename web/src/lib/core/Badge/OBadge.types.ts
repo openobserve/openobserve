@@ -34,7 +34,7 @@ export type BadgeVariant =
   | "success-soft"
   | "warning-soft"
   | "error-soft"
-  // NEW: Extended color families for correlation dimensions (8 colors × 3 variants = 24 new variants)
+  // Extended color families for correlation dimensions.
   | "teal" | "teal-outline" | "teal-soft"
   | "orange" | "orange-outline" | "orange-soft"
   | "lime" | "lime-outline" | "lime-soft"
@@ -81,7 +81,7 @@ export interface BadgeProps {
    */
   hideZeroCount?: boolean;
   /**
-   * Renders a 7px solid status dot before the label (HANDOFF §11). The dot
+   * Renders a 7px solid status dot before the label. The dot
    * inherits the badge's foreground colour (`currentColor`), so a `success`
    * badge gets a green dot, an `error` badge a red dot, etc. Use for live
    * status pills like "active" / "suspended".

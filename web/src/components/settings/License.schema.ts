@@ -4,9 +4,6 @@
 // `licenseKey` field is entered in two mutually-exclusive cards (the "no
 // license" card and the "update license" card); both share this schema.
 //
-// Replaces the `:disabled="!licenseKey.trim()"` Save gate with a schema rule
-// (R3 — the Save button stays enabled; the schema blocks an empty submit).
-//
 // Validation TIMING is owned by OForm (submit-then-change via revalidateLogic);
 // this file only describes WHAT is valid.
 

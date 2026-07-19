@@ -30,11 +30,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       }}</span>
     </div>
 
-    <!-- DESCENDANT step (Rule ③): the AddAlert orchestrator owns the ONE <OForm>
-         and provides FORM_CONTEXT_KEY. The OForm* fields below inject that form
-         and bind by nested `name=` (trigger_condition.*, destinations,
-         creates_incident); the composed schema in AddAlert.schema.ts validates
-         them on save. -->
+    <!-- The AddAlert orchestrator owns the ONE <OForm> and provides
+         FORM_CONTEXT_KEY. The OForm* fields below inject that form and bind by
+         nested `name=` (trigger_condition.*, destinations, creates_incident); the
+         composed schema in AddAlert.schema.ts validates them on save. -->
     <div class="px-3 py-2">
       <div>
         <!-- For Real-Time Alerts -->
@@ -356,7 +355,7 @@ export default defineComponent({
     const router = useRouter();
 
     // Field refs consumed by the parent's AlertFocusManager (registered off the
-    // step ref). Scheduled-only, mirroring the pre-migration template.
+    // step ref). Scheduled-only.
     const periodFieldRef = ref<any>(null);
     const silenceFieldRef = ref<any>(null);
     const destinationsFieldRef = ref<any>(null);
@@ -386,13 +385,13 @@ export default defineComponent({
       }
     };
 
-    // Period typed → the pre-migration cross-step CASCADE (period drives
-    // frequency / cron / timezone / silence). The ancestor AddAlert listens to
-    // @update:trigger (updateTriggerCondition → setFieldValue) and writes the
-    // whole trigger_condition into the ONE form, so the visible silence field
-    // auto-fills like before. The period field value itself is already written
-    // into the form by its own OFormInput binding; it rides on the emit so the
-    // parent write does not revert it.
+    // Period typed → cross-step CASCADE (period drives frequency / cron /
+    // timezone / silence). The ancestor AddAlert listens to @update:trigger
+    // (updateTriggerCondition → setFieldValue) and writes the whole
+    // trigger_condition into the ONE form, so the visible silence field
+    // auto-fills. The period field value itself is already written into the form
+    // by its own OFormInput binding; it rides on the emit so the parent write
+    // does not revert it.
     const handlePeriodChange = (val: unknown) => {
       const periodValue = Number(val);
       // Spread the FRESH form value, not `props.formData.trigger_condition`.
@@ -400,10 +399,7 @@ export default defineComponent({
       // render, and the parent's @update:trigger handler is a WHOLE-OBJECT
       // `setFieldValue("trigger_condition", …)` — so spreading the stale prop
       // round-trips a pre-write snapshot and silently clobbers any field written
-      // earlier in the same tick. Today only `period` is written in this tick and
-      // line below re-sets it, so nothing was lost; reading fresh makes that
-      // structural instead of an invariant someone has to remember to maintain.
-      // (Same bug, same fix as QueryConfig's emitTriggerUpdate.)
+      // earlier in the same tick.
       const currentTrigger =
         form?.getFieldValue?.("trigger_condition") ??
         props.formData.trigger_condition;

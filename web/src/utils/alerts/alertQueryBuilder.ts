@@ -102,9 +102,6 @@ export const generateSqlQuery = (
   // SELECT histgoram(_timestamp, '1 minute') AS zo_sql_key, avg(action_error_count) as zo_sql_val,
   // geo_info_city FROM _rundata WHERE geo_info_country='india' GROUP BY zo_sql_key,geo_info_city ORDER BY zo_sql_key ASC;
   let query = `SELECT histogram(${timestampColumn}) AS zo_sql_key,`;
-  //this method is used to generate the where clause
-  //previously it was just iterating over the conditions and getting the where clause
-  //now we are using the new format of conditions and getting the where clause using generateWhereClause method
   const whereClause = generateWhereClause(
     formData.query_condition.conditions,
     streamFieldsMap,

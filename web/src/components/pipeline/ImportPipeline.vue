@@ -339,7 +339,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   </base-import>
 
   <!-- Actions live in the pipeline shell's AppPageHeader (Functions.vue), next
-       to the "Pipelines â€º Import" breadcrumb â€” the shell owns the single header
+       to the "Pipelines › Import" breadcrumb — the shell owns the single header
        so BaseImport's built-in header is hidden (hide-header). -->
   <!-- defer is required: #o2-page-actions is created by Functions.vue (parent shell)
        and must exist before this child mounts. See PipelineHistory.vue for the same pattern. -->

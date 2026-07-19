@@ -1,6 +1,5 @@
 /**
  * Alert Data Transformation Utilities
- * Extracted from AddAlert.vue to reduce file complexity
  *
  * VERSION SUPPORT:
  * - Version 1: Old structure with {and: [...]} or {or: [...]} format

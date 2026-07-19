@@ -1,12 +1,7 @@
 // Copyright 2026 OpenObserve Inc.
 //
 // Validation schema for AddTab.vue. Built via a factory so the required message
-// stays i18n-driven (pass useI18n's `t`), matching the old `t('dashboard.nameRequired')`.
-//
-// No defaults factory here: AddTab is an EDIT-prefill form. The OForm owns the
-// `name` field; the component seeds it via a `defaults` computed (edit → the
-// loaded tab's name, create → blank) and the non-schema fields (panels/tabId)
-// come from the externally-loaded `editingTab` record — not a schema factory.
+// stays i18n-driven (pass useI18n's `t`).
 
 import { z } from "zod";
 

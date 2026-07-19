@@ -1329,8 +1329,7 @@ defineExpose({
   animation: logs-skel-row-in 320ms ease-out forwards;
 }
 
-/* Token-backed shimmer: --color-skeleton-* already flip with the theme, which
-   replaces the former light/dark raw-palette pair. */
+/* Token-backed shimmer: --color-skeleton-* already flip with the theme. */
 .logs-skel-pill {
   background: linear-gradient(
     90deg,

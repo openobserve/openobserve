@@ -39,8 +39,7 @@ export interface TrellisDeps {
 
 /**
  * Creates the four trellis-layout helper functions.
- * All functions close over `deps` so they behave identically to the original
- * closures defined inside `convertSQLData`.
+ * All functions close over `deps`.
  */
 export function createTrellisHelpers(deps: TrellisDeps) {
   const {

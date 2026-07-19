@@ -62,7 +62,7 @@ export function buildDataLookupMap(
     const xValue = getDataValue(item, xAxisKey);
     const key = `${breakdownValue}||${xValue}`;
 
-    // Only set if NOT already present (keeps FIRST occurrence, matching original .find() behavior)
+    // Only set if NOT already present (keeps FIRST occurrence)
     if (!dataMap.has(key)) {
       dataMap.set(key, item);
     }
@@ -73,8 +73,7 @@ export function buildDataLookupMap(
 
 /**
  * Creates all series-building helper functions.
- * All functions close over `deps` so they behave identically to the original
- * closures defined inside `convertSQLData`.
+ * All functions close over `deps`.
  */
 export function createSeriesBuilders(deps: SeriesDeps) {
   const {

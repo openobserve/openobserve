@@ -595,8 +595,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                OFormInput's built-in message would render inside
                                the 7.5rem field and wrap/clip. The empty #error
                                slot keeps the field form-owned (name=) but
-                               suppresses its inline message; we surface the schema
-                               error in the full-width sibling below (R3-timed). -->
+                               suppresses its inline message; the schema error is
+                               surfaced in the full-width sibling below. -->
                           <div
                             class="flex items-stretch border border-card-glass-border rounded-default w-fit overflow-hidden"
                           >
@@ -703,7 +703,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           </div>
                         </div>
                         <!-- The required rule lives in the schema (period ≥ 1);
-                             surfaced here after submit (R3). Otherwise, once a
+                             surfaced here after submit. Otherwise, once a
                              period is set, show the informational note. -->
                         <div
                           v-if="periodError"
@@ -1176,7 +1176,7 @@ const getColumns = computed(() => {
 
 const { t } = useI18n();
 
-// ── Rule ③ DESCENDANT ─────────────────────────────────────────────────────────
+// ── Form descendant ───────────────────────────────────────────────────────────
 // ScheduledPipeline is rendered INSIDE Query's <OForm>; it injects that form and
 // treats it as the SINGLE source of truth. The validated scalar controls below
 // are OForm* `name=` fields (trigger_condition.* / delay / query_condition.type /
@@ -1199,8 +1199,8 @@ const delayCondition = form.useStore((s: any) => s.values.delay);
 // fields wrapped in a shared w-fit/overflow-hidden border, so their OFormInput
 // carries an empty #error slot (suppresses the built-in inline message) and we
 // render the schema error in a full-width sibling below the group. These read
-// the same R3-timed field errors OFormInput would have surfaced — single source
-// of truth, just displayed at column width.
+// the same field errors OFormInput would have surfaced — single source of truth,
+// just displayed at column width.
 const frequencyError = form.useStore((s: any) =>
   firstFieldError(s.fieldMeta?.["trigger_condition.frequency"]?.errors ?? []),
 );
@@ -1222,7 +1222,7 @@ const setAggregation = (value: any) => {
   });
 };
 
-// Stream type / name are form-owned (Rule ③): the two <OFormSelect> controls own
+// Stream type / name are form-owned: the two <OFormSelect> controls own
 // `stream_type` / `stream_name`. These are reactive READ views of that single
 // source of truth — every programmatic write goes through form.setFieldValue so
 // all the internal read-sites (query preview, field lists, watches, AI context)
@@ -1426,10 +1426,9 @@ watch(
   },
 );
 
-// The stream-name <OFormSelect> owns `stream_name`; loading the selected stream's
-// fields was the old @update:model-value="getStreamFields" side effect. React to
-// the form-owned value here (the SQL-sync path awaits getStreamFields explicitly,
-// so skip it to avoid a double fetch).
+// The stream-name <OFormSelect> owns `stream_name`; react to the form-owned value
+// here to load the selected stream's fields. The SQL-sync path awaits
+// getStreamFields explicitly, so skip it there to avoid a double fetch.
 watch(
   () => selectedStreamName.value,
   (val) => {
@@ -1477,8 +1476,7 @@ watch(
 );
 
 // Cross-field reset: when frequency_type flips, recompute the form-owned period.
-// flush:"sync" so the period write lands before any same-tick read (matches the
-// established cross-field-reset timing in the other migrated forms).
+// flush:"sync" so the period write lands before any same-tick read.
 watch(
   () => triggerData.value.frequency_type,
   (val) => {
@@ -1497,10 +1495,8 @@ watch(
   { flush: "sync" },
 );
 
-// The frequency / cron OForm* fields write the form directly; mirror the old
-// `@update:model-value="updateFrequency/updateCron"` side effects (validate +
-// recompute period) by watching the form-owned values. These were previously
-// inline change handlers — now they react to the single source of truth.
+// The frequency / cron OForm* fields write the form directly; their side effects
+// (validate + recompute period) run by watching the form-owned values.
 watch(
   () => triggerData.value.frequency,
   () => {
@@ -1956,7 +1952,7 @@ const updateQuery = () => {
     query.value = form.state.values?.query_condition?.sql ?? props.sql ?? "";
 };
 
-// group_by[] is a form-owned array (Rule ①): each row renders as an indexed
+// group_by[] is a form-owned array: each row renders as an indexed
 // OFormSelect (`query_condition.aggregation.group_by[${i}]`) so the row value is
 // owned by the form and its per-row error comes from the schema's superRefine —
 // no bare <OSelect>, no manual :error binding, no bridge. Add/remove rows go
@@ -2057,9 +2053,6 @@ const onBlurQueryEditor = debounce(async () => {
   emits("validate-sql");
 }, 10);
 
-// NOTE: the old imperative `validateInputs()` gate is GONE — the Query schema
-// (makeQuerySchema: period ≥ 1, frequency/cron validity, group_by rows required
-// when aggregation enabled) now gates the save through OForm.
 const collapseFieldList = () => {
   splitterModel.value = collapseFields.value ? 30 : 0;
   collapseFields.value = !collapseFields.value;
@@ -2129,9 +2122,8 @@ const getStreamFields = () => {
         }
       })
       .finally(() => {
-        // Note: Default query generation removed
-        // Query is now cleared when stream changes (see watch on selectedStreamName)
-        // Initial query generation happens in onMounted
+        // Query is cleared when stream changes (see watch on selectedStreamName);
+        // initial query generation happens in onMounted.
         expandState.value.query = true;
         expandState.value.output = false;
         resolve(true);
@@ -2356,7 +2348,7 @@ const filterStreams = (val: string, update: any) => {
   });
 };
 
-// Modify getStreamList to store the full list
+// getStreamList stores the full stream list
 async function getStreamList() {
   if (streamsLoading.value) return;
   streamsLoading.value = true;
@@ -2745,8 +2737,7 @@ const sendToAiChat = (value: any, append: boolean = true) => {
 defineExpose({
   tab,
   tabOptions,
-  // The imperative validateInputs() gate is GONE (schema replaces it). The
-  // reactive form-owned slices are exposed for tests/behaviour.
+  // Reactive form-owned slices exposed for tests/behaviour.
   form,
   triggerData,
   aggregationData,

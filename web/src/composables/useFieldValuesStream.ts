@@ -167,7 +167,7 @@ const useFieldValuesStream = () => {
           });
         });
 
-        // [NEW] Background capture — does not block handleResponse return
+        // Background capture — does not block handleResponse return
         if (chunkValues.length > 0 && fieldName) {
           captureFromValuesApi(
             {

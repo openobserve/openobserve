@@ -464,7 +464,7 @@ const validationErrors = ref<string[]>([]);
 
 const { track } = useReo();
 
-// ── Pipeline name: OForm-owned (migrated from the store-driven OInput) ───────
+// ── Pipeline name: OForm-owned ───────────────────────────────────────────────
 // The name input is a headless OForm so the teleported <OFormInput> validates
 // via the schema (submit-then-change timing; the inline error appears on the
 // first save attempt). `currentSelectedPipeline.name` stays the PERSISTED field

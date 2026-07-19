@@ -27,7 +27,7 @@ import { type SQLContext } from "../shared/types";
 /**
  * Applies chart-specific options for: pie AND donut
  *
- * Mutates `ctx.options` in place, exactly as the original switch cases did.
+ * Mutates `ctx.options` in place.
  */
 export function applyPieDonutChart(ctx: SQLContext): void {
   const {

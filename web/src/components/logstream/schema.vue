@@ -970,9 +970,9 @@ export default defineComponent({
 
     const patternIdToApplyAtMap = new Map();
 
-    // The "Add Field(s)" rows are owned by a small TanStack form (StreamFieldInputs
-    // is form-only now). Writes go through the form (push/remove/reset); reads use
-    // the reactive `newSchemaFields` view below — single source of truth, no mirror.
+    // The "Add Field(s)" rows are owned by a small TanStack form. Writes go through
+    // the form (push/remove/reset); reads use the reactive `newSchemaFields` view
+    // below — single source of truth, no mirror.
     const newSchemaFieldsForm = useOForm<{ newSchemaFields: any[] }>({
       defaultValues: { newSchemaFields: [] },
       schema: makeSchemaFieldsSchema(t),
@@ -993,10 +993,8 @@ export default defineComponent({
       (indexData.value.schema || []).map((f: any) => f.name).sort(),
     );
     const isDialogOpen = ref(false);
-    // The child (StreamFieldInputs) owns row deletion now and no longer emits a
-    // @remove event, so the parent can't run "close the dialog when the last row
-    // is deleted" inline. Observe the row count instead: whenever the rows drain
-    // to empty while the dialog is open, close it (restores main's behavior).
+    // Observe the row count: whenever the rows drain to empty while the dialog is
+    // open, close it.
     watch(
       () => newSchemaFields.value.length,
       (len) => {
@@ -1955,8 +1953,7 @@ export default defineComponent({
     // NOTE: adding/removing "Add Field(s)" rows is owned by the child
     // (StreamFieldInputs) via form.pushFieldValue / form.removeFieldValue. The
     // parent seeds the first row in openDialog and closes the dialog when the
-    // rows drain to empty via the watch above — so no add/remove handlers live
-    // here anymore.
+    // rows drain to empty via the watch above.
 
     const scrollToAddFields = () => {
       const el = document.getElementById("schema-add-fields-section");
@@ -2474,8 +2471,7 @@ export default defineComponent({
     };
 
     // OSelect doesn't have a max-values prop; enforce it client-side instead.
-    // Trims the selection to the last 2 values picked (matches old q-select
-    // :max-values="2" behaviour: silently caps at 2).
+    // Trims the selection to the last 2 values picked (silently caps at 2).
     const MAX_INDEX_TYPES = 2;
     const enforceMaxIndexTypes = (value: any) => {
       if (!Array.isArray(value)) return value;
@@ -2706,7 +2702,7 @@ export default defineComponent({
 }
 
 /* The !important here outranks the less-specific `thead tr th` / `tbody tr td`
-   rules above — that is the pre-existing computed result, preserved verbatim. */
+   rules above. */
 .o2-schema-table :deep(th),
 .o2-schema-table :deep(td) {
   height: 0.875rem !important;

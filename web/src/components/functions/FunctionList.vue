@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="flex flex-col h-full min-h-0"
   >
     <div v-if="!showAddJSTransformDialog" class="flex flex-col h-full min-h-0">
-      <!-- Standard section header: title + actions only. Search moved to toolbar. -->
+      <!-- Standard section header: title + actions only. Search lives in the toolbar. -->
       <AppPageHeader
         :title="t('function.header')"
         icon="function"

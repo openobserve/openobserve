@@ -22,7 +22,7 @@ const actions = {
   update: (org_identifier: string, action_id: string, data: any) => {
     return http().put(`/api/${org_identifier}/actions/${action_id}`, data);
   },
-  //as backend is not supporting the pagination,  page no, desc so as of now we removed it
+  // backend does not support pagination / page-no / desc
   list: (org_identifier: string) => {
     return http().get(`/api/${org_identifier}/actions`);
   },

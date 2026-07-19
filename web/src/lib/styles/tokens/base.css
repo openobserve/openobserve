@@ -16,7 +16,6 @@
   font-display: swap;
 }
 
-
 /* ============================================================
    BASE TOKENS — raw palette, spacing, radius, shadows, fonts
    These are NEVER referenced directly in components.
@@ -27,16 +26,14 @@
   /* --- Font family tokens --- */
   --font-sans: 'Geist', -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif;
   /* Fallbacks are per-glyph: any character Geist Mono lacks (CJK, box-drawing,
-     symbols in log data) falls through to the next family automatically. Keep the
-     chain broad. Do NOT add families we don't ship a @font-face for — they resolve
-     only on machines that happen to have them installed, which is how the app
-     drifted to a different look per OS in the first place. */
+     symbols in log data) falls through to the next family automatically. Do NOT
+     add families we don't ship a @font-face for — they resolve only on machines
+     that happen to have them installed, giving a different look per OS. */
   --font-mono: 'Geist Mono', ui-monospace, 'SF Mono', Menlo, monospace;
 
-  /* --- Font size scale — SINGLE source of truth ---
+  /* --- Font size scale — single source of truth ---
      Values match Tailwind's conventional scale, so token-driven element rules and
-     the text-* utilities agree pixel-for-pixel. Role guidance ("when to use which")
-     lives here and in the ui-architect skill. Do NOT use raw text-[..px]. */
+     the text-* utilities agree pixel-for-pixel. Do NOT use raw text-[..px]. */
   --text-3xs:  0.625rem;  /* 10px — chart axis micro-labels, dense table sub-text */
   --text-2xs:  0.6875rem; /* 11px — tiny labels, chips, badge text */
   --text-xs:   0.75rem;   /* 12px — captions, metadata, timestamps */
@@ -70,14 +67,13 @@
   --font-semibold: 600;
   --font-bold: 700;
   /* --- Primary palette — blue-teal #3F7994 ---
-     BRAND ARCHITECTURE (decided — AUDIT §5.D / STANDARD C.4): the runtime theme
-     engine is the AUTHORITY for brand colour. `constants/themes.ts` defines the
-     selectable themes; `utils/theme.ts#generatePrimaryPalette` derives the full
-     50–950 ramp from the chosen base and writes it as inline styles on <html>,
+     The runtime theme engine is the AUTHORITY for brand colour. `constants/themes.ts`
+     defines the selectable themes; `utils/theme.ts#generatePrimaryPalette` derives the
+     full 50–950 ramp from the chosen base and writes it as inline styles on <html>,
      which beat this stylesheet. The values below are the DEFAULT O2 theme only —
-     theme.ts removes its inline overrides when the default theme is active, so
-     these then apply. To change the brand: edit constants/themes.ts (or pick a
-     theme in the UI) — do NOT edit this ramp and expect custom themes to follow. */
+     theme.ts removes its inline overrides when the default theme is active, so these
+     then apply. To change the brand: edit constants/themes.ts (or pick a theme in the
+     UI) — do NOT edit this ramp and expect custom themes to follow. */
   --color-primary-50:  #f5f8fa;
   --color-primary-100: #e2ebef;
   --color-primary-200: #c5d7df;
@@ -91,10 +87,9 @@
   --color-primary-950: #0d181e;   /* darkest — dark-mode hover/drag bgs */
 
   /* --- Grey palette --- */
-  /* Tailwind "neutral" palette — true greys with no blue undertone.
-     Previously used "gray" (#1f2937, #111827, …) which has a cool/blue tint,
-     causing inputs / selects / dropdowns / dialogs to read as dark blue in
-     dark mode. Neutral matches user expectation of "dark grey, not blue". */
+  /* Tailwind "neutral" palette — true greys with no blue undertone. Tailwind's
+     "gray" has a cool/blue tint that makes inputs / selects / dropdowns / dialogs
+     read as dark blue in dark mode; neutral reads as "dark grey, not blue". */
   --color-grey-0:   #ffffff;
   --color-grey-50:  #fafafa;
   --color-grey-100: #f5f5f5;
@@ -113,7 +108,7 @@
   /* --- Error palette --- */
   --color-error-50:  #fef2f2;
   --color-error-100: #fee2e2;
-  --color-error-300: #fca5a5;   /* referenced by destructive-disabled / focus-ring */
+  --color-error-300: #fca5a5;
   --color-error-400: #f87171;
   --color-error-500: #ef4444;
   --color-error-600: #dc2626;
@@ -123,9 +118,9 @@
   --color-success-50:  #f0fdf4;
   --color-success-100: #dcfce7;
   --color-success-200: #bbf7d0;
-  --color-success-400: #4ade80;   /* referenced by EmptyState check illustration */
+  --color-success-400: #4ade80;
   --color-success-500: #22c55e;
-  --color-success-600: #16a34a;   /* parity with error-600 — ghost-success play/resume text */
+  --color-success-600: #16a34a;
   --color-success-700: #15803d;
   --color-success-900: #14532d;
 
@@ -147,10 +142,6 @@
   --color-purple-600: #9333ea;
   --color-purple-700: #7e22ce;
   --color-purple-900: #581c87;
-
-  /* --- Info palette (blue, used by OBanner info variant) --- */
-
-  /* --- Note container palette (pipeline guideline cards) --- */
 
   /* --- Teal palette --- */
   --color-teal-50:  #f0fdfa;
@@ -221,8 +212,8 @@
   --color-indigo-900: #312e81;
 
   /* --- Trace span categorical palette (50 colors) ---
-     Restored from the legacy _variables.scss $o2-span-* set. Theme-neutral
-     (same in light/dark); consumed as --color-span-{n} by utils/traces/traceColors.ts. */
+     Theme-neutral (same in light/dark); consumed as --color-span-{n} by
+     utils/traces/traceColors.ts. */
   --color-span-1: #3B82F6;
   --color-span-2: #EF4444;
   --color-span-3: #10B981;
@@ -288,12 +279,10 @@
   --spacing-10:  2.5rem;    /* 40px */
 
   /* --- Radius scale --- */
-  /* ONE app corner radius (A5). Standardised to a single value (the max-used
-     4px) so every surface rounds identically; change --radius-default to retune
-     every corner at once. The legacy sm/md/lg/xl are kept as ALIASES of it —
-     app templates use `rounded-default`, but these remain so scoped-block
-     `var(--radius-*)` refs and the OTag/OSkeleton `shape` API keep resolving
-     (all to the one value). `full` stays for pills/avatars/circles. */
+  /* One app corner radius: sm/md/lg/xl are all aliases of --radius-default, so
+     changing it retunes every corner at once and any `var(--radius-*)` ref (scoped
+     blocks, the OTag/OSkeleton `shape` API) still resolves. `full` is for
+     pills/avatars/circles. */
   --radius-default: 0.25rem;   /* 4px — the one app corner radius */
   --radius-sm:   var(--radius-default);
   --radius-md:   var(--radius-default);
@@ -303,25 +292,21 @@
 
   /* --- Shadow scale — hairline-border philosophy ---
      Only md/lg render real elevation (overlays: dialogs, menus). Cards use a
-     1px border, not a drop shadow — a flat surface needs NO shadow class.
-     --shadow-sm (was `none`, A6) and --shadow-xs retired: they were no-op
-     tokens; their classes were stripped rather than shipping dead utilities. */
+     1px border, not a drop shadow — a flat surface needs NO shadow class. */
   --shadow-md: 0 4px 12px -2px rgb(0 0 0 / 0.08), 0 2px 6px -2px rgb(0 0 0 / 0.06);
   --shadow-lg: 0 12px 24px -4px rgb(0 0 0 / 0.10), 0 4px 8px -4px rgb(0 0 0 / 0.06);
 }
 
 /* ============================================================
    DOMAIN / DATA-VIZ / BRAND LITERAL TOKENS
-   Relocated from semantic.css (2026-07-18). Fixed categorical /
-   brand values (label chips, trace DAG nodes, code syntax, external-
-   brand replicas, json / service-health / wildcard, gradients, …) —
-   raw values that belong with the palette, not the semantic intent
-   layer. Registered for utilities in semantic.css / component.css
-   @theme inline; dark overrides in dark.css.
+   Fixed categorical / brand values (label chips, trace DAG nodes, code
+   syntax, external-brand replicas, json / service-health / wildcard,
+   gradients, …) — raw values that belong with the palette, not the
+   semantic intent layer. Registered for utilities in semantic.css /
+   component.css @theme inline; dark overrides in dark.css.
    ============================================================ */
-/* â”€â”€ Domain data-viz: label chips (field-value type chips) â”€â”€
-   Domain label-chip palette (field-value type chips). See dark.css for dark
-   overrides; component.css's @theme inline registers these for Tailwind. */
+/* Label chips (field-value type chips). Dark overrides in dark.css;
+   component.css's @theme inline registers these for Tailwind. */
 :root {
   --color-label-chip-ip-bg:      #F2FCF3;
   --color-label-chip-ip-text:    #208A3C;
@@ -349,14 +334,14 @@
   --color-label-chip-pattern-text: #2E55A3;
 }
 
-/* â”€â”€ Domain data-viz & migrated color tokens â”€â”€ */
+/* Domain data-viz color tokens */
 :root {
   --color-actions-column-shadow: rgba(0, 0, 0, 0.1);
   --color-bg-gray: color-mix(in srgb, var(--color-theme-accent) 10%, rgb(237, 237, 237));
   --color-card-glass-border: rgba(0, 0, 0, 0.12);
   --color-cancel-query-bg: #f67a7a;
   --color-highlight-bg: #e7e6e6;   /* syntax-guide highlight chip (dark: #747474) */
-  --color-brand-indigo: #5960B2;   /* brand indigo â€” loading bar, AI accents (theme-independent) */
+  --color-brand-indigo: #5960B2;   /* brand indigo — loading bar, AI accents (theme-independent) */
   --color-card-glass-bg: rgba(255, 255, 255, 0.8);
   --color-card-glass-solid: rgba(255, 255, 255);
   --color-dashboard-placeholder-bg: #B3BDF1;
@@ -375,15 +360,14 @@
   --color-focus-ring: #282D5D;
   --color-gray: #818594;
   /* AI-assistant identity accents (welcome hero + prompt chips). Same values in
-     both themes â€” translucent bgs sit fine on light and dark surfaces. */
+     both themes — translucent bgs sit fine on light and dark surfaces. */
   --color-ai-accent: #7B61FF;
   /* SQL / query-editor violet accent (stream-name label, sql status bar). Theme-aware:
      lighter in dark for legibility. */
   --color-sql-accent: #7C3AED;
   /* VRL-function blue accent, the sibling of --color-sql-accent: the two mark the
-     SQL vs function halves of an expanded search-history / scheduler row. Minted
-     because no blue "function" accent existed; the raw literal it replaces had no
-     dark treatment at all. Theme-aware: lighter in dark for legibility. */
+     SQL vs function halves of an expanded search-history / scheduler row.
+     Theme-aware: lighter in dark for legibility. */
   --color-function-accent: #0A7EBC;
   --color-lang-sql-text: #7B61FF;
   --color-lang-sql-bg: rgba(123, 97, 255, 0.10);
@@ -393,7 +377,7 @@
   --color-lang-promql-bg: rgba(16, 185, 129, 0.12);
   /* Trace DAG node-type palette (LLM span types). ONE base color per type;
      at the call site border = base, bg = base@12% over surface, text = base
-     mixed toward the foreground. Dark values live in dark.css â€” the base flips,
+     mixed toward the foreground. Dark values live in dark.css — the base flips,
      so consumers need NO dark: variant. */
   --color-dag-node-generation: #4caf50;
   --color-dag-node-embedding:  #2196f3;
@@ -408,7 +392,7 @@
   --color-dag-node-guardrail:  #f44336;
   --color-dag-node-event:      #ffc107;
   --color-dag-node-default:    #9e9e9e;
-  /* Code syntax highlighting (highlight.js) â€” GitHub light palette. Shared by
+  /* Code syntax highlighting (highlight.js) — GitHub light palette. Shared by
      O2AIChat + OCodeBlock; dark values in dark.css so one rule covers both themes. */
   --color-syntax-bg:       #f6f8fa;
   --color-syntax-text:     #24292e;
@@ -424,8 +408,8 @@
   --color-syntax-addition-bg: #f0fff4;
   --color-syntax-deletion-fg: #b31d28;
   --color-syntax-deletion-bg: #ffeef0;
-  /* Brand gradients â€” theme-independent (same in light/dark) unless noted.
-     One AI gradient reused across ~40 sites; -subtle/-faint are its idle washes
+  /* Brand gradients — theme-independent (same in light/dark) unless noted.
+     One AI gradient reused widely; -subtle/-faint are its idle washes
      (dark alpha bumped in dark.css). */
   --color-gradient-ai:        linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%);
   --color-gradient-ai-subtle: linear-gradient(135deg, rgba(139,92,246,0.15) 0%, rgba(236,72,153,0.15) 100%);
@@ -434,7 +418,7 @@
   --color-gradient-notification: linear-gradient(135deg, #ef4444 0%, #ec4899 100%);
   --color-gradient-danger:       linear-gradient(135deg, #f56565 0%, #e53e3e 100%);
   --color-gradient-danger-hover: linear-gradient(135deg, #e53e3e 0%, #c53030 100%);
-  /* External brand colors (destination-preview CTAs, promo banner) â€” fixed,
+  /* External brand colors (destination-preview CTAs, promo banner) — fixed,
      theme-independent by design (replicate other products' brands). */
   --color-brand-slack:        #007a5a;
   --color-brand-slack-hover:  #005a42;
@@ -444,10 +428,10 @@
   --color-brand-email-hover:  #0056b3;
   --color-promo-webinar-link:       #1e3a8a;
   --color-promo-webinar-link-hover: #1e40af;
-  /* Home-banner accent (D13 promo art â€” theme-independent, matches the amber
-     header top-bar). `-accent` is decorative only (gradient wash, border tint,
-     blur blobs, badge dot); `-accent-text` is the darker step the badge LABEL
-     needs to stay legible on the near-white banner. */
+  /* Home-banner accent (theme-independent, matches the amber header top-bar).
+     `-accent` is decorative only (gradient wash, border tint, blur blobs, badge
+     dot); `-accent-text` is the darker step the badge LABEL needs to stay legible
+     on the near-white banner. */
   --color-promo-webinar-accent:      var(--color-amber-400);
   --color-promo-webinar-accent-text: var(--color-amber-700);
   /* Body text + separator on the amber top-bar. Fixed (theme-independent) like
@@ -468,19 +452,19 @@
      are deliberately theme-independent, like the brand replicas. */
   --color-flame-tooltip-label: #cbd5e1;
   --color-flame-tooltip-error: #f87171;
-  /* Global scrollbar treatment (consumed by styles/base-elements.css). Semantic
-     names for what were raw palette refs; values are unchanged. Dark steps in dark.css. */
+  /* Global scrollbar treatment (consumed by styles/base-elements.css).
+     Dark steps in dark.css. */
   --color-scrollbar-thumb:       var(--color-grey-300);
   --color-scrollbar-thumb-hover: var(--color-grey-400);
   /* Secondary section-header accent bar. The alert/query editors mark most
      sections with a --color-theme-accent bar and VRL-editor sections with a
-     deliberately DIFFERENT hue; this token carries that distinction (it rode on
-     Quasar's teal --q-secondary until Quasar was removed). Dark step in dark.css. */
+     deliberately DIFFERENT hue; this token carries that distinction. Dark step
+     in dark.css. */
   --color-section-accent-secondary: var(--color-teal-600);
-  /* AI-chat message bubbles â€” subtle theme-aware gradient tints (dark in dark.css). */
+  /* AI-chat message bubbles — subtle theme-aware gradient tints (dark in dark.css). */
   --color-chat-bubble-user: linear-gradient(135deg, #f0f4ff 0%, #e8f0fe 100%);
   --color-chat-bubble-ai:   linear-gradient(135deg, #f8f9ff 0%, #e8edff 100%);
-  /* Destination-preview brand replicas (Slack/Teams/Email message mockups) â€”
+  /* Destination-preview brand replicas (Slack/Teams/Email message mockups) —
      FIXED, theme-independent (must look like the real product in any app theme). */
   --color-brand-msg-text: #4a5568;
   --color-brand-msg-meta: #6c757d;
@@ -546,11 +530,11 @@
   --color-wildcard-bar-orange: #E56D17;
   --color-wildcard-bar-purple: #834DF0;
 
-  /* Empty-state illustration palette — a fixed warm-earth decorative set for
-     the empty-state character/scene art. Theme-independent by design (like the
-     brand replicas): the illustrations read the same in light and dark.
-     Consumed as SVG fill/stroke in lib/core/EmptyState/illustrations/**;
-     not registered as Tailwind utilities. Ordered light → dark. */
+  /* Empty-state illustration palette — a fixed warm-earth decorative set for the
+     empty-state character/scene art. Theme-independent: the illustrations read the
+     same in light and dark. Consumed as SVG fill/stroke in
+     lib/core/EmptyState/illustrations/**; not registered as Tailwind utilities.
+     Ordered light → dark. */
   --color-illustration-sand:     #f0c29a;
   --color-illustration-tan:      #e8b48c;
   --color-illustration-clay:     #b5764a;

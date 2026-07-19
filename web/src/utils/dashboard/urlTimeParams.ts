@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-// Shared URL <-> time-range / refresh helpers (simple date-picker shape), lifted from ViewDashboard.
+// Shared URL <-> time-range / refresh helpers (simple date-picker shape).
 // ⚠️ Not the rich-shape date.ts helpers — those expect {tab,relative,absolute} and throw on this shape.
 
 import type { LocationQuery } from "vue-router";

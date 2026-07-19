@@ -3,11 +3,8 @@
 // Validation schema for Stream.vue (the input/output stream pipeline-node
 // drawer, select-existing branch).
 //
-// Field ownership (R1-strict — every editable control inside <OForm> is
-// form-owned):
-//   • stream_type — required select. RESTORED from the BEFORE baseline:
-//                   the original required BOTH stream_type AND stream_name, but
-//                   the O-component migration only validated stream_name.
+// Field ownership (every editable control inside <OForm> is form-owned):
+//   • stream_type — required select.
 //   • stream_name — required select (creatable on output nodes).
 //   • appendData  — optional switch (only relevant for enrichment_tables output).
 //
@@ -15,8 +12,7 @@
 // select-existing form for the AddStream create child), so it is not a field.
 //
 // Validation TIMING is owned by OForm (submit-then-change); this file only
-// describes WHAT is valid. Messages mirror the BEFORE baseline ('Field is
-// required!').
+// describes WHAT is valid.
 
 import { z } from "zod";
 

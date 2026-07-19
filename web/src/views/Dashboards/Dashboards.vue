@@ -874,7 +874,7 @@ export default defineComponent({
       // explicit: the folder watcher stamps it into the URL on every ordinary
       // visit, so honoring it would defeat the favorites-first landing on
       // every reload. With no (effective) deep link, land on Favorites when
-      // the user has any, else on the default folder exactly as before.
+      // the user has any, else on the default folder.
       activeFolderId.value = null;
       if (route.query.folder === FAVORITES_FOLDER_ID) {
         activeFolderId.value = FAVORITES_FOLDER_ID;

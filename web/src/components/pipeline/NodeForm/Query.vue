@@ -81,13 +81,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="w-full h-full stream-routing-section bg-surface-base"
       :class="{ 'fullscreen-mode': isFullscreenMode }"
     >
-    <!-- ── Rule ③ OWNER pattern ──────────────────────────────────────────────
+    <!-- ── OWNER pattern ──────────────────────────────────────────────
          Query OWNS <OForm> (created with useOForm) and hands it to <OForm :form>.
          ScheduledPipeline is rendered INSIDE as a DESCENDANT: it injects the form
          and renders the validated scalar controls as OForm* `name=` fields. The
          form is the SINGLE source of truth — no v-model:trigger/sql/… mirror.
-         The schema (makeQuerySchema) replaces ScheduledPipeline.validateInputs();
-         the SQL editor stays bare so validateSqlQuery() remains a pre-submit
+         The SQL editor stays bare so validateSqlQuery() remains a pre-submit
          guard inside saveQueryData (the form's onSubmit). -->
     <OForm :form="form" class="w-full h-full rounded-default stream-routing-container">
       <scheduled-pipeline
@@ -349,12 +348,12 @@ const getDefaultStreamRoute: any = () => {
   };
 };
 
-// ── OForm (Rule ③ OWNER) ──────────────────────────────────────────────────────
+// ── OForm ──────────────────────────────────────────────────────
 // The form's defaultValues are the streamRoute object — so the form is the
 // SINGLE source of truth for the whole route. ScheduledPipeline (descendant)
 // reads/writes the validated slices via the injected form; the schema gates
 // submit. `min` is the org min_auto_refresh_interval (seconds) fed to the schema
-// factory so the frequency/cron superRefine matches validateFrequency.
+// factory.
 const min = Number(store.state?.zoConfig?.min_auto_refresh_interval) || 1;
 
 const form = useOForm<QueryForm>({
@@ -365,8 +364,7 @@ const form = useOForm<QueryForm>({
 
 // `streamRoute` is a reactive VIEW of the form-owned values (the single source
 // of truth) — NOT a mirror copy. Reads (template, tests, payload build) and the
-// helper mutations below go through the form. Kept as `streamRoute` to preserve
-// the established read surface.
+// helper mutations below go through the form.
 const streamRoute = form.useStore((s: any) => s.values as StreamRoute);
 
 // Server-error highlight ranges for the SQL editor. Provided here (parent) and
@@ -434,8 +432,7 @@ const filterStreams = (val: string, update: any) => {
   filteredStreams.value = filterColumns(indexOptions.value, val, update);
 };
 
-// Kept as an exposed computed for unit tests. NOTE: this was never an actual
-// submit gate (saveQueryData never read it), and the live drawer does not edit
+// Exposed computed for unit tests. The live drawer does not edit
 // streamRoute.name, so it is intentionally NOT a schema field (see Query.schema).
 const isValidStreamName = computed(() => {
   const roleNameRegex = /^[a-zA-Z0-9+=,.@_-]+$/;
@@ -496,8 +493,7 @@ const getDefaultPromqlCondition = () => {
   };
 };
 
-// Drive submission through the form so the schema gates the save (replaces the
-// old direct saveQueryData wiring + scheduledPipelineRef.validateInputs gate).
+// Drive submission through the form so the schema gates the save.
 const submitForm = () => {
   form.handleSubmit();
 };
@@ -523,7 +519,6 @@ const saveQueryData = async () => {
     stream_type: formData.stream_type, // required
     org_id: store.state.selectedOrganization.identifier, // required
     query_condition: {
-      // same as before
       type: formData.query_condition.type,
       conditions: null,
       sql: formData.query_condition.sql,
@@ -534,7 +529,6 @@ const saveQueryData = async () => {
       search_event_type: "derivedstream",
     },
     trigger_condition: {
-      // same as before
       period: period || 1,
       operator: "=",
       threshold: 0,
@@ -620,7 +614,7 @@ const validateSqlQuery = async () => {
 
   query.query.sql = normalizeLimit(streamRoute.value.query_condition.sql,100);
 
-  //removed the encoding as it is not required for the pipeline queries
+  //encoding is not required for the pipeline queries
   if (store.state.zoConfig.sql_base64_enabled && query?.encoding) {
     delete query.encoding;
   }
@@ -697,12 +691,8 @@ const normalizeLimit = (sql: string, maxLimit = 100): string => {
     // regex will detect the LIMIT and OFFSET in the sql query
     // it will capture multiple LIMIT and OFFSET in the sql query
     const regex = /\bLIMIT\s+(\d+)(\s+OFFSET\s+\d+)?/gi;
-     //here we will test if the sql query has LIMIT and OFFSET
-    //if it has LIMIT then we will replace the LIMIT with the normalized limit
-    //if it has no LIMIT then we will return the sql query as is
-    //if it has LIMIT but no OFFSET then we will return the sql query with the normalized
-    //we have moved to match instead of test because sometimes it fails when there are multiple limit with in the same query
-    //due to last index effects
+    //if the sql has a LIMIT, replace it with the normalized limit; otherwise return as is.
+    //using match instead of test — test can fail with multiple LIMITs in one query due to lastIndex effects
     if (sql.match(regex)) {
       return sql.replace(regex, (match, limit, offset) => {
         const num = parseInt(limit, 10);

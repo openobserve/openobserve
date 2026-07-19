@@ -46,10 +46,8 @@
             :disabled="dashboardPanelDataPageKey === 'logs'"
             @update:model-value="onStreamTypeChange"
           />
-          <!-- Metric type as a LETTER (C/G/H/S/O), not a glyph. It used to be an
-               icon per type (a hash for Counter, bars for Histogram, a speedometer
-               for Gauge…) with no way to tell which was which. The `badge` renders
-               inline beside the name and costs no row height. -->
+          <!-- Metric type as a LETTER (C/G/H/S/O), not a glyph. The `badge`
+               renders inline beside the name and costs no row height. -->
           <OSelect
             :model-value="currentStream"
             :label="t('dashboard.selectIndex')"
