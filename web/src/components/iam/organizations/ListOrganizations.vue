@@ -254,9 +254,7 @@ export default defineComponent({
         header: "#",
         accessorKey: "#",
         size: TABLE_INDEX_COL_SIZE,
-        minSize: 32,
-        maxSize: 40,
-        meta: { align: "left", compactPadding: true },
+        meta: { align: "left" },
       },
       {
         id: "name",

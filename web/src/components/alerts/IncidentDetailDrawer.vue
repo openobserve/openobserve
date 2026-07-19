@@ -122,7 +122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Content -->
     <div v-if="!loading && incidentDetails" class="bg-card-glass-bg flex flex-col overflow-hidden flex-1 min-h-0">
-      <div class="flex-shrink-0 border-b border-border-default">
+      <div class="flex-shrink-0 px-page-edge border-b border-border-default">
         <OTabs
           v-model="activeTab"
           align="left"
