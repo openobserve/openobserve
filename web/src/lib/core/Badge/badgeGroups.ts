@@ -862,7 +862,7 @@ export const BADGE_GROUPS = {
   // Span / trace status — dot.
   spanStatus: {
     mode: "dot",
-    shape: "rounded",
+    shape: "pill",
     values: {
       ok: { variant: "success-soft", label: "OK" },
       success: { variant: "success-soft" },
