@@ -14,17 +14,16 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <div class="p-0" style="min-height: inherit">
-    <!-- Header -->
-    <AppPageHeader
-      :title="isEditing ? t('aiToolset.update') : t('aiToolset.add')"
-      :back="{
-        label: t('aiToolset.header'),
-        onClick: () => $emit('cancel:hideform'),
-        dataTest: 'ai-toolset-back-btn',
-      }"
-      class="shrink-0 border-b border-border-default"
-    />
+  <PageLayout
+    class="min-h-[inherit]"
+    :title="isEditing ? t('aiToolset.update') : t('aiToolset.add')"
+    :back="{
+      label: t('aiToolset.header'),
+      onClick: () => $emit('cancel:hideform'),
+      dataTest: 'ai-toolset-back-btn',
+    }"
+    bleed
+  >
 
     <!-- Inline page form. The form is created in setup() via useOForm (headless)
          so this owner can read `kind`/arrays/skill content reactively to drive
@@ -349,7 +348,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </OForm>
-  </div>
+  </PageLayout>
 </template>
 
 <script lang="ts">
@@ -372,7 +371,7 @@ import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormTextarea from "@/lib/forms/Input/OFormTextarea.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OFormSwitch from "@/lib/forms/Switch/OFormSwitch.vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import PageLayout from "@/components/common/PageLayout.vue";
 import { useOForm } from "@/lib/forms/Form/useOForm";
 import type { ToolsetKind } from "@/services/ai_toolsets";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -389,7 +388,7 @@ const QueryEditor = defineAsyncComponent(
 export default defineComponent({
   name: "AddAiToolset",
   components: {
-    AppPageHeader,
+    PageLayout,
     OTag,
     OButton,
     OIcon,
