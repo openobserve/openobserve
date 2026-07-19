@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
        another bg-card-glass-bg would render same-bg-on-same-bg and the
        inner cards would visually disappear (no border contrast). -->
   <div
-    class="bg-transparent h-full flex flex-col px-2.5"
+    class="bg-transparent h-full flex flex-col"
   >
     <!-- Toolbar: Stream/Agent mode tab (left) + the matching picker (right) —
          hidden when no streams are available. Padding lives on the toolbar +
@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          instead of floating inside a padded box. -->
     <div
       v-if="availableStreams.length > 0"
-      class="flex items-center justify-end gap-2 px-4 py-2"
+      class="flex items-center justify-end gap-2 px-page-edge py-2"
     >
       <!-- Filter mode: view a whole Stream, or a single Agent. Sits directly
            beside the picker so switching mode and choosing the value are one
@@ -92,7 +92,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <LLMInsightsSkeleton
       v-if="!streamsLoaded || switching"
       :hide-toolbar="streamsLoaded"
-      class="flex-1 px-4"
+      class="flex-1 px-page-edge"
     />
 
     <!-- Generic error state — kept separate because a failed request is a
@@ -119,7 +119,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          the preset's "Instrument with OpenTelemetry" call to action. -->
     <div
       v-else-if="isEmpty"
-      class="flex-1 min-h-0 flex items-center justify-center px-4"
+      class="flex-1 min-h-0 flex items-center justify-center px-page-edge"
       data-test="llm-insights-empty"
     >
       <OEmptyState
@@ -134,7 +134,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          back to the Stream tab. -->
     <div
       v-else-if="agentEmpty"
-      class="flex-1 min-h-0 flex items-center justify-center px-4"
+      class="flex-1 min-h-0 flex items-center justify-center px-page-edge"
       data-test="llm-insights-agent-empty"
     >
       <OEmptyState
@@ -150,7 +150,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Dashboard content — scrollable panel area. Horizontal padding lives
          here (inside the scroll container) so the scrollbar sits at the
          content-area edge with content padded away from it. -->
-    <div v-else class="flex-1 overflow-y-auto px-4 pb-3">
+    <div v-else class="flex-1 overflow-y-auto px-page-edge pb-3">
       <!-- KPI strip: keep a skeleton until the first KPI result lands so the
            cards never flash zeros. The panels below render regardless, so
            their queries fire in parallel with the KPI fetch. -->
