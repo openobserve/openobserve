@@ -44,7 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <div class="max-w-190 flex flex-col gap-6">
         <!-- ── Model Details Card ── -->
-        <div class="border border-card-glass-border rounded-default shadow-md">
+        <div class="border border-card-glass-border rounded-default">
           <div class="flex flex-row items-center justify-between gap-3 py-2.5 px-4 bg-surface-panel border-b border-card-glass-border rounded-t-default">
             <div>
               <div class="form-card-title text-compact font-semibold">
@@ -180,7 +180,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </ODialog>
 
         <!-- ── Pricing Tiers ── -->
-        <div class="border border-card-glass-border rounded-default shadow-md">
+        <div class="border border-card-glass-border rounded-default">
           <div class="flex flex-row items-center justify-between gap-3 py-2.5 px-4 bg-surface-panel border-b border-card-glass-border rounded-t-default">
             <div>
               <div class="form-card-title text-compact font-semibold">
@@ -196,7 +196,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div
               v-for="(tier, idx) in formTiers"
               :key="idx"
-              class="border border-card-glass-border rounded-default overflow-hidden shadow-md"
+              class="border border-card-glass-border rounded-default overflow-hidden"
             >
               <!-- Tier Header -->
               <div class="flex items-center justify-between gap-2 py-2 px-4 bg-surface-panel border-b border-card-glass-border">

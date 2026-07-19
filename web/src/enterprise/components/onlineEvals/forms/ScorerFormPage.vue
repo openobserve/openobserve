@@ -41,7 +41,7 @@
     </AppPageHeader>
 
     <div class="flex-1 min-h-0 overflow-hidden grid grid-cols-[minmax(0,1.6fr)_minmax(320px,0.9fr)] max-[1100px]:grid-cols-1 gap-2.5">
-      <div class="scorer-form__main min-w-0 overflow-auto p-[18px_24px_24px] bg-surface-base rounded-default shadow-[0_0_0.313rem_0.063rem_var(--color-hover-shadow)]">
+      <div class="scorer-form__main min-w-0 overflow-auto p-[18px_24px_24px] bg-surface-base rounded-default border border-border-default">
         <!-- Section 01: Identity -->
         <section class="mb-6">
           <div class="flex items-center gap-2.5 pb-2.5 border-b border-dialog-header-border mb-3">
@@ -608,7 +608,7 @@
       />
     </div>
 
-    <footer class="sticky bottom-0 flex items-center justify-end gap-2 px-5.5 py-3 bg-surface-base rounded-default shadow-[0_0_0.313rem_0.063rem_var(--color-hover-shadow)] shrink-0 z-1">
+    <footer class="sticky bottom-0 flex items-center justify-end gap-2 px-5.5 py-3 bg-surface-base border-t border-border-default shrink-0 z-1">
       <OButton
         data-test="scorer-form-cancel-btn"
         type="button"

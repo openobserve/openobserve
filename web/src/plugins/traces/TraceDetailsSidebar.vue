@@ -249,7 +249,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
-    <div class="px-page-edge span_details_tabs">
+    <div class="span_details_tabs">
       <OTabs
         v-model="activeTab"
         dense
