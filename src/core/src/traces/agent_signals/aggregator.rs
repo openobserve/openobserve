@@ -43,6 +43,7 @@ pub async fn write_agent_signals(
     if records.is_empty() {
         return Ok(());
     }
+    let record_count = records.len();
     let enriched = records_to_json(&records);
     let req = cluster_rpc::IngestionRequest {
         org_id: org_id.to_string(),
@@ -61,6 +62,12 @@ pub async fn write_agent_signals(
         .await
         .map(|_| ())
         .map_err(|e| anyhow::anyhow!("{e}"))
+        .inspect_err(|e| {
+            log::error!("[AgentSignals] Failed to write agent signal records: {e}");
+        })?;
+
+    log::info!("[AgentSignals] Wrote {record_count} agent signal records for {org_id}");
+    Ok(())
 }
 
 #[cfg(not(feature = "enterprise"))]
