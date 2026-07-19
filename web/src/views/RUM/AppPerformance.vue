@@ -57,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </AppPageHeader>
 
     <OTabs
-      class="shrink-0 px-3 border-b border-border-default"
+      class="shrink-0 px-page-edge border-b border-border-default"
       v-model="activePerformanceTab"
       align="left"
       dense

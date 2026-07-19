@@ -102,7 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="showTabs"
         v-model="activeAnalysisType"
         dense
-        class="border-b border-solid border-card-glass-border text-text-secondary! insights-dashboard-tabs"
+        class="px-page-edge border-b border-solid border-card-glass-border text-text-secondary! insights-dashboard-tabs"
         align="left"
       >
         <OTab

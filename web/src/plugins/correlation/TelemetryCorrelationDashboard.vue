@@ -89,7 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
 
       <!-- Tabs (only in dialog mode, hidden in embedded-tabs mode) -->
-      <div class="px-4">
+      <div class="px-page-edge">
       <OTabs
         v-if="!isEmbeddedTabs"
         v-model="activeTab"
@@ -306,7 +306,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-model="activeOuterTab"
                   dense
                   align="left"
-                  class="metric-group-tabs border-b border-solid border-card-glass-border"
+                  class="metric-group-tabs px-page-edge border-b border-solid border-card-glass-border"
                 >
                   <OTab
                     v-for="outerGroup in groupDefs"
@@ -335,7 +335,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-model="activeMetricGroupTab"
                   dense
                   align="left"
-                  class="metric-group-tabs shrink-0 bg-surface-panel border-b border-solid border-card-glass-border"
+                  class="metric-group-tabs px-page-edge shrink-0 bg-surface-panel border-b border-solid border-card-glass-border"
                 >
                   <OTab
                     v-for="group in groupedUniqueMetricStreams.groups.filter(

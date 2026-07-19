@@ -148,7 +148,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Tabs: Operations / Nodes / Pods -->
         <template v-if="streamFilter !== 'all'">
           <div
-            class="flex items-end border-b border-b-card-glass-border mx-2 mb-1.5"
+            class="flex items-end border-b border-b-card-glass-border px-page-edge mb-1.5"
             data-test="service-graph-node-panel-tabs-row"
           >
             <OTabs

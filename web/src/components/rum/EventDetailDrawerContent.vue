@@ -94,7 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
 
     <!-- Tabs Navigation -->
-    <div class="flex pt-2 px-2">
+    <div class="flex pt-2 px-page-edge">
       <div class="w-full">
         <OTabs v-model="activeTab" align="left" dense>
           <OTab
