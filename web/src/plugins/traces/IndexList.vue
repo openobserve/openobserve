@@ -16,23 +16,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="flex flex-col w-full index-menu py-1.5! bg-surface-panel!">
-    <OSelect
-      data-test="log-search-index-list-select-stream"
-      :model-value="searchObj.data.stream.selectedStream?.value ?? null"
-      :label="
-        searchObj.data.stream.selectedStream?.label
-          ? ''
-          : t('search.selectIndex')
-      "
-      :options="streamOptions"
-      data-cy="index-dropdown"
-      @search="onStreamSearch"
-      @update:model-value="onStreamChange"
-    >
+    <!-- Stream selector sits on the same 6px rail inset as the field list below it. -->
+    <div class="px-1.5">
+      <OSelect
+        data-test="log-search-index-list-select-stream"
+        :model-value="searchObj.data.stream.selectedStream?.value ?? null"
+        :label="
+          searchObj.data.stream.selectedStream?.label
+            ? ''
+            : t('search.selectIndex')
+        "
+        :options="streamOptions"
+        data-cy="index-dropdown"
+        @search="onStreamSearch"
+        @update:model-value="onStreamChange"
+      >
         <template #empty>
           <div class="p-2">{{ t("search.noResult") }}</div>
         </template>
-    </OSelect>
+      </OSelect>
+    </div>
     <div
       class="index-table h-[calc(100%-2rem)]! w-full"
       data-test="log-search-index-list-fields-table"

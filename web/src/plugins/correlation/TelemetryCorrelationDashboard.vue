@@ -177,7 +177,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <!-- Search -->
                   <div
-                    class="dimension-sidebar-search-container p-2.5 border-b border-solid border-card-glass-border"
+                    class="dimension-sidebar-search-container px-1.5 py-2 border-b border-solid border-card-glass-border"
                   >
                     <OSearchInput
                       v-model="metricSearchText"
@@ -188,7 +188,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                 <!-- Grouped metric list -->
                 <div
-                  class="dimension-list-container flex-1 min-h-0 overflow-y-auto px-[0.325rem]"
+                  class="dimension-list-container flex-1 min-h-0 overflow-y-auto px-1.5"
                   style="max-height: calc(100vh - 210px)"
                 >
                   <template

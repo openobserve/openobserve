@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <!-- Source Event Banner -->
   <div
     v-if="sourceEvent && (sourceEvent.timestamp || sourceEvent.message)"
-    class="flex items-start gap-3 px-4 py-2 border-b border-solid border-card-glass-border bg-card-glass-bg"
+    class="flex items-start gap-3 px-page-edge py-2 border-b border-solid border-card-glass-border bg-card-glass-bg"
   >
     <OTag
       v-if="sourceEvent.severity"
@@ -46,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <!-- Chips Row -->
   <div
     v-if="hasChips || $slots['chip-actions']"
-    class="flex items-center gap-6 px-4 border-b border-solid border-card-glass-border"
+    class="flex items-center gap-6 px-page-edge border-b border-solid border-card-glass-border"
   >
     <!-- Context chips (Correlated by) — flex-1 so it occupies exactly the space
          left after the shrink-0 subject section (toggles + dynamic badge). Its
