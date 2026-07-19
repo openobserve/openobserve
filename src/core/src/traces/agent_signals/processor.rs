@@ -44,31 +44,60 @@ pub async fn process_agent_signals_stream(
     }
     let ts = end_time; // stamp records at window end
 
+    // Schema-gate each pass: streams from different frameworks carry different
+    // columns. Referencing a missing column is a hard search error, so only run a
+    // pass when its required columns exist (mirrors the service-graph gating).
+    let schema =
+        infra::schema::get(org_id, stream_name, config::meta::stream::StreamType::Traces).await;
+    let has_field = |name: &str| {
+        schema
+            .as_ref()
+            .map(|s| s.field_with_name(name).is_ok())
+            .unwrap_or(false)
+    };
+    let has_failure_cols = has_field("error_message") || has_field("error_type");
+    let has_tool = has_field("gen_ai_tool_name");
+    let has_cost = has_field("gen_ai_usage_cost");
+
     let mut records = Vec::new();
 
-    // R1 failure taxonomy
-    let sql = build_failure_sql(stream_name, start_time, end_time);
-    match crate::service::traces::service_graph::run_graph_search(org_id, sql, start_time, end_time)
+    // R1 failure taxonomy — needs error_message/error_type.
+    if has_failure_cols {
+        let sql = build_failure_sql(stream_name, start_time, end_time);
+        match crate::service::traces::service_graph::run_graph_search(
+            org_id, sql, start_time, end_time,
+        )
         .await
-    {
-        Ok(hits) => records.extend(map_failure_hits(org_id, stream_name, ts, &hits)),
-        Err(e) => log::warn!("[AgentSignals] failure pass failed for {org_id}/{stream_name}: {e}"),
+        {
+            Ok(hits) => records.extend(map_failure_hits(org_id, stream_name, ts, &hits)),
+            Err(e) => {
+                log::warn!("[AgentSignals] failure pass failed for {org_id}/{stream_name}: {e}")
+            }
+        }
     }
-    // R2 loop ratio
-    let sql = build_loop_ratio_sql(stream_name, start_time, end_time);
-    match crate::service::traces::service_graph::run_graph_search(org_id, sql, start_time, end_time)
+    // R2 loop ratio — needs gen_ai_tool_name.
+    if has_tool {
+        let sql = build_loop_ratio_sql(stream_name, start_time, end_time);
+        match crate::service::traces::service_graph::run_graph_search(
+            org_id, sql, start_time, end_time,
+        )
         .await
-    {
-        Ok(hits) => records.extend(map_loop_hits(org_id, stream_name, ts, &hits)),
-        Err(e) => log::warn!("[AgentSignals] loop pass failed for {org_id}/{stream_name}: {e}"),
+        {
+            Ok(hits) => records.extend(map_loop_hits(org_id, stream_name, ts, &hits)),
+            Err(e) => log::warn!("[AgentSignals] loop pass failed for {org_id}/{stream_name}: {e}"),
+        }
     }
-    // R4 cost/diagnosis
-    let sql = build_cost_sql(stream_name, start_time, end_time);
-    match crate::service::traces::service_graph::run_graph_search(org_id, sql, start_time, end_time)
+    // R4 cost/diagnosis — needs gen_ai_usage_cost.
+    if has_cost {
+        let sql = build_cost_sql(stream_name, start_time, end_time);
+        match crate::service::traces::service_graph::run_graph_search(
+            org_id, sql, start_time, end_time,
+        )
         .await
-    {
-        Ok(hits) => records.extend(map_cost_hits(org_id, stream_name, ts, &hits)),
-        Err(e) => log::warn!("[AgentSignals] cost pass failed for {org_id}/{stream_name}: {e}"),
+        {
+            Ok(hits) => records.extend(map_cost_hits(org_id, stream_name, ts, &hits)),
+            Err(e) => log::warn!("[AgentSignals] cost pass failed for {org_id}/{stream_name}: {e}"),
+        }
     }
 
     super::aggregator::write_agent_signals(org_id, records).await
