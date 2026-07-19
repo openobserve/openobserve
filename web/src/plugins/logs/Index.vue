@@ -82,7 +82,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                      into the panel foot. The stream selector is the exception and
                      pads its own right edge (see IndexList) — it's a control, not
                      a scrolling surface. -->
-                <div class="relative-position h-full pt-2.5 pl-2.5 border-r border-border-default bg-surface-panel">
+                <div class="relative-position h-full pt-2.5 border-r border-border-default bg-surface-panel">
                   <index-list
                     v-if="searchObj.meta.showFields"
                     data-test="logs-search-index-list"

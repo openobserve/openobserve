@@ -7,12 +7,12 @@
       <slot name="before-list" />
     </div>
 
-    <!-- Search input. `searchClass` lets the owning panel pull this control
-         inside its gutter while the scrolling body below stays flush to the
-         panel edge (so the scrollbar lands on the edge, not floating off it).
-         The gutter is the panel's concern, not the list's, so the value comes
-         from the consumer rather than being baked in here. -->
-    <div v-if="showSearch" class="shrink-0 py-1.5" :class="searchClass">
+    <!-- Search input. The horizontal inset is the page-edge grid line, baked in
+         here so every field list (logs, traces, RUM, dashboards) lines up with
+         the page header instead of each panel supplying its own gutter — that's
+         how this drifted to four different values. `searchClass` remains as an
+         escape hatch for a panel that genuinely needs to differ. -->
+    <div v-if="showSearch" class="shrink-0 py-1.5 px-page-edge" :class="searchClass">
       <OInput
         :model-value="searchModel"
         data-test="o-field-list-search"
@@ -53,7 +53,7 @@
         <!-- Group header -->
         <div
           v-if="row.isGroup"
-          class="o-field-list__group-header h-7 flex items-center justify-between text-2xs font-semibold text-field-list-group-text cursor-default select-none tracking-[0.01em] sticky top-0 z-[2] bg-transparent"
+          class="o-field-list__group-header h-7 px-page-edge flex items-center justify-between text-2xs font-semibold text-field-list-group-text cursor-default select-none tracking-[0.01em] sticky top-0 z-[2] bg-transparent"
           :data-test="`o-field-list-group-${row.groupName}`"
         >
           <slot name="group-header" :row="row" :group-name="row.groupName">

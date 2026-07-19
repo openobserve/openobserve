@@ -1,7 +1,7 @@
 <!-- Copyright 2026 OpenObserve Inc. -->
 
 <template>
-  <div class="w-full h-full flex flex-col px-3 bg-surface-panel border-r border-border-default">
+  <div class="w-full h-full flex flex-col bg-surface-panel border-r border-border-default">
     <div class="flex items-center justify-between shrink-0 my-3">
       <span class="text-base font-bold">{{ t("panel.fields") }}</span>
       <OButton
@@ -69,7 +69,7 @@
       <!-- Group header -->
       <template #group-header="{ row }">
         <div
-          class="h-7! w-full flex justify-between items-center rounded-default font-semibold pl-2 pr-1 text-xs cursor-default select-none bg-section-header-bg text-text-secondary"
+          class="h-7! w-full flex justify-between items-center rounded-default font-semibold text-xs cursor-default select-none bg-section-header-bg text-text-secondary"
           :title="row.groupName"
         >
           <div class="flex-1 min-w-0">{{ row.groupName }}</div>

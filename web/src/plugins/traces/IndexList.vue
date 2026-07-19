@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="flex flex-col w-full index-menu p-1.5! bg-surface-panel!">
+  <div class="flex flex-col w-full index-menu py-1.5! bg-surface-panel!">
     <OSelect
       data-test="log-search-index-list-select-stream"
       :model-value="searchObj.data.stream.selectedStream?.value ?? null"
@@ -153,7 +153,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="flex items-center justify-center w-full pt-8"
           >
             <div
-              class="text-sm font-medium font-bold w-fit mx-auto my-0 flex-col justify-items-center"
+              class="text-sm font-medium w-fit mx-auto my-0 flex-col justify-items-center"
             >
               <OSpinner size="sm" />
               {{ t("traces.loadingStream") }}
@@ -651,10 +651,12 @@ export default defineComponent({
   cursor: default;
 }
 
+/* Vertical padding only — the horizontal inset comes from OFieldList's group
+   header (--spacing-page-edge) so this list lines up with the page header. */
 .index-menu :deep(.field_list.field-group-header) {
   font-weight: 600;
   font-size: var(--text-xs);
-  padding: 0.25rem 0.325rem;
+  padding-block: 0.25rem;
 }
 
 .index-menu :deep(.field_list .field_label) {

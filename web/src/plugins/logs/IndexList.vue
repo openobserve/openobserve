@@ -116,7 +116,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         ref="fieldListRef"
         :fields="streamFieldsRows"
         :search="searchObj.data.stream.filterField"
-        search-class="pr-2.5"
         :loading="searchObj.loadingStream"
         :theme="store.state.theme"
         :show-pagination="true"

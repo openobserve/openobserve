@@ -115,7 +115,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :horizontal="false"
       >
         <template #before>
-          <div class="bg-card-glass-bg p-[0.325rem] h-full overflow-auto border-r border-border-default">
+          <div class="bg-card-glass-bg py-1 h-full overflow-auto border-r border-border-default">
             <SearchFieldList
               :fields="streamFields"
               :time-stamp="{
