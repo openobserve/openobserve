@@ -20,12 +20,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
        and uses the same breadcrumb section-switcher for fast lateral nav:
          Stream Pipelines ▾            (› Edit Pipeline on a detail page)
        Page actions (and the detail-view teleport target) live in the bar. -->
-  <div class="h-full min-h-0 flex flex-col">
+  <PageLayout bleed>
+    <template #header v-if="showPipelineActions || isDetailView">
     <!-- This row hosts page actions: the pipelines-list buttons or the detail
          teleport target. Section pages (functions/enrichment/eval) render
          nothing here — their content components have their own headers. -->
     <AppPageHeader
-      v-if="showPipelineActions || isDetailView"
       :title="showPipelineActions ? t('menu.pipeline') : breadcrumbLabel"
       :subtitle="showPipelineActions ? t('pipeline.subtitle') : ''"
       :icon="showPipelineActions ? 'lan' : undefined"
@@ -126,17 +126,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </template>
     </AppPageHeader>
+    </template>
 
     <div class="flex-1 min-h-0 flex flex-col overflow-hidden">
       <RouterView v-slot="{ Component }">
         <component :is="Component" class="h-full" @sendToAiChat="sendToAiChat" />
       </RouterView>
     </div>
-  </div>
+  </PageLayout>
 </template>
 
 <script lang="ts">
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import PageLayout from "@/components/common/PageLayout.vue";
 import PipelineSectionTabs from "@/components/pipeline/PipelineSectionTabs.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
@@ -161,6 +163,7 @@ export default defineComponent({
   name: "AppFunctions",
   components: {
     AppPageHeader,
+    PageLayout,
     PipelineSectionTabs,
     OButton,
     ODropdown,
