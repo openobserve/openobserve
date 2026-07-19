@@ -19,14 +19,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <PageLayout bleed
       v-if="!showDestinationEditor && !showImportDestination"
-      :main-panel="false"    >
-      <template #header>
-      <AppPageHeader
-        :title="t('alert_destinations.header')"
-        title-data-test="alert-destinations-list-title"
-        icon="location-on"
-        subtitle="Where triggered alerts are delivered"
-      >
+      :title="t('alert_destinations.header')"
+      title-data-test="alert-destinations-list-title"
+      icon="location-on"
+      subtitle="Where triggered alerts are delivered"
+    >
         <template #actions>
           <OToggleGroup
             :model-value="activeTab"
@@ -60,8 +57,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="editDestination(null)"
           >{{ t(`alert_destinations.add`) }}</OButton>
         </template>
-      </AppPageHeader>
-      </template>
       <div class="bg-card-glass-bg flex-1 min-h-0">
         <OTable
           data-test="alert-destinations-list-table"
@@ -293,7 +288,6 @@ import OTag from '@/lib/core/Badge/OTag.vue';
 import OTable from "@/lib/core/Table/OTable.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import PageLayout from "@/components/common/PageLayout.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -321,7 +315,6 @@ export default defineComponent({
     OTable,
     OToggleGroup,
     OToggleGroupItem,
-    AppPageHeader,
     PageLayout,
   },
   setup() {
