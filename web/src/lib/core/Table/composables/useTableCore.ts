@@ -86,6 +86,23 @@ export function useTableCore<TData>(
   // column can stay pinned flush-right. Only added when resizing is on and the
   // table has no explicit elastic (`autoWidth`) column — if a column is marked
   // autoWidth, THAT column is the filler instead and no spacer is needed.
+  // Whether an invisible trailing `__spacer__` column will be appended. When
+  // true the actions column is NOT the row's last cell (the spacer is), so it
+  // keeps px-2; when false the actions column is last and gets the 1rem right
+  // edge inset. `actionColumnWidth` reads this to budget the right padding.
+  const hasTrailingSpacer = computed<boolean>(() => {
+    const base = indexColumn.value
+      ? [indexColumn.value, ...props.columns]
+      : props.columns;
+    const hasAutoWidth = base.some((c) => c.meta?.autoWidth);
+    return (
+      (props.enableColumnResize ?? false) &&
+      !props.horizontalScroll &&
+      !props.defaultColumns &&
+      !hasAutoWidth
+    );
+  });
+
   const effectiveColumns = computed<OTableColumnDef<TData>[]>(() => {
     const base = indexColumn.value
       ? [indexColumn.value, ...props.columns]
@@ -97,13 +114,7 @@ export function useTableCore<TData>(
     // flush-right) and blank space lands in the spacer when a column shrinks.
     // `flex` tables need it too — the flex column freezes after the first resize
     // and no longer re-absorbs, so the spacer takes over.
-    const hasAutoWidth = base.some((c) => c.meta?.autoWidth);
-    const wantSpacer =
-      (props.enableColumnResize ?? false) &&
-      !props.horizontalScroll &&
-      !props.defaultColumns &&
-      !hasAutoWidth;
-    if (!wantSpacer) return base;
+    if (!hasTrailingSpacer.value) return base;
     const spacer: OTableColumnDef<TData> = {
       id: "__spacer__",
       header: "",
@@ -129,11 +140,14 @@ export function useTableCore<TData>(
   // header. Computed (not DOM-measured) so the skeleton and loaded table match.
   const ACTION_ICON_BTN = 32; // OButton size="icon-sm" → w-8
   const ACTION_BTN_GAP = 4; // gap-1 between buttons
-  const ACTION_CELL_PAD = 16; // td px-2
   const ACTIONS_HEADER_MIN = 80; // enough to show the "Actions" header in full
   const actionColumnWidth = (actionCount?: number): number => {
     const n = Math.max(1, Number(actionCount) || 2);
-    const content = n * ACTION_ICON_BTN + (n - 1) * ACTION_BTN_GAP + ACTION_CELL_PAD;
+    // Cell padding: px-2 is 8+8=16. When the actions column is the row's last
+    // cell (no trailing spacer) the symmetric edge inset bumps its right padding
+    // to 1rem, so budget 8+16=24 to keep the buttons from clipping.
+    const cellPad = hasTrailingSpacer.value ? 16 : 24;
+    const content = n * ACTION_ICON_BTN + (n - 1) * ACTION_BTN_GAP + cellPad;
     return Math.max(content, ACTIONS_HEADER_MIN);
   };
 

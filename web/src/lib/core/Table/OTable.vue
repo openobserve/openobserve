@@ -888,9 +888,13 @@ defineExpose({
           props.horizontalScroll ? 'min-w-max' : ((useComputedWidth && frozen) ? '' : 'w-full'),
           props.horizontalScroll || props.defaultColumns ? 'table-auto' : 'table-fixed',
           (props.bordered && !props.columns.some((c) => c.pinned || c.isAction)) ? '' : 'border-separate border-spacing-0',
-          // Without a leading selection/expansion gutter the first column would
-          // hug the table's left edge; inset it so it aligns like gutter tables.
-          (!selection.isEnabled.value && !expansion.isEnabled.value) ? 'o2-table--inset-first' : '',
+          // Symmetric edge inset (SPACING_AUDIT.md §7): the first and last cell
+          // content sit 16px (1rem) from the table edges on EVERY table, while the
+          // per-cell row dividers still span the full width (full-bleed). Applied
+          // unconditionally so all tables align identically; the compact `.o2-table`
+          // modifier still overrides it via !important, and a leading checkbox/
+          // expand/drag gutter supplies the left inset on its own (see the CSS).
+          'o2-table--edge-inset',
         ]"
         :style="{
           ...columnSizeVars,
@@ -1175,15 +1179,22 @@ defineExpose({
 </template>
 
 <style scoped>
-/* When the table has no leading selection/expansion gutter, the first data
-   column would otherwise sit flush against the left edge with only the default
-   cell padding (0.5rem). Inset the first header + body cell so these tables read
-   with the same comfortable left margin as tables that do have a checkbox
-   gutter. Targeted by data-test prefix so full-width colspan rows (expanded /
-   tree-warning) are left untouched. */
-.o2-table--inset-first :deep(th[data-test^="o2-table-th-"]:first-child),
-.o2-table--inset-first :deep(td[data-test^="o2-table-cell-"]:first-child) {
+/* Symmetric edge inset (SPACING_AUDIT.md §7). The first and last real cell of
+   every row are inset 1rem so a table's content aligns to the same 1rem grid
+   line as the page header, on BOTH edges — while the per-cell row dividers
+   (border-b on each td) still span the full table width, so separators stay
+   full-bleed. Targeted by the data-test prefix so full-width colspan rows
+   (expanded / tree-warning) are untouched, and the invisible trailing __spacer__
+   column is excluded so the right inset lands on real content. A leading
+   checkbox/expand/drag gutter is excluded from the left rule — that gutter cell
+   already supplies the left inset itself; padding it would squish its icon. */
+.o2-table--edge-inset :deep(th[data-test^="o2-table-th-"]:first-child:not([data-test="o2-table-th-select"]):not([data-test="o2-table-th-expand"]):not([data-test="o2-table-th-drag"])),
+.o2-table--edge-inset :deep(td[data-test^="o2-table-cell-"]:first-child) {
   padding-left: 1rem;
+}
+.o2-table--edge-inset :deep(th[data-test^="o2-table-th-"]:last-child:not([data-test="o2-table-th-__spacer__"])),
+.o2-table--edge-inset :deep(td[data-test^="o2-table-cell-"]:last-child:not([data-test="o2-table-cell-__spacer__"])) {
+  padding-right: 1rem;
 }
 
 /* keep(lib-override:o2-table-modifiers): `.o2-table` / `.o2-row-md` /
