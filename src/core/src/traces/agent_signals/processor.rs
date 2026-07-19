@@ -61,6 +61,23 @@ pub(super) fn build_cost_sql(stream: &str, start: i64, end: i64) -> String {
     )
 }
 
+/// R3 — per-trace loop attribution. GATED: call ONLY for an (agent,tool) pair that R2
+/// already flagged, with a `threshold` relative to that pair's norm. This is the single
+/// controlled `GROUP BY trace_id` exception (design §3.2) — it is output-bounded ONLY
+/// because R2 restricts it to one flagged tool. NOT yet wired into the orchestrator.
+#[allow(dead_code)]
+pub(super) fn build_loop_attribution_sql(
+    stream: &str, flagged_tool: &str, threshold: u64, start: i64, end: i64,
+) -> String {
+    format!(
+        r#"SELECT trace_id, COUNT(*) AS repeats
+        FROM "{stream}"
+        WHERE _timestamp >= {start} AND _timestamp < {end}
+          AND gen_ai_tool_name = '{flagged_tool}' AND gen_ai_operation_name = 'execute_tool'
+        GROUP BY trace_id HAVING COUNT(*) >= {threshold}"#
+    )
+}
+
 use config::meta::agent_signals::AgentSignalRecord;
 use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
 
@@ -247,5 +264,15 @@ mod test {
         // enabled defaults to false; the fn must return Ok without attempting a search.
         let r = super::process_agent_signals_stream("default", "nostream", 0, 1).await;
         assert!(r.is_ok());
+    }
+
+    #[test]
+    fn test_loop_attribution_sql_is_gated_and_thresholded() {
+        let sql = super::build_loop_attribution_sql("s1", "cli_kubectl", 20, 100, 200);
+        // input restricted to ONE flagged tool (gated), threshold applied via HAVING
+        assert!(sql.contains("gen_ai_tool_name = 'cli_kubectl'"));
+        assert!(sql.contains("HAVING COUNT(*) >= 20"));
+        // this is the ONLY place a trace_id group-by is allowed — and only because it's gated
+        assert!(sql.contains("GROUP BY trace_id"));
     }
 }
