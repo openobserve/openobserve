@@ -78,6 +78,35 @@ pub(crate) struct PersistedAlertSnapshotManifest {
     pub(crate) manifest: AlertSnapshotManifest,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct AlertSnapshotManifestView {
+    pub snapshot_id: Ksuid,
+    pub org_id: String,
+    pub alert_id: Ksuid,
+    pub alert_name: Option<String>,
+    pub trigger_timestamp: i64,
+    pub window_start: i64,
+    pub window_end: i64,
+    pub created_at: i64,
+    pub schema_version: i16,
+    pub streams: Vec<AlertSnapshotStreamView>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct AlertSnapshotStreamView {
+    pub stream_type: StreamType,
+    pub stream_name: String,
+    pub files: Vec<AlertSnapshotFileRefView>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct AlertSnapshotFileRefView {
+    pub file_id: Option<i64>,
+    pub file_key: String,
+    pub min_ts: i64,
+    pub max_ts: i64,
+}
+
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub(crate) struct AlertSnapshotStream {
     pub(crate) stream_type: StreamType,
@@ -158,6 +187,15 @@ pub(crate) async fn get_snapshot_manifest(
         .await
         .map_err(|e| anyhow!("alert snapshot manifest lookup failed: {e}"))?;
     record.map(from_persistence_record).transpose()
+}
+
+pub async fn get_snapshot_manifest_view(
+    org_id: &str,
+    snapshot_id: Ksuid,
+) -> Result<Option<AlertSnapshotManifestView>> {
+    Ok(get_snapshot_manifest(org_id, snapshot_id)
+        .await?
+        .map(AlertSnapshotManifestView::from))
 }
 
 pub(crate) async fn find_snapshot_by_occurrence(
@@ -268,6 +306,53 @@ impl From<FileKey> for AlertSnapshotFileRef {
             file_key: file.key,
             min_ts: file.meta.min_ts,
             max_ts: file.meta.max_ts,
+        }
+    }
+}
+
+impl From<PersistedAlertSnapshotManifest> for AlertSnapshotManifestView {
+    fn from(persisted: PersistedAlertSnapshotManifest) -> Self {
+        let manifest = persisted.manifest;
+        Self {
+            snapshot_id: persisted.snapshot_id,
+            org_id: manifest.org_id,
+            alert_id: manifest.alert_id,
+            alert_name: manifest.alert_name,
+            trigger_timestamp: manifest.trigger_timestamp,
+            window_start: manifest.window_start,
+            window_end: manifest.window_end,
+            created_at: manifest.created_at,
+            schema_version: manifest.schema_version,
+            streams: manifest
+                .streams
+                .into_iter()
+                .map(AlertSnapshotStreamView::from)
+                .collect(),
+        }
+    }
+}
+
+impl From<AlertSnapshotStream> for AlertSnapshotStreamView {
+    fn from(stream: AlertSnapshotStream) -> Self {
+        Self {
+            stream_type: stream.stream_type,
+            stream_name: stream.stream_name,
+            files: stream
+                .files
+                .into_iter()
+                .map(AlertSnapshotFileRefView::from)
+                .collect(),
+        }
+    }
+}
+
+impl From<AlertSnapshotFileRef> for AlertSnapshotFileRefView {
+    fn from(file: AlertSnapshotFileRef) -> Self {
+        Self {
+            file_id: file.file_id,
+            file_key: file.file_key,
+            min_ts: file.min_ts,
+            max_ts: file.max_ts,
         }
     }
 }

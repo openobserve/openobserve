@@ -23,7 +23,7 @@ use serde::{Deserialize, Serialize};
 use svix_ksuid::Ksuid;
 use utoipa::ToSchema;
 
-use super::{Alert, FrequencyType, QueryCondition, TriggerCondition};
+use super::{Alert, FrequencyType, QueryCondition, StreamType, TriggerCondition};
 
 /// HTTP response body for `GetAlert` endpoint.
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
@@ -78,9 +78,93 @@ pub struct EnableAlertResponseBody {
     pub enabled: bool,
 }
 
+/// HTTP response body for `GetAlertSnapshotManifest` endpoint.
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct AlertSnapshotManifestResponseBody {
+    #[schema(value_type = String)]
+    pub snapshot_id: Ksuid,
+    pub org_id: String,
+    #[schema(value_type = String)]
+    pub alert_id: Ksuid,
+    pub alert_name: Option<String>,
+    pub trigger_timestamp: i64,
+    pub window_start: i64,
+    pub window_end: i64,
+    pub created_at: i64,
+    pub schema_version: i16,
+    pub streams: Vec<AlertSnapshotStreamResponseBody>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct AlertSnapshotStreamResponseBody {
+    pub stream_type: StreamType,
+    pub stream_name: String,
+    pub files: Vec<AlertSnapshotFileRefResponseBody>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct AlertSnapshotFileRefResponseBody {
+    pub file_id: Option<i64>,
+    pub file_key: String,
+    pub min_ts: i64,
+    pub max_ts: i64,
+}
+
 impl From<(meta_alerts::Alert, Option<Trigger>)> for GetAlertResponseBody {
     fn from(value: (meta_alerts::Alert, Option<Trigger>)) -> Self {
         Self(value.into())
+    }
+}
+
+impl From<openobserve_core::alerts::snapshots::AlertSnapshotManifestView>
+    for AlertSnapshotManifestResponseBody
+{
+    fn from(value: openobserve_core::alerts::snapshots::AlertSnapshotManifestView) -> Self {
+        Self {
+            snapshot_id: value.snapshot_id,
+            org_id: value.org_id,
+            alert_id: value.alert_id,
+            alert_name: value.alert_name,
+            trigger_timestamp: value.trigger_timestamp,
+            window_start: value.window_start,
+            window_end: value.window_end,
+            created_at: value.created_at,
+            schema_version: value.schema_version,
+            streams: value
+                .streams
+                .into_iter()
+                .map(AlertSnapshotStreamResponseBody::from)
+                .collect(),
+        }
+    }
+}
+
+impl From<openobserve_core::alerts::snapshots::AlertSnapshotStreamView>
+    for AlertSnapshotStreamResponseBody
+{
+    fn from(value: openobserve_core::alerts::snapshots::AlertSnapshotStreamView) -> Self {
+        Self {
+            stream_type: value.stream_type.into(),
+            stream_name: value.stream_name,
+            files: value
+                .files
+                .into_iter()
+                .map(AlertSnapshotFileRefResponseBody::from)
+                .collect(),
+        }
+    }
+}
+
+impl From<openobserve_core::alerts::snapshots::AlertSnapshotFileRefView>
+    for AlertSnapshotFileRefResponseBody
+{
+    fn from(value: openobserve_core::alerts::snapshots::AlertSnapshotFileRefView) -> Self {
+        Self {
+            file_id: value.file_id,
+            file_key: value.file_key,
+            min_ts: value.min_ts,
+            max_ts: value.max_ts,
+        }
     }
 }
 

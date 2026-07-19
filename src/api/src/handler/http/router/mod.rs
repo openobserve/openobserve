@@ -755,6 +755,7 @@ pub fn service_routes() -> Router {
 
         // Alerts (v2)
         .route("/v2/{org_id}/alerts", get(alerts::list_alerts).post(alerts::create_alert))
+        .route("/v2/{org_id}/alerts/snapshots/{snapshot_id}", get(alerts::snapshots::get_alert_snapshot_manifest))
         .route("/v2/{org_id}/alerts/{alert_id}", get(alerts::get_alert).put(alerts::update_alert).delete(alerts::delete_alert))
         .route("/v2/{org_id}/alerts/{alert_id}/export", post(alerts::export_alert))
         .route("/v2/{org_id}/alerts/bulk", delete(alerts::delete_alert_bulk))
