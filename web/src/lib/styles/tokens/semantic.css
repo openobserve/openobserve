@@ -12,8 +12,8 @@
 /* ── Light-mode defaults ─────────────────────────────────── */
 :root {
   /* Text — grey-based semantic hierarchy */
-  --color-text-heading:     var(--color-grey-900);  /* h1-h6, modal titles, page/panel titles */
-  --color-text-body:        var(--color-grey-800);  /* paragraphs, default body */
+  --color-text-heading:     var(--color-grey-800);  /* h1-h6, modal titles, page/panel titles */
+  --color-text-body:        var(--color-grey-700);  /* paragraphs, default body */
   --color-text-secondary:   var(--color-grey-500);  /* supporting text, descriptions, captions */
   --color-text-label:       var(--color-grey-400);  /* form labels, metadata, badges */
   --color-text-muted:       var(--color-grey-300);  /* disabled, placeholder, de-emphasized */
