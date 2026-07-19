@@ -7492,15 +7492,24 @@
       "sectionTitle": "Agent behavior",
       "detail": {
         "title": "Signal details",
-        "summary": "What this shows",
-        "tracesTitle": "Underlying traces",
+        "tracesTitle": "Traces",
         "tracesHint": "Click a trace to open it",
+        "worstLoopTraces": "Worst traces (most repeats first)",
+        "topCostTraces": "Most expensive traces",
         "noTraces": "No traces found for this signal",
-        "colTraceId": "Trace ID",
+        "errorsTitle": "What the errors say",
+        "noErrors": "No error messages captured — open a trace to inspect",
+        "colTraceId": "Trace",
         "colSpans": "Spans",
-        "loopExplain": "These traces called the same tool repeatedly. A high calls-per-trace ratio usually means the agent isn't caching results or is stuck retrying.",
-        "failExplain": "These traces hit this failure class. Open one to see the exact error and where it happened.",
-        "costExplain": "These traces drove this agent's spend, tokens, and errors."
+        "colRepeats": "Repeats",
+        "colError": "Error message",
+        "colOccurrences": "Times",
+        "loopHeadline": "{agent} called {tool} {ratio}× per trace on average ({calls} calls across {traces} traces).",
+        "failHeadline": "{agent} hit {count} “{cls}” errors.",
+        "costHeadline": "{agent}: ${cost} spend · {tokens} tokens · {errors} errors.",
+        "loopExplain": "A high repeat rate usually means the agent isn't caching results or is retrying. Open the worst traces below to see the repeated calls.",
+        "failExplain": "These are the actual error messages behind this failure class — read them to find the fix, or open a trace to see where it happened.",
+        "costExplain": "These traces drove this agent's spend. Open the most expensive ones to see what ran."
       }
     }
   },

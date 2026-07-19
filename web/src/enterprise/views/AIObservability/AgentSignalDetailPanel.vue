@@ -24,33 +24,38 @@
     @update:open="(v: boolean) => emit('update:open', v)"
   >
     <div class="flex flex-col gap-6 p-4">
-      <!-- What this row represents -->
-      <div class="flex flex-col gap-2">
-        <div class="text-sm font-semibold text-text-primary">
-          {{ t("aiObservability.behavior.detail.summary") }}
+      <!-- Headline: the finding, stated plainly -->
+      <div class="flex flex-col gap-1.5">
+        <div class="text-sm text-text-primary" data-test="agent-signal-detail-headline">
+          {{ headline }}
         </div>
-        <div class="flex flex-col gap-1.5 text-sm">
-          <div
-            v-for="field in summaryFields"
-            :key="field.label"
-            class="flex justify-between gap-4"
-          >
-            <span class="text-text-secondary">{{ field.label }}</span>
-            <span class="text-text-primary font-medium text-right break-all">
-              {{ field.value }}
-            </span>
-          </div>
-        </div>
-        <div class="text-xs text-text-secondary mt-1">
-          {{ explanation }}
-        </div>
+        <div class="text-xs text-text-secondary">{{ explanation }}</div>
       </div>
 
-      <!-- The underlying traces -->
+      <!-- FAILURE: the real error messages (the "read it, know the fix" section) -->
+      <div v-if="signalType === 'failure'" class="flex flex-col gap-2">
+        <div class="text-sm font-semibold text-text-primary">
+          {{ t("aiObservability.behavior.detail.errorsTitle") }}
+        </div>
+        <OTable
+          data-test="agent-signal-detail-errors"
+          :data="errorRows"
+          :columns="errorColumns"
+          :default-columns="false"
+          :frame="false"
+        />
+        <OEmptyState
+          v-if="!loading && errorRows.length === 0"
+          preset="no-data"
+          :title="t('aiObservability.behavior.detail.noErrors')"
+        />
+      </div>
+
+      <!-- LOOP / COST: the worst traces, ranked by what makes them bad -->
       <div class="flex flex-col gap-2">
         <div class="flex items-center justify-between">
           <span class="text-sm font-semibold text-text-primary">
-            {{ t("aiObservability.behavior.detail.tracesTitle") }}
+            {{ tracesTitle }}
           </span>
           <span class="text-xs text-text-secondary">
             {{ t("aiObservability.behavior.detail.tracesHint") }}
@@ -85,7 +90,6 @@ import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import searchService from "@/services/search";
 
-/** The clicked Behavior row + which signal kind it came from. */
 interface SignalRow {
   signalType: "loop" | "failure" | "cost";
   agent?: string;
@@ -114,69 +118,53 @@ const { t } = useI18n();
 const store = useStore();
 const router = useRouter();
 
-const traceRows = ref<Array<{ trace_id: string; spans: number; when: number }>>(
-  [],
-);
+const errorRows = ref<
+  Array<{ message: string; occurrences: number; traces: number }>
+>([]);
+const traceRows = ref<Array<Record<string, any>>>([]);
 const loading = ref(false);
 
 const orgId = computed(
   () => store.state.selectedOrganization?.identifier as string,
 );
+const signalType = computed(() => props.row?.signalType);
 
 const title = computed(() => {
   const r = props.row;
   if (!r) return t("aiObservability.behavior.detail.title");
-  if (r.signalType === "loop")
-    return `${r.agent ?? ""} · ${r.tool ?? ""}`;
-  if (r.signalType === "failure")
-    return `${r.agent ?? ""} · ${r.failClass ?? ""}`;
-  return r.agent ?? t("aiObservability.behavior.detail.title");
+  const agent = r.agent || t("aiObservability.behavior.unknownAgent");
+  if (r.signalType === "loop") return `${agent} · ${r.tool ?? ""}`;
+  if (r.signalType === "failure") return `${agent} · ${r.failClass ?? ""}`;
+  return agent;
 });
 
-const summaryFields = computed(() => {
+/** The finding, stated as a plain sentence a user can act on. */
+const headline = computed(() => {
   const r = props.row;
-  if (!r) return [];
-  const f: Array<{ label: string; value: string }> = [
-    { label: t("aiObservability.behavior.colAgent"), value: r.agent ?? "—" },
-  ];
+  if (!r) return "";
+  const agent = r.agent || t("aiObservability.behavior.unknownAgent");
   if (r.signalType === "loop") {
-    f.push({ label: t("aiObservability.behavior.colTool"), value: r.tool ?? "—" });
-    f.push({
-      label: t("aiObservability.behavior.colRatio"),
-      value: String(r.ratio ?? "—"),
-    });
-    f.push({
-      label: t("aiObservability.behavior.colCalls"),
-      value: String(r.calls ?? "—"),
-    });
-    f.push({
-      label: t("aiObservability.behavior.colTraces"),
-      value: String(r.traces ?? "—"),
-    });
-  } else if (r.signalType === "failure") {
-    f.push({
-      label: t("aiObservability.behavior.colFailClass"),
-      value: r.failClass ?? "—",
-    });
-    f.push({
-      label: t("aiObservability.behavior.colCount"),
-      value: String(r.count ?? "—"),
-    });
-  } else {
-    f.push({
-      label: t("aiObservability.behavior.colCost"),
-      value: String(r.cost ?? "—"),
-    });
-    f.push({
-      label: t("aiObservability.behavior.colTokens"),
-      value: String(r.tokens ?? "—"),
-    });
-    f.push({
-      label: t("aiObservability.behavior.colErrors"),
-      value: String(r.errors ?? "—"),
+    return t("aiObservability.behavior.detail.loopHeadline", {
+      agent,
+      tool: r.tool ?? "",
+      ratio: r.ratio ?? "?",
+      calls: r.calls ?? "?",
+      traces: r.traces ?? "?",
     });
   }
-  return f;
+  if (r.signalType === "failure") {
+    return t("aiObservability.behavior.detail.failHeadline", {
+      agent,
+      count: r.count ?? "?",
+      cls: r.failClass ?? "",
+    });
+  }
+  return t("aiObservability.behavior.detail.costHeadline", {
+    agent,
+    cost: r.cost ?? 0,
+    tokens: r.tokens ?? 0,
+    errors: r.errors ?? 0,
+  });
 });
 
 const explanation = computed(() => {
@@ -189,47 +177,97 @@ const explanation = computed(() => {
   return t("aiObservability.behavior.detail.costExplain");
 });
 
-const traceColumns = computed<OTableColumnDef[]>(() => [
+const tracesTitle = computed(() => {
+  const r = props.row;
+  if (r?.signalType === "loop")
+    return t("aiObservability.behavior.detail.worstLoopTraces");
+  if (r?.signalType === "cost")
+    return t("aiObservability.behavior.detail.topCostTraces");
+  return t("aiObservability.behavior.detail.tracesTitle");
+});
+
+// ── Error-message table (failure signals) ──────────────────────────────
+const errorColumns = computed<OTableColumnDef[]>(() => [
   {
-    id: "trace_id",
-    header: t("aiObservability.behavior.detail.colTraceId"),
-    accessorKey: "trace_id",
+    id: "message",
+    header: t("aiObservability.behavior.detail.colError"),
+    accessorKey: "message",
     meta: { align: "left", autoWidth: true },
+  },
+  {
+    id: "occurrences",
+    header: t("aiObservability.behavior.detail.colOccurrences"),
+    accessorKey: "occurrences",
+    meta: { align: "right" },
     sortable: true,
   },
   {
-    id: "spans",
-    header: t("aiObservability.behavior.detail.colSpans"),
-    accessorKey: "spans",
+    id: "traces",
+    header: t("aiObservability.behavior.colTraces"),
+    accessorKey: "traces",
     meta: { align: "right" },
     sortable: true,
   },
 ]);
 
-/** WHERE clause that isolates the spans behind this signal row. */
-const buildWhere = (r: SignalRow): string => {
-  const clauses: string[] = [];
-  if (r.agent)
-    clauses.push(
-      `(gen_ai_agent_name = '${r.agent}' OR service_name = '${r.agent}')`,
-    );
-  if (r.signalType === "loop" && r.tool)
-    clauses.push(
-      `gen_ai_tool_name = '${r.tool}' AND gen_ai_operation_name = 'execute_tool'`,
-    );
-  if (r.signalType === "failure") clauses.push(`span_status = 'ERROR'`);
-  return clauses.length ? clauses.join(" AND ") : "1=1";
-};
-
-const fetchTraces = async () => {
-  const r = props.row;
-  if (!r || !props.sourceStream || !orgId.value) {
-    traceRows.value = [];
-    return;
+// ── Trace table — columns adapt to signal type so the value is visible ──
+const traceColumns = computed<OTableColumnDef[]>(() => {
+  const idCol: OTableColumnDef = {
+    id: "trace_id",
+    header: t("aiObservability.behavior.detail.colTraceId"),
+    accessorKey: "trace_id",
+    meta: { align: "left", autoWidth: true },
+  };
+  if (props.row?.signalType === "loop") {
+    return [
+      idCol,
+      {
+        id: "repeats",
+        header: t("aiObservability.behavior.detail.colRepeats"),
+        accessorKey: "repeats",
+        meta: { align: "right" },
+        sortable: true,
+      },
+    ];
   }
-  loading.value = true;
-  const where = buildWhere(r);
-  const sql = `SELECT trace_id, COUNT(*) AS spans, MIN(_timestamp) AS when FROM "${props.sourceStream}" WHERE ${where} GROUP BY trace_id ORDER BY spans DESC LIMIT 50`;
+  if (props.row?.signalType === "cost") {
+    return [
+      idCol,
+      {
+        id: "cost",
+        header: t("aiObservability.behavior.colCost"),
+        accessorKey: "cost",
+        meta: { align: "right" },
+        sortable: true,
+      },
+      {
+        id: "tokens",
+        header: t("aiObservability.behavior.colTokens"),
+        accessorKey: "tokens",
+        meta: { align: "right" },
+        sortable: true,
+      },
+    ];
+  }
+  return [
+    idCol,
+    {
+      id: "spans",
+      header: t("aiObservability.behavior.detail.colSpans"),
+      accessorKey: "spans",
+      meta: { align: "right" },
+      sortable: true,
+    },
+  ];
+});
+
+const agentFilter = (agent?: string) =>
+  agent
+    ? `(gen_ai_agent_name = '${agent}' OR service_name = '${agent}')`
+    : "1=1";
+
+const runQuery = async (sql: string): Promise<any[]> => {
+  if (!orgId.value) return [];
   const now = Date.now() * 1000;
   const start = props.startTime ?? now - 24 * 60 * 60 * 1_000_000;
   const end = props.endTime ?? now;
@@ -237,23 +275,62 @@ const fetchTraces = async () => {
     const res = await searchService.search({
       org_identifier: orgId.value,
       query: {
-        query: {
-          sql,
-          start_time: start,
-          end_time: end,
-          from: 0,
-          size: 50,
-        },
+        query: { sql, start_time: start, end_time: end, from: 0, size: 50 },
       },
       page_type: "traces",
     });
-    traceRows.value = (res.data?.hits ?? []).map((h: any) => ({
-      trace_id: h.trace_id,
-      spans: h.spans,
-      when: h.when,
-    }));
+    return res.data?.hits ?? [];
   } catch {
+    return [];
+  }
+};
+
+const fetchDetails = async () => {
+  const r = props.row;
+  if (!r || !props.sourceStream || !orgId.value) {
+    errorRows.value = [];
     traceRows.value = [];
+    return;
+  }
+  loading.value = true;
+  const s = props.sourceStream;
+  const af = agentFilter(r.agent);
+  try {
+    if (r.signalType === "failure") {
+      // The real, grouped error messages behind this class — the actionable content.
+      errorRows.value = (
+        await runQuery(
+          `SELECT status_message AS message, COUNT(*) AS occurrences, approx_distinct(trace_id) AS traces FROM "${s}" WHERE span_status = 'ERROR' AND ${af} AND status_message IS NOT NULL AND status_message != '' GROUP BY status_message ORDER BY occurrences DESC LIMIT 20`,
+        )
+      ).map((h: any) => ({
+        message: h.message,
+        occurrences: h.occurrences,
+        traces: h.traces,
+      }));
+      traceRows.value = (
+        await runQuery(
+          `SELECT trace_id, COUNT(*) AS spans FROM "${s}" WHERE span_status = 'ERROR' AND ${af} GROUP BY trace_id ORDER BY spans DESC LIMIT 50`,
+        )
+      ).map((h: any) => ({ trace_id: h.trace_id, spans: h.spans }));
+    } else if (r.signalType === "loop") {
+      // Worst traces first — ranked by how many times the tool repeated.
+      traceRows.value = (
+        await runQuery(
+          `SELECT trace_id, COUNT(*) AS repeats FROM "${s}" WHERE gen_ai_tool_name = '${r.tool}' AND gen_ai_operation_name = 'execute_tool' AND ${af} GROUP BY trace_id ORDER BY repeats DESC LIMIT 50`,
+        )
+      ).map((h: any) => ({ trace_id: h.trace_id, repeats: h.repeats }));
+    } else {
+      // Cost outliers — the traces driving this agent's spend.
+      traceRows.value = (
+        await runQuery(
+          `SELECT trace_id, ROUND(SUM(gen_ai_usage_cost), 4) AS cost, SUM(gen_ai_usage_total_tokens) AS tokens FROM "${s}" WHERE ${af} AND gen_ai_usage_cost IS NOT NULL GROUP BY trace_id ORDER BY cost DESC LIMIT 50`,
+        )
+      ).map((h: any) => ({
+        trace_id: h.trace_id,
+        cost: h.cost,
+        tokens: h.tokens,
+      }));
+    }
   } finally {
     loading.value = false;
   }
@@ -276,7 +353,7 @@ const openTrace = (row: { trace_id: string }) => {
 watch(
   () => [props.open, props.row],
   () => {
-    if (props.open && props.row) fetchTraces();
+    if (props.open && props.row) fetchDetails();
   },
 );
 </script>
