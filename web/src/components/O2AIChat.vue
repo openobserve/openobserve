@@ -158,7 +158,7 @@
       <OSeparator class="bg-separator" />
 
       <!-- History Panel -->
-      <ODrawer data-test="o2-ai-chat-history-drawer" v-model:open="showHistory" size="sm" title="Chat History">
+      <ODrawer data-test="o2-ai-chat-history-drawer" bleed v-model:open="showHistory" size="sm" title="Chat History">
         <ul class="flex flex-col divide-y divide-border">
           <li
             v-for="chat in chatHistory"

@@ -137,6 +137,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:cancel="deleteDialog.show = false"
     />
     <ODrawer
+      bleed
       v-model:open="showListSchemaDialog"
       size="xl"
       :show-close="false"

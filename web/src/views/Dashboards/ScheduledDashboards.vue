@@ -16,6 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <ODrawer data-test="scheduled-dashboards-drawer"
+    bleed
     :open="open"
     :width="60"
     :title="t('dashboard.scheduledDashboards')"

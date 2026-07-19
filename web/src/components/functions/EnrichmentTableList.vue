@@ -317,6 +317,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- URL Jobs Dialog -->
     <ODrawer data-test="enrichment-table-list-url-jobs-drawer"
+      bleed
       v-model:open="showUrlJobsDialogState"
       size="lg"
     >

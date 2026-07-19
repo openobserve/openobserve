@@ -276,7 +276,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- SQL Query Dialog -->
-    <ODrawer data-test="search-job-inspector-sql-drawer" v-model:open="showSqlDialog" size="lg" title="SQL Query">
+    <ODrawer data-test="search-job-inspector-sql-drawer" bleed v-model:open="showSqlDialog" size="lg" title="SQL Query">
       <template #header-right>
         <OButton
           v-if="profileData?.sql"

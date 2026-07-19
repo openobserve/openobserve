@@ -28,6 +28,7 @@ const props = withDefaults(defineProps<DrawerProps>(), {
   persistent: false,
   side: "right",
   size: "md",
+  bleed: false,
   showClose: true,
   width: undefined,
   seamless: false,
@@ -132,6 +133,12 @@ const hasFooter = computed(
 );
 const hasTrigger = computed(() => !!slots.trigger);
 const isRight = computed(() => props.side !== "left");
+
+// Fixed body inset (same token as ODialog's body) unless `bleed` is set. One
+// value app-wide → every drawer's content aligns identically. See the `bleed` prop.
+const bodyPaddingClass = computed(() =>
+  props.bleed ? "" : "px-dialog-content-px py-dialog-content-py",
+);
 
 // The primary button is loading when the consumer says so OR a nested OForm is
 // mid-submit (auto). Kept as a computed so the disabled logic below picks it up.
@@ -477,6 +484,7 @@ watch(internalOpen, (open) => {
           :class="[
             'flex-1 min-h-0 overflow-y-auto overflow-x-hidden',
             'text-dialog-content-text',
+            bodyPaddingClass,
             canScrollUp && '[box-shadow:inset_0_8px_6px_-6px_rgba(0,0,0,0.1)]',
             canScrollDown && '[box-shadow:inset_0_-8px_6px_-6px_rgba(0,0,0,0.1)]',
             canScrollUp && canScrollDown && '[box-shadow:inset_0_8px_6px_-6px_rgba(0,0,0,0.1),inset_0_-8px_6px_-6px_rgba(0,0,0,0.1)]',

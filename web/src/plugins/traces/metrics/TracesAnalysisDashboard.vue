@@ -16,6 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <ODrawer data-test="traces-analysis-dashboard-drawer"
+    bleed
     v-model:open="isOpen"
     :width="80"
     :title="drawerTitle"

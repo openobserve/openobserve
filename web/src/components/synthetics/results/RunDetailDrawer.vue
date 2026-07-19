@@ -121,6 +121,7 @@ function toggleSteps(executionId: string) {
 
 <template>
   <ODrawer
+    bleed
     :open="open"
     size="lg"
     :title="t('synthetics.runDetail.title')"

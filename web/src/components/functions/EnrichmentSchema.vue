@@ -20,6 +20,7 @@
 
     <template>
         <ODrawer data-test="enrichment-schema-drawer"
+        bleed
         :open="open"
         size="lg"
         :title="t('logStream.schemaHeader')"

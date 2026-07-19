@@ -16,6 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <ODrawer data-test="event-detail-drawer"
+    bleed
     :open="open"
     size="xl"
     @update:open="emit('update:open', $event)"

@@ -343,6 +343,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Service detail side panel -->
     <ODrawer
+      bleed
       :open="!!selectedService"
       @update:open="
         (val) => {

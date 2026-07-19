@@ -80,7 +80,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
        The drawer owns the footer Cancel/Save (built-in ODrawer footer); its Save
        submits this form via `form-id="add-stream-node-form"`, so no inline
        buttons here. -->
-    <div v-else class="p-4 w-full">
+    <div v-else class="w-full">
       <OForm
         id="add-stream-node-form"
         :form="addStreamForm"

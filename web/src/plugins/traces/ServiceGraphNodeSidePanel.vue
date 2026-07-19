@@ -16,6 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <ODrawer
+    bleed
     :open="visible"
     :width="60"
     :seamless="true"

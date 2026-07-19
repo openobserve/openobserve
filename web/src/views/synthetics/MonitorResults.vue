@@ -90,6 +90,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
   <!-- ════════════ Run Detail Drawer ════════════ -->
   <ODrawer
+    bleed
     v-model:open="drawerOpen"
     side="right"
     :width="90"

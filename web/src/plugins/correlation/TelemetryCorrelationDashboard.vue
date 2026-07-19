@@ -17,6 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <!-- Dialog Mode -->
   <ODrawer data-test="telemetry-correlation-dashboard-drawer"
+    bleed
     v-if="props.mode === 'dialog'"
     v-model:open="isOpen"
     side="right"

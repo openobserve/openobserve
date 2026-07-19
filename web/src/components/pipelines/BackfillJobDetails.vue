@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OSpinner size="lg" />
     </div>
 
-    <div v-else-if="job" class="flex flex-col gap-5 px-6 py-4">
+    <div v-else-if="job" class="flex flex-col gap-5">
           <!-- Status and Actions -->
           <div class="flex items-center justify-between">
             <OTag

@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @click:primary="handleApply"
     @update:open="handleOpenChange"
   >
-  <div class="p-3">
+  <div>
       <!-- File Upload -->
       <div class="mb-3">
         <OFile

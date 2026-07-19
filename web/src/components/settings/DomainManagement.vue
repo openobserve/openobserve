@@ -76,7 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         side="right"
         :width="40"
       >
-        <div class="p-4 text-sm">
+        <div class="text-sm">
           <div class="mb-4 p-4 rounded-default bg-surface-subtle">
             <div class="font-medium mb-2">{{ t("settings.claimParserFunctionInputTitle") }}</div>
             <div>{{ t("settings.claimParserFunctionInputDescription") }}</div>

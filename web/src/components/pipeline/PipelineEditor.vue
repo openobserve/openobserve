@@ -129,6 +129,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @cancel:hideform="resetDialog"
   />
   <ODrawer data-test="pipeline-editor-json-editor-drawer"
+    bleed
     v-model:open="showJsonEditorDialog"
     :width="70"
     :title="t('pipeline.editPipelineJSON')"

@@ -20,7 +20,7 @@
     @update:open="handleOpenChange"
     @click:secondary="$emit('cancel')"
   >
-    <OForm id="score-config-form" class="py-3.5 px-5.5" :form="form">
+    <OForm id="score-config-form" :form="form">
       <div
         v-if="mode === 'edit'"
         class="flex gap-2.5 items-start px-3 py-2.5 bg-[color-mix(in_srgb,var(--color-status-info-text)_14%,transparent)] border border-[color-mix(in_srgb,var(--color-status-info-text)_20%,transparent)] rounded-default text-xs leading-normal text-text-body mb-4"

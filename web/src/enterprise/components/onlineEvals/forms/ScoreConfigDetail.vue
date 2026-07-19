@@ -1,5 +1,6 @@
 ﻿<template>
   <ODrawer
+    bleed
     :open="open"
     side="right"
     size="lg"

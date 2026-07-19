@@ -270,6 +270,7 @@ the Free Software Foundation, either version 3 of the License, or
       />
 
       <ODrawer
+        bleed
         v-model:open="showScoreConfigLibrary"
         side="right"
         size="lg"
@@ -293,6 +294,7 @@ the Free Software Foundation, either version 3 of the License, or
       </ODrawer>
 
       <ODrawer
+        bleed
         v-model:open="showScorerLibrary"
         side="right"
         size="lg"

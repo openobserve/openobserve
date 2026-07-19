@@ -127,6 +127,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
     </OTable>
     <ODrawer
+      bleed
       v-model:open="showListSchemaDialog"
       size="lg"
       data-test="list-schema-dialog"

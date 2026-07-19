@@ -435,6 +435,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   </OForm>
 
   <ODrawer data-test="add-alert-json-editor-drawer"
+    bleed
     v-model:open="showJsonEditorDialog"
     size="lg"
     :title="t('alerts.editJson')"

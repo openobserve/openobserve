@@ -168,6 +168,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
     </OTable>
     <ODrawer data-test="associated-stream-function-index-schema-drawer"
+      bleed
       v-model:open="showIndexSchemaDialog"
       size="lg"
     >

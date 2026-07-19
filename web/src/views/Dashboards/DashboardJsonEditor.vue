@@ -1,5 +1,6 @@
 <template>
   <ODrawer data-test="dashboard-json-editor-drawer"
+    bleed
     :open="open"
     :width="70"
     persistent

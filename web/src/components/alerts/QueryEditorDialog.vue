@@ -17,6 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <!-- Editor Dialog -->
   <ODrawer data-test="query-editor-dialog"
+    bleed
     v-model:open="isOpen"
     size="full"
     :show-close="false"

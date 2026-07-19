@@ -17,6 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div>
     <ODrawer data-test="pattern-details-dialog"
+    bleed
     :open="modelValue"
     @update:open="$emit('update:modelValue', $event)"
     :width="90"
