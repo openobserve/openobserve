@@ -14,18 +14,16 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <div class="p-0 overflow-hidden [background:linear-gradient(to_bottom_right,var(--color-theme-body-bg-primary),var(--color-theme-body-bg-secondary))] h-[calc(100vh-3rem)] min-h-[inherit]"
+  <PageLayout
+    class="overflow-hidden [background:linear-gradient(to_bottom_right,var(--color-theme-body-bg-primary),var(--color-theme-body-bg-secondary))] h-[calc(100vh-3rem)]! min-h-[inherit]"
+    :title="isUpdatingTemplate ? t('alert_templates.updateTitle') : isClone ? t('alert_templates.cloneTitle') : t('alert_templates.addTitle')"
+    title-data-test="add-template-title"
+    :back="{
+      label: t('alert_templates.header'),
+      onClick: () => emit('cancel:hideform'),
+    }"
+    bleed
   >
-    <AppPageHeader
-      :title="isUpdatingTemplate ? t('alert_templates.updateTitle') : isClone ? t('alert_templates.cloneTitle') : t('alert_templates.addTitle')"
-      title-data-test="add-template-title"
-      :back="{
-        label: t('alert_templates.header'),
-        onClick: () => emit('cancel:hideform'),
-      }"
-      class="border-b border-border-default"
-    />
-
     <OSplitter class="h-[calc(100vh-6.625rem)]"
       v-model="splitterModel"
       unit="%"
@@ -170,7 +168,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </template>
     </OSplitter>
-  </div>
+  </PageLayout>
 </template>
 <script lang="ts" setup>
 import {
@@ -193,7 +191,7 @@ import { useOForm } from "@/lib/forms/Form/useOForm";
 import type { TemplateData } from "@/ts/interfaces/index";
 import { useRouter } from "vue-router";
 import AppTabs from "@/components/common/AppTabs.vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import PageLayout from "@/components/common/PageLayout.vue";
 import { useReo } from "@/services/reodotdev_analytics";
 import {
   validateTemplateBody,

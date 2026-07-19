@@ -24,7 +24,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- ═══════════════════════════════════════════════════════════════════ -->
     <!-- V3 "Single Pane of Glass" Layout (All alert types)                -->
     <!-- ═══════════════════════════════════════════════════════════════════ -->
-      <div class="flex flex-col h-full">
+    <PageLayout bleed>
+      <template #header>
       <AppPageHeader
         class="alert-v3-topbar [container-type:inline-size] [container-name:topbar] shrink-0 border-b border-border-default"
         :back="{
@@ -123,6 +124,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </template>
       </AppPageHeader>
+      </template>
 
       <div class="flex flex-1 min-h-0">
 
@@ -431,7 +433,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       </div>
-      </div>
+    </PageLayout>
   </OForm>
 
   <ODrawer data-test="add-alert-json-editor-drawer"
@@ -482,6 +484,7 @@ import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import PageLayout from "@/components/common/PageLayout.vue";
 
 export default defineComponent({
   name: "ComponentAddUpdateAlert",
@@ -511,6 +514,7 @@ export default defineComponent({
   ],
   components: {
     OIcon,
+    PageLayout,
     JsonEditor,
     QueryConfig,
     AlertSettings,

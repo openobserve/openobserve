@@ -15,18 +15,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="p-0 overflow-hidden [background:linear-gradient(to_bottom_right,var(--color-theme-body-bg-primary),var(--color-theme-body-bg-secondary))] h-[calc(100vh-3rem)] min-h-[inherit] flex flex-col"
+  <PageLayout
+    class="overflow-hidden [background:linear-gradient(to_bottom_right,var(--color-theme-body-bg-primary),var(--color-theme-body-bg-secondary))] h-[calc(100vh-3rem)]! min-h-[inherit]"
+    :title="destination ? t('alert_destinations.updateTitle') : t('alert_destinations.addTitle')"
+    title-data-test="add-destination-title"
+    :back="{
+      label: t('alert_destinations.header'),
+      onClick: () => emit('cancel:hideform'),
+    }"
+    bleed
   >
-    <AppPageHeader
-      :title="destination ? t('alert_destinations.updateTitle') : t('alert_destinations.addTitle')"
-      title-data-test="add-destination-title"
-      :back="{
-        label: t('alert_destinations.header'),
-        onClick: () => emit('cancel:hideform'),
-      }"
-      class="border-b border-border-default shrink-0"
-    >
-    </AppPageHeader>
     <div
       class="bg-card-glass-bg py-2 flex-1 overflow-y-auto overflow-x-hidden"
     >
@@ -498,7 +496,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :template-content="previewContent"
       data-test="destination-preview-modal"
     />
-  </div>
+  </PageLayout>
 </template>
 <script lang="ts" setup>
 import {
@@ -519,7 +517,7 @@ import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OFormSwitch from "@/lib/forms/Switch/OFormSwitch.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import PageLayout from "@/components/common/PageLayout.vue";
 import type {
   Template,
   Headers,
