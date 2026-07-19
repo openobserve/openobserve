@@ -141,12 +141,16 @@ export function useTableCore<TData>(
   const ACTION_ICON_BTN = 32; // OButton size="icon-sm" → w-8
   const ACTION_BTN_GAP = 4; // gap-1 between buttons
   const ACTIONS_HEADER_MIN = 80; // enough to show the "Actions" header in full
+  // The page-edge inset (--spacing-page-edge) that OTable applies to the last
+  // cell's right padding, in px. Keep in sync with the token (0.75rem = 12px).
+  const PAGE_EDGE_PX = 12;
   const actionColumnWidth = (actionCount?: number): number => {
     const n = Math.max(1, Number(actionCount) || 2);
     // Cell padding: px-2 is 8+8=16. When the actions column is the row's last
-    // cell (no trailing spacer) the symmetric edge inset bumps its right padding
-    // to 1rem, so budget 8+16=24 to keep the buttons from clipping.
-    const cellPad = hasTrailingSpacer.value ? 16 : 24;
+    // cell (no trailing spacer) the edge inset replaces its right padding with
+    // the page-edge inset, so budget 8 + PAGE_EDGE_PX — exact, so the buttons
+    // land on the same right-edge grid line as everything else (no over-width).
+    const cellPad = hasTrailingSpacer.value ? 16 : 8 + PAGE_EDGE_PX;
     const content = n * ACTION_ICON_BTN + (n - 1) * ACTION_BTN_GAP + cellPad;
     return Math.max(content, ACTIONS_HEADER_MIN);
   };
