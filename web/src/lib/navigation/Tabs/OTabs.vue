@@ -309,9 +309,14 @@ const alignClasses: Record<NonNullable<OTabsProps['align']>, string> = {
         class="flex-1 overflow-x-hidden relative pt-0.75"
       >
         <TabsList as-child :loop="true">
+          <!-- pl-1 (4px) + each OTab's own px-2 (8px) = 12px, so the FIRST tab's
+               label lands exactly on the --spacing-page-edge grid line. A tab
+               strip therefore needs NO wrapper padding: drop it straight above an
+               OContent body and the labels align with the content. pr-0.75 (3px)
+               keeps the right scroll-overflow measurement (see updateScrollState). -->
           <div
             ref="tablistRef"
-            :class="['o-tabs flex flex-row relative px-0.75', alignClasses[align]]"
+            :class="['o-tabs flex flex-row relative pl-1 pr-0.75', alignClasses[align]]"
             @focusin="handleFocusin"
             @dragstart="onTabDragStart"
             @dragover="onTabDragOver"

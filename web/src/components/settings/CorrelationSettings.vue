@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </AppPageHeader>
 
     <!-- Tab bar -->
-    <div class="shrink-0 px-page-edge border-b border-border-default" data-test="correlation-settings-tabs">
+    <div class="shrink-0 border-b border-border-default" data-test="correlation-settings-tabs">
       <OTabs :model-value="activeTab" dense @update:model-value="onTabChange">
         <OTab
           name="services"
