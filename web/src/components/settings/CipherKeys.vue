@@ -17,15 +17,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/x-invalid-end-tag -->
 <template>
   <div class="flex flex-col h-full p-0">
-    <div v-if="!showAddDialog" class="flex flex-col h-full">
-      <!-- Standard section header: title + actions only. Search moved into the
-           table's own toolbar below. -->
-      <AppPageHeader
-        :title="t('cipherKey.header')"
-        icon="key"
-        :subtitle="t('settings.cipherKeysPage.subtitle')"
-        class="shrink-0 border-b border-border-default"
-      >
+    <PageLayout
+      v-if="!showAddDialog"
+      :title="t('cipherKey.header')"
+      icon="key"
+      :subtitle="t('settings.cipherKeysPage.subtitle')"
+      bleed
+    >
         <template #actions>
           <OButton
             variant="primary"
@@ -36,7 +34,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t(`cipherKey.add`) }}
           </OButton>
         </template>
-      </AppPageHeader>
       <div class="bg-card-glass-bg flex-1 min-h-0 overflow-hidden">
       <OTable
         :frame="false"
@@ -127,7 +124,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </OTable>
       </div>
-    </div>
+    </PageLayout>
     <div v-else>
       <add-cipher-key @cancel:hideform="hideAddDialog" />
     </div>
@@ -169,7 +166,7 @@ import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import PageLayout from "@/components/common/PageLayout.vue";
 import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
@@ -177,7 +174,7 @@ import { isInputFocused } from "@/utils/keyboardShortcuts";
 export default defineComponent({
   name: "PageCipherKeys",
   components: {
-    AppPageHeader,
+    PageLayout,
     OEmptyState,
     AddCipherKey,
     ConfirmDialog,

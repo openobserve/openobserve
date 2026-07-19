@@ -17,15 +17,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/x-invalid-end-tag -->
 <template>
   <div class="p-0" style="min-height: inherit; height: calc(100vh - 88px);">
-    <div v-if="!showAddDialog">
-      <!-- Standard section header: title + actions only. Search moved into the
-           table toolbar below. -->
-      <AppPageHeader
-        :title="t('aiToolset.header')"
-        icon="smart-toy"
-        :subtitle="t('settings.aiToolsetsPage.subtitle')"
-        class="shrink-0 border-b border-border-default"
-      >
+    <PageLayout
+      v-if="!showAddDialog"
+      :title="t('aiToolset.header')"
+      icon="smart-toy"
+      :subtitle="t('settings.aiToolsetsPage.subtitle')"
+      bleed
+    >
         <template #actions>
           <OButton
             data-test="ai-toolsets-add-btn"
@@ -34,7 +32,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="addToolset"
           >{{ t('aiToolset.add') }}</OButton>
         </template>
-      </AppPageHeader>
 
       <!-- Table -->
       <div class="bg-card-glass-bg mt-2.5 overflow-hidden">
@@ -107,7 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </OTable>
       </div>
-    </div>
+    </PageLayout>
 
     <!-- Add / Edit form -->
     <div v-else>
@@ -144,7 +141,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import PageLayout from "@/components/common/PageLayout.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
@@ -157,7 +154,7 @@ import { isInputFocused } from "@/utils/keyboardShortcuts";
 export default defineComponent({
   name: "PageAiToolsets",
   components: {
-    AppPageHeader,
+    PageLayout,
     OEmptyState,
     ConfirmDialog,
     AddAiToolset,

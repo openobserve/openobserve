@@ -16,16 +16,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/x-invalid-end-tag -->
 <template>
-  <div class="flex flex-col h-full overflow-hidden">
-    <!-- Standard page header on top (full-width). The filter panel (left) + table
-         (right) sit below in the splitter — the standard header + left + right model. -->
-    <AppPageHeader
-      :title="t('nodes.header')"
-      icon="hub"
-      :subtitle="t('settings.nodesPage.subtitle')"
-      class="shrink-0 border-b border-border-default"
-    >
-    </AppPageHeader>
+  <PageLayout
+    :title="t('nodes.header')"
+    icon="hub"
+    :subtitle="t('settings.nodesPage.subtitle')"
+    bleed
+  >
     <OSplitter
       :model-value="splitterModel"
       @update:model-value="(v: number) => splitterModel = v"
@@ -516,7 +512,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </template>
     </OSplitter>
-  </div>
+  </PageLayout>
 </template>
 
 <script lang="ts">
@@ -551,14 +547,14 @@ import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import PageLayout from "@/components/common/PageLayout.vue";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 
 export default defineComponent({
   name: "PageCipherKeys",
   components: {
-    AppPageHeader,
+    PageLayout,
     OEmptyState,
     OButton,
     OProgressBar,

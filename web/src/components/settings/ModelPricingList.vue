@@ -30,11 +30,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <TestModelMatchDialog v-model="showTestMatchDialog" />
 
     <!-- Main List View -->
-    <div v-if="!showImportModelPricingPage" class="flex flex-col h-full">
-      <!-- List View Header -->
-      <!-- Standard section header: title + actions only. Tabs + search moved
-           into the table toolbar below. -->
-      <AppPageHeader icon="paid" :subtitle="t('settings.modelPricingList.subtitle')" class="shrink-0 border-b border-border-default">
+    <PageLayout
+      v-if="!showImportModelPricingPage"
+      icon="paid"
+      :subtitle="t('settings.modelPricingList.subtitle')"
+      bleed
+    >
         <template #title>
           {{ t("modelPricing.header") }}
           <OButton
@@ -82,7 +83,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("modelPricing.newModel") }}
           </OButton>
         </template>
-      </AppPageHeader>
 
       <!-- List Table -->
       <div class="bg-card-glass-bg flex-1 min-h-0 overflow-hidden">
@@ -372,7 +372,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </OTable>
       </div>
-    </div>
+    </PageLayout>
     <!-- end v-if="!showImportModelPricingPage" -->
 
     <!-- Pricing detail side panel -->
@@ -494,7 +494,7 @@ import { useStore } from "vuex";
 import useTheme from "@/composables/useTheme";
 import { useRouter } from "vue-router";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import PageLayout from "@/components/common/PageLayout.vue";
 import { getImageURL } from "@/utils/zincutils";
 import modelPricingService from "@/services/model_pricing";
 import ImportModelPricing from "@/components/settings/ImportModelPricing.vue";
