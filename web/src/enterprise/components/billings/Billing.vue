@@ -16,14 +16,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/x-invalid-end-tag -->
 <template>
-  <div class="p-0 pt-1 overflow-hidden h-full flex flex-col">
-    <!-- Standard page header: title + icon. Usage date / data-type controls live
-         in the toolbar row below. -->
-    <AppPageHeader
-      :title="headerBasedOnRoute()"
-      icon="paid"
-      class="shrink-0 border-b border-border-default"
-    >
+  <PageLayout
+    :title="headerBasedOnRoute()"
+    icon="paid"
+    bleed
+  >
       <template #actions>
         <div v-if="isOrgGroupRoute" class="flex items-center gap-2">
           <OButton
@@ -37,7 +34,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
         </div>
       </template>
-    </AppPageHeader>
     <OSplitter
       v-model="splitterModel"
       unit="px"
@@ -171,7 +167,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </template>
     </OSplitter>
-  </div>
+  </PageLayout>
 </template>
 
 <script lang="ts">
@@ -190,7 +186,7 @@ import Usage from "./usage.vue";
 import { getImageURL } from "@/utils/zincutils";
 import { resolveTab } from "@/utils/routeTabMaps";
 import AppTabs from "@/components/common/AppTabs.vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import PageLayout from "@/components/common/PageLayout.vue";
 
 import BillingService from "@/services/billings";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -202,7 +198,7 @@ import { getConsumableRelativeTime } from "@/utils/date";
 export default defineComponent({
   name: "PageIngestion",
   components: {
-    AppPageHeader, OTabs, ORouteTab, ConfirmDialog, Usage, AppTabs, OSelect,
+    PageLayout, OTabs, ORouteTab, ConfirmDialog, Usage, AppTabs, OSelect,
     OIcon, OSplitter, OButton, UsageMemberList, DateTimePickerDashboard },
   setup() {
     const { t } = useI18n();
