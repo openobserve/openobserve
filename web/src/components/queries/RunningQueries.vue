@@ -15,27 +15,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div
+  <PageLayout
     v-if="isMetaOrg"
-    class="rounded-default p-0 flex flex-col h-full"
+    :title="t('queries.runningQueries')"
+    icon="query-stats"
+    :subtitle="'Inspect and cancel running queries'"
+    bleed
   >
-    <div class="flex-none">
-      <div class="bg-card-glass-bg">
-        <div
-          class="flex flex-col py-3 border-b-[1px] sticky"
-          style="top: 0; z-index: 1000;"
-        >
-          <!-- Standard section header: title + actions only. Filters live in the
-               band below (directly above the table). -->
-          <AppPageHeader
-            :title="t('queries.runningQueries')"
-            icon="query-stats"
-            :subtitle="'Inspect and cancel running queries'"
-            class="border-b border-border-default mb-3"
-          />
+    <!-- Filters live in the sub-nav band directly above the table. -->
+    <template #subnav>
           <div
             data-test="running-queries-filter-container"
-            class="flex justify-start items-center gap-3 px-page-edge"
+            class="flex justify-start items-center gap-3 px-page-edge py-2"
           >
             <OToggleGroup
               :model-value="selectedQueryTypeTab"
@@ -81,9 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </div>
           </div>
-        </div>
-      </div>
-    </div>
+    </template>
 
     <div class="flex-1 min-h-0">
       <div class="w-full h-full">
@@ -146,7 +135,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <QueryList :schemaData="schemaData" @close="showListSchemaDialog = false" />
     </ODrawer>
-  </div>
+  </PageLayout>
 </template>
 
 <script lang="ts">
@@ -178,11 +167,11 @@ import { getDuration } from "@/utils/zincutils";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import PageLayout from "@/components/common/PageLayout.vue";
 
 export default defineComponent({
   name: "RunningQueries",
-  components: { AppPageHeader, QueryList, ConfirmDialog, RunningQueriesList, SummaryList, OToggleGroup, OToggleGroupItem, ODrawer, OSelect, OSearchInput,
+  components: { PageLayout, QueryList, ConfirmDialog, RunningQueriesList, SummaryList, OToggleGroup, OToggleGroupItem, ODrawer, OSelect, OSearchInput,
 },
   setup() {
     const store = useStore();
