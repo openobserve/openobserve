@@ -61,6 +61,72 @@ pub(super) fn build_cost_sql(stream: &str, start: i64, end: i64) -> String {
     )
 }
 
+use config::meta::agent_signals::AgentSignalRecord;
+
+fn get_str(v: &serde_json::Value, k: &str) -> Option<String> {
+    v.get(k).and_then(|x| x.as_str()).map(|s| s.to_string())
+}
+fn get_u64(v: &serde_json::Value, k: &str) -> Option<u64> {
+    v.get(k).and_then(|x| x.as_u64())
+}
+fn get_f64(v: &serde_json::Value, k: &str) -> Option<f64> {
+    v.get(k).and_then(|x| x.as_f64())
+}
+
+pub(super) fn map_failure_hits(
+    org: &str, stream: &str, ts: i64, hits: &[serde_json::Value],
+) -> Vec<AgentSignalRecord> {
+    hits.iter().map(|h| AgentSignalRecord {
+        timestamp: ts,
+        org_id: org.to_string(),
+        source_stream: stream.to_string(),
+        signal_type: "failure".to_string(),
+        agent_name: get_str(h, "gen_ai_agent_name"),
+        tool_name: None,
+        fail_class: get_str(h, "fail_class"),
+        count: get_u64(h, "count").unwrap_or(0),
+        calls: None, distinct_traces: None, cost: None, tokens: None, errors: None, p95_latency_ns: None,
+    }).collect()
+}
+
+pub(super) fn map_loop_hits(
+    org: &str, stream: &str, ts: i64, hits: &[serde_json::Value],
+) -> Vec<AgentSignalRecord> {
+    hits.iter().map(|h| AgentSignalRecord {
+        timestamp: ts,
+        org_id: org.to_string(),
+        source_stream: stream.to_string(),
+        signal_type: "loop".to_string(),
+        agent_name: get_str(h, "gen_ai_agent_name"),
+        tool_name: get_str(h, "gen_ai_tool_name"),
+        fail_class: None,
+        count: get_u64(h, "calls").unwrap_or(0),
+        calls: get_u64(h, "calls"),
+        distinct_traces: get_u64(h, "distinct_traces"),
+        cost: None, tokens: None, errors: None, p95_latency_ns: None,
+    }).collect()
+}
+
+pub(super) fn map_cost_hits(
+    org: &str, stream: &str, ts: i64, hits: &[serde_json::Value],
+) -> Vec<AgentSignalRecord> {
+    hits.iter().map(|h| AgentSignalRecord {
+        timestamp: ts,
+        org_id: org.to_string(),
+        source_stream: stream.to_string(),
+        signal_type: "cost".to_string(),
+        agent_name: get_str(h, "gen_ai_agent_name"),
+        tool_name: None,
+        fail_class: None,
+        count: get_u64(h, "errors").unwrap_or(0),
+        calls: None, distinct_traces: None,
+        cost: get_f64(h, "cost"),
+        tokens: get_u64(h, "tokens"),
+        errors: get_u64(h, "errors"),
+        p95_latency_ns: get_u64(h, "p95"),
+    }).collect()
+}
+
 #[cfg(all(test, feature = "enterprise"))]
 mod test {
     #[test]
@@ -94,5 +160,34 @@ mod test {
         assert!(sql.contains("approx_percentile_cont(end_time - start_time, 0.95)"));
         assert!(sql.contains("GROUP BY gen_ai_agent_name"));
         assert!(!sql.to_lowercase().contains("group by trace_id"));
+    }
+
+    #[test]
+    fn test_map_failure_hits_builds_records() {
+        let hits = vec![serde_json::json!({
+            "gen_ai_agent_name": "sre_rca_agent",
+            "fail_class": "malformed_tool_call",
+            "count": 161
+        })];
+        let recs = super::map_failure_hits("default", "s1", 1_000, &hits);
+        assert_eq!(recs.len(), 1);
+        assert_eq!(recs[0].signal_type, "failure");
+        assert_eq!(recs[0].fail_class.as_deref(), Some("malformed_tool_call"));
+        assert_eq!(recs[0].count, 161);
+        assert_eq!(recs[0].tool_name, None);
+        assert_eq!(recs[0].timestamp, 1_000);
+    }
+
+    #[test]
+    fn test_map_loop_hits_carries_calls_and_traces() {
+        let hits = vec![serde_json::json!({
+            "gen_ai_agent_name": "a", "gen_ai_tool_name": "cli_kubectl",
+            "calls": 1646, "distinct_traces": 71
+        })];
+        let recs = super::map_loop_hits("default", "s1", 1_000, &hits);
+        assert_eq!(recs[0].signal_type, "loop");
+        assert_eq!(recs[0].tool_name.as_deref(), Some("cli_kubectl"));
+        assert_eq!(recs[0].calls, Some(1646));
+        assert_eq!(recs[0].distinct_traces, Some(71));
     }
 }
