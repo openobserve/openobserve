@@ -426,6 +426,16 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
       v-if="!enableColumnReorder"
       class="bg-table-header-bg"
     >
+      <!-- Gutter order MUST be expansion → selection → drag, matching
+           OTableBodyRow and OTableLoading. This branch used to render
+           selection → drag → expansion, so any table with both an expand and a
+           checkbox gutter had its header columns offset from its body. -->
+      <th
+        v-if="expansionEnabled"
+        class="w-4 min-w-4 px-0 border-b border-table-header-border"
+        data-test="o2-table-th-expand"
+      />
+
       <th
         v-if="selectionMultiple"
         class="text-left border-b border-table-header-border"
@@ -447,11 +457,6 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
         aria-hidden="true"
       />
 
-      <th
-        v-if="expansionEnabled"
-        class="w-4 min-w-4 px-0 border-b border-table-header-border"
-        data-test="o2-table-th-expand"
-      />
       <th
         v-for="header in headerGroup.headers"
         :key="header.id"

@@ -949,6 +949,7 @@ defineExpose({
           :selection-enabled="selection.isEnabled.value"
           :expansion-enabled="expansion.isEnabled.value"
           :enable-row-reorder="props.enableRowReorder"
+          :bordered="props.bordered"
         />
 
         <!-- ── Body ─────────────────────────────────────────── -->
