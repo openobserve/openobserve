@@ -50,15 +50,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <!-- No overflow-hidden here: it clipped the focus ring of the right-most
        action button. Title overflow is handled by truncate + min-w-0 on the
        title block instead. h-14 gives the header a touch more breathing room. -->
+  <!-- The header ALWAYS owns its own bottom divider (border-b, inside its own
+       h-15 box so the header is exactly 60px whether it's used directly or via
+       PageLayout). Never wrap it in a bordered div and never hand-draw a
+       border-b on a wrapper — that adds a second 1px line and makes the header
+       61px on some pages and 60px on others. -->
   <header
-    class="app-page-header shrink-0 px-page-edge"
+    class="app-page-header shrink-0 px-page-edge border-b border-border-default"
     :class="[
       tabsBelow
         ? 'flex flex-col'
         : 'h-15 flex items-center justify-between gap-4',
-      // The header owns its bottom divider whenever it carries tabs, so the tab
-      // underline always lands on it — consumers never hand-draw a border-b.
-      { 'border-b border-border-default': hasTabs && tabsBelow },
     ]"
   >
     <!-- Row 1. In two-row mode this is its own flex row; otherwise it collapses

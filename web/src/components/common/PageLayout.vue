@@ -54,9 +54,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="flex flex-col h-full">
     <!-- ── Header (props → AppPageHeader, or #header escape hatch) ── -->
+    <!-- Just a shrink-0 slot: AppPageHeader draws its OWN border-b (so the header
+         is a consistent 60px). Don't add a border here — it would double the
+         divider and add 1px. -->
     <div
       v-if="hasHeader"
-      :class="headerClass ?? 'shrink-0 border-b border-border-default'"
+      :class="headerClass ?? 'shrink-0'"
     >
       <slot name="header">
         <AppPageHeader
