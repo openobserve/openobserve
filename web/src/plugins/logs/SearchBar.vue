@@ -858,7 +858,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :title="t('search.cancel')"
                   variant="ghost"
                   size="sm-toolbar"
-                  class="p-0 h-[1.875rem]! font-medium! leading-4! px-1! w-[5.875rem]! whitespace-normal break-words text-center [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] bg-cancel-query-bg! text-button-primary-foreground! element-box-shadow [border-radius:0.375rem_0_0_0.375rem]!"
+                  class="p-0 h-[1.875rem]! font-medium! leading-4! px-1! w-[5.875rem]! whitespace-normal break-words text-center [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] bg-cancel-query-bg! text-button-primary-foreground! element-box-shadow rounded-s-default! rounded-e-none!"
                   @click="cancelVisualizeQueries"
                   >{{ t("search.cancel") }}</OButton
                 >
@@ -886,9 +886,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="p-0 h-[1.875rem]! element-box-shadow"
                   :class="[
                     isNaturalLanguageDetected && !searchObj.meta.nlpMode
-                      ? 'o2-ai-generate-button [border-radius:0.375rem_0_0_0.375rem]!'
+                      ? 'o2-ai-generate-button rounded-s-default! rounded-e-none!'
                       : 'font-medium! leading-4! px-1! w-[5.875rem]! whitespace-normal break-words text-center [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] bg-button-primary! text-button-primary-foreground! hover:opacity-90 hover:[box-shadow:0_0_8px_color-mix(in_srgb,var(--color-button-primary),transparent_30%)]',
-                    '[border-radius:0.375rem_0_0_0.375rem]!',
+                    'rounded-s-default! rounded-e-none!',
                   ]"
                   @click="
                     isNaturalLanguageDetected && !searchObj.meta.nlpMode
@@ -921,7 +921,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               )
                             ? 'bg-button-primary! text-button-primary-foreground! hover:opacity-90 hover:[box-shadow:0_0_8px_color-mix(in_srgb,var(--color-button-primary),transparent_30%)]'
                             : '',
-                        '[border-radius:0_0.375rem_0.375rem_0]!',
+                        'rounded-s-none! rounded-e-default!',
                       ]"
                     >
                       <OIcon name="arrow-drop-down" size="sm" />
@@ -960,7 +960,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   variant="ghost"
                   :title="t('search.cancel')"
                   size="sm-toolbar"
-                  class="p-0 h-[1.875rem]! font-medium! leading-4! px-1! w-[5.875rem]! whitespace-normal break-words text-center [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] bg-cancel-query-bg! text-button-primary-foreground! element-box-shadow [border-radius:0.375rem_0_0_0.375rem]!"
+                  class="p-0 h-[1.875rem]! font-medium! leading-4! px-1! w-[5.875rem]! whitespace-normal break-words text-center [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] bg-cancel-query-bg! text-button-primary-foreground! element-box-shadow rounded-s-default! rounded-e-none!"
                   @click="cancelVisualizeQueries"
                   >{{ t("search.cancel") }}</OButton
                 >
@@ -989,9 +989,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="p-0 h-[1.875rem]! element-box-shadow"
                   :class="[
                     isNaturalLanguageDetected && !searchObj.meta.nlpMode
-                      ? 'o2-ai-generate-button [border-radius:0.375rem_0_0_0.375rem]!'
+                      ? 'o2-ai-generate-button rounded-s-default! rounded-e-none!'
                       : 'font-medium! leading-4! px-1! w-[5.875rem]! whitespace-normal break-words text-center [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] bg-button-primary! text-button-primary-foreground! hover:opacity-90 hover:[box-shadow:0_0_8px_color-mix(in_srgb,var(--color-button-primary),transparent_30%)]',
-                    '[border-radius:0.375rem_0_0_0.375rem]!',
+                    'rounded-s-default! rounded-e-none!',
                   ]"
                   @click="
                     isNaturalLanguageDetected && !searchObj.meta.nlpMode
@@ -1024,7 +1024,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               )
                             ? 'bg-button-primary! text-button-primary-foreground! hover:opacity-90 hover:[box-shadow:0_0_8px_color-mix(in_srgb,var(--color-button-primary),transparent_30%)]'
                             : '',
-                        '[border-radius:0_0.375rem_0.375rem_0]!',
+                        'rounded-s-none! rounded-e-default!',
                       ]"
                     >
                       <OIcon name="arrow-drop-down" size="sm" />
@@ -1088,7 +1088,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="p-0 h-[1.875rem]! font-medium! leading-4! px-1! w-[5.875rem]! whitespace-normal break-words text-center [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] bg-cancel-query-bg! text-button-primary-foreground! element-box-shadow"
                 :class="
                   config.isEnterprise == 'true'
-                    ? '[border-radius:0.375rem_0_0_0.375rem]!'
+                    ? 'rounded-s-default! rounded-e-none!'
                     : 'rounded-default'
                 "
                 @click="cancelQuery"
@@ -1116,7 +1116,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     ? 'o2-ai-generate-button'
                     : 'font-medium! leading-4! px-1! w-[5.875rem]! whitespace-normal break-words text-center [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] bg-button-primary! text-button-primary-foreground! hover:opacity-90 hover:[box-shadow:0_0_8px_color-mix(in_srgb,var(--color-button-primary),transparent_30%)]',
                   store.state.zoConfig.auto_query_enabled
-                    ? '[border-radius:0.375rem_0_0_0.375rem]!'
+                    ? 'rounded-s-default! rounded-e-none!'
                     : 'rounded-default',
                 ]"
                 @click="
@@ -1191,7 +1191,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           ? 'bg-button-primary! text-button-primary-foreground! hover:opacity-90 hover:[box-shadow:0_0_8px_color-mix(in_srgb,var(--color-button-primary),transparent_30%)]'
                           : '',
                       store.state.zoConfig.auto_query_enabled
-                        ? '[border-radius:0_0.375rem_0.375rem_0]!'
+                        ? 'rounded-s-none! rounded-e-default!'
                         : 'rounded-default',
                     ]"
                   >
@@ -5688,7 +5688,7 @@ export default defineComponent({
 
 .logs-search-bar-component .download-logs-btn {
   height: 1.875rem;
-  border-radius: 0.375rem;
+  border-radius: var(--radius-default);
   transition: all 0.2s ease;
 }
 
@@ -5709,7 +5709,7 @@ export default defineComponent({
   padding-left: 0.5rem;
   height: 1.875rem;
   padding-top: 0.1875rem;
-  border-radius: 0.375rem;
+  border-radius: var(--radius-default);
 }
 
 /* keep(lib-override:o2): .saved-view-item is rendered by the Function/Transform
