@@ -18,14 +18,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="flex flex-col h-full p-0">
     <PageLayout bleed
       v-if="!showImportTemplate && !showTemplateEditor"
-      :main-panel="false"    >
-      <!-- Standard section header: title + actions only. Search moved to toolbar. -->
-      <template #header>
-      <AppPageHeader
-        :title="t('alert_templates.header')"
-        icon="description"
-        :subtitle="'Reusable alert message templates'"
-      >
+      :title="t('alert_templates.header')"
+      icon="description"
+      :subtitle="'Reusable alert message templates'"
+    >
         <template #actions>
           <OToggleGroup
             :model-value="activeTab"
@@ -61,8 +57,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >{{ t(`alert_templates.add`) }}</OButton
           >
         </template>
-      </AppPageHeader>
-      </template>
       <div class="bg-card-glass-bg flex-1 min-h-0 overflow-hidden">
       <OTable
         :frame="false"
@@ -257,7 +251,6 @@ import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import PageLayout from "@/components/common/PageLayout.vue";
 import ImportTemplate from "./ImportTemplate.vue";
 import { useReo } from "@/services/reodotdev_analytics";

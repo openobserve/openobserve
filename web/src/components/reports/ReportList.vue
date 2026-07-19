@@ -17,16 +17,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div data-test="report-list-page" class="h-full">
     <PageLayout bleed
-      :main-panel="false"    >
-      <!-- Row 1: standard header — title + actions only. Tabs / search / folder
-           scope moved into the table's own toolbar below. -->
-      <template #header>
-        <AppPageHeader
-          :title="t('reports.header')"
-          title-data-test="report-list-title"
-          icon="description"
-          :subtitle="t('reports.subtitle')"
-        >
+      :title="t('reports.header')"
+      title-data-test="report-list-title"
+      icon="description"
+      :subtitle="t('reports.subtitle')"
+    >
           <template #actions>
             <OButton
               data-test="report-list-add-report-btn"
@@ -37,8 +32,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t(`reports.add`) }}
             </OButton>
           </template>
-        </AppPageHeader>
-      </template>
 
     <!-- Folder rail (fixed width) + table — matches the Alerts layout. -->
     <div
@@ -317,8 +310,7 @@ import { ref, onBeforeMount, reactive, computed, watch, defineAsyncComponent } f
 import type { Ref } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import PageLayout from "@/components/common/PageLayout.vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import PageLayout from "@/components/common/PageLayout.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import FolderList from "@/components/common/sidebar/FolderList.vue";

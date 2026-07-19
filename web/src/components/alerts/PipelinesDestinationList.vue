@@ -18,14 +18,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="flex flex-col h-full p-0">
     <PageLayout bleed
       v-if="!showDestinationEditor"
-      :main-panel="false"    >
-      <!-- Standard section header: title + actions only. Search moved to toolbar. -->
-      <template #header>
-      <AppPageHeader
-        :title="t('pipeline_destinations.header')"
-        icon="person-pin-circle"
-        :subtitle="'External targets for pipeline output'"
-      >
+      :title="t('pipeline_destinations.header')"
+      icon="person-pin-circle"
+      :subtitle="'External targets for pipeline output'"
+    >
         <template #actions>
           <OButton
             data-test="pipeline-destination-list-add-btn"
@@ -35,8 +31,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >{{ t(`alert_destinations.add`) }}</OButton
           >
         </template>
-      </AppPageHeader>
-      </template>
       <div class="bg-card-glass-bg flex-1 min-h-0 overflow-hidden">
       <OTable
         :frame="false"
@@ -204,7 +198,6 @@ import { isInputFocused } from "@/utils/keyboardShortcuts";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import PageLayout from "@/components/common/PageLayout.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
@@ -227,7 +220,6 @@ const formatOutputFormat = (val: any): string => {
 export default defineComponent({
   name: "PageAlerts",
   components: {
-    AppPageHeader,
     PageLayout,
     PipelineDestinationEditor,
     OEmptyState,

@@ -19,11 +19,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div data-test="action-scripts-list-page" class="h-full">
     <div v-if="!showAddActionScriptDialog" class="h-full">
-      <PageLayout bleed      >
+      <PageLayout
+        bleed
+        :title="t('actions.header')"
+        icon="code"
+        :subtitle="'Custom automation and scripting'"
+      >
         <!-- Row 1: standard header — title + actions only. Search moved into the
              table's own toolbar below. -->
-        <template #header>
-          <AppPageHeader :title="t('actions.header')" icon="code" :subtitle="'Custom automation and scripting'">
             <template #actions>
               <OButton
                 data-test="action-list-add-btn"
@@ -33,8 +36,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >{{ t("actions.add") }}</OButton
               >
             </template>
-          </AppPageHeader>
-        </template>
         <OTable
           data-test="action-scripts-table"
           :data="visibleRows"
@@ -255,7 +256,6 @@ import {
 } from "vue";
 import type { Ref } from "vue";
 import PageLayout from "@/components/common/PageLayout.vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import useStreams from "@/composables/useStreams";
@@ -314,7 +314,6 @@ export default defineComponent({
   name: "AlertList",
   components: {
     PageLayout,
-    AppPageHeader,
     OIcon,
     EditScript: defineAsyncComponent(
       () => import("@/components/actionScripts/EditScript.vue"),
