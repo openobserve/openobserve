@@ -405,7 +405,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
                     }
                     if need_pipeline_migration {
                         get_ownership_all_org_tuple(org_name, "pipelines", &mut tuples);
-                        match db::pipeline::list_by_org(org_name).await {
+                        match openobserve_pipeline::service::list_by_org(org_name).await {
                             Ok(pipelines) => {
                                 for pipeline in pipelines {
                                     add_tuple_for_pipeline(org_name, &pipeline.id, &mut tuples);

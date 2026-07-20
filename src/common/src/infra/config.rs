@@ -21,10 +21,8 @@ use config::{
         alerts::alert::Alert,
         destinations::{Destination, Template},
         folder::Folder,
-        pipeline::Pipeline,
         promql::ClusterLeader,
         ratelimit::CachedUserRoles,
-        stream::StreamParams,
         system_settings::SystemSetting,
         user::User,
     },
@@ -63,16 +61,6 @@ pub static ALERTS_TEMPLATES: Lazy<RwHashMap<String, Template>> = Lazy::new(Defau
 pub static DESTINATIONS: Lazy<RwHashMap<String, Destination>> = Lazy::new(Default::default);
 pub static MAXMIND_DB_CLIENT: Lazy<Arc<tokio::sync::RwLock<Option<MaxmindClient>>>> =
     Lazy::new(|| Arc::new(tokio::sync::RwLock::new(None)));
-
-pub static PIPELINE_STREAM_MAPPING: Lazy<RwAHashMap<String, StreamParams>> =
-    Lazy::new(Default::default);
-
-pub static SCHEDULED_PIPELINES: Lazy<RwAHashMap<String, Pipeline>> = Lazy::new(Default::default);
-
-// Maps every pipeline_id (enabled or disabled, realtime or scheduled) to its owning org.
-// Used by HTTP handlers to perform O(1) cross-org IDOR checks without a DB round trip.
-// Populated by the pipeline `cache()` startup hook and kept in sync by `watch()`.
-pub static PIPELINE_ID_TO_ORG: Lazy<RwAHashMap<String, String>> = Lazy::new(Default::default);
 
 pub static USER_SESSIONS: Lazy<RwHashMap<String, String>> = Lazy::new(Default::default);
 pub static USER_SESSIONS_EXPIRY: Lazy<RwHashMap<String, i64>> = Lazy::new(Default::default);

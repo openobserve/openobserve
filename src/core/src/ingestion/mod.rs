@@ -38,13 +38,10 @@ use infra::{
     errors::{Error, Result},
     schema::STREAM_RECORD_ID_GENERATOR,
 };
-use openobserve_pipeline::batch_execution::ExecutablePipeline;
+use openobserve_pipeline::{batch_execution::ExecutablePipeline, service as pipeline};
 use proto::cluster_rpc::IngestionType;
 
-use super::{
-    db::{alerts::alert, pipeline},
-    self_reporting::publish_triggers_usage,
-};
+use super::{db::alerts::alert, self_reporting::publish_triggers_usage};
 use crate::{
     common::{
         infra::config::{REALTIME_ALERT_TRIGGERS, STREAM_ALERTS},

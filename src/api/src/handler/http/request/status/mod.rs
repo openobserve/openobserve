@@ -691,7 +691,7 @@ pub async fn cache_status() -> impl IntoResponse {
         json::json!({"len": len, "cap": cap, "mem_size": mem_size}),
     );
 
-    let (len, cap, mem_size) = openobserve_core::cache::STREAM_EXECUTABLE_PIPELINES
+    let (len, cap, mem_size) = openobserve_pipeline::service::STREAM_EXECUTABLE_PIPELINES
         .stats()
         .await;
     stats.insert(
@@ -699,7 +699,7 @@ pub async fn cache_status() -> impl IntoResponse {
         json::json!({"len": len, "cap": cap, "mem_size": mem_size}),
     );
 
-    let (len, cap, mem_size) = crate::common::infra::config::PIPELINE_STREAM_MAPPING
+    let (len, cap, mem_size) = openobserve_pipeline::service::PIPELINE_STREAM_MAPPING
         .stats()
         .await;
     stats.insert(
@@ -707,7 +707,7 @@ pub async fn cache_status() -> impl IntoResponse {
         json::json!({"len": len, "cap": cap, "mem_size": mem_size}),
     );
 
-    let (len, cap, mem_size) = crate::common::infra::config::SCHEDULED_PIPELINES
+    let (len, cap, mem_size) = openobserve_pipeline::service::SCHEDULED_PIPELINES
         .stats()
         .await;
     stats.insert(
@@ -1608,7 +1608,7 @@ async fn reload_module_cache(module: &str) -> Result<(), anyhow::Error> {
         "user" => db::user::cache().await,
         "session" => db::session::cache().await,
         "functions" => db::functions::cache().await,
-        "pipeline" => db::pipeline::cache().await,
+        "pipeline" => openobserve_pipeline::service::cache().await,
         "alerts" => db::alerts::alert::cache().await,
         "destinations" => db::alerts::destinations::cache().await,
         "templates" => db::alerts::templates::cache().await,

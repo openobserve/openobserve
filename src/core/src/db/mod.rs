@@ -88,7 +88,6 @@ pub mod org_status;
 pub mod org_storage_providers;
 pub mod org_users;
 pub mod organization;
-pub mod pipeline;
 pub mod pipeline_errors {
     pub use openobserve_pipeline::repository::pipeline_errors::*;
 }

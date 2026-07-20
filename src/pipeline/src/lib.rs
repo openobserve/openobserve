@@ -18,3 +18,4 @@ pub mod batch_execution;
 mod http;
 pub mod ports;
 pub mod repository;
+pub mod service;

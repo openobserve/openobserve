@@ -29,12 +29,9 @@ use config::meta::{
     stream::ListStreamParams,
     triggers::{Trigger, TriggerModule},
 };
+use openobserve_pipeline::{repository::PipelineError, service as pipeline};
 
-use super::db::{
-    functions as db_functions,
-    pipeline::{self, PipelineError},
-    scheduler,
-};
+use super::db::{functions as db_functions, scheduler};
 
 struct CoreRecordSink;
 struct CoreRuntimeServices;
@@ -59,6 +56,12 @@ impl openobserve_pipeline::ports::RuntimeServices for CoreRuntimeServices {
         name: &str,
     ) -> anyhow::Result<config::meta::function::Transform> {
         Ok(db_functions::get(org_id, name).await?)
+    }
+
+    async fn wait_for_geoip(&self) {
+        std::sync::LazyLock::force(&crate::enrichment_table::geoip::MMDB_INIT_NOTIFIER)
+            .notified()
+            .await;
     }
 
     async fn publish_error(&self, error: config::meta::self_reporting::error::ErrorData) {

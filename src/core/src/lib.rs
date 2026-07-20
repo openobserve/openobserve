@@ -26,7 +26,6 @@ pub mod anomaly_detection;
 pub mod auth;
 pub mod authz;
 pub mod bootstrap;
-pub mod cache;
 pub mod cluster_info;
 pub mod compact;
 pub mod dashboards;
@@ -176,8 +175,6 @@ mod common {
         pub mod config {
             pub use ::common::infra::config::*;
             pub use openobserve_alerts::REALTIME_ALERT_TRIGGERS;
-
-            pub use crate::cache::STREAM_EXECUTABLE_PIPELINES;
         }
 
         #[cfg(feature = "enterprise")]

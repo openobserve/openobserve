@@ -1032,10 +1032,14 @@ pub async fn delete_stream(
 
     // delete associated feature resources, i.e. pipelines, alerts
     if del_related_feature_resources {
-        for pipeline in
-            db::pipeline::get_by_stream(&StreamParams::new(org_id, stream_name, stream_type)).await
+        for pipeline in openobserve_pipeline::service::get_by_stream(&StreamParams::new(
+            org_id,
+            stream_name,
+            stream_type,
+        ))
+        .await
         {
-            if let Err(e) = db::pipeline::delete(&pipeline.id).await {
+            if let Err(e) = openobserve_pipeline::service::delete(&pipeline.id).await {
                 return Ok((
                     http::StatusCode::INTERNAL_SERVER_ERROR,
                     [(ERROR_HEADER, format!("failed to delete stream: {e}"))],

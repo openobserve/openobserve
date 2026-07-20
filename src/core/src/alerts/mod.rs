@@ -67,7 +67,7 @@ pub mod destinations {
         }
 
         async fn pipeline_using_destination(&self, org_id: &str, name: &str) -> Option<String> {
-            crate::db::pipeline::list_by_org(org_id)
+            openobserve_pipeline::service::list_by_org(org_id)
                 .await
                 .ok()?
                 .into_iter()

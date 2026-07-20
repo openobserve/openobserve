@@ -388,10 +388,10 @@ pub async fn update_function(
     }
 
     // update associated pipelines
-    if let Ok(associated_pipelines) = db::pipeline::list_by_org(org_id).await {
+    if let Ok(associated_pipelines) = openobserve_pipeline::service::list_by_org(org_id).await {
         for pipeline in associated_pipelines {
             if pipeline.contains_function(&func.name)
-                && let Err(e) = db::pipeline::update(&pipeline, None).await
+                && let Err(e) = openobserve_pipeline::service::update(&pipeline, None).await
             {
                 return Ok((
                     http::StatusCode::INTERNAL_SERVER_ERROR,
@@ -497,7 +497,7 @@ pub async fn get_pipeline_dependencies(
 }
 
 async fn get_dependencies(org_id: &str, func_name: &str) -> Vec<PipelineDependencyItem> {
-    db::pipeline::list_by_org(org_id)
+    openobserve_pipeline::service::list_by_org(org_id)
         .await
         .map_or(vec![], |mut pipelines| {
             pipelines.retain(|pl| pl.contains_function(func_name));

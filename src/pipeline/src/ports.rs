@@ -47,6 +47,8 @@ pub struct UsageReport {
 pub trait RuntimeServices: Send + Sync + 'static {
     async fn get_transform(&self, org_id: &str, name: &str) -> anyhow::Result<Transform>;
 
+    async fn wait_for_geoip(&self);
+
     async fn publish_error(&self, error: ErrorData);
 
     async fn report_usage(&self, report: UsageReport);
@@ -76,6 +78,12 @@ pub async fn get_transform(org_id: &str, name: &str) -> anyhow::Result<Transform
         .get()
         .ok_or_else(|| anyhow::anyhow!("pipeline runtime services are not installed"))?;
     services.get_transform(org_id, name).await
+}
+
+pub async fn wait_for_geoip() {
+    if let Some(services) = RUNTIME_SERVICES.get() {
+        services.wait_for_geoip().await;
+    }
 }
 
 pub async fn publish_error(error: ErrorData) {

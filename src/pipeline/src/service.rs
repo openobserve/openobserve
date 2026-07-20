@@ -16,6 +16,7 @@
 use std::sync::{Arc, LazyLock as Lazy};
 
 use config::{
+    RwAHashMap,
     cluster::LOCAL_NODE,
     meta::{
         pipeline::{Pipeline, PipelineKind},
@@ -23,14 +24,16 @@ use config::{
     },
 };
 use infra::{coordinator::pipelines::PIPELINES_WATCH_PREFIX, db};
-pub use openobserve_pipeline::repository::PipelineError;
-use openobserve_pipeline::{
-    batch_execution::ExecutablePipeline, repository::pipelines as pipeline_repository,
-};
 
-use crate::common::infra::config::{
-    PIPELINE_ID_TO_ORG, PIPELINE_STREAM_MAPPING, SCHEDULED_PIPELINES, STREAM_EXECUTABLE_PIPELINES,
-};
+pub use crate::repository::PipelineError;
+use crate::{batch_execution::ExecutablePipeline, repository::pipelines as pipeline_repository};
+
+pub static STREAM_EXECUTABLE_PIPELINES: Lazy<RwAHashMap<StreamParams, Vec<ExecutablePipeline>>> =
+    Lazy::new(Default::default);
+pub static PIPELINE_STREAM_MAPPING: Lazy<RwAHashMap<String, StreamParams>> =
+    Lazy::new(Default::default);
+pub static SCHEDULED_PIPELINES: Lazy<RwAHashMap<String, Pipeline>> = Lazy::new(Default::default);
+pub static PIPELINE_ID_TO_ORG: Lazy<RwAHashMap<String, String>> = Lazy::new(Default::default);
 
 /// Stores a new pipeline to database.
 ///
@@ -218,9 +221,7 @@ pub async fn cache() -> Result<(), anyhow::Error> {
         && !config::get_config().common.mmdb_disable_download
     {
         log::info!("[PIPELINE:CACHE] waiting mmdb data to be available");
-        Lazy::force(&crate::enrichment_table::geoip::MMDB_INIT_NOTIFIER)
-            .notified()
-            .await;
+        crate::ports::wait_for_geoip().await;
         log::info!("[PIPELINE:CACHE] done waiting");
     }
     let mut pipeline_stream_mapping_cache = PIPELINE_STREAM_MAPPING.write().await;

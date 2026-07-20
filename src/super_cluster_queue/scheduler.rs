@@ -164,7 +164,10 @@ async fn update(msg: Message) -> Result<()> {
                 );
                 return Ok(());
             };
-            if db::pipeline::get_by_id(&pipeline_id).await.is_ok() {
+            if openobserve_pipeline::service::get_by_id(&pipeline_id)
+                .await
+                .is_ok()
+            {
                 // We need to add this trigger to the db in this region
                 scheduler::push(trigger.clone()).await.map_err(|e| {
                     let error_msg = format!(
