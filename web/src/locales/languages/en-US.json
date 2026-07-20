@@ -5121,6 +5121,7 @@
       "learnIngest": "Learn how to ingest metrics",
       "noMatch": "No metrics match the current filters",
       "noMatchHint": "Try removing a label filter, clearing prefix/suffix selections, or switching from “With data” to “All”.",
+      "noMatchHintFavorites": "Try removing a label filter, or switching from “With data” to “All”.",
       "clearAllFilters": "Clear all filters",
       "emptyActions": {
         "clearSearch": "Clear search",

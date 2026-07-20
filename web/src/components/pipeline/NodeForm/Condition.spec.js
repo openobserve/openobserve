@@ -586,9 +586,10 @@ describe("Condition Component", () => {
     it("shows dialog when changes were made", async () => {
       const wrapper = createWrapper();
       await flushPromises();
-      wrapper.vm.conditionGroup.conditions = [
+      wrapper.vm.conditionGroup = makeConditionGroup("AND", [
         makeCondition({ column: "changed", value: "yes" }),
-      ];
+      ]);
+      await nextTick();
       await wrapper.vm.openCancelDialog();
       expect(wrapper.vm.dialog.show).toBe(true);
       expect(wrapper.vm.dialog.title).toBe("Discard Changes");
@@ -597,7 +598,8 @@ describe("Condition Component", () => {
     it("dialog okCallback calls closeDialog which emits cancel:hideform", async () => {
       const wrapper = createWrapper();
       await flushPromises();
-      wrapper.vm.conditionGroup.conditions = [makeCondition()];
+      wrapper.vm.conditionGroup = makeConditionGroup("AND", [makeCondition()]);
+      await nextTick();
       await wrapper.vm.openCancelDialog();
       vi.useFakeTimers();
       wrapper.vm.dialog.okCallback();
@@ -672,7 +674,7 @@ describe("Condition Component", () => {
       const wrapper = createWrapper();
       await flushPromises();
       const initialKey = wrapper.vm.filterGroupKey;
-      wrapper.vm.conditionGroup.label = "or";
+      wrapper.vm.conditionGroup = { ...wrapper.vm.conditionGroup, label: "or" };
       await nextTick();
       expect(wrapper.vm.filterGroupKey).toBe(initialKey + 1);
     });

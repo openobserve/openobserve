@@ -2282,7 +2282,10 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
         payload,
         activeFolderId.value,
       );
-      callAlert
+      // Hold the settled promise so onSubmit (and therefore the form's
+      // isSubmitting) spans the whole request — otherwise the Save button
+      // re-enables in the same tick and repeat clicks fire duplicate saves.
+      const request = callAlert
         .then((res: { data: any }) => {
           resetForm(defaultAlertValue());
           emit("update:list", activeFolderId.value);
@@ -2309,7 +2312,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
         alert_name: formData.value.name,
         page: "Add/Update Alert",
       });
-      return;
+      return request;
     } else {
       payload.folder_id = activeFolderId.value;
       callAlert = alertsService.create_by_alert_id(
@@ -2318,7 +2321,8 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
         activeFolderId.value,
       );
 
-      callAlert
+      // Same as the update branch: returned below so isSubmitting spans the request.
+      const request = callAlert
         .then((res: { data: any }) => {
           resetForm(defaultAlertValue());
           emit("update:list", activeFolderId.value);
@@ -2345,6 +2349,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
         alert_name: formData.value.name,
         page: "Add/Update Alert",
       });
+      return request;
     }
     return undefined;
   };

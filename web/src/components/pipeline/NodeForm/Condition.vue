@@ -74,13 +74,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :stream-fields="filteredColumns"
               :group="conditionGroup"
               :depth="0"
+              name-prefix="conditions"
               condition-input-width="w-[130px]"
               :allow-custom-columns="true"
               module="pipelines"
               @add-condition="(updatedGroup) => updateGroup(updatedGroup)"
               @add-group="(updatedGroup) => updateGroup(updatedGroup)"
               @remove-group="(groupId) => removeConditionGroup(groupId)"
-              @input:update="onInputUpdate"
+              @input:update="(name, field) => onInputUpdate(name, field)"
             />
             <div v-else class="p-3 text-gray-400">Loading conditions...</div>
           </div>
@@ -168,6 +169,7 @@ import FilterGroup from "@/components/alerts/FilterGroup.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import { useOForm } from "@/lib/forms/Form/useOForm";
+import { cloneDeep } from "lodash-es";
 import { firstFieldError } from "@/lib/forms/Form/fieldError";
 import { makeConditionSchema, type ConditionForm } from "./Condition.schema";
 import {
@@ -359,51 +361,51 @@ const importSqlParser = async () => {
   parser = await sqlParser();
 };
 
-const conditionGroup: Ref<ConditionGroup> = ref(getDefaultConditionGroup());
+// Initial conditions tree — loads existing node data synchronously via
+// getDefaultConditionGroup(). Seeds the form; after creation the form OWNS it.
+const initialConditions = getDefaultConditionGroup();
 
-// Create a deep copy to preserve the original state for comparison
+// Deep-copy snapshot for the dirty-check on Cancel.
 const originalConditionGroup: Ref<ConditionGroup> = ref(
-  JSON.parse(JSON.stringify(getDefaultConditionGroup())),
+  JSON.parse(JSON.stringify(initialConditions)),
 );
 
 // Simple incrementing key to force re-render when needed
 const filterGroupKey = ref(0);
 
-// Watch for label changes specifically to force re-render
-watch(
-  () => conditionGroup.value.label,
-  () => {
-    filterGroupKey.value++;
-  },
-);
-
 // ── OForm wiring (Rule ③ OWNER pattern) ──────────────────────────────────────
-// This component OWNS <OForm> and needs to read the form-level `conditions`
-// error to surface it under the FilterGroup, so it creates the form here with
-// useOForm and reads it reactively via form.useStore — a SINGLE source of truth
-// (no mirror ref, no store.subscribe). The composite FilterGroup has no OForm*
-// equivalent, so its model (`conditionGroup`) is bridged INTO the form as the
-// `conditions` field via a DIRECT form.setFieldValue from the FilterGroup's own
-// change handlers (updateGroup / removeConditionGroup / onInputUpdate) — NOT a
-// watch on a local-ref mirror (Rule ③). The schema's superRefine
-// ("at least one condition") then gates submit (R3/R4).
-const conditionDefaults = computed((): ConditionForm => ({
-  conditions: conditionGroup.value,
-}));
-
+// This component OWNS <OForm>. FilterGroup renders in FORM MODE (name-prefix=
+// "conditions"): FilterCondition name-binds each leaf's column/operator/value
+// straight into the form, and structural changes (add/remove/toggle/reorder) are
+// written to the form by updateGroup/removeConditionGroup below — mirroring
+// alerts' useAlertForm. SINGLE source of truth (form.useStore); no mirror ref, no
+// value-sync bridge. The schema's superRefine ("at least one condition") gates
+// submit (R3/R4).
 const form = useOForm<ConditionForm>({
-  defaultValues: conditionDefaults.value,
+  defaultValues: { conditions: initialConditions },
   schema: makeConditionSchema(t),
   onSubmit: () => saveCondition(),
 });
 
-// Bridge the composite child's model into the form's `conditions` field. Called
-// from the FilterGroup change handlers (the control's own handlers).
-const syncConditionsToForm = () => {
-  form.setFieldValue("conditions", conditionGroup.value, {
-    dontUpdateMeta: true,
-  });
-};
+// Reactive READ-VIEW of the form-owned conditions tree, exposed as a WRITABLE
+// computed: reads come from form.useStore (drives FilterGroup's `:group`), and
+// any imperative write (restore-on-cancel) goes straight through the form via
+// setFieldValue. Still a SINGLE source of truth — no mirror ref, no copy.
+const conditionGroupStore = form.useStore(
+  (s: any) => s.values.conditions ?? getDefaultConditionGroup(),
+);
+const conditionGroup = computed({
+  get: () => conditionGroupStore.value,
+  set: (v: any) => form.setFieldValue("conditions", v),
+});
+
+// Watch for label changes specifically to force re-render
+watch(
+  () => (conditionGroup.value as any)?.label,
+  () => {
+    filterGroupKey.value++;
+  },
+);
 
 // Surface the form-level `conditions` error (no OForm* field renders it) — a
 // reactive view of the SAME form, no mirror.
@@ -529,59 +531,46 @@ const getFields = async () => {
 // Group management functions - Using shared utilities from alertDataTransforms
 // These functions are called when FilterGroup emits add-condition, add-group, or remove-group events
 
+// Structural change from FilterGroup (add-condition / add-group). The transform
+// utils MUTATE their context in place, and the form store is readonly, so run
+// them on a CLONE of the form's current conditions, then write the result back
+// with setFieldValue (mirrors alerts' useAlertForm.updateGroup).
 const updateGroup = (updatedGroup: any) => {
-  // Create a context object that matches the alert utility's expected structure
-  // The utility expects: context.formData.query_condition.conditions
-  // We need to create a temporary wrapper and then extract the updated value
+  const cloned = cloneDeep((form.state.values as any).conditions);
   const tempContext = {
-    formData: {
-      query_condition: {
-        conditions: conditionGroup.value,
-      },
-    },
+    formData: { query_condition: { conditions: cloned } },
   };
-
-  // Call the shared utility
   updateGroupUtil(updatedGroup, tempContext as any);
-
-  // Extract the updated value back
-  conditionGroup.value = tempContext.formData.query_condition.conditions;
-  syncConditionsToForm();
+  form.setFieldValue(
+    "conditions",
+    tempContext.formData.query_condition.conditions,
+  );
 };
 
 const removeConditionGroup = (targetGroupId: string) => {
-  // Create a context object that matches the alert utility's expected structure
+  const cloned = cloneDeep((form.state.values as any).conditions);
   const tempContext = {
-    formData: {
-      query_condition: {
-        conditions: conditionGroup.value,
-      },
-    },
+    formData: { query_condition: { conditions: cloned } },
   };
-
-  // Call the shared utility
-  removeConditionGroupUtil(
-    targetGroupId,
-    conditionGroup.value,
-    tempContext as any,
+  removeConditionGroupUtil(targetGroupId, cloned, tempContext as any);
+  form.setFieldValue(
+    "conditions",
+    tempContext.formData.query_condition.conditions,
   );
-
-  // Extract the updated value back
-  conditionGroup.value = tempContext.formData.query_condition.conditions;
-  syncConditionsToForm();
 };
 
-const onInputUpdate = () => {
-  // FilterGroup mutates the passed `conditionGroup` in place and emits this on
-  // every field edit — bridge the live model into the form so the schema's
-  // superRefine sees column/operator changes (Rule ③ direct-handler bridge).
-  syncConditionsToForm();
+const onInputUpdate = (_name?: string, _field?: any) => {
+  // Leaf values are name-bound in form mode (FilterCondition writes them straight
+  // into the form), so there is no bridge to run here. Kept for the template's
+  // @input:update wiring / the bare-mode event surface.
 };
 
 const closeDialog = () => {
-  // Restore the original condition group when canceling
-  conditionGroup.value = JSON.parse(
-    JSON.stringify(originalConditionGroup.value),
+  // Restore the original condition group when canceling. conditionGroup is now a
+  // readonly form read-view, so write the restore THROUGH the form.
+  form.setFieldValue(
+    "conditions",
+    JSON.parse(JSON.stringify(originalConditionGroup.value)),
   );
   pipelineObj.userClickedNode = {};
   pipelineObj.userSelectedNode = {};
@@ -623,7 +612,8 @@ const saveCondition = async () => {
     let conditionData = {
       node_type: "condition",
       version: 2, // Numeric version for consistency with alerts
-      conditions: conditionGroup.value,
+      // Detach from the readonly form read-view before handing to addNode.
+      conditions: cloneDeep((form.state.values as any).conditions),
     };
 
     // Ensure currentSelectedNodeData has proper structure

@@ -659,19 +659,23 @@ export function useMetricsExplorerGrid() {
       !matchesSearch(card.name, card.help, searchTerm.value)
     )
       return false;
+    const applyFacets = !showFavoritesOnly.value;
     if (
+      applyFacets &&
       except !== "type" &&
       selectedTypes.value.size > 0 &&
       !selectedTypes.value.has(card.typeFilterBucket)
     )
       return false;
     if (
+      applyFacets &&
       except !== "prefix" &&
       selectedPrefixes.value.size > 0 &&
       !selectedPrefixes.value.has(prefixOf(card.name))
     )
       return false;
     if (
+      applyFacets &&
       except !== "suffix" &&
       selectedSuffixes.value.size > 0 &&
       !selectedSuffixes.value.has(suffixOf(card.name))

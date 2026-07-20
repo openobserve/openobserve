@@ -34,8 +34,8 @@ async function mountComp(props: Record<string, any> = {}) {
     global: {
       plugins: [i18n, store],
       stubs: {
-        TagInput: {
-          name: "TagInput",
+        OTagInput: {
+          name: "OTagInput",
           template: '<div data-test="tag-input-stub"></div>',
           props: ["modelValue"],
           emits: ["update:modelValue"],
