@@ -19,6 +19,15 @@
 //! histogram sample becomes `_count`, `_sum` and cumulative `le` `_bucket` records --
 //! the same shape the OTLP exponential-histogram path writes -- so existing PromQL
 //! (`histogram_quantile` etc.) works on it unchanged.
+//!
+//! Known limitation, inherited from classic-histogram semantics: `sum by (le)`
+//! aggregation is only sound across series that share a bucket layout. Each native
+//! series carries `le`s only for its own populated value range, so quantiles
+//! aggregated across series with similar distributions (e.g. one handler across
+//! instances) are exact, but mixing series whose observations span different ranges
+//! understates the cumulative tail and skews high quantiles -- the aggregation
+//! problem native histograms were designed to remove. Per-series quantiles and
+//! `_count`/`_sum` rates are always exact.
 
 use proto::prometheus_rpc;
 
