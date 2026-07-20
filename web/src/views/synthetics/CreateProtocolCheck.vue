@@ -9,6 +9,7 @@ import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useStore } from 'vuex'
 import type {
+  AgentSetup,
   BrowserCheck,
   ProtocolCheck,
   ProtocolCheckType,
@@ -29,6 +30,7 @@ import OButton from '@/lib/core/Button/OButton.vue'
 import OIcon from '@/lib/core/Icon/OIcon.vue'
 import ODialog from '@/lib/overlay/Dialog/ODialog.vue'
 import CheckConfigure from '@/components/synthetics/configure/CheckConfigure.vue'
+import AgentSetupDrawer from '@/components/synthetic-monitoring/AgentSetupDrawer.vue'
 import CreateBrowserTestSkeleton from '@/components/synthetics/CreateBrowserTestSkeleton.vue'
 import CheckHttpConfig from '@/components/synthetics/configure/types/CheckHttpConfig.vue'
 import CheckTcpConfig from '@/components/synthetics/configure/types/CheckTcpConfig.vue'
@@ -112,6 +114,22 @@ async function fetchLocations() {
     )
   } catch {
     locations.value = []
+  }
+}
+
+// ── Private agent setup (drawer opened from the locations card) ──────────
+const showAgentSetup = ref(false)
+const agentSetup = ref<AgentSetup | null>(null)
+
+async function openAgentSetup() {
+  showAgentSetup.value = true
+  if (agentSetup.value) return
+  try {
+    const org = store.state.selectedOrganization.identifier
+    const res = await syntheticsService.getAgentSetup(org)
+    agentSetup.value = (res.data ?? null) as AgentSetup | null
+  } catch {
+    agentSetup.value = null
   }
 }
 
@@ -239,9 +257,11 @@ async function saveCheck() {
           :locations="locations"
           :destinations="destinations"
           :folders="folders"
+          allow-private-locations
           class="w-full!"
           @refresh:destinations="fetchDestinations"
           @update:check="onConfigureUpdate"
+          @setup-agent="openAgentSetup"
         >
           <template #type-config>
             <component
@@ -264,6 +284,17 @@ async function saveCheck() {
           <template #suffix><OIcon name="save" size="sm" /></template>
         </OButton>
       </div>
+
+      <!-- Private agent setup drawer; locations reload on close so a freshly
+           registered location becomes selectable without leaving the form. -->
+      <AgentSetupDrawer
+        v-model:open="showAgentSetup"
+        :token="agentSetup?.token"
+        :o2-url="agentSetup?.o2_url"
+        :script-url="agentSetup?.script_url"
+        :install="agentSetup?.install"
+        @update:open="(open: boolean) => { if (!open) fetchLocations() }"
+      />
 
       <!-- Unsaved changes dialog -->
       <ODialog

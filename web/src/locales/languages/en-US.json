@@ -8786,7 +8786,16 @@
       "locationAwsEast": "AWS · us-east-1",
       "subtitle": "Select the locations the journey runs from",
       "title": "Locations",
-      "privateBadge": "Private"
+      "privateBadge": "Private",
+      "publicTitle": "Public",
+      "privateTitle": "Private locations",
+      "setupAgent": "Set up private agent",
+      "privateEmptyBody": "Run this check from your own VPC or on-premise network.",
+      "offlineWarning": "No live agent — the check won't run from here until an agent is back.",
+      "liveAgents": "{count} live agents",
+      "liveAgentsNamed": "{count} live agents ({names})",
+      "offlineSince": "Offline · last seen {ago}",
+      "pendingAgent": "Waiting for the first agent to register"
     },
     "newCheck": {
       "back": "Checks",
@@ -9275,7 +9284,16 @@
         "step3Body": "Select this location when creating or editing any check. Checks will run from your own infrastructure.",
         "noToken": "Could not load the setup command — check your permissions and retry.",
         "imagePlaceholderNote": "The agent image name is a placeholder until the published image is available.",
-        "browserNote": "Browser tests cannot run from private locations yet — protocol checks only (HTTP, TCP, TLS, SSH)."
+        "browserNote": "Browser tests cannot run from private locations yet — protocol checks only (HTTP, TCP, TLS, SSH).",
+        "locationNameLabel": "Location name",
+        "locationNamePlaceholder": "Corp HQ",
+        "regionLabel": "Region (optional)",
+        "regionPlaceholder": "us-east",
+        "tabDocker": "Docker",
+        "tabK8s": "Kubernetes",
+        "tabLinux": "Linux",
+        "tabWindows": "Windows",
+        "windowsSoon": "Coming soon"
       },
       "detail": {
         "title": "Private location",

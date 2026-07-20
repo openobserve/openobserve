@@ -262,6 +262,21 @@ export interface SyntheticsLocation {
   /** Check types runnable at this location (live agents' capabilities). */
   types?: string[]
   status?: 'online' | 'offline' | 'pending'
+  /** Live agents' names, most recently seen first (private rows). */
+  agent_names?: string[]
+  live_agents?: number
+  /** Most recent agent last_seen_at (epoch µs). */
+  last_seen_at?: number
+}
+
+/** Shape returned by GET /api/{org}/synthetics/agent-setup — ingredients the
+ *  setup drawer composes per-platform install commands from. */
+export interface AgentSetup {
+  token?: string
+  o2_url: string
+  script_url: string
+  /** Legacy docker one-liner (drawer fallback when composing is impossible). */
+  install: string
 }
 
 export interface SyntheticsDevice {
@@ -329,6 +344,8 @@ export interface SyntheticLocation {
   enabled: boolean
   types: string[]
   live_agents: number
+  /** Live agents' names, most recently seen first. */
+  agent_names: string[]
   agents_total: number
   status: 'online' | 'offline' | 'pending'
   version?: string

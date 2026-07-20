@@ -211,6 +211,10 @@
       v-model:open="showSetupDrawer"
       :install="setupInstall"
       :location-name="setupLocationName"
+      :location-id="setupLocationId"
+      :token="setupData?.token"
+      :o2-url="setupData?.o2_url"
+      :script-url="setupData?.script_url"
     />
 
     <!-- Delete location confirmation -->
@@ -263,7 +267,7 @@ import AgentSetupDrawer from "@/components/synthetic-monitoring/AgentSetupDrawer
 import FolderList from "@/components/common/sidebar/FolderList.vue";
 import MoveAcrossFolders from "@/components/common/sidebar/MoveAcrossFolders.vue";
 import { mapResponseToBrowserCheck, buildCreateBrowserTestPayload } from '@/utils/synthetics/buildPayload'
-import { SYNTHETIC_CHECK_TYPES, type SyntheticCheckType, type SyntheticLocation } from '@/types/synthetics'
+import { SYNTHETIC_CHECK_TYPES, type AgentSetup, type SyntheticCheckType, type SyntheticLocation } from '@/types/synthetics'
 import type { IconName } from '@/lib/core/Icon/OIcon.icons'
 import { useI18n } from 'vue-i18n'
 import syntheticsService from '@/services/synthetics'
@@ -550,6 +554,8 @@ const locationsLoading   = ref(false);
 const showSetupDrawer    = ref(false);
 const setupInstall       = ref<string | null>(null);
 const setupLocationName  = ref<string | null>(null);
+const setupLocationId    = ref<string | null>(null);
+const setupData          = ref<AgentSetup | null>(null);
 const showDeleteLocation = ref(false);
 const locationToDelete   = ref<SyntheticLocation | null>(null);
 
@@ -566,18 +572,18 @@ async function loadPrivateLocations() {
   }
 }
 
-/** Opens the setup drawer. Without a row: the org-level template (agent
+/** Opens the setup drawer. Without a row: the org-level composer (agent
  *  declares its location via AGENT_LOCATION — the row auto-appears on first
- *  register). With a row: that location's pinned install command. */
+ *  register). With a row: pinned to that location via --location-id. */
 async function openSetupDrawer(row?: SyntheticLocation) {
   setupInstall.value = null;
   setupLocationName.value = row?.name ?? null;
+  setupLocationId.value = row?.id ?? null;
   showSetupDrawer.value = true;
   try {
-    const res = row
-      ? await syntheticsService.getLocation(orgIdentifier.value, row.id)
-      : await syntheticsService.getAgentSetup(orgIdentifier.value);
-    setupInstall.value = (res.data as any).install ?? null;
+    const res = await syntheticsService.getAgentSetup(orgIdentifier.value);
+    setupData.value = (res.data ?? null) as AgentSetup | null;
+    setupInstall.value = (res.data as any)?.install ?? null;
   } catch (err) {
     console.error('[synthetics] failed to load agent setup', err);
   }

@@ -17,9 +17,9 @@
           variant="outline"
           size="sm"
           icon-left="content-copy"
-          :disabled="!detail?.install"
+          :disabled="!detail"
           data-test="synthetics-private-location-detail-setup-btn"
-          @click="showSetup = true"
+          @click="openSetup"
         >
           {{ t("synthetics.privateLocations.copySetupCmd") }}
         </OButton>
@@ -161,6 +161,10 @@
       v-model:open="showSetup"
       :install="detail?.install"
       :location-name="detail?.name"
+      :location-id="detail?.id"
+      :token="agentSetup?.token"
+      :o2-url="agentSetup?.o2_url"
+      :script-url="agentSetup?.script_url"
     />
   </div>
 </template>
@@ -180,7 +184,7 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { resolveBadge } from "@/lib/core/Badge/badgeGroups";
 import AgentSetupDrawer from "@/components/synthetic-monitoring/AgentSetupDrawer.vue";
 import syntheticsService from "@/services/synthetics";
-import type { SyntheticLocationDetail } from "@/types/synthetics";
+import type { AgentSetup, SyntheticLocationDetail } from "@/types/synthetics";
 import { formatTimeAgoUs, formatIntervalSecs } from "@/utils/synthetics/format";
 
 const { t } = useI18n();
@@ -191,6 +195,18 @@ const store = useStore();
 const detail = ref<SyntheticLocationDetail | null>(null);
 const loading = ref(false);
 const showSetup = ref(false);
+const agentSetup = ref<AgentSetup | null>(null);
+
+async function openSetup() {
+  showSetup.value = true;
+  if (agentSetup.value) return;
+  try {
+    const res = await syntheticsService.getAgentSetup(orgIdentifier.value);
+    agentSetup.value = (res.data ?? null) as AgentSetup | null;
+  } catch (err) {
+    console.error("[synthetics] failed to load agent setup", err);
+  }
+}
 
 const orgIdentifier = computed(() => store.state.selectedOrganization.identifier);
 
