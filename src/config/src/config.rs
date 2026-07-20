@@ -2383,7 +2383,7 @@ pub struct Prometheus {
     /// A native histogram sample with more populated buckets than this is downscaled
     /// (adjacent buckets merged, halving resolution) until it fits, bounding the
     /// per-series `le` cardinality its classic degrade produces.
-    #[env_config(name = "ZO_PROMETHEUS_NATIVE_HISTOGRAM_MAX_BUCKETS", default = 64)]
+    #[env_config(name = "ZO_PROMETHEUS_NATIVE_HISTOGRAM_MAX_BUCKETS", default = 16)]
     pub native_histogram_max_buckets: usize,
 }
 

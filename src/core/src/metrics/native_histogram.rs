@@ -107,7 +107,11 @@ fn expand_with_bucket_limit(
         buckets.push((bucket_bound(schema, idx - 1), bucket_bound(schema, idx), c));
     }
     for &(idx, c) in &neg {
-        buckets.push((-bucket_bound(schema, idx), -bucket_bound(schema, idx - 1), c));
+        buckets.push((
+            -bucket_bound(schema, idx),
+            -bucket_bound(schema, idx - 1),
+            c,
+        ));
     }
     if zero_count > 0.0 {
         buckets.push((-hp.zero_threshold, hp.zero_threshold, zero_count));
@@ -119,6 +123,8 @@ fn expand_with_bucket_limit(
     let mut recs = Vec::with_capacity(2 * buckets.len() + 3);
     recs.push(("_count", None, count));
     recs.push(("_sum", None, hp.sum));
+
+    let mut points: Vec<(String, f64)> = Vec::with_capacity(2 * buckets.len() + 1);
     let mut cumulative = 0.0;
     let mut prev_upper = f64::NEG_INFINITY;
     for (lower, upper, c) in buckets {
@@ -129,19 +135,44 @@ fn expand_with_bucket_limit(
         // both bounds collapse to the same value and the marker would duplicate the
         // bucket's own `le`.
         if lower > prev_upper && lower < upper {
-            recs.push(("_bucket", Some(lower.to_string()), cumulative));
+            push_le_point(&mut points, format_le(lower), cumulative);
         }
         cumulative += c;
-        recs.push(("_bucket", Some(upper.to_string()), cumulative));
+        push_le_point(&mut points, format_le(upper), cumulative);
         prev_upper = upper;
     }
     // `le="inf"` must equal `_count`; `max` also repairs a short count field
-    recs.push((
-        "_bucket",
-        Some(f64::INFINITY.to_string()),
-        count.max(cumulative),
-    ));
+    push_le_point(&mut points, format_le(f64::INFINITY), count.max(cumulative));
+
+    recs.extend(points.into_iter().map(|(le, v)| ("_bucket", Some(le), v)));
     recs
+}
+
+/// `le` label for a bucket bound: rounded to 4 significant digits and rendered as the
+/// shortest decimal ("0.5946", "8", "0.02628"). Full precision would be 17 digits per
+/// label for no practical gain; 4 digits cannot collide adjacent buckets, since even
+/// the finest schema (8) spaces bounds 0.271% apart -- above the 0.1% worst-case
+/// resolution of 4 significant digits.
+fn format_le(v: f64) -> String {
+    let rounded: f64 = format!("{v:.3e}").parse().unwrap();
+    if rounded.is_finite() || !v.is_finite() {
+        rounded.to_string()
+    } else {
+        // rounding up overflowed f64 (v is around f64::MAX, the clamped last bucket);
+        // keep the full-precision label so it stays distinct from `le="inf"`
+        v.to_string()
+    }
+}
+
+/// Appends a cumulative `le` point, merging with the previous point when rounding
+/// collapsed two distinct bounds onto one label (an arbitrary `zero_threshold` can
+/// round onto a neighboring bucket bound) -- two records sharing one `le` on the same
+/// series and timestamp would otherwise overwrite each other nondeterministically.
+fn push_le_point(points: &mut Vec<(String, f64)>, le: String, cumulative: f64) {
+    match points.last_mut() {
+        Some((last_le, last_v)) if *last_le == le => *last_v = cumulative.max(*last_v),
+        _ => points.push((le, cumulative)),
+    }
 }
 
 /// Upper bound of native bucket `idx`: `2^(idx * 2^-schema)`, computed through `exp2`
@@ -471,8 +502,10 @@ mod tests {
             buckets.iter().map(|(_, c)| *c).collect::<Vec<_>>(),
             vec![0.0, 5.0, 8.0, 8.0]
         );
-        assert_eq!(buckets[1].0, (250f64 / 256f64).exp2());
-        assert_eq!(buckets[2].0, (251f64 / 256f64).exp2());
+        // 2^(250/256) = 1.96777... and 2^(251/256) = 1.97310... stay distinct at
+        // 4-significant-digit precision
+        assert_eq!(buckets[1].0, 1.968);
+        assert_eq!(buckets[2].0, 1.973);
     }
 
     /// Bounds landing on powers of two must be exact -- iterated multiplication
@@ -489,6 +522,48 @@ mod tests {
         // shared boundary across schemas: schema 2 idx 4 == schema 1 idx 2 == schema 0 idx 1
         assert_eq!(bucket_bound(2, 4), bucket_bound(0, 1));
         assert_eq!(bucket_bound(2, 4), 2.0);
+    }
+
+    /// `le` labels carry 4 significant digits rendered as the shortest decimal.
+    #[test]
+    fn test_format_le() {
+        assert_eq!(format_le(8.0), "8");
+        assert_eq!(format_le(0.5946035575013605), "0.5946");
+        assert_eq!(format_le(0.022097086912079608), "0.0221");
+        assert_eq!(format_le(-0.7071067811865476), "-0.7071");
+        assert_eq!(format_le(f64::INFINITY), "inf");
+        assert_eq!(format_le(0.00001), "0.00001");
+        // finest schema stays collision-free
+        assert_ne!(
+            format_le(bucket_bound(8, 250)),
+            format_le(bucket_bound(8, 251))
+        );
+    }
+
+    /// An arbitrary `zero_threshold` can round onto a neighboring bucket bound; the
+    /// two points must merge into one record (keeping the larger cumulative) instead
+    /// of emitting two records with the same `le` on one series and timestamp.
+    #[test]
+    fn test_expand_native_histogram_merges_le_rounding_collisions() {
+        let hp = prometheus_rpc::Histogram {
+            zero_threshold: 1.0001, // rounds to le="1", same as bucket idx 0's bound
+            count: Some(prometheus_rpc::histogram::Count::CountInt(5)),
+            zero_count: Some(prometheus_rpc::histogram::ZeroCount::ZeroCountInt(2)),
+            positive_spans: vec![prometheus_rpc::BucketSpan {
+                offset: 0,
+                length: 1,
+            }],
+            positive_deltas: vec![3],
+            ..native_histogram_base()
+        };
+        let recs = expand_native_histogram(&hp);
+        assert_bucket_invariants(&recs);
+        // bucket (0.5, 1]:3 sorts first, zero bucket (-1.0001, 1.0001):2 second; both
+        // uppers format to "1" and merge, keeping the full cumulative 5
+        assert_eq!(
+            bucket_records(&recs),
+            vec![(0.5, 0.0), (1.0, 5.0), (f64::INFINITY, 5.0)]
+        );
     }
 
     /// Over-limit samples are downscaled, not truncated: adjacent bucket pairs merge
@@ -517,11 +592,11 @@ mod tests {
         assert_eq!(
             bucket_records(&scaled),
             vec![
-                (1.0, 0.0),            // lower marker: schema 1 idx 0 bound
-                (0.5f64.exp2(), 3.0),  // (1, sqrt2]:   1+2
-                (2.0, 10.0),           // (sqrt2, 2]:   3+4
-                (1.5f64.exp2(), 21.0), // (2, 2sqrt2]:  5+6
-                (4.0, 36.0),           // (2sqrt2, 4]:  7+8
+                (1.0, 0.0),    // lower marker: schema 1 idx 0 bound
+                (1.414, 3.0),  // (1, sqrt2]:   1+2
+                (2.0, 10.0),   // (sqrt2, 2]:   3+4
+                (2.828, 21.0), // (2, 2sqrt2]:  5+6
+                (4.0, 36.0),   // (2sqrt2, 4]:  7+8
                 (f64::INFINITY, 36.0),
             ]
         );
@@ -667,6 +742,8 @@ mod tests {
             vec![
                 (0.5, 0.0),
                 (1.0, 3.0),
+                // rounding f64::MAX to 4 digits would overflow to infinity and collide
+                // with the inf bucket, so the clamped bound keeps full precision
                 (f64::MAX, 4.0),
                 (f64::INFINITY, 4.0),
             ]
